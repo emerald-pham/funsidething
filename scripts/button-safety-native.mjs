@@ -25,7 +25,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
  }
  if(browserServerEndpoint!==null){assert.equal(engine,'webkit');assert.ok(mobileYesMotion,'Remote launch is only admitted for the capped mobile consumer');assert.match(browserServerEndpoint,/^ws:\/\/127\.0\.0\.1:[1-9][0-9]*\/[a-zA-Z0-9_-]+$/);assert.equal(typeof closeBrowserServer,'function','Remote browser requires owner-confirmed closure');}
  if(mobileYesMotion){assert.equal(engine,'webkit');assert.ok(['normal','reduced'].includes(mobileYesMotion));assert.ok(scenarioFilter===null||scenarioFilter===MOBILE_SCENARIO);scenarioFilter=MOBILE_SCENARIO;}
- assert.ok(control===null||['pageerror','unhandled','reload','navigation','stall','short-stall','async-pending','async-predicate-false','close','crash','new-action'].includes(control),'Known explicit sensitivity control');
+ assert.ok(control===null||['pageerror','unhandled','reload','navigation','stall','short-stall','async-pending','async-predicate-false','close','crash','new-action','top-layer-release'].includes(control),'Known explicit sensitivity control');
+ if(control==='top-layer-release'){assert.equal(probe,true,'Top-layer sensitivity uses the existing public probe');assert.equal(selectedProfile,'ordinary','Top-layer sensitivity uses the accepted ordinary64 fixture');assert.equal(mobileYesMotion,null);assert.equal(startupOpening,null);}
  let hostedPolicy=null;
  if(process.env.CI==='true'){
   hostedPolicy=hostedButtonPolicy();
@@ -424,14 +425,60 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     // Write before semantic/hash assertions so mismatches retain their actual values.
     report.ordinaryUndoFinalSource=writeOrdinaryUndoSource('final-source',snapshot);save();
    };
+   const topLayerProbe=probe&&control==='top-layer-release'&&name==='detector sensitivity';
+   const topLayerDefinition=topLayerProbe?{name:'detector sensitivity',file:'scripts/button-safety-native.mjs',actionFamilies:['act:scene-time-settings'],minimumAttempts:2,assertionId:'ordinary-top-layer-intended-target-refusal',expected:'Two intended scene opener attempts accept the first and neutrally refuse the genuinely covered second; the real overlapping preset receives no click and every complete saved source stays exact.'}:null;
+   const captureTopLayerPhase=async phase=>{
+    assert.ok(topLayerProbe,'The complete source observer belongs only to the named ordinary probe');
+    const snapshot=await page.evaluate(async()=>{
+     const head=await ScannerDeviceStore.readHead(),current=JSON.stringify(state),sha256=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),byte=>byte.toString(16).padStart(2,'0')).join('');
+     const settingsOpen=!!document.querySelector('#modalRoot .settings-section'),timeDialogOpen=document.getElementById('sceneTimeDialog')?.open===true;let geometry=null;
+     if(settingsOpen){
+      const selector='#modalRoot [data-act="scene-time-settings"]',els=document.querySelectorAll(selector),el=els[0],r=el.getBoundingClientRect(),box={x:r.x,y:r.y,width:r.width,height:r.height},point={x:r.x+r.width/2,y:r.y+r.height/2},hit=document.elementFromPoint(point.x,point.y),hitControl=hit?.closest('button,summary,[data-act],[role="button"]');
+      const presetSelector='#sceneTimeDialog[open] [data-scene-preset="first-light"]',presets=document.querySelectorAll(presetSelector),preset=presets[0],p=preset?.getBoundingClientRect();
+      geometry={point,opener:{selector,count:els.length,connected:el.isConnected,visible:!!(r.width&&r.height),disabled:el.matches(':disabled'),box},preset:preset?{selector:presetSelector,count:presets.length,connected:preset.isConnected,visible:!!(p.width&&p.height),box:{x:p.x,y:p.y,width:p.width,height:p.height}}:null,hitAction:hitControl?.dataset.act?'act:'+hitControl.dataset.act:hitControl?.dataset.scenePreset?'scene-preset:'+hitControl.dataset.scenePreset:null,covered:!!preset&&!!hit&&(hit===preset||preset.contains(hit))};
+     }
+     const snapshot={current,currentHash:await sha256(current),durable:head.payload,durableHash:head.hash,capturedAtMs:Date.now(),backups:await ScannerDeviceStore.listBackups(),opaque:await ScannerDeviceStore.listOpaqueArchives(),pending:await ScannerDeviceStore.getPendingUpload('gate-owner'),pendingOwner:await ScannerDeviceStore.getPendingUpload('owner'),hold:await ScannerDeviceStore.getRecoveryCloudHold(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,
+      view:{documentId:window.__installedFixture.documentId,authMode:window.__installedFixture.authMode,ready:document.documentElement.dataset.appReady==='true',sceneReady:typeof window.applySyncedSceneTime==='function',sceneTime:LivingSky.readSceneTime(localStorage),sceneSeason:LivingSky.readSceneSeason(localStorage),sceneIntents:Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:')).sort().map(key=>({key,raw:localStorage.getItem(key)})),settingsOpen,timeDialogOpen,geometry},presses:structuredClone(window.__buttonNativePresses),clicks:structuredClone(window.__buttonNativeClicks)};
+     snapshot.capturedAtMs=Date.now();return{...snapshot,sourceValueEncoding:'chain-scanner.manual-archive-value/v1',sourceValue:encodeManualArchiveValue(snapshot,'ordinary top-layer sourceSnapshot')};
+    });
+    recordOrdinaryWoopPhase(phase,snapshot);return snapshot;
+   };
    const repeat=async(actionFamily,attemptCount,expect,selector,description)=>{
-    const definition=profileDefinition.requiredRepeatCases?.find(row=>row.name===name);
+    const definition=topLayerProbe?topLayerDefinition:profileDefinition.requiredRepeatCases?.find(row=>row.name===name);
     assert.ok(definition,'Independent ordinary repeat definition required: '+name);
     assert.ok(definition.actionFamilies.includes(actionFamily),'Ordinary repeat action belongs to its selected case: '+name);
     assert.ok(Number.isSafeInteger(attemptCount)&&attemptCount>=definition.minimumAttempts,'Required ordinary native repeat attempts: '+name);
     const attempts=[];report.inFlightRepeat={scenario:name,actionFamily,attempts};
     for(let index=0;index<attemptCount;index++){
      const before={presses:report.presses?.length||0,clicks:report.clicks?.length||0};
+     if(topLayerProbe&&index===1){
+      const target=page.locator(selector).first();
+      const availability=await bounded(target.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{box:{x:r.x,y:r.y,width:r.width,height:r.height},present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};}),'ordinary top-layer covered target');
+      assert.ok(availability.present&&!availability.disabled&&!availability.hit,'The second intended opener is really covered, present and enabled');
+      const pressPoint={x:availability.box.x+availability.box.width/2,y:availability.box.y+availability.box.height/2};
+      await bounded((async()=>{await page.mouse.move(pressPoint.x,pressPoint.y);await page.mouse.down();})(),'ordinary top-layer native down');
+      const down=await bounded(page.evaluate(()=>({action:window.__buttonNativePresses.at(-1)?.action})),'ordinary top-layer delivered down');
+      assert.equal(down.action,'scene-preset:first-light','The real overlapping preset receives the actual native down');
+      const neutralDocumentId=await bounded(page.evaluate(point=>{const sink=document.getElementById('__buttonReleaseSink');if(!sink?.isConnected||sink.contentDocument?.readyState!=='complete'||!sink.contentWindow.__buttonReleaseDocumentId)throw Error('Prepared neutral release document unavailable');const layer=document.getElementById('__buttonReleaseLayer');layer.style.left=(point.x-4)+'px';layer.style.top=(point.y-4)+'px';sink.style.left=(point.x-4)+'px';sink.style.top=(point.y-4)+'px';sink.hidden=false;layer.showModal();return sink.contentWindow.__buttonReleaseDocumentId;},pressPoint),'ordinary top-layer release surface');
+      await bounded((async()=>{await page.mouse.up();await page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(sink){document.getElementById('__buttonReleaseLayer').close();sink.hidden=true;}});})(),'ordinary top-layer refused release');
+      await bounded(page.evaluate(()=>true),'ordinary top-layer native receipt');const presses=(report.presses||[]).slice(before.presses),clicks=(report.clicks||[]).slice(before.clicks);assert.equal(presses.length,1,'One actual trusted down for the covered intended opener');assert.deepEqual(clicks,[],'A neutrally refused covered target produces no preset or other app click');const press=presses[0];assert.equal(press.scenario,name);assert.equal(press.action,'scene-preset:first-light');assert.equal(press.trusted,true);assert.equal(press.pointerType,'mouse');assert.ok(Number.isFinite(press.at)&&press.at>=0);await waitFor(expect,12000,'ordinary top-layer stays open after neutral refusal');check();
+      attempts.push({receiptId:name+':'+randomUUID(),actionFamily,trusted:true,result:'refused',receiptAtMs:press.at,nativeRefusal:{index,availability,nativeDownAction:down.action,neutralDocumentId,neutralRelease:true,trustedPresses:presses.length,acceptedClicks:clicks.length,classification:'refused',at:press.at}});await captureTopLayerPhase('refused');save();continue;
+     }
+     if(name==='ordinary pending Copy refuses reentry'&&index===1){
+      // The existing disabled-target marker/down/separate-document release
+      // boundary records a real refused attempt without forging an app click.
+      const target=page.locator(selector).first();
+      const availability=await bounded(target.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{box:{x:r.x,y:r.y,width:r.width,height:r.height},present:!!(r.width&&r.height),disabled:el.matches(':disabled'),hit:!!hit&&(el===hit||el.contains(hit))};}),'ordinary pending Copy disabled target');
+      assert.ok(availability.present&&availability.hit&&availability.disabled,'The second Copy attempt targets the actually disabled current control');
+      const pressPoint={x:availability.box.x+availability.box.width/2,y:availability.box.y+availability.box.height/2};
+      await bounded(page.evaluate(point=>{const marker=document.createElement('span');marker.id='__buttonDisabledAttempt';marker.style.cssText='position:fixed;left:'+(point.x-2)+'px;top:'+(point.y-2)+'px;width:4px;height:4px;z-index:2147483647';(document.querySelector('dialog[open]')||document.body).append(marker);},pressPoint),'ordinary disabled refusal marker');
+      await bounded((async()=>{await page.mouse.move(pressPoint.x,pressPoint.y);await page.mouse.down();})(),'ordinary pending Copy native down');
+      const down=await bounded(page.evaluate(()=>{const receipt=window.__buttonNativePresses.at(-1);return{action:receipt?.action};}),'ordinary pending Copy delivered down');
+      const neutralDocumentId=await bounded(page.evaluate(point=>{const sink=document.getElementById('__buttonReleaseSink');if(!sink?.isConnected||sink.contentDocument?.readyState!=='complete'||!sink.contentWindow.__buttonReleaseDocumentId)throw Error('Prepared neutral release document unavailable');const layer=document.getElementById('__buttonReleaseLayer');layer.style.left=(point.x-4)+'px';layer.style.top=(point.y-4)+'px';sink.style.left=(point.x-4)+'px';sink.style.top=(point.y-4)+'px';sink.hidden=false;layer.showModal();return sink.contentWindow.__buttonReleaseDocumentId;},pressPoint),'ordinary pending Copy release surface');
+      await bounded((async()=>{await page.mouse.up();await page.evaluate(()=>{const sink=document.getElementById('__buttonReleaseSink');if(sink){document.getElementById('__buttonReleaseLayer').close();sink.hidden=true;}document.getElementById('__buttonDisabledAttempt')?.remove();});})(),'ordinary pending Copy refused release');
+      await bounded(page.evaluate(()=>true),'ordinary pending Copy native receipt');const presses=(report.presses||[]).slice(before.presses),clicks=(report.clicks||[]).slice(before.clicks);assert.equal(presses.length,1,'One actual trusted down for refused Copy');assert.deepEqual(clicks,[],'A refused Copy attempt produces no app click or unrelated action');const press=presses[0];assert.equal(press.scenario,name);assert.equal(press.action,null);assert.equal(press.trusted,true);assert.equal(press.pointerType,'mouse');assert.ok(Number.isFinite(press.at)&&press.at>=0);assert.equal(down.action,null);await waitFor(expect,12000,'ordinary pending Copy remains busy after refusal');check();
+      attempts.push({receiptId:name+':'+randomUUID(),actionFamily,trusted:true,result:'refused',receiptAtMs:press.at,nativeRefusal:{index,availability,nativeDownAction:down.action,neutralDocumentId,neutralRelease:true,trustedPresses:presses.length,acceptedClicks:clicks.length,classification:'refused',at:press.at}});save();continue;
+     }
      await step(selector,expect,description+' '+(index+1));
      const presses=(report.presses||[]).slice(before.presses),clicks=(report.clicks||[]).slice(before.clicks);
      assert.equal(presses.length,1,'One trusted native press receipt per ordinary repeat attempt: '+name);
@@ -442,6 +489,13 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
      const click=clicks[0];assert.equal(click.scenario,name);assert.equal(click.action,actionFamily);assert.equal(click.trusted,true);
      assert.ok(Number.isFinite(click.at)&&click.at>=press.at,'Native click follows its trusted press: '+name);
      attempts.push({receiptId:name+':'+randomUUID(),actionFamily,trusted:true,result:'accepted',receiptAtMs:press.at});
+     if(topLayerProbe&&index===0){
+      // Move only the real rendered preset into the intended opener's current
+      // coordinate. No app state, handler, source or synthetic click is changed.
+      await bounded(page.evaluate(()=>{const opener=document.querySelector('#modalRoot [data-act="scene-time-settings"]'),dialog=document.querySelector('#sceneTimeDialog[open]'),preset=dialog?.querySelector('[data-scene-preset="first-light"]');if(!opener||!preset)throw Error('Actual opener and open scene preset required');const r=opener.getBoundingClientRect();preset.style.cssText='position:fixed;left:'+(r.x+r.width/2-20)+'px;top:'+(r.y+r.height/2-10)+'px;width:40px;height:20px;min-width:0;min-height:0;max-width:none;max-height:none;margin:0;padding:0;z-index:2147483647';}),'ordinary top-layer real preset overlap');
+      await waitFor(()=>{const opener=document.querySelector('#modalRoot [data-act="scene-time-settings"]'),preset=document.querySelector('#sceneTimeDialog[open] [data-scene-preset="first-light"]');if(!opener||!preset)return false;const r=opener.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return !!hit&&(hit===preset||preset.contains(hit));},12000,'Actual real preset covers the intended opener point');
+      await captureTopLayerPhase('opened');
+     }
      if(name==='ordinary Undo consumes two saved edit frames'){
       const snapshot=await page.evaluate(index=>window.__ordinaryUndoSavedPhases?.[index],index);
       assert.ok(snapshot,'The completed native Undo input must retain its complete board phase');
@@ -452,7 +506,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     return attempts;
    };
    const recordRepeatOutcome=(caseName,attempts,evidence)=>{
-    const definition=profileDefinition.requiredRepeatCases?.find(row=>row.name===caseName);
+    const definition=topLayerProbe?topLayerDefinition:profileDefinition.requiredRepeatCases?.find(row=>row.name===caseName);
     assert.ok(definition,'Independent ordinary repeat definition required: '+caseName);assert.equal(caseName,name,'Repeat evidence is bound to the current scenario');
     assert.ok(Array.isArray(attempts)&&attempts.length>=definition.minimumAttempts,'Complete native repeat attempts required: '+caseName);
     assert.ok(typeof evidence==='string'&&evidence.trim().length>0,'Independent ordinary semantic evidence required: '+caseName);
@@ -471,6 +525,31 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     report.repeatOutcomes.push(outcome);delete report.inFlightRepeat;save();
    };
    const recordOrdinaryWoopPhase=(phase,snapshot)=>{
+    if(topLayerProbe){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','settings','opened','refused','final-source'];report.ordinaryTopLayerPhases??=[];assert.equal(phase,order[report.ordinaryTopLayerPhases.length],'Retain every complete top-layer source phase once in order');
+     const file='ordinary-top-layer-release-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryTopLayerPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
+    if(name==='ordinary obsolete Copy cannot alter replacement transfer'){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','settings-old','prepared-old','pending-old','closed','settings-new','prepared-new','pending-new','obsolete-settled','completed-new','final-source'];report.ordinaryObsoleteCopyPhases??=[];assert.equal(phase,order[report.ordinaryObsoleteCopyPhases.length],'Retain every complete old/replacement Copy source phase once in order');
+     const file='ordinary-obsolete-copy-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryObsoleteCopyPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
+    if(name==='ordinary pending Copy refuses reentry'){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','settings','prepared','pending-refused','completed','downloaded','final-source'];report.ordinaryPendingCopyPhases??=[];assert.equal(phase,order[report.ordinaryPendingCopyPhases.length],'Retain every complete pending Copy source phase once in order');
+     const file='ordinary-pending-copy-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryPendingCopyPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
+    if(name==='ordinary scene choice survives reopen and task Undo'){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','locked','closed','reopened','edit-one','edit-two','undone-two','final-source'];report.ordinarySceneChoicePhases??=[];assert.equal(phase,order[report.ordinarySceneChoicePhases.length],'Retain every complete scene/reopen/task-Undo source phase once in order');
+     const file='ordinary-scene-choice-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinarySceneChoicePhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
+    if(name==='ordinary two distinct scanner decisions'){
+     assert.equal(selectedProfile,'ordinary');const order=['seed','accepted-two','final-source'];report.ordinaryDistinctDecisionPhases??=[];assert.equal(phase,order[report.ordinaryDistinctDecisionPhases.length],'Retain every complete distinct-decision source phase once in order');
+     const file='ordinary-distinct-decision-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryDistinctDecisionPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+    }
     if(name==='ordinary repeated saved decision choice'){
      assert.equal(selectedProfile,'ordinary');const order=['seed','settings','baseline-saved','settings-review','read-refused','reviewed','selected','repeated','write-refused','reviewed-retry','selected-retry','applied','final-source'];report.ordinarySavedDecisionPhases??=[];assert.equal(phase,order[report.ordinarySavedDecisionPhases.length],'Retain every complete saved-decision source phase once in order');
      const file='ordinary-saved-decision-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
@@ -499,6 +578,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
       currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();
    };
    const reopenOrdinaryWoop=async()=>{
+    if(name==='ordinary scene choice survives reopen and task Undo'){
+     assert.equal(selectedProfile,'ordinary');const before=await page.evaluate(()=>window.__installedFixture.documentId);assert.equal(allowedNavigation,null);allowedNavigation={url:page.url(),remaining:1,action:'ordinary-scene-browser-reopen'};
+     await page.reload({waitUntil:'domcontentloaded'});await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready&&typeof window.applySyncedSceneTime==="function"'),12000,'Actual browser reopen of saved independent scene');
+     assert.equal(allowedNavigation.remaining,0,'Exactly one same-route scene browser reopen');allowedNavigation=null;check();return;
+    }
     if(name==='ordinary final WOOP repeated Next retains answers'){
      assert.equal(selectedProfile,'ordinary');const before=await page.evaluate(()=>window.__installedFixture.documentId);assert.equal(allowedNavigation,null);allowedNavigation={url:page.url(),remaining:1,action:'ordinary-final-woop-browser-reopen'};
      await page.reload({waitUntil:'domcontentloaded'});await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready'),12000,'Actual browser reopen of saved/deleted final WOOP');
@@ -511,7 +595,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready'),12000,'Actual browser reopen of saved ordinary WOOP');
     assert.equal(allowedNavigation.remaining,0,'Exactly one same-route browser reopen');allowedNavigation=null;check();
    };
-   const ui={page,recordOrdinaryCloudSourcePhase:recordOrdinaryWoopPhase,recordOrdinaryWoopPhase,reopenOrdinaryWoop,mobileYesMotion,recordMobileStory:value=>{report.mobileStory=value;},click:step,waitFor,burst,repeat,recordRepeatOutcome,recordOrdinaryUndoPhase,recordOrdinaryUndoSeedSource,recordOrdinaryUndoFinalSource,ordinaryUndoFixtureSeed:name==='ordinary Undo consumes two saved edit frames'?report.retainedSources?.at(-1)?.ordinaryUndoFixtureSeed:undefined,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
+   const ui={page,...(topLayerProbe?{captureTopLayerPhase}:{}),recordOrdinaryCloudSourcePhase:recordOrdinaryWoopPhase,recordOrdinaryWoopPhase,reopenOrdinaryWoop,mobileYesMotion,recordMobileStory:value=>{report.mobileStory=value;},click:step,waitFor,burst,repeat,recordRepeatOutcome,recordOrdinaryUndoPhase,recordOrdinaryUndoSeedSource,recordOrdinaryUndoFinalSource,ordinaryUndoFixtureSeed:name==='ordinary Undo consumes two saved edit frames'?report.retainedSources?.at(-1)?.ordinaryUndoFixtureSeed:undefined,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await page.evaluate(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
    report.scenarios??=[];const record={name,status:'running',setup};report.scenarios.push(record);save();
    if(control==='new-action')await page.evaluate(()=>{const button=document.createElement('button');button.dataset.act='gate-new-untested';button.textContent='New untested button';document.body.append(button);});
    if(control){
@@ -535,12 +619,24 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    report.openingResult={functional:'passed',tasks:await page.evaluate(()=>state.tasks.length),timing:report.startupTimeline.status};
   });
   else if(mobileYesMotion){const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});}
+  else if(probe&&control==='top-layer-release')await scenario('detector sensitivity',{retainedCopies:3},async ui=>{
+   await ui.waitFor(()=>document.documentElement.dataset.appReady==='true'&&typeof window.applySyncedSceneTime==='function',12000,'Existing scene controls finish loading');
+   await ui.captureTopLayerPhase('seed');
+   await ui.act('settings',()=>!!document.querySelector('#modalRoot .settings-section'));
+   await ui.page.locator('#modalRoot [data-act="scene-time-settings"]').scrollIntoViewIfNeeded();
+   await ui.waitFor(()=>{const el=document.querySelector('#modalRoot [data-act="scene-time-settings"]');if(!el)return false;const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.width>0&&r.height>0&&!el.disabled&&!!hit&&(el===hit||el.contains(hit));},12000,'Current intended opener is actually available');
+   await ui.captureTopLayerPhase('settings');
+   const attempts=await ui.repeat('act:scene-time-settings',2,()=>document.getElementById('sceneTimeDialog')?.open===true,'#modalRoot [data-act="scene-time-settings"]','Open scene time once and neutrally refuse its real covered target');
+   const final=await ui.captureTopLayerPhase('final-source');
+   ui.recordRepeatOutcome('detector sensitivity',attempts,JSON.stringify({intendedOpenerAttempts:2,accepted:attempts.filter(row=>row.result==='accepted').length,refused:attempts.filter(row=>row.result==='refused').length,coveringAction:attempts[1].nativeRefusal.nativeDownAction,currentHash:final.currentHash,durableHash:final.durableHash,completePhases:5,unrelatedClicks:0}));
+  });
   else if(probe)await scenario('detector sensitivity',{},async ui=>{await ui.act('settings',control==='async-predicate-false'?async()=>false:()=>!!document.getElementById('stHorizon'));});
+  else if(scenarioFilter==='ordinary pending Copy refuses reentry'||scenarioFilter==='ordinary obsolete Copy cannot alter replacement transfer'){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   else if(scenarioFilter?.startsWith('rapid ')){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   else {
    await runButtonScenarios({scenario});
    if(diagnosticProfile){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
-   else{const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});}
+   else{const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});if(!scenarioFilter){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario:async(caseName,options,execute)=>{if(caseName==='ordinary pending Copy refuses reentry'||caseName==='ordinary obsolete Copy cannot alter replacement transfer')await scenario(caseName,options,execute);}});}}
   }
   if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
   if(!startupOpening)for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);

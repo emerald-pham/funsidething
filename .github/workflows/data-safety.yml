@@ -251,6 +251,12 @@ jobs:
       - name: Report 512MB stress outcomes with full execution integrity
         if: always()
         run: node scripts/button-safety-mobile-memory.mjs --run --profile stress-512mb --output-dir "$RUNNER_TEMP/mobile-memory/stress"
+      - name: Install matching selected workload browsers
+        if: always()
+        run: npx --no-install playwright install --with-deps chromium webkit
+      - name: Execute selected optional workload diagnostics
+        if: always()
+        run: npm run test:group -- --optional-workload-diagnostics --group native-process --output-dir "$RUNNER_TEMP/mobile-memory/optional-workload" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "${{ needs.validation-context.outputs.base }}"
       - name: Preserve capped runtime configuration control and native results
         if: always()
         uses: actions/upload-artifact@v4
@@ -324,7 +330,7 @@ jobs:
         id: aggregate
         if: always()
         run: |
-          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --mobile-report "$RUNNER_TEMP/mobile-memory/required/report.json" --mobile-stress-report "$RUNNER_TEMP/mobile-memory/stress/report.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --mobile-report "$RUNNER_TEMP/mobile-memory/required/report.json" --mobile-stress-report "$RUNNER_TEMP/mobile-memory/stress/report.json" --optional-workload-result "$RUNNER_TEMP/mobile-memory/optional-workload/result.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve verified aggregate and final observations
         if: always()
         uses: actions/upload-artifact@v4

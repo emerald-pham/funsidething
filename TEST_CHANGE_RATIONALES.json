@@ -27276,5 +27276,2282 @@
     "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/light-repeat-repair/1418-RED --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK saved decision review guidance: mounted changelog records selected review continuity$ tests.js",
     "failure": "Observed6254ea98 one test/one ERR_ASSERTION, zero skip/cancel, child/wrapper1: The existing public Changelog mounts the selected saved-decision fix. Missing-note assertion before text edit; raw /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/light-repeat-repair/1418-RED"
   }
-}
+},
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "6219c4424690eed91b2200d9e1d98f75506f35a6a4b36ead939df8c47205f760",
+    "reason": "#1425 exact source-backed post-bootstrap bookkeeping correction authorized by CLOSED #1424. Existing OR06 consumer updated; same root/title/callback and201 assertion sites, no new root/assertion/coverage claim. Header title quotes single-to-double register the real updated consumer in the actual diff per the explicit1425 addendum.",
+    "previousBehavior": "The original OR06 oracle wrongly carried the pre-bootstrap decorated pin into every hydrated phase and the full literalLive board. Actual1419/4a84a3bd captured13 phases then failed the first seed pin assertion; seed and all13 current/durable pin arrays were already empty after healthy matching-cloud bootstrap, with all three complete manual originals exact. Earlier after-Apply attribution was incorrect and is retained historically with the additive1424 correction.",
+    "intendedBehavior": "Only this healthy same-board OR06 native oracle and mirrored outer independently expect exact post-bootstrap empty pins and explicitly set literalLive.protectedBackupIds=[]; the pre-bootstrap expectedSeed pin, fixed64 fixture/auth/options, seedHash, originalPayloads, source/pending identities and separate damaged-cloud oracle stay unchanged. No app behavior or retention-policy change.",
+    "replacementTests": [
+      "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources"
+    ],
+    "preservedCoverage": [
+      "All201 original assertion sites retained with only the two explicitly admitted expected-state adjustments in each oracle mirror. Complete original rows/raw payloads, typed/unknown/pending/current/durable/remote/history/lifecycle/authority/receipt/focus/scroll/cleanup assertions remain intact.",
+      "The single updated-header quote change is nonsemantic. Native/outer oracle bytes are identical and exact inverse reconstruction restores the complete original source and consumer. No assertion removal/filter/skip/relaxed comparison or expectation inferred from actual values.",
+      "Every historical rationale object is an unchanged prefix; all app/web assets and all source outside the two oracle mirrors/one header are unchanged. Old failures and original201 body stay immutable. This correction claims no GREEN, native acceptance, device/release proof or final integration."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/293-optional-policy/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/interim-source-checkpoint/1419/current-runs --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources$' tests.js",
+      "failure": "Observed actual1419/4a84a3bd-1092-4fdf-9189-00304ee2474c: whole outer1 test/0pass/1fail/0skip/0cancel, child/wrapper1; native verifySavedDecisionSources at scripts/button-safety-cloud.mjs:428:542 expected [gate-retained-1] but got [] at FIRST seed phase after13 phases captured. Full raw source/state/201 chronology in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/interim-source-checkpoint/1419-FAILED-RESULT.json SHA-256 8a6335038b45a0a304b8a39978c9a3124be7d998c26ed0f74c911d78803e2ca5. Root read-only1424 decision /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/ack-preservation-decision/1424-DECISION.json SHA-256 e47621aaae95020082359fe00e8834c26191f01d66ce1ad9bb905211146fef15 admits only these grounded expected values; this is an oracle correction, not app-consumer RED for new product behavior."
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "2b1edbf2280f1053dee1d6a166c17e1464564fb4cf2fc59c91e1b8bb6291724e",
+    "reason": "#1454 human-approved #1435 four-family source-expectation correction after the single original offline assertion failure in closed #1453. Existing complete mirrored saved-decision kernel only; no app defect or production behavior migration is claimed.",
+    "previousBehavior": "The retained kernel incorrectly required owner pending and both retry preservation payloads to remain null, and required direct acknowledged commit to rotate baseline latest. Actual original offline run f24ca0fb-865f-4de4-8809-9c8904c126b2 failed the phase.pendingOwner strict-null check at original source424:59; later linked assumptions were established by source/retained-fact assessment1435, not separately executed failures.",
+    "intendedBehavior": "Require null owner pending before failed Apply and after acknowledgement, one complete UID-bound refused generation validated against independently expected unpublished source hash, baseline revision and deliberate event time, and exact marker retention through both retries/previews. The first prepared choice/archive pending stays null; retry choice and archive top-level/evidence.pending retain that exact validated marker. Direct recovery retains every exact baseline backup including latest plus exact refused/superseded/confirmed copies, with no invented automatic rotation.",
+    "replacementTests": [
+      "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources"
+    ],
+    "preservedCoverage": [
+      "Independent literal64-task seed/hash/encoding/row preamble stays byte-identical; all unrelated source assertions and complete outside-kernel statements/consumer registration/outer report/receipt/input/accounting/cleanup tail remain exact.",
+      "Complete current/durable/remote/unknown/typed/manual/history/source/account/revision/pending-gate/protection/view/focus/scroll contracts remain intact. Corrected kernel147 assertion-text sites versus original138 are source counts only, not executed assertion totals.",
+      "All1006 previous rationale objects and their original raw prefix remain exact. Original nativec4f9d6cb failure, original offlinef24ca0fb failure, all13 complete raw phases and original201-site whole-body evidence remain immutable. Offline success cannot close1427/1419/1270/1299 or establish native/release acceptance."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/C-recorder --purpose later-baseline-sensitivity --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --max-old-space-size=6144 --expose-gc /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/saved-decision-offline-adapter.mjs --source-manifest /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/B-original-source.json",
+      "failure": "Observed original offline f24ca0fb-865f-4de4-8809-9c8904c126b2: exactly one complete-kernel invocation, child/wrapper1/no signal, ERR_ASSERTION strictEqual failed owner pending marker versus null at original scripts/button-safety-cloud.mjs424:59. First8 phase-loop iterations completed; remaining failing-phase statements/final4 iterations/all post-loop source checks unearned. This later-baseline-sensitivity expectation failure is not appRED. Full actual/error/stack/argv/unchanged-input records in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/C-ORIGINAL-FAILURE.json SHA256 9e172f0f558f108bd442ddaa4614380b2f01ca20eac8fde50a74a190cf34958e."
+    },
+    "sourceBasis": {
+      "assessment1435": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/pending-lifecycle-assessment/1435-ASSESSMENT.json",
+        "sha256": "60ca5a61755ebe974f52011b4ea6f6748bcd22ba11e592e4d6673ec514b20114"
+      },
+      "kernelChanges": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/D-KERNEL-CHANGES.json",
+      "inverseProof": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/D-SOURCE-INVERSE-PROOF.json",
+      "pendingDerivation": "Independently expected failed prepared board minus its recoveryChoice archive envelope and the already-declared seven device-local keys gives the actual refused cloud payload; hash/base revision/decision event time/owner UID must equal the complete pending marker. Source-generated nonce format and exact full-object equality bind its identity through retries.",
+      "backupDerivation": "applyDecisionRecovery invokes commitHead without backups/removeBackupIds; commitHead defaults to empty additions/removals. Every baseline manual/daily/latest row remains exact; only explicit preservation rows/hold disposition are admitted."
+    },
+    "observedEvidence": {
+      "status": "corrected offline command not yet run",
+      "commandLiteral": [
+        "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/agent-tools/record-run.mjs",
+        "--repo",
+        "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+        "--evidence-dir",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/E-recorder",
+        "--purpose",
+        "green",
+        "--summary",
+        "--",
+        "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--max-old-space-size=6144",
+        "--expose-gc",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/saved-decision-offline-adapter.mjs",
+        "--source-manifest",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/D-corrected-source.json"
+      ],
+      "runId": null,
+      "result": null,
+      "wholeNativeAcceptance": "unearned;201-site outer/report/receipt/input/accounting/cleanup and actual native outcome remain held"
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "71265eab9d93dabc99197bfbb173d5b3806532c4a55a2bfa5a980d585df28c8c",
+    "reason": "#1461 implements the single normalized bootstrap decision-base expectation family identified in closed1459 under the human unlimited completion authority recorded by1460. The preserved E8320d3dd assertion failure is expectation evidence, not an application repair or appRED.",
+    "previousBehavior": "The complete retained source kernel checked seed.decisionBase.payload against raw legacy remotePayload(seed), although established legacy bootstrap stores an independently normalized v2 shared read-base and preserves the v1 raw remote. Actual E8320d3dd reached this unchanged seed equality after13 initial phase loops and failed at checkBase418:202, called432:493. Later kernel assertions remained unearned.",
+    "intendedBehavior": "Construct normalized startup shared bytes solely from independent fixed64 expectedSeed plus the already enumerated literal hydrated task/default/settings/v2/worked16 values, before attaching observed base metadata. Preserve a separate full raw revision4 remote fixture expectation with v1/worked8/account/revision4/dirty/unknown fields and without the device-only protected-backup decorator. Keep original expectedSeed/seedHash/manual/pending preamble, full hydrated seed equality and later exact revision5/6 base==remote/expected publication bytes.",
+    "replacementTests": [
+      "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources"
+    ],
+    "preservedCoverage": [
+      "All1007 prior rationale objects and raw prefix, independent literal seed/hash/encoding/row preamble, application/assets/runtime/fixture/adapter/all13 original full captures and original failed C/E/native records stay exact.",
+      "Both complete kernels remain byte-identical, with149 source assertion-text sites after two raw-remote assertions; all unrelated four-family pending/consent/archive/backup protections and account/identity/revision/current/durable/remote/history/unknown/typed/manual/protected/focus/scroll/input/outer/report/receipt/accounting/cleanup statements and return contract stay exact.",
+      "Expected startup bytes never use actual current/durable/base payloads, app hydrate/cloudPayload/makeDecisionBase, fixture producer or prior producer result. Metadata attaches only after independent shared bytes are frozen; existing observed base ID format checks retain their original limits. Offline success would cover only13 historical inputs, not native or release acceptance."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/E-recorder --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --max-old-space-size=6144 --expose-gc /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/saved-decision-offline-adapter.mjs --source-manifest /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/D-corrected-source.json",
+      "failure": "Actual E2026-10-29T21-03-25-129Z-8320d3dd-0a1f-4de9-b9b3-94eb7fdd6dfc failed ERR_ASSERTION/deepStrictEqual at unchanged native source418:202 called432:493; child/wrapper1/no signal, exactly one invocation. Scalar seed base v/id/account/revision4 matched, actual normalized payload1077033B SHA2e227b67365da32572af5d361feaa2d3711d0c9179f5ef817be545d0cbf9e53d differed from raw remote1069186B SHA3c2bbdda651d50947fc029b7dcc6c2dabaa57d144bde4242fed7a492764bbcee. This historical expectation failure remains immutable in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/E-FAILED-RESULT.json SHA256 fac05072d3afb07be42103bb50ce77db205b934a65f50080f1c51c792178c8e7; no reconstructed or new appRED claim."
+    },
+    "sourceBasis": {
+      "assessment1459SHA256": "2d8f1451171198647bb47ea86c656354c57cf9d141c8867954a22eec4288bc2b",
+      "proposalSHA256": "0821f8cd6b688140ede3dd6b8e4c635b6d6e15bae017647044818af9bd83029f",
+      "relatedInventory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/seed-decision-base-assessment/sol-owner/RELATED-CHECK-INVENTORY.json",
+      "replacement": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1461-REPLACEMENT.json",
+      "inverseParityProof": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1461-INVERSE-PARITY-PROOF.json",
+      "independentExpectedSources": "Existing taskLiteral/expectedSeed and the already declared complete hydrated values within the unchanged source kernel; released default/migration contracts and fixed64 fixture specification, seven established device-local exclusions. No captured actual payload supplies expected bytes."
+    },
+    "observedEvidence": {
+      "status": "Complete retained-input source kernel passed once in1462; offline-only",
+      "commandLiteral": [
+        "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/agent-tools/record-run.mjs",
+        "--repo",
+        "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+        "--evidence-dir",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-recorder",
+        "--purpose",
+        "green",
+        "--summary",
+        "--",
+        "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--max-old-space-size=6144",
+        "--expose-gc",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/G/approved-offline-20261029/sol-owner/saved-decision-offline-adapter.mjs",
+        "--source-manifest",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1461-SOURCE-MANIFEST.json"
+      ],
+      "runId": "2026-10-29T22-37-33-606Z-c152ca1c-98e4-4969-92d4-11bd02a92392",
+      "result": {
+        "childExit": 0,
+        "wrapperExit": 0,
+        "signal": null,
+        "kernelInvocations": 1,
+        "completeKernelReturned": true,
+        "fullHistoricalPhases": 13,
+        "sourceAssertionTextSites": 149,
+        "executedAssertionCount": "Not instrumented;149 is a source-text-site count.",
+        "semantic": {
+          "phases": [
+            "seed",
+            "settings",
+            "baseline-saved",
+            "settings-review",
+            "read-refused",
+            "reviewed",
+            "selected",
+            "repeated",
+            "write-refused",
+            "reviewed-retry",
+            "selected-retry",
+            "applied",
+            "final-source"
+          ],
+          "theme": "light",
+          "horizonMin": 61,
+          "currentHash": "c97132006eacc7faef7b5544cb99c0339423ae8a00be4ba0ee9c18481d9cfad4",
+          "durableHash": "c97132006eacc7faef7b5544cb99c0339423ae8a00be4ba0ee9c18481d9cfad4",
+          "refusedChoiceId": "tadc75787-1d78-4fae-af5c-84f8c2db5d1c",
+          "confirmedChoiceId": "t9a586932-84f0-4e64-8316-ed74b56df0ce",
+          "completeBoardsPreserved": true,
+          "completeRecoveryLifecycleValidated": true,
+          "typedOpaquePreserved": true,
+          "pendingUploadPreserved": true,
+          "selectionDoesNotSave": true,
+          "failedAcknowledgementRemainsPending": true,
+          "explicitApplyAcknowledged": true,
+          "mountedReviewPreserved": true
+        }
+      },
+      "wholeNativeAcceptance": "unearned; original outer/report/receipt/input/accounting/cleanup and actual native outcome remain separate",
+      "sourceAndEvidence": {
+        "resultPacket": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-COMPLETE-RESULT.json",
+        "resultPacketSha256": "5cf59590d0f2611f8e45f01be2867f7bb36cd6219b633d3a62534f9e9e1ba111",
+        "executedSourceManifest": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1461-SOURCE-MANIFEST.json",
+          "sha256": "c6de2395dbc714552514075af6220c76ecbd7b293cb8eb576fc08eeff9987249"
+        },
+        "executedRawRationaleSha256": "5ab3d73a0aef6f56fd82d8449208ec311ca1054061e8f59d2047d1cb09862f7d",
+        "rawRecorderEvidence": [
+          {
+            "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-recorder/2026-10-29T22-37-33-606Z-c152ca1c-98e4-4969-92d4-11bd02a92392.json",
+            "sha256": "8eb11bcfc5d27a278af647f5b49a17dcc8497c920efc3c0e37405d4110326a9e",
+            "bytes": 11096719
+          },
+          {
+            "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-recorder/2026-10-29T22-37-33-606Z-c152ca1c-98e4-4969-92d4-11bd02a92392.stdout.txt",
+            "sha256": "580dbe92a6fdb36a13c4b96198f6233e9d16f7ce0bdf96e3887a5ca91941a2ba",
+            "bytes": 7666
+          },
+          {
+            "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-recorder/2026-10-29T22-37-33-606Z-c152ca1c-98e4-4969-92d4-11bd02a92392.stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "bytes": 0
+          },
+          {
+            "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-COMMAND-RESULT.json",
+            "sha256": "805191035e0eb784875c33e2c345abd7d746298410757a1474c29ff27f20523c",
+            "bytes": 2089
+          },
+          {
+            "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-ATTEMPT-STARTED.json",
+            "sha256": "9b930e78e5b52711de44ead5a4fd59c1b5476f0e7c596cdcc5fb22d125750e13",
+            "bytes": 2165
+          },
+          {
+            "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/saved-decision-owner/1462-PRE-RUN-RATIONALE.raw.json",
+            "sha256": "5ab3d73a0aef6f56fd82d8449208ec311ca1054061e8f59d2047d1cb09862f7d",
+            "bytes": 5611292
+          }
+        ],
+        "recorderActualVersusSanitizedFiles": [
+          {
+            "path": "TEST_CHANGE_RATIONALES.json",
+            "actualBytesSha256": "5ab3d73a0aef6f56fd82d8449208ec311ca1054061e8f59d2047d1cb09862f7d",
+            "sanitizedContentSha256": "50da450fc6eb764df80822dfb7a154e3deba19f9b7555549b82b8c3c6bb33814",
+            "actualDiffSha256": "e5cfc4bcf810431738cd9942f857c4524958128211959c223719a6c43a3f2c41",
+            "sanitizedDiffSha256": "e5cfc4bcf810431738cd9942f857c4524958128211959c223719a6c43a3f2c41",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "scripts/button-safety-cloud.mjs",
+            "actualBytesSha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+            "sanitizedContentSha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+            "actualDiffSha256": "76dc998bdcdd9d18ea4b6426d1726b114c9ca51ef7d8e0d42cea5f2546e7c63d",
+            "sanitizedDiffSha256": "76dc998bdcdd9d18ea4b6426d1726b114c9ca51ef7d8e0d42cea5f2546e7c63d",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "scripts/test-group-assignments.json",
+            "actualBytesSha256": "dd2fd728abd9dea860f43d9c60431d500b23abbbf267cbd6e6236d09e77e3114",
+            "sanitizedContentSha256": "95edf0d129ba2ee44369cb29a1a8aeb07751e03f718c84b1a942374d0c5dd7c1",
+            "actualDiffSha256": "ceb3d643aa3e2a5d7e4757f4cb7406e0b43150aab7f5b5243597cc7628f70813",
+            "sanitizedDiffSha256": "ceb3d643aa3e2a5d7e4757f4cb7406e0b43150aab7f5b5243597cc7628f70813",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "tests.js",
+            "actualBytesSha256": "4dd1943b72dea08d1557ae421dd4fdac28b47220708d64d5823fcdfcdaea12fd",
+            "sanitizedContentSha256": "b631e10ae44a6b10015cfa49e0b581b908f65807811c03bd4484289b99b1e6a8",
+            "actualDiffSha256": "c8e8a8947a60b59bc77a9fb84e9e686af19e7f6d5279d11feb9468a3af22eeb3",
+            "sanitizedDiffSha256": "c8e8a8947a60b59bc77a9fb84e9e686af19e7f6d5279d11feb9468a3af22eeb3",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "sameAdapterAndFull13Inputs": true,
+        "all25OriginalRawFilesUnchanged": true,
+        "historicalFailuresPreserved": true
+      }
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "86067714bb18cb0289d845fe5f9f980392a728a42806731dc62958c502ab5818",
+    "reason": "#1476 applies only the complete source-backed outer action/disclosure and repeat-receipt association correction established by closed1475. Preserved4944 whole failure is observed proof-oracle RED, never app RED or accepted native evidence.",
+    "previousBehavior": "The actual full public4944d50d outer failed its exact twelve-pointer-action equality after the native child and both full kernels returned. The fixed native expose helper legitimately opens the initially closed Scanning/Horizon and Recovery/review Settings disclosures; the outer omitted both clicks and also bound the later two repeat receipts to obsolete press indices6/7. Receipt-index failures were diagnosed read-only, not claimed dynamically executed.",
+    "intendedBehavior": "Require the independently source-derived exact14 pointer click and press sequence including only disclosure entries1/4. Bind the two deliberate selected-Light repeat receipt timestamps to exact press indices8/9. Preserve all original strict trust/scenario/finite ordered time/unique prefixed receipt IDs, accounting, semantic/source/navigation/input/native-exit/report/cleanup assertions; no filtering or arbitrary extra allowance.",
+    "replacementTests": [
+      "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources"
+    ],
+    "preservedCoverage": [
+      "All1008 prior complete rationale objects and their raw prefix, every original failed source/raw run,149-site complete mirrored saved-decision kernels and independent seed/preamble/return contract remain byte-exact.",
+      "The entire212-site current outer retains every assertion and all unrelated source/phase/hash/typed/unknown/durable/pending/history/manual/backup/authority/focus/scroll/protected/receipt/accounting/navigation/input/exit/cleanup boundaries; only the exact sequence/message and receipt-offset regions change.",
+      "Native cloud fixture/kernel, native runtime/helper/producer, independent inventory/normative complete file row/64-task54+6 source map, group assignments, adapter/raw13 historical captures, all31 committed app assets, canonicalG/rootf22 and foreign ownership stay exact."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/native-continuation/sol-owner/1427-recorder --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources$' tests.js",
+      "failure": "Actual4944d50d on pre-correction tests4dd1943b/full-indexd029/fp71265: child/wrapper1,1test/0pass/1fail/0skip/0cancel, no signal. ERR_ASSERTION tests.js48579:351: Exactly the intended twelve native pointer actions; expected12/actual14, extra trusted disclosure indices1,4. Inner native0/report passed does not confer whole acceptance.",
+      "recordPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/native-continuation/sol-owner/1427-recorder/2026-10-29T23-06-09-614Z-4944d50d-eb6b-4ad4-8e6d-63d192f44cb8.json",
+      "classification": "Observed public proof-oracle failure; no product RED or repeated command claimed."
+    },
+    "sourceBasis": {
+      "diagnosis": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/native-action-contract/sol-owner/1475-COMPLETE-DIAGNOSIS.json",
+      "diagnosisSha256": "f1cc89c5cfe384f6bd4128bff22d5e27ffa474bde6d21a06c52551766314ac8c",
+      "workflowPointers": [
+        "index.html13608/13617: closed Scanning and recurrence contains Horizon",
+        "index.html13654/13655: closed Recovery and cleanup contains first review",
+        "scripts/button-safety-native.mjs258-260,274-275,290-291: expose uses actual native summary step before fill/control",
+        "scripts/button-safety-cloud.mjs492-520: fixed Settings61/read-refusal/Light two repeats/failed Apply/review/reselect/ACK workflow",
+        "scripts/button-safety-native.mjs427-444: strict sole trusted repeat down/click receipt association"
+      ],
+      "expectedPointerActions": [
+        "act:settings",
+        "disclosure",
+        "act:save-settings",
+        "act:settings",
+        "disclosure",
+        "act:review-decision-recovery",
+        "act:review-decision-recovery",
+        "act:choose-decision-recovery",
+        "act:choose-decision-recovery",
+        "act:choose-decision-recovery",
+        "act:apply-decision-recovery",
+        "act:review-decision-recovery",
+        "act:choose-decision-recovery",
+        "act:apply-decision-recovery"
+      ],
+      "expectedRepeatPressIndices": [
+        8,
+        9
+      ]
+    },
+    "observedEvidence": {
+      "atCorrection": "No corrected-source kernel/native/browser/test execution. #1477 separately owns fresh readiness and one whole unchanged public command; its future result is not claimed here.",
+      "old4944WholeRemainsFailed": true,
+      "assertionTextSites": {
+        "kernel": 149,
+        "outer": 212
+      },
+      "textCountsAreNotDynamicExecutionCounts": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "528b96c7d7f36bca78c6effa4739805b3e238d376148188c21fa87f4b088e095",
+    "reason": "#1061 independently defines the accepted ordinary two distinct scanner decisions consumer before functional implementation. This definition record does not claim RED or GREEN; #1062 separately owns the first actual runner-enforcement RED.",
+    "previousBehavior": "The independent ordinary catalog requires this two-Yes case, but unchanged rapid-core has no selected native implementation/phase source writer for it. Missing selected-case enforcement is runner coverage, not evidence of an app defect.",
+    "intendedBehavior": "Exactly two intentional trusted Yes inputs bind independently captured offered IDs synthetic-populated-1 then synthetic-populated-2. Both complete accepted decisions and independent baseline/rating/history semantics survive in ordered current/durable boards and complete retained source records. No priming action or substitute app mutation.",
+    "replacementTests": [
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources"
+    ],
+    "preservedCoverage": [
+      "The complete prior tests.js bytes and all1009 rationale objects remain exact. Existing saved-decision kernels149/text outer212 and every original diagnostic case/assertion are unchanged.",
+      "Complete literal64-task signed-out fixture, role-specific sources, accepted1020 name/file/actions/expected and full catalog refinement including2 attempts/assertionId are independently enforced.",
+      "Every task/unknown/history field, original three manual sources, typed opaque NUL/bytes/negative zero, pending owner/hold/upload, exact lifecycle rows, trust/receipts/time/accounting/source/exit/cleanup remain strict. No app assets, native writer, rapid-core implementation or inventory is changed under definition."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1062-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources$ tests.js",
+      "failure": "NOT EXECUTED at1061 definition. This truthful staged metadata reserves the exact public command for1062; no observed RED or product failure is claimed.",
+      "stage": "definition-before-actual-red",
+      "sourceBindingPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1061-DEFINITION-BINDING.json",
+      "sourceBindingSha256": "ed6e144274b2870445cec930d7f9dc7cf3b7de19fc2398d1e18c3dfdce1c2f91"
+    },
+    "observedEvidence": {
+      "behavioralRuns": 0,
+      "nativeRuns": 0,
+      "definitionOnly": true,
+      "prior1477NativeAnd1271PureAreHistoricalPredecessors": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "528b96c7d7f36bca78c6effa4739805b3e238d376148188c21fa87f4b088e095",
+    "reason": "#1063 implements only the accepted OR07 named native case after actual1062 selected-case runner-enforcement RED376d0fff. The independent complete tests.js definition remains byte exact; no app defect or earlier native pass is claimed.",
+    "previousBehavior": "The public ordinary runner must execute the required two-distinct-scanner-decisions selected case; undefined !== 1",
+    "intendedBehavior": "Existing selected native consumer delivers two trusted Yes inputs and retains full seed/accepted-two/final-source artifacts through the existing writer. Literal independent offered IDs1/2, both ordered decision facts, complete current/durable/history/unknown/protected/typed/pending/backup sources, exact receipts/accounting and cleanup must pass under1272.",
+    "replacementTests": [
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources"
+    ],
+    "preservedCoverage": [
+      "All1010 prior complete rationale objects/raw prefix and all original tests.js/rapid-core/native bytes are preserved by exact inverse; no original diagnostic assertion, workload/cap/attempt/receipt/helper/writer branch changes.",
+      "The exact1061 independent kernel is mirrored byte-for-byte in the existing native case; raw/normalized fixture literals, full baseline/ratings/history/current/durable expectations are never sourced from actual state or producer results.",
+      "All31 app assets, inventory including full normative file field, role-specific54+6 map, cloud/kernel, assignments/RISK map and foreign/canonical/root sources remain exact."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1062-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources$ tests.js",
+      "failure": "Actual376d0fff before rapid/native edits: one whole public outer1test/0pass/1fail/0skip/0cancel/0todo, child/wrapper1/no signal; ERR_ASSERTION requiredselectedcase undefined!==1 at tests.js48687:9. Native errors[], no selected scenario/context/input/kernel/phase. Meaningful runner-enforcement RED, not app defect or infrastructure failure.",
+      "recordPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1062-recorder/2026-10-29T23-59-14-482Z-376d0fff-f84d-4d19-94bf-482c29c0ea0f.json",
+      "recordSha256": "f4db152208554cef5444d739d9034589399c6263d43e289a4e1ed2500fb737fe",
+      "resultPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1062-RED-RESULT.json",
+      "resultSha256": "571cc1c6970806e0075f3ca35f85a4ee36f65faf9f582b3c20692a707d4e1c37"
+    },
+    "observedEvidence": {
+      "definitionUnchanged": true,
+      "implementationHasNotBeenExecuted": true,
+      "greenOwnedSeparatelyBy1272": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "781634d17630a4263fa315c55a9a406661d09ec985720cb675f0f5115838c2cd",
+    "reason": "#1490 applies exactly the complete1488/root-approved normalized-live threshold literal correction in both existing mirrors. Raw fixture/manual/pending source custody stays exact0; original4fd81f79 stays failed. This is proof-oracle repair, not an app defect or a native acceptance.",
+    "previousBehavior": "The complete native kernel first failed its independent hydrated signed-out seed: actual live thresholdPct1 versus frozen expected0. The raw preboot durable seed and all3 protected manual originals correctly retain0. The outer rejected the still-running scenario; repeat semantic evidence was never recorded.",
+    "intendedBehavior": "Require the independently established canonical live threshold1 from existing SETTINGS_RANGE[1,90]/clamp/normalize/hydrate, while preserving the full literal raw64seed0 and all exact pending/manual source bytes/hashes. Carry this live literal through both complete independently expected accepted boards; preserve all176whole-outer assertions, helpers and strict numeric/source/receipt/accounting contracts.",
+    "replacementTests": [
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources"
+    ],
+    "preservedCoverage": [
+      "All1011 prior complete rationale objects and raw prefix, every earlier failed source/raw run and the complete1488 static assessment remain exact. Only one live literal byte changes in each mirror; all122kernel/preamble+54tail/176whole source-text assertion sites, complete return contract and unrelated tests remain.",
+      "Raw expectedSeed/decorator/manual payloads/pending hash retain threshold0. No hydration/app/helper/producer call supplies expected bytes. Existing pair/history formulas, exact mu/sigma, bounded observed rank and1e-12 likelihood tolerance, role-specific account/revision/source shape, all64tasks/unknowns/prior histories/typed/opaque/current/durable/manual/automatic backup checks stay unchanged.",
+      "Native writer, fixtures/app31assets, cloud mirrored saved-decision kernel, inventory including file/role map, assignments/RISK map, canonicalG and foreign/root sources stay exact. No app behavior/deadline/tolerance/priming/harness change."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1272-recorder --purpose green --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources$ tests.js",
+      "failure": "Actual4fd81f79 before1490 correction: outer1test/0pass/1fail/0skip/0cancel/0todo, child/wrapper1/no signal. Native first ERR_ASSERTION Independent complete hydrated signed-out seed threshold1!==0; outer rejected scenario running!==passed. Original report/input/raw remains failed and immutable; no productRED claimed.",
+      "recordPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1272-recorder/2026-10-30T00-03-28-870Z-4fd81f79-3cc8-4b37-9d00-682f870dcb01.json",
+      "recordSha256": "ef0d0d44e4ac1b85f43fc6960183d69f592a2cc9a1291d2cb8ff0cfdbb5ad345",
+      "resultPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1272-FAILED-RESULT.json",
+      "resultSha256": "83f7761c3aa82b9a244a6e0c20d4fb4e9573b010c8442b402a71ae13d10caebd",
+      "classification": "Observed proof-oracle RED; not app RED or a repeated command."
+    },
+    "sourceAuthority": {
+      "diagnosis": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/1488-diagnosis/1488-COMPLETE-DIAGNOSIS.json",
+      "diagnosisSha256": "0d4b3e92bff3fa2b9e7f8f7c4411b9f943ef53a21f2d9beb63caadd99ee3834c",
+      "proposalSha256": "81363bcf1fe4f336f981ced41e423cdc1d173f5b82a9e91eee12f49370419aa8",
+      "pointers": [
+        "index.html1092/1093: threshold range1..90 and clamp",
+        "index.html1242-1253/1611: existing normalization/hydration",
+        "historical4c0055236: same range/clamp since2026-09-02"
+      ]
+    },
+    "observedEvidence": {
+      "atCorrection": "No corrected kernel/test/native/browser execution.1491 separately owns one complete saved-raw kernel;1492 separately owns one fresh whole native attempt.",
+      "kernelAndPreambleAssertionTextSites": 122,
+      "wholeOuterAssertionTextSites": 176,
+      "textCountsAreNotDynamicExecutionCounts": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "59443065b23a4e1dc5ce5f81db792edbe372459859f0e683355fd40915ca72fd",
+    "reason": "#1065 defines the accepted OR08 existing public native scene/reopen/task-Undo contract before any scenes/native implementation or behavioral execution. Actual complete OR07 is closed on its exact source; independent raw/canonical and action contracts were statically reviewed first.",
+    "previousBehavior": "The ordinary inventory requires this named scene case but the existing public scene scenario registry has no implementation. Missing-case execution must be observed under1066 as runner-enforcement RED, never represented as an app defect.",
+    "intendedBehavior": "One exact selected outer requires a real trusted23:15/winter scene lock, genuine same-route new document, two distinct title edits and two trusted Undo inputs, full independent literal64-task current/durable/history/unknown/protected/typed/pending/manual/automatic sources, exact11 ordered native receipts and complete report/exit/owned cleanup.",
+    "replacementTests": [
+      "RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "Every prior tests.js byte and1012 complete rationale objects/raw prefix remains exact; scene/native/rapid/cloud/app/fixture/inventory source stays unchanged through definition and actualRED.",
+      "Original scene motion/readiness/repaint and required1211 acceptance remain exact. No new renderer clock/app behavior/helper/harness/telemetry/source projection or assertion weakening.",
+      "Both4field accepted1020 and6field inventory include exactfile, literalminimumAttempts2 and explicitassertionId. Rawv1/worked8 and canonicalv2/worked16/defaults are separately literal; no producer/app call derives expected bytes."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources$ tests.js",
+      "failure": "NOT EXECUTED in1065: this is definition-only.1066 owns one meaningful selected public-consumer run; no RED or native pass is claimed from authoring or source inspection."
+    },
+    "observedEvidence": {
+      "definitionOnly": true,
+      "testOrKernelExecuted": false,
+      "staticOracleReview": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/1065-STATIC-ORACLE-REVIEW.json",
+        "sha256": "ee8ecb09fd62633dd9fcdbae6ee8517fcd013b7a355d11a8ad83a2262f6fbaaf",
+        "bytes": 4137
+      },
+      "actualOR07Handoff": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-distinct-decisions/sol-owner/correction1490/FINAL-HANDOFF.json",
+        "sha256": "226211d9a4b2d8a57b8acff3b3686c211162b44ddbc33f35f02f8cf158cec47d",
+        "bytes": 5821
+      }
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "fd9cff562d44741b52305160a5598156fc62545ab87d17340156fe45706f2640",
+    "reason": "#1503 applies exactly the single source-backed new unexecuted OR08 oracle correction from the complete1500 diagnosis. Original1065/prelaunch error and unused readiness remain historical; this correction creates no productRED or acceptance.",
+    "previousBehavior": "The new definition incorrectly expected Undo.disabled to track empty/nonempty stack. Immutable index.html476 keeps the public header button enabled and TaskActionOwner.undo7675 returnsfalse internally on an empty stack. No1066 command had run.",
+    "intendedBehavior": "Require the actual public enabled Undo control in every scene phase; retain all exact complete chosen scene/reopen/two task edits/two trusted Undo reversal/current/durable/history/unknown/protected/typed/pending/backup/input/receipt/exit/cleanup expectations.",
+    "replacementTests": [
+      "RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "Only one new tests.js expectation changes; exact inverse restores all original1065 bytes. Full109kernel/168outer textsites, all earlier test prefixes and1013 complete rationale objects/rawprefix remain exact.",
+      "No scenes/native/rapid/cloud/app31/fixture/inventory/runtime or unrelated assertion change; the complete12family diagnosis found no other supported literal correction.",
+      "Actual1066 runner-enforcement RED remains unexecuted and owns its one command after closed1503/readiness/liveGET. No app defect or historical run pass is invented."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources$ tests.js",
+      "failure": "NOT EXECUTED: source-backed preparation expectation correction before the first1066 invocation. Static1500 diagnosis4ca632fa/closed6512285860 establishes the incorrect disabled expectation; no behavioral RED is claimed."
+    },
+    "observedEvidence": {
+      "diagnosis": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/1500-diagnosis/FINAL-HANDOFF.json",
+        "sha256": "4d9e8e2002d8a70d77f47d72c9add41de89487771a4e5b4c348a70f9aec38268",
+        "bytes": 3323
+      },
+      "prelaunchOriginal": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/1066-PRELAUNCH-ORACLE-DISCREPANCY.json",
+        "sha256": "758235ad7aab226c07f272163a147743fd6b8ac01504882eda9312ac37c19ffb",
+        "bytes": 11069
+      },
+      "inverseExact": true,
+      "kernelOrTestOrNativeExecuted": false
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "fd9cff562d44741b52305160a5598156fc62545ab87d17340156fe45706f2640",
+    "reason": "#1067 implements only the required named OR08 scene/native case after actual1066 selected-case runner-enforcement RED479b62c4; full independently corrected tests definition remains byte exact.",
+    "previousBehavior": "Actual public ordinary selectedcase failed undefined!==1 before any scenario/context/input/sourcephase/kernel, with errors[] and complete owned cleanup. This is missing runner registration, not app defect.",
+    "intendedBehavior": "Existing scene native public consumer locks23:15/winter through real UI, retains full8raw phases around genuine reopen/two separate title edits/two trusted Undo inputs, and verifies both complete independent109site mirrors/full168outer under1275.",
+    "replacementTests": [
+      "RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "All previous tests bytes,1014 rationale objects/rawprefix and all unrelated scene/native branches/helpers/writers/diagnostic controls remain exact by inverse. No app/fixture/rapid/cloud/inventory/assignment/map edits.",
+      "Both complete independent raw/canonical64task kernel literals match exact e6d08292; no state/fixture/hydrate/producer result creates expected bytes. Full scene/task/current/durable/history/typed/unknown/pending/manual/automatic source and11receipt/accounting/cleanup oracles remain.",
+      "Only existing exact named recordOrdinaryWoopPhase8phase and reopenOrdinaryWoop one-navigation guard branches are added, per live1067 binding+GET. No new harness/telemetry/globalclock/inputpriming or deadline/tolerance change."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/1066-current-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources$ tests.js",
+      "failure": "Actual479b62c4 whole1test/0pass/1fail/0skip/cancel/todo child/wrapper1/no signal: required scene-choice/reopen/task-Undo selectedcase undefined!==1 at48796:9; source unchanged, no context/input/kernel.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/1066-RED-RESULT.json",
+        "sha256": "73cd79af1330bd8329a42cd152f5eb1dc1e7c0e47cf7f7a5e8a7362571d296eb",
+        "bytes": 5227
+      },
+      "record": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/1066-current-recorder/2026-10-30T01-04-37-046Z-479b62c4-fa68-4770-a65b-d4ba18618ccb.json",
+        "sha256": "fc4892d382791ce0ede63832a6bd36343c4729054aed09d1f4e28609d349c7e1",
+        "bytes": 11534243
+      }
+    },
+    "observedEvidence": {
+      "implementationNotExecuted": true,
+      "wholeGreenOwnedBy1275": true,
+      "exactNativeRegionBodyGET": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/1067-binding.readback.json",
+        "sha256": "e5a0d99ab58c27e9cbba104858f9d173c9c1fe7fbc45715d48ddb8f5552e560d",
+        "bytes": 129468
+      }
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "23ef257f78554a204118b5f87d10259d50d1b93f2851f828eaa72b51ed6863a9",
+    "reason": "#1069 defines the accepted OR09 complete existing public native pending-Copy contract before functional rapid/native edit or behavioral execution. Actual OR08 complete acceptance and full static raw/canonical/source/action review are bound first.",
+    "previousBehavior": "Inventory requires the named ordinary pending Copy case; existing rapid consumer has only its original diagnostic variants, with no named ordinary implementation.1070 owns the actual selected runner-enforcement RED, never an app defect claim.",
+    "intendedBehavior": "Two actual Copy press attempts at deferred clipboard boundary, firstaccepted/secondrefused with native disabled-target/neutral-release proof, exactlyone clipboard operation, truthful copied thenDownload status, actual full downloaded bytes equal original full prepared/clipboard archive, independently literal64task current/rawdurable/history/unknown/typed/local/4storeIDB/manual/pending sources in all7 full phases,5actualclicks/6presses includingdisclosure/refusal, strict sourceidentity/accounting/cleanup/exit.",
+    "replacementTests": [
+      "RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "Every prior tests.js byte and1015 complete rationale objects/rawprefix remains exact; rapid/native/scenes/cloud/fixture/inventory/all31appassets unchanged through definition and actualRED. Original ten/2s/400/1GB/512MB diagnostics and generic ordinary repeats remain exact.",
+      "Both complete fourfield1020 accepted and sixfieldcatalog refinement retainfile, literalminimumAttempts2 andexplicitassertionId. Rawv1/worked8 and canonicalv2/worked16/defaults are independent literals. Expected full sources are not produced by app/fixture/hydrate/cloudPayload or copied from actual board/output.",
+      "No new app seam/harness/telemetry/globalclock/inputpriming/tolerance. Existing deferred externalclipboard setup/settlement, full lossless actual source codec and public native consumer seams are already agreed. Native exact namedcase dispatch/repeat-refusal/writer permitted only afteractualRED and live1071regionGET."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources$ tests.js",
+      "failure": "NOT EXECUTED in1069; definition only.1070 owns one real whole selected public consumer run."
+    },
+    "observedEvidence": {
+      "definitionOnly": true,
+      "testOrKernelExecuted": false,
+      "staticReview": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or09/1069-STATIC-ORACLE-REVIEW.json",
+        "sha256": "d0e1fd9e6d19624964bcaa115fbd533fffb3f004971c13c3cc9c116671d40674",
+        "bytes": 4861
+      },
+      "actualOR08Handoff": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or08/FINAL-HANDOFF.json",
+        "sha256": "9ecfec9c2388e2921b5fbc53c8c4fba27b9a469a6379a9dfe9e8ad58b100899c",
+        "bytes": 6418
+      }
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "23ef257f78554a204118b5f87d10259d50d1b93f2851f828eaa72b51ed6863a9",
+    "reason": "#1071 implements only the exact named OR09 existing rapid/native case after actual1070 runner-enforcement REDba5a7b65. Both complete independent kernels/whole outer remain unchanged.",
+    "previousBehavior": "Actual whole selected public consumer rejected missing required pending-Copy case undefined!==1 at tests48898:9, child/wrapper1/errors[], before scenario/context/input/kernel, with complete owned cleanup. This is missing runner registration, not product defect.",
+    "intendedBehavior": "Existing consumer executes exactlytwo Copyattempts at deferred externalclipboard boundary: firstaccepted, secondrefused via actual disabledtarget/neutralmarker/trusteddown/separatedocumentup/receiptcapture; exact1clipboardoperation and identical actualDownload/fullarchive bytes; both96sitekernels/all7fullsources/complete165siteouter strict semantic/receipt/accounting/report/exit/cleanup under1277.",
+    "replacementTests": [
+      "RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "Every previous tests byte and1016raw rationale objects/prefix, all31appassets/fixtures/inventory/assignments/map/scenes/cloud/rapidcore exact. Native original ten/2s diagnostic burst bytehash exact; original genericrepeat bytes exact after removing one exactnamedsecondattempt branch.",
+      "Existing rapid/native exactnamed dispatch/fourstore fullphasewriter/refusal branch only, as live1071 literalregionGET. Fullordinary route filters existing rapid entry to this exactname after unchangedcore, no duplicatedcoreexecution or extra rapidcase. All earlier diagnostic implementations/otherbranch bytes inverseexact.",
+      "Independent raw/canonical64task fullmaps, allsource/history/typed/unknown/pending/manual/localIDB/completearchive and5click6press oracles stay exact; no newharness/appseam/telemetry/globalclock/inputpriming/deadline/tolerance change. Externalclipboard fixture is not OSclipboard proof."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or09/1070-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources$ tests.js",
+      "failure": "Actualba5a7b65 whole1test/0pass/1fail/0skip/cancel/todo child/wrapper1/no signal: required pendingCopy selectedcase undefined!==1 tests48898:9, sourceunchanged, no context/input/kernel.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or09/1070-RED-RESULT.json",
+        "sha256": "47b87a7eb72cb6a623686186d3d4cdd2c44737661f9d10d2cda25b69aad98485",
+        "bytes": 5292
+      },
+      "record": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or09/1070-recorder/2026-10-30T01-29-13-538Z-ba5a7b65-f768-4301-8b43-1c92cbde4543.json",
+        "sha256": "4901831e1fb0fe40e77738c4a114b981553ccd8784acc667a018f6230acff83c",
+        "bytes": 11668053
+      }
+    },
+    "observedEvidence": {
+      "implementationNotExecuted": true,
+      "wholeGreenOwnedBy1277": true,
+      "exactNativeRegionBodyGET": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or09/1071-binding.readback.json",
+        "sha256": "1fa6b1e3ef82659563e040b85002d1508b481760d389ce73664a8916e34c4544",
+        "bytes": 98786
+      }
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "cdd8f7ee9101847642a7724410d6e680b668f8f988ba55e17420661169b83caa",
+    "reason": "#1073 defines only the accepted OR10 existing public native obsolete-Copy/replacement contract before functional consumer edits or execution; actual complete OR09 source/packet/closure and full static raw/canonical/source/action review bound first.",
+    "previousBehavior": "Independent ordinary inventory requires this named obsolete-Copy case, but existing rapid consumer has only its original diagnostic variant.1075 owns the real missing-case runner-enforcement RED; authoring/static proof is not app defect or RED.",
+    "intendedBehavior": "Real oldCopy and realClose/Settings/disclosure/Export/newCopy produce exactlytwo trusted accepted Copy attempts associated with actualglobalpress3/8. Settle old clipboard promise while new remains deferred; every newer status/busy/completearchive/clipboard field stays byteexact, and complete independent64task current/rawdurable/history/settings/unknown/typednegativezero/manual/pending/local/4storeIDB sources remain exact. Then settle newer promise truthfully. Full11raw phases,9click9down complete receipt/accounting/report/exit/cleanup.",
+    "replacementTests": [
+      "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "Every earlier tests byte and1017raw rationale objects/prefix, all31appassets/fixtures/inventory/functionalrapid/native/scenes/cloud/rapidcore bytes remain exact through definition and actualRED. Original ten/2s/400/1GB/512MB diagnostics and accepted OR09 refusal branch remain protected.",
+      "Full independent4field1020 accepted and6fieldcatalog exact includingfile/minimumAttempts2/explicitassertionId. Rawv1/worked8/threshold25 and canonicalv2/worked16/defaults plus exact physicalstore/local/source map are separate literal authority; no implementation/fixture/hydrate/cloudPayload/observed output produces expected bytes.",
+      "Reuse existing native ui.act full trusted receipts and recordRepeatOutcome; old/new accepted classifications must match actual Copy clicks and deferredoperations. No genericrepeat change/newharness/appseam/telemetry/globalclock/priming/deadline change; exactnative named dispatch/fullwriter regions GET after actualRED."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources$ tests.js",
+      "failure": "NOT EXECUTED in1073; definition only.1075 owns ONE whole selected public consumer run."
+    },
+    "observedEvidence": {
+      "definitionOnly": true,
+      "testOrKernelExecuted": false,
+      "staticReview": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or10/1073-STATIC-ORACLE-REVIEW.json",
+        "sha256": "07a64a420e3a517a50f47859daec96695a8cadf21665178b5049ece865b9e67c",
+        "bytes": 5066
+      },
+      "actualOR09Handoff": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or09/FINAL-HANDOFF.json",
+        "sha256": "a2d704710f5dc9b191adda5f7845222d12acb3fc19a7b970e4ae5a6ff38a3d57",
+        "bytes": 5905
+      }
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "cdd8f7ee9101847642a7724410d6e680b668f8f988ba55e17420661169b83caa",
+    "reason": "#1076 implements only exactnamed OR10 existing rapid/native case after actual1075runner RED736982dd. Both complete independent kernels/full outer remain unchanged.",
+    "previousBehavior": "Actual whole selected public consumer rejected missing obsolete-Copy case undefined!==1 at tests49002:9, child/wrapper1/errors[], before context/input/kernel, complete owned cleanup. Runner-enforcement RED, not app defect.",
+    "intendedBehavior": "Existing ui.act oldCopy/realclose/newSettings/disclosure/Export/newCopy, two accepted actualtrusted Copy pairs3/8, defer newerclipboard while settling old then prove unchanged whole newer UI/status/busy/archive/clipboard and every complete independent raw/current/durable/history/typed/localIDB/manual/pending/source byte. Truthful newercompletion afterward. Both104site kernels/full163site outer with all11fullraw phases/receipt/semantic/accounting/report/exit/cleanup under1279.",
+    "replacementTests": [
+      "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "All prior tests byteexact and1018raw rationale objects/prefix; all31appassets/fixtures/inventory/assignments/map/scenes/cloud/rapidcore exact. All other rapid/native bytes inverseexact. Original genericrepeat including OR09refusal bytehash exact; original diagnosticten2s burst bytehash exact.",
+      "Only exactnamed full11phasewriter and existing focused/fullordinary exactcasefilter extension plus namedrapidcase. Complete independent source/oracles unchanged; source-specific literalregions/bodyGET beforeedit.",
+      "Existing recordRepeatOutcome binds actual ui.act fulltrusted receiptpairs after complete independent kernel validation; no manufactured acceptedclick/event or input replacement/state mutation. Existing30ms obsoleteclipboard diagnostic settlement barrier retained, no new harness/appseam/telemetry/globalclock/deadline/tolerance changes. Externalclipboard is not OSclipboard proof."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or10/1075-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources$ tests.js",
+      "failure": "Actual736982dd whole1/0pass/1fail/0skip/cancel/todo child/wrapper1/no signal required obsoleteCopy selectedcase undefined!==1 tests49002:9, sourceunchanged/no context/input/kernel.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or10/1075-RED-RESULT.json",
+        "sha256": "95fc91221cb3ba9073f005a17b98b6f7c4c32bae89da1cd5bd0ae5dc150bf2ff",
+        "bytes": 5475
+      },
+      "record": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or10/1075-recorder/2026-10-30T01-43-03-369Z-736982dd-6e66-4441-87c8-548a155b94c1.json",
+        "sha256": "487c5c5a21915f1c0d92d91f2be59214792283170f0b8a9226a01323db8b8813",
+        "bytes": 11801554
+      }
+    },
+    "observedEvidence": {
+      "implementationNotExecuted": true,
+      "wholeGreenOwnedBy1279": true,
+      "exactNativeRegionBodyGET": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/ordinary-next-preparation/sol-owner/or10/1076-binding.readback.json",
+        "sha256": "b17d3192e402cc95d47237cb3434b612f5aacb63f4c2214461033dfa31230df1",
+        "bytes": 95207
+      }
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "75a4bc9192ecbbf8d3b00ee9a0189ad78eac5aefddcf177f96d82d0ec5154d4a",
+    "protectedTestFile": "scripts/agent-tools/test-groups.test.mjs",
+    "reason": "#1195 defines only the accepted independent existing public CLI/fixture admission cohort before runner/actual workload registration implementation or execution; actual1078accepted source and full1193/1288decision bound first.",
+    "previousBehavior": "Existing CLI assigns seven optional heavy roots to required native-process and registers their actual tests unconditionally. The first public fixture descriptor must expose that meaningful runner enforcement mismatch under1196, not native/product failure.",
+    "intendedBehavior": "Exactly7 explicit source-bound optional roots and complete immutable historical baseline retained; four required groups/defaultnpmtest and inheritedopt-in failclosed, explicitoptionalCLI runs exactly7actual fixture callbacks/TAP/journals/artifacts/source/cleanup with distinct resultkind, unknown/missing/duplicate/mandatory-root/reason/baseline/registration/digest/substitution negatives reject.",
+    "replacementTests": [
+      "test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution"
+    ],
+    "preservedCoverage": [
+      "All original agenttest bytes inverseexact after removing one conditional existingfixtureoption and appendedroot; default existinghelper paths and all oldassertions unchanged. Actual seven heavy callback source, tests.js, runner, app/fixtures/native/workflow/inventory unchanged in1195.",
+      "Every1019earlier rationale object/rawprefix and accepted8759OR10packet protected. Requiredmonolith tests fingerprint remainscdd8f7ee; this separate exact agenttest fingerprint is independently validated using exported actual dirty regression gate.",
+      "No newharness/browser/native/ports/fullprojectgroups/package/install/appedit/commit/CI/release. Newfixture journals use existingpublic CLI artifacts; originalten/400/2s/memory/pure controls protected."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution$ scripts/agent-tools/test-groups.test.mjs",
+      "failure": "NOT EXECUTED in1195; definition only.1196 owns ONE actual unchanged runner public CLI enforcement RED."
+    },
+    "observedEvidence": {
+      "definitionOnly": true,
+      "testOrKernelExecuted": false,
+      "binding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/nr-resume/sol-owner/1195-ACTUAL-BINDING-v2.json",
+        "sha256": "39a44d7db925a2d4711100086b2fda4d070c81a0dff0eab0d9fda89113d272c3",
+        "bytes": 20726
+      },
+      "existingFixtureOnly": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "5a11d6d9748b7c54e69259e41a394c567459eb9da09693a612a6da7e1ad5c858",
+    "protectedTestFile": "tests.js",
+    "agentTestChangesSha256": "75a4bc9192ecbbf8d3b00ee9a0189ad78eac5aefddcf177f96d82d0ec5154d4a",
+    "reason": "#1197 implements the accepted #1193 exact seven-root optional diagnostic partition only after the actual #1196 public CLI descriptor enforcement RED; every original heavy callback assertion remains byte-exact.",
+    "previousBehavior": "Actual #1196 CLI descriptor returned nine required native fixture roots including all seven explicitly classified workloads, instead of the independent two mandatory native roots. Default npm registration also included the seven strict optional diagnostics.",
+    "intendedBehavior": "Four required groups and default npm entry exclude exactly seven explicitly selected diagnostic registrations; required children force opt-in0. Existing explicit optional CLI runs the same complete source/TAP/artifact/accounting/cleanup verifier with distinct kind, immutable full baseline partition and digest, exact source/reason/registration controls and mandatory-evidence substitution refusal.",
+    "replacementTests": [
+      "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
+      "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+      "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+      "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+      "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
+      "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+      "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release"
+    ],
+    "newPublicConsumerTests": [
+      "test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution"
+    ],
+    "preservedCoverage": [
+      "All seven prior complete callback blocks and their assertion bodies remain exact after removing one leading registration space/wrapper; every other monolith byte and all earlier NR agent-test bytes remain exact.",
+      "Original immutable inventory/counts/durations/history, all four required groups and every ordinary, detector, source, unknown-root, process-child, missing/duplicate/skip guard remain fail-closed. Optional fixture execution never claims native/browser/product qualification.",
+      "All1020 prior rationale objects and raw prefix preserved; no app, fixture producer, native, deadlines, ten/400/2000/memory limits, workflow/package, source join or release changed."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/nr-resume/sol-owner/1196-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution$ scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Default required native partition must exclude exactly the seven explicitly classified workload roots; actual9 includesall7 versus expected2mandatory nativefixture roots; test-groups.test.mjs990:9"
+    },
+    "observedEvidence": {
+      "redResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/nr-resume/sol-owner/1196-RED-RESULT.json",
+        "sha256": "f19999022f4e9aa37e072eb65d09b179b88ab19b141ffd04cb291619cf5533cf",
+        "bytes": 7814
+      },
+      "redRun": "2026-10-30T02-16-48-698Z-e293ff8b-6ec2-4887-ac08-75661d1cb46d",
+      "binding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/nr-resume/sol-owner/1197-ACTUAL-BINDING.json",
+        "sha256": "ca73f2d42d7d926011a40d3f4796cc203bd4aaf3f051add73e1e10a2dc592597",
+        "bytes": 22249
+      },
+      "implementationOnly": true,
+      "behavioralCommands": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "ddfdceb99093c6fe75add5fd094d5ec5e9c0629fb08f5d6636baf98e9c57a759",
+    "reason": "#1200 selects the source-backed strict optional workload-diagnostic profile at exactly one original caller after actual routing RED #1199. No original callback assertion, fixture, registration, native implementation or limit changes.",
+    "previousBehavior": "The original caller omitted profile and requested a diagnostic-only rapid scenario. Actual raw native reports select ordinary and reject it at the trusted ordinary scenario fixture guard before context/input; the complete outer failure and cleanup are retained.",
+    "intendedBehavior": "Only this original caller explicitly selects the accepted workload-diagnostic profile and its original400 saved tasks,10 trusted attempts,2000ms strict window, full sensitivity/neutral document release/cleanup contract. Its one honest optional workload outcome is retained separately from required ordinary qualification.",
+    "replacementTests": [
+      "RISK repository process: native burst preparation survives remounts without waiving missing or late input"
+    ],
+    "preservedCoverage": [
+      "All other tests.js bytes invert exactly and every earlier complete callback assertion, negative-mode/neutral-release behavior and original strict400/ten/2000 limit remains exact. NR shared explicit opt-in/default npm refusal/four required groups/seven optional partition remain exact.",
+      "All earlier rationale objects and raw prefix preserved append-only. Independent NR cohort, immutable historical inventory/assignments, RISK map, native/fixture/app/workflow/package sources and all earlier failed raw reports remain exact.",
+      "No app behavior, deadline/tolerance/memory limit, new harness/telemetry/input priming, source join/commit/full suite/CI/push/release changes or execution."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1199-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: native burst preparation survives remounts without waiving missing or late input$ tests.js",
+      "failure": "Actual 2026-10-30T02-49-34-126Z-3f163bb6-f449-4cdc-ad8a-aba2e4c4e03d whole original caller failed; every raw ordinary-profile native report earliest failure: Trusted ordinary scenario fixture required: rapid motion settings open and both choices respond. Original P1 contextClosed assertion is a later symptom when applicable; not appRED or setup/import failure."
+    },
+    "observedEvidence": {
+      "routingRedResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1199-OUTCOME-RESULT.json",
+        "sha256": "f1797f908553a6190f0c74297225865be8c989e52becebaf9fc817aaa5833f66",
+        "bytes": 14517
+      },
+      "routingRedClosure": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1199-complete.readback.json",
+        "sha256": "e7938ba68461243ec72f2b8ed5ea9ee36689086007dd65de7df6f8254c0d20fe",
+        "bytes": 108596
+      },
+      "correctionBinding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1200-ACTUAL-BINDING.json",
+        "sha256": "9f0df55e183b236dd12a3bc4f1024ba12427f752a8ad27456adc6c7f7ba8cca9",
+        "bytes": 16598
+      },
+      "singleArgumentOnly": true,
+      "behavioralCommandsInCorrection": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "d711c4e177d67d61e76fe6cab23517095b54859a7e46c7a6b0210a3247b9d51b",
+    "reason": "#1203 selects the source-backed strict optional workload-diagnostic profile at exactly one original caller after actual routing RED #1202. No original callback assertion, fixture, registration, native implementation or limit changes.",
+    "previousBehavior": "The original caller omitted profile and requested a diagnostic-only rapid scenario. Actual raw native reports select ordinary and reject it at the trusted ordinary scenario fixture guard before context/input; the complete outer failure and cleanup are retained.",
+    "intendedBehavior": "Only this original caller explicitly selects the accepted workload-diagnostic profile and its original400 saved tasks,10 trusted attempts,2000ms strict window, full sensitivity/neutral document release/cleanup contract. Its one honest optional workload outcome is retained separately from required ordinary qualification.",
+    "replacementTests": [
+      "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts"
+    ],
+    "preservedCoverage": [
+      "All other tests.js bytes invert exactly and every earlier complete callback assertion, negative-mode/neutral-release behavior and original strict400/ten/2000 limit remains exact. NR shared explicit opt-in/default npm refusal/four required groups/seven optional partition remain exact.",
+      "All earlier rationale objects and raw prefix preserved append-only. Independent NR cohort, immutable historical inventory/assignments, RISK map, native/fixture/app/workflow/package sources and all earlier failed raw reports remain exact.",
+      "No app behavior, deadline/tolerance/memory limit, new harness/telemetry/input priming, source join/commit/full suite/CI/push/release changes or execution."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1202-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts$ tests.js",
+      "failure": "Actual 2026-10-30T02-58-53-161Z-4111ac6c-0e7e-4676-ae73-bfc24ae83b1f whole original caller failed; every raw ordinary-profile native report earliest failure: Trusted ordinary scenario fixture required: rapid motion settings open and both choices respond. Original P1 contextClosed assertion is a later symptom when applicable; not appRED or setup/import failure."
+    },
+    "observedEvidence": {
+      "routingRedResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1202-OUTCOME-RESULT.json",
+        "sha256": "929527fa61868df276e643ba8fe494a4a01b796129430664632010ac441a8a3d",
+        "bytes": 12240
+      },
+      "routingRedClosure": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1202-complete.readback.json",
+        "sha256": "a3a119dd3e6160759d952d69d17a0e5c58c0278b1d09cc4b162bc7c9a72ab119",
+        "bytes": 111009
+      },
+      "correctionBinding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1203-ACTUAL-BINDING.json",
+        "sha256": "30cc6ef27fb19f90448f117a23db25ad6be04b1aa06b8f9b342cd76810696c2f",
+        "bytes": 17625
+      },
+      "singleArgumentOnly": true,
+      "behavioralCommandsInCorrection": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "27e9c4981a34ddee835fd679f5d5301bb911c4928c8552e4173ce5ef4a9b533d",
+    "reason": "#1208 selects the source-backed strict optional workload-diagnostic profile at exactly one original caller after actual routing RED #1207. No original callback assertion, fixture, registration, native implementation or limit changes.",
+    "previousBehavior": "The original caller omitted profile and requested a diagnostic-only rapid scenario. Actual raw native reports select ordinary and reject it at the trusted ordinary scenario fixture guard before context/input; the complete outer failure and cleanup are retained.",
+    "intendedBehavior": "Only this original caller explicitly selects the accepted workload-diagnostic profile and its original400 saved tasks,10 trusted attempts,2000ms strict window, full sensitivity/neutral document release/cleanup contract. Its one honest optional workload outcome is retained separately from required ordinary qualification.",
+    "replacementTests": [
+      "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release"
+    ],
+    "preservedCoverage": [
+      "All other tests.js bytes invert exactly and every earlier complete callback assertion, negative-mode/neutral-release behavior and original strict400/ten/2000 limit remains exact. NR shared explicit opt-in/default npm refusal/four required groups/seven optional partition remain exact.",
+      "All earlier rationale objects and raw prefix preserved append-only. Independent NR cohort, immutable historical inventory/assignments, RISK map, native/fixture/app/workflow/package sources and all earlier failed raw reports remain exact.",
+      "No app behavior, deadline/tolerance/memory limit, new harness/telemetry/input priming, source join/commit/full suite/CI/push/release changes or execution."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1207-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release$ tests.js",
+      "failure": "Actual 2026-10-30T03-06-57-805Z-a5c64031-5da8-4781-b95f-8b3cdb227da8 whole original caller failed; every raw ordinary-profile native report earliest failure: Trusted ordinary scenario fixture required: rapid scene time presets, lock, live time, and close. Original P1 contextClosed assertion is a later symptom when applicable; not appRED or setup/import failure."
+    },
+    "observedEvidence": {
+      "routingRedResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1207-OUTCOME-RESULT.json",
+        "sha256": "aeddf4f9609035b593f907999f36251945d478c8a4469d4e7ec0ee11e187961f",
+        "bytes": 9786
+      },
+      "routingRedClosure": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1207-complete.readback.json",
+        "sha256": "de6947a214356157c9bf1a3cc73ce1fb4aa1eb2ecfe3b615ed000bf432931957",
+        "bytes": 111346
+      },
+      "correctionBinding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/profiles-resume/sol-owner/1208-ACTUAL-BINDING.json",
+        "sha256": "1183fc051c194b58252815b05b0fc2b8ab886e27627a4e6bb79caf9665dea8ba",
+        "bytes": 18624
+      },
+      "singleArgumentOnly": true,
+      "behavioralCommandsInCorrection": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "8044530c6726836005b953944a1797206ea81fb2980b94c6f3427cae700ae220",
+    "reason": "#1212 independently defines the accepted #1193 ordinary top-layer public probe/control consumer before producer implementation or runtime, with full source-backed64-task, geometry, intended input/refusal, typed source and cleanup oracles.",
+    "previousBehavior": "The existing public --probe/--control native consumer rejects the newly accepted top-layer-release capability at Known explicit sensitivity control. Existing optional400/ten/2000 overlay diagnostics remain exact and do not establish required ordinary sensitivity.",
+    "intendedBehavior": "Required ordinary64 signed-out two-engine probe accepts one intended opener and neutrally refuses a second real covered target. Full Settings setup plus native receipt/action indices, real preset overlap, complete raw/canonical/protected source bytes and types, no unintended click/save and complete cleanup are independently specified before one later enforcement RED and minimal producer implementation.",
+    "replacementTests": [
+      "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources"
+    ],
+    "preservedCoverage": [
+      "All earlier monolith bytes and original optional seven callbacks/strict400-ten-2000/negative/neutral-release/source assertions remain exact; new root is required native-process, no61st inventory scenario or114action relaxation.",
+      "All1024 earlier rationale objects/rawprefix, immutable baseline/catalog, app/fixture/native/CLI producers and other existing dirty source bytes remain exact. No expected data is derived by invoking fixture/app hydration/producer helpers or copying observed output.",
+      "This leaf performs definition/static checks only. No native/test/kernel execution, engine/port allocation or polling, new harness/telemetry, deadline/cadence, app state priming, sourcejoin/commit/fullsuite/CI/push/release."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources$ tests.js",
+      "failure": "NOT EXECUTED in1212 definition-only leaf.1213 after explicit root engine handoff owns ONE public CLI unknown top-layer-release control/receipt enforcement RED; no observed RED or app defect is claimed now."
+    },
+    "observedEvidence": {
+      "definitionOnly": true,
+      "behavioralCommands": 0,
+      "binding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1212-ACTUAL-BINDING.json",
+        "sha256": "01617fdd52d12b9d3cef4c597aae9a1d21bc7b0a944fc21396482faba9882073",
+        "bytes": 8935
+      },
+      "independentContract": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1212-INDEPENDENT-CONTRACT.json",
+        "sha256": "cf4367ef5d0860f1ce32403db1b5e4ec63f819fccdf90a4a5065b1148adfabd5",
+        "bytes": 4637
+      },
+      "nativeQueueHoldBefore1213": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "8044530c6726836005b953944a1797206ea81fb2980b94c6f3427cae700ae220",
+    "reason": "#1214 minimal existing named ordinary top-layer probe/control implementation follows actual #1213 public CLI missing-control enforcement RED; the independent #1212 complete consumer remains byte-exact.",
+    "previousBehavior": "Both actual public CLI engine requests reject top-layer-release at Known explicit sensitivity control before any report/browser/server/fixture/input. Run179cbb15 whole3tests/0pass/3fail, child/wrapper1/1, retained unchanged.",
+    "intendedBehavior": "The existing public ordinary64 probe performs one explicit Settings setup and two intended opener attempts. First accepts, real preset covers second actual trusted down, existing separate-document neutral up refuses without any preset/other click. Five complete typed full source phases and exact reports bind unchanged independent expectations for both engines.",
+    "replacementTests": [
+      "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources"
+    ],
+    "preservedCoverage": [
+      "The entire1212 consumer and all prior monolith/test/assignment/RISK bytes remain exact. Original seven optional callbacks,400/ten/2000/clocks/cadence/negative controls/neutral-release behavior remain exact. No61st inventory scenario or114-action change.",
+      "All1025 prior rationale objects and raw prefix remain exact. Only the exact named native public control/local repeat/source-writer/overlap branch is admitted; every other native byte inverts exactly. All app/fixture/publicCLI/catalog/baseline/other dirty sources remain exact.",
+      "No behavioral execution occurs in implementation. The single later1215 unchanged whole native sensitivity command separately earns actual acceptance; no invented GREEN, retry, app change, new harness/telemetry, app-state priming, install, commit/join/fullsuite/CI/release."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1213-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources$ tests.js",
+      "failure": "Actual planned enforcement RED: both public CLI requests exit1 with Known explicit sensitivity control. Complete3tests/0pass/3fail, child/wrapper1/1; no setup/import/app failure.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1213-OUTCOME-RESULT.json",
+        "sha256": "79d557fbe658316e8a5fbede94d5f9b60edf037f865ade5df75aa3742c5f67f8",
+        "bytes": 9318
+      }
+    },
+    "observedEvidence": {
+      "binding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1214-ACTUAL-BINDING.json",
+        "sha256": "036123f298ce92d03056473df771cfffcaa64985de889b52013e8eae717a7477",
+        "bytes": 20519
+      },
+      "redResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1213-OUTCOME-RESULT.json",
+        "sha256": "79d557fbe658316e8a5fbede94d5f9b60edf037f865ade5df75aa3742c5f67f8",
+        "bytes": 9318
+      },
+      "redClosure": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1213-complete.readback.json",
+        "sha256": "7e129f8357b021015f7a2e7caffe1120671b9c3a39d5ff3db214082fe4f51f12",
+        "bytes": 104186
+      },
+      "exactNativeReplacements": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1214-EXACT-NATIVE-REPLACEMENTS.json",
+        "sha256": "e5c5e5cb449b5634ff3af68654493ba80f0202e8ac5918f184cd1022397aed7a",
+        "bytes": 15464
+      },
+      "frozenIndependentConsumer": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/1212-NEW-ROOT.txt",
+        "sha256": "adaa78a37708e35649fb26bd77452031bcccae8999b1d5df1eeb71ca2e17852d",
+        "bytes": 20341
+      },
+      "greenNotRun": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+    "reason": "#1080 independently defines the full accepted #1020/#1193 trusted aggregate/planner/workflow ordinary-versus-optional profile boundary before any PA execution or implementation.",
+    "previousBehavior": "The public planner has no explicit fixed engine/profile admission context; selected existing workflow has no seven-root optional public mode/result transfer and aggregate has no separately identified optional workload outcome. Current default ordinary and raw optional mobile protections already exist and remain preserved.",
+    "intendedBehavior": "Trusted caller context fixes one complete ordinary Chromium and WebKit report. The same default-false optional_mobile_diagnostics job separately runs and retains exact seven strict optional roots/raw outcomes. Complete selected/unselected optional evidence cannot replace missing or false ordinary report/action/repeat/receipt/source/accounting/cleanup or block solely on optional status.",
+    "replacementTests": [
+      "RISK repository process: trusted planner declares ordinary engines separately from optional workloads"
+    ],
+    "preservedCoverage": [
+      "Every prior monolith and agent callback/assertion and original strict400/ten/2000/source/motion/1GB/512MB/kernel/OOM/cleanup/negative control remains byte-exact; only complete independent roots are appended. No app behavior, fixture relaxation, new harness, deadline/cadence, runtime allocation, commit/join/fullsuite/CI/release.",
+      "All1026 prior rationale objects/rawprefix, original inventory/case/source/replacement mappings and every existing producer/workflow file remain exact in this definition-only leaf. No fake pass/skip or opaque source projection."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^(?:RISK repository process: trusted planner declares ordinary engines separately from optional workloads|test group public workflow retains selected workload evidence without admitting it as ordinary proof)$ tests.js scripts/agent-tools/test-groups.test.mjs",
+      "failure": "NOT EXECUTED under1080 definition-only.1082 owns ONE future complete public-consumer enforcement RED; no observed failure or app defect claimed now."
+    },
+    "observedEvidence": {
+      "definitionOnly": true,
+      "binding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1080-ACTUAL-BINDING.json",
+        "sha256": "c6596344230147ecc28eaefd59d20fcfcec79d58acc2633b553c2cac5adcc509",
+        "bytes": 8794
+      },
+      "fullDefinition": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1080-MONOLITH-ROOT.txt",
+        "sha256": "d5efd2cac54106e32c6f18bd1160e076ffa66e66fef40278b916cd25eaa52ea7",
+        "bytes": 2407
+      },
+      "futureNodeTests": 34,
+      "behavioralCommands": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da",
+    "reason": "#1080 independently defines the full accepted #1020/#1193 trusted aggregate/planner/workflow ordinary-versus-optional profile boundary before any PA execution or implementation.",
+    "previousBehavior": "The public planner has no explicit fixed engine/profile admission context; selected existing workflow has no seven-root optional public mode/result transfer and aggregate has no separately identified optional workload outcome. Current default ordinary and raw optional mobile protections already exist and remain preserved.",
+    "intendedBehavior": "Trusted caller context fixes one complete ordinary Chromium and WebKit report. The same default-false optional_mobile_diagnostics job separately runs and retains exact seven strict optional roots/raw outcomes. Complete selected/unselected optional evidence cannot replace missing or false ordinary report/action/repeat/receipt/source/accounting/cleanup or block solely on optional status.",
+    "replacementTests": [
+      "test group public workflow retains selected workload evidence without admitting it as ordinary proof"
+    ],
+    "preservedCoverage": [
+      "Every prior monolith and agent callback/assertion and original strict400/ten/2000/source/motion/1GB/512MB/kernel/OOM/cleanup/negative control remains byte-exact; only complete independent roots are appended. No app behavior, fixture relaxation, new harness, deadline/cadence, runtime allocation, commit/join/fullsuite/CI/release.",
+      "All1026 prior rationale objects/rawprefix, original inventory/case/source/replacement mappings and every existing producer/workflow file remain exact in this definition-only leaf. No fake pass/skip or opaque source projection."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^(?:RISK repository process: trusted planner declares ordinary engines separately from optional workloads|test group public workflow retains selected workload evidence without admitting it as ordinary proof)$ tests.js scripts/agent-tools/test-groups.test.mjs",
+      "failure": "NOT EXECUTED under1080 definition-only.1082 owns ONE future complete public-consumer enforcement RED; no observed failure or app defect claimed now."
+    },
+    "observedEvidence": {
+      "definitionOnly": true,
+      "binding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1080-ACTUAL-BINDING.json",
+        "sha256": "c6596344230147ecc28eaefd59d20fcfcec79d58acc2633b553c2cac5adcc509",
+        "bytes": 8794
+      },
+      "fullDefinition": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1080-AGENT-ROOT.txt",
+        "sha256": "4af74d36ec5a79088e616333595999fa0f69a1fcca7824b28c2c2346dd39baee",
+        "bytes": 24033
+      },
+      "futureNodeTests": 34,
+      "behavioralCommands": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+    "reason": "#1084 minimal existing runner/aggregate/planner/workflow trusted profile admission follows actual complete #1082 intended public consumer RED. Both complete independent #1080 roots remain unchanged.",
+    "previousBehavior": "ONE actual9863debd whole34tests/13pass/21fail reaches the missing fixed planner context, selected seven-root workflow execution/transfer and separate aggregate optional raw outcome. All13 mandatory ordinary negatives already pass and remain protected.",
+    "intendedBehavior": "Explicit trusted ordinary Chromium/WebKit context remains mandatory. The same selected existing job runs exactly seven optional public-mode workload roots and retains full raw result/actual status/TAP/artifacts. Existing verifier and artifact/source checks identify pass, failed, invalid, unavailable or not-run without substituting for ordinary action/repeat/receipt/source/accounting/cleanup or failing mandatory solely on optional status; original mobile pass/app-failed/failed/integrity evidence remains exact.",
+    "replacementTests": [
+      "RISK repository process: trusted planner declares ordinary engines separately from optional workloads"
+    ],
+    "preservedCoverage": [
+      "Both entire independent roots and every earlier test/native/app/fixture/catalog/baseline byte stay exact. All original optional400/ten/2000/source/motion/1GB/512MB/kernel/OOM/cleanup/negative assertions and old G/GW controls remain preserved.",
+      "All1028 prior rationale objects/rawprefix and original case/source/replacement mappings remain exact. Only frozen exact runner/workflow replacements and two truthful rationale objects are added; no new job/workflow/harness/telemetry, native execution, install, app state priming, commit/join/fullsuite/CI/release."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^(?:RISK repository process: trusted planner declares ordinary engines separately from optional workloads|test group public workflow retains selected workload evidence without admitting it as ordinary proof)$ tests.js scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual intended RED9863debd:34tests/13pass/21fail, child/wrapper1/1, no signal/skip/cancel/todo/stderr. Missing trusted descriptor and separate optional producer/outcome assertions; no app/import/setup failure.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      }
+    },
+    "observedEvidence": {
+      "implementationBinding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1084-ACTUAL-BINDING.json",
+        "sha256": "aa0910d6455e9256aecb544f47b4ff6738ebb3cc0128cc1b37f5e4bd8e5dcb3b",
+        "bytes": 5911
+      },
+      "exactReplacements": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1084-EXACT-REPLACEMENTS.json",
+        "sha256": "7eee6eaac1653f5d2644ca25beea376b986a10294b56b6a851d24a655f37384d",
+        "bytes": 12213
+      },
+      "actualRED": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      },
+      "redClosure": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-complete.readback.json",
+        "sha256": "0ee43c6545a1ce8ac2254e946286c950535d6cc60d9b2ac85745a5a24d5a5371",
+        "bytes": 91471
+      },
+      "greenNotRun": true,
+      "behavioralCommands": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da",
+    "reason": "#1084 minimal existing runner/aggregate/planner/workflow trusted profile admission follows actual complete #1082 intended public consumer RED. Both complete independent #1080 roots remain unchanged.",
+    "previousBehavior": "ONE actual9863debd whole34tests/13pass/21fail reaches the missing fixed planner context, selected seven-root workflow execution/transfer and separate aggregate optional raw outcome. All13 mandatory ordinary negatives already pass and remain protected.",
+    "intendedBehavior": "Explicit trusted ordinary Chromium/WebKit context remains mandatory. The same selected existing job runs exactly seven optional public-mode workload roots and retains full raw result/actual status/TAP/artifacts. Existing verifier and artifact/source checks identify pass, failed, invalid, unavailable or not-run without substituting for ordinary action/repeat/receipt/source/accounting/cleanup or failing mandatory solely on optional status; original mobile pass/app-failed/failed/integrity evidence remains exact.",
+    "replacementTests": [
+      "test group public workflow retains selected workload evidence without admitting it as ordinary proof"
+    ],
+    "preservedCoverage": [
+      "Both entire independent roots and every earlier test/native/app/fixture/catalog/baseline byte stay exact. All original optional400/ten/2000/source/motion/1GB/512MB/kernel/OOM/cleanup/negative assertions and old G/GW controls remain preserved.",
+      "All1028 prior rationale objects/rawprefix and original case/source/replacement mappings remain exact. Only frozen exact runner/workflow replacements and two truthful rationale objects are added; no new job/workflow/harness/telemetry, native execution, install, app state priming, commit/join/fullsuite/CI/release."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^(?:RISK repository process: trusted planner declares ordinary engines separately from optional workloads|test group public workflow retains selected workload evidence without admitting it as ordinary proof)$ tests.js scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual intended RED9863debd:34tests/13pass/21fail, child/wrapper1/1, no signal/skip/cancel/todo/stderr. Missing trusted descriptor and separate optional producer/outcome assertions; no app/import/setup failure.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      }
+    },
+    "observedEvidence": {
+      "implementationBinding": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1084-ACTUAL-BINDING.json",
+        "sha256": "aa0910d6455e9256aecb544f47b4ff6738ebb3cc0128cc1b37f5e4bd8e5dcb3b",
+        "bytes": 5911
+      },
+      "exactReplacements": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1084-EXACT-REPLACEMENTS.json",
+        "sha256": "7eee6eaac1653f5d2644ca25beea376b986a10294b56b6a851d24a655f37384d",
+        "bytes": 12213
+      },
+      "actualRED": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      },
+      "redClosure": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-complete.readback.json",
+        "sha256": "0ee43c6545a1ce8ac2254e946286c950535d6cc60d9b2ac85745a5a24d5a5371",
+        "bytes": 91471
+      },
+      "greenNotRun": true,
+      "behavioralCommands": 0
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "comparisonBases": [
+      {
+        "base": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+        "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+        "diff": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/PREVIEW-3bd119a5-tests.js.patch",
+          "sha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+          "bytes": 149153
+        }
+      }
+    ],
+    "testChangesSha256": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+    "reason": "#1090 exact final metadata reconciles the actual complete profile and ordinary-consumer test diff against the retained physical3bd source and original admitted2962 G base, preserving every complete earlier record and observed chronology.",
+    "previousBehavior": "Earlier independently observed G/OR/NR/TP/PA cycles and retained failed/optional/native packets remain historical. The final dirty test diff includes the new current-source planner/whole workflow aggregate consumer; a committed HEAD-only comparison cannot validate these dirty edits.",
+    "intendedBehavior": "Actual focused PA129/129 and preserved diagnostic143/143 on identical code retain required ordinary engine/profile/source/action/repeat/receipt/accounting/cleanup admission while optional strict workloads stay separately identified raw outcomes. Final exported validators will check the real dirty comparison; no clean committed source/fullsuite/CI/release proof is claimed here.",
+    "replacementTests": [
+      "RISK repository process: trusted planner declares ordinary engines separately from optional workloads"
+    ],
+    "preservedCoverage": [
+      "All1030 complete prior rationale objects and their raw prefix remain exact, including original real RED/GREEN/native/optional failures and source-pool/replacement/case metadata. No prior record, assertion, normalized value, raw protected source or typed evidence is rewritten.",
+      "Both complete PA definitions, all prior test/native/app/fixture/runner/workflow modules and existing RISK/assignment maps remain byte-exact from actual1088 accepted source. Metadata-only append; no native/browser/port/cap/Docker/host Git mutex/sourcejoin/commit/fullsuite/CI/release.",
+      "Physical3bd and admitted2962 bases and actual absence of configured upstream for own and inherited G branch are recorded separately; no future root, sourcejoin, upstream or commit identity is invented."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^(?:RISK repository process: trusted planner declares ordinary engines separately from optional workloads|test group public workflow retains selected workload evidence without admitting it as ordinary proof)$ tests.js scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual #1082 preimplementation run9863debd retained34tests/13pass/21fail, child/wrapper1/1. Missing trusted descriptor and separate optional workflow/result contract, with all13 mandatory negatives already passing; no app/import/setup RED.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      }
+    },
+    "observedEvidence": {
+      "metadataOnly": true,
+      "testFile": "tests.js",
+      "acceptedPA04": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1086-OUTCOME-RESULT.json",
+        "sha256": "e5710040766a09588ada9b34d6570f3d79ef376440a5222566cd7aa0d18729d9",
+        "bytes": 12537
+      },
+      "preservedPS02": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1088-OUTCOME-RESULT.json",
+        "sha256": "290092f913db19dc8a1c8cb11b5710994604a1dece5915c68139f715811e9659",
+        "bytes": 15337
+      },
+      "sourceBeforeMetadata": {
+        "worktree": "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+        "head": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+        "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+        "branch": "agent/1451-saved-offline",
+        "files": {
+          ".github/workflows/data-safety.yml": {
+            "sha256": "5cf4d3336b0554b0395059d522a46f46c412b7acab6cbad4cd19bf54db274e7d",
+            "bytes": 20310
+          },
+          "RISK_TEST_COVERAGE.md": {
+            "sha256": "0d761fe9469f127e6a3734e58ef53f2426723378d3e1b826a7bdc4536e423d63",
+            "bytes": 248623
+          },
+          "TEST_CHANGE_RATIONALES.json": {
+            "sha256": "9dc65ccfb01383a241edace4fce5fb53f105bbcc60ff230e373093271c9ac7e3",
+            "bytes": 5706758
+          },
+          "scripts/agent-tools/test-groups.test.mjs": {
+            "sha256": "65575b0329eb684d8e0da0118a937ea5c6110147171dc03fdc864a9b2bb4f37e",
+            "bytes": 127188
+          },
+          "scripts/button-safety-cloud.mjs": {
+            "sha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+            "bytes": 101492
+          },
+          "scripts/button-safety-native.mjs": {
+            "sha256": "25267840ea2a56187e00249b72761f96217e1306af26f1d779e8da18c27bd91b",
+            "bytes": 90773
+          },
+          "scripts/button-safety-rapid-core.mjs": {
+            "sha256": "2f89b3b7510bd78b904388fefeb88c9c6faffbf530e67dbe887123ae46eaffed",
+            "bytes": 150396
+          },
+          "scripts/button-safety-rapid.mjs": {
+            "sha256": "abb18be383b22343d14775253bbff5cf44fc6403935e8d73c0958ba8dc0a7ec2",
+            "bytes": 54056
+          },
+          "scripts/button-safety-scenes.mjs": {
+            "sha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+            "bytes": 35442
+          },
+          "scripts/test-group-assignments.json": {
+            "sha256": "cdcb2f1b0e40206867d2dfbf18046bd8d34fbb2ca9695b1a70efbaa7865bced7",
+            "bytes": 494220
+          },
+          "scripts/test-groups.mjs": {
+            "sha256": "2e75ad927dd4f4552da6c64f9642b64f09f07def3d331988b1143a4e61e058ea",
+            "bytes": 81347
+          },
+          "tests.js": {
+            "sha256": "7d43d5d877c569d6433c75737e5162397f2a3b85ad991b8d326b7e3056b297ce",
+            "bytes": 4746603
+          }
+        },
+        "fullIndexPatchSha256": "1645b2c7bf25f61559f28b66bba2fd85146ef53afe1eeb087b4fa1dec8fd4b1f",
+        "testDiffSha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+        "protectedTestFingerprint": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+        "agentTestDiffSha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+        "agentProtectedTestFingerprint": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da"
+      },
+      "basePreparation": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/METADATA-BASE-COMPARISON-PREPARATION.json",
+        "sha256": "b24d8e405b82cc3d668c866783a663a11cf7dbfe9aa3c13841e20eb13a9edca0",
+        "bytes": 5647
+      },
+      "upstreams": [
+        {
+          "branch": "agent/1451-saved-offline",
+          "remote": {
+            "exit": 1,
+            "value": ""
+          },
+          "merge": {
+            "exit": 1,
+            "value": ""
+          },
+          "configured": false
+        },
+        {
+          "branch": "agent/293-optional-policy",
+          "remote": {
+            "exit": 1,
+            "value": ""
+          },
+          "merge": {
+            "exit": 1,
+            "value": ""
+          },
+          "configured": false
+        }
+      ],
+      "laterFinal1292NotExecuted": true
+    }
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "comparisonBases": [
+      {
+        "base": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+        "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+        "diff": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/PREVIEW-3bd119a5-test-groups.test.mjs.patch",
+          "sha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+          "bytes": 40317
+        }
+      },
+      {
+        "base": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+        "tree": "2944bffc61e244b132bb48a8afaa392f14a24c14",
+        "diff": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/PREVIEW-2962c18f-test-groups.test.mjs.patch",
+          "sha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+          "bytes": 40317
+        }
+      }
+    ],
+    "testChangesSha256": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da",
+    "reason": "#1090 exact final metadata reconciles the actual complete profile and ordinary-consumer test diff against the retained physical3bd source and original admitted2962 G base, preserving every complete earlier record and observed chronology.",
+    "previousBehavior": "Earlier independently observed G/OR/NR/TP/PA cycles and retained failed/optional/native packets remain historical. The final dirty test diff includes the new current-source planner/whole workflow aggregate consumer; a committed HEAD-only comparison cannot validate these dirty edits.",
+    "intendedBehavior": "Actual focused PA129/129 and preserved diagnostic143/143 on identical code retain required ordinary engine/profile/source/action/repeat/receipt/accounting/cleanup admission while optional strict workloads stay separately identified raw outcomes. Final exported validators will check the real dirty comparison; no clean committed source/fullsuite/CI/release proof is claimed here.",
+    "replacementTests": [
+      "test group public workflow retains selected workload evidence without admitting it as ordinary proof"
+    ],
+    "preservedCoverage": [
+      "All1030 complete prior rationale objects and their raw prefix remain exact, including original real RED/GREEN/native/optional failures and source-pool/replacement/case metadata. No prior record, assertion, normalized value, raw protected source or typed evidence is rewritten.",
+      "Both complete PA definitions, all prior test/native/app/fixture/runner/workflow modules and existing RISK/assignment maps remain byte-exact from actual1088 accepted source. Metadata-only append; no native/browser/port/cap/Docker/host Git mutex/sourcejoin/commit/fullsuite/CI/release.",
+      "Physical3bd and admitted2962 bases and actual absence of configured upstream for own and inherited G branch are recorded separately; no future root, sourcejoin, upstream or commit identity is invented."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^(?:RISK repository process: trusted planner declares ordinary engines separately from optional workloads|test group public workflow retains selected workload evidence without admitting it as ordinary proof)$ tests.js scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual #1082 preimplementation run9863debd retained34tests/13pass/21fail, child/wrapper1/1. Missing trusted descriptor and separate optional workflow/result contract, with all13 mandatory negatives already passing; no app/import/setup RED.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      }
+    },
+    "observedEvidence": {
+      "metadataOnly": true,
+      "testFile": "scripts/agent-tools/test-groups.test.mjs",
+      "acceptedPA04": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1086-OUTCOME-RESULT.json",
+        "sha256": "e5710040766a09588ada9b34d6570f3d79ef376440a5222566cd7aa0d18729d9",
+        "bytes": 12537
+      },
+      "preservedPS02": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1088-OUTCOME-RESULT.json",
+        "sha256": "290092f913db19dc8a1c8cb11b5710994604a1dece5915c68139f715811e9659",
+        "bytes": 15337
+      },
+      "sourceBeforeMetadata": {
+        "worktree": "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+        "head": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+        "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+        "branch": "agent/1451-saved-offline",
+        "files": {
+          ".github/workflows/data-safety.yml": {
+            "sha256": "5cf4d3336b0554b0395059d522a46f46c412b7acab6cbad4cd19bf54db274e7d",
+            "bytes": 20310
+          },
+          "RISK_TEST_COVERAGE.md": {
+            "sha256": "0d761fe9469f127e6a3734e58ef53f2426723378d3e1b826a7bdc4536e423d63",
+            "bytes": 248623
+          },
+          "TEST_CHANGE_RATIONALES.json": {
+            "sha256": "9dc65ccfb01383a241edace4fce5fb53f105bbcc60ff230e373093271c9ac7e3",
+            "bytes": 5706758
+          },
+          "scripts/agent-tools/test-groups.test.mjs": {
+            "sha256": "65575b0329eb684d8e0da0118a937ea5c6110147171dc03fdc864a9b2bb4f37e",
+            "bytes": 127188
+          },
+          "scripts/button-safety-cloud.mjs": {
+            "sha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+            "bytes": 101492
+          },
+          "scripts/button-safety-native.mjs": {
+            "sha256": "25267840ea2a56187e00249b72761f96217e1306af26f1d779e8da18c27bd91b",
+            "bytes": 90773
+          },
+          "scripts/button-safety-rapid-core.mjs": {
+            "sha256": "2f89b3b7510bd78b904388fefeb88c9c6faffbf530e67dbe887123ae46eaffed",
+            "bytes": 150396
+          },
+          "scripts/button-safety-rapid.mjs": {
+            "sha256": "abb18be383b22343d14775253bbff5cf44fc6403935e8d73c0958ba8dc0a7ec2",
+            "bytes": 54056
+          },
+          "scripts/button-safety-scenes.mjs": {
+            "sha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+            "bytes": 35442
+          },
+          "scripts/test-group-assignments.json": {
+            "sha256": "cdcb2f1b0e40206867d2dfbf18046bd8d34fbb2ca9695b1a70efbaa7865bced7",
+            "bytes": 494220
+          },
+          "scripts/test-groups.mjs": {
+            "sha256": "2e75ad927dd4f4552da6c64f9642b64f09f07def3d331988b1143a4e61e058ea",
+            "bytes": 81347
+          },
+          "tests.js": {
+            "sha256": "7d43d5d877c569d6433c75737e5162397f2a3b85ad991b8d326b7e3056b297ce",
+            "bytes": 4746603
+          }
+        },
+        "fullIndexPatchSha256": "1645b2c7bf25f61559f28b66bba2fd85146ef53afe1eeb087b4fa1dec8fd4b1f",
+        "testDiffSha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+        "protectedTestFingerprint": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+        "agentTestDiffSha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+        "agentProtectedTestFingerprint": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da"
+      },
+      "basePreparation": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/METADATA-BASE-COMPARISON-PREPARATION.json",
+        "sha256": "b24d8e405b82cc3d668c866783a663a11cf7dbfe9aa3c13841e20eb13a9edca0",
+        "bytes": 5647
+      },
+      "upstreams": [
+        {
+          "branch": "agent/1451-saved-offline",
+          "remote": {
+            "exit": 1,
+            "value": ""
+          },
+          "merge": {
+            "exit": 1,
+            "value": ""
+          },
+          "configured": false
+        },
+        {
+          "branch": "agent/293-optional-policy",
+          "remote": {
+            "exit": 1,
+            "value": ""
+          },
+          "merge": {
+            "exit": 1,
+            "value": ""
+          },
+          "configured": false
+        }
+      ],
+      "laterFinal1292NotExecuted": true
+    }
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "comparisonBases": [
+      {
+        "base": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+        "tree": "2944bffc61e244b132bb48a8afaa392f14a24c14",
+        "diff": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/PREVIEW-2962c18f-tests.js.patch",
+          "sha256": "0321800f7994eace3014e07ff2a62da9798c9780086413c0c7c5704ff66087cb",
+          "bytes": 338949
+        }
+      }
+    ],
+    "testChangesSha256": "2b031a4c8a611a15a2b6038fabfefcf45afd18e7b84bcb1a9e3b3c8b7dab099a",
+    "reason": "#1090 exact final metadata reconciles the actual complete profile and ordinary-consumer test diff against the retained physical3bd source and original admitted2962 G base, preserving every complete earlier record and observed chronology.",
+    "previousBehavior": "Earlier independently observed G/OR/NR/TP/PA cycles and retained failed/optional/native packets remain historical. The final dirty test diff includes the new current-source planner/whole workflow aggregate consumer; a committed HEAD-only comparison cannot validate these dirty edits.",
+    "intendedBehavior": "Actual focused PA129/129 and preserved diagnostic143/143 on identical code retain required ordinary engine/profile/source/action/repeat/receipt/accounting/cleanup admission while optional strict workloads stay separately identified raw outcomes. Final exported validators will check the real dirty comparison; no clean committed source/fullsuite/CI/release proof is claimed here.",
+    "replacementTests": [
+      "RISK repository process: trusted planner declares ordinary engines separately from optional workloads"
+    ],
+    "preservedCoverage": [
+      "All1030 complete prior rationale objects and their raw prefix remain exact, including original real RED/GREEN/native/optional failures and source-pool/replacement/case metadata. No prior record, assertion, normalized value, raw protected source or typed evidence is rewritten.",
+      "Both complete PA definitions, all prior test/native/app/fixture/runner/workflow modules and existing RISK/assignment maps remain byte-exact from actual1088 accepted source. Metadata-only append; no native/browser/port/cap/Docker/host Git mutex/sourcejoin/commit/fullsuite/CI/release.",
+      "Physical3bd and admitted2962 bases and actual absence of configured upstream for own and inherited G branch are recorded separately; no future root, sourcejoin, upstream or commit identity is invented."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^(?:RISK repository process: trusted planner declares ordinary engines separately from optional workloads|test group public workflow retains selected workload evidence without admitting it as ordinary proof)$ tests.js scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual #1082 preimplementation run9863debd retained34tests/13pass/21fail, child/wrapper1/1. Missing trusted descriptor and separate optional workflow/result contract, with all13 mandatory negatives already passing; no app/import/setup RED.",
+      "result": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      }
+    },
+    "observedEvidence": {
+      "metadataOnly": true,
+      "testFile": "tests.js",
+      "acceptedPA04": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1086-OUTCOME-RESULT.json",
+        "sha256": "e5710040766a09588ada9b34d6570f3d79ef376440a5222566cd7aa0d18729d9",
+        "bytes": 12537
+      },
+      "preservedPS02": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1088-OUTCOME-RESULT.json",
+        "sha256": "290092f913db19dc8a1c8cb11b5710994604a1dece5915c68139f715811e9659",
+        "bytes": 15337
+      },
+      "sourceBeforeMetadata": {
+        "worktree": "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+        "head": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+        "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+        "branch": "agent/1451-saved-offline",
+        "files": {
+          ".github/workflows/data-safety.yml": {
+            "sha256": "5cf4d3336b0554b0395059d522a46f46c412b7acab6cbad4cd19bf54db274e7d",
+            "bytes": 20310
+          },
+          "RISK_TEST_COVERAGE.md": {
+            "sha256": "0d761fe9469f127e6a3734e58ef53f2426723378d3e1b826a7bdc4536e423d63",
+            "bytes": 248623
+          },
+          "TEST_CHANGE_RATIONALES.json": {
+            "sha256": "9dc65ccfb01383a241edace4fce5fb53f105bbcc60ff230e373093271c9ac7e3",
+            "bytes": 5706758
+          },
+          "scripts/agent-tools/test-groups.test.mjs": {
+            "sha256": "65575b0329eb684d8e0da0118a937ea5c6110147171dc03fdc864a9b2bb4f37e",
+            "bytes": 127188
+          },
+          "scripts/button-safety-cloud.mjs": {
+            "sha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+            "bytes": 101492
+          },
+          "scripts/button-safety-native.mjs": {
+            "sha256": "25267840ea2a56187e00249b72761f96217e1306af26f1d779e8da18c27bd91b",
+            "bytes": 90773
+          },
+          "scripts/button-safety-rapid-core.mjs": {
+            "sha256": "2f89b3b7510bd78b904388fefeb88c9c6faffbf530e67dbe887123ae46eaffed",
+            "bytes": 150396
+          },
+          "scripts/button-safety-rapid.mjs": {
+            "sha256": "abb18be383b22343d14775253bbff5cf44fc6403935e8d73c0958ba8dc0a7ec2",
+            "bytes": 54056
+          },
+          "scripts/button-safety-scenes.mjs": {
+            "sha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+            "bytes": 35442
+          },
+          "scripts/test-group-assignments.json": {
+            "sha256": "cdcb2f1b0e40206867d2dfbf18046bd8d34fbb2ca9695b1a70efbaa7865bced7",
+            "bytes": 494220
+          },
+          "scripts/test-groups.mjs": {
+            "sha256": "2e75ad927dd4f4552da6c64f9642b64f09f07def3d331988b1143a4e61e058ea",
+            "bytes": 81347
+          },
+          "tests.js": {
+            "sha256": "7d43d5d877c569d6433c75737e5162397f2a3b85ad991b8d326b7e3056b297ce",
+            "bytes": 4746603
+          }
+        },
+        "fullIndexPatchSha256": "1645b2c7bf25f61559f28b66bba2fd85146ef53afe1eeb087b4fa1dec8fd4b1f",
+        "testDiffSha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+        "protectedTestFingerprint": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+        "agentTestDiffSha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+        "agentProtectedTestFingerprint": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da"
+      },
+      "basePreparation": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/METADATA-BASE-COMPARISON-PREPARATION.json",
+        "sha256": "b24d8e405b82cc3d668c866783a663a11cf7dbfe9aa3c13841e20eb13a9edca0",
+        "bytes": 5647
+      },
+      "upstreams": [
+        {
+          "branch": "agent/1451-saved-offline",
+          "remote": {
+            "exit": 1,
+            "value": ""
+          },
+          "merge": {
+            "exit": 1,
+            "value": ""
+          },
+          "configured": false
+        },
+        {
+          "branch": "agent/293-optional-policy",
+          "remote": {
+            "exit": 1,
+            "value": ""
+          },
+          "merge": {
+            "exit": 1,
+            "value": ""
+          },
+          "configured": false
+        }
+      ],
+      "laterFinal1292NotExecuted": true
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "1b758cb6506a51311b035e5175c75ddf193898a368ce0ae58a4db53dd0998c06",
+    "reason": "#1555 adds the missing exact comparison association for scripts/agent-tools/button-ci-policy.test.mjs when the preserved dirty G source is compared with both frozenf22 and actual clean rootd042 through their common ancestorc920. This is append-only comparison metadata; it changes no executable test, app, validator, source pool, workflow, map or assignment.",
+    "previousBehavior": "The physical3bd and admitted2962 comparisons passed their existing associations under1292, but neither identifies this actualc920 per-file diff. The one recorded1555 before invocation returned a missing exact-diff rationale for this file under each root/f22 comparison; source and all1033 complete prior objects were unchanged.",
+    "intendedBehavior": "Associate only the actual exported protected fingerprint and the exact added or updated test declarations in this file with both independently captured comparison identities. Preserve all1033 prior complete objects/rawprefix, all180 other tracked files and every source-qualified original RED/GREEN/optional status; an eligible metadata pass confers no new behavior, native, full-suite or release proof.",
+    "replacementTests": [
+      "hosted memory policy admits only explicitly selected mobile workflow dispatch on a branch",
+      "hosted mobile reports require explicit raw policy for optional dispatch"
+    ],
+    "preservedCoverage": [
+      "The original complete G/GW caller/job routing and optional-download source consumers retain mandatory four-group, source/attempt/profile/action/cleanup authority and default-false optional selection; optional pass/app-failed/failed/invalid/unavailable/not-run states remain distinct and cannot supply ordinary proof.",
+      "Every current complete PC/PR/AO/OR/TP/PA/PS callback, source/auth fixture map, exact64-task normative seed, saved current/durable/protected/typed/unknown/pending/remote/history/lifecycle/source-pool/receipt accounting and cleanup assertion is byte exact. This metadata leaf executes no callback, app, native or VM consumer.",
+      "Original strict400-task, ten-attempt,2000ms,1GB/512MB/kernel/OOM/source/cap/accounting/cleanup requirements and all failed/infrastructure/pending chronology remain intact. The historical G05 infrastructure classification and independent nested policy failure remain separately preserved; no failure is relabeled product RED.",
+      "The existing exported validators and their matching semantics are unchanged. Exact replacement names come only from actual added declaration lines in the frozen per-file diff, including the two already committed policy/routing files. No unchanged native title or arbitrary new replacement is admitted."
+    ],
+    "redEvidence": {
+      "command": "#1555 metadata eligibility only: [\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/exact-validators.mjs\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/EXACT-VALIDATOR-INPUTS.json\"]. Original functional RED/GREEN commands remain in the complete unchanged component records and whole referenced source-qualified evidence; this association creates no new behavioral RED.",
+      "failure": "ONE before invocation observed child/wrapper1/1, empty stderr and exactly eight missing-association errors across four files and two comparisons, including this file twice. Both validateTestFirst results were empty. This is missing metadata eligibility, not an app or new functional regression. Original G01/G02/G05/GW03, PC/PR/AO/OR/TP/PA RED/GREEN and PS preservation outcomes retain their own original source identities and limits.",
+      "metadataFailureResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-VALIDATION-RESULT.json",
+        "sha256": "5dc54b7f0d76dcbfecda6eaf92a32b539d290128fb65e4260475462d078d9cc6",
+        "bytes": 26762
+      },
+      "appOrBehaviorRed": false
+    },
+    "comparisonIdentities": {
+      "root": {
+        "head": "d0427557554d10c926dbb1959ee01988bd629833",
+        "tree": "997cdfcbd8452d6e04699bf5f67baa354dd5fceb",
+        "clean": true
+      },
+      "frozen": {
+        "head": "f22f28be699f10a766ce9a90d01469b65457bfed",
+        "tree": "404f4f86556ceb9e6a64544c201ad1ab1d652868"
+      },
+      "actualSharedMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384"
+    },
+    "comparedTestFile": "scripts/agent-tools/button-ci-policy.test.mjs",
+    "actualDiff": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/frozen-f22-scripts__agent-tools__button-ci-policy.test.mjs-UNIFIED0.patch",
+      "sha256": "355464069a33b6c33171c9ff2639bf50263e21237a938a00d89de4361e7b5f87",
+      "bytes": 3118
+    },
+    "sourceBeforeMetadataAppend": {
+      "worktree": "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+      "head": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+      "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+      "branch": "agent/1451-saved-offline",
+      "files": {
+        ".github/workflows/data-safety.yml": {
+          "sha256": "5cf4d3336b0554b0395059d522a46f46c412b7acab6cbad4cd19bf54db274e7d",
+          "bytes": 20310
+        },
+        "RISK_TEST_COVERAGE.md": {
+          "sha256": "0d761fe9469f127e6a3734e58ef53f2426723378d3e1b826a7bdc4536e423d63",
+          "bytes": 248623
+        },
+        "TEST_CHANGE_RATIONALES.json": {
+          "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+          "bytes": 5733129
+        },
+        "scripts/agent-tools/test-groups.test.mjs": {
+          "sha256": "65575b0329eb684d8e0da0118a937ea5c6110147171dc03fdc864a9b2bb4f37e",
+          "bytes": 127188
+        },
+        "scripts/button-safety-cloud.mjs": {
+          "sha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+          "bytes": 101492
+        },
+        "scripts/button-safety-native.mjs": {
+          "sha256": "25267840ea2a56187e00249b72761f96217e1306af26f1d779e8da18c27bd91b",
+          "bytes": 90773
+        },
+        "scripts/button-safety-rapid-core.mjs": {
+          "sha256": "2f89b3b7510bd78b904388fefeb88c9c6faffbf530e67dbe887123ae46eaffed",
+          "bytes": 150396
+        },
+        "scripts/button-safety-rapid.mjs": {
+          "sha256": "abb18be383b22343d14775253bbff5cf44fc6403935e8d73c0958ba8dc0a7ec2",
+          "bytes": 54056
+        },
+        "scripts/button-safety-scenes.mjs": {
+          "sha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+          "bytes": 35442
+        },
+        "scripts/test-group-assignments.json": {
+          "sha256": "cdcb2f1b0e40206867d2dfbf18046bd8d34fbb2ca9695b1a70efbaa7865bced7",
+          "bytes": 494220
+        },
+        "scripts/test-groups.mjs": {
+          "sha256": "2e75ad927dd4f4552da6c64f9642b64f09f07def3d331988b1143a4e61e058ea",
+          "bytes": 81347
+        },
+        "tests.js": {
+          "sha256": "7d43d5d877c569d6433c75737e5162397f2a3b85ad991b8d326b7e3056b297ce",
+          "bytes": 4746603
+        }
+      },
+      "fullIndexPatchSha256": "70fd00e2cbffb5866a93124be5521a48b6e21d1bd39c5c9d9f487af9566b1bd0",
+      "testDiffSha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+      "protectedTestFingerprint": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+      "agentTestDiffSha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+      "agentProtectedTestFingerprint": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da"
+    },
+    "originalCompleteRationaleArray": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-RAW-SOURCE/TEST_CHANGE_RATIONALES.json",
+      "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+      "bytes": 5733129
+    },
+    "originalEvidence": [
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G01/COMPLETION.json",
+        "sha256": "8bec82ad6a01f4e74eec04043c939baca7fe8231b3957b7e8a4c52e738147691",
+        "bytes": 2777
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G02/COMPLETION.json",
+        "sha256": "725300f12f26687b082ee40a9ef8fcdda8cae5f6e1fa1036dbce7f9b13732334",
+        "bytes": 3547
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G03/COMPLETION.json",
+        "sha256": "dbdadacefa9cb128ae36bda89670b316847ec56b7204ea7e4a300c2a1fec6f6a",
+        "bytes": 2048
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G05/COMPLETION.json",
+        "sha256": "d8f3b6b76f6236c802194fb932da07a2d835f8c8566d390c3338a13428f0a216",
+        "bytes": 4655
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G06/COMPLETION.json",
+        "sha256": "2437b7c1e0c9282947e28fca52fb5b76b0a5c3cf53d51ae831a34a8ff53b5426",
+        "bytes": 2084
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW03/COMPLETION.json",
+        "sha256": "6fed3a21e53ecaae5a9c9e7ad08b028a71fc2c650f8cd8b38fbe5d6dd533956c",
+        "bytes": 2241
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW05/COMPLETION.json",
+        "sha256": "752157ae7e9fa31dd372fc552e8a16ef932b258d91cd8e3a44cd35e9de319d9f",
+        "bytes": 1740
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW07/COMPLETION.json",
+        "sha256": "0af7ccbf30a3230a1a16fec341d3108c227ea1f43b357c63bd3d3a04745bc4ae",
+        "bytes": 5081
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1086-OUTCOME-RESULT.json",
+        "sha256": "e5710040766a09588ada9b34d6570f3d79ef376440a5222566cd7aa0d18729d9",
+        "bytes": 12537
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1088-OUTCOME-RESULT.json",
+        "sha256": "290092f913db19dc8a1c8cb11b5710994604a1dece5915c68139f715811e9659",
+        "bytes": 15337
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1291-FOCUSED-RECEIPT.json",
+        "sha256": "b41888ae880bf952afdf730a9f1ea7e966218e34c0fda3dfca5dc983ef38c0b2",
+        "bytes": 51775
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "3252e9ed67fd943b6576695b34c1657a3203ec2fbf7dd80512fd039a19bc66fb",
+        "bytes": 11569
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "4acf8df25e783d57b2c75af119340027d35c03f7a5db2c1e63452b273a7f92a9",
+        "bytes": 5864
+      }
+    ],
+    "metadataOnly": true
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "336ffeb58fbf79f097c1539b1e253f44864f45ec8a1f931b7c50cf3d40a1c06d",
+    "reason": "#1555 adds the missing exact comparison association for scripts/agent-tools/ci-routing.test.mjs when the preserved dirty G source is compared with both frozenf22 and actual clean rootd042 through their common ancestorc920. This is append-only comparison metadata; it changes no executable test, app, validator, source pool, workflow, map or assignment.",
+    "previousBehavior": "The physical3bd and admitted2962 comparisons passed their existing associations under1292, but neither identifies this actualc920 per-file diff. The one recorded1555 before invocation returned a missing exact-diff rationale for this file under each root/f22 comparison; source and all1033 complete prior objects were unchanged.",
+    "intendedBehavior": "Associate only the actual exported protected fingerprint and the exact added or updated test declarations in this file with both independently captured comparison identities. Preserve all1033 prior complete objects/rawprefix, all180 other tracked files and every source-qualified original RED/GREEN/optional status; an eligible metadata pass confers no new behavior, native, full-suite or release proof.",
+    "replacementTests": [
+      "workflow dispatch explicitly selects optional mobile diagnostics",
+      "current grouped routing ignores optional mobile diagnostic rows for reuse"
+    ],
+    "preservedCoverage": [
+      "The original complete G/GW caller/job routing and optional-download source consumers retain mandatory four-group, source/attempt/profile/action/cleanup authority and default-false optional selection; optional pass/app-failed/failed/invalid/unavailable/not-run states remain distinct and cannot supply ordinary proof.",
+      "Every current complete PC/PR/AO/OR/TP/PA/PS callback, source/auth fixture map, exact64-task normative seed, saved current/durable/protected/typed/unknown/pending/remote/history/lifecycle/source-pool/receipt accounting and cleanup assertion is byte exact. This metadata leaf executes no callback, app, native or VM consumer.",
+      "Original strict400-task, ten-attempt,2000ms,1GB/512MB/kernel/OOM/source/cap/accounting/cleanup requirements and all failed/infrastructure/pending chronology remain intact. The historical G05 infrastructure classification and independent nested policy failure remain separately preserved; no failure is relabeled product RED.",
+      "The existing exported validators and their matching semantics are unchanged. Exact replacement names come only from actual added declaration lines in the frozen per-file diff, including the two already committed policy/routing files. No unchanged native title or arbitrary new replacement is admitted."
+    ],
+    "redEvidence": {
+      "command": "#1555 metadata eligibility only: [\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/exact-validators.mjs\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/EXACT-VALIDATOR-INPUTS.json\"]. Original functional RED/GREEN commands remain in the complete unchanged component records and whole referenced source-qualified evidence; this association creates no new behavioral RED.",
+      "failure": "ONE before invocation observed child/wrapper1/1, empty stderr and exactly eight missing-association errors across four files and two comparisons, including this file twice. Both validateTestFirst results were empty. This is missing metadata eligibility, not an app or new functional regression. Original G01/G02/G05/GW03, PC/PR/AO/OR/TP/PA RED/GREEN and PS preservation outcomes retain their own original source identities and limits.",
+      "metadataFailureResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-VALIDATION-RESULT.json",
+        "sha256": "5dc54b7f0d76dcbfecda6eaf92a32b539d290128fb65e4260475462d078d9cc6",
+        "bytes": 26762
+      },
+      "appOrBehaviorRed": false
+    },
+    "comparisonIdentities": {
+      "root": {
+        "head": "d0427557554d10c926dbb1959ee01988bd629833",
+        "tree": "997cdfcbd8452d6e04699bf5f67baa354dd5fceb",
+        "clean": true
+      },
+      "frozen": {
+        "head": "f22f28be699f10a766ce9a90d01469b65457bfed",
+        "tree": "404f4f86556ceb9e6a64544c201ad1ab1d652868"
+      },
+      "actualSharedMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384"
+    },
+    "comparedTestFile": "scripts/agent-tools/ci-routing.test.mjs",
+    "actualDiff": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/frozen-f22-scripts__agent-tools__ci-routing.test.mjs-UNIFIED0.patch",
+      "sha256": "481388fc16fdc667f6e099ea97d8ae1d52e48513d2f54b6ea03c419271a0bcd6",
+      "bytes": 7198
+    },
+    "sourceBeforeMetadataAppend": {
+      "worktree": "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+      "head": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+      "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+      "branch": "agent/1451-saved-offline",
+      "files": {
+        ".github/workflows/data-safety.yml": {
+          "sha256": "5cf4d3336b0554b0395059d522a46f46c412b7acab6cbad4cd19bf54db274e7d",
+          "bytes": 20310
+        },
+        "RISK_TEST_COVERAGE.md": {
+          "sha256": "0d761fe9469f127e6a3734e58ef53f2426723378d3e1b826a7bdc4536e423d63",
+          "bytes": 248623
+        },
+        "TEST_CHANGE_RATIONALES.json": {
+          "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+          "bytes": 5733129
+        },
+        "scripts/agent-tools/test-groups.test.mjs": {
+          "sha256": "65575b0329eb684d8e0da0118a937ea5c6110147171dc03fdc864a9b2bb4f37e",
+          "bytes": 127188
+        },
+        "scripts/button-safety-cloud.mjs": {
+          "sha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+          "bytes": 101492
+        },
+        "scripts/button-safety-native.mjs": {
+          "sha256": "25267840ea2a56187e00249b72761f96217e1306af26f1d779e8da18c27bd91b",
+          "bytes": 90773
+        },
+        "scripts/button-safety-rapid-core.mjs": {
+          "sha256": "2f89b3b7510bd78b904388fefeb88c9c6faffbf530e67dbe887123ae46eaffed",
+          "bytes": 150396
+        },
+        "scripts/button-safety-rapid.mjs": {
+          "sha256": "abb18be383b22343d14775253bbff5cf44fc6403935e8d73c0958ba8dc0a7ec2",
+          "bytes": 54056
+        },
+        "scripts/button-safety-scenes.mjs": {
+          "sha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+          "bytes": 35442
+        },
+        "scripts/test-group-assignments.json": {
+          "sha256": "cdcb2f1b0e40206867d2dfbf18046bd8d34fbb2ca9695b1a70efbaa7865bced7",
+          "bytes": 494220
+        },
+        "scripts/test-groups.mjs": {
+          "sha256": "2e75ad927dd4f4552da6c64f9642b64f09f07def3d331988b1143a4e61e058ea",
+          "bytes": 81347
+        },
+        "tests.js": {
+          "sha256": "7d43d5d877c569d6433c75737e5162397f2a3b85ad991b8d326b7e3056b297ce",
+          "bytes": 4746603
+        }
+      },
+      "fullIndexPatchSha256": "70fd00e2cbffb5866a93124be5521a48b6e21d1bd39c5c9d9f487af9566b1bd0",
+      "testDiffSha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+      "protectedTestFingerprint": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+      "agentTestDiffSha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+      "agentProtectedTestFingerprint": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da"
+    },
+    "originalCompleteRationaleArray": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-RAW-SOURCE/TEST_CHANGE_RATIONALES.json",
+      "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+      "bytes": 5733129
+    },
+    "originalEvidence": [
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G01/COMPLETION.json",
+        "sha256": "8bec82ad6a01f4e74eec04043c939baca7fe8231b3957b7e8a4c52e738147691",
+        "bytes": 2777
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G02/COMPLETION.json",
+        "sha256": "725300f12f26687b082ee40a9ef8fcdda8cae5f6e1fa1036dbce7f9b13732334",
+        "bytes": 3547
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G03/COMPLETION.json",
+        "sha256": "dbdadacefa9cb128ae36bda89670b316847ec56b7204ea7e4a300c2a1fec6f6a",
+        "bytes": 2048
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G05/COMPLETION.json",
+        "sha256": "d8f3b6b76f6236c802194fb932da07a2d835f8c8566d390c3338a13428f0a216",
+        "bytes": 4655
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G06/COMPLETION.json",
+        "sha256": "2437b7c1e0c9282947e28fca52fb5b76b0a5c3cf53d51ae831a34a8ff53b5426",
+        "bytes": 2084
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW03/COMPLETION.json",
+        "sha256": "6fed3a21e53ecaae5a9c9e7ad08b028a71fc2c650f8cd8b38fbe5d6dd533956c",
+        "bytes": 2241
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW05/COMPLETION.json",
+        "sha256": "752157ae7e9fa31dd372fc552e8a16ef932b258d91cd8e3a44cd35e9de319d9f",
+        "bytes": 1740
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW07/COMPLETION.json",
+        "sha256": "0af7ccbf30a3230a1a16fec341d3108c227ea1f43b357c63bd3d3a04745bc4ae",
+        "bytes": 5081
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1086-OUTCOME-RESULT.json",
+        "sha256": "e5710040766a09588ada9b34d6570f3d79ef376440a5222566cd7aa0d18729d9",
+        "bytes": 12537
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1088-OUTCOME-RESULT.json",
+        "sha256": "290092f913db19dc8a1c8cb11b5710994604a1dece5915c68139f715811e9659",
+        "bytes": 15337
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1291-FOCUSED-RECEIPT.json",
+        "sha256": "b41888ae880bf952afdf730a9f1ea7e966218e34c0fda3dfca5dc983ef38c0b2",
+        "bytes": 51775
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "3252e9ed67fd943b6576695b34c1657a3203ec2fbf7dd80512fd039a19bc66fb",
+        "bytes": 11569
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "4acf8df25e783d57b2c75af119340027d35c03f7a5db2c1e63452b273a7f92a9",
+        "bytes": 5864
+      }
+    ],
+    "metadataOnly": true
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "837adc4abfc14442fcd50055f34df9fa751d3df50c8af28e890f13b09a0632de",
+    "reason": "#1555 adds the missing exact comparison association for scripts/agent-tools/test-groups.test.mjs when the preserved dirty G source is compared with both frozenf22 and actual clean rootd042 through their common ancestorc920. This is append-only comparison metadata; it changes no executable test, app, validator, source pool, workflow, map or assignment.",
+    "previousBehavior": "The physical3bd and admitted2962 comparisons passed their existing associations under1292, but neither identifies this actualc920 per-file diff. The one recorded1555 before invocation returned a missing exact-diff rationale for this file under each root/f22 comparison; source and all1033 complete prior objects were unchanged.",
+    "intendedBehavior": "Associate only the actual exported protected fingerprint and the exact added or updated test declarations in this file with both independently captured comparison identities. Preserve all1033 prior complete objects/rawprefix, all180 other tracked files and every source-qualified original RED/GREEN/optional status; an eligible metadata pass confers no new behavior, native, full-suite or release proof.",
+    "replacementTests": [
+      "test group aggregate preserves optional outcomes separately from the required verdict",
+      "test group workflow scanner command rejects missing parallel group evidence",
+      "test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution",
+      "test group public workflow retains selected workload evidence without admitting it as ordinary proof"
+    ],
+    "preservedCoverage": [
+      "The original complete G/GW caller/job routing and optional-download source consumers retain mandatory four-group, source/attempt/profile/action/cleanup authority and default-false optional selection; optional pass/app-failed/failed/invalid/unavailable/not-run states remain distinct and cannot supply ordinary proof.",
+      "Every current complete PC/PR/AO/OR/TP/PA/PS callback, source/auth fixture map, exact64-task normative seed, saved current/durable/protected/typed/unknown/pending/remote/history/lifecycle/source-pool/receipt accounting and cleanup assertion is byte exact. This metadata leaf executes no callback, app, native or VM consumer.",
+      "Original strict400-task, ten-attempt,2000ms,1GB/512MB/kernel/OOM/source/cap/accounting/cleanup requirements and all failed/infrastructure/pending chronology remain intact. The historical G05 infrastructure classification and independent nested policy failure remain separately preserved; no failure is relabeled product RED.",
+      "The existing exported validators and their matching semantics are unchanged. Exact replacement names come only from actual added declaration lines in the frozen per-file diff, including the two already committed policy/routing files. No unchanged native title or arbitrary new replacement is admitted."
+    ],
+    "redEvidence": {
+      "command": "#1555 metadata eligibility only: [\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/exact-validators.mjs\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/EXACT-VALIDATOR-INPUTS.json\"]. Original functional RED/GREEN commands remain in the complete unchanged component records and whole referenced source-qualified evidence; this association creates no new behavioral RED.",
+      "failure": "ONE before invocation observed child/wrapper1/1, empty stderr and exactly eight missing-association errors across four files and two comparisons, including this file twice. Both validateTestFirst results were empty. This is missing metadata eligibility, not an app or new functional regression. Original G01/G02/G05/GW03, PC/PR/AO/OR/TP/PA RED/GREEN and PS preservation outcomes retain their own original source identities and limits.",
+      "metadataFailureResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-VALIDATION-RESULT.json",
+        "sha256": "5dc54b7f0d76dcbfecda6eaf92a32b539d290128fb65e4260475462d078d9cc6",
+        "bytes": 26762
+      },
+      "appOrBehaviorRed": false
+    },
+    "comparisonIdentities": {
+      "root": {
+        "head": "d0427557554d10c926dbb1959ee01988bd629833",
+        "tree": "997cdfcbd8452d6e04699bf5f67baa354dd5fceb",
+        "clean": true
+      },
+      "frozen": {
+        "head": "f22f28be699f10a766ce9a90d01469b65457bfed",
+        "tree": "404f4f86556ceb9e6a64544c201ad1ab1d652868"
+      },
+      "actualSharedMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384"
+    },
+    "comparedTestFile": "scripts/agent-tools/test-groups.test.mjs",
+    "actualDiff": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/frozen-f22-scripts__agent-tools__test-groups.test.mjs-UNIFIED0.patch",
+      "sha256": "317853d3ec071d25c39041a8c1a56ff1432a5e04db6e6ff9c747e5c823cba764",
+      "bytes": 60070
+    },
+    "sourceBeforeMetadataAppend": {
+      "worktree": "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+      "head": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+      "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+      "branch": "agent/1451-saved-offline",
+      "files": {
+        ".github/workflows/data-safety.yml": {
+          "sha256": "5cf4d3336b0554b0395059d522a46f46c412b7acab6cbad4cd19bf54db274e7d",
+          "bytes": 20310
+        },
+        "RISK_TEST_COVERAGE.md": {
+          "sha256": "0d761fe9469f127e6a3734e58ef53f2426723378d3e1b826a7bdc4536e423d63",
+          "bytes": 248623
+        },
+        "TEST_CHANGE_RATIONALES.json": {
+          "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+          "bytes": 5733129
+        },
+        "scripts/agent-tools/test-groups.test.mjs": {
+          "sha256": "65575b0329eb684d8e0da0118a937ea5c6110147171dc03fdc864a9b2bb4f37e",
+          "bytes": 127188
+        },
+        "scripts/button-safety-cloud.mjs": {
+          "sha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+          "bytes": 101492
+        },
+        "scripts/button-safety-native.mjs": {
+          "sha256": "25267840ea2a56187e00249b72761f96217e1306af26f1d779e8da18c27bd91b",
+          "bytes": 90773
+        },
+        "scripts/button-safety-rapid-core.mjs": {
+          "sha256": "2f89b3b7510bd78b904388fefeb88c9c6faffbf530e67dbe887123ae46eaffed",
+          "bytes": 150396
+        },
+        "scripts/button-safety-rapid.mjs": {
+          "sha256": "abb18be383b22343d14775253bbff5cf44fc6403935e8d73c0958ba8dc0a7ec2",
+          "bytes": 54056
+        },
+        "scripts/button-safety-scenes.mjs": {
+          "sha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+          "bytes": 35442
+        },
+        "scripts/test-group-assignments.json": {
+          "sha256": "cdcb2f1b0e40206867d2dfbf18046bd8d34fbb2ca9695b1a70efbaa7865bced7",
+          "bytes": 494220
+        },
+        "scripts/test-groups.mjs": {
+          "sha256": "2e75ad927dd4f4552da6c64f9642b64f09f07def3d331988b1143a4e61e058ea",
+          "bytes": 81347
+        },
+        "tests.js": {
+          "sha256": "7d43d5d877c569d6433c75737e5162397f2a3b85ad991b8d326b7e3056b297ce",
+          "bytes": 4746603
+        }
+      },
+      "fullIndexPatchSha256": "70fd00e2cbffb5866a93124be5521a48b6e21d1bd39c5c9d9f487af9566b1bd0",
+      "testDiffSha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+      "protectedTestFingerprint": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+      "agentTestDiffSha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+      "agentProtectedTestFingerprint": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da"
+    },
+    "originalCompleteRationaleArray": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-RAW-SOURCE/TEST_CHANGE_RATIONALES.json",
+      "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+      "bytes": 5733129
+    },
+    "originalEvidence": [
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G01/COMPLETION.json",
+        "sha256": "8bec82ad6a01f4e74eec04043c939baca7fe8231b3957b7e8a4c52e738147691",
+        "bytes": 2777
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G02/COMPLETION.json",
+        "sha256": "725300f12f26687b082ee40a9ef8fcdda8cae5f6e1fa1036dbce7f9b13732334",
+        "bytes": 3547
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G03/COMPLETION.json",
+        "sha256": "dbdadacefa9cb128ae36bda89670b316847ec56b7204ea7e4a300c2a1fec6f6a",
+        "bytes": 2048
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G05/COMPLETION.json",
+        "sha256": "d8f3b6b76f6236c802194fb932da07a2d835f8c8566d390c3338a13428f0a216",
+        "bytes": 4655
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G06/COMPLETION.json",
+        "sha256": "2437b7c1e0c9282947e28fca52fb5b76b0a5c3cf53d51ae831a34a8ff53b5426",
+        "bytes": 2084
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW03/COMPLETION.json",
+        "sha256": "6fed3a21e53ecaae5a9c9e7ad08b028a71fc2c650f8cd8b38fbe5d6dd533956c",
+        "bytes": 2241
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW05/COMPLETION.json",
+        "sha256": "752157ae7e9fa31dd372fc552e8a16ef932b258d91cd8e3a44cd35e9de319d9f",
+        "bytes": 1740
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW07/COMPLETION.json",
+        "sha256": "0af7ccbf30a3230a1a16fec341d3108c227ea1f43b357c63bd3d3a04745bc4ae",
+        "bytes": 5081
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1086-OUTCOME-RESULT.json",
+        "sha256": "e5710040766a09588ada9b34d6570f3d79ef376440a5222566cd7aa0d18729d9",
+        "bytes": 12537
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1088-OUTCOME-RESULT.json",
+        "sha256": "290092f913db19dc8a1c8cb11b5710994604a1dece5915c68139f715811e9659",
+        "bytes": 15337
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1291-FOCUSED-RECEIPT.json",
+        "sha256": "b41888ae880bf952afdf730a9f1ea7e966218e34c0fda3dfca5dc983ef38c0b2",
+        "bytes": 51775
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "3252e9ed67fd943b6576695b34c1657a3203ec2fbf7dd80512fd039a19bc66fb",
+        "bytes": 11569
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "4acf8df25e783d57b2c75af119340027d35c03f7a5db2c1e63452b273a7f92a9",
+        "bytes": 5864
+      }
+    ],
+    "metadataOnly": true
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "217b78744a00c95cc069f48acf6597d5de4f7a0877aa94d0479d0e785b1b91b9",
+    "reason": "#1555 adds the missing exact comparison association for tests.js when the preserved dirty G source is compared with both frozenf22 and actual clean rootd042 through their common ancestorc920. This is append-only comparison metadata; it changes no executable test, app, validator, source pool, workflow, map or assignment.",
+    "previousBehavior": "The physical3bd and admitted2962 comparisons passed their existing associations under1292, but neither identifies this actualc920 per-file diff. The one recorded1555 before invocation returned a missing exact-diff rationale for this file under each root/f22 comparison; source and all1033 complete prior objects were unchanged.",
+    "intendedBehavior": "Associate only the actual exported protected fingerprint and the exact added or updated test declarations in this file with both independently captured comparison identities. Preserve all1033 prior complete objects/rawprefix, all180 other tracked files and every source-qualified original RED/GREEN/optional status; an eligible metadata pass confers no new behavior, native, full-suite or release proof.",
+    "replacementTests": [
+      "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict",
+      "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
+      "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+      "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+      "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+      "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles",
+      "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles",
+      "RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned",
+      "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources",
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: optional mobile diagnostics do not block ordinary reuse",
+      "RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission",
+      "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
+      "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+      "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+      "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources",
+      "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources",
+      "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources",
+      "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources",
+      "RISK saved decision review guidance: mounted FAQ retains place and explicit save authority",
+      "RISK saved decision review guidance: mounted changelog records selected review continuity",
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources",
+      "RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources",
+      "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources",
+      "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources",
+      "RISK repository process: trusted planner declares ordinary engines separately from optional workloads"
+    ],
+    "preservedCoverage": [
+      "The original complete G/GW caller/job routing and optional-download source consumers retain mandatory four-group, source/attempt/profile/action/cleanup authority and default-false optional selection; optional pass/app-failed/failed/invalid/unavailable/not-run states remain distinct and cannot supply ordinary proof.",
+      "Every current complete PC/PR/AO/OR/TP/PA/PS callback, source/auth fixture map, exact64-task normative seed, saved current/durable/protected/typed/unknown/pending/remote/history/lifecycle/source-pool/receipt accounting and cleanup assertion is byte exact. This metadata leaf executes no callback, app, native or VM consumer.",
+      "Original strict400-task, ten-attempt,2000ms,1GB/512MB/kernel/OOM/source/cap/accounting/cleanup requirements and all failed/infrastructure/pending chronology remain intact. The historical G05 infrastructure classification and independent nested policy failure remain separately preserved; no failure is relabeled product RED.",
+      "The existing exported validators and their matching semantics are unchanged. Exact replacement names come only from actual added declaration lines in the frozen per-file diff, including the two already committed policy/routing files. No unchanged native title or arbitrary new replacement is admitted."
+    ],
+    "redEvidence": {
+      "command": "#1555 metadata eligibility only: [\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/exact-validators.mjs\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/EXACT-VALIDATOR-INPUTS.json\"]. Original functional RED/GREEN commands remain in the complete unchanged component records and whole referenced source-qualified evidence; this association creates no new behavioral RED.",
+      "failure": "ONE before invocation observed child/wrapper1/1, empty stderr and exactly eight missing-association errors across four files and two comparisons, including this file twice. Both validateTestFirst results were empty. This is missing metadata eligibility, not an app or new functional regression. Original G01/G02/G05/GW03, PC/PR/AO/OR/TP/PA RED/GREEN and PS preservation outcomes retain their own original source identities and limits.",
+      "metadataFailureResult": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-VALIDATION-RESULT.json",
+        "sha256": "5dc54b7f0d76dcbfecda6eaf92a32b539d290128fb65e4260475462d078d9cc6",
+        "bytes": 26762
+      },
+      "appOrBehaviorRed": false
+    },
+    "comparisonIdentities": {
+      "root": {
+        "head": "d0427557554d10c926dbb1959ee01988bd629833",
+        "tree": "997cdfcbd8452d6e04699bf5f67baa354dd5fceb",
+        "clean": true
+      },
+      "frozen": {
+        "head": "f22f28be699f10a766ce9a90d01469b65457bfed",
+        "tree": "404f4f86556ceb9e6a64544c201ad1ab1d652868"
+      },
+      "actualSharedMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384"
+    },
+    "comparedTestFile": "tests.js",
+    "actualDiff": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/frozen-f22-tests.js-UNIFIED0.patch",
+      "sha256": "82511c22570ce5000dd2ab0a848798c0a7c57c8c98949d81533ab0fe3ace595b",
+      "bytes": 342776
+    },
+    "sourceBeforeMetadataAppend": {
+      "worktree": "/Users/emeraldpham/.codex/worktrees/1451-saved-offline/funsidething",
+      "head": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+      "tree": "ef72b6f1b13df46c6579cb059a1b12de61424de2",
+      "branch": "agent/1451-saved-offline",
+      "files": {
+        ".github/workflows/data-safety.yml": {
+          "sha256": "5cf4d3336b0554b0395059d522a46f46c412b7acab6cbad4cd19bf54db274e7d",
+          "bytes": 20310
+        },
+        "RISK_TEST_COVERAGE.md": {
+          "sha256": "0d761fe9469f127e6a3734e58ef53f2426723378d3e1b826a7bdc4536e423d63",
+          "bytes": 248623
+        },
+        "TEST_CHANGE_RATIONALES.json": {
+          "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+          "bytes": 5733129
+        },
+        "scripts/agent-tools/test-groups.test.mjs": {
+          "sha256": "65575b0329eb684d8e0da0118a937ea5c6110147171dc03fdc864a9b2bb4f37e",
+          "bytes": 127188
+        },
+        "scripts/button-safety-cloud.mjs": {
+          "sha256": "e2d3de069f2ec1edc6fc179593692cc987c2d21970c166e311935ff409e2ab69",
+          "bytes": 101492
+        },
+        "scripts/button-safety-native.mjs": {
+          "sha256": "25267840ea2a56187e00249b72761f96217e1306af26f1d779e8da18c27bd91b",
+          "bytes": 90773
+        },
+        "scripts/button-safety-rapid-core.mjs": {
+          "sha256": "2f89b3b7510bd78b904388fefeb88c9c6faffbf530e67dbe887123ae46eaffed",
+          "bytes": 150396
+        },
+        "scripts/button-safety-rapid.mjs": {
+          "sha256": "abb18be383b22343d14775253bbff5cf44fc6403935e8d73c0958ba8dc0a7ec2",
+          "bytes": 54056
+        },
+        "scripts/button-safety-scenes.mjs": {
+          "sha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+          "bytes": 35442
+        },
+        "scripts/test-group-assignments.json": {
+          "sha256": "cdcb2f1b0e40206867d2dfbf18046bd8d34fbb2ca9695b1a70efbaa7865bced7",
+          "bytes": 494220
+        },
+        "scripts/test-groups.mjs": {
+          "sha256": "2e75ad927dd4f4552da6c64f9642b64f09f07def3d331988b1143a4e61e058ea",
+          "bytes": 81347
+        },
+        "tests.js": {
+          "sha256": "7d43d5d877c569d6433c75737e5162397f2a3b85ad991b8d326b7e3056b297ce",
+          "bytes": 4746603
+        }
+      },
+      "fullIndexPatchSha256": "70fd00e2cbffb5866a93124be5521a48b6e21d1bd39c5c9d9f487af9566b1bd0",
+      "testDiffSha256": "d2a2ce96a12023f26b81286fc07be39b7eebc2a9f03ed8c8dc90e9c1cd44f6db",
+      "protectedTestFingerprint": "db3e487333efaf0c90c0f672a71cb722e38d021f134e9d089ee2d001f6abe3d4",
+      "agentTestDiffSha256": "179c06a721570b3eb369c173c629ebcc0ae3ade2139d7bb4bc3f1529644968ea",
+      "agentProtectedTestFingerprint": "12b6d4430b4a9a44fff903bea192c3c932e38bfbed1e94448c01e6ca1ecaf6da"
+    },
+    "originalCompleteRationaleArray": {
+      "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/root-admission1293/metadata-followup1555/sol-owner/BEFORE-RAW-SOURCE/TEST_CHANGE_RATIONALES.json",
+      "sha256": "0ad951c667f2fb0a5cf19ccde6533595f6ba7aafd5686ab54c847c06f4177e72",
+      "bytes": 5733129
+    },
+    "originalEvidence": [
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G01/COMPLETION.json",
+        "sha256": "8bec82ad6a01f4e74eec04043c939baca7fe8231b3957b7e8a4c52e738147691",
+        "bytes": 2777
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G02/COMPLETION.json",
+        "sha256": "725300f12f26687b082ee40a9ef8fcdda8cae5f6e1fa1036dbce7f9b13732334",
+        "bytes": 3547
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G03/COMPLETION.json",
+        "sha256": "dbdadacefa9cb128ae36bda89670b316847ec56b7204ea7e4a300c2a1fec6f6a",
+        "bytes": 2048
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G05/COMPLETION.json",
+        "sha256": "d8f3b6b76f6236c802194fb932da07a2d835f8c8566d390c3338a13428f0a216",
+        "bytes": 4655
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/phase-G06/COMPLETION.json",
+        "sha256": "2437b7c1e0c9282947e28fca52fb5b76b0a5c3cf53d51ae831a34a8ff53b5426",
+        "bytes": 2084
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW03/COMPLETION.json",
+        "sha256": "6fed3a21e53ecaae5a9c9e7ad08b028a71fc2c650f8cd8b38fbe5d6dd533956c",
+        "bytes": 2241
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW05/COMPLETION.json",
+        "sha256": "752157ae7e9fa31dd372fc552e8a16ef932b258d91cd8e3a44cd35e9de319d9f",
+        "bytes": 1740
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/gate-policy/download-addendum/phase-GW07/COMPLETION.json",
+        "sha256": "0af7ccbf30a3230a1a16fec341d3108c227ea1f43b357c63bd3d3a04745bc4ae",
+        "bytes": 5081
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1082-OUTCOME-RESULT.json",
+        "sha256": "798a97bbddabba251c364df4e122a4a5b7b4a6a2a4af34918544b3b7ea132f7e",
+        "bytes": 8127
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1086-OUTCOME-RESULT.json",
+        "sha256": "e5710040766a09588ada9b34d6570f3d79ef376440a5222566cd7aa0d18729d9",
+        "bytes": 12537
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1088-OUTCOME-RESULT.json",
+        "sha256": "290092f913db19dc8a1c8cb11b5710994604a1dece5915c68139f715811e9659",
+        "bytes": 15337
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/1291-FOCUSED-RECEIPT.json",
+        "sha256": "b41888ae880bf952afdf730a9f1ea7e966218e34c0fda3dfca5dc983ef38c0b2",
+        "bytes": 51775
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/pa-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "3252e9ed67fd943b6576695b34c1657a3203ec2fbf7dd80512fd039a19bc66fb",
+        "bytes": 11569
+      },
+      {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/G-next-frontier/tp-resume/sol-owner/FINAL-HANDOFF.json",
+        "sha256": "4acf8df25e783d57b2c75af119340027d35c03f7a5db2c1e63452b273a7f92a9",
+        "bytes": 5864
+      }
+    ],
+    "metadataOnly": true
+  }
 ]
