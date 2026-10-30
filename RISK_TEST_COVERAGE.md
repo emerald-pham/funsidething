@@ -2414,3 +2414,15 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command
 
 - RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch
+
+- RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)
+
+- RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)
+
+- RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)
+
+- RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)
+
+- RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)
+
+- RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)

@@ -13491,6 +13491,36 @@
       "root": "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

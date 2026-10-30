@@ -28413,5 +28413,324 @@
       "commonBase": "b9212f86b310c5b07853b3413148a19e2ddb891d",
       "metadataOnly": true
     }
+  },
+{
+  "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+  "testChangesSha256": "984494a1319ad46ac7d3df3e8323419867d5ef2e491f5e7bedbc343e01b43e4f",
+  "cycle": "353-real-service-definition-1504",
+  "reason": "Define independently specified actual service File Import coverage through the existing app/File/backend and real Firestore SDK consumers before executing this new cohort.",
+  "previousBehavior": "Existing signed-in File import app coverage used a fakeAPI backend and did not establish actual CloudSync/Firestore acknowledgement, publication uncertainty or offline cold reopen for the current transfer source.",
+  "intendedBehavior": "Preserve the established stricter signed-in behavior: exact cloud ACK precedes local adoption; unavailable or uncertain results keep the last accepted local board, full incoming file and every protected original truthful through cold reopen.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)"
+  ],
+  "preservedCoverage": [
+    "Every preexisting test assertion and complete prior rationale object stays unchanged; the new shared helper reuses existing actual app/File/backend/SDK adapters without changing application, cloud-store, device-store, rules or workflow source.",
+    "Complete original File bytes, protected current/manual/opaque originals, accepted result and archive pending/debug nonreplay are independently asserted. Controlled auth, VM DOM, constructed File and SDK I/O failures are not OS chooser, Google auth, physical network or production proof.",
+    "The existing four test groups and native installed-client/full rules/compatibility/final exact-candidate obligations remain. Actual current emulator proof and later broken-handler sensitivity are distinct pending leaves."
+  ],
+  "redEvidence": {
+    "command": "No behavioral test executed in this source-only definition. The next explicit actual real-emulator command is populated and GET-bound under a separate atomic proof leaf before launch.",
+    "failure": "No new app defect or preimplementation RED is claimed. This is tests-only established-behavior coverage authored before its first run; any actual failure and later sensitivity retain their actual chronology and source identities."
+  }
+},
+{
+  "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+  "testChangesSha256": "6347b2ba9af623a9b5a2d4057750eb4ed1e42d759751a80b0f35c342a88156f1",
+  "cycle": "353-real-service-definition-1505",
+  "reason": "Define independently specified actual service File Import coverage through the existing app/File/backend and real Firestore SDK consumers before executing this new cohort.",
+  "previousBehavior": "Existing signed-in File import app coverage used a fakeAPI backend and did not establish actual CloudSync/Firestore acknowledgement, publication uncertainty or offline cold reopen for the current transfer source.",
+  "intendedBehavior": "Preserve the established stricter signed-in behavior: exact cloud ACK precedes local adoption; unavailable or uncertain results keep the last accepted local board, full incoming file and every protected original truthful through cold reopen.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+    "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)"
+  ],
+  "preservedCoverage": [
+    "Every preexisting test assertion and complete prior rationale object stays unchanged; the new shared helper reuses existing actual app/File/backend/SDK adapters without changing application, cloud-store, device-store, rules or workflow source.",
+    "Complete original File bytes, protected current/manual/opaque originals, accepted result and archive pending/debug nonreplay are independently asserted. Controlled auth, VM DOM, constructed File and SDK I/O failures are not OS chooser, Google auth, physical network or production proof.",
+    "The existing four test groups and native installed-client/full rules/compatibility/final exact-candidate obligations remain. Actual current emulator proof and later broken-handler sensitivity are distinct pending leaves."
+  ],
+  "redEvidence": {
+    "command": "No behavioral test executed in this source-only definition. The next explicit actual real-emulator command is populated and GET-bound under a separate atomic proof leaf before launch.",
+    "failure": "No new app defect or preimplementation RED is claimed. This is tests-only established-behavior coverage authored before its first run; any actual failure and later sensitivity retain their actual chronology and source identities."
+  }
+},
+{
+  "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+  "testChangesSha256": "9ced5ae2ceb4d3b9b08072d85bba8223c86cdab42a74cdbe684ca6886b371e6a",
+  "cycle": "353-real-service-definition-1506",
+  "reason": "Define independently specified actual service File Import coverage through the existing app/File/backend and real Firestore SDK consumers before executing this new cohort.",
+  "previousBehavior": "Existing signed-in File import app coverage used a fakeAPI backend and did not establish actual CloudSync/Firestore acknowledgement, publication uncertainty or offline cold reopen for the current transfer source.",
+  "intendedBehavior": "Preserve the established stricter signed-in behavior: exact cloud ACK precedes local adoption; unavailable or uncertain results keep the last accepted local board, full incoming file and every protected original truthful through cold reopen.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+    "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+    "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)"
+  ],
+  "preservedCoverage": [
+    "Every preexisting test assertion and complete prior rationale object stays unchanged; the new shared helper reuses existing actual app/File/backend/SDK adapters without changing application, cloud-store, device-store, rules or workflow source.",
+    "Complete original File bytes, protected current/manual/opaque originals, accepted result and archive pending/debug nonreplay are independently asserted. Controlled auth, VM DOM, constructed File and SDK I/O failures are not OS chooser, Google auth, physical network or production proof.",
+    "The existing four test groups and native installed-client/full rules/compatibility/final exact-candidate obligations remain. Actual current emulator proof and later broken-handler sensitivity are distinct pending leaves."
+  ],
+  "redEvidence": {
+    "command": "No behavioral test executed in this source-only definition. The next explicit actual real-emulator command is populated and GET-bound under a separate atomic proof leaf before launch.",
+    "failure": "No new app defect or preimplementation RED is claimed. This is tests-only established-behavior coverage authored before its first run; any actual failure and later sensitivity retain their actual chronology and source identities."
+  }
+},
+{
+  "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+  "testChangesSha256": "8951a4fcdafd965414330638ea8f2ffd4ab2e9d81ccc5a7c56d6217f32aa982f",
+  "cycle": "353-real-service-definition-1507",
+  "reason": "Define independently specified actual service File Import coverage through the existing app/File/backend and real Firestore SDK consumers before executing this new cohort.",
+  "previousBehavior": "Existing signed-in File import app coverage used a fakeAPI backend and did not establish actual CloudSync/Firestore acknowledgement, publication uncertainty or offline cold reopen for the current transfer source.",
+  "intendedBehavior": "Preserve the established stricter signed-in behavior: exact cloud ACK precedes local adoption; unavailable or uncertain results keep the last accepted local board, full incoming file and every protected original truthful through cold reopen.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+    "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+    "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+    "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)"
+  ],
+  "preservedCoverage": [
+    "Every preexisting test assertion and complete prior rationale object stays unchanged; the new shared helper reuses existing actual app/File/backend/SDK adapters without changing application, cloud-store, device-store, rules or workflow source.",
+    "Complete original File bytes, protected current/manual/opaque originals, accepted result and archive pending/debug nonreplay are independently asserted. Controlled auth, VM DOM, constructed File and SDK I/O failures are not OS chooser, Google auth, physical network or production proof.",
+    "The existing four test groups and native installed-client/full rules/compatibility/final exact-candidate obligations remain. Actual current emulator proof and later broken-handler sensitivity are distinct pending leaves."
+  ],
+  "redEvidence": {
+    "command": "No behavioral test executed in this source-only definition. The next explicit actual real-emulator command is populated and GET-bound under a separate atomic proof leaf before launch.",
+    "failure": "No new app defect or preimplementation RED is claimed. This is tests-only established-behavior coverage authored before its first run; any actual failure and later sensitivity retain their actual chronology and source identities."
+  }
+},
+{
+  "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+  "testChangesSha256": "55cb1573fdd89ed9e4b04f12ba7c6b1471e1e21069bb574eafe603d2caef80bb",
+  "cycle": "353-real-service-definition-1508",
+  "reason": "Define independently specified actual service File Import coverage through the existing app/File/backend and real Firestore SDK consumers before executing this new cohort.",
+  "previousBehavior": "Existing signed-in File import app coverage used a fakeAPI backend and did not establish actual CloudSync/Firestore acknowledgement, publication uncertainty or offline cold reopen for the current transfer source.",
+  "intendedBehavior": "Preserve the established stricter signed-in behavior: exact cloud ACK precedes local adoption; unavailable or uncertain results keep the last accepted local board, full incoming file and every protected original truthful through cold reopen.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+    "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+    "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+    "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+    "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)"
+  ],
+  "preservedCoverage": [
+    "Every preexisting test assertion and complete prior rationale object stays unchanged; the new shared helper reuses existing actual app/File/backend/SDK adapters without changing application, cloud-store, device-store, rules or workflow source.",
+    "Complete original File bytes, protected current/manual/opaque originals, accepted result and archive pending/debug nonreplay are independently asserted. Controlled auth, VM DOM, constructed File and SDK I/O failures are not OS chooser, Google auth, physical network or production proof.",
+    "The existing four test groups and native installed-client/full rules/compatibility/final exact-candidate obligations remain. Actual current emulator proof and later broken-handler sensitivity are distinct pending leaves."
+  ],
+  "redEvidence": {
+    "command": "No behavioral test executed in this source-only definition. The next explicit actual real-emulator command is populated and GET-bound under a separate atomic proof leaf before launch.",
+    "failure": "No new app defect or preimplementation RED is claimed. This is tests-only established-behavior coverage authored before its first run; any actual failure and later sensitivity retain their actual chronology and source identities."
+  }
+},
+{
+  "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+  "testChangesSha256": "eaaa17be1c3af3328b251fd6fe61eb3cb4f9e3ba4cbd7e52097eebd69c1638df",
+  "cycle": "353-complete-fixture-correction-1518",
+  "reason": "Correct all first-cohort cross-VM primitive-row comparison and unavailable-read boundary lifetime/readiness fixture errors together without changing the real File/CloudSync behavior.",
+  "previousBehavior": "New test-only cold checks compared realm prototypes and restored controlled app I/O before testing unavailable acknowledgement through closing; startup fixture only promised nonnull state. The original five-case actual-emulator run failed and remains unaccepted.",
+  "intendedBehavior": "Exact complete primitive row keys/types/Object.is values compare across VM boundaries without dropping any field, unknown typed objects fail closed, unavailable I/O stays unavailable through normal close, and cold readback waits real accepted authority then verifies full state/head/source.",
+  "replacementTests": [
+    "not ok 1 - RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+    "not ok 2 - RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+    "not ok 3 - RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+    "not ok 4 - RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+    "not ok 5 - RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)"
+  ],
+  "preservedCoverage": [
+    "Every strict real server publication/revision/payload/hash/ACK, local current/head, selected original fullbytes, manual/opaque/Settings draft and archived pending/debug nonreplay assertion remains; complete authoritative state/head readback is strengthened.",
+    "All previous test prefixes, complete rationale objects and app/CloudSync/device/rules source bytes remain unchanged. The original first attempt retains0/5/no appRED and its exact runtime/source/cleanup evidence.",
+    "No actual source or emulator invocation occurs in the correction; a separate fresh exact-bound whole cohort is required. Unknown asynchronous path from the initial mismatch is retained, not labeled a causal product defect."
+  ],
+  "redEvidence": {
+    "command": "Original actual1515 record-run whole5realservice Firebase emulator command; recorder3d5544c9-81e3-4d4d-bd80-0a3bde28691d at actual-proof/recorder, completeCOMPLETE-DIAGNOSIS.json retains argv/source/raw SHA and each failed site.",
+    "failure": "Actual5tests0pass5fail/zeroskipcancel: four tests failed at cold manual-row strict cross-VM deep comparison; ACK-loss failed old versus selected coldtitle. This is new fixture diagnostic failure, not preimplementation application RED. Corrected outcomes are not yet run."
+  }
+},
+{
+  "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+  "testChangesSha256": "2100fdf4a220059387e797e3a2a85d3ae36db9f6deef0500474409196812b642",
+  "cycle": "353-later-ACK-sensitivity-1520",
+  "reason": "Add a discriminating later broken-handler control at the established actual File/app/backend/Firestore consumer; keep all current normal-case assertions byteexact and bind current metadata to real root names.",
+  "previousBehavior": "Five normal actual real-emulator cases passed after complete fixture correction; the new actual service coverage had not yet proved it rejects deliberately bypassed signed-in cloud acknowledgement.",
+  "intendedBehavior": "A single isolated in-memory classic-source guard omission must reach the complete consumer and fail its exact independent serverrevision check, while working app/backend/rules source stays unchanged. Current metadata uses exact added RISK root names.",
+  "replacementTests": [
+    "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+    "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+    "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+    "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+    "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+    "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+  ],
+  "historicalAuthoringCorrection": {
+    "cycle": "353-complete-fixture-correction-1518",
+    "field": "replacementTests",
+    "reason": "The previous new association accidentally copied rendered TAP not-ok labels instead of source test names. That object and original source are retained; no gate pass on that malformed association was claimed. New current fingerprint includes this appended control and uses all six exact added root names."
+  },
+  "preservedCoverage": [
+    "Every existing test and complete prior rationale object/rawprefix is preserved; new control is appended after the exact normal five-consumer source accepted by1519. Complete source/current/head/file/manual/opaque/draft/archivepending and actual server ACK/refusal/uncertainty/peer cases stay intact.",
+    "Actual index/cloud/device/rules and complete realbackend source remain byteexact. Only the explicit existing loadApp appSource seam receives the retained deliberatelybrokenclassic guard specimen; no backend fake-success tuple or working source mutation.",
+    "This is later sensitivity with exact specific ERR_ASSERTION/actual1/expected2 required. Original1515 failed0/5 remains historical;1519 actual84457628 passed5/5 and later control is unexecuted in this definition. Full qualification/review/CI/release remain separate."
+  ],
+  "redEvidence": {
+    "command": "Normal current actual1519 recorder84457628-224a-4cb7-9170-f1d2fe21dd99 Firebase SDK/emulator wholefive tests passed5/5. Later exact single-control actual-emulator command will be independently source/runtime/argv/lease+GET bound before launch.",
+    "failure": "No new app preimplementationRED is claimed. Original3d5544c9 coldfixture failure and its corrected1518/84457628 chronology retained. This authored later control requires the actual specific serverrevision assertion from a deliberately broken in-memory source and rejects unrelated/setup errors; it has not yet executed."
+  }
+},
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "1f9e9acd002bda273db602fee51e1068c8e61d0fb086fed14f5184012365c039",
+    "cycle": "353-current-comparison-metadata-1522",
+    "reason": "Associate the exact current dirty combined test diff with complete preserved source and actual five-case service proof plus specific later ACK bypass sensitivity before private packaging.",
+    "previousBehavior": "Five normal actual real-emulator cases passed after complete fixture correction; the new actual service coverage had not yet proved it rejects deliberately bypassed signed-in cloud acknowledgement.",
+    "intendedBehavior": "A single isolated in-memory classic-source guard omission must reach the complete consumer and fail its exact independent serverrevision check, while working app/backend/rules source stays unchanged. Current metadata uses exact added RISK root names.",
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ],
+    "historicalAuthoringCorrection": {
+      "cycle": "353-complete-fixture-correction-1518",
+      "field": "replacementTests",
+      "reason": "The previous new association accidentally copied rendered TAP not-ok labels instead of source test names. That object and original source are retained; no gate pass on that malformed association was claimed. New current fingerprint includes this appended control and uses all six exact added root names."
+    },
+    "preservedCoverage": [
+      "Every existing test and complete prior rationale object/rawprefix is preserved; new control is appended after the exact normal five-consumer source accepted by1519. Complete source/current/head/file/manual/opaque/draft/archivepending and actual server ACK/refusal/uncertainty/peer cases stay intact.",
+      "Actual index/cloud/device/rules and complete realbackend source remain byteexact. Only the explicit existing loadApp appSource seam receives the retained deliberatelybrokenclassic guard specimen; no backend fake-success tuple or working source mutation.",
+      "This is later sensitivity with exact specific ERR_ASSERTION/actual1/expected2 required. Original1515 failed0/5 remains historical;1519 actual84457628 passed5/5 and later control is unexecuted in this definition. Full qualification/review/CI/release remain separate.",
+      "This additive association preserves all prior1033 complete rationale objects including malformed historical1518 TAP-label record and its explicit correction; replacement names are six exact currently added source declarations. No normal service/helper assertion or working app source is changed by metadata reconciliation."
+    ],
+    "redEvidence": {
+      "command": "Actual current five-case Firestore recorder84457628-224a-4cb7-9170-f1d2fe21dd99 passed5/5; separate later control e9ad783d-9afd-4f13-b3ac-e4c16addf90b passed1/1 requiring the complete consumer specific assertion. No duplicate emulator command or original product RED is claimed.",
+      "failure": "The isolated in-memory classic handler omitted its sole account-bound exact cloud write/ACK call. Actual independent real service revision stayed1 versus expected2, caught ERR_ASSERTION353 source revision advanced exactly once. Original1515 fixture failures remain historical failures; all preexisting rationale objects retained."
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "1767a5192d2c4ca67c4e2c7fa41df21fb17670c8cb0004b2dbb33588b1e2ac21",
+    "cycle": "353-current-comparison-metadata-1522",
+    "reason": "Associate the exact current dirty combined test diff with complete preserved source and actual five-case service proof plus specific later ACK bypass sensitivity before private packaging.",
+    "previousBehavior": "Five normal actual real-emulator cases passed after complete fixture correction; the new actual service coverage had not yet proved it rejects deliberately bypassed signed-in cloud acknowledgement.",
+    "intendedBehavior": "A single isolated in-memory classic-source guard omission must reach the complete consumer and fail its exact independent serverrevision check, while working app/backend/rules source stays unchanged. Current metadata uses exact added RISK root names.",
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ],
+    "historicalAuthoringCorrection": {
+      "cycle": "353-complete-fixture-correction-1518",
+      "field": "replacementTests",
+      "reason": "The previous new association accidentally copied rendered TAP not-ok labels instead of source test names. That object and original source are retained; no gate pass on that malformed association was claimed. New current fingerprint includes this appended control and uses all six exact added root names."
+    },
+    "preservedCoverage": [
+      "Every existing test and complete prior rationale object/rawprefix is preserved; new control is appended after the exact normal five-consumer source accepted by1519. Complete source/current/head/file/manual/opaque/draft/archivepending and actual server ACK/refusal/uncertainty/peer cases stay intact.",
+      "Actual index/cloud/device/rules and complete realbackend source remain byteexact. Only the explicit existing loadApp appSource seam receives the retained deliberatelybrokenclassic guard specimen; no backend fake-success tuple or working source mutation.",
+      "This is later sensitivity with exact specific ERR_ASSERTION/actual1/expected2 required. Original1515 failed0/5 remains historical;1519 actual84457628 passed5/5 and later control is unexecuted in this definition. Full qualification/review/CI/release remain separate.",
+      "This additive association preserves all prior1033 complete rationale objects including malformed historical1518 TAP-label record and its explicit correction; replacement names are six exact currently added source declarations. No normal service/helper assertion or working app source is changed by metadata reconciliation."
+    ],
+    "redEvidence": {
+      "command": "Actual current five-case Firestore recorder84457628-224a-4cb7-9170-f1d2fe21dd99 passed5/5; separate later control e9ad783d-9afd-4f13-b3ac-e4c16addf90b passed1/1 requiring the complete consumer specific assertion. No duplicate emulator command or original product RED is claimed.",
+      "failure": "The isolated in-memory classic handler omitted its sole account-bound exact cloud write/ACK call. Actual independent real service revision stayed1 versus expected2, caught ERR_ASSERTION353 source revision advanced exactly once. Original1515 fixture failures remain historical failures; all preexisting rationale objects retained."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "24d4c5784c7428482f3c9f5609dc659811ac5735eeda7162d134dba2e77b0a53",
+    "cycle": "353-current-comparison-metadata-1522",
+    "reason": "Associate the exact current dirty combined test diff with complete preserved source and actual five-case service proof plus specific later ACK bypass sensitivity before private packaging.",
+    "previousBehavior": "Five normal actual real-emulator cases passed after complete fixture correction; the new actual service coverage had not yet proved it rejects deliberately bypassed signed-in cloud acknowledgement.",
+    "intendedBehavior": "A single isolated in-memory classic-source guard omission must reach the complete consumer and fail its exact independent serverrevision check, while working app/backend/rules source stays unchanged. Current metadata uses exact added RISK root names.",
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ],
+    "historicalAuthoringCorrection": {
+      "cycle": "353-complete-fixture-correction-1518",
+      "field": "replacementTests",
+      "reason": "The previous new association accidentally copied rendered TAP not-ok labels instead of source test names. That object and original source are retained; no gate pass on that malformed association was claimed. New current fingerprint includes this appended control and uses all six exact added root names."
+    },
+    "preservedCoverage": [
+      "Every existing test and complete prior rationale object/rawprefix is preserved; new control is appended after the exact normal five-consumer source accepted by1519. Complete source/current/head/file/manual/opaque/draft/archivepending and actual server ACK/refusal/uncertainty/peer cases stay intact.",
+      "Actual index/cloud/device/rules and complete realbackend source remain byteexact. Only the explicit existing loadApp appSource seam receives the retained deliberatelybrokenclassic guard specimen; no backend fake-success tuple or working source mutation.",
+      "This is later sensitivity with exact specific ERR_ASSERTION/actual1/expected2 required. Original1515 failed0/5 remains historical;1519 actual84457628 passed5/5 and later control is unexecuted in this definition. Full qualification/review/CI/release remain separate.",
+      "This additive association preserves all prior1033 complete rationale objects including malformed historical1518 TAP-label record and its explicit correction; replacement names are six exact currently added source declarations. No normal service/helper assertion or working app source is changed by metadata reconciliation."
+    ],
+    "redEvidence": {
+      "command": "Actual current five-case Firestore recorder84457628-224a-4cb7-9170-f1d2fe21dd99 passed5/5; separate later control e9ad783d-9afd-4f13-b3ac-e4c16addf90b passed1/1 requiring the complete consumer specific assertion. No duplicate emulator command or original product RED is claimed.",
+      "failure": "The isolated in-memory classic handler omitted its sole account-bound exact cloud write/ACK call. Actual independent real service revision stayed1 versus expected2, caught ERR_ASSERTION353 source revision advanced exactly once. Original1515 fixture failures remain historical failures; all preexisting rationale objects retained."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "02c1fb801b5e4213dc2a68a7843df4f6911c23715f0d92f2f87f348cd9bda20a",
+    "cycle": "353-current-comparison-metadata-1522",
+    "reason": "Associate the exact current dirty combined test diff with complete preserved source and actual five-case service proof plus specific later ACK bypass sensitivity before private packaging.",
+    "previousBehavior": "Five normal actual real-emulator cases passed after complete fixture correction; the new actual service coverage had not yet proved it rejects deliberately bypassed signed-in cloud acknowledgement.",
+    "intendedBehavior": "A single isolated in-memory classic-source guard omission must reach the complete consumer and fail its exact independent serverrevision check, while working app/backend/rules source stays unchanged. Current metadata uses exact added RISK root names.",
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ],
+    "historicalAuthoringCorrection": {
+      "cycle": "353-complete-fixture-correction-1518",
+      "field": "replacementTests",
+      "reason": "The previous new association accidentally copied rendered TAP not-ok labels instead of source test names. That object and original source are retained; no gate pass on that malformed association was claimed. New current fingerprint includes this appended control and uses all six exact added root names."
+    },
+    "preservedCoverage": [
+      "Every existing test and complete prior rationale object/rawprefix is preserved; new control is appended after the exact normal five-consumer source accepted by1519. Complete source/current/head/file/manual/opaque/draft/archivepending and actual server ACK/refusal/uncertainty/peer cases stay intact.",
+      "Actual index/cloud/device/rules and complete realbackend source remain byteexact. Only the explicit existing loadApp appSource seam receives the retained deliberatelybrokenclassic guard specimen; no backend fake-success tuple or working source mutation.",
+      "This is later sensitivity with exact specific ERR_ASSERTION/actual1/expected2 required. Original1515 failed0/5 remains historical;1519 actual84457628 passed5/5 and later control is unexecuted in this definition. Full qualification/review/CI/release remain separate.",
+      "This additive association preserves all prior1033 complete rationale objects including malformed historical1518 TAP-label record and its explicit correction; replacement names are six exact currently added source declarations. No normal service/helper assertion or working app source is changed by metadata reconciliation."
+    ],
+    "redEvidence": {
+      "command": "Actual current five-case Firestore recorder84457628-224a-4cb7-9170-f1d2fe21dd99 passed5/5; separate later control e9ad783d-9afd-4f13-b3ac-e4c16addf90b passed1/1 requiring the complete consumer specific assertion. No duplicate emulator command or original product RED is claimed.",
+      "failure": "The isolated in-memory classic handler omitted its sole account-bound exact cloud write/ACK call. Actual independent real service revision stayed1 versus expected2, caught ERR_ASSERTION353 source revision advanced exactly once. Original1515 fixture failures remain historical failures; all preexisting rationale objects retained."
+    }
+  },
+  {
+    "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "02c1fb801b5e4213dc2a68a7843df4f6911c23715f0d92f2f87f348cd9bda20a",
+    "cycle": "353-current-comparison-metadata-1522",
+    "reason": "Associate the exact current dirty combined test diff with complete preserved source and actual five-case service proof plus specific later ACK bypass sensitivity before private packaging.",
+    "previousBehavior": "Five normal actual real-emulator cases passed after complete fixture correction; the new actual service coverage had not yet proved it rejects deliberately bypassed signed-in cloud acknowledgement.",
+    "intendedBehavior": "A single isolated in-memory classic-source guard omission must reach the complete consumer and fail its exact independent serverrevision check, while working app/backend/rules source stays unchanged. Current metadata uses exact added RISK root names.",
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ],
+    "historicalAuthoringCorrection": {
+      "cycle": "353-complete-fixture-correction-1518",
+      "field": "replacementTests",
+      "reason": "The previous new association accidentally copied rendered TAP not-ok labels instead of source test names. That object and original source are retained; no gate pass on that malformed association was claimed. New current fingerprint includes this appended control and uses all six exact added root names."
+    },
+    "preservedCoverage": [
+      "Every existing test and complete prior rationale object/rawprefix is preserved; new control is appended after the exact normal five-consumer source accepted by1519. Complete source/current/head/file/manual/opaque/draft/archivepending and actual server ACK/refusal/uncertainty/peer cases stay intact.",
+      "Actual index/cloud/device/rules and complete realbackend source remain byteexact. Only the explicit existing loadApp appSource seam receives the retained deliberatelybrokenclassic guard specimen; no backend fake-success tuple or working source mutation.",
+      "This is later sensitivity with exact specific ERR_ASSERTION/actual1/expected2 required. Original1515 failed0/5 remains historical;1519 actual84457628 passed5/5 and later control is unexecuted in this definition. Full qualification/review/CI/release remain separate.",
+      "This additive association preserves all prior1033 complete rationale objects including malformed historical1518 TAP-label record and its explicit correction; replacement names are six exact currently added source declarations. No normal service/helper assertion or working app source is changed by metadata reconciliation."
+    ],
+    "redEvidence": {
+      "command": "Actual current five-case Firestore recorder84457628-224a-4cb7-9170-f1d2fe21dd99 passed5/5; separate later control e9ad783d-9afd-4f13-b3ac-e4c16addf90b passed1/1 requiring the complete consumer specific assertion. No duplicate emulator command or original product RED is claimed.",
+      "failure": "The isolated in-memory classic handler omitted its sole account-bound exact cloud write/ACK call. Actual independent real service revision stayed1 versus expected2, caught ERR_ASSERTION353 source revision advanced exactly once. Original1515 fixture failures remain historical failures; all preexisting rationale objects retained."
+    }
   }
 ]

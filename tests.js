@@ -48370,3 +48370,203 @@ test('RISK repository process: startup capture selection refuses unknown and for
  });
  const {runButtonSafety}=await import('./scripts/button-safety-native.mjs');await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'webkit',outputDir:path.join(dir,'api'),startupCapture:'unsupported'}),/startup capture selection/i);assert.equal(fs.existsSync(path.join(dir,'api')),false);
 });
+
+function assertPrimitiveSourceRow353(actual,expected,label){
+ assert.ok(actual&&expected,label+': both complete source rows exist');
+ const keys=Reflect.ownKeys(expected),actualKeys=Reflect.ownKeys(actual);
+ assert.ok(keys.every(key=>typeof key==='string')&&actualKeys.every(key=>typeof key==='string'),label+': no unencoded symbol keys');
+ assert.deepEqual([...actualKeys].sort(),[...keys].sort(),label+': complete own keys remain exact');
+ for(const key of keys){
+  const a=Object.getOwnPropertyDescriptor(actual,key),b=Object.getOwnPropertyDescriptor(expected,key);
+  assert.ok(a&&b&&Object.hasOwn(a,'value')&&Object.hasOwn(b,'value'),label+': data properties remain explicit');
+  assert.ok(b.value===null||!['object','function','symbol'].includes(typeof b.value),label+': fixture expects a complete primitive field');
+  assert.equal(typeof a.value,typeof b.value,label+': field type '+key);
+  assert.ok(Object.is(a.value,b.value),label+': exact primitive field '+key);
+ }
+}
+
+// #353 uses the existing actual app/File/backend consumers and real Firestore SDK.
+// Only SDK I/O failures, auth plumbing and the established VM DOM are controlled.
+async function realFileImportCase353(t,{mode='success',appSource=appSrc}={}){
+ assert.ok(process.env.FIRESTORE_EMULATOR_HOST,'353 actual-service proof requires the real isolated Firestore emulator');
+ const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-import353-'+mode,firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+ const provider=retentionSDK253(F,env.authenticatedContext('owner').firestore()),control={armed:false,denyReads:false,rootCommits:0,refusedPublications:0,serverReadFailures:0},clients=[],apps=[];
+ const sdk={...provider.sdk};
+ sdk.runTransaction=(database,callback)=>{
+  let rootWrite=false;
+  return provider.sdk.runTransaction(database,async tx=>{
+   rootWrite=false;
+   const port={...tx,set(ref,value){if(ref.path==='users/owner')rootWrite=true;return tx.set(ref,value);}};
+   const result=await callback(port);
+   if(control.armed&&rootWrite&&mode==='publication-failure'){
+    control.refusedPublications++;throw Object.assign(Error('353 controlled publication refusal'),{code:'permission-denied'});
+   }
+   return result;
+  }).then(result=>{
+   if(control.armed&&rootWrite){control.rootCommits++;if(mode==='ack-loss')control.denyReads=true;}
+   return result;
+  });
+ };
+ for(const name of ['getDocFromServer','getDocsFromServer'])sdk[name]=(...args)=>{
+  if(control.armed&&control.denyReads){control.serverReadFailures++;return Promise.reject(Object.assign(Error('353 controlled server read unavailable'),{code:'unavailable'}));}
+  return provider.sdk[name](...args);
+ };
+ t.after(async()=>{
+  control.armed=false;control.denyReads=false;
+  for(const client of clients)client.CS.suspend();
+  for(const app of apps)await app.dispose();
+  await provider.drain();await env.cleanup();
+ });
+ await env.clearFirestore();
+ const indexedDB=new IDBFactory(),deviceDbName='real-file-import353-'+mode+'-'+Math.random(),storage=sharedScannerStorage();
+ const original=syncState({tasks:[{...syncTask('353-current','353 current accepted task'),future353:{full:['old','😀']}}],settings:{horizonMin:60,thresholdPct:1,samples:250,cantMin:30,workedHours:8,theme:'system'},future353:{original:'preserve full unknown data'}});
+ const app=await loadBackupFileFixtureApp({appSource,sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(original),[LOCAL_HEAD_KEY]:JSON.stringify(original)}});apps.push(app);
+ const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ await prepareBackupFileFixtureSource(ctx);
+ const seeder=await loadCloudBackendV2({timeoutMs:15000,firebaseSDK:provider.sdk});clients.push(seeder);
+ const initialPayload=ctx.cloudPayload();
+ assert.equal((await seeder.CS.push(initialPayload,ctx.state.updatedAt||1,0)).ok,true,'353 real service seeds the known accepted current board');
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,failures:{authPending:true},timeoutMs:15000,firebaseSDK:sdk});clients.push(backend);
+ backend.emitAuth({uid:'owner',email:'e@example.com'});
+ await fixtureDeadline(async wait=>{
+  while(!vm.runInContext('reconciled()&&!pulling&&!cloudPushInFlight&&!pendingPush&&!cloudResumePending&&!cloudAdoptionHeld&&!deferredCloudPull&&state.syncDirty!==true',ctx))await wait(25);
+ },'353 actual service source reconciliation did not settle',15000);
+ await prepareBackupFileFixtureSource(ctx);
+ const remoteBefore=await backend.CS.pull();
+ assert.equal(remoteBefore.payload,ctx.cloudPayload(),'353 source handshake checks exact real-server payload');
+ assert.equal(remoteBefore.rev,ctx.state.syncRev,'353 source handshake checks actual real-server revision');
+ assert.equal(ctx.state.syncAccount,'e@example.com');
+ assert.equal(vm.runInContext('reconciled()&&!pulling&&!cloudPushInFlight&&!pendingPush&&!cloudResumePending&&!cloudAdoptionHeld&&!deferredCloudPull',ctx),true,'353 source is ready before File consent');
+ const sourceRaw=JSON.stringify(ctx.state),sourceHead=await store.readHead(),sourceRevision=ctx.state.syncRev;
+ assert.equal(sourceHead.payload,sourceRaw);
+ const protectedBackup={id:'353-preexisting-protected',day:new Date().toISOString().slice(0,10),at:Date.now(),kind:'manual',payload:sourceRaw};
+ assert.equal((await store.putBackup({expectedHash:sourceHead.hash,backup:protectedBackup})).ok,true);
+ assert.equal(await store.protectRecoverySource({expectedHash:sourceHead.hash,key:'353-preexisting-original',raw:'353 exact original\u0000😀'}),true);
+ await ctx.refreshDeviceBackupCache();
+ const oldManual=(await store.listBackups()).find(row=>row.id===protectedBackup.id),oldOpaque=(await store.listOpaqueArchives()).find(row=>row.key==='353-preexisting-original');
+ assert.ok(oldManual);assert.ok(oldOpaque);
+ const selected=JSON.parse(sourceRaw);
+ selected.tasks=[{...selected.tasks[0],title:'353-selected',future353:{full:['selected','🧭'],zero:0}}];
+ selected.future353={original:'preserve full unknown data',selected:['complete','🌿']};
+ const archive={format:'chain-scanner.recovery-archive',formatVersion:1,capturedAt:'2026-10-29T00:00:00.000Z',currentBoard:selected,
+  manifest:{status:'complete',consistency:'single-readonly-idb-transaction-and-unchanged-live-sources',sources:{currentBoard:{status:'included',format:'existing-board-json'}},failures:[]},
+  appSources:{localStorage:[],indexedDB:{database:'chain-scanner-v2',stores:{meta:[],snapshots:[],backups:[{key:{type:'string',value:'pending-upload'},value:{type:'object',value:{task:{id:'ARCHIVED_PENDING_MUST_NOT_REPLAY',title:'Archived pending task'}}}}],opaque:[]}}},
+  debugLog:{tasks:[{id:'ARCHIVED_DEBUG_MUST_NOT_IMPORT',title:'Debug report is evidence'}]}};
+ const fileBytes=Buffer.from('\uFEFF \n'+JSON.stringify(archive,null,2)+'\n','utf8'),file=new File([fileBytes],'real-service353-'+mode+'.json',{type:'application/json',lastModified:1793232000000});
+ ctx.openSettings();const modal=shim.document.getElementById('modalRoot');
+ assert.match(modal.innerHTML,/data-act="import-backup"/);
+ const input=makeFakeElement();Object.assign(input,{id:'restoreBackupFile',files:[],matches:()=>false});let pickerOpens=0;input.click=()=>{pickerOpens++;};
+ const source=makeFakeElement();source.value='file';
+ const settingsControl=shim.document.getElementById('stHorizon');Object.assign(settingsControl,{id:'stHorizon',type:'number',value:'73',checked:false,selectedIndex:-1});
+ const get=shim.document.getElementById.bind(shim.document),query=modal.querySelectorAll.bind(modal);
+ modal.querySelectorAll=selector=>selector==='input,select,textarea'?[settingsControl]:query(selector);
+ shim.document.getElementById=id=>id==='restoreBackupFile'?input:id==='backupRestoreSource'?source:get(id);
+ const assertProtected=async(stage,targetStore=store)=>{
+  const rows=await targetStore.listBackups(),incoming=rows.find(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===file.name);
+  assert.ok(incoming,stage+': exact incoming file has a protected source row');
+  assert.deepEqual(Buffer.from(incoming.restoreFile.bytesBase64,'base64'),fileBytes,stage+': original incoming bytes include BOM/whitespace/Unicode');
+  assert.ok(rows.some(row=>row.kind==='before-file-restore'&&row.payload===sourceRaw),stage+': exact previously accepted board remains protected');
+  assertPrimitiveSourceRow353(rows.find(row=>row.id===oldManual.id),oldManual,stage+': full preexisting manual row remains exact');
+  assertPrimitiveSourceRow353((await targetStore.listOpaqueArchives()).find(row=>row.key===oldOpaque.key),oldOpaque,stage+': full preexisting opaque original remains exact');
+  const pending=await targetStore.getPendingUpload('owner');
+  assert.doesNotMatch(JSON.stringify(pending),/ARCHIVED_PENDING_MUST_NOT_REPLAY|ARCHIVED_DEBUG_MUST_NOT_IMPORT/,stage+': archived records are never upload actions');
+ };
+ await ctx.onAction('import-backup',{});assert.equal(pickerOpens,1);input.files=[file];
+ const outcomes=await fixtureDeadline(shim.document.dispatchEventAndWait({type:'change',target:input}),'353 real File selection did not complete');
+ assert.deepEqual(outcomes,[true],'353 actual File handler reaches its protected preview');
+ const preview=modal.innerHTML,confirm=preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0];
+ assert.ok(confirm,'353 preview contains real Confirm');assert.doesNotMatch(confirm,/\sdisabled(?:\s|>|=)/,'353 complete ready source has usable consent');
+ assert.equal(JSON.stringify(ctx.state),sourceRaw,'353 Preview does not adopt a board');
+ assert.deepEqual(await store.readHead(),sourceHead,'353 Preview does not replace the durable head');
+ assert.equal(control.rootCommits,0);await assertProtected('preview');
+ let expectedRemote=remoteBefore;
+ if(mode==='peer'){
+  const peer=JSON.parse(remoteBefore.payload);peer.tasks[0].title='353-peer';
+  const peerPayload=JSON.stringify(peer),written=await seeder.CS.push(peerPayload,Date.now(),sourceRevision);
+  assert.equal(written.ok,true,'353 actual service peer publication commits');assert.equal(written.rev,sourceRevision+1);
+  expectedRemote={payload:peerPayload,rev:written.rev};
+ }
+ control.armed=true;if(mode==='fresh-read')control.denyReads=true;
+ const confirmed=await fixtureDeadline(ctx.onAction('confirm-file-restore',{}),'353 actual File confirmation did not complete',15000);
+ const recorded={mode,confirmed,control:{...control},sourceRevision};
+ // Keep the app's controlled unavailable boundary through normal disposal.
+ // The independent server reader below uses the unwrapped SDK.
+ const server=await seeder.CS.pull(),root=(await F.getDocFromServer(F.doc(provider.db,'users','owner'))).data();
+ assert.equal(server.rev,root.rev,'353 independent actual service read agrees with direct server root');
+ if(mode==='success'){
+  assert.equal(confirmed,true,'353 exact ACK permits adoption');
+  assert.equal(root.rev,sourceRevision+1,'353 source revision advanced exactly once');
+  assert.equal(control.rootCommits,1,'353 exactly one actual root publication committed');
+  assert.equal(ctx.state.tasks[0].title,'353-selected');
+  assert.deepEqual(ctx.state.tasks[0].future353,{full:['selected','🧭'],zero:0});
+  assert.deepEqual(ctx.state.future353,{original:'preserve full unknown data',selected:['complete','🌿']});
+  assert.equal(server.payload,ctx.cloudPayload(),'353 independently read server bytes equal the accepted application payload');
+  const header=(await F.getDocFromServer(F.doc(provider.db,'users','owner','generations',root.activeGeneration))).data();
+  assert.equal(header.hash,createHash('sha256').update(server.payload,'utf8').digest('hex'),'353 server header binds independent exact UTF8 payload');
+  assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.state.syncRev,sourceRevision+1);assert.equal(ctx.state.syncAccount,'e@example.com');
+  assert.match(shim.document.getElementById('toast').textContent,/The exact board was confirmed by cloud and saved on this device/);
+ }else{
+  assert.equal(confirmed,false,'353 uncertain/refused cloud state cannot authorize local adoption');
+  assert.equal(JSON.stringify(ctx.state),sourceRaw,'353 refusal keeps the last accepted complete local board');
+  assert.deepEqual(await store.readHead(),sourceHead,'353 refusal keeps the last accepted durable head');
+  assert.doesNotMatch(shim.document.getElementById('toast').textContent,/The exact board was confirmed by cloud and saved on this device/);
+  if(mode==='ack-loss'){
+   assert.equal(control.rootCommits,1);assert.ok(control.serverReadFailures>0);
+   assert.equal(root.rev,sourceRevision+1,'353 uncertain publication actually committed remotely');
+   assert.equal(JSON.parse(server.payload).tasks[0].title,'353-selected');
+   assert.match(shim.document.getElementById('toast').textContent,/exact saved board could not be verified/);
+  }else{
+   assert.equal(root.rev,expectedRemote.rev);assert.equal(server.payload,expectedRemote.payload,'353 a refused File cannot overwrite the real accepted server source');
+   assert.equal(control.rootCommits,0);
+   if(mode==='fresh-read'){assert.ok(control.serverReadFailures>0);assert.match(shim.document.getElementById('toast').textContent,/cloud source changed or could not be verified/);}
+   if(mode==='publication-failure'){assert.equal(control.refusedPublications,1);assert.match(shim.document.getElementById('toast').textContent,/cloud did not confirm this exact restore/);}
+   if(mode==='peer')assert.match(modal.innerHTML,/Cloud sync is held|cloud source changed|board, account or recovery copies changed/);
+  }
+  await assertProtected('refusal');await ctx.onAction('cancel-file-restore',{});
+ }
+ assert.equal(settingsControl.value,'73','353 unfinished Settings draft is retained without saving its value');
+ assert.equal(ctx.state.settings.horizonMin,60,'353 preserved Settings draft is not adopted into board settings');
+ assert.doesNotMatch(JSON.stringify(ctx.state),/ARCHIVED_PENDING_MUST_NOT_REPLAY|ARCHIVED_DEBUG_MUST_NOT_IMPORT/);
+ assert.doesNotMatch(server.payload,/ARCHIVED_PENDING_MUST_NOT_REPLAY|ARCHIVED_DEBUG_MUST_NOT_IMPORT/);
+ await assertProtected('completed');
+ const acceptedRaw=JSON.stringify(ctx.state),acceptedHead=await store.readHead();assert.equal(acceptedHead.payload,acceptedRaw);
+ ctx.suspendCloudSync();backend.CS.suspend();await app.dispose();
+ control.armed=false;control.denyReads=false;
+ const cold=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName,navigatorProvider:{onLine:false}});apps.push(cold);
+ await fixtureDeadline(async wait=>{while(!vm.runInContext('liveBoardAccepted&&deviceStorageAuthority&&!pulling',cold.ctx))await wait(5);},'353 cold reopen did not earn authoritative accepted data');
+ assert.equal(cold.ctx.window.CloudSync,undefined,'353 cold reopen is independent of any cloud client/ACK');
+ assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).hash,acceptedHead.hash,'353 cold reopen binds the exact accepted head');
+ assert.equal(JSON.stringify(cold.ctx.state),acceptedRaw,'353 cold reopen verifies the complete authoritative accepted state');
+ assert.equal((await cold.ctx.window.ScannerDeviceStore.readHead()).payload,acceptedRaw,'353 cold reopen preserves the exact accepted durable result');
+ assert.equal(cold.ctx.state.tasks[0].title,mode==='success'?'353-selected':'353 current accepted task');
+ assert.deepEqual(cold.ctx.state.tasks[0].future353,mode==='success'?{full:['selected','🧭'],zero:0}:{full:['old','😀']});
+ await assertProtected('offline cold reopen',cold.ctx.window.ScannerDeviceStore);
+ t.diagnostic('353 actual-service boundary '+JSON.stringify(recorded));return recorded;
+}
+
+test("RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{await realFileImportCase353(t,{mode:"success"});});
+
+test("RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{await realFileImportCase353(t,{mode:"fresh-read"});});
+
+test("RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{await realFileImportCase353(t,{mode:"publication-failure"});});
+
+test("RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{await realFileImportCase353(t,{mode:"ack-loss"});});
+
+test("RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{await realFileImportCase353(t,{mode:"peer"});});
+
+
+test("RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const target='if(p.accountBound&&!p.unacceptedSource)await fileRestoreCloudWrite(p);';
+ assert.equal(appSrc.split(target).length,2,'353 later sensitivity mutates exactly one existing cloud-ACK guard');
+ const specimen=appSrc.replace(target,'if(false)await fileRestoreCloudWrite(p);');
+ const actualSourceHash=createHash('sha256').update(specimen).digest('hex');
+ assert.equal(actualSourceHash,"82ab13b676888945851ff5f94fd3f784cf741ef8d5fd78e8dea5459585105a6f",'353 later sensitivity binds its exact independently retained broken source');
+ let failure;
+ try{await realFileImportCase353(t,{mode:'success',appSource:specimen});}catch(error){failure=error;}
+ assert.equal(failure?.code,'ERR_ASSERTION','353 later sensitivity requires the actual consumer assertion, not setup or another error');
+ assert.match(failure.message,/353 source revision advanced exactly once/,'353 later sensitivity reaches the exact independent real-server revision check');
+ assert.equal(failure.actual,1);assert.equal(failure.expected,2);
+ t.diagnostic('353 later sensitivity '+JSON.stringify({kind:'later-broken-handler-control',actualSourceHash,code:failure.code,message:failure.message,actual:failure.actual,expected:failure.expected}));
+});
