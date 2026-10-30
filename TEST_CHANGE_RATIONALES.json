@@ -47714,5 +47714,89 @@
     "committedGatePending": "Leaf1689 must execute actual public CLI on the real packaging commit; no exported validator substitutes for it."
   },
   "limits": "No actual native/browser/app observation/cause, future tail-fit/RSS/memory, full qualification/CI/release or Beta acceptance. Large45 manual input derives48 occurrences but full ordinary annotations stay unearned; public CLI correctly refuses that large review tail. Full reader stdout remains transient<=67108864B, complete hash/reference view only; no persistent PNG cache."
-}
+},
+  {
+    "cycle": "startup-reference-reader-1707-1722-ea10dfb9bce0",
+    "baseCommit": "ea10dfb9bce0185a524127f466a5bd2c40fd3161",
+    "comparisonMergeBase": "ea10dfb9bce0185a524127f466a5bd2c40fd3161",
+    "testChangesSha256": "64165a35038ce764bc12c160c85eba834cb461c790678436d2ffbf2c24633091",
+    "reason": "Frozen1706 reader interface adds one opt-in lossless canonical-reference view and keeps all inherited behavioral assertions. Tests extend only existing profileCLI prepared-directory/extra-argv/custody support and append finite public reader cases. Existing schema1/default/schema2/old48/old56 assertions remain protected.",
+    "previousBehavior": "Unchanged ea10 public CLI repeats the complete100000-character parent in1000 children, exceeding the existing64MiB binary transport sink; actual frozen test fails completed reference transport with ENOBUFS. Existing full Map/CLI/profiles remain the independent legacy contract.",
+    "intendedBehavior": "Explicit file-backed canonical-reference-v1 completes bounded compact transport and reconstructs every old serialized value/key-order/occurrence with the same verifier, while legacy results/formatters and meaningful source/typed/clock/filesystem guards stay exact. R01 literal inputs/argv/assertions remain the observed before-source RED/SAME GREEN pair.",
+    "replacementTests": [
+      "RISK repository process: startup reference view completes bounded lossless parent transport",
+      "RISK repository process: startup reference view preserves full values custody bounds and owned leases"
+    ],
+    "preservedCoverage": [
+      "All existing tests.js assertions and all unrelated historical rationale objects remain unchanged; only the existing profileCLI fixture helper gains optional prepared-directory/extra-argv/external custody support with old defaults.",
+      "Schema1/default/schema2/old48/old56 descriptors, full Map/CLI formatting, source/stack/clock/PNG/custody/trusted-input/cleanup/ownership assertions remain independent and preserved.",
+      "No provider/lifecycle/wrapper/app/fixture/runtime/lock/retention-profile/timing/viewport/motion/FAQ/PWA/cloud/rules/CI/release behavior is changed."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-name-pattern=\"^RISK repository process: startup reference view completes bounded lossless parent transport$\" tests.js (exact env/argv in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-FROZEN-BEFORE-FIRST-CHILD.json)",
+      "failure": "Actual2026-10-30T19:57:30Z unchanged ea10 four modules: AssertionError completed reference transport, ENOBUFS !== null;64MiB Buffer sink collected67174400 PARTIAL stdout bytes SHA584641030faf0896b21a59cb12efa3a4ea0fddfc03f62a178e411ee28037628f; no stderr/persistent payload stdout; future import/export was after assertion.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-RED-ACTUAL.json",
+      "frozenInputPlan": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/PRELAUNCH-PLAN.json",
+      "testOnlyPatch": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-frozen-test-only.patch"
+    },
+    "greenEvidence": {
+      "sameR01": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-GREEN-ACTUAL.json",
+      "expandedBytes": 104766644,
+      "expandedSha256": "6f38cda8f09a40a7d085f9fbe8230646279402013a06c7383202d510c554ddc1",
+      "compactBytes": 14322,
+      "finitePasses": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/FRONTIER-PARTIAL-CASE-MAP.json",
+      "richAndReferencePass": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/SETUP-REMEDY-ACTUAL.json",
+      "setupFailure": "Original rich fixture used an inherited encoder on arrays and failed before reader; R06 unexecuted. ROOT authorized literal existing full tagged custody representation, unchanged four modules, then affected-only3/3 test pass. This setup error is not reader RED or escalation.",
+      "coherentFinal": "Pending exact committed focused pass; final evidence will bind actual commit/tree."
+    },
+    "sourceBinding": {
+      "sourceBaseline": "ea10dfb9bce0185a524127f466a5bd2c40fd3161",
+      "firstSameGreen": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-CANDIDATE-BEFORE-FIRST-GREEN.json",
+      "actualAll4ModuleHashesUnchangedSinceFirstGreen": true,
+      "strictWrapperSha256": "56d7c1e9bf5e0b0aa2cb5ab24f21b87120d2db191d4b31cfba08f2ab60d02753"
+    },
+    "limits": "Private finite reader proof only. No new retention profile/native/browser/capture/source admission/integration/push/CI/full qualification/release/RSS/physical-device claim. Focused rich-only selector is explicit test-run selection; default coherent pass registers every required finite case, fail-stop on dependency failure."
+  },
+  {
+    "cycle": "startup-reference-reader-1707-1722-8cd524a7f0ab",
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "comparisonMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "56b1bd8a982d3bc9cb4b71db5792925ec948373318d0976503f360d02345ddc4",
+    "reason": "Frozen1706 reader interface adds one opt-in lossless canonical-reference view and keeps all inherited behavioral assertions. Tests extend only existing profileCLI prepared-directory/extra-argv/custody support and append finite public reader cases. Existing schema1/default/schema2/old48/old56 assertions remain protected.",
+    "previousBehavior": "Unchanged ea10 public CLI repeats the complete100000-character parent in1000 children, exceeding the existing64MiB binary transport sink; actual frozen test fails completed reference transport with ENOBUFS. Existing full Map/CLI/profiles remain the independent legacy contract.",
+    "intendedBehavior": "Explicit file-backed canonical-reference-v1 completes bounded compact transport and reconstructs every old serialized value/key-order/occurrence with the same verifier, while legacy results/formatters and meaningful source/typed/clock/filesystem guards stay exact. R01 literal inputs/argv/assertions remain the observed before-source RED/SAME GREEN pair.",
+    "replacementTests": [
+      "RISK repository process: startup reference view completes bounded lossless parent transport",
+      "RISK repository process: startup reference view preserves full values custody bounds and owned leases"
+    ],
+    "preservedCoverage": [
+      "All existing tests.js assertions and all unrelated historical rationale objects remain unchanged; only the existing profileCLI fixture helper gains optional prepared-directory/extra-argv/external custody support with old defaults.",
+      "Schema1/default/schema2/old48/old56 descriptors, full Map/CLI formatting, source/stack/clock/PNG/custody/trusted-input/cleanup/ownership assertions remain independent and preserved.",
+      "No provider/lifecycle/wrapper/app/fixture/runtime/lock/retention-profile/timing/viewport/motion/FAQ/PWA/cloud/rules/CI/release behavior is changed."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-name-pattern=\"^RISK repository process: startup reference view completes bounded lossless parent transport$\" tests.js (exact env/argv in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-FROZEN-BEFORE-FIRST-CHILD.json)",
+      "failure": "Actual2026-10-30T19:57:30Z unchanged ea10 four modules: AssertionError completed reference transport, ENOBUFS !== null;64MiB Buffer sink collected67174400 PARTIAL stdout bytes SHA584641030faf0896b21a59cb12efa3a4ea0fddfc03f62a178e411ee28037628f; no stderr/persistent payload stdout; future import/export was after assertion.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-RED-ACTUAL.json",
+      "frozenInputPlan": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/PRELAUNCH-PLAN.json",
+      "testOnlyPatch": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-frozen-test-only.patch"
+    },
+    "greenEvidence": {
+      "sameR01": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-GREEN-ACTUAL.json",
+      "expandedBytes": 104766644,
+      "expandedSha256": "6f38cda8f09a40a7d085f9fbe8230646279402013a06c7383202d510c554ddc1",
+      "compactBytes": 14322,
+      "finitePasses": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/FRONTIER-PARTIAL-CASE-MAP.json",
+      "richAndReferencePass": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/SETUP-REMEDY-ACTUAL.json",
+      "setupFailure": "Original rich fixture used an inherited encoder on arrays and failed before reader; R06 unexecuted. ROOT authorized literal existing full tagged custody representation, unchanged four modules, then affected-only3/3 test pass. This setup error is not reader RED or escalation.",
+      "coherentFinal": "Pending exact committed focused pass; final evidence will bind actual commit/tree."
+    },
+    "sourceBinding": {
+      "sourceBaseline": "ea10dfb9bce0185a524127f466a5bd2c40fd3161",
+      "firstSameGreen": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-CANDIDATE-BEFORE-FIRST-GREEN.json",
+      "actualAll4ModuleHashesUnchangedSinceFirstGreen": true,
+      "strictWrapperSha256": "56d7c1e9bf5e0b0aa2cb5ab24f21b87120d2db191d4b31cfba08f2ab60d02753"
+    },
+    "limits": "Private finite reader proof only. No new retention profile/native/browser/capture/source admission/integration/push/CI/full qualification/release/RSS/physical-device claim. Focused rich-only selector is explicit test-run selection; default coherent pass registers every required finite case, fail-stop on dependency failure."
+  }
 ]

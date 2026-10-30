@@ -13821,6 +13821,16 @@
       "root": "RISK repository process: additional56 Timeline rejects non-string selectors before coercion or activation",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup reference view completes bounded lossless parent transport",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup reference view preserves full values custody bounds and owned leases",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
