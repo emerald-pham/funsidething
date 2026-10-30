@@ -2475,3 +2475,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - `RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict` — The existing aggregate preserves all optional mobile outcomes separately from the required ordinary verdict, without converting failed/unavailable diagnostics into passes.
 - `RISK repository process: optional mobile diagnostics do not block ordinary reuse` — The existing current-source reuse planner disregards optional mobile failures while still refusing missing, failed or ambiguous mandatory producers.
 - `RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission` — The existing hosted optional mobile route requires explicit branch workflow-dispatch selection and retains raw event/ref/source admission; unselected or forged policy refuses before runtime.
+
+- RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending

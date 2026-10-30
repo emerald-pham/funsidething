@@ -33799,5 +33799,664 @@
       "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
     },
     "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+{
+  "testChangesSha256": "e210824aadde23d1756d89b92a080993c5f8055f3892d53994e2059cb47d4d8a",
+  "reason": "Complete source-bound scene criteria missing from #1537: preserve existing consumers, add actual boot visual/focus matrix, real native accepted-pending reopen, complete five-mode post-edit Export/Copy and ordinary renderer variants under explicit root configuration.",
+  "previousBehavior": "The retained proofs covered VM replay and settled native reopen/Undo; boot/focus and loaded-text lifecycle receipts were unavailable, held ordinary edits lacked their subsequent Export and native pending-save interruption was not established.",
+  "intendedBehavior": "Prove all four complete finite accepted-source consumers with independently specified scene/source/authority oracles. Keep both legacy400 renderer bodies unchanged on the existing explicit optional selection and never count controlled incomplete inner flows as native qualification.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "updatedExistingConsumers": [
+    "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+    "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+    "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+    "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+  ],
+  "preservedCoverage": [
+    "All1156 complete prior rationale objects and their raw prefix remain byte exact; all178 unrelated tracked source files remain exact.",
+    "Complete old held-rate, same-mounted, first-trusted-action, preset/live/reload and task/source assertions remain protected.",
+    "All full original400 renderer assertions, fixed400/two-source/mobileYesMotion/verifier routes remain verbatim in the explicit optional branch.",
+    "The historical sceneIntentTestFixture default remains workload-diagnostic; only the new five-mode Export call selects the existing ordinary64 profile. All old63 consumer callbacks and the partial-race control remain intact.",
+    "Full raw meta, snapshot, backup, opaque and pending snapshots retain type tags, minus zero, NaN and own undefined; no projection or app authority change is substituted.",
+    "Accepted VM replay, settled OR08 reopen/Undo and public Undo paint retain their original actual receipts; these definitions do not rerun them or add scenarios, harnesses, production APIs or optional gates."
+  ],
+  "redEvidence": {
+    "command": "Static criterion/source audit under #1537 and definitions1540-1543; no app behavior command executed before implementation because this group adds tests only.",
+    "failure": "No application RED is asserted. The actual bounded120-recorder search found no eligible legacy execution receipts and the source-order audit proved the missing native pending-save and five-mode post-edit Export oracles. The one-shot coverage baselines1544-1547 remain not executed."
+  },
+  "executionEvidence": {
+    "status": "not-executed",
+    "sourceBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "definitionLeaves": [
+      1540,
+      1541,
+      1542,
+      1543
+    ],
+    "proofLeaves": [
+      1544,
+      1545,
+      1546,
+      1547
+    ],
+    "scope": "test coverage definitions only; no app changes or fabricated test-first chronology"
   }
+},
+{
+  "testChangesSha256": "40766c69eb60d90af97e661b38c0ed990a6d73612e0a4809ec79d4b0f17f02e1",
+  "reason": "Correct the seven independently source-proved NEW scene observer and archive expectation contracts under #1573, preserving the entire coverage group and all original raw evidence.",
+  "previousBehavior": "The first #1546 run failed because five new source observers used the wrong backup key; the required whole static audit also found an unsorted repairInfo expected list and hydrated instead of raw native priorScene expectation before those assertions executed.",
+  "intendedBehavior": "Keep complete independent exact-source assertions while naming the canonical daily-backups key, the exact sorted repairInfo fields and null raw durable scene predecessor. Preserve every full typed, current, raw, account, authority, scene receipt and post-Export tail.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "updatedExistingConsumers": [
+    "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
+    "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+    "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+    "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+  ],
+  "preservedCoverage": [
+    "All1157 complete previous rationale objects and their raw object prefix remain exact; all180 other frozen tracked files remain byte exact.",
+    "The unrelated historical backups key observer at tests.js16102 remains byte exact; only five new source key literals change.",
+    "Strict full manifest/local-store and independently decoded physical-store equality remain intact, including pending, opaque, negative zero, NaN and own undefined values.",
+    "The exact raw native fixture still lacks settings.scene; its complete receipt, original event facts, head, account, authority, pending-save and true cold-reopen assertions remain intact.",
+    "Both complete original legacy400 renderer bodies and existing fixture defaults, seven optional roots and sixty ordinary scenarios remain unchanged.",
+    "All unrelated assertions and every post-Export no-replay, cleanup and authority tail remain intact; no application, runner, harness, scenario or runtime API changes occur."
+  ],
+  "redEvidence": {
+    "command": "Original #1546 two-root seven-status recorder dedbc88b-cd1b-42bc-b7e7-9c2af3256e50; additional complete source-only static audit before any corrective edit or new invocation.",
+    "failure": "Original run had pass1/fail6/skip0/cancel0, child1/wrapper1 at the new manifest expectation. Static audit found two further new oracle errors before execution. This is test source-contract repair, not an application RED, native failure or model escalation."
+  },
+  "executionEvidence": {
+    "at": "2026-10-30T06:52:12.482Z",
+    "status": "Source-only correction before the separately admitted #1574 invocation; native1544/1545/1547 unlaunched at this record timestamp.",
+    "originalFailureHandoff": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1546/FAILURE-HANDOFF.json",
+    "originalFailureHandoffSha256": "c633383f5133ac16addcd3e3216544529fbc6ebd01fe66ecfbcdce97a2191200",
+    "staticAudit": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1573/STATIC-AUDIT-ADDITIONAL-FINDINGS.json",
+    "staticAuditSha256": "e062adab1e8ca70830e675a3473c78a0a6559ce0e5965d3460ee95e685779b6f",
+    "comparisonBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "originalTestsSha256": "b886b25201302211eefbe2292fca8be8a31c4959944213ede0006af19714a3f7",
+    "correctedTestsSha256": "583eb664972ed1a3d57cf7fe58f23d3d9b8798bfd85f1c89dd2bfe08fc06f729",
+    "admittedSourceCorrections": [
+      {
+        "line": 27034,
+        "from": "fvp:chain-scanner:backups:v1",
+        "to": "fvp:chain-scanner:daily-backups:v1"
+      },
+      {
+        "line": 47684,
+        "from": "fvp:chain-scanner:backups:v1",
+        "to": "fvp:chain-scanner:daily-backups:v1"
+      },
+      {
+        "line": 49030,
+        "from": "fvp:chain-scanner:backups:v1",
+        "to": "fvp:chain-scanner:daily-backups:v1"
+      },
+      {
+        "line": 49302,
+        "from": "fvp:chain-scanner:backups:v1",
+        "to": "fvp:chain-scanner:daily-backups:v1"
+      },
+      {
+        "line": 51113,
+        "from": "fvp:chain-scanner:backups:v1",
+        "to": "fvp:chain-scanner:daily-backups:v1"
+      },
+      {
+        "from": "assert.deepEqual(Object.keys(archive.repairInfo).sort(),['version','debugLog']);",
+        "to": "assert.deepEqual(Object.keys(archive.repairInfo).sort(),['debugLog','version']);",
+        "description": "Exact independently sorted repairInfo key set"
+      },
+      {
+        "from": "assert.deepEqual(receipt.priorScene,input.settings.scene);",
+        "to": "assert.equal(Object.hasOwn(JSON.parse(fixtureRaw).settings,'scene'),false,'The exact raw durable predecessor has no scene property');assert.equal(receipt.priorScene,null);",
+        "description": "Exact raw durable predecessor rather than hydrated scene defaults"
+      }
+    ],
+    "behaviorInvocations": 0
+  }
+},
+{
+  "testChangesSha256": "c536d6ea0e0407df40cca59e961151f6dd6d7a31b6b685177e31703eb2a2763c",
+  "reason": "Correct the single new readiness theme observation to the actual final stylesheet-owned html paint surface under #1576, preserving strict full theme equality and an independent body-transparency assertion.",
+  "previousBehavior": "The first complete #1544 native matrix measured intentionally transparent body background and expected superseded inline fallback colors. All eight cases failed the same new oracle before the later native readiness tails.",
+  "intendedBehavior": "Read the real html root background and independently assert final CSS literal light RGB247/252/248 or dark RGB36/61/84 plus transparent body, with actual data-theme and computed colorScheme exact. Preserve every other readiness and source assertion.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "updatedExistingConsumers": [
+    "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live"
+  ],
+  "preservedCoverage": [
+    "All1158 complete previous rationale objects and their raw object prefix remain exact; all180 other frozen tracked files remain byte exact.",
+    "The complete eight-case loading/ready matrix keeps held SPAWN source, natural disabled palettes, actual native keyboard focus, same mounted controls, first trusted actions, screenshots and preset/live/reload/task assertions.",
+    "The already accepted seven-status five-mode Export and independent partial-race callback, helper and app inputs remain byte exact; no VM replay is performed.",
+    "Full current, durable, typed physical, local, account, held, pending, protected and authority source guards remain intact; no projection, broad accepted range or softened comparison replaces them.",
+    "Both complete legacy400 renderer branches, original fixture defaults, seven optional roots and sixty ordinary scenarios remain unchanged.",
+    "No app, CSS, runtime API, native runner, harness, scenario, gate, root name or group assignment change occurs."
+  ],
+  "redEvidence": {
+    "command": "Original ONE #1544 complete native matrix recorder34a9af22-ec0b-40a3-96c0-0ab650db863d,2026-10-30T07:00:58.206Z; whole source-only callback/CSS/control audit under #1576 before this correction.",
+    "failure": "Original run had9statuses/pass0/fail9/skip0/cancel0 child1/wrapper1. Every actual theme attribute and scheme matched while body background was transparent. Final landscape.css6/28/29 source proves this new observer error; no application RED or new run is claimed."
+  },
+  "executionEvidence": {
+    "at": "2026-10-30T07:17:07.674Z",
+    "status": "Source-only correction before separately admitted ONE #1577 matrix;1545/1547 remain unlaunched at this timestamp.",
+    "comparisonBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "originalTestsSha256": "583eb664972ed1a3d57cf7fe58f23d3d9b8798bfd85f1c89dd2bfe08fc06f729",
+    "correctedTestsSha256": "63254688ad75664185be1ddbb743eb1f2d3d02f025d726970f3ef5e276cb8919",
+    "originalFailureHandoff": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1544/FAILURE-HANDOFF.json",
+    "originalFailureHandoffSha256": "c463d29eff8eb163649e05703e9bb8078f151aeedcd62375efe4ba83659bcc84",
+    "wholeStaticAudit": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1576/WHOLE-READINESS-STATIC-AUDIT.json",
+    "wholeStaticAuditSha256": "57a4b301bed05e0bc4809b37995b902886563ae551f14e1446c4db1ca7904e2f",
+    "actualFinalCss": {
+      "file": "landscape.css",
+      "sha256": "ad37e1c50291b3819a58dcc5ab26365c5dd7db1795b8786c852fff949f41ccd9",
+      "source": "line6 --bg:light-dark(#f7fcf8,#243d54); line28 html background var(--bg); line29 body transparent"
+    },
+    "behaviorInvocations": 0,
+    "sameOwnerNoModelEscalation": true
+  }
+},
+{
+  "testChangesSha256": "aaf4b22d87d8e7754ab7e6fb776e5d5cac2a40f79915dc5c5a6c42210e23f117",
+  "reason": "Apply the exact ROOT-admitted F1-F4 complete static audit corrections under #1581 while preserving every strict source and renderer oracle.",
+  "previousBehavior": "The new readiness predicate returned a Promise to the actual synchronous Page poller and captured a pre-QuickStart durable head; the postreload tail lacked normal app/renderer readiness. The configured ordinary renderer sentinel callers omitted full native.errors checks, and the synthetic late-text location projection triggered a real user-scene save despite a whole-source nonmutation expectation.",
+  "intendedBehavior": "Use synchronous positive actual QuickStart/saved/accepted/authority readiness followed by independently hashed complete public source assertions; wait only after the existing immediate reload for ordinary saved/renderer readiness and exact intended scene; retain and require empty native errors in both ordinary sentinel callers; use only the existing synchronous board-adoption applyingSceneFromState protocol around the synthetic ordinary public location projection, restoring the previous flag in finally. Preserve all location/time/pixel triggers and complete current/durable/raw/typed/account/authority equality.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "updatedExistingConsumers": [
+    "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+    "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+    "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+  ],
+  "preservedCoverage": [
+    "All1159 complete prior rationale objects/raw object prefix and all180 other tracked files remain byte exact.",
+    "The complete readiness8child+parent9status matrix retains exact themes, palettes, native focus, same mounted controls,5trustedactions, complete current/head/raw/local/authority guards, presets, immediate reload, live/task/Help and cleanup tails.",
+    "The pending native whole callback, accepted five-mode VM Export and original partial control, exact scene intent helper/default and lossless typed/raw/account/undefined/NaN/minusZero/opaque/future pending assertions are byte exact. No acceptedVM/OR08 replay occurs.",
+    "Both complete original optional400 renderer branches and their fixed assertions, source/scenario/profile/native interfaces, exact64/three-source ordinary fixture and all existing pixel/lifecycle/current-flight/source guards remain.",
+    "Inner sentinel reports stay actual failed/nonqualifying; full native.errors must be empty and original probe/run failures and cleanup remain enforced.",
+    "No app/CSS/newhelper/harness/scenario/gate/group/root rename, baseline shift, broad accepted values or source projection replaces a preservation assertion."
+  ],
+  "redEvidence": {
+    "command": "Original ONE #1577 readiness matrix recordee87ec94-e246-49c2-b7f0-f6a49b1ba42f,2026-10-30T07:19:34.460Z; complete source-only #1580 audit; exact ROOT decisione394b514 before this correction.",
+    "failure": "Original whole9status matrix hadpass0/fail9/skip0/cancel0 child1/wrapper1 at strict head baseline. All8currentboards stayed byte identical while normal QuickStart save changed rawv1 durablehead to canonicalv2; installed SDK source proves first-Promise truthiness, not an app RED. F2-F4 are source-proved unreached/missing-oracle/caller-contract corrections, not additional observed app failures."
+  },
+  "executionEvidence": {
+    "at": "2026-10-30T08:05:11.399Z",
+    "status": "Source-only correction before separately admitted ONE #1582 samewhole readiness matrix; pending1545 and renderer1547 remain unexecuted.",
+    "comparisonBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "originalTestsSha256": "63254688ad75664185be1ddbb743eb1f2d3d02f025d726970f3ef5e276cb8919",
+    "correctedTestsSha256": "2d0bb71e440cf2a232e8a2826a83b4406561e90b707de1ae6b8ea28ef2765707",
+    "originalFailureHandoff": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1577/FAILURE-HANDOFF.json",
+    "originalFailureHandoffSha256": "605173496038f579aea5066a677ae27e35159841543f61259b9bf89ec17bd783",
+    "wholeStaticAudit": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1580/COMPLETE-STATIC-AUDIT.json",
+    "wholeStaticAuditSha256": "c1ce061d8a5e0fbafef364a6640d7cfb521ee272ae5ba44fe032e28bcdd1a28b",
+    "exactGroupedPatch": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1580/PROPOSED-GROUPED-CORRECTION.diff",
+    "exactGroupedPatchSha256": "705a176334f406480092f473fac6eff2ceacb00e505c6e8863e467d047afcb2c",
+    "rootDecision": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/synchronous-readiness/correction-publication/ROOT-CALLER-AND-READINESS-DECISION.json",
+    "rootDecisionSha256": "e394b51427662d057c6850de3185b7fb17782ddf4165e828c303545ca79a6233",
+    "installedSdkSha256": "9393fa79e1c67c74edc26b610d65a4f7ed73d345a762465cc88340a33a2454ac",
+    "behaviorInvocations": 0,
+    "sameOwnerNoModelEscalation": true
+  }
+},
+{
+  "testChangesSha256": "5b845981801c822a26e6357bc59e8c780559917e2ab94a1cf45e9d81ed6c0f2c",
+  "reason": "Apply the exact ROOT-admitted complete post-replay source observer and physical-graph oracle correction under #1588, preserving every substantive strict behavior and protected full source.",
+  "previousBehavior": "The new pending native consumer sampled appReady before the normal migration save settled, expected the initial required-device flag after a new document, and omitted the normal daily/latest backup references. Its first real f66108cd run failed whole3/3 at head/current updatedAt equality; later strict tails were unreached. No app RED was established.",
+  "intendedBehavior": "Preserve original rawv1 without scene and both accepted decisions, positively entered pending hash and immediate different-document reload. Only afterwards wait synchronously for the natural normal save timer/generation/finalizers and whole persisted raw state, independently serialize and hash the full expected board, assert literal false-to-true authority and full reference-GC graph with the two original manual sources plus final snapshot and daily/latest references. Explicitly retain the same-local-calendar-day fixture condition without a clock override.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "preservedCoverage": [
+    "All1160 complete previous rationale objects and their raw object prefix remain exact; all180 other tracked files including RISK and group assignments remain exact.",
+    "Every earlier tests.js byte remains exact, including accepted VM7/7/readiness9/9 consumers, helpers, partial controls, and both complete original optional400 renderer branches. No accepted behavior replay occurs here.",
+    "The original genuine three trusted actions, entire accepted payload/hash gate, old head/raw/local/full authority preservation while pending, exact bounded receipt/two facts/FNV64 baseline, immediate new-document reload, no extra gesture and retirement remain strict.",
+    "Whole current and public durable payload/hash each equal the independent complete expected board; no updatedAt omission, normalization, head-self oracle, changed seed, broad accepted value, or protected-source projection.",
+    "Entire meta, snapshots, backups, account, pending future metadata, opaque bytes, NaN, minusZero, ownUndefined, manual payloads and all raw local sources remain compared exactly, with only source/shape/order/range-bound unpredictable UUID/time metadata observed.",
+    "Literal required-device false-to-true lifecycle, native errors, complete owned context/browser cleanup and failure branches remain. Same local day is a fixture precondition; cross-midnight migration is not claimed."
+  ],
+  "redEvidence": {
+    "command": "Original ONE #1545 anchored full native root run f66108cd-00b0-48ae-ba48-1addb17980a5 at 2026-10-30T08:21:28.031Z; full immutable FAILURE-HANDOFF d598cad9 plus closed complete source-only #1587 audit and ROOT decision0132789a before this source correction.",
+    "failure": "Both Chromium and WebKit plus parent FAILED3/3, child/wrapper1, skip/cancel0 at tests.js51132 strict head.payload===current. Actual retained strings differ only updatedAt by25ms/19ms after normal migration save started. Initial deviceStorageRequired=false becomes true in the next document. Full source audit establishes followup daily/latest refs and reference GC. This is source-oracle/setup correction, not app RED or a successful original run."
+  },
+  "executionEvidence": {
+    "at": "2026-10-30T09:09:46.163Z",
+    "status": "Source-only #1588 exact correction before separately admitted ONE distinct #1589 whole two-engine proof; original failed1545 remains failed.1547 and1562 remain pending.",
+    "comparisonBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "originalTestsSha256": "2d0bb71e440cf2a232e8a2826a83b4406561e90b707de1ae6b8ea28ef2765707",
+    "correctedTestsSha256": "a29be9138cef101c796fcbc2bab95be5b9cc125a21f4ddd10b776b821408c907",
+    "originalFailureHandoff": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1545/FAILURE-HANDOFF.json",
+    "originalFailureHandoffSha256": "d598cad9b2ff1bdbc4a9f5efe44416983b37e42f1f11f907cd599f9cbfa90353",
+    "wholeStaticAssessment": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1587/COMPLETE-ASSESSMENT.json",
+    "wholeStaticAssessmentSha256": "be19988b8b14322be60857806d167bcd1da3d7e6e27f847115099b8a2fd5d3d0",
+    "exactGroupedPatch": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1587/PROPOSED-GROUPED-CORRECTION.diff",
+    "exactGroupedPatchSha256": "2143bac77842be7a086ba132149d9528f56038cfab9b3e46a5cad13dd56e6cde",
+    "rootDecision": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/post-replay-save/publication/ROOT-SAVE-LIFECYCLE-AND-ORACLE-DECISION.json",
+    "rootDecisionSha256": "0132789a859ec1ea778a1d63bde8ac9051db5d25679aca53f011c630a8a40d57",
+    "behaviorInvocations": 0,
+    "sameOwnerNoModelEscalation": true
+  }
+},
+{
+  "testChangesSha256": "516bcec4861e6cc7c257711345c31fdd291529778ab1e13fe4b7ec0b1040961f",
+  "reason": "Bind the TWO new ordinary renderer context motion-consent suffixes to the already existing fixed renderer instant under the exact ROOT #1592 decision, without changing any behavior assertion.",
+  "previousBehavior": "The new context suffixes stamped consent with Date.now while the original fixed Date was installed through separately evaluated init scripts whose order the pinned SDK leaves undefined. Original whole1547run881d12e9 passed8/10 statuses and failed Normal late effective motion actualreduced versus expectednormal; exact savedAt/init ordering was not captured and no app RED is established.",
+  "intendedBehavior": "Use savedAt:Date.parse(\"2026-10-06T03:23:42.125Z\") only in those two new ordinary suffixes, matching their unchanged existing deterministic clock regardless of init order. Keep strict Normal/Reduced actual app mode, media, full source/typed/current/head/pixel/currentflight/error/sentinel/cleanup tails and complete historical400 branches unchanged.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "updatedExistingConsumers": [
+    "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+    "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+  ],
+  "associationScope": "The fingerprint binds the entire coherent H-to-dirty tests.js diff. replacementTests names its one actual added test declaration; updatedExistingConsumers names the two existing renderer declarations whose suffixes change here. No source comment, fake or duplicate declaration is added.",
+  "preservedCoverage": [
+    "All1161 complete prior rationale objects and their raw object prefix remain exact; all180 other tracked files including RISK/current group assignment remain byte exact.",
+    "Reversing ONLY the two exact admitted suffix substitutions restores the entire failed881d tests.js file byte for byte, including every substantive assertion, both fixed clocks, all Normal/Reduced cases, and both historical optional400 branches.",
+    "Accepted pending native whole3/3, readiness9/9 and VM7/7 consumers/helpers/source guards are byte exact and are not replayed. Original failed881d/f661/ee87/34a9/dedbc evidence remains immutable.",
+    "Both complete renderer roots retain all8 children/10 statuses, exact64/THREE-source fixture, identity-checked inner failed/nonqualifying sentinels, errors=[], current/durable/raw typed/account/pending/opaque/local protection, exact independent refreshed pixels/visitors and controlled cleanup.",
+    "No app/provider/clock/harness/protocol/profile/scenario/deadline/runtime/asset change, consent-policy weakening, Normal omission, broad accepted mode or protected-value projection."
+  ],
+  "redEvidence": {
+    "command": "Original ONE anchored full two-root #1547 recorder881d12e9-cbea-4752-a42c-ef112d12f2ee at2026-10-30T09:19:46.399Z, full FAILURE-HANDOFF324d8a80; independently published ROOTtwo-site decisionf5f9bd4e before this correction.",
+    "failure": "Complete cohort10statuses/pass8/fail2/skip0/cancel0/todo0, child1/wrapper1 at tests.js49316:1152 strict effective appmotion actualreduced versus expectednormal in Normal unchanged late child; text parent also failed. Browser context reducedMedia=false/no-preference was correct. Later Normal tails were unreached. This is retained fixture-configuration evidence, not appRED or measured original timestamp/order."
+  },
+  "executionEvidence": {
+    "at": "2026-10-30T09:35:48.960Z",
+    "status": "Source-only1592 before separately admitted ONE distinct1593 samewhole10status renderer proof; no behavior invocation here.",
+    "comparisonBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "originalTestsSha256": "a29be9138cef101c796fcbc2bab95be5b9cc125a21f4ddd10b776b821408c907",
+    "correctedTestsSha256": "2da59b87f930ec8c825c9cebeff1aaf0f46d0433288ea3b59c5ed67116f9767e",
+    "rootDecision": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/renderer-motion-time/publication/ROOT-DETERMINISTIC-MOTION-FIXTURE-DECISION.json",
+    "rootDecisionSha256": "f5f9bd4e9c7d749b5331ba3a6092cc89452944d7ce42e37508318db608060f62",
+    "exactTwoSites": [
+      47674,
+      49282
+    ],
+    "reverseTwoSubstitutionsWholeFileExact": true,
+    "originalFailureHandoff": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1547/FAILURE-HANDOFF.json",
+    "originalFailureHandoffSha256": "324d8a80ffe86eb9825729d431ddd1350c68c17755b1efa72faa52a5a24b22bb",
+    "originalSavedAtAndInitOrder": "Not observed; no exact value/order claimed.",
+    "behaviorInvocations": 0,
+    "sameOwnerNoModelEscalation": true
+  }
+},
+{
+  "testChangesSha256": "f86f5885996a1b283580e80f050653922195701501b3c864cfde4c6b38c841d9",
+  "reason": "Bind the exact current scoped private scene-proof tests.js delta against currentROOT comparison only; preserve its separate FAQ/G/D/tooling at ROOTjoin at 25be1c21ba68aad7ef366e1dfeacfda7016e278b with complete source-qualified proof receipts under #1562.",
+  "previousBehavior": "All prior source/definition/correction associations remain exact, but this actual resolved reference-to-current wholefile fingerprint is newly distinct after the coherent scene coverage. This private H-based package does not copy or admit the newer ROOT FAQ/D/tooling source and does not claim an active PR294 comparison.",
+  "intendedBehavior": "Associate only this actual complete tests.js fingerprint with its real added pending native declaration and updated existing scene consumers, retain every historical rationale object and original failure, qualify the four actual complete proofs by entire original source spans and unchanged app/fixture inputs, then package only the four admitted files on soleparentH. ROOT must preserve its newer source when it later admits/reconciles the scoped patch.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "updatedExistingConsumers": [
+    "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+    "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+    "RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation",
+    "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+    "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+  ],
+  "preservedCoverage": [
+    "All1162 complete current objects/raw object prefix, including all1156 initialH objects, remain exact and append-only; no old statement or chronology is rewritten.",
+    "All182 executed-source inputs remain exact except final append-only rationale metadata; tests2da59b87, RISK77058918, assignment3c901a01 and all180 other file bytes are unchanged from closed1592, with all178 nonpackagefiles identicalH.",
+    "Every complete originally bound accepted VM/readiness/pending/renderer source span is byte-for-byte present in currenttests. The two VM snapshots include their original extra trailing blank line intact, not normalized; metadata plan records exact original/current framing and hashes.",
+    "Full Normal/Reduced/nativecontrols/immediatependinginterruption/receipt/twofacts/independentpayloadSHA/rawtyped/account/pending/opaque/local/unknown/backup/authority/pixel/visitors/currentflight/error/cleanup protections remain; complete legacy400 branches and optional classification stay unchanged.",
+    "CurrentROOT25be direct-reference delta is metadata/source comparison only. Later ROOT FAQ/G/D/tooling bytes and rationale history remain owned and untouched in ROOT; this H-only privatecommit is not a rollback/admission of that fullreference delta.",
+    "No new test declaration, dummy replacement name, skip, helper, harness, runtime API, app/CSS/version/asset change or acceptedproof replay is introduced by packaging."
+  ],
+  "redEvidence": {
+    "command": "Original recorded source-oracle failures dedbc88b7statuses,34a9af22/ee87ec949statuses,f66108cd3statuses,881d12e910statuses retain full original commands/source/outputs; separately populated corrections1573/1576/1581/1588/1592 precede their distinct complete successful runs. This1562metadata association itself is nonfunctional packaging.",
+    "failure": "Original dedbc key mismatch,34a9 painted-layer mismatch,ee87 premature readiness, f661 postreplay-save/authority/graph mismatch and881d Normal fixture mode mismatch remain failed on their exact original sources. They are observer/fixture failures, not fabricated appRED. Latercb94 VM7/7,c756 readiness9/9,895a pending3/3,1481 renderer10/10 are distinct complete observed passes; no chronology is relabeled."
+  },
+  "executionEvidence": {
+    "at": "2026-10-30T09:55:56.410Z",
+    "status": "All four actual proofleaves1544-1547 CLOSED before this private metadata package. Only final rationale metadata changes after the last proof; no behavior/native replay.",
+    "comparison": {
+      "label": "currentROOT comparison only; preserve its separate FAQ/G/D/tooling at ROOTjoin",
+      "referenceSha": "25be1c21ba68aad7ef366e1dfeacfda7016e278b",
+      "dirtyTestDiffSha256": "7f9a2f5af86023262f5fbd23889ed6aa5ab62c429c5f4a4c4258129f555427da",
+      "protectedTestFingerprint": "f86f5885996a1b283580e80f050653922195701501b3c864cfde4c6b38c841d9",
+      "committedCliMergeBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+      "scopedFiles": [
+        "RISK_TEST_COVERAGE.md",
+        "TEST_CHANGE_RATIONALES.json",
+        "scripts/test-group-assignments.json",
+        "tests.js"
+      ]
+    },
+    "sourceBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "sourceTestsSha256": "2da59b87f930ec8c825c9cebeff1aaf0f46d0433288ea3b59c5ed67116f9767e",
+    "executedRationaleSha256": "56924698ebc157b71c4d9000540e1f2bf19bc238478ff622bb9c7ecf9354d001",
+    "executedRationaleObjects": 1162,
+    "completeProofs": [
+      {
+        "kind": "readiness",
+        "issue": 1544,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1582/FINAL-PROOF.json",
+        "sha256": "d39542bd0e9f39e79441452ee1aa6f9cfd4dbe0b2e2c9b4832c23cd8bb50a2b7",
+        "runId": "2026-10-30T08-13-14-755Z-c75602eb-e326-41fd-88df-94263376cd6d",
+        "actualCounts": {
+          "tests": 9,
+          "pass": 9,
+          "fail": 0,
+          "skipped": 0,
+          "cancelled": 0,
+          "todo": 0
+        }
+      },
+      {
+        "kind": "pending",
+        "issue": 1545,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1589/FINAL-PROOF.json",
+        "sha256": "ed69adc14238e35d30ea5d4fa7924b2f578d07dc3f0631832797593b86b822a2",
+        "runId": "2026-10-30T09-13-25-394Z-895a3e94-e52a-4178-9c52-9ed0299bd8df",
+        "actualCounts": {
+          "tests": 3,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "kind": "VM",
+        "issue": 1546,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1574/FINAL-PROOF.json",
+        "sha256": "081dd2828a58b17520d1d0919a30862259ebcb906ee4cade294689cf79ba01ea",
+        "runId": "2026-10-30T06-55-59-375Z-cb94e0ec-ad6d-4048-8bb9-6378e61f7d45",
+        "actualCounts": {
+          "tests": 7,
+          "pass": 7,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "kind": "renderer",
+        "issue": 1547,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/FINAL-PROOF.json",
+        "sha256": "f7eb14747d9dae08c95afad8bab82e2df72ed7b39732b273474691c67925d765",
+        "runId": "2026-10-30T09-37-54-582Z-1481fbcd-a48e-4a4d-8285-10905fd5cc78",
+        "actualCounts": {
+          "tests": 10,
+          "pass": 10,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      }
+    ],
+    "exactSourceQualification": [
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1574/ACTUAL-RUN-INPUTS.json",
+        "key": "held",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1573/CORRECTED-held.txt",
+        "originalBoundBytes": 10255,
+        "originalBoundSha256": "c509f9907d14bb7a235ab122d3addf5a4aa741ad216cc71bcd07790dc0ccb82e",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-held.txt",
+        "currentConsumerBytes": 10254,
+        "currentConsumerSha256": "1a12bf192972202c699b701697f85b6e457008c3e2f09d7366f1329e0f81c0a1",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "The original bound snapshot includes exactly one additional trailing blank-line byte; that entire original snapshot is present byte-for-byte in currenttests, not normalized."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1574/ACTUAL-RUN-INPUTS.json",
+        "key": "partial",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1573/CORRECTED-partial.txt",
+        "originalBoundBytes": 2374,
+        "originalBoundSha256": "e835ed3c798671b4aa3cb715eff9b26ca858ea4b02ab6cf2e4ef75eb130a1ee5",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-partial.txt",
+        "currentConsumerBytes": 2373,
+        "currentConsumerSha256": "7b881dba7215055972de6f15f0511744863ce74c03d82e460c97dc85bee49d2b",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "The original bound snapshot includes exactly one additional trailing blank-line byte; that entire original snapshot is present byte-for-byte in currenttests, not normalized."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1582/ACTUAL-RUN-INPUTS.json",
+        "key": "ready",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1581/CORRECTED-ready.txt",
+        "originalBoundBytes": 16321,
+        "originalBoundSha256": "a54c13ec32f1516b9312ea8364aaf91e23d5ad828e10743cafa2ab19cc665722",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-ready.txt",
+        "currentConsumerBytes": 16321,
+        "currentConsumerSha256": "a54c13ec32f1516b9312ea8364aaf91e23d5ad828e10743cafa2ab19cc665722",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1589/ACTUAL-RUN-INPUTS.json",
+        "key": "pending",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1589/WHOLE-pending.txt",
+        "originalBoundBytes": 19754,
+        "originalBoundSha256": "c06157a2e1951785eca020cf25122ec2cad711b060742de49a7c3f2de52a6cbf",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-pending.txt",
+        "currentConsumerBytes": 19754,
+        "currentConsumerSha256": "c06157a2e1951785eca020cf25122ec2cad711b060742de49a7c3f2de52a6cbf",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/ACTUAL-RUN-INPUTS.json",
+        "key": "startup",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/WHOLE-startup.txt",
+        "originalBoundBytes": 24753,
+        "originalBoundSha256": "d39f9d7107165769255c4c79e62bf8091b732ea4876838a4ae741fef6a9a9199",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-startup.txt",
+        "currentConsumerBytes": 24753,
+        "currentConsumerSha256": "d39f9d7107165769255c4c79e62bf8091b732ea4876838a4ae741fef6a9a9199",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/ACTUAL-RUN-INPUTS.json",
+        "key": "text",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/WHOLE-text.txt",
+        "originalBoundBytes": 24809,
+        "originalBoundSha256": "336bb37c9d245ba223cde0d1eb42c0a55bf6eb9f72ac3063bf3d6f04bfe117c9",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-text.txt",
+        "currentConsumerBytes": 24809,
+        "currentConsumerSha256": "336bb37c9d245ba223cde0d1eb42c0a55bf6eb9f72ac3063bf3d6f04bfe117c9",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      }
+    ],
+    "proofAndMetadataBoundary": "Executed test/app/fixture bytes remain exact. This later append-only metadata is final packaging provenance, not a new executed sourceidentity, independent review, ROOTadmission, fullqualification/CI/release or physical-device claim."
+  }
+},
+{
+  "testChangesSha256": "c0a30bc98138065381752d70e274046117bb585c88e127009cf5e4af93cd7957",
+  "reason": "Bind the exact current scoped private scene-proof tests.js delta against fresh origin/main and localmain at 8cd524a7f0ab7a25b6689244722ae3c5baf861c8 with complete source-qualified proof receipts under #1562.",
+  "previousBehavior": "All prior source/definition/correction associations remain exact, but this actual resolved reference-to-current wholefile fingerprint is newly distinct after the coherent scene coverage. This private H-based package does not copy or admit the newer ROOT FAQ/D/tooling source and does not claim an active PR294 comparison.",
+  "intendedBehavior": "Associate only this actual complete tests.js fingerprint with its real added pending native declaration and updated existing scene consumers, retain every historical rationale object and original failure, qualify the four actual complete proofs by entire original source spans and unchanged app/fixture inputs, then package only the four admitted files on soleparentH. ROOT must preserve its newer source when it later admits/reconciles the scoped patch.",
+  "replacementTests": [
+    "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+  ],
+  "updatedExistingConsumers": [
+    "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+    "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+    "RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation",
+    "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+    "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+  ],
+  "preservedCoverage": [
+    "All1162 complete current objects/raw object prefix, including all1156 initialH objects, remain exact and append-only; no old statement or chronology is rewritten.",
+    "All182 executed-source inputs remain exact except final append-only rationale metadata; tests2da59b87, RISK77058918, assignment3c901a01 and all180 other file bytes are unchanged from closed1592, with all178 nonpackagefiles identicalH.",
+    "Every complete originally bound accepted VM/readiness/pending/renderer source span is byte-for-byte present in currenttests. The two VM snapshots include their original extra trailing blank line intact, not normalized; metadata plan records exact original/current framing and hashes.",
+    "Full Normal/Reduced/nativecontrols/immediatependinginterruption/receipt/twofacts/independentpayloadSHA/rawtyped/account/pending/opaque/local/unknown/backup/authority/pixel/visitors/currentflight/error/cleanup protections remain; complete legacy400 branches and optional classification stay unchanged.",
+    "CurrentROOT25be direct-reference delta is metadata/source comparison only. Later ROOT FAQ/G/D/tooling bytes and rationale history remain owned and untouched in ROOT; this H-only privatecommit is not a rollback/admission of that fullreference delta.",
+    "No new test declaration, dummy replacement name, skip, helper, harness, runtime API, app/CSS/version/asset change or acceptedproof replay is introduced by packaging."
+  ],
+  "redEvidence": {
+    "command": "Original recorded source-oracle failures dedbc88b7statuses,34a9af22/ee87ec949statuses,f66108cd3statuses,881d12e910statuses retain full original commands/source/outputs; separately populated corrections1573/1576/1581/1588/1592 precede their distinct complete successful runs. This1562metadata association itself is nonfunctional packaging.",
+    "failure": "Original dedbc key mismatch,34a9 painted-layer mismatch,ee87 premature readiness, f661 postreplay-save/authority/graph mismatch and881d Normal fixture mode mismatch remain failed on their exact original sources. They are observer/fixture failures, not fabricated appRED. Latercb94 VM7/7,c756 readiness9/9,895a pending3/3,1481 renderer10/10 are distinct complete observed passes; no chronology is relabeled."
+  },
+  "executionEvidence": {
+    "at": "2026-10-30T09:55:56.411Z",
+    "status": "All four actual proofleaves1544-1547 CLOSED before this private metadata package. Only final rationale metadata changes after the last proof; no behavior/native replay.",
+    "comparison": {
+      "label": "fresh origin/main and localmain",
+      "referenceSha": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "dirtyTestDiffSha256": "06092feb5443c98f43851bafebdb021fd1ad9fef0729aa79246558d779bd7716",
+      "protectedTestFingerprint": "c0a30bc98138065381752d70e274046117bb585c88e127009cf5e4af93cd7957",
+      "committedCliMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "scopedFiles": [
+        "RISK_TEST_COVERAGE.md",
+        "TEST_CHANGE_RATIONALES.json",
+        "scripts/test-group-assignments.json",
+        "tests.js"
+      ]
+    },
+    "sourceBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "sourceTestsSha256": "2da59b87f930ec8c825c9cebeff1aaf0f46d0433288ea3b59c5ed67116f9767e",
+    "executedRationaleSha256": "56924698ebc157b71c4d9000540e1f2bf19bc238478ff622bb9c7ecf9354d001",
+    "executedRationaleObjects": 1162,
+    "completeProofs": [
+      {
+        "kind": "readiness",
+        "issue": 1544,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1582/FINAL-PROOF.json",
+        "sha256": "d39542bd0e9f39e79441452ee1aa6f9cfd4dbe0b2e2c9b4832c23cd8bb50a2b7",
+        "runId": "2026-10-30T08-13-14-755Z-c75602eb-e326-41fd-88df-94263376cd6d",
+        "actualCounts": {
+          "tests": 9,
+          "pass": 9,
+          "fail": 0,
+          "skipped": 0,
+          "cancelled": 0,
+          "todo": 0
+        }
+      },
+      {
+        "kind": "pending",
+        "issue": 1545,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1589/FINAL-PROOF.json",
+        "sha256": "ed69adc14238e35d30ea5d4fa7924b2f578d07dc3f0631832797593b86b822a2",
+        "runId": "2026-10-30T09-13-25-394Z-895a3e94-e52a-4178-9c52-9ed0299bd8df",
+        "actualCounts": {
+          "tests": 3,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "kind": "VM",
+        "issue": 1546,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1574/FINAL-PROOF.json",
+        "sha256": "081dd2828a58b17520d1d0919a30862259ebcb906ee4cade294689cf79ba01ea",
+        "runId": "2026-10-30T06-55-59-375Z-cb94e0ec-ad6d-4048-8bb9-6378e61f7d45",
+        "actualCounts": {
+          "tests": 7,
+          "pass": 7,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "kind": "renderer",
+        "issue": 1547,
+        "packet": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/FINAL-PROOF.json",
+        "sha256": "f7eb14747d9dae08c95afad8bab82e2df72ed7b39732b273474691c67925d765",
+        "runId": "2026-10-30T09-37-54-582Z-1481fbcd-a48e-4a4d-8285-10905fd5cc78",
+        "actualCounts": {
+          "tests": 10,
+          "pass": 10,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      }
+    ],
+    "exactSourceQualification": [
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1574/ACTUAL-RUN-INPUTS.json",
+        "key": "held",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1573/CORRECTED-held.txt",
+        "originalBoundBytes": 10255,
+        "originalBoundSha256": "c509f9907d14bb7a235ab122d3addf5a4aa741ad216cc71bcd07790dc0ccb82e",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-held.txt",
+        "currentConsumerBytes": 10254,
+        "currentConsumerSha256": "1a12bf192972202c699b701697f85b6e457008c3e2f09d7366f1329e0f81c0a1",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "The original bound snapshot includes exactly one additional trailing blank-line byte; that entire original snapshot is present byte-for-byte in currenttests, not normalized."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1574/ACTUAL-RUN-INPUTS.json",
+        "key": "partial",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1573/CORRECTED-partial.txt",
+        "originalBoundBytes": 2374,
+        "originalBoundSha256": "e835ed3c798671b4aa3cb715eff9b26ca858ea4b02ab6cf2e4ef75eb130a1ee5",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-partial.txt",
+        "currentConsumerBytes": 2373,
+        "currentConsumerSha256": "7b881dba7215055972de6f15f0511744863ce74c03d82e460c97dc85bee49d2b",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "The original bound snapshot includes exactly one additional trailing blank-line byte; that entire original snapshot is present byte-for-byte in currenttests, not normalized."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1582/ACTUAL-RUN-INPUTS.json",
+        "key": "ready",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1581/CORRECTED-ready.txt",
+        "originalBoundBytes": 16321,
+        "originalBoundSha256": "a54c13ec32f1516b9312ea8364aaf91e23d5ad828e10743cafa2ab19cc665722",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-ready.txt",
+        "currentConsumerBytes": 16321,
+        "currentConsumerSha256": "a54c13ec32f1516b9312ea8364aaf91e23d5ad828e10743cafa2ab19cc665722",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1589/ACTUAL-RUN-INPUTS.json",
+        "key": "pending",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1589/WHOLE-pending.txt",
+        "originalBoundBytes": 19754,
+        "originalBoundSha256": "c06157a2e1951785eca020cf25122ec2cad711b060742de49a7c3f2de52a6cbf",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-pending.txt",
+        "currentConsumerBytes": 19754,
+        "currentConsumerSha256": "c06157a2e1951785eca020cf25122ec2cad711b060742de49a7c3f2de52a6cbf",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/ACTUAL-RUN-INPUTS.json",
+        "key": "startup",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/WHOLE-startup.txt",
+        "originalBoundBytes": 24753,
+        "originalBoundSha256": "d39f9d7107165769255c4c79e62bf8091b732ea4876838a4ae741fef6a9a9199",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-startup.txt",
+        "currentConsumerBytes": 24753,
+        "currentConsumerSha256": "d39f9d7107165769255c4c79e62bf8091b732ea4876838a4ae741fef6a9a9199",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      },
+      {
+        "proofInput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/ACTUAL-RUN-INPUTS.json",
+        "key": "text",
+        "originalBoundSource": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1593/WHOLE-text.txt",
+        "originalBoundBytes": 24809,
+        "originalBoundSha256": "336bb37c9d245ba223cde0d1eb42c0a55bf6eb9f72ac3063bf3d6f04bfe117c9",
+        "currentWholeConsumerSnapshot": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/scene-acceptance/final-proof/sol-owner/1592/CORRECTED-text.txt",
+        "currentConsumerBytes": 24809,
+        "currentConsumerSha256": "336bb37c9d245ba223cde0d1eb42c0a55bf6eb9f72ac3063bf3d6f04bfe117c9",
+        "fullOriginalBoundSpanByteExactInCurrent": true,
+        "framingNote": "Same whole-consumer framing."
+      }
+    ],
+    "proofAndMetadataBoundary": "Executed test/app/fixture bytes remain exact. This later append-only metadata is final packaging provenance, not a new executed sourceidentity, independent review, ROOTadmission, fullqualification/CI/release or physical-device claim."
+  }
+}
 ]
