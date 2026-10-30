@@ -36,8 +36,8 @@ async function replacePreviousWithCurrentBoard(ui,remote){
   for(const chunk of chunks)remote.set(prefix+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
 }
 
-function assertFixtureBoard(board,label){
-  const original=fixture('reconcile-held');
+function assertFixtureBoard(board,label,profile='workload-diagnostic'){
+  const original=fixture('reconcile-held',{profile});
   assert.ok(board&&Array.isArray(board.tasks),label+' keeps a readable durable board');
   assert.deepEqual(board.tasks.map(({id,futureTask})=>({id,futureTask})),
     original.tasks.map(({id,futureTask})=>({id,futureTask})),label+' retains each exact task extension');
@@ -45,13 +45,13 @@ function assertFixtureBoard(board,label){
   assert.deepEqual(board.futurePopulated,original.futurePopulated,label+' retains the exact large unknown board value');
 }
 
-async function assertCurrentAndStoredFixtureBoard(ui,label){
+async function assertCurrentAndStoredFixtureBoard(ui,label,profile='workload-diagnostic'){
   const boards=await ui.page.evaluate(async()=>{
     const head=await window.ScannerDeviceStore.readHead();
     return {current:JSON.parse(JSON.stringify(state)),stored:head?.payload?JSON.parse(head.payload):null};
   });
-  assertFixtureBoard(boards.current,label+' active board');
-  assertFixtureBoard(boards.stored,label+' saved board');
+  assertFixtureBoard(boards.current,label+' active board',profile);
+  assertFixtureBoard(boards.stored,label+' saved board',profile);
 }
 
 async function assertPublished(remote,label){
@@ -257,35 +257,36 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
 
   const unavailableSync={authMode:'reconcile-held',remote:new Map(),cloudReadFail:true};
   await h.scenario('cloud retry, reload, and sign out preserve the device board during read failures',unavailableSync,async ui=>{
+    const expectedTaskCount=ui.profile==='ordinary'?64:400;
     await ui.page.waitForFunction(()=>window.CloudSync?.ready===true&&window.CloudSync.status==='error'&&
       window.CloudSync.errorCode==='unavailable'&&!pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy,null,{timeout:10000});
     await ui.act('sync',()=>document.querySelector('#modalRoot h2')?.textContent==='Cloud sync needs attention','#syncBtn');
-    await ui.act('sync-retry',async()=>{
+    await ui.act('sync-retry',new Function('return ('+(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return !document.querySelector('#modalRoot .modal')&&window.CloudSync?.status==='error'&&
         window.CloudSync.errorCode==='unavailable'&&state.tasks.length===400&&
         state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576&&
         !pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy;
-    },'#modalRoot [data-act="sync-retry"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Cloud retry read failure');
+    }).toString().replaceAll('===400','==='+expectedTaskCount)+')')(),'#modalRoot [data-act="sync-retry"]');
+    await assertCurrentAndStoredFixtureBoard(ui,'Cloud retry read failure',ui.profile);
     await ui.act('sync',()=>document.querySelector('#modalRoot h2')?.textContent==='Cloud sync needs attention','#syncBtn');
     await ui.expectReload('sync-reload');
-    await ui.waitFor(async()=>{
+    await ui.waitFor(new Function('return ('+(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.ready===true&&window.CloudSync.status==='error'&&window.CloudSync.errorCode==='unavailable'&&
         state.tasks.length===400&&state.futurePopulated?.opaque.length===1048576&&
         saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576&&
         !pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy;
-    },10000);
-    await assertCurrentAndStoredFixtureBoard(ui,'Cloud reload read failure');
+    }).toString().replaceAll('===400','==='+expectedTaskCount)+')')(),10000);
+    await assertCurrentAndStoredFixtureBoard(ui,'Cloud reload read failure',ui.profile);
     await ui.act('sync',()=>document.querySelector('#modalRoot h2')?.textContent==='Cloud sync needs attention','#syncBtn');
-    await ui.act('sync-signout',async()=>{
+    await ui.act('sync-signout',new Function('return ('+(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.user===null&&window.CloudSync.status==='signed-out'&&
         state.tasks.length===400&&state.futurePopulated?.opaque.length===1048576&&
         saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
-    },'#modalRoot [data-act="sync-signout"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Cloud read failure and sign out');
+    }).toString().replaceAll('===400','==='+expectedTaskCount)+')')(),'#modalRoot [data-act="sync-signout"]');
+    await assertCurrentAndStoredFixtureBoard(ui,'Cloud read failure and sign out',ui.profile);
   });
 
   const cloudOptions={authMode:'reconcile-held',remote:await damagedCurrentRemote()};
