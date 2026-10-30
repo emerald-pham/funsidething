@@ -13886,6 +13886,11 @@
       "root": "RISK repository process: full-domain Timeline reference loading preserves the owned namespace and orphan guards",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup fixture temp aliases preserve canonical owned custody",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

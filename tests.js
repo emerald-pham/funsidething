@@ -51499,7 +51499,7 @@ const profileFixtureRoots=new WeakMap();
 function profileFixtureRoot(){
  const fixtures=appFixtureScope.getStore();assert.ok(fixtures,'Profile fixtures require an owned test scope');let owner=profileFixtureRoots.get(fixtures);
  if(!owner){
-  owner={directory:fs.mkdtempSync(path.join(os.tmpdir(),'startup-fixtures-')),inputs:new Set()};profileFixtureRoots.set(fixtures,owner);
+  owner={directory:fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'startup-fixtures-'))),inputs:new Set()};profileFixtureRoots.set(fixtures,owner);
   fixtures.add({dispose:()=>{for(const directory of owner.inputs)fs.rmSync(directory,{recursive:true,force:true});if(fs.existsSync(owner.directory)&&fs.readdirSync(owner.directory).length===0)fs.rmdirSync(owner.directory);}});
  }
  return owner;
@@ -52677,4 +52677,10 @@ test('RISK repository process: full-domain Timeline reference loading preserves 
   const png=path.join(namespace,'frame-9999.png');fs.writeFileSync(png,before,{flag:'wx'});referenceRefusal('R07-persistent-png',referencePreparedCLI(directory,{label:'R07-persistent-png'}),/persistent PNG/);assert.deepEqual(fs.readFileSync(png),before);fs.renameSync(png,path.join(root,'retained-png-negative-original'));
   await referenceMutateFile(small,'inventory.json',b=>{const x=JSON.parse(b);x[0].kind='foreign';return Buffer.from(JSON.stringify(x));},async()=>referenceRefusal('R07-inventory-hash',referencePreparedCLI(directory,{label:'R07-inventory-hash'}),/original raw identity/));verifyForeign();
   const x=fullDomainPartialControl(),bytes=Buffer.from('owned partial raw'),orphan={path:'startup-timeline/event-9999.json',bytes:bytes.length,sha256:retentionSHA(bytes)};x.capture.orphans=[orphan];x.capture.physicalPayloadBytes+=bytes.length;x.inputs.rawFiles.set(orphan.path,bytes);profileBind(x);const c=await referenceControl(x,'R07-orphan');await referenceRoundTrip(c);assert.deepEqual(fs.readFileSync(path.join(c.directory,orphan.path)),bytes);assert.equal(x.capture.physicalPayloadBytes,x.capture.rawEventBytes+bytes.length);
+});
+
+test('RISK repository process: startup fixture temp aliases preserve canonical owned custody',async()=>{
+ const builtinOS=(await import('node:os')).default,tmpdir=builtinOS.tmpdir,base=fs.realpathSync(fs.mkdtempSync(path.join(tmpdir(),'startup-owned-alias-'))),target=path.join(base,'target'),alias=path.join(base,'alias'),owned=new Set();fs.mkdirSync(target);fs.symlinkSync(target,alias);
+ try{builtinOS.tmpdir=()=>alias;let directory;await appFixtureScope.run(owned,()=>{directory=profileDirectory('canonical');});assert.equal(directory,fs.realpathSync(directory),'Default owned test input paths must be canonical even when the host temp root is an alias');fs.writeFileSync(path.join(directory,'owned-control'),'complete',{flag:'wx'});assert.equal(fs.readFileSync(path.join(directory,'owned-control'),'utf8'),'complete');for(const fixture of owned)await fixture.dispose();owned.clear();assert.equal(fs.existsSync(directory),false);assert.equal(fs.existsSync(alias),true,'Owned input cleanup retains its external temp parent');}
+ finally{builtinOS.tmpdir=tmpdir;for(const fixture of owned)await fixture.dispose();fs.rmSync(base,{recursive:true,force:true});}
 });
