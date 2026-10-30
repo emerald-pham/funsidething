@@ -50,7 +50,7 @@ export function verifyNativeTimelineCapture(c,{retentionProfile}={}){
  if(canonical){
   let orphanBytes=0;check(c.orphans===undefined||Array.isArray(c.orphans)&&c.orphans.length<=1,'bounded owned orphan inventory required');
   for(const row of c.orphans||[]){check(/^startup-timeline\/event-[0-9]{4}\.json$/.test(row.path)&&!paths.has(row.path)&&Number.isSafeInteger(row.bytes)&&row.bytes>=0&&row.bytes<=1048576&&/^[a-f0-9]{64}$/.test(row.sha256),'owned partial write identity required');paths.add(row.path);orphanBytes+=row.bytes;}
-  check(c.rawEventBytes===rawBytes&&c.derivedFrameBytes===frameBytes&&Number.isSafeInteger(c.physicalPayloadBytes)&&c.physicalPayloadBytes===rawBytes+orphanBytes&&c.physicalPayloadBytes<=33554432,'canonical physical/logical bytes must reconcile');
+  check(c.rawEventBytes===rawBytes&&c.derivedFrameBytes===frameBytes&&Number.isSafeInteger(c.physicalPayloadBytes)&&c.physicalPayloadBytes===rawBytes+orphanBytes&&c.physicalPayloadBytes<=(selected?bounds.maxPhysicalPayloadBytes:33554432),'canonical physical/logical bytes must reconcile');
   if(c.status==='captured')check(orphanBytes===0&&!(c.orphans||[]).length,'captured cannot hide partial writes');
  }
  check(c.facts?.presentation==='engine-content-snapshot; first-occurrence-unverified'&&Array.isArray(c.facts.work),'snapshot is not first presentation');
@@ -102,7 +102,7 @@ export function createNativeTimelineProvider({verifyRuntime}={}){
    availableFrameBytes=screens.reduce((n,s)=>n+(selectedRetention?s.bytes:s.data.length),0);prospectiveLogicalBytes=capture.totalBytes+bytes.length+availableFrameBytes;prospectivePhysicalBytes=capture.physicalPayloadBytes+bytes.length;
    check(capture.frames.length+screens.length<=120,'raw frame bound reached');
    check(Number.isSafeInteger(prospectiveLogicalBytes)&&prospectiveLogicalBytes<=bounds.maxTotalBytes,'raw logical total byte bound reached');
-   check(Number.isSafeInteger(prospectivePhysicalBytes)&&prospectivePhysicalBytes<=33554432,'raw physical payload bound reached');
+   check(Number.isSafeInteger(prospectivePhysicalBytes)&&prospectivePhysicalBytes<=(selectedRetention?bounds.maxPhysicalPayloadBytes:33554432),'raw physical payload bound reached');
    const index=capture.events.length+1,relative='startup-timeline/event-'+String(index).padStart(4,'0')+'.json',row=owned.get(session);
    // One exclusive canonical file owns the delivery. Derived PNGs are views,
    // charged once per occurrence logically, without a persistent duplicate.
