@@ -527,5 +527,890 @@
   "userStories": [
     "Buttons work with 400 saved tasks without crashing.",
     "Buttons work when pressed ten times within two seconds."
-  ]
+  ],
+  "profiles": {
+    "ordinary": {
+      "requiredScenarios": [
+        "populated Add contexts settings and list",
+        "editor done-task",
+        "editor worked-task",
+        "editor dot-task",
+        "editor delete-task",
+        "scanner yes",
+        "scanner no",
+        "scanner cant",
+        "scanner postpone",
+        "scanner cand-done",
+        "scanner cand-worked",
+        "scanner bench-done",
+        "scanner bench-cant",
+        "scanner bench-postpone",
+        "scanner dislodge",
+        "scanner worked",
+        "scanner start-working",
+        "intervention continue and skipped fresh pass",
+        "exhausted scanner rescan and new pass",
+        "fresh pass",
+        "overdue WOOP native walkthrough",
+        "recorded history and final WOOP",
+        "manual backup restore delete and reset",
+        "debug log refresh selection and return",
+        "Help original apology and native backdrop dismissal",
+        "native install accepted",
+        "native install dismissed",
+        "both-mode scan and resume descending",
+        "both-mode scan and resume chance",
+        "both-mode scan and resume squared",
+        "theme preference changes through its button",
+        "motion settings open and both choices respond",
+        "scene time presets, lock, live time, and close",
+        "location request, save name, reset, and close",
+        "denied location request leaves the default sky",
+        "scene view enters and returns to the task view",
+        "Help FAQ and changelog disclosures toggle and close",
+        "first-run Quick Start can be acknowledged",
+        "cloud sync signs out and rejects signed-out authentication safely",
+        "cloud retry, reload, and sign out preserve the device board during read failures",
+        "cloud recovery reviews, protects, and applies a source with read and write failures",
+        "Settings decision review offers Light and saves it while protecting failures",
+        "populated comprehensive export",
+        "oversized retained-source export",
+        "accepted unsaved current board export",
+        "clipboard refusal never renders payload or downloads",
+        "download refusal keeps the prepared export usable",
+        "unavailable saved-source export is visibly partial",
+        "guarded file import preview cancel and confirm",
+        "guarded paste import rejects malformed data and retains cancelled draft",
+        "ordinary repeated selected eligibility",
+        "ordinary Undo consumes two saved edit frames",
+        "ordinary overdue WOOP repeated Next retains answers",
+        "ordinary final WOOP repeated Next retains answers",
+        "ordinary repeated cloud source choice",
+        "ordinary repeated saved decision choice",
+        "ordinary two distinct scanner decisions",
+        "ordinary scene choice survives reopen and task Undo",
+        "ordinary pending Copy refuses reentry",
+        "ordinary obsolete Copy cannot alter replacement transfer"
+      ],
+      "scenarioRoles": {
+        "exhausted scanner rescan and new pass": "exhausted",
+        "fresh pass": "exhausted",
+        "recorded history and final WOOP": "sole",
+        "ordinary final WOOP repeated Next retains answers": "sole"
+      },
+      "fixture": {
+        "savedTasks": 64,
+        "source": "signed-out-installed",
+        "authMode": "signed-out"
+      },
+      "scenarioFixtures": {
+        "populated Add contexts settings and list": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "editor done-task": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "editor worked-task": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "editor dot-task": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "editor delete-task": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner yes": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner no": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner cant": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner postpone": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner cand-done": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner cand-worked": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner bench-done": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner bench-cant": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner bench-postpone": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner dislodge": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner worked": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scanner start-working": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "intervention continue and skipped fresh pass": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "exhausted scanner rescan and new pass": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "exhausted"
+        },
+        "fresh pass": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "exhausted"
+        },
+        "overdue WOOP native walkthrough": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "recorded history and final WOOP": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "sole"
+        },
+        "manual backup restore delete and reset": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "debug log refresh selection and return": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "Help original apology and native backdrop dismissal": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "native install accepted": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "native install dismissed": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "both-mode scan and resume descending": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "both-mode scan and resume chance": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "both-mode scan and resume squared": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "theme preference changes through its button": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "motion settings open and both choices respond": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scene time presets, lock, live time, and close": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "location request, save name, reset, and close": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "denied location request leaves the default sky": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "scene view enters and returns to the task view": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "Help FAQ and changelog disclosures toggle and close": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "first-run Quick Start can be acknowledged": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "cloud sync signs out and rejects signed-out authentication safely": {
+          "savedTasks": 64,
+          "source": "reconcile-held-installed",
+          "authMode": "reconcile-held",
+          "syncAccount": "fixture@example.invalid",
+          "seedSyncRev": 4,
+          "fixtureRole": "active"
+        },
+        "cloud retry, reload, and sign out preserve the device board during read failures": {
+          "savedTasks": 64,
+          "source": "reconcile-held-installed",
+          "authMode": "reconcile-held",
+          "syncAccount": "fixture@example.invalid",
+          "seedSyncRev": 4,
+          "fixtureRole": "active"
+        },
+        "cloud recovery reviews, protects, and applies a source with read and write failures": {
+          "savedTasks": 64,
+          "source": "reconcile-held-installed",
+          "authMode": "reconcile-held",
+          "syncAccount": "fixture@example.invalid",
+          "seedSyncRev": 4,
+          "fixtureRole": "active"
+        },
+        "Settings decision review offers Light and saves it while protecting failures": {
+          "savedTasks": 64,
+          "source": "reconcile-held-installed",
+          "authMode": "reconcile-held",
+          "syncAccount": "fixture@example.invalid",
+          "seedSyncRev": 4,
+          "fixtureRole": "active"
+        },
+        "populated comprehensive export": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "oversized retained-source export": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "accepted unsaved current board export": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "clipboard refusal never renders payload or downloads": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "download refusal keeps the prepared export usable": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "unavailable saved-source export is visibly partial": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "guarded file import preview cancel and confirm": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "guarded paste import rejects malformed data and retains cancelled draft": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "ordinary repeated selected eligibility": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "ordinary Undo consumes two saved edit frames": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "ordinary overdue WOOP repeated Next retains answers": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "ordinary final WOOP repeated Next retains answers": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "sole"
+        },
+        "ordinary repeated cloud source choice": {
+          "savedTasks": 64,
+          "source": "reconcile-held-installed",
+          "authMode": "reconcile-held",
+          "syncAccount": "fixture@example.invalid",
+          "seedSyncRev": 4,
+          "fixtureRole": "active"
+        },
+        "ordinary repeated saved decision choice": {
+          "savedTasks": 64,
+          "source": "reconcile-held-installed",
+          "authMode": "reconcile-held",
+          "syncAccount": "fixture@example.invalid",
+          "seedSyncRev": 4,
+          "fixtureRole": "active"
+        },
+        "ordinary two distinct scanner decisions": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "ordinary scene choice survives reopen and task Undo": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "ordinary pending Copy refuses reentry": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        },
+        "ordinary obsolete Copy cannot alter replacement transfer": {
+          "savedTasks": 64,
+          "source": "signed-out-installed",
+          "authMode": "signed-out",
+          "syncAccount": null,
+          "seedSyncRev": 0,
+          "fixtureRole": "active"
+        }
+      },
+      "requiredRepeatCases": [
+        {
+          "name": "ordinary repeated selected eligibility",
+          "file": "scripts/button-safety-rapid-core.mjs",
+          "actionFamilies": [
+            "act:list-eligibility"
+          ],
+          "expected": "Select Eligible, then deliver two repeated native clicks and native Enter; retain mounted rows, selected control, focus and scroll. A genuinely changed filter still refreshes the view.",
+          "minimumAttempts": 2,
+          "assertionId": "selected-row-keeps-focus-and-scroll"
+        },
+        {
+          "name": "ordinary Undo consumes two saved edit frames",
+          "file": "scripts/button-safety-rapid-core.mjs",
+          "actionFamilies": [
+            "act:undo"
+          ],
+          "expected": "Create two real independently saved title edits, deliver two native Undo inputs, and restore the exact current and durable baseline without consuming prior history.",
+          "minimumAttempts": 2,
+          "assertionId": "undo-restores-two-independent-saves"
+        },
+        {
+          "name": "ordinary overdue WOOP repeated Next retains answers",
+          "file": "scripts/button-safety-rapid-core.mjs",
+          "actionFamilies": [
+            "act:woop-next"
+          ],
+          "expected": "Open overdue WOOP through the scanner; two Next attempts with one answer advance exactly one step, retain later answers and save the exact complete plan through durable reopen.",
+          "minimumAttempts": 2,
+          "assertionId": "overdue-woop-advances-one-step-and-reopens"
+        },
+        {
+          "name": "ordinary final WOOP repeated Next retains answers",
+          "file": "scripts/button-safety-rapid-core.mjs",
+          "actionFamilies": [
+            "act:woop-next"
+          ],
+          "expected": "Use the sole-active-task role; repeat Next twice at each answered step, never skip a required answer, then save/delete through actual controls and verify durable state.",
+          "minimumAttempts": 2,
+          "assertionId": "sole-task-woop-retains-required-answers"
+        },
+        {
+          "name": "ordinary repeated cloud source choice",
+          "file": "scripts/button-safety-cloud.mjs",
+          "actionFamilies": [
+            "act:choose-cloud-recovery-source"
+          ],
+          "expected": "Repeat the same eligible source twice and Enter without replacing mounted facts, focus or scroll; alternate source choice still changes selection. Preserve exact protected originals and no adoption before explicit Apply, including read/write refusal.",
+          "minimumAttempts": 2,
+          "assertionId": "same-cloud-source-keeps-review-and-protected-originals"
+        },
+        {
+          "name": "ordinary repeated saved decision choice",
+          "file": "scripts/button-safety-cloud.mjs",
+          "actionFamilies": [
+            "act:choose-decision-recovery"
+          ],
+          "expected": "Repeat the same Light choice twice without losing selection or gaining authority; explicit Apply saves Light, failed acknowledgement remains pending and exact device/cloud source boundaries remain protected.",
+          "minimumAttempts": 2,
+          "assertionId": "same-decision-choice-does-not-gain-authority"
+        },
+        {
+          "name": "ordinary two distinct scanner decisions",
+          "file": "scripts/button-safety-rapid-core.mjs",
+          "actionFamilies": [
+            "act:yes"
+          ],
+          "expected": "Deliver two distinct intentional Yes inputs tied to independently captured offered task IDs, account both accepted decisions, and preserve both in ordered current/durable scanner state without dropping or retargeting input.",
+          "minimumAttempts": 2,
+          "assertionId": "two-yes-inputs-bind-to-two-offered-task-ids"
+        },
+        {
+          "name": "ordinary scene choice survives reopen and task Undo",
+          "file": "scripts/button-safety-scenes.mjs",
+          "actionFamilies": [
+            "scene-time:lock",
+            "act:undo"
+          ],
+          "expected": "Accept a scene lock, reopen and verify its durable identity, perform two distinct task edits and two native Undo inputs, retain the independently chosen scene and exact protected sources. Keep readiness, Normal/Reduced and unchanged-scene repaint checks in existing regression consumers.",
+          "minimumAttempts": 2,
+          "assertionId": "scene-lock-survives-reopen-and-task-undo"
+        },
+        {
+          "name": "ordinary pending Copy refuses reentry",
+          "file": "scripts/button-safety-rapid.mjs",
+          "actionFamilies": [
+            "act:copy-export"
+          ],
+          "expected": "Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, preserve archive bytes and independent Download availability after truthful completion/refusal.",
+          "minimumAttempts": 2,
+          "assertionId": "pending-copy-refuses-reentry-and-keeps-download"
+        },
+        {
+          "name": "ordinary obsolete Copy cannot alter replacement transfer",
+          "file": "scripts/button-safety-rapid.mjs",
+          "actionFamilies": [
+            "act:copy-export"
+          ],
+          "expected": "Start Copy, replace/close the prepared transfer and start a newer Copy; settle the old completion while the new operation is busy, proving unchanged new status, busy state, archive identity and protected sources.",
+          "minimumAttempts": 2,
+          "assertionId": "obsolete-copy-cannot-change-new-transfer"
+        }
+      ]
+    },
+    "workload-diagnostic": {
+      "requiredScenarios": [
+        "populated Add contexts settings and list",
+        "editor done-task",
+        "editor worked-task",
+        "editor dot-task",
+        "editor delete-task",
+        "scanner yes",
+        "scanner no",
+        "scanner cant",
+        "scanner postpone",
+        "scanner cand-done",
+        "scanner cand-worked",
+        "scanner bench-done",
+        "scanner bench-cant",
+        "scanner bench-postpone",
+        "scanner dislodge",
+        "scanner worked",
+        "scanner start-working",
+        "intervention continue and skipped fresh pass",
+        "exhausted scanner rescan and new pass",
+        "fresh pass",
+        "overdue WOOP native walkthrough",
+        "recorded history and final WOOP",
+        "manual backup restore delete and reset",
+        "debug log refresh selection and return",
+        "Help original apology and native backdrop dismissal",
+        "native install accepted",
+        "native install dismissed",
+        "both-mode scan and resume descending",
+        "both-mode scan and resume chance",
+        "both-mode scan and resume squared",
+        "theme preference changes through its button",
+        "motion settings open and both choices respond",
+        "scene time presets, lock, live time, and close",
+        "location request, save name, reset, and close",
+        "denied location request leaves the default sky",
+        "scene view enters and returns to the task view",
+        "Help FAQ and changelog disclosures toggle and close",
+        "first-run Quick Start can be acknowledged",
+        "cloud sync signs out and rejects signed-out authentication safely",
+        "cloud retry, reload, and sign out preserve the device board during read failures",
+        "cloud recovery reviews, protects, and applies a source with read and write failures",
+        "Settings decision review offers Light and saves it while protecting failures",
+        "populated comprehensive export",
+        "oversized retained-source export",
+        "accepted unsaved current board export",
+        "clipboard refusal never renders payload or downloads",
+        "download refusal keeps the prepared export usable",
+        "unavailable saved-source export is visibly partial",
+        "guarded file import preview cancel and confirm",
+        "guarded paste import rejects malformed data and retains cancelled draft",
+        "rapid Add and context actions with 400 saved tasks",
+        "rapid Settings, theme, context management, and save with 400 tasks",
+        "rapid All Tasks and bulk editing with 400 saved tasks",
+        "rapid editor, history, and task actions with 400 saved tasks",
+        "rapid Undo consumes ten actual saved edit frames",
+        "rapid scanner candidate actions with 400 active tasks",
+        "rapid benchmark bench-done with 400 tasks",
+        "rapid benchmark bench-cant with 400 tasks",
+        "rapid benchmark bench-postpone with 400 tasks",
+        "rapid benchmark dislodge with 400 tasks",
+        "rapid benchmark worked with 400 tasks",
+        "rapid scan and work transitions with 400 tasks",
+        "rapid Continue scan from intervention with 400 tasks",
+        "rapid Rescan on an exhausted 400-task fixture",
+        "rapid New pass on an exhausted 400-task fixture",
+        "rapid overdue WOOP action with 400 tasks",
+        "rapid final-task WOOP walkthrough and delete with 400 saved tasks",
+        "rapid backup creation, restore, and deletion with 400 saved tasks",
+        "rapid history clearing preserves the remaining 400-task workspace",
+        "rapid reset confirms once and retains the 400-task backup",
+        "rapid Debug log and Help actions with 400 saved tasks",
+        "rapid first-run Quick Start acknowledges once with 400 tasks",
+        "rapid native install accepted with 400 tasks",
+        "rapid native install dismissed with 400 tasks",
+        "rapid theme preference changes through its button",
+        "rapid motion settings open and both choices respond",
+        "rapid scene time presets, lock, live time, and close",
+        "rapid location request, save name, reset, and close",
+        "rapid denied location request leaves the default sky",
+        "rapid scene view enters and returns to the task view",
+        "rapid first-run Quick Start can be acknowledged",
+        "rapid all Help and changelog disclosures",
+        "rapid cloud retry, reload, and sign out preserve the device board during read failures",
+        "rapid cloud recovery reviews, protects, and applies a source with read and write failures",
+        "rapid Settings decision review offers Light and saves it while protecting failures",
+        "rapid prepared Export Copy and Download retain exact sources",
+        "rapid pending Copy disables reentry without losing the archive",
+        "rapid guarded file import preview cancel and confirm",
+        "rapid guarded paste import rejects malformed data and retains cancelled draft",
+        "rapid clipboard completion belongs to its prepared transfer"
+      ],
+      "scenarioRoles": {
+        "exhausted scanner rescan and new pass": "exhausted",
+        "fresh pass": "exhausted",
+        "recorded history and final WOOP": "sole",
+        "rapid Rescan on an exhausted 400-task fixture": "exhausted",
+        "rapid New pass on an exhausted 400-task fixture": "exhausted",
+        "rapid final-task WOOP walkthrough and delete with 400 saved tasks": "sole"
+      },
+      "requiredWorkload": {
+        "savedTasks": 400,
+        "rapidAttempts": 10,
+        "rapidWindowMs": 2000
+      },
+      "requiredRapidActions": [
+        "act:add",
+        "act:add-ctx",
+        "act:add-ctx-named",
+        "act:add-dependency",
+        "act:apply-cloud-source-recovery",
+        "act:apply-decision-recovery",
+        "act:bench-cant",
+        "act:bench-done",
+        "act:bench-postpone",
+        "act:bulk-cancel",
+        "act:bulk-clear",
+        "act:bulk-edit",
+        "act:bulk-save",
+        "act:bulk-select",
+        "act:bulk-select-all",
+        "act:bulk-toggle",
+        "act:cancel-file-restore",
+        "act:cand-done",
+        "act:cand-worked",
+        "act:cant",
+        "act:choose-cloud-recovery-source",
+        "act:choose-decision-recovery",
+        "act:clear-done",
+        "act:clear-list-filters",
+        "act:clear-task-date",
+        "act:close-modal",
+        "act:close-paste-recovery",
+        "act:confirm-file-restore",
+        "act:confirm-wipe",
+        "act:continue-scan",
+        "act:copy-export",
+        "act:cycle-context",
+        "act:cycle-theme",
+        "act:del-ctx",
+        "act:delete-local-backup",
+        "act:delete-task",
+        "act:dislodge",
+        "act:done-task",
+        "act:dot-task",
+        "act:download-export",
+        "act:edit",
+        "act:export-backup",
+        "act:help",
+        "act:import-backup",
+        "act:install-app",
+        "act:list-eligibility",
+        "act:list-tag",
+        "act:location-settings",
+        "act:make-manual-backup",
+        "act:mback",
+        "act:more-rating-history",
+        "act:native-install",
+        "act:new-pass",
+        "act:no",
+        "act:ok-quickstart",
+        "act:postpone",
+        "act:preview-pasted-recovery",
+        "act:qctx",
+        "act:refresh-support-diagnostics",
+        "act:remove-dependency",
+        "act:reopen-apology",
+        "act:rescan",
+        "act:restore",
+        "act:restore-local-backup",
+        "act:resume-scan",
+        "act:return-candidate",
+        "act:return-support-diagnostics",
+        "act:reveal",
+        "act:review-cloud-source-recovery",
+        "act:review-decision-recovery",
+        "act:run-woop",
+        "act:save-edit",
+        "act:save-settings",
+        "act:scene-settings",
+        "act:scene-time-settings",
+        "act:select-support-diagnostics",
+        "act:settings",
+        "act:start-scan",
+        "act:start-working",
+        "act:sync",
+        "act:sync-reload",
+        "act:sync-retry",
+        "act:sync-signout",
+        "act:toggle-add",
+        "act:toggle-ctx",
+        "act:toggle-hist",
+        "act:toggle-list",
+        "act:toggle-no-context",
+        "act:undo",
+        "act:view-support-diagnostics",
+        "act:wipe",
+        "act:woop-delete",
+        "act:woop-next",
+        "act:woop-start",
+        "act:worked",
+        "act:worked-task",
+        "act:yes",
+        "disclosure",
+        "location:close",
+        "location:request",
+        "location:reset",
+        "location:save-name",
+        "motion:normal",
+        "motion:reduced",
+        "scene-preset:00:00",
+        "scene-preset:12:00",
+        "scene-preset:first-light",
+        "scene-preset:last-light",
+        "scene-preset:sunrise",
+        "scene-preset:sunset",
+        "scene-time:close",
+        "scene-time:live",
+        "scene-time:lock",
+        "scene-view"
+      ]
+    }
+  }
 }

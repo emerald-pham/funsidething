@@ -12800,12 +12800,16 @@
     {
       "root": "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
     },
     {
       "root": "RISK repository process: native rapid cloud selection preserves the two-second input burst",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
     },
     {
       "root": "RISK repository process: native button gate refuses unallocated local launch before browser startup",
@@ -12883,19 +12887,11 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups",
-      "group": "native-process",
-      "file": "tests.js"
-    },
-    {
-      "root": "test group aggregate refuses a declared mobile memory story without a capped runtime report",
-      "group": "native-process",
-      "file": "scripts/agent-tools/test-groups.test.mjs"
-    },
-    {
       "root": "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
     },
     {
       "root": "RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes",
@@ -12943,11 +12939,6 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK repository process: current producer reuse requires successful capped mobile evidence",
-      "group": "native-process",
-      "file": "tests.js"
-    },
-    {
       "root": "hosted button consumers admit routed event policies before their runtime boundary",
       "group": "native-process",
       "file": "scripts/agent-tools/button-ci-policy.test.mjs"
@@ -12963,11 +12954,6 @@
       "file": "scripts/agent-tools/button-ci-policy.test.mjs"
     },
     {
-      "root": "current grouped routing requires the completed capped mobile producer before reuse",
-      "group": "native-process",
-      "file": "scripts/agent-tools/ci-routing.test.mjs"
-    },
-    {
       "root": "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
       "group": "core",
       "file": "tests.js"
@@ -12980,7 +12966,9 @@
     {
       "root": "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
     },
     {
       "root": "RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files",
@@ -13085,7 +13073,9 @@
     {
       "root": "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
     },
     {
       "root": "RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults",
@@ -13125,7 +13115,9 @@
     {
       "root": "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
     },
     {
       "root": "RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources",
@@ -13240,7 +13232,9 @@
     {
       "root": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
       "group": "native-process",
-      "file": "tests.js"
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
     },
     {
       "root": "workflow input reuse retains large original native evidence and rejects changed bytes",
@@ -13526,6 +13520,141 @@
       "root": "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate preserves optional outcomes separately from the required verdict",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: optional mobile diagnostics do not block ordinary reuse",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "hosted mobile reports require explicit raw policy for optional dispatch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted memory policy admits only explicitly selected mobile workflow dispatch on a branch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "current grouped routing ignores optional mobile diagnostic rows for reuse",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow dispatch explicitly selects optional mobile diagnostics",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved decision review guidance: mounted FAQ retains place and explicit save authority",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved decision review guidance: mounted changelog records selected review continuity",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution",
+      "file": "scripts/agent-tools/test-groups.test.mjs",
+      "group": "native-process"
+    },
+    {
+      "root": "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources",
+      "file": "tests.js",
+      "group": "native-process"
+    },
+    {
+      "root": "RISK repository process: trusted planner declares ordinary engines separately from optional workloads",
+      "file": "tests.js",
+      "group": "native-process"
+    },
+    {
+      "root": "test group public workflow retains selected workload evidence without admitting it as ordinary proof",
+      "file": "scripts/agent-tools/test-groups.test.mjs",
+      "group": "native-process"
     }
   ],
   "processControls": [

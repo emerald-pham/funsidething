@@ -26,6 +26,14 @@ test('hosted button consumers admit routed event policies before their runtime b
   const result=invoke(kind,boundary(sub),{CI:'true',CHAIN_TEST_EVENT_POLICY:policy,GITHUB_EVENT_NAME:event,GITHUB_REF:ref});assert.match(result.stderr,/EEXIST|file already exists/,'The actual consumer must admit the configured route before the deliberate filesystem stop: '+result.stderr);
  });
 });
+test('hosted memory policy admits only explicitly selected mobile workflow dispatch on a branch', t => {
+ const selected=invoke('memory',boundary(t),{CI:'true',CHAIN_TEST_EVENT_POLICY:'optional-mobile-dispatch-v1',GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/optional-diagnostic'});
+ assert.match(selected.stderr,/EEXIST|file already exists/,'The selected policy must reach the deliberate output sentinel before any capped runtime work: '+selected.stderr);
+ const unselected=invoke('memory',boundary(t),{CI:'true',CHAIN_TEST_EVENT_POLICY:'workflow-dispatch-unselected-v1',GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/optional-diagnostic'});
+ assert.doesNotMatch(unselected.stderr,/EEXIST|file already exists/,'An unselected dispatch must be rejected before output or runtime work');
+ const tag=invoke('memory',boundary(t),{CI:'true',CHAIN_TEST_EVENT_POLICY:'optional-mobile-dispatch-v1',GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/tags/diagnostic'});
+ assert.doesNotMatch(tag.stderr,/EEXIST|file already exists/,'A dispatch ref outside branches must be rejected before output or runtime work');
+});
 test('hosted button consumers reject invalid missing mismatched and local launches',async t=>{
  const invalid=[
   ['missing policy',{CHAIN_TEST_EVENT_POLICY:''}],['unknown policy',{CHAIN_TEST_EVENT_POLICY:'local'}],['missing raw event',{GITHUB_EVENT_NAME:''}],
@@ -54,4 +62,16 @@ test('hosted child and memory artifacts preserve raw policy and distinct source 
   ['wrong native policy',b=>{b.native.normal.hostedPolicy.eventPolicy='pull_request';}],
   ['source confused with checkout',b=>{b.report.sourceSha=b.report.candidateCommit;}],
  ])await t.test(name,sub=>{const bundle=create(sub);mutate(bundle);refreshMobileBundle(bundle);assert.throws(()=>verify(bundle));});
+});
+test('hosted mobile reports require explicit raw policy for optional dispatch', async t => {
+ const {createMobileBundle,refreshMobileBundle}=await import('./mobile-memory-fixture.mjs');
+ const {verifyMobileMemoryReport}=await import('../button-safety-mobile-contract.mjs');
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-optional-dispatch-report-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const policy={eventPolicy:'optional-mobile-dispatch-v1',eventName:'workflow_dispatch',eventRef:'refs/heads/diagnostic'};
+ const bundle=createMobileBundle(directory,{sourceSha:'c'.repeat(40),eventPolicy:policy.eventPolicy});
+ bundle.report.hostedPolicy={...policy};for(const row of [bundle.report.negativeControl,...bundle.report.cases])row.hostedPolicy={...policy};for(const native of Object.values(bundle.native))native.hostedPolicy={...policy};refreshMobileBundle(bundle);
+ const verify=()=>verifyMobileMemoryReport(bundle.report,{artifactRoot:directory,candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),sourceSha:'c'.repeat(40),eventPolicy:policy.eventPolicy});
+ assert.equal(verify().status,'passed','A correctly bound optional dispatch fixture is parser evidence only, not a hosted cap receipt');
+ delete bundle.report.hostedPolicy;refreshMobileBundle(bundle);
+ assert.throws(verify,/Raw and routed hosted policy evidence required/,'An optional dispatch report must not lose its raw event/ref binding');
 });
