@@ -48012,6 +48012,16 @@ test('RISK repository process: button safety report admission binds ordinary and
   const report=makeReport('ordinary');assert.equal(verify(report).profile,'ordinary');assert.equal(report.requiredActions.length,114);assert.equal(report.scenarios.length,60);
   for(const row of report.scenarios){const fixture=expectedScenarioFixtures[row.name];assert.ok(fixture,'Reviewed ordinary fixture exists: '+row.name);assert.equal(row.setup.currentTasks,64);assert.equal(row.setup.durableTasks,64);assert.equal(row.setup.source,fixture.source);assert.equal(row.setup.authMode,fixture.authMode);assert.equal(row.setup.fixtureRole,fixture.fixtureRole);assert.match(row.setup.durableHash,/^[a-f0-9]{64}$/);}
  });
+ await t.test('ordinary retains correct350ms observations while missing and failed outcomes still refuse',()=>{
+  const report=makeReport('ordinary'),action=report.requiredActions[0],scenario=report.scenarios[0].name;
+  report.samples=[{scenario,action,elapsedMs:350,maxFrameGapMs:350,preInputMaxFrameGapMs:0,inputMaxFrameGapMs:350,firstTrustedInputAt:1700000000000,eventToFirstFrameMs:350}];
+  report.outcomes[0].steps=[{scenario,description:'Synthetic correct350ms ordinary report observation',elapsedMs:350,maxFrameGapMs:350,frames:2}];
+  const original=structuredClone(report),accepted=verify(report);
+  assert.equal(accepted,report,'The real report consumer returns the complete accepted report');assert.deepEqual(accepted,original,'Correct350ms observations remain exact without becoming a release threshold');
+  const missing=structuredClone(report);missing.outcomes.shift();assert.throws(()=>verify(missing),/Missing required button action/,'Correct timing cannot supply a missing required action');
+  const failed=structuredClone(report);failed.outcomes[0].status='failed';assert.throws(()=>verify(failed),/must pass/i,'A recorded correct-duration sample cannot excuse a failed ordinary outcome');
+  const stalled=structuredClone(report);stalled.outcomes[0].responsive=false;assert.throws(()=>verify(stalled),/responsiveness required/i,'Diagnostic timing never waives the required responsive outcome');
+ });
  await t.test('ordinary rejects wrong per-scenario source or mode for signed-out and reconcile-held cases',()=>{
   const controls=[
    ['signed-out base source','populated Add contexts settings and list','source','reconcile-held-installed'],

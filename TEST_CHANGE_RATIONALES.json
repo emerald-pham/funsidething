@@ -33381,5 +33381,203 @@
       "commonBase": "c920ccffc11af487ec84277c33fe2e370541e384",
       "metadataOnlyAssociation": true
     }
+  },
+  {
+    "baseCommit": "d8de8276642eabe735ba2ebae8d9b7b73626f763",
+    "comparisonMergeBase": "d8de8276642eabe735ba2ebae8d9b7b73626f763",
+    "testChangesSha256": "5c328bc2556fea204441e799ffa8979ee1ebd70df9f8d91e945498e6fb1b31fe",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "d0427557554d10c926dbb1959ee01988bd629833",
+    "comparisonMergeBase": "d0427557554d10c926dbb1959ee01988bd629833",
+    "testChangesSha256": "a426835b47ee31b81001dd39eac18f63d1487efe21a4aba7c6ed76b4f2ef27cc",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "505ee67c076445c959c725d8afcc46eda8879e6a",
+    "comparisonMergeBase": "505ee67c076445c959c725d8afcc46eda8879e6a",
+    "testChangesSha256": "732f84b1bfa9572337f4217ec774edf01913892cf8f3bae888113795d5710732",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "comparisonMergeBase": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "55b1e983ffbfe3acc6fc9d9de15b6d0f9598d229d15edca426426bdcf3e787a3",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "335fbf2e20c5c5d5141f9ef44180133c29baa565bcb09351a35ee4b6462cd467",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "9ea6ca7ce46445556879f76f479ded61f8aa9664f5d79fb501b57dab874c7b77",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "ce29eee3a9e640f323a6cc50dfff96d48b74fe396c6bb5391a9ba206a6f77035",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "comparisonMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "79c012baab8751b43c589d64c26554143e34ab2bc86e89aa5cec18582340402d",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "comparisonMergeBase": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "788864a879960b98f416ba9b6c7a393eaade52d71037f5068b2a39a87be8f4fa",
+    "cycle": "coverage-only-1559",
+    "reason": "Add the explicitly requested350ms correct ordinary report consumer control while preserving every required failure boundary and all original assertions.",
+    "previousBehavior": "The report contract already separates diagnostic timing from required correctness, but the integration proof lacks an explicit350ms positive with matched required-outcome negatives.",
+    "intendedBehavior": "Use the existing complete independently declared ordinary fixture and real consumer to accept exact350ms observations while rejecting missing, failed and not-responsive outcomes; no application source changes.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations while missing and failed outcomes still refuse"
+    ],
+    "preservedCoverage": [
+      "All previous seven profile-admission nested cases,114actions,60ordinary scenarios,54signed-out/sixheld fixtures and ten trusted repeat cases remain exact.",
+      "Every prior complete rationale object remains its original raw prefix, and all existing optional400-task/ten-attempt/two-second/cap assertions and original failed evidence remain intact.",
+      "No actual browser/native timing or product defect is claimed; this is coverage-only proof at the existing report consumer."
+    ],
+    "redEvidence": {
+      "command": "Coverage-only baseline expected to pass on the existing correct runtime; the exact recorded focused command and actual complete outcome are retained under1559.",
+      "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
+    },
+    "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
   }
 ]
