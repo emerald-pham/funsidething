@@ -13725,6 +13725,36 @@
       "root": "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile retains full logical occurrences within finite physical storage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile consumer derives exact bytes and reaches every finite guard",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile controller retains the complete sequence before truthful terminal cleanup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile CLI requires reader consent and an exact raw namespace",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile cannot activate unrelated native routes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup settings distinguish legacy raw8 from independently versioned live and durable16",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

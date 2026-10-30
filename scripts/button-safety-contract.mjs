@@ -12,8 +12,8 @@ export function verifyButtonInventorySource(source,inventory){
 }
 export const digest=value=>createHash('sha256').update(value).digest('hex');
 // Diagnostic timing is independent of the application's functional verdict.
-export function verifyButtonStartupCapture(capture){
- if(capture?.provider==='webkit-native-timeline')return verifyNativeTimelineCapture(capture);
+export function verifyButtonStartupCapture(capture,{retentionProfile}={}){
+ if(capture?.provider==='webkit-native-timeline')return verifyNativeTimelineCapture(capture,{retentionProfile});
  const check=(condition,message)=>assert.ok(condition,'Startup capture '+message),finite=value=>Number.isFinite(value)&&value>=0;
  check(capture?.schemaVersion===1&&capture.selected===true&&capture.provider==='playwright-public-screencast','known selected public provider required');
  check(JSON.stringify(capture.bounds)===JSON.stringify({maxDurationMs:12000,maxFrames:120,maxTotalBytes:8388608,maxFrameBytes:262144}),'fixed finite bounds required');
@@ -44,7 +44,7 @@ export function classifyButtonStartupTimeline(timeline,capture=null,nativeInputs
   if(!valid)missing.push(name);
  }
  if(!missing.length){const times=names.slice(0,5).map(name=>observations[name].atMs);if(times[0]!==0||times.some((value,index)=>index>0&&value<times[index-1]))missing.push('ordered-page-clock');}
- if(capture){verifyButtonStartupCapture(capture);missing.push('supplemental-clock-and-work-provenance');}
+ if(capture){verifyButtonStartupCapture(capture,{retentionProfile:nativeInputs?.retentionProfile});missing.push('supplemental-clock-and-work-provenance');}
  const nativeEvidence=nativeInputs?deriveNativeTimelineEvidence({...nativeInputs,capture}):null;
  assert.ok(!timeline?.nativeEvidence||nativeEvidence,'Native Timeline derived claim requires its raw inputs');
  return{...timeline,status:missing.length?'incomplete':'complete',missing,...(nativeEvidence?{nativeEvidence,ordinaryRouteEligible:false}:{})};
