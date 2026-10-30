@@ -33799,5 +33799,258 @@
       "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
     },
     "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "comparisonMergeBase": "6d961875d1778c1a83dd38252e85f92ae40f6309",
+    "testFile": "tests.js",
+    "testChangesSha256": "b80fe2a3f238c7ed716bde40759a9fde865070abd56b205833a5bc48a606cba8",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "5eda580d631f5532430162369775b1ed6777d978",
+    "comparisonMergeBase": "5eda580d631f5532430162369775b1ed6777d978",
+    "testFile": "tests.js",
+    "testChangesSha256": "ebde553415216e6706a68661dcd814055887aa6b8c5f63026d64077dbe5e7f2f",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "d8de8276642eabe735ba2ebae8d9b7b73626f763",
+    "comparisonMergeBase": "d8de8276642eabe735ba2ebae8d9b7b73626f763",
+    "testFile": "tests.js",
+    "testChangesSha256": "c830ddd78dc26ecc496c71eea36ab572b35981d1442d51037843ee75082eaa3a",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "d0427557554d10c926dbb1959ee01988bd629833",
+    "comparisonMergeBase": "d0427557554d10c926dbb1959ee01988bd629833",
+    "testFile": "tests.js",
+    "testChangesSha256": "c568b9ef3a22a3116e10ac2891371449247b802d96ed437a6be30ff45359c6f8",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "505ee67c076445c959c725d8afcc46eda8879e6a",
+    "comparisonMergeBase": "505ee67c076445c959c725d8afcc46eda8879e6a",
+    "testFile": "tests.js",
+    "testChangesSha256": "30a808ca09b92a2ebb60183fb3f95ab7f76a900682f40b1645121ca4a18252ab",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "comparisonMergeBase": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testFile": "tests.js",
+    "testChangesSha256": "01e52cb17140e58d1b9453f3c622450af3ac493158f50d8a1c919cfaafe86162",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testFile": "tests.js",
+    "testChangesSha256": "f395a73e68c263b7268aa7fd3dd884523c2c13350d4705ed9eca3e35aa88b0ba",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testFile": "tests.js",
+    "testChangesSha256": "d3a344393e77b01d6d02e2434847c9f32ee4e71689870fdabc894ffd1a1ab47f",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testFile": "tests.js",
+    "testChangesSha256": "ad69f17249b3eec7fde6af3949180f74eb9b91021fcae0d3622dc49b0b782dfb",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "comparisonMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testFile": "tests.js",
+    "testChangesSha256": "83b54f6e266731a92ed74d2292b8944f9153b3f5bd48dc69edbc78255a7cf5d4",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "comparisonMergeBase": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testFile": "tests.js",
+    "testChangesSha256": "7f6c449d41b92c021785af120971125e41ebc7b11e14cf145cfbfb717502ea40",
+    "cycle": "mounted-faq-1572",
+    "reason": "Update the existing mounted FAQ expectation to the accepted required ordinary-use and optional stress-check policy, preserving the entire actual Help/changelog consumer.",
+    "previousBehavior": "The mounted answer described large boards and rapid presses next to failed required checks without identifying the ordinary/optional distinction; exact old wording failed the new existing-consumer expectation.",
+    "intendedBehavior": "Required ordinary button correctness and saved-data protection are explained plainly, larger and rapid checks are explicitly optional, and device coverage remains honestly limited.",
+    "replacementTests": [
+      "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress"
+    ],
+    "preservedCoverage": [
+      "The same single complete mounted Help/changelog callback retains every other assertion; only its meaningful title and exact expected answer changed, with no added test count.",
+      "All1156prior complete rationale objects and original raw prefix are retained, every unrelated app/FAQ/changelog/risk row and catalog assignment remains exact.",
+      "All required ordinary native actions and seven optional diagnostic roots, thresholds, protected-source and production storage/cloud/runtime contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Actual one existing mounted FAQ consumer, Node24 recorder 2026-10-30T06-30-12-010Z-af32f477-3b93-4bb8-bb3a-77593df0f294; literal argv and raw exact source retained under guidance-ordinary-policy/red-execution.",
+      "failure": "Exactly one expected mounted-copy AssertionError on old versus required new answer, zero skipped/cancelled, app unchanged. Initial invalid-purpose preparation was refused before child and remains separately retained. No application behavior RED asserted."
+    },
+    "sourceParent": "6d961875d1778c1a83dd38252e85f92ae40f6309"
   }
 ]

@@ -204,7 +204,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
 - RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits
-- RISK button safety guidance: mounted FAQ states required browser checks and limits
+- RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress
 - RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes
 - RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database
 - RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore

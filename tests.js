@@ -21226,7 +21226,7 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
 
 });
 
-test('RISK button safety guidance: mounted FAQ states required browser checks and limits',async t=>{
+test('RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());
   for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
   app.ctx.openHelp();
@@ -21234,7 +21234,7 @@ test('RISK button safety guidance: mounted FAQ states required browser checks an
   const answer=help.match(/<dt>How are button crashes checked\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'the mounted FAQ explains how required button checks work');
   const plain=answer.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-  assert.equal(plain,'Buttons are checked with large boards and rapid presses; failed required checks block release. These checks cannot cover every device.');
+  assert.equal(plain,'Required checks cover ordinary button use and saved-data protection before release. Large boards and rapid presses provide optional stress checks. These checks cannot cover every device.');
   assert.doesNotMatch(plain,/RAM|\b(?:512|1\s?GB|WebKit|Chromium|protocol|automation)\b/i,'Player help stays focused on the outcome and real limitation');
   assert.match(help,/Button checks help catch crashes and unresponsive controls before release\./,'Settings changelog states the outcome briefly');
   assert.doesNotMatch(help,/enforced 512 MB|browser-process budget|separate mobile WebKit.equivalent check/,'Old testing machinery is not public guidance');
