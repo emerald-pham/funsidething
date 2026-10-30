@@ -8,13 +8,19 @@ export {canonicalStartupSource} from './button-safety-startup.mjs';
 //1468 vendor release/build mapping, not an assertion about the private C++ recipe.
 export const TIMELINE_PROVENANCE=Object.freeze({playwright:'1.62.1',webkitRevision:'2336',node:'v24.19.0',coreBundle:'9393fa79e1c67c74edc26b610d65a4f7ed73d345a762465cc88340a33a2454ac',protocol:'448bdfe4851c841182a686d85cf3080672adbebf5dfc54d516eb3e3cd967e5fe',wrapper:'a85baad3d8c07173ac387a59b41500c382b21ed692afe0964d29aac247ccc63b',webkit:'0eb9d97522607740724d1f019f5ecc8cc1839d24a8152243a4d2d9c59a5de361',webcore:'9403414950b629fa8732c9ac3df48cbcd05828bf09cf0ad5423a466ce8aef3f3',jsc:'7f5f6858e7c990f616850c129757548483f56041f9cc7acff2771581ecfa903d',executable:'fbb73b3ee767f999e312bdf67095b95c81421185513e196a74f6f62a2f702845'});
 export const TIMELINE_BOUNDS=Object.freeze({maxDurationMs:12000,maxEvents:4096,maxEventBytes:1048576,maxTotalBytes:33554432,maxFrames:120,maxFrameBytes:1048576});
+const RETENTION_PROFILE='canonical-json-48mib-memory-png-v1';
+const RETENTION_PROFILE_BOUNDS=Object.freeze({...TIMELINE_BOUNDS,maxTotalBytes:50331648,maxPhysicalPayloadBytes:33554432,maxPersistentPngBytes:0,maxDecodedPngInFlightBytes:1048576});
 const hash=b=>createHash('sha256').update(b).digest('hex'),finite=n=>Number.isFinite(n)&&n>=0;
 const check=(ok,message)=>assert.ok(ok,'Native Timeline '+message);
-export function verifyNativeTimelineCapture(c){
- check([1,2].includes(c?.schemaVersion)&&c.selected===true&&c.provider==='webkit-native-timeline','selected provider required');
+export function verifyNativeTimelineCapture(c,{retentionProfile}={}){
+ const selected=c?.schemaVersion===3,bounds=selected?RETENTION_PROFILE_BOUNDS:TIMELINE_BOUNDS;
+ if(selected){check(retentionProfile===RETENTION_PROFILE,'explicit retention profile consent required');check(c.retentionProfile===RETENTION_PROFILE,'selected retention profile mismatch');}
+ else check(retentionProfile===undefined,'retention profile does not match capture schema');
+ check([1,2,3].includes(c?.schemaVersion)&&c.selected===true&&c.provider==='webkit-native-timeline','selected provider required');
  check(c.engine==='webkit'&&c.connection==='local-owned','owned local WebKit required');
  check(JSON.stringify(c.provenance)===JSON.stringify(TIMELINE_PROVENANCE),'exact1468 runtime provenance required');
- check(JSON.stringify(c.bounds)===JSON.stringify(TIMELINE_BOUNDS),'fixed finite bounds required');
+ if(selected)assert.deepEqual(c.bounds,bounds,'Native Timeline fixed finite bounds required');
+ else check(JSON.stringify(c.bounds)===JSON.stringify(bounds),'fixed finite bounds required');
  check(['captured','unavailable','error'].includes(c.status),'explicit outcome required');
  check(c.clock?.basis==='inspector-stopwatch-seconds'&&c.clock.fallback===false&&c.clock.pageClockConversion==='unavailable','native clock cannot be replaced with host/fallback time');
  check(c.startedBeforeNavigation===true&&finite(c.startedHostMonotonicMs)&&finite(c.stoppedHostMonotonicMs)&&c.stoppedHostMonotonicMs>=c.startedHostMonotonicMs&&c.stoppedHostMonotonicMs-c.startedHostMonotonicMs<=12000,'pre-navigation bounded lifetime required');
@@ -26,7 +32,7 @@ export function verifyNativeTimelineCapture(c){
  for(const d of c.documents)check(typeof d.id==='string'&&d.id&&sessions.has(d.sessionId)&&Number.isSafeInteger(d.contextId)&&d.contextId>0&&finite(d.timeOrigin),'exact document/context/session binding required');
  check(Array.isArray(c.events)&&Array.isArray(c.frames)&&c.events.length<=4096&&c.frames.length<=120,'raw event/frame limits required');
  check(c.counts&&['received','accepted','dropped'].every(k=>Number.isSafeInteger(c.counts[k])&&c.counts[k]>=0)&&c.counts.accepted===c.events.length&&c.counts.received===c.counts.accepted+c.counts.dropped,'raw counts must reconcile');
- const canonical=c.schemaVersion===2;
+ const canonical=c.schemaVersion===2||selected;
  if(canonical)check(c.storage?.kind==='canonical-native-json-derived-png','canonical storage kind required');
  const paths=new Set();let bytes=0,rawBytes=0,frameBytes=0;
  for(const [i,e]of c.events.entries()){
@@ -34,10 +40,10 @@ export function verifyNativeTimelineCapture(c){
   check(Number.isSafeInteger(e.bytes)&&e.bytes>0&&e.bytes<=1048576&&/^[a-f0-9]{64}$/.test(e.sha256),'raw event bytes/hash required');bytes+=e.bytes;rawBytes+=e.bytes;
  }
  for(const [i,f]of c.frames.entries()){
-  check(f.index===i+1&&/^startup-timeline\/frame-[0-9]{4}\.png$/.test(f.path)&&!paths.has(f.path)&&Number.isSafeInteger(f.eventIndex)&&c.events[f.eventIndex-1]?.sessionId===f.sessionId&&Array.isArray(f.recordPath)&&f.recordPath.every(n=>Number.isSafeInteger(n)&&n>=0),'snapshot/raw-record correlation required');paths.add(f.path);
+  check(f.index===i+1&&/^startup-timeline\/frame-[0-9]{4}\.png$/.test(f.path)&&!paths.has(f.path)&&Number.isSafeInteger(f.eventIndex)&&c.events[f.eventIndex-1]?.sessionId===f.sessionId&&Array.isArray(f.recordPath)&&f.recordPath.every(n=>Number.isSafeInteger(n)&&n>=0),selected?'snapshot frame/raw-record path correlation required':'snapshot/raw-record correlation required');paths.add(f.path);
   check(finite(f.startSeconds)&&finite(f.endSeconds)&&f.endSeconds>=f.startSeconds&&Number.isSafeInteger(f.bytes)&&f.bytes>0&&f.bytes<=1048576&&/^[a-f0-9]{64}$/.test(f.sha256),'bounded native snapshot interval required');bytes+=f.bytes;frameBytes+=f.bytes;
  }
- check(Number.isSafeInteger(bytes)&&c.totalBytes===bytes&&bytes<=33554432,'total written bytes must reconcile');
+ check(Number.isSafeInteger(bytes)&&c.totalBytes===bytes&&bytes<=bounds.maxTotalBytes,selected?'logical total bytes must reconcile':'total written bytes must reconcile');
  if(canonical){
   let orphanBytes=0;check(c.orphans===undefined||Array.isArray(c.orphans)&&c.orphans.length<=1,'bounded owned orphan inventory required');
   for(const row of c.orphans||[]){check(/^startup-timeline\/event-[0-9]{4}\.json$/.test(row.path)&&!paths.has(row.path)&&Number.isSafeInteger(row.bytes)&&row.bytes>=0&&row.bytes<=1048576&&/^[a-f0-9]{64}$/.test(row.sha256),'owned partial write identity required');paths.add(row.path);orphanBytes+=row.bytes;}
@@ -62,7 +68,9 @@ export function verifyNativeTimelineCapture(c){
 export function createNativeTimelineProvider({verifyRuntime}={}){
  check(typeof verifyRuntime==='function','mandatory runtime verifier required');
  // Construction is import-safe. Only an actual start activates the mandatory guard.
- return async function startNativeTimelineCapture({page,outputDir,sourceURL,onSave=()=>{},onStop=()=>{}}){
+ return async function startNativeTimelineCapture({page,outputDir,sourceURL,onSave=()=>{},onStop=()=>{},retentionProfile}){
+ check(retentionProfile===undefined||retentionProfile===RETENTION_PROFILE,'unknown retention profile');
+ const selectedRetention=retentionProfile===RETENTION_PROFILE,bounds=selectedRetention?RETENTION_PROFILE_BOUNDS:TIMELINE_BOUNDS;
  const provenance=verifyRuntime();check(JSON.stringify(provenance)===JSON.stringify(TIMELINE_PROVENANCE),'exact verifier provenance required');
  canonicalStartupSource('',undefined,sourceURL);
  const connection=page?._connection;
@@ -71,7 +79,7 @@ export function createNativeTimelineProvider({verifyRuntime}={}){
  check(delegate?._page===impl&&impl?.browserContext?._browser?.options?.browserType==='webkit'&&initial&&typeof initial.send==='function'&&!initial.isDisposed()&&typeof delegate._initializeSession==='function','Page/delegate/live WebKit session back-map required');
  check(page.url()==='about:blank'&&impl.mainFrame().url()==='about:blank','initial blank Page/main-frame required; late navigation is unavailable');
  const descriptor=Object.getOwnPropertyDescriptor(delegate,'_initializeSession'),original=delegate._initializeSession,nonce=randomUUID(),prefix='native-timeline:'+nonce+':',directory=path.join(outputDir,'startup-timeline');fs.mkdirSync(directory);
- const capture={schemaVersion:2,storage:{kind:'canonical-native-json-derived-png'},rawEventBytes:0,derivedFrameBytes:0,physicalPayloadBytes:0,orphans:[],selected:true,provider:'webkit-native-timeline',status:'running',engine:'webkit',connection:'local-owned',provenance,bounds:{...TIMELINE_BOUNDS},clock:{basis:'inspector-stopwatch-seconds',fallback:false,pageClockConversion:'unavailable'},startedBeforeNavigation:false,startedHostMonotonicMs:performance.now(),stoppedHostMonotonicMs:null,stopReason:null,sessions:[],documents:[],counts:{received:0,accepted:0,dropped:0},totalBytes:0,events:[],frames:[],errors:[],facts:{calibration:{status:'unavailable',reason:'No matched same-document pre/post native marks'},work:[],presentation:'engine-content-snapshot; first-occurrence-unverified'},cleanup:{listenersRemoved:false,hookRestored:false,sessionsStopped:false,timerCleared:false},overhead:'Diagnostic instance session initialization hook, native Timeline/Screenshot instrumentation, page marks, raw synchronous bounded writes; no OS presentation acknowledgement'};
+ const capture={schemaVersion:selectedRetention?3:2,...(selectedRetention?{retentionProfile}:{}),storage:{kind:'canonical-native-json-derived-png'},rawEventBytes:0,derivedFrameBytes:0,physicalPayloadBytes:0,orphans:[],selected:true,provider:'webkit-native-timeline',status:'running',engine:'webkit',connection:'local-owned',provenance,bounds:{...bounds},clock:{basis:'inspector-stopwatch-seconds',fallback:false,pageClockConversion:'unavailable'},startedBeforeNavigation:false,startedHostMonotonicMs:performance.now(),stoppedHostMonotonicMs:null,stopReason:null,sessions:[],documents:[],counts:{received:0,accepted:0,dropped:0},totalBytes:0,events:[],frames:[],errors:[],facts:{calibration:{status:'unavailable',reason:'No matched same-document pre/post native marks'},work:[],presentation:'engine-content-snapshot; first-occurrence-unverified'},cleanup:{listenersRemoved:false,hookRestored:false,sessionsStopped:false,timerCleared:false},overhead:'Diagnostic instance session initialization hook, native Timeline/Screenshot instrumentation, page marks, raw synchronous bounded writes; no OS presentation acknowledgement'};
  const owned=new Map(),listeners=[],anchors=[],contexts=new Map();let halted=false,stopping=false,stopPromise,timer,boundMainContext=null;
  const deadline=async work=>{let t;try{return await Promise.race([work,new Promise((_,reject)=>{t=setTimeout(()=>reject(Error('native command deadline')),1000);})]);}finally{clearTimeout(t);}};
  const fail=error=>{capture.errors.push(String(error).slice(0,500));capture.status='error';halted=true;try{onSave(capture);}catch(error){capture.errors.push('onSave: '+String(error).slice(0,500));}finally{queueMicrotask(()=>{void stop('capture-error');});}};
@@ -86,11 +94,11 @@ export function createNativeTimelineProvider({verifyRuntime}={}){
    const bytes=Buffer.from(JSON.stringify(event)),screens=[];availableEventBytes=bytes.length;
    check(bytes.length<=1048576&&capture.events.length<4096,'raw event bound reached');
    walk(event.record,(record,recordPath)=>{if(record.type==='Screenshot'){
-    check(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(record.data?.imageData||''),'native PNG data required');const data=Buffer.from(record.data.imageData.split(',')[1],'base64');check(data.toString('base64')===record.data.imageData.split(',')[1]&&data.subarray(0,8).toString('hex')==='89504e470d0a1a0a'&&data.length<=1048576&&finite(record.startTime)&&finite(record.endTime)&&record.endTime>=record.startTime,'native snapshot bound/interval');screens.push({data,record,recordPath});
+    check(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(record.data?.imageData||''),'native PNG data required');const data=Buffer.from(record.data.imageData.split(',')[1],'base64');check(data.toString('base64')===record.data.imageData.split(',')[1]&&data.subarray(0,8).toString('hex')==='89504e470d0a1a0a'&&data.length<=1048576&&finite(record.startTime)&&finite(record.endTime)&&record.endTime>=record.startTime,'native snapshot bound/interval');screens.push(selectedRetention?{bytes:data.length,sha256:hash(data),record,recordPath}:{data,record,recordPath});
    }});
-   availableFrameBytes=screens.reduce((n,s)=>n+s.data.length,0);prospectiveLogicalBytes=capture.totalBytes+bytes.length+availableFrameBytes;prospectivePhysicalBytes=capture.physicalPayloadBytes+bytes.length;
+   availableFrameBytes=screens.reduce((n,s)=>n+(selectedRetention?s.bytes:s.data.length),0);prospectiveLogicalBytes=capture.totalBytes+bytes.length+availableFrameBytes;prospectivePhysicalBytes=capture.physicalPayloadBytes+bytes.length;
    check(capture.frames.length+screens.length<=120,'raw frame bound reached');
-   check(Number.isSafeInteger(prospectiveLogicalBytes)&&prospectiveLogicalBytes<=33554432,'raw logical total byte bound reached');
+   check(Number.isSafeInteger(prospectiveLogicalBytes)&&prospectiveLogicalBytes<=bounds.maxTotalBytes,'raw logical total byte bound reached');
    check(Number.isSafeInteger(prospectivePhysicalBytes)&&prospectivePhysicalBytes<=33554432,'raw physical payload bound reached');
    const index=capture.events.length+1,relative='startup-timeline/event-'+String(index).padStart(4,'0')+'.json',row=owned.get(session);
    // One exclusive canonical file owns the delivery. Derived PNGs are views,
@@ -100,7 +108,7 @@ export function createNativeTimelineProvider({verifyRuntime}={}){
     fd=fs.openSync(path.join(outputDir,relative),'wx+');created=true;let written=0;
     while(written<bytes.length){const n=fs.writeSync(fd,bytes,written,bytes.length-written,written);check(n>0,'canonical write made no progress');written+=n;}
     capture.rawEventBytes+=bytes.length;capture.physicalPayloadBytes+=bytes.length;capture.totalBytes+=bytes.length;capture.events.push({index,sessionId:session.sessionId,epoch:row.epoch,bytes:bytes.length,sha256:hash(bytes),path:relative});capture.counts.accepted++;
-    for(const item of screens){const i=capture.frames.length+1,relative='startup-timeline/frame-'+String(i).padStart(4,'0')+'.png';capture.derivedFrameBytes+=item.data.length;capture.totalBytes+=item.data.length;capture.frames.push({index:i,path:relative,bytes:item.data.length,sha256:hash(item.data),sessionId:session.sessionId,eventIndex:index,recordPath:item.recordPath,startSeconds:item.record.startTime,endSeconds:item.record.endTime});}
+    for(const item of screens){const i=capture.frames.length+1,relative='startup-timeline/frame-'+String(i).padStart(4,'0')+'.png',bytes=selectedRetention?item.bytes:item.data.length,sha256=selectedRetention?item.sha256:hash(item.data);capture.derivedFrameBytes+=bytes;capture.totalBytes+=bytes;capture.frames.push({index:i,path:relative,bytes,sha256,sessionId:session.sessionId,eventIndex:index,recordPath:item.recordPath,startSeconds:item.record.startTime,endSeconds:item.record.endTime});}
    }catch(error){
     if(created){const size=fs.fstatSync(fd).size;check(Number.isSafeInteger(size)&&size>=0&&size<=bytes.length,'partial canonical write size required');const partial=Buffer.alloc(size);let read=0;while(read<size){const n=fs.readSync(fd,partial,read,size-read,read);check(n>0,'partial canonical read made no progress');read+=n;}capture.orphans.push({path:relative,bytes:size,sha256:hash(partial)});capture.physicalPayloadBytes+=size;}
     throw error;
@@ -195,11 +203,11 @@ function verifyStackTrace(stack){
 
 // Pure byte-to-evidence consumer. Filesystem custody/realpath checks belong to
 // the loader: this boundary accepts bytes, never paths that it opens itself.
-export function deriveNativeTimelineEvidence({capture,captureBytes,expectedCaptureSha256,rawInventoryBytes,rawFiles,sources,producer,consumer}={}){
+export function deriveNativeTimelineEvidence({capture,captureBytes,expectedCaptureSha256,rawInventoryBytes,rawFiles,sources,producer,consumer,retentionProfile}={}){
  check(Buffer.isBuffer(captureBytes)&&captureBytes.length<=1048576&&sha256Pattern.test(expectedCaptureSha256||'')&&hash(captureBytes)===expectedCaptureSha256,'capture bytes/hash binding required');
  const parse=(bytes,label)=>{try{return JSON.parse(bytes.toString('utf8'));}catch{check(false,label+' JSON required');}};
- const parsed=parse(captureBytes,'capture');assert.deepEqual(capture,parsed,'Native Timeline capture object must equal exact bytes');verifyNativeTimelineCapture(capture);
- const canonical=capture.schemaVersion===2,partial=canonical&&capture.status!=='captured';
+ const parsed=parse(captureBytes,'capture');assert.deepEqual(capture,parsed,'Native Timeline capture object must equal exact bytes');verifyNativeTimelineCapture(capture,{retentionProfile});
+ const canonical=capture.schemaVersion===2||capture.schemaVersion===3,partial=canonical&&capture.status!=='captured';
  check((capture.status==='captured'||partial)&&capture.sessions.length===1&&capture.sessions[0].role==='initial-blank'&&capture.sessions[0].armedBeforeNavigation===true&&(partial?capture.documents.length<=1:capture.documents.length===1),'initial-only captured session/document required');
  const session=capture.sessions[0],document=capture.documents[0]||null;check(!document||document.sessionId===session.id,'sole main document session required');
  check(producer&&producer.captureSha256===expectedCaptureSha256&&sha256Pattern.test(producer.sourcePacketSha256||'')&&typeof producer.recorderId==='string'&&producer.recorderId.length>0,'original producer identity required');

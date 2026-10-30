@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "kind": "independently frozen portable event input; existing PNG reused as bytes only, no new capture",
+  "profile": "canonical-json-48mib-memory-png-v1",
+  "bounds": {
+    "maxDurationMs": 12000,
+    "maxEvents": 4096,
+    "maxEventBytes": 1048576,
+    "maxTotalBytes": 50331648,
+    "maxPhysicalPayloadBytes": 33554432,
+    "maxFrames": 120,
+    "maxFrameBytes": 1048576,
+    "maxPersistentPngBytes": 0,
+    "maxDecodedPngInFlightBytes": 1048576
+  },
+  "sourcePNG": {
+    "virtualPath": "scripts/agent-tools/fixtures/startup-retention-1526/startup-timeline/frame-0003.png",
+    "physicalPNGFile": false,
+    "canonicalPath": "scripts/agent-tools/fixtures/startup-retention-1526/startup-timeline/event-0210.json",
+    "canonicalBytes": 643467,
+    "canonicalSha256": "e560ea22ba4a54cda90c6178bba7b1aa59d4ab6d5fac7808f0311d2a31114bbc",
+    "eventIndex": 210,
+    "recordPath": [],
+    "fullOriginalFrameRow": {
+      "kind": "frame",
+      "path": "startup-timeline/frame-0003.png",
+      "index": 3,
+      "bytes": 482487,
+      "sha256": "ea1280633480d5124cd58d4a0370948dc7a78016fdb34fd460157aa9c4d1be6e",
+      "declaredMatch": true,
+      "eventIndex": 210,
+      "recordPath": [],
+      "rawReconstructionEqualsPNG": true,
+      "base64CanonicalRoundtrip": true,
+      "nativeIntervalMatches": true
+    },
+    "encodedBytes": 643338,
+    "encodedSha256": "20021a2dfa6aca9c85c6fce1cda37d413fdcc7c4d1b2a2d16fffa0e853797c17",
+    "bytes": 482487,
+    "sha256": "ea1280633480d5124cd58d4a0370948dc7a78016fdb34fd460157aa9c4d1be6e"
+  },
+  "eventTemplate": {
+    "futureRoot": {
+      "order": [
+        "retain",
+        "☃",
+        null
+      ],
+      "repeatedFields": {
+        "imageLike": "retained unknown field"
+      }
+    },
+    "record": {
+      "type": "Composite",
+      "startTime": 1.04,
+      "endTime": 1.05,
+      "data": {
+        "future": "exact\\/\u0000"
+      },
+      "children": [
+        {
+          "type": "Composite",
+          "startTime": 1.04,
+          "endTime": 1.05,
+          "data": {
+            "unknownParent": [
+              1,
+              2,
+              3
+            ]
+          },
+          "children": [
+            {
+              "type": "Screenshot",
+              "startTime": 1.04,
+              "endTime": 1.05,
+              "data": {
+                "imageData": "$FROZEN_PNG_DATA_URL",
+                "unknownImageField": [
+                  "whole",
+                  true
+                ]
+              }
+            },
+            {
+              "type": "FutureNativeEvent",
+              "startTime": 1.045,
+              "data": {
+                "opaque": {
+                  "keep": "every field"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "imageRecordPath": [
+    0,
+    0
+  ],
+  "eventBytes": 643850,
+  "eventSha256": "da6d2afd213f8b7a9d5d502f1d2ec86f9beba761e3e18ad09cc1217819a8a338",
+  "recordVisitsPerDelivery": 4,
+  "deliveries": 40,
+  "sequenceRawBytes": 25754000,
+  "sequenceDecodedOccurrenceBytes": 19299480,
+  "sequenceLogicalBytes": 45053480,
+  "sequenceRecordVisits": 160,
+  "defaultAcceptedDataEventsBeforeLogicalStop": 29,
+  "profileAcceptedDataEventsBeforeLogicalStop": 44,
+  "oldPrefixMarginBeforeNextEvent": 890659,
+  "newPrefixMarginBeforeNextEvent": 772820,
+  "sourceScope": "Synthetic SDK/control only; does not claim native app pixels/timing/cause. All old fixture files are unchanged."
+}

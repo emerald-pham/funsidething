@@ -2497,3 +2497,9 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 | Canonical Timeline raw storage, exact derived PNG/logical bounds and truthful failed controller custody | `RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes`; `RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness`; `RISK repository process: failed Timeline controller finalizes available custody before browser close`; `RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup` |
 
 - RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending
+
+| Explicit opt-in finite Timeline capacity, same raw bytes, controller finalization and consent-bound CLI | `RISK repository process: explicit Timeline profile retains full logical occurrences within finite physical storage`; `RISK repository process: explicit Timeline profile consumer derives exact bytes and reaches every finite guard`; `RISK repository process: explicit Timeline profile controller retains the complete sequence before truthful terminal cleanup`; `RISK repository process: explicit Timeline profile CLI requires reader consent and an exact raw namespace`; `RISK repository process: explicit Timeline profile cannot activate unrelated native routes` |
+
+| Original legacy Worked-hours8 and independent live/durable v2 numeric16, strict full ordinary/raw/typed boundaries | `RISK repository process: ordinary startup settings distinguish legacy raw8 from independently versioned live and durable16` |
+
+| Complete bounded public Git diff collection and specific rationale, coverage, ref and child-error refusals | `RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals` |
