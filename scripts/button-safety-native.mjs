@@ -292,8 +292,8 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    if(interrupted)throw Error('Startup capture interrupted: '+interrupted);
    await page.goto(origin+prefix);if(interrupted)throw Error('Startup capture interrupted: '+interrupted);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
-    const result=await evalPage(async(captureFixtureMode)=>{const head=await ScannerDeviceStore.readHead();return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,...(captureFixtureMode?{authMode:window.__installedFixture?.authMode}:{})};},Boolean(scenarioFixture));
-    if(result.currentTasks===(startupOpening?64:fixtureTaskCount)&&result.durableTasks===(startupOpening?64:fixtureTaskCount)){
+    const result=await evalPage(async({captureFixtureMode,waitForSavedDecision})=>{const head=await ScannerDeviceStore.readHead();if(waitForSavedDecision&&!(CloudSync?.ready===true&&CloudSync.user==='fixture@example.invalid'&&CloudSync.status==='ok'&&state.syncDirty===false&&!pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy&&head?.payload===JSON.stringify(state)&&state.syncAccount==='fixture@example.invalid'&&state.syncIdentity==='owner'&&state.syncRev===4))return null;return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,...(captureFixtureMode?{authMode:window.__installedFixture?.authMode}:{})};},{captureFixtureMode:Boolean(scenarioFixture),waitForSavedDecision:name==='ordinary repeated saved decision choice'});
+    if(result&&result.currentTasks===(startupOpening?64:fixtureTaskCount)&&result.durableTasks===(startupOpening?64:fixtureTaskCount)){
      const row={...result,fixtureRole};
      if(scenarioFixture){
       assert.equal(row.authMode,fixtureMode,'Ordinary page retained the installed auth fixture: '+name);
@@ -343,8 +343,19 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     await bounded(mobileYesMotion?target.tap(clickOptions):target.click(clickOptions),name+' / '+description);
     if(expect)await waitFor(expect,control==='async-pending'||control==='async-predicate-false'?2500:12000,'outcome '+description);
     else assert.fail('Every button step requires an independent expected outcome: '+description);
+    if(name==='ordinary two distinct scanner decisions'){
+     assert.ok(report.inFlightRepeat,'The two-input source observation belongs to the existing ordinary repeat');
+     report.inFlightRepeat.currentObservation=await bounded(evalPage(()=>{
+      const candidates=document.querySelectorAll('#scan .card.cand .title'),benchmarks=document.querySelectorAll('#scan .card.bench .title'),buttons=document.querySelectorAll('#scan [data-act="yes"]'),candidate=candidates[0],benchmark=benchmarks[0],yes=buttons[0],c=candidate?.getBoundingClientRect(),b=benchmark?.getBoundingClientRect(),y=yes?.getBoundingClientRect();
+      const afterCurrent=JSON.stringify(state);
+      return{afterCurrent,targetAcknowledgement:{documentId:window.__installedFixture.documentId,observedAtMs:performance.timeOrigin+performance.now(),
+       candidate:{count:candidates.length,text:candidate?.textContent.trim()??null,connected:candidate?.isConnected??false,visible:!!(c?.width&&c?.height)&&getComputedStyle(candidate).visibility!=='hidden'},
+       benchmark:{count:benchmarks.length,text:benchmark?.textContent.trim()??null,connected:benchmark?.isConnected??false,visible:!!(b?.width&&b?.height)&&getComputedStyle(benchmark).visibility!=='hidden'},
+       yes:{count:buttons.length,candidate:yes?.dataset.candidate??null,benchmark:yes?.dataset.benchmark??null,connected:yes?.isConnected??false,disabled:yes?.disabled??null,visible:!!(y?.width&&y?.height)&&getComputedStyle(yes).visibility!=='hidden'}}};
+     }),'ordinary distinct complete current and useful visible DOM observation');
+    }
     await bounded(evalPage(()=>new Promise(resolve=>requestAnimationFrame(()=>resolve(true)))),'frame '+description);
-    await new Promise(resolve=>setTimeout(resolve,30));check();
+    if(name!=='ordinary two distinct scanner decisions')await new Promise(resolve=>setTimeout(resolve,30));check();
     const heartbeat=await bounded(evalPage(()=>({...window.__buttonHeartbeat})),'continuous heartbeat');
     report.samples??=[];report.samples.push({scenario:name,action,elapsedMs:Date.now()-started,maxFrameGapMs:heartbeat.maxGapMs,preInputMaxFrameGapMs:heartbeat.preInputMaxGapMs,inputMaxFrameGapMs:heartbeat.inputMaxGapMs,firstTrustedInputAt:heartbeat.inputAt===null?null:heartbeat.timeOrigin+heartbeat.inputAt,eventToFirstFrameMs:heartbeat.firstFrameAfterClickMs});
     // Preserve the complete-step threshold. Separate phases explain a cold or
@@ -553,7 +564,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
      assert.equal(clicks.length,1,'One trusted matching click per ordinary repeat attempt: '+name);
      const click=clicks[0];assert.equal(click.scenario,name);assert.equal(click.action,actionFamily);assert.equal(click.trusted,true);
      assert.ok(Number.isFinite(click.at)&&click.at>=press.at,'Native click follows its trusted press: '+name);
-     attempts.push({receiptId:name+':'+randomUUID(),actionFamily,trusted:true,result:'accepted',receiptAtMs:press.at});
+     if(name==='ordinary two distinct scanner decisions')assert.ok(report.inFlightRepeat.currentObservation,'Complete in-memory current/target observation required after each accepted input');
+     attempts.push({receiptId:name+':'+randomUUID(),actionFamily,trusted:true,result:'accepted',receiptAtMs:press.at,...(name==='ordinary two distinct scanner decisions'?report.inFlightRepeat.currentObservation:{})});
+     if(name==='ordinary two distinct scanner decisions')delete report.inFlightRepeat.currentObservation;
      if(topLayerProbe&&index===0){
       // Move only the real rendered preset into the intended opener's current
       // coordinate. No app state, handler, source or synthetic click is changed.
@@ -566,8 +579,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
       assert.ok(snapshot,'The completed native Undo input must retain its complete board phase');
       snapshot.currentHash=digest(snapshot.current);recordOrdinaryUndoPhase('U'+(index+1),snapshot);
      }
-     save();
+     if(name!=='ordinary two distinct scanner decisions')save();
     }
+    if(name==='ordinary two distinct scanner decisions')save();
     return attempts;
    };
    const recordRepeatOutcome=(caseName,attempts,evidence)=>{
@@ -611,20 +625,20 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
      const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinarySceneChoicePhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
     }
     if(name==='ordinary two distinct scanner decisions'){
-     assert.equal(selectedProfile,'ordinary');const order=['seed','accepted-two','final-source'];report.ordinaryDistinctDecisionPhases??=[];assert.equal(phase,order[report.ordinaryDistinctDecisionPhases.length],'Retain every complete distinct-decision source phase once in order');
+     assert.equal(selectedProfile,'ordinary');const order=['seed','accepted-two','reopened','final-source'];report.ordinaryDistinctDecisionPhases??=[];assert.equal(phase,order[report.ordinaryDistinctDecisionPhases.length],'Retain every complete distinct-decision source phase once in order');
      const file='ordinary-distinct-decision-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
      const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryDistinctDecisionPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
     }
     if(name==='ordinary repeated saved decision choice'){
-     assert.equal(selectedProfile,'ordinary');const order=['seed','settings','baseline-saved','settings-review','read-refused','reviewed','selected','repeated','write-refused','reviewed-retry','selected-retry','applied','final-source'];report.ordinarySavedDecisionPhases??=[];assert.equal(phase,order[report.ordinarySavedDecisionPhases.length],'Retain every complete saved-decision source phase once in order');
+     assert.equal(selectedProfile,'ordinary');const cancelOrder=['cancel-selected','cancel-closed','cancel-reopened'],isCancel=cancelOrder.includes(phase),order=isCancel?cancelOrder:['seed','settings','baseline-saved','settings-review','read-refused','reviewed','selected','repeated','write-refused','reviewed-retry','selected-retry','applied','final-source'];const references=isCancel?(report.ordinarySavedDecisionCancelPhases??=[]):(report.ordinarySavedDecisionPhases??=[]);assert.equal(phase,order[references.length],'Retain every complete saved-decision source phase once in order');
      const file='ordinary-saved-decision-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
-     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinarySavedDecisionPhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});references.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
     }
     if(name==='ordinary repeated cloud source choice'){
-     assert.equal(selectedProfile,'ordinary');const order=['seed','menu','read-refused','reviewed','selected','repeated','keyboard','alternate','write-refused','final-source'];report.ordinaryCloudSourcePhases??=[];assert.equal(phase,order[report.ordinaryCloudSourcePhases.length],'Retain every complete cloud-choice source phase once in order');
+     assert.equal(selectedProfile,'ordinary');const cancelOrder=['cancel-selected','cancel-closed','cancel-reopened'],isCancel=cancelOrder.includes(phase),order=isCancel?cancelOrder:['seed','menu','read-refused','reviewed','selected','repeated','keyboard','alternate','write-refused','final-source'];const references=isCancel?(report.ordinaryCloudSourceCancelPhases??=[]):(report.ordinaryCloudSourcePhases??=[]);assert.equal(phase,order[references.length],'Retain every complete cloud-choice source phase once in order');
      const file='ordinary-cloud-source-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
      // Same external source writer: retain the full lossless actual read before assertions.
-     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinaryCloudSourcePhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+     const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});references.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
     }
     if(name==='ordinary final WOOP repeated Next retains answers'){
      assert.equal(selectedProfile,'ordinary');const order=['seed','opened','outcome-filled','outcome-repeated','obstacle-filled','obstacle-repeated','plan-filled','saved','reopened','deleted','deleted-reopened','final-source'];report.ordinaryFinalWoopPhases??=[];
@@ -643,6 +657,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
       currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();
    };
    const reopenOrdinaryWoop=async()=>{
+    if(name==='ordinary two distinct scanner decisions'){
+     assert.equal(selectedProfile,'ordinary');const before=await page.evaluate(()=>window.__installedFixture.documentId);assert.equal(allowedNavigation,null);allowedNavigation={url:page.url(),remaining:1,action:'ordinary-distinct-decisions-browser-reopen'};
+     await page.reload({waitUntil:'domcontentloaded'});await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready'),12000,'Actual browser reopen of both saved independent scanner decisions');
+     assert.equal(allowedNavigation.remaining,0,'Exactly one same-route distinct-decision browser reopen');allowedNavigation=null;check();return;
+    }
     if(name==='ordinary scene choice survives reopen and task Undo'){
      assert.equal(selectedProfile,'ordinary');const before=await page.evaluate(()=>window.__installedFixture.documentId);assert.equal(allowedNavigation,null);allowedNavigation={url:page.url(),remaining:1,action:'ordinary-scene-browser-reopen'};
      await page.reload({waitUntil:'domcontentloaded'});await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready&&typeof window.applySyncedSceneTime==="function"'),12000,'Actual browser reopen of saved independent scene');

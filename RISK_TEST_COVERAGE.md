@@ -2443,10 +2443,12 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
   - Sole-active ordinary64 final WOOP, four trusted repeated Next receipts, actual answer/Save/Delete controls, complete lossless source and real-time/lifecycle preservation through two browser reopens. Runner-enforcement RED pending under1050; no app-regression claim.
 
 - RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources
+  - Current1631/1663 definition and actual1664 whole coverage RED retain both engines, the original10 full phases plus exact separate selected/closed/reopened3, real trusted footer Cancel/Sync/review and unselected reset, complete held authority/typed/source/account/current/durable protection and all original focus/Enter/alternate/refused Apply tails.Actual1634 whole both-engine GREEN8103f4a6 passed6/6 with58 full raw phases and complete source/receipt/refusal/ACK/cleanup verification; historical definition labels above remain original chronology.
   - Ordinary held64 source choices retain mounted full facts/focus/scroll through two trusted repeats and Enter; alternate selection/read refusal/explicit refused publication preserve complete current/durable/remote/typed/pending/protected sources and declared added-copy lifecycle. Definition-only RED pending1054.
   - CF02 #1284 independently requires full trusted focus-event/node/receipt boundaries in all10 lossless phases, application received-focus continuity and actual Enter; read-only observation RED pending1285. Existing whole source/lifecycle/exit/cleanup assertions retained.
 
 - RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources
+  - Current1631/1663 definition and actual1664 whole coverage RED retain both engines, strict raw bootstrap/canonical setup, original13 full phases plus exact separate selected/closed/reopened3, actual footer Close/Settings/disclosure/review reset with no decision authority, whole typed/current/durable/remote/pending/account/revision protection and every original Light-only repeat/refusal/retry/ACK tail.Actual1634 whole both-engine GREEN8103f4a6 passed6/6 with58 full raw phases and complete source/receipt/refusal/ACK/cleanup verification; historical definition labels above remain original chronology.
   - Ordinary held64 Light selections retain the mounted review and exact complete current/durable/cloud/manual/protected/typed/pending sources. Explicit refused Apply retains prepared consent; explicit retry confirms only its new decision. Definition-only1057; actual runner RED1058 still unrun.
 
 - RISK saved decision review guidance: mounted FAQ retains place and explicit save authority
@@ -2497,3 +2499,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 | Canonical Timeline raw storage, exact derived PNG/logical bounds and truthful failed controller custody | `RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes`; `RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness`; `RISK repository process: failed Timeline controller finalizes available custody before browser close`; `RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup` |
 
 - RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending
+
+| Complete bounded public Git diff collection and specific rationale, coverage, ref and child-error refusals | `RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals` |

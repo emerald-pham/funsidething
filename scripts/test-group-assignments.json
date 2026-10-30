@@ -13725,7 +13725,12 @@
       "root": "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
       "group": "native-process",
       "file": "tests.js"
-    }
+    },
+{
+  "root": "RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals",
+  "group": "native-process",
+  "file": "tests.js"
+}
   ],
   "processControls": [
     {
