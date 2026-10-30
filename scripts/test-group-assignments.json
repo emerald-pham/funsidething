@@ -13760,6 +13760,26 @@
       "root": "RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary deliberate Reload preserves complete saved sources and account authority",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: external browser termination retains lifecycle classification without app crash credit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: external disconnect classification rejects an omitted lifecycle listener",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

@@ -2503,3 +2503,11 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 | Original legacy Worked-hours8 and independent live/durable v2 numeric16, strict full ordinary/raw/typed boundaries | `RISK repository process: ordinary startup settings distinguish legacy raw8 from independently versioned live and durable16` |
 
 | Complete bounded public Git diff collection and specific rationale, coverage, ref and child-error refusals | `RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals` |
+
+- RISK repository process: ordinary deliberate Reload preserves complete saved sources and account authority
+
+- RISK repository process: external browser termination retains lifecycle classification without app crash credit
+
+- RISK repository process: external disconnect classification rejects an omitted lifecycle listener
+
+- RISK repository process: opening frame gaps refuse native input before reset and retain missing input status
