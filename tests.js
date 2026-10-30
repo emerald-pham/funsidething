@@ -16260,7 +16260,46 @@ test('RISK saved view opening source preservation: invalid optional appearance k
  });
 });
 
-test('RISK saved view held Export: terminal Settings preserves an exact partial source-only archive',async t=>{
+async function nativeTransferSettingsRoutes297(t,view,browserEngine,held){
+ const page=view.page,label=held?'held':'healthy',output=process.env.CHAIN_NATIVE_OUTPUT;
+ assert.ok(output&&path.isAbsolute(output),'the native Settings route retains actual rendered evidence');
+ const data=page.getByText('Data and backups',{exact:true}).locator('..'),recovery=page.getByText('Recovery and cleanup',{exact:true}).locator('..');
+ const ensureData=async()=>{if(!await data.evaluate(element=>element.open))await data.locator('summary').click();};
+ await ensureData();
+ for(const action of ['import-backup','export-backup']){const button=data.locator('[data-act="'+action+'"]');assert.equal(await button.count(),1);assert.equal(await button.isVisible(),true);assert.equal(await button.isEnabled(),true);}
+ assert.deepEqual(await data.locator('#backupRestoreSource option').evaluateAll(options=>options.map(option=>option.value)),['file','paste']);
+ assert.equal(await data.locator('[data-act="make-manual-backup"]').isEnabled(),!held,'manual saving reflects actual accepted-board capability');
+ if(!held){assert.ok(await data.locator('.backup-row [data-act="restore-local-backup"]:enabled').count()>0,'existing saved backups remain reachable');assert.ok(await data.locator('.backup-row [data-act="delete-local-backup"]:enabled').count()>0);}
+ assert.equal(await data.locator('[data-act="review-decision-recovery"],[data-act="wipe"],[data-act="view-support-diagnostics"],#syncErrorLog').count(),0);
+ if(!await recovery.evaluate(element=>element.open))await recovery.locator('summary').click();
+ for(const action of ['review-decision-recovery','wipe','view-support-diagnostics']){const button=recovery.locator('[data-act="'+action+'"]');assert.equal(await button.count(),1);assert.equal(await button.isVisible(),true);assert.equal(await button.isEnabled(),action==='view-support-diagnostics'||!held);}
+ assert.equal(await recovery.locator('#syncErrorLog').count(),1);
+ const scanning=page.getByText('Scanning and recurrence',{exact:true}).locator('..');
+ assert.equal(await scanning.locator('[data-act="install-app"]').count(),1,'the existing separate app-install control remains outside board transfers');
+ assert.equal(await scanning.locator('[data-act="install-app"]').isEnabled(),!held);
+ assert.equal(await data.locator('[data-act="install-app"]').count(),0);
+ assert.equal(await page.locator('#modalRoot textarea').count(),0,'Settings never mounts a full raw backup editor');
+ const surface=await page.evaluate(()=>{const modal=document.querySelector('#modalRoot .modal');return{held:openingRecoveryHeld,accepted:liveBoardAccepted,sections:[...document.querySelectorAll('#modalRoot details.settings-section')].map(section=>({name:section.querySelector('summary').textContent,actions:[...section.querySelectorAll('[data-act]')].map(button=>({action:button.dataset.act,disabled:button.disabled}))})),width:modal.getBoundingClientRect().width,clientWidth:modal.clientWidth,scrollWidth:modal.scrollWidth,viewport:innerWidth,htmlLength:modal.innerHTML.length};});
+ assert.equal(surface.held,held);assert.equal(surface.accepted,!held);assert.ok(surface.width<=surface.viewport&&surface.scrollWidth<=surface.clientWidth+1,'the real narrow Settings pane remains bounded');
+ fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'settings-'+browserEngine+'-'+label+'.png')});
+ await recovery.locator('[data-act="view-support-diagnostics"]').click();
+ assert.equal(await page.getByRole('heading',{name:'Debug log',exact:true}).isVisible(),true,'the separate real Debug route opens');
+ await page.locator('#modalRoot [data-act="return-support-diagnostics"]').click();await ensureData();
+ await data.locator('#backupRestoreSource').selectOption('file');
+ const [chooser]=await Promise.all([page.waitForEvent('filechooser',{timeout:10000}),data.locator('[data-act="import-backup"]').click()]);
+ assert.equal(chooser.isMultiple(),false,'the actual File route opens its single-source chooser');await chooser.setFiles([]);
+ await data.locator('#backupRestoreSource').selectOption('paste');await data.locator('[data-act="import-backup"]').click();
+ const draft='Unfinished native Import draft '+browserEngine+' '+label;
+ await page.locator('#jsonBox').fill(draft);assert.equal(await page.locator('#jsonBox').inputValue(),draft);
+ await page.locator('#modalRoot [data-act="close-paste-recovery"]').first().click();await ensureData();
+ assert.equal(await page.evaluate(()=>pasteDraftBuffer?.raw),draft,'the actual Paste Close preserves the complete unfinished draft');
+ assert.equal(await page.locator('#modalRoot textarea').count(),0);
+ const evidence={browserEngine,label,surface,fileChooser:true,syntheticClipboard:false,pasteDraft:draft,appBackupUpdate:'No explicit Settings app-backup/update buttons exist in d697; install-app remains in Scanning/recurrence and unchanged service-worker update logic remains automatic.'};
+ fs.writeFileSync(path.join(output,'settings-'+browserEngine+'-'+label+'.json'),JSON.stringify(evidence,null,2)+'\n');t.diagnostic('Actual native Settings routes: '+JSON.stringify(evidence));
+ return draft;
+}
+
+test('RISK saved view held Export: terminal Settings preserves an exact partial source-only archive',async t => {
  await openingBoardFixture(t);
  for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
  const backupPayload='{"futureHeldExportSource":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'held-export-source-backup',day:'2026-10-28',at:1,kind:'manual',payload:backupPayload};
@@ -16268,12 +16307,15 @@ test('RISK saved view held Export: terminal Settings preserves an exact partial 
  const opaqueKey='held-export-opaque-source',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',19]}};
  const heldExportSources={backupPayload,backup,pendingOwner,pending,opaqueKey,opaqueValue};
  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,brokenDeviceBoard:true,retainAppearance:true,oneTask:true,readFailures:2,syntheticCloud:true,holdConfiguredFirebaseImports:true,topOfPage:true,heldExportSources});
+ let traceStarted=false;
  try{
   await view.waitForFirebaseImports();view.releaseHeldFirebaseImports();
   await view.page.waitForFunction(()=>window.SavedAppearance?.recoveryHeld===true,null,{timeout:6000});
   const seeded=view.startup.heldExportSources;
   await view.page.locator('[data-saved-preview] [data-act="settings"]').click();
   await view.page.getByText('Data and backups',{exact:true}).click();
+  await view.context.tracing.start({screenshots:true,snapshots:true,sources:true});traceStarted=true;
+  const retainedDraft=await nativeTransferSettingsRoutes297(t,view,browserEngine,true);
   const sourceKeys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2'];
   await view.page.evaluate(keys=>{
    window.__heldExportSourceWrites=[];window.__heldExportDeviceWrites=[];window.__heldExportCloudPushes=0;
@@ -16380,8 +16422,9 @@ test('RISK saved view held Export: terminal Settings preserves an exact partial 
   assert.equal(after.recoveryHeld,true,'closing Export keeps the terminal recovery hold active');assert.equal(after.scanTimer,null);assert.equal(after.saveTimer,null);
   assert.deepEqual(after.cloud,before.cloud,'Export does not upload, replay pending work, or change account/revision acknowledgement authority');
   assert.deepEqual(after.sourceWrites,[],'the public Export flow makes no app-owned localStorage set/remove/clear');assert.deepEqual(after.deviceWrites,[],'no native write transaction is attempted against the original device database');
+  assert.equal(await view.page.evaluate(()=>pasteDraftBuffer?.raw),retainedDraft,'held Export preserves the separate unfinished Import draft');
   assert.deepEqual(view.errors,[]);
- }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+ }finally{view.releaseHeldFirebaseImports();try{if(traceStarted)await view.context.tracing.stop({path:path.join(process.env.CHAIN_NATIVE_OUTPUT,'held-settings-'+browserEngine+'.zip')});}finally{await view.browser.close();}}
  });
 });
 
@@ -16715,15 +16758,21 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
  });
 });
 
-test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources',async t=>{
+test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources',async t => {
  await openingBoardFixture(t);
+ const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs'),{isDeepStrictEqual}=await import('node:util');
  for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
   const backupPayload='{"futureNativeDownloadBackup":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'native-download-proof-backup',day:'2026-10-29',at:1793275200000,kind:'manual',payload:backupPayload};
   const pendingOwner='native-download-proof-owner@example.test',pending={generationId:'native-download-proof-pending',payloadHash:'b'.repeat(64),baseRev:9,updatedAt:1793275200000,futurePendingField:{retain:'unknown pending metadata'}};
-  const opaqueKey='native-download-proof-opaque',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',23]}};
+  const opaqueKey='native-download-proof-opaque',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',23]},futureTyped:{negativeZero:-0,notANumber:NaN,unknown:undefined}};
   const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,fixedTime:'2026-10-29T12:00:00Z',topOfPage:true});
+  let traceStarted=false;
   try{
    await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.__actualLocalRead?.settled&&liveBoardAccepted&&window.ScannerDeviceStore&&deviceStorageAuthority&&!openingRecoveryHeld,null,{timeout:30000});
+   await view.context.tracing.start({screenshots:true,snapshots:true,sources:true});traceStarted=true;
+   await view.page.locator('#appHeader [data-act="settings"]').first().click();await view.page.getByText('Data and backups',{exact:true}).click();
+   const retainedDraft=await nativeTransferSettingsRoutes297(t,view,browserEngine,false);
+   await view.page.locator('#modalRoot .mtop [data-act="close-modal"]').click();
    const seeded=await view.page.evaluate(async fixture=>{
     const store=window.ScannerDeviceStore;
     if(!liveBoardAccepted||!store||!deviceStorageAuthority)throw Error('The healthy signed-out fixture must begin from an accepted board with readable device authority');
@@ -16780,7 +16829,7 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    await view.page.getByText('Data and backups',{exact:true}).click();
    const exportControl=view.page.locator('#modalRoot [data-act="export-backup"]');
    assert.equal(await exportControl.count(),1);assert.equal(await exportControl.isEnabled(),true);
-   const beforeExport=await view.page.evaluate(()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,deviceHeadHash};});
+   const beforeExport=await view.page.evaluate(()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,deviceHeadHash,debugLog:JSON.parse(supportDiagnosticsText({readOnly:true}))};});
    assert.deepEqual(beforeExport.board,acceptedUnsaved.board,'the whole independently captured accepted input stays exact before Export');assert.equal(beforeExport.savePending,true,'the normal save producer is still pending at Export');assert.equal(beforeExport.deviceHeadHash,seeded.baselineHead.hash);
    await exportControl.click();await view.page.waitForSelector('#exportTransferDialog',{timeout:10000});
    assert.equal(await view.page.getByText(/Complete recovery archive captured\. Saved sources were not changed\./).isVisible(),true,'all accepted and readable sources form a complete archive');
@@ -16805,6 +16854,14 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
     return[name,{keys:rows.map(row=>decodeManualArchiveTypedValue(row.key)),values:rows.map(row=>decodeManualArchiveTypedValue(row.value))}];
    }))};
    assert.deepEqual(decodedSnapshot,seeded.rawSources,'the complete archive independently preserves every exact durable meta, snapshot, backup, pending and opaque row');
+   const decodedArchive=value=>({...value,appSources:{...value.appSources,indexedDB:{...value.appSources.indexedDB,
+    stores:Object.fromEntries(Object.entries(value.appSources.indexedDB.stores).map(([name,rows])=>[name,{keys:rows.map(row=>decodeManualArchiveTypedValue(row.key)),values:rows.map(row=>decodeManualArchiveTypedValue(row.value))}]))}}});
+   const expectedArchive={format:'chain-scanner.recovery-archive',formatVersion:1,capturedAt:'2026-10-29T12:00:00.000Z',currentBoard:acceptedUnsaved.board,
+    manifest:{status:'complete',consistency:'single-readonly-idb-transaction-and-unchanged-live-sources',sources:{currentBoard:{status:'included',format:'existing-board-json'},
+     localStorage:Object.fromEntries(seeded.localSources.map(row=>[row.key,{status:row.status==='present'?'included':row.status,...(row.reason?{reason:row.reason}:{})}])),
+     indexedDB:{database:seeded.database,schemaVersion:2,stores:Object.fromEntries(['meta','snapshots','backups','opaque'].map(name=>[name,{status:'included',rowCount:seeded.rawSources.stores[name].keys.length}]))}},failures:[]},
+    appSources:{localStorage:seeded.localSources,indexedDB:{database:seeded.database,stores:seeded.rawSources.stores}},repairInfo:{version:1,debugLog:beforeExport.debugLog}};
+   assert.deepEqual(decodedArchive(archive),expectedArchive,'the entire decoded archive matches the independently captured full board, raw sources, metadata report and literal manifest');
    const durableHead=decodedSnapshot.stores.meta.values[decodedSnapshot.stores.meta.keys.indexOf('head')];
    const {payload:durablePayload,...durableMetadata}=seeded.baselineHead;
    assert.deepEqual(durableHead,durableMetadata,'the archive retains the exact accepted-board durable head metadata captured before the user edit');
@@ -16849,13 +16906,89 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Download started\. The archive contains the exact prepared export\./,'the app status reports initiation while the native event/file readback separately proves completion');
    assert.equal(await view.page.locator('#exportTransferDialog a[download="chain-scanner-recovery-archive.json"]').count(),0,'the temporary anchor is removed after successful initiation');
    t.diagnostic('Actual complete native Download artifact: '+JSON.stringify({browserEngine,file,suggestedFilename:download.suggestedFilename(),failure:await download.failure(),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),preparedSerial:serial,downloads,acceptedUnsavedTitle:acceptedUnsaved.title,durableTitle:durableTask.title,durableHash:durableHead.hash,currentBoardSha256:createHash('sha256').update(JSON.stringify(acceptedUnsaved.board)).digest('hex')}));
+   // The original accepted edit may now finish its normal debounce save. Let
+   // that actual producer settle before comparing each later refusal boundary;
+   // the originally prepared archive/serial must remain the same throughout.
+   const captureCurrent=()=>view.page.evaluate(async()=>{
+    const observeProducer=()=>({state:JSON.stringify(state),draft:pasteDraftBuffer?.raw,savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,
+     authority:{accepted:liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,deviceHeadHash,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,revision:state.syncRev??null,user:window.CloudSync?.user??null}});
+    const before=observeProducer(),head=await ScannerDeviceStore.readHead(),rawSources=await ScannerDeviceStore.readRawExportSnapshot();
+    const sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
+    const keys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())],localSources=keys.map(key=>({key,raw:localStorage.getItem(key)})),after=observeProducer();
+    return{state:after.state,head,rawSources,localSources,draft:after.draft,authority:after.authority,producer:{before,after}};
+   });
+   const currentBeforeRefusal=await waitForTruthyProbe(async()=>{
+    const current=await captureCurrent(),{before,after}=current.producer;
+    if(before.savePending||after.savePending||before.activePersistCalls!==0||after.activePersistCalls!==0||!isDeepStrictEqual(before,after))return false;
+    if(!current.head||current.head.payload!==current.state||current.head.hash!==current.authority.deviceHeadHash||current.head.account!==seeded.baselineHead.account)return false;
+    if(createHash('sha256').update(current.head.payload).digest('hex')!==current.head.hash)return false;
+    const expectedAuthority={accepted:true,deviceStorageAuthority:true,deviceStorageRequired:seeded.authority.deviceStorageRequired,deviceHeadHash:current.head.hash,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,revision:seeded.authority.revision,user:null};
+    return isDeepStrictEqual(current.authority,expectedAuthority)&&current.draft===retainedDraft?current:false;
+   },{timeoutMs:10000}),{serialize}=await import('node:v8');
+   assert.deepEqual(currentBeforeRefusal.producer.before,currentBeforeRefusal.producer.after,'the full awaited source read spans a completed producer with unchanged complete state, draft and source authority');
+   assert.equal(currentBeforeRefusal.producer.before.savePending,false);assert.equal(currentBeforeRefusal.producer.after.savePending,false);
+   assert.equal(currentBeforeRefusal.producer.before.activePersistCalls,0);assert.equal(currentBeforeRefusal.producer.after.activePersistCalls,0);
+   assert.equal(currentBeforeRefusal.head.payload,currentBeforeRefusal.state,'the full current board is exactly the normally committed payload');
+   assert.equal(createHash('sha256').update(currentBeforeRefusal.head.payload).digest('hex'),currentBeforeRefusal.authority.deviceHeadHash);
+   const {payload:settledPayload,...settledMetadata}=currentBeforeRefusal.head,settledSources=currentBeforeRefusal.rawSources.stores;
+   assert.deepEqual(settledSources.meta.values[settledSources.meta.keys.indexOf('head')],settledMetadata,'the post-save full raw head agrees with the public payload and authority');
+   assert.deepEqual(settledSources.snapshots.values[settledSources.snapshots.keys.indexOf(currentBeforeRefusal.head.hash)],{hash:currentBeforeRefusal.head.hash,payload:settledPayload});
+   assert.deepEqual(settledSources.meta.values[settledSources.meta.keys.indexOf('pending:'+pendingOwner)],{...pending,account:pendingOwner},'normal save retains the entire independently declared pending owner, revision and unknown metadata');
+   assert.deepEqual(settledSources.backups.values.find(row=>row.id===backup.id),{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
+   assert.equal(settledSources.snapshots.values.find(row=>row.hash===backupHash)?.payload,backupPayload,'normal save keeps the exact manual recovery payload');
+   assert.deepEqual(settledSources.opaque.values[settledSources.opaque.keys.indexOf(opaqueKey)],opaqueValue,'normal save retains the entire independent typed opaque source including negative zero, NaN and own undefined');
+   assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial},'normal persistence leaves the original prepared archive instance exact');
+   const durableAfterSave=JSON.parse(currentBeforeRefusal.head.payload);for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete durableAfterSave[key];
+   assert.deepEqual(durableAfterSave,acceptedUnsaved.board,'the normal save catches up with the independently accepted edit');assert.equal(currentBeforeRefusal.draft,retainedDraft);
+   const expectedFile=path.join(directory,'independent-expected-archive.v8'),sourceFile=path.join(directory,'current-sources-before-refusal.v8');
+   fs.writeFileSync(expectedFile,serialize(expectedArchive));fs.writeFileSync(sourceFile,serialize(currentBeforeRefusal));
+   // Only status text changes between these finished transfer actions. Compare
+   // the actual mounted markup with its earlier prepared form, not a size budget.
+   const preparedTransferMarkup=await view.page.locator('#exportTransferDialog').evaluate(element=>{const copy=element.cloneNode(true);copy.querySelector('#exportTransferStatus').textContent='';return copy.innerHTML;});
+   const assertExportBounded=async label=>{
+    const surface=await view.page.evaluate(()=>{
+     const dialog=document.getElementById('exportTransferDialog'),modal=dialog.closest('.modal'),measure=element=>{const rect=element.getBoundingClientRect();return{left:rect.left,right:rect.right,width:rect.width,clientWidth:element.clientWidth,scrollWidth:element.scrollWidth};},copy=dialog.cloneNode(true);
+     copy.querySelector('#exportTransferStatus').textContent='';
+     return{viewport:innerWidth,modal:measure(modal),dialog:measure(dialog),textareas:dialog.querySelectorAll('textarea').length,editors:dialog.querySelectorAll('input,[contenteditable]').length,rawRendered:dialog.textContent.includes(exportTransferPayload),markup:copy.innerHTML};
+    });
+    fs.writeFileSync(path.join(directory,label+'-surface.json'),JSON.stringify(surface,null,2)+'\n');await view.page.screenshot({path:path.join(directory,label+'.png')});
+    for(const [name,box] of Object.entries({modal:surface.modal,dialog:surface.dialog}))assert.ok(box.width>0&&box.width<=surface.viewport&&box.left>=-1&&box.right<=surface.viewport+1&&box.scrollWidth<=box.clientWidth+1,label+' '+name+' stays inside the real narrow viewport without horizontal scrolling: '+JSON.stringify(box));
+    assert.equal(surface.textareas,0,label+' mounts no giant editable archive');assert.equal(surface.editors,0);assert.equal(surface.rawRendered,false,label+' keeps prepared raw bytes out of rendered text');
+    assert.equal(surface.markup,preparedTransferMarkup,label+' changes status only while retaining constant prepared Export markup');
+   };
+   await assertExportBounded('positive-download');
+   for(const clipboardOutcome of ['rejected','absent'])await t.test('refused Copy '+clipboardOutcome+' then full native Download',async sub=>{
+    const beforeCount=downloads;
+    await view.page.evaluate(mode=>{window.__nativeRefusedCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:mode==='absent'?undefined:{async writeText(value){window.__nativeRefusedCopyRequests.push(value);throw new DOMException('Isolated clipboard refusal','NotAllowedError');}}});},clipboardOutcome);
+    await copyControl.click();
+    const status=clipboardOutcome==='rejected'?'Clipboard access failed. Download remains available for this prepared archive.':'Clipboard is unavailable. Download the same prepared archive instead.';
+    await view.page.waitForFunction(expected=>exportTransferBusy===false&&document.getElementById('exportTransferStatus')?.textContent===expected,status,{timeout:10000});
+    assert.equal(await view.page.locator('#exportTransferStatus').innerText(),status,'the actual Copy reports the correct external failure');
+    assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial},'refused Copy retains the exact same prepared archive instance');
+    assert.deepEqual(await view.page.evaluate(()=>window.__nativeRefusedCopyRequests),clipboardOutcome==='rejected'?[raw]:[]);
+    assert.equal(downloads,beforeCount,'refused Copy starts no file');assert.equal(await copyControl.isEnabled(),true);assert.equal(await downloadControl.isEnabled(),true);
+    assert.equal(await view.page.locator('#exportTransferDialog textarea').count(),0);assert.deepEqual(await captureCurrent(),currentBeforeRefusal,'refused Copy preserves every full current, typed source, draft and authority value');
+    await assertExportBounded(clipboardOutcome+'-copy');
+    const [saved]=await Promise.all([view.page.waitForEvent('download',{timeout:15000}),downloadControl.click()]);
+    const savedFile=path.join(directory,clipboardOutcome+'-'+saved.suggestedFilename());await saved.saveAs(savedFile);assert.equal(await saved.failure(),null);assert.equal(saved.suggestedFilename(),'chain-scanner-recovery-archive.json');
+    const savedBytes=fs.readFileSync(savedFile);assert.deepEqual(savedBytes,Buffer.from(raw,'utf8'),'Download after refusal retains every prepared UTF8 byte');
+    assert.deepEqual(decodedArchive(JSON.parse(savedBytes.toString('utf8'))),expectedArchive,'the full file after refusal equals the independent complete archive expectation');
+    assert.equal(downloads,beforeCount+1);assert.deepEqual(await captureCurrent(),currentBeforeRefusal,'Download after refusal preserves all current sources, pending/opaque/typed values and the unfinished draft');
+    assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial});
+    assert.equal(await view.page.locator('#exportTransferDialog textarea').count(),0);assert.equal(await view.page.locator('#exportTransferDialog a[download]').count(),0);
+    assert.equal(await view.page.locator('#exportTransferStatus').innerText(),'Download started. The archive contains the exact prepared export.','each later real Download truthfully reports initiation');
+    assert.equal(await copyControl.isEnabled(),true);assert.equal(await downloadControl.isEnabled(),true,'each later real Download leaves both independent transfer controls enabled');
+    await assertExportBounded(clipboardOutcome+'-download');
+    sub.diagnostic('Actual refused-Copy Download: '+JSON.stringify({browserEngine,clipboardOutcome,status,file:savedFile,bytes:savedBytes.length,sha256:createHash('sha256').update(savedBytes).digest('hex'),serial,downloads,expectedFile,sourceFile,limits:'External rejected/absent clipboard controls; no OS clipboard permission/write claim.'}));
+   });
    await view.page.locator('#exportTransferDialog [data-act="close-modal"]').click();
    await view.page.waitForFunction(()=>!document.getElementById('exportTransferDialog'));
    assert.deepEqual(await view.page.evaluate(()=>({accepted:liveBoardAccepted,authority:deviceStorageAuthority,required:deviceStorageRequired,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,user:window.CloudSync?.user??null,transfer:exportTransferPayload,serial:exportCaptureSerial})),
     {accepted:true,authority:true,required:seeded.authority.deviceStorageRequired,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,user:null,transfer:null,serial:serial+1},'closing Export invalidates only the prepared transfer and preserves accepted source authority');
-   assert.equal(downloads,1,'Copy and closing Export start no extra native download');
+   assert.deepEqual(await captureCurrent(),currentBeforeRefusal,'Close preserves all settled board, raw sources, typed values, pending work, unfinished draft and source authority');
+   assert.equal(downloads,3,'Copy and closing Export start no extra native download beyond the three deliberate positive/rejected/absent Download presses');
    assert.deepEqual(view.errors,[]);
-  }finally{await view.browser.close();}
+  }finally{try{if(traceStarted)await view.context.tracing.stop({path:path.join(process.env.CHAIN_NATIVE_OUTPUT,'complete-download-'+browserEngine+'.zip')});}finally{await view.browser.close();}}
  });
 });
 
@@ -48360,6 +48493,395 @@ test('RISK repository process: selected startup capture produces real bounded JP
  const capture=report.startupCapture;assert.ok(capture,'Selected startup operation must retain real bounded JPEG capture evidence');assert.equal(capture.provider,'playwright-public-screencast');assert.equal(capture.status,'captured');assert.equal(capture.startedBeforeNavigation,true);assert.ok(capture.frames.length>0&&capture.frames.length<=120);assert.equal(capture.counts.accepted,capture.frames.length);assert.equal(capture.clock.reportedTimestampBasis,'engine-or-Date.now-fallback-ambiguous');assert.equal(capture.clock.pageClockConversion,'unavailable');assert.equal(capture.bounds.maxDurationMs,12000);assert.equal(capture.bounds.maxTotalBytes,8388608);assert.equal(capture.bounds.maxFrameBytes,262144);assert.equal(capture.cleanup.stopped,true);assert.equal(capture.cleanup.timerCleared,true);assert.equal(capture.stopReason,'case-finished');
  let total=0;for(const frame of capture.frames){assert.match(frame.path,/^startup-frames\/frame-[0-9]{4}\.jpg$/);const bytes=fs.readFileSync(path.join(input.nativeOutput,frame.path));assert.equal(bytes.length,frame.bytes);assert.ok(bytes.length>0&&bytes.length<=262144);assert.equal(bytes.subarray(0,2).toString('hex'),'ffd8');assert.equal(bytes.subarray(-2).toString('hex'),'ffd9');assert.equal(createHash('sha256').update(bytes).digest('hex'),frame.sha256);assert.ok(Number.isFinite(frame.reportedTimestampMs)&&Number.isFinite(frame.hostReceiptEpochMs)&&Number.isFinite(frame.hostReceiptMonotonicMs));assert.ok(frame.hostReceiptMonotonicMs>=capture.startedHostMonotonicMs&&frame.hostReceiptMonotonicMs-capture.startedHostMonotonicMs<=12000);total+=bytes.length;}
  assert.equal(total,capture.totalBytes);assert.ok(total<=8388608);assert.equal(report.openingResult.savedHeadHash,input.fixtureSha256,'Accepted native action preserves exact durable board');assert.equal(report.startupTimeline.status,'incomplete');assert.equal(report.startupTimeline.observations.overlappingWorkIntervals.status,'unavailable');for(const key of ['firstBackgroundPaint','completeBoardPaint','firstVisibleResponse'])assert.equal(report.startupTimeline.observations[key].status,'unavailable','Supplemental frames do not fabricate exact painted timestamps');
+});
+
+test('RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries',{timeout:120000},async t=>{
+ const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb');
+ let sequence=0;
+ const quietCloud=()=>({configured:false,ready:false,user:null,status:'off'});
+ // Persisted data equality crosses the VM/IndexedDB realm boundary. Native
+ // structuredClone rehomes ordinary containers while retaining typed values,
+ // sparse keys, undefined, NaN and negative zero; JSON would discard them.
+ function assertDataEqual(actual,expected,message){assert.deepEqual(structuredClone(actual),structuredClone(expected),message);}
+ async function fixture(scope,label,appSource=null){
+  const indexedDB=new IDBFactory(),deviceDbName='transfer-proof-'+label+'-'+Date.now()+'-'+(++sequence);
+  const sharedStorage=sharedScannerStorage(),app=await loadBackupFileFixtureApp({...(appSource?{appSource}:{}),sharedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:quietCloud});
+  const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+  scope.after(async()=>{try{await store?.close?.();}catch{}try{await app.dispose();}catch{}});
+  ctx.addTask('Transfer proof original board',false);await prepareBackupFileFixtureSource(app);
+  const currentRaw=JSON.stringify(ctx.state),head=await store.readHead();
+  const priorRows=await store.listBackups();
+  const manual={id:'transfer-proof-manual-'+label,kind:'manual',day:'2026-10-28',at:1793180000000,payload:currentRaw,
+   futureTyped:{negativeZero:-0,notANumber:NaN,bytes:Uint8Array.of(0,127,128,255),unknown:undefined}};
+  assert.equal((await store.putBackup({expectedHash:head.hash,backup:manual})).ok,true,'the isolated fixture seeds an independent manual original');
+  const opaqueKey='transfer-proof-opaque-'+label,opaqueRaw='Opaque original <value> & 🌿 '+label;
+  assert.equal(await store.protectRecoverySource({expectedHash:head.hash,key:opaqueKey,raw:opaqueRaw}),true,'an independent opaque original is protected through the real store');
+  const pendingOwner='transfer-proof-pending@example.test';
+  const pending={generationId:'transfer-proof-pending-'+label,payloadHash:'b'.repeat(64),baseRev:7,updatedAt:1793180000001};
+  const pendingExpected={...pending,account:pendingOwner};
+  assert.equal((await store.setPendingUpload(pendingOwner,pending)).ok,true,'the isolated fixture seeds a separate pending-upload original');
+  assertDataEqual(await store.getPendingUpload(pendingOwner),pendingExpected,'the exact independent pending object is readable before transfer');
+  const originalRows=await store.listBackups();
+  assert.equal(originalRows.length,priorRows.length+1,'the explicit manual source is added alongside the fixture producer originals');
+  for(const original of priorRows)assertDataEqual(originalRows.find(row=>row.id===original.id),original,'every fixture producer original remains exact before transfer');
+  assertDataEqual(originalRows.find(row=>row.id===manual.id),manual,'the independent manual source retains every exact field and typed value before transfer');
+  const authority={liveBoardAccepted:true,deviceStorageAuthority:true,deviceStorageRequired:false,deviceHeadHash:head.hash};
+  assertDataEqual(readConst(ctx,'({liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,deviceHeadHash})'),authority,
+   'the accepted board is bound to its real isolated durable head before transfer');
+  const originalSnapshot=await store.readRawExportSnapshot();
+  assert.ok(originalSnapshot.stores.opaque.values.some(row=>row.key===opaqueKey&&row.raw===opaqueRaw),'the independent opaque bytes exist before transfer');
+  return {app,ctx,shim,store,indexedDB,deviceDbName,sharedStorage,currentRaw,head,manual,pendingOwner,pendingExpected,originalRows,originalSnapshot,authority,
+   protectedRows:new Map(originalRows.map(row=>[row.id,structuredClone(row)])),allowedPayloads:new Set([currentRaw])};
+ }
+ async function assertOriginalSources(f,store=f.store,{changedHead=false}={}){
+  const [rows,snapshot]=await Promise.all([store.listBackups(),store.readRawExportSnapshot()]);
+  for(const original of f.originalRows)assertDataEqual(rows.find(row=>row.id===original.id),original,'every complete original backup row retains all fields and typed values');
+  for(const original of f.protectedRows.values())assertDataEqual(rows.find(row=>row.id===original.id),original,'every previously verified incoming and before-restore row remains exact at this boundary');
+  for(const [name,source]of Object.entries(f.originalSnapshot.stores))for(const [i,key]of source.keys.entries()){
+   if(changedHead&&name==='meta'&&key==='head')continue;
+   const current=snapshot.stores[name],at=current.keys.findIndex(candidate=>Object.is(candidate,key));
+   assert.ok(at>=0,'the original '+name+' key remains present: '+String(key));
+   assertDataEqual(current.values[at],source.values[i],'the complete original '+name+' value remains exact: '+String(key));
+  }
+  return rows;
+ }
+ function assertProtected(f,expectedHead=f.head){
+  assert.equal(JSON.stringify(f.ctx.state),f.currentRaw,'the current accepted board remains byte-exact');
+  return Promise.all([
+   f.store.readHead().then(value=>assertDataEqual(value,expectedHead,'the exact durable head remains active')),
+   f.store.getPendingUpload(f.pendingOwner).then(value=>assertDataEqual(value,f.pendingExpected,'the independent pending upload remains exact')),
+   assertOriginalSources(f).then(()=>{
+    assertDataEqual(readConst(f.ctx,'({liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,deviceHeadHash})'),f.authority,
+     'device authority and its original head binding remain unchanged');
+   })
+  ]);
+ }
+ async function awaitFile(operation,label){
+  let timer;try{return await Promise.race([operation,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' did not settle within 8 seconds')),8000);})]);}
+  finally{clearTimeout(timer);}
+ }
+ function pasteEvent(shim,box,raw){
+  let prevented=false;
+  shim.document.dispatchEvent({type:'paste',target:box,clipboardData:{getData:()=>raw},preventDefault(){prevented=true;}});
+  return prevented;
+ }
+ async function openPaste(f,fromSettings=true){
+  if(fromSettings){
+   f.ctx.openSettings();const source=makeFakeElement();source.value='paste';
+   const get=f.shim.document.getElementById.bind(f.shim.document);
+   f.shim.document.getElementById=id=>id==='backupRestoreSource'?source:get(id);
+   await f.ctx.onAction('import-backup',{isConnected:true});assert.match(f.shim.document.getElementById('modalRoot').innerHTML,/id="jsonBox"/,'the visible Settings Import opens the Paste route');
+  }else await f.ctx.onAction('open-paste-recovery',{});
+  const box=f.shim.document.getElementById('jsonBox');assert.ok(box,'the actual paste editor is open');box.id='jsonBox';return box;
+ }
+ async function openFile(f,file){
+  f.ctx.openSettings();const source=makeFakeElement();source.value='file';
+  const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;let picker=0;input.click=()=>{picker++;};
+  const get=f.shim.document.getElementById.bind(f.shim.document);
+  f.shim.document.getElementById=id=>id==='backupRestoreSource'?source:id==='restoreBackupFile'?input:get(id);
+  await f.ctx.onAction('import-backup',{isConnected:true});
+  assert.equal(picker,1,'the established File control is invoked');input.files=[file];
+  const outcomes=await awaitFile(f.shim.document.dispatchEventAndWait({type:'change',target:input}),'actual selected-file handler');
+  return {input,outcomes,markup:f.shim.document.getElementById('modalRoot').innerHTML};
+ }
+ function assertIncoming(rows,raw,name,f){
+  const expectedBytes=Buffer.from(raw),expectedBase64=expectedBytes.toString('base64');
+  const row=rows.find(item=>item.kind==='restore-file-source'&&item.restoreFile?.fileName===name&&item.restoreFile?.bytesBase64===expectedBase64);
+  assert.ok(row,'the selected incoming source has a durable evidence row');
+  assert.equal(row.restoreFile.format,'chain-scanner.restore-file-source');assert.equal(row.restoreFile.formatVersion,1);
+  assert.equal(row.restoreFile.mediaType,'application/json');assert.equal(row.restoreFile.byteLength,expectedBytes.byteLength);
+  assert.deepEqual(Buffer.from(row.restoreFile.bytesBase64,'base64'),expectedBytes,'the exact complete incoming bytes are protected');
+  assert.equal(row.payload,f.currentRaw,'incoming evidence retains the exact independently captured pre-adoption current board');
+  assert.ok(rows.some(item=>item.kind==='before-file-restore'&&item.payload===f.currentRaw),'the pre-adoption full current board is protected separately');
+  for(const item of rows)if(!f.protectedRows.has(item.id)){
+   assert.ok(['before-file-restore','restore-file-source','latest','daily'].includes(item.kind),'only the established transfer and automatic producer rows are added');
+   assert.ok(f.allowedPayloads.has(item.payload),'each added row carries an expected original or accepted lifecycle payload');
+   f.protectedRows.set(item.id,structuredClone(item));
+  }
+  return row;
+ }
+ async function coldReopen(scope,f,acceptedHead,expectedId){
+  f.allowedPayloads.add(acceptedHead.payload);
+  await f.store.close();await f.app.dispose();
+  const reopened=await loadApp({sharedStorage:f.sharedStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.deviceDbName,cloudSyncFactory:quietCloud});
+  scope.after(async()=>{try{await reopened.dispose();}catch{}});
+  const deadline=Date.now()+5000;let head;
+  while(Date.now()<deadline){
+   head=await reopened.ctx.window.ScannerDeviceStore.readHead();
+   if(reopened.ctx.state?.tasks?.[0]?.id===expectedId&&JSON.stringify(reopened.ctx.state)===acceptedHead.payload&&head?.payload===acceptedHead.payload&&
+    readConst(reopened.ctx,'liveBoardAccepted&&deviceStorageAuthority&&deviceStorageRequired&&deviceHeadHash==='+JSON.stringify(acceptedHead.hash)+'&&localDeviceStartupAttempt?.pending===false'))break;
+   await flush();
+  }
+  assert.equal(reopened.ctx.state.tasks[0].id,expectedId,'normal cold startup opens the independently selected board');
+  assert.equal(JSON.stringify(reopened.ctx.state),acceptedHead.payload,'normal cold startup reads the entire accepted durable board');
+  assertDataEqual(head,acceptedHead,'the exact accepted full head survives a normal cold reopen');
+  assert.equal(readConst(reopened.ctx,'liveBoardAccepted&&deviceStorageAuthority&&deviceStorageRequired&&deviceHeadHash==='+JSON.stringify(acceptedHead.hash)+'&&localDeviceStartupAttempt?.pending===false'),true,
+   'cold readiness requires accepted durable authority and completed startup, not a provisional non-null state');
+  await assertOriginalSources(f,reopened.ctx.window.ScannerDeviceStore,{changedHead:true});
+  return reopened;
+ }
+
+ await t.test('#347 large Paste survives Cancel, Close, and repreview without changing protected sources',async sub=>{
+  const f=await fixture(sub,'347'),board=JSON.parse(f.currentRaw);board.futureLargeTransfer='🌿 café 🧭\n'.repeat(30000);
+  const raw=JSON.stringify(board,null,2);assert.ok(raw.length>262144,'the captured archive exceeds the bounded editor threshold');
+  const box=await openPaste(f),prevented=pasteEvent(f.shim,box,raw);
+  assert.equal(prevented,true,'the oversized synthetic Paste event is captured before editor insertion');
+  assert.ok(box.value.length<1024,'the editor remains bounded while the complete draft is held');
+  assert.match(f.shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+  assert.equal(await f.ctx.onAction('preview-pasted-recovery',{}),true,'the captured complete bytes reach protected Preview');
+  assert.match(f.shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+  await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,'Pasted board.json',f);
+  await f.ctx.onAction('cancel-file-restore',{});assert.ok(f.shim.document.getElementById('jsonBox').value.length<1024);
+  assert.match(f.shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+  await assertProtected(f);
+  assert.equal(await f.ctx.onAction('preview-pasted-recovery',{}),true,'the exact retained draft previews again after Cancel');
+  await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,'Pasted board.json',f);
+  await f.ctx.onAction('cancel-file-restore',{});await assertProtected(f);
+  await f.ctx.onAction('close-paste-recovery',{});await assertProtected(f);
+  await openPaste(f,false);
+  assert.match(f.shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+  await assertProtected(f);
+  assert.equal(await f.ctx.onAction('preview-pasted-recovery',{}),true,'the closed draft previews again after reopening');
+  await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,'Pasted board.json',f);
+ });
+
+ await t.test('#348 typing and paste replace a live oversized capture with the selected bytes',async sub=>{
+  for(const replacementRoute of ['typing','paste'])await sub.test(replacementRoute,async leaf=>{
+   const f=await fixture(leaf,'348-'+replacementRoute),large=JSON.parse(f.currentRaw);large.futureCaptured='old oversized source '.repeat(18000);
+   const staleRaw=JSON.stringify(large),next=JSON.parse(f.currentRaw);next.futureReplacement='deliberate '+replacementRoute+' replacement 🌿';
+   const replacement=JSON.stringify(next);const box=await openPaste(f);assert.equal(pasteEvent(f.shim,box,staleRaw),true);
+   assert.match(f.shim.document.getElementById('pasteDraftStatus').textContent,/complete text/i);
+   if(replacementRoute==='typing'){
+    box.value=replacement;f.shim.document.dispatchEvent({type:'input',target:box});
+   }else{
+    const nativeDefault=pasteEvent(f.shim,box,replacement);assert.equal(nativeDefault,false,'ordinary replacement Paste remains an editor input');
+    box.value=replacement;f.shim.document.dispatchEvent({type:'input',target:box});
+   }
+   assert.equal(box.value,replacement,'the established editor event selects the exact replacement');
+   assert.equal(await f.ctx.onAction('preview-pasted-recovery',{}),true,'Preview accepts the deliberately replaced source');
+   await assertProtected(f);const rows=await f.store.listBackups();assertIncoming(rows,replacement,'Pasted board.json',f);
+   assert.ok(!rows.some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===staleRaw),
+    'the superseded live capture is not mistaken for the selected replacement');
+   assert.ok(f.shim.document.getElementById('modalRoot').innerHTML.includes('futureReplacement')||
+    f.shim.document.getElementById('modalRoot').innerHTML.includes('deliberate '+replacementRoute),'the replacement reaches the bounded preview');
+  });
+ });
+
+ await t.test('#351 archive File adopts only currentBoard and survives a signed-out cold reopen',async sub=>{
+  const f=await fixture(sub,'351'),archiveBoard=JSON.parse(f.currentRaw);
+  archiveBoard.tasks=[{...archiveBoard.tasks[0],id:'archive-current-board-351',title:'Archive currentBoard only'}];
+  archiveBoard.futureArchiveTyped={keep:['opaque <value> & 🌿',19]};archiveBoard.considered={};archiveBoard.workedAt={};
+  const archive={format:'chain-scanner.recovery-archive',formatVersion:1,capturedAt:'2026-10-28T12:00:00.000Z',currentBoard:archiveBoard,
+   manifest:{status:'complete',consistency:'isolated transfer proof',sources:{currentBoard:{status:'included'}},failures:[]},
+   appSources:{localStorage:[],indexedDB:{stores:{meta:[{key:{type:'string',value:'pending-upload'},value:{type:'object',value:{task:{id:'pending-archive-351',title:'Never replay'}}}}],backups:[],snapshots:[],opaque:[]}},
+    debugLog:{schema:'funsidething.support-diagnostics',marker:'debug-archive-351-must-not-become-a-task'}}};
+  const raw='\uFEFF \n'+JSON.stringify(archive,null,2)+'\n',bytes=new TextEncoder().encode(raw),file=new File([bytes],'archive-351.json',{type:'application/json'});
+  const opened=await openFile(f,file);assert.deepEqual(opened.outcomes,[true]);
+  assert.match(opened.markup,/Only its ordinary <code>currentBoard<\/code> can be restored/);
+  assert.equal(JSON.stringify(f.ctx.state),f.currentRaw,'archive preparation leaves the accepted board unchanged');
+  await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,'archive-351.json',f);
+  assert.equal(await f.ctx.onAction('confirm-file-restore',{}),true,'the selected archive reaches actual explicit adoption');
+  for(let attempt=0;attempt<120&&f.ctx.state.tasks?.[0]?.id!=='archive-current-board-351';attempt++)await flush();
+  assert.equal(f.ctx.state.tasks[0].id,'archive-current-board-351');assert.equal(f.ctx.state.tasks[0].title,'Archive currentBoard only');
+  assertDataEqual(f.ctx.state.futureArchiveTyped,{keep:['opaque <value> & 🌿',19]});
+  assert.doesNotMatch(JSON.stringify(f.ctx.state),/pending-archive-351|debug-archive-351/,'archive pending records and Debug report never become board data');
+  assert.equal(f.ctx.state.syncAccount,null,'this fixture proves signed-out local restoration only');
+  assertDataEqual(await f.store.getPendingUpload(f.pendingOwner),f.pendingExpected,'the independent pending upload remains pending after adoption');
+  const acceptedHead=await f.store.readHead();assert.equal(acceptedHead.payload,JSON.stringify(f.ctx.state),'the chosen board is durably committed before reopen');
+  await assertOriginalSources(f,f.store,{changedHead:true});
+  const beforeRestore=await f.store.listBackups();assert.ok(beforeRestore.some(row=>row.kind==='before-file-restore'&&row.payload===f.currentRaw));
+  const reopened=await coldReopen(sub,f,acceptedHead,'archive-current-board-351');
+  assert.equal(reopened.ctx.state.tasks[0].id,'archive-current-board-351','normal cold reopen reads the durable chosen board');
+  assertDataEqual(reopened.ctx.state.futureArchiveTyped,{keep:['opaque <value> & 🌿',19]});
+  assert.doesNotMatch(JSON.stringify(reopened.ctx.state),/pending-archive-351|debug-archive-351/,'cold reopen never replays archived pending or Debug sources');
+  assert.equal(reopened.ctx.state.syncAccount,null,'cold reopen retains its local signed-out status');
+  assertDataEqual(await reopened.ctx.window.ScannerDeviceStore.getPendingUpload(f.pendingOwner),f.pendingExpected);
+  const reopenedRows=await reopened.ctx.window.ScannerDeviceStore.listBackups();
+  assert.ok(reopenedRows.some(row=>row.payload===f.currentRaw&&row.kind==='before-file-restore'));
+  assertIncoming(reopenedRows,raw,'archive-351.json',f);
+ });
+
+ await t.test('#352 raw backup array requires explicit row choice and cold reopens the chosen result',async sub=>{
+  const f=await fixture(sub,'352'),selected={...JSON.parse(f.currentRaw),tasks:[{...JSON.parse(f.currentRaw).tasks[0],id:'raw-choice-352',title:'Explicit raw row'}],futureRawBoard:{retain:352}};
+  const rows=[{id:'chosen-352',day:'2026-10-28',at:1793180000100,kind:'manual',payload:'\n '+JSON.stringify(selected)+'\n',futureRow:{keep:3}},
+   {id:'damaged-352',day:'2026-10-28',at:1793180000101,kind:'manual',payload:'{"tasks":['},
+   {id:'pending-352',day:'2026-10-28',at:1793180000102,kind:'decision-recovery-pending',payload:'{"pending":"retain only"}'},
+   {id:'future-352',day:'2026-10-28',at:1793180000103,kind:'unknown-future-kind',payload:JSON.stringify(selected)}];
+  const raw='\n'+JSON.stringify(rows,null,2)+'\n',file=new File([raw],'raw-backups-352.json',{type:'application/json'}),opened=await openFile(f,file);
+  assert.deepEqual(opened.outcomes,[true]);assert.match(opened.markup,/id="fileRestoreBackupChoice"/);
+  assert.match(opened.markup,/Choose a supported board above/);assert.match(opened.markup,/confirm-file-restore[^>]*disabled/);
+  await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,'raw-backups-352.json',f);
+  const choice=f.shim.document.getElementById('fileRestoreBackupChoice');choice.id='fileRestoreBackupChoice';choice.value='0';choice.matches=()=>false;
+  const outcomes=await awaitFile(f.shim.document.dispatchEventAndWait({type:'change',target:choice}),'explicit raw backup row choice');
+  assert.deepEqual(outcomes,[true]);assert.match(f.shim.document.getElementById('modalRoot').innerHTML,/Explicit raw row/);
+  await assertProtected(f);assert.equal(await f.ctx.onAction('confirm-file-restore',{}),true,'only the explicitly selected raw row is adopted');
+  for(let attempt=0;attempt<120&&f.ctx.state.tasks?.[0]?.id!=='raw-choice-352';attempt++)await flush();
+  assert.equal(f.ctx.state.tasks[0].id,'raw-choice-352');assert.equal(f.ctx.state.tasks[0].title,'Explicit raw row');assertDataEqual(f.ctx.state.futureRawBoard,{retain:352});
+  assert.doesNotMatch(JSON.stringify(f.ctx.state),/pending-352|damaged-352|future-352/,'other raw rows remain evidence and are not replayed');
+  assertDataEqual(await f.store.getPendingUpload(f.pendingOwner),f.pendingExpected);
+  const acceptedHead=await f.store.readHead();assert.equal(acceptedHead.payload,JSON.stringify(f.ctx.state),'the complete chosen raw board is durably committed');
+  await assertOriginalSources(f,f.store,{changedHead:true});
+  assert.ok((await f.store.listBackups()).some(row=>row.kind==='before-file-restore'&&row.payload===f.currentRaw));
+  const reopened=await coldReopen(sub,f,acceptedHead,'raw-choice-352');
+  assert.equal(reopened.ctx.state.tasks[0].id,'raw-choice-352');assertDataEqual(reopened.ctx.state.futureRawBoard,{retain:352});
+  assert.doesNotMatch(JSON.stringify(reopened.ctx.state),/pending-352|damaged-352|future-352/,'cold reopen retains only the explicitly selected board');
+  assert.equal(reopened.ctx.state.syncAccount,null,'the reopened raw result remains signed out and locally durable');
+  assertDataEqual(await reopened.ctx.window.ScannerDeviceStore.getPendingUpload(f.pendingOwner),f.pendingExpected);
+  assert.ok((await reopened.ctx.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='before-file-restore'&&row.payload===f.currentRaw));
+  assertIncoming(await reopened.ctx.window.ScannerDeviceStore.listBackups(),raw,'raw-backups-352.json',f);
+ });
+
+ async function cancelLateTransfer(scope,label,outcome,{appSource=null,negativeControl=false}={}){
+  const f=await fixture(scope,label,appSource),next=JSON.parse(f.currentRaw);next.futureNewerDraft='newer '+label+' draft';
+  const newerRaw=JSON.stringify(next),oldBoard=JSON.parse(f.currentRaw);oldBoard.futureObsolete='obsolete '+label+' incoming source '.repeat(18000);
+  const oldRaw=JSON.stringify(oldBoard),fileName='Pasted board.json';
+  let release,enteredResolve;const gate=new Promise(resolve=>release=resolve),entered=new Promise(resolve=>enteredResolve=resolve);
+  const realPut=f.store.putBackup.bind(f.store);let held=false;
+  f.store.putBackup=async options=>{
+   const result=await realPut(options);
+   if(!held&&options?.backup?.kind==='restore-file-source'){
+    held=true;enteredResolve();await gate;if(outcome==='reject')throw Error('late protected-source rejection '+label);
+   }
+   return result;
+  };
+  let pendingAction=false;
+  const box=await openPaste(f);assert.equal(pasteEvent(f.shim,box,oldRaw),true,'the old source enters through the actual oversized Paste capture');
+  pendingAction=f.ctx.onAction('preview-pasted-recovery',{});
+  try{
+  await awaitFile(entered,'the selected incoming source protection write');
+  assert.equal(held,true,'the real preparation boundary is pending after exact incoming bytes were written');
+  await f.ctx.onAction('close-paste-recovery',{});await f.ctx.onAction('open-paste-recovery',{});
+  const reopenedBox=f.shim.document.getElementById('jsonBox');reopenedBox.id='jsonBox';reopenedBox.value=newerRaw;f.shim.document.dispatchEvent({type:'input',target:reopenedBox});
+  assert.equal(reopenedBox.value,newerRaw,'the different newer draft uses the visible editor input route');
+  await assertProtected(f);assertIncoming(await f.store.listBackups(),oldRaw,fileName,f);
+  release();const oldResult=await awaitFile(pendingAction,'late '+outcome+' preparation for '+label);
+  const markup=f.shim.document.getElementById('modalRoot').innerHTML;
+  if(negativeControl){
+   let observed=null;
+   for(const check of [
+    ()=>assert.equal(oldResult,false,'cancelled older preparation does not settle as an accepted preview'),
+    ()=>assert.doesNotMatch(markup,/data-act="confirm-file-restore"/,'obsolete work cannot install a late confirmation surface'),
+    ()=>assert.equal(f.shim.document.getElementById('jsonBox')?.value,newerRaw,'late work keeps the complete different newer draft')
+   ])try{check();}catch(error){observed=error;break;}
+   assert.ok(observed?.code==='ERR_ASSERTION','the source-mutated consumer must fail a new exact cancellation assertion');
+   scope.diagnostic('Later broken-handler sensitivity caught '+observed.operator+' for '+label+': '+observed.message.split('\n')[0]+'; it is not preimplementation RED.');
+  }else{
+   assert.equal(oldResult,false,'cancelled older preparation does not settle as an accepted preview');
+   assert.doesNotMatch(markup,/data-act="confirm-file-restore"/,'obsolete work cannot install a late confirmation surface');
+   assert.equal(f.shim.document.getElementById('jsonBox').value,newerRaw,'late work keeps the complete different newer draft');
+  }
+  await assertProtected(f);assertIncoming(await f.store.listBackups(),oldRaw,fileName,f);
+  assert.equal((await f.store.listBackups()).some(row=>row.kind==='restore-file-source'&&row.restoreFile?.fileName===fileName&&
+   Buffer.from(row.restoreFile.bytesBase64,'base64').toString('utf8')===newerRaw),false,'newer text never masquerades as the older selected source');
+  }finally{release();await awaitFile(pendingAction,'owned late Paste cleanup');}
+ }
+
+ await t.test('#349 and #356 Paste Close preserves newer draft after obsolete success and rejection',async sub=>{
+  for(const outcome of ['resolve','reject'])await sub.test('Paste Close / late '+outcome,async leaf=>{
+   await cancelLateTransfer(leaf,'349-'+outcome,outcome);
+  });
+  const fragment='if(p.consentGeneration!==fileRestoreConsentGeneration||!pasteDraftIsCurrent(p))return false;';
+  assert.equal(appSrc.split(fragment).length-1,1,'the negative control targets one exact current authority guard');
+  await sub.test('later negative control detects a broken authority guard',async leaf=>{
+   await cancelLateTransfer(leaf,'349-negative-control','resolve',{appSource:appSrc.replace(fragment,'if(false)return false;'),negativeControl:true});
+  });
+ });
+
+ await t.test('#356 File Close retains exact incoming source after obsolete success and rejection',async sub=>{
+  for(const outcome of ['resolve','reject'])await sub.test('File Close / late '+outcome,async leaf=>{
+   const f=await fixture(leaf,'356-file-'+outcome),board=JSON.parse(f.currentRaw);board.futureFilePending='selected file source '+outcome;
+   const raw=JSON.stringify(board),name='356-file-'+outcome+'.json',file=new File([raw],name,{type:'application/json'});
+   let release,enteredResolve;const gate=new Promise(resolve=>release=resolve),entered=new Promise(resolve=>enteredResolve=resolve);
+   const realPut=f.store.putBackup.bind(f.store);let held=false;
+   f.store.putBackup=async options=>{const result=await realPut(options);if(!held&&options?.backup?.kind==='restore-file-source'){
+    held=true;enteredResolve();await gate;if(outcome==='reject')throw Error('late File protection rejection');}return result;};
+   f.ctx.openSettings();const source=makeFakeElement(),input=makeFakeElement();source.value='file';input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
+   const get=f.shim.document.getElementById.bind(f.shim.document);f.shim.document.getElementById=id=>id==='backupRestoreSource'?source:id==='restoreBackupFile'?input:get(id);
+   await f.ctx.onAction('import-backup',{isConnected:true});input.files=[file];
+   const preparing=f.shim.document.dispatchEventAndWait({type:'change',target:input});
+   try{
+   await awaitFile(entered,'File source protection write');assert.equal(held,true);
+   await f.ctx.onAction('close-modal',{});await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,name,f);
+   const newerRaw=JSON.stringify({...JSON.parse(f.currentRaw),futureFileNewerDraft:'Different editor after File Close '+outcome});
+   const box=await openPaste(f);box.value=newerRaw;f.shim.document.dispatchEvent({type:'input',target:box});
+   assert.equal(box.value,newerRaw,'the different newer draft is present before the obsolete File operation settles');
+   await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,name,f);
+   release();const outcomes=await awaitFile(preparing,'late File '+outcome+' preparation');assert.deepEqual(outcomes,[false]);
+   assert.doesNotMatch(f.shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);
+   assert.equal(f.shim.document.getElementById('jsonBox').value,newerRaw,'obsolete File success or rejection cannot overwrite the newer draft');
+   await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,name,f);
+   }finally{release();await awaitFile(preparing,'owned late File cleanup');}
+  });
+ });
+
+ await t.test('#354 Paste confirmation refuses account, peer-head, and unfinished-draft changes after Preview',async sub=>{
+  for(const changed of ['account','peer-head','unfinished-draft'])await sub.test(changed,async leaf=>{
+   const f=await fixture(leaf,'354-'+changed),board=JSON.parse(f.currentRaw);board.futureAfterPreview='must not be adopted';
+   const raw=JSON.stringify(board),box=await openPaste(f);assert.equal(pasteEvent(f.shim,box,raw),false,'this small synthetic Paste follows ordinary editor insertion');
+   box.value=raw;f.shim.document.dispatchEvent({type:'input',target:box});
+   assert.equal(await f.ctx.onAction('preview-pasted-recovery',{}),true,'the actual Paste Preview completes before authority changes');
+   await assertProtected(f);assertIncoming(await f.store.listBackups(),raw,'Pasted board.json',f);
+   let expectedHead=f.head;
+   if(changed==='account')f.ctx.window.CloudSync.user='changed-account@example.test';
+   if(changed==='peer-head'){
+    const peer=JSON.stringify({...JSON.parse(f.currentRaw),peerAfterPreview:'retained'});
+    assert.equal((await f.store.commitHead({expectedHash:f.head.hash,payload:peer,account:null})).ok,true,'a separate device writer changes the peer head');
+    expectedHead=await f.store.readHead();
+   }
+   if(changed==='unfinished-draft'){
+    const add=f.shim.document.getElementById('addInput');assert.ok(add,'the ordinary unfinished quick-add field remains behind the preview');
+    add.value='Unsubmitted task draft retained after preview';
+   }
+   const accepted=await f.ctx.onAction('confirm-file-restore',{});assert.equal(accepted,false,'the stale Paste confirmation is refused');
+   assert.equal(JSON.stringify(f.ctx.state),f.currentRaw,'the in-memory accepted board remains exact');
+   assertDataEqual(await f.store.readHead(),expectedHead,'the original or intervening peer head remains exactly active');
+   assertDataEqual(await f.store.getPendingUpload(f.pendingOwner),f.pendingExpected);
+   const after=await assertOriginalSources(f,f.store,{changedHead:changed==='peer-head'});
+   assertIncoming(after,raw,'Pasted board.json',f);
+   if(changed==='unfinished-draft')assert.equal(f.shim.document.getElementById('addInput').value,'Unsubmitted task draft retained after preview');
+   assert.equal(await f.ctx.onAction('confirm-file-restore',{}),false,'a repeated Confirm cannot later adopt the stale candidate');
+   assert.equal(JSON.stringify(f.ctx.state),f.currentRaw);assertDataEqual(await f.store.readHead(),expectedHead);
+   await assertOriginalSources(f,f.store,{changedHead:changed==='peer-head'});
+  });
+ });
+
+ await t.test('#355 metadata-only Debug report is refused through File and Paste with exact bytes protected',async sub=>{
+  const f=await fixture(sub,'355'),report=JSON.parse(f.ctx.supportDiagnosticsText());
+  assert.equal(report.schema,'funsidething.support-diagnostics');assert.equal(report.metadataOnly,true);assert.equal(report.boardDataIncluded,false);
+  const valid=JSON.parse(f.currentRaw),complete={format:'chain-scanner.recovery-archive',formatVersion:1,currentBoard:valid,
+   manifest:{status:'complete',failures:[],sources:{currentBoard:{status:'included'}}}};
+  const partial={...complete,manifest:{status:'partial',failures:[{source:'indexedDB.backups',status:'error'}],sources:{currentBoard:{status:'included'}}}};
+  const inputs=[
+   {name:'corrupt',raw:'{not JSON'},
+   {name:'wrong-shape',raw:JSON.stringify({format:'ordinary-object',tasks:{}})},
+   {name:'unsupported-version',raw:JSON.stringify({...complete,formatVersion:2})},
+   {name:'missing-current-board',raw:JSON.stringify({format:'chain-scanner.recovery-archive',formatVersion:1,manifest:complete.manifest})},
+   {name:'partial-archive',raw:JSON.stringify(partial)},
+   {name:'source-only-archive',raw:JSON.stringify({...partial,currentBoard:null,manifest:{status:'partial',failures:[{source:'currentBoard',status:'unavailable'}],sources:{currentBoard:{status:'unavailable'}}}})},
+   {name:'metadata-only-debug-report',raw:JSON.stringify(report,null,2)},
+   {name:'invalid-utf8',bytes:Uint8Array.of(0xc3,0x28),fileOnly:true}
+  ];
+  for(const input of inputs){
+   const bytes=input.bytes||new TextEncoder().encode(input.raw),exact=input.raw??bytes,fileName='unsupported-355-'+input.name+'.json';
+   const opened=await openFile(f,new File([bytes],fileName,{type:'application/json'}));
+   assert.deepEqual(opened.outcomes,[false],input.name+' File reaches the existing refusal path');
+   assert.doesNotMatch(opened.markup,/data-act="confirm-file-restore"/,input.name+' File never reaches a confirmable board');
+   await assertProtected(f);assertIncoming(await f.store.listBackups(),exact,fileName,f);
+   assert.equal(await f.ctx.onAction('confirm-file-restore',{}),false,input.name+' File cannot acquire replacement authority');
+   if(!input.fileOnly){
+    const box=await openPaste(f);box.value=input.raw;f.shim.document.dispatchEvent({type:'input',target:box});
+    assert.equal(await f.ctx.onAction('preview-pasted-recovery',{}),false,input.name+' Paste reaches the existing refusal path');
+    assert.doesNotMatch(f.shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/,input.name+' Paste never reaches a confirmable board');
+    await assertProtected(f);assertIncoming(await f.store.listBackups(),input.raw,'Pasted board.json',f);
+    assert.equal(await f.ctx.onAction('confirm-file-restore',{}),false,input.name+' Paste cannot acquire replacement authority');
+    await f.ctx.onAction('close-paste-recovery',{});await assertProtected(f);
+    const retained=await openPaste(f,false);assert.equal(retained.value,input.raw,input.name+' Close retains the exact refused draft');
+    await assertProtected(f);await f.ctx.onAction('close-paste-recovery',{});
+   }
+   f.ctx.openSettings();assert.match(f.shim.document.getElementById('modalRoot').innerHTML,/data-act="import-backup"/,input.name+' refusal leaves a usable Settings retry route');
+   await assertProtected(f);
+  }
+ });
 });
 
 test('RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch',async t=>{

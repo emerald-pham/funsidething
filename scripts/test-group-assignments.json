@@ -13491,6 +13491,11 @@
       "root": "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [

@@ -1295,9 +1295,12 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts
 - RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens
 - RISK saved view held Export: terminal Settings preserves an exact partial source-only archive
+  - Current297 terminal-held Settings extension verifies protected Import/Export/File/Paste/Debug routes and natural disabled edit/save/recovery controls with full original source-only Export assertions retained.
 - RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources
 - RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources
 - RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources
+  - Current297/339 native extension retains the positive whole-file control, then independently rejected and absent clipboard outcomes each retain the same archive and yield a full actual Download with complete independent decoded archive/source/draft equality.
+  - Current1533 correction awaits the complete normal save before capturing a separate full live source baseline; each refused Copy and later Download retains the original archive, exact sources and status, enabled controls, narrow Export width/scroll bounds and constant markup without a giant editor.
 - RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
@@ -2414,3 +2417,6 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command
 
 - RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch
+
+- RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries
+  - Actual existing Settings File/Paste handlers retain complete incoming bytes and all protected sources through Cancel/Close, deliberate replacement, stale confirmation, late resolve/reject and archive/raw normal cold reopen. Typed manual fields, opaque originals and a later isolated broken-guard assertion remain explicit; VM evidence does not claim native or actual service proof.

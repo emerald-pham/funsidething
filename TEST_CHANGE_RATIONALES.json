@@ -28413,5 +28413,228 @@
       "commonBase": "b9212f86b310c5b07853b3413148a19e2ddb891d",
       "metadataOnly": true
     }
+  },
+  {
+    "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+    "testChangesSha256": "8f420c21c3cb600de337f4ff4aec3a0d8047c21a04f35a5b262543279b8e23ae",
+    "cycle": "1517-transfer-vm-fixture",
+    "reason": "Add the explicitly approved missing current File/Paste acceptance coverage after one complete static reconciliation of the transferred new fixture; application source remains unchanged.",
+    "previousBehavior": "The new test root stopped at missing dependency, a manual-only backup assumption, cross-realm row identity, then an incorrect fresh-process deviceStorageRequired=true expectation. Those four observed preparation failures prevented new consumer acceptance. Existing current-source predecessors retain their separate valid results.",
+    "intendedBehavior": "Use the existing public consumers, independent selected input bytes and seeded manual/pending/opaque originals; compare persisted data without realm-only identity, retain typed values, account actual producer and protection rows, and wait for accepted full-state/head authority on normal cold reopen. Verify unchanged real behavior without manufacturing product RED.",
+    "replacementTests": [
+      "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries"
+    ],
+    "preservedCoverage": [
+      "Every preexisting tests.js byte remains unchanged; the new root is additive. All1026 prior rationale objects and their complete raw prefix remain exact. The explicit original cohort and all failure evidence are retained.",
+      "Every original backup/raw meta/snapshot/opaque source and separately seeded typed manual row remains exactly compared at each relevant boundary. Host structuredClone retains unknown keys, undefined, NaN, negative zero and typed bytes; no opaque/full-source JSON projection is used.",
+      "The complete accepted current board, durable head, authority, pending upload, exact source filename/media/format/version/length/Base64/decoded bytes and pre-adoption backup are independently asserted. Earlier verified incoming rows remain protected across later Cancel/Close/repreview boundaries.",
+      "Archive and raw File cases explicitly Confirm, assert independent selected fields and no archive-source replay, then use normal same-storage cold startup with full committed payload/head/authority readback. File and Paste late success/rejection preserve a different newer editor draft.",
+      "The isolated in-memory broken consent/draft guard control runs only after healthy cases and must catch a specific ERR_ASSERTION. Its actual later sensitivity result is not preimplementation RED. No app/native/browser/OS clipboard/service/physical-device acceptance is inferred."
+    ],
+    "redEvidence": {
+      "command": "Retained original same8root record-run.mjs commands in transfer-acceptance/current-proof-dispatch/owner/vm:492afd39,a72ed68b,d0afec20,2e323b28; exact new one-cohort command and diagnosis/readiness are in transfer-sol-handoff/owner before execution.",
+      "failure": "Original492afd39 failed fake-indexeddb resolution; a72ed68b expected only manual although real latest/daily rows exist; d0afec20 rejected realm prototypes for identical manual data; full2e323b28 output additionally has actual deviceStorageRequired=false versus expected=true. All are preparation evidence, not app defect RED. The later broken-guard control has separate real chronology and cannot restore original RED."
+    }
+  },
+  {
+    "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+    "testChangesSha256": "de35046eaf5f4dcc46bdac862778309d7754197e74c4bc19d1ab169c4aba6d76",
+    "cycle": "1524-native297-339-definition",
+    "reason": "Extend the existing current two-engine native Settings/whole-file consumers with the precisely missing297 rendered routes and339 refused/absent Copy followed by same-instance Download, preserving accepted1517 and all original assertions.",
+    "previousBehavior": "Existing T5 proved complete accepted-unsaved Copy and native Download only with a successful clipboard stub. Denied/absent clipboard followed by actual Download and complete healthy/held rendered Settings route/state evidence were missing; no application defect is inferred.",
+    "intendedBehavior": "Keep the one original positive native control, then run independently rejected and absent Copy on that same prepared raw/serial and save/read the complete native files against an independent full decoded archive expectation. Verify real healthy and terminal-held Settings sections/routes/natural disabled states and exact sources, typed primitives, pending work, unfinished draft and authority.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries"
+    ],
+    "preservedCoverage": [
+      "All1027 previous full rationale objects and complete raw prefix remain exact; the accepted1517 VM root and explicit group assignment are byte-identical and are not reexecuted.",
+      "The complete original T5 ordinary current-board, accepted-unsaved Edit/Save, local/raw metadata/snapshot/backup/pending/opaque, manifest/source/hash/authority/status/positive full Download and error assertions remain. Original first Download count1 is retained; final exact total3 accounts for the two newly deliberate refusal Downloads.",
+      "Existing full held Export raw-store observation, unaccepted placeholder, complete partial source-only manifest, source-write refusal, scanner/save/authority/cloud/error assertions remain. New real terminal Settings File/Paste/Debug routes execute before those independent raw observations, without priming board/handler/authority.",
+      "Native opaque fixtures additionally carry negative zero, NaN and own undefined keys. Full raw/decoded strict comparisons and v8-serialized expected/source artifacts retain their types; no lossy JSON opaque/fullsource projection is used.",
+      "No source permission/OS clipboard write, trusted system Paste, physical device or whole release claim is made. Clipboard rejection/absence are external test boundaries. Root-approved source-backed absence of Settings app-backup/update buttons does not invent new UI; install-app and automatic update paths remain separate."
+    ],
+    "redEvidence": {
+      "command": "Original retained T5 accepted complete native Download source845ce7b/recorder498a0b30 is existing positive evidence; current tests-only definition1524 and conditional ONE native1525 command are bound in transfer-sol-handoff/native1524/definition before execution.",
+      "failure": "No contemporaneous application RED is claimed for this coverage extension. Known original1517 preparation failures remain immutable in their custody and actual later guard sensitivity remains separately labeled. A genuinely new native consumer failure must retain complete output/source and stop for bounded diagnosis; no blind rerun/app repair."
+    }
+  },
+  {
+    "baseCommit": "d6979cbace8cfec1d14f6cbc51b0534fccc93679",
+    "testChangesSha256": "12c714a20c8857354f6e0418ce26586e2621bf8c892826e7dfec79aab67a7956",
+    "cycle": "1533-complete-native-settlement-fixture",
+    "reason": "Correct the complete diagnosed native test-fixture lifecycle and missing per-outcome rendering/status coverage while leaving application source and the approved consumer seams unchanged.",
+    "previousBehavior": "Attempt01018816 failed3/6 before clipboard refusal cases because the newly async Playwright wait returned a truthy Promise before the normal350ms debounce. Accepted live edit and journal remained exact; durable storage was still the prior baseline.",
+    "intendedBehavior": "Await the existing bounded Node async probe through actual producer completion and full state/head/hash/draft/authority agreement, then freeze a separate whole post-save raw-source baseline. Keep the original prepared archive and independent whole expected file exact across both Copy refusal modes and actual Downloads, with explicit later status/control/geometry checks.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+    ],
+    "preservedCoverage": [
+      "All1028 previous complete rationale objects and their exact complete-object raw prefix remain; no fingerprint deduplication. All1517 accepted VM bytes and existing native held/healthy Settings routes remain exact.",
+      "Every old positive full-file, independent accepted-board/journal, complete raw source, manual snapshot, pending/account/revision, typed opaque(-0,NaN,own undefined), draft, original archive/serial, error/count and Close assertion remains; full settled source comparisons are added through Close.",
+      "The original prepared archive retains its earlier durable raw sources. Legitimate normal-save head/snapshot/latest bookkeeping is captured only in the separate completed-producer baseline and cannot regenerate the prepared archive.",
+      "Each external rejected or absent clipboard boundary retains exact failure status and enabled controls, then an actual complete file matching both prepared UTF8 bytes and the original independent whole archive. Real narrow Export width/scroll bounds and unchanged status-neutral markup prohibit raw/giant editors without an arbitrary new budget.",
+      "The existing synchronous-predicate process guard remains byte-identical and is statically clean; its execution belongs only to the next authorized three-root native recorder cohort. No product RED, OS clipboard/system Paste, service, physical-device or release proof is manufactured."
+    ],
+    "redEvidence": {
+      "command": "Retained actual01018816: Node24 scripts/agent-tools/record-run.mjs --purpose green -- Node24 --test --test-name-pattern=^(?:RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources|RISK saved view held Export: terminal Settings preserves an exact partial source-only archive)$ tests.js; full literal recorded command/source/raw outputs remain in transfer-sol-handoff/native1524/runs/2026-10-30T02-13-03-292Z-01018816-025a-4b7b-b325-1d04cb937954.json.",
+      "failure": "Observed6tests/3pass/3fail/zero skipcancel, child+wrapper1. Both T5 children failed the newly added settlement assertion with old durable head before either clipboard-refusal case; full lossless trace captures prove the exact accepted live edit/journal survived. DIAGNOSIS.md and COUPLED-ORACLE-REVIEW.md correct the initial interpretation. This test-only fixture correction uses that actual chronology, not a new preimplementation application RED."
+    }
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "85033284305c74833f8dbcf18fae51105872b3da39f8969ee65c001e7364ca00",
+    "cycle": "1529-private-transfer-packaging-frozen",
+    "reason": "Metadata-only source association for the actual frozen comparison. Preserve the accepted current tests and all prior complete provenance; this adds no behavior or test execution.",
+    "previousBehavior": "The current1533/1534 corrected native fixture and1517 VM source had accepted exact-byte evidence, but this specific complete comparison fingerprint lacked its current base-bound metadata association.",
+    "intendedBehavior": "Retain every consumer assertion and all1029 prior complete rationale objects/raw prefix, and bind the actual unchanged current source to this exact requested comparison and effective merge base for private packaging.",
+    "replacementTests": [
+      "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+    ],
+    "preservedCoverage": [
+      "All1029 prior complete rationale objects and their complete-object raw prefix remain byte-exact; no fingerprint-only deduplication or rewrite of original chronology.",
+      "The accepted1517 full VM block6f9552b0, all77 prior native T5 assertion lines, corrected current native consumers, existing synchronous guard, RISK map and group assignments remain byte-exact.",
+      "Current whole e9ad6e3d proof passed11/11 with zero failures/cancelled/skipped/todo, both engines and full source/typed/draft/authority/status/geometry/Close/file/count/error tails; this metadata creates no fresh native or full qualification proof.",
+      "Original01018816 remains failed3/6 with full corrected trace diagnosis; previous Luna and all earlier RED/GREEN/source records remain exact. Device-only and cloud/service/OS clipboard/physical-device/release evidence remain distinct."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED or consumer execution in this metadata packaging. Original01018816 recorder command/source/raw output remains in transfer-sol-handoff/native1524/runs/2026-10-30T02-13-03-292Z-01018816-025a-4b7b-b325-1d04cb937954.json; accepted current proof command is retained in owner/proof/ACTUAL-LAUNCH.json.",
+      "failure": "Original native01018816 observed6tests3pass3fail before either refusal case because a newly async wait returned before the normal save debounce; accepted live board/journal remained intact. The complete1533 fixture correction and actual1534 whole11/11 success retain their actual chronology. This additive association is not preimplementation RED and changes no test or application bytes."
+    },
+    "sourceAssociation": {
+      "requestedCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+      "effectiveMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+      "acceptedTestSha256": "e7f764f4396ca559eebe68be0e46e10df973c3b7d406f8cf16c2dcca7ed6e23d",
+      "nativeHandoffSha256": "01e495ebf4a4de60aa5a81d3d738306473a645f48d219b2c94531dff7a52b19d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "0631f4e2f415ace6690ae21791624d52edbe01e13b4334ed9b47c63b11b49c4b",
+    "cycle": "1529-private-transfer-packaging-c920",
+    "reason": "Metadata-only source association for the actual c920 comparison. Preserve the accepted current tests and all prior complete provenance; this adds no behavior or test execution.",
+    "previousBehavior": "The current1533/1534 corrected native fixture and1517 VM source had accepted exact-byte evidence, but this specific complete comparison fingerprint lacked its current base-bound metadata association.",
+    "intendedBehavior": "Retain every consumer assertion and all1029 prior complete rationale objects/raw prefix, and bind the actual unchanged current source to this exact requested comparison and effective merge base for private packaging.",
+    "replacementTests": [
+      "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+    ],
+    "preservedCoverage": [
+      "All1029 prior complete rationale objects and their complete-object raw prefix remain byte-exact; no fingerprint-only deduplication or rewrite of original chronology.",
+      "The accepted1517 full VM block6f9552b0, all77 prior native T5 assertion lines, corrected current native consumers, existing synchronous guard, RISK map and group assignments remain byte-exact.",
+      "Current whole e9ad6e3d proof passed11/11 with zero failures/cancelled/skipped/todo, both engines and full source/typed/draft/authority/status/geometry/Close/file/count/error tails; this metadata creates no fresh native or full qualification proof.",
+      "Original01018816 remains failed3/6 with full corrected trace diagnosis; previous Luna and all earlier RED/GREEN/source records remain exact. Device-only and cloud/service/OS clipboard/physical-device/release evidence remain distinct."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED or consumer execution in this metadata packaging. Original01018816 recorder command/source/raw output remains in transfer-sol-handoff/native1524/runs/2026-10-30T02-13-03-292Z-01018816-025a-4b7b-b325-1d04cb937954.json; accepted current proof command is retained in owner/proof/ACTUAL-LAUNCH.json.",
+      "failure": "Original native01018816 observed6tests3pass3fail before either refusal case because a newly async wait returned before the normal save debounce; accepted live board/journal remained intact. The complete1533 fixture correction and actual1534 whole11/11 success retain their actual chronology. This additive association is not preimplementation RED and changes no test or application bytes."
+    },
+    "sourceAssociation": {
+      "requestedCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+      "effectiveMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+      "acceptedTestSha256": "e7f764f4396ca559eebe68be0e46e10df973c3b7d406f8cf16c2dcca7ed6e23d",
+      "nativeHandoffSha256": "01e495ebf4a4de60aa5a81d3d738306473a645f48d219b2c94531dff7a52b19d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "f029a150a72aa3acf5309bc531963367b65965fd96dc7dd797c2e03c3c524d8a",
+    "cycle": "1529-private-transfer-packaging-b176",
+    "reason": "Metadata-only source association for the actual b176 comparison. Preserve the accepted current tests and all prior complete provenance; this adds no behavior or test execution.",
+    "previousBehavior": "The current1533/1534 corrected native fixture and1517 VM source had accepted exact-byte evidence, but this specific complete comparison fingerprint lacked its current base-bound metadata association.",
+    "intendedBehavior": "Retain every consumer assertion and all1029 prior complete rationale objects/raw prefix, and bind the actual unchanged current source to this exact requested comparison and effective merge base for private packaging.",
+    "replacementTests": [
+      "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+    ],
+    "preservedCoverage": [
+      "All1029 prior complete rationale objects and their complete-object raw prefix remain byte-exact; no fingerprint-only deduplication or rewrite of original chronology.",
+      "The accepted1517 full VM block6f9552b0, all77 prior native T5 assertion lines, corrected current native consumers, existing synchronous guard, RISK map and group assignments remain byte-exact.",
+      "Current whole e9ad6e3d proof passed11/11 with zero failures/cancelled/skipped/todo, both engines and full source/typed/draft/authority/status/geometry/Close/file/count/error tails; this metadata creates no fresh native or full qualification proof.",
+      "Original01018816 remains failed3/6 with full corrected trace diagnosis; previous Luna and all earlier RED/GREEN/source records remain exact. Device-only and cloud/service/OS clipboard/physical-device/release evidence remain distinct."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED or consumer execution in this metadata packaging. Original01018816 recorder command/source/raw output remains in transfer-sol-handoff/native1524/runs/2026-10-30T02-13-03-292Z-01018816-025a-4b7b-b325-1d04cb937954.json; accepted current proof command is retained in owner/proof/ACTUAL-LAUNCH.json.",
+      "failure": "Original native01018816 observed6tests3pass3fail before either refusal case because a newly async wait returned before the normal save debounce; accepted live board/journal remained intact. The complete1533 fixture correction and actual1534 whole11/11 success retain their actual chronology. This additive association is not preimplementation RED and changes no test or application bytes."
+    },
+    "sourceAssociation": {
+      "requestedCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+      "effectiveMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "acceptedTestSha256": "e7f764f4396ca559eebe68be0e46e10df973c3b7d406f8cf16c2dcca7ed6e23d",
+      "nativeHandoffSha256": "01e495ebf4a4de60aa5a81d3d738306473a645f48d219b2c94531dff7a52b19d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "comparisonMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "93e912a8a02aa032093d899faa1836099fe202a11b4ea734b3d39643f1404440",
+    "cycle": "1529-private-transfer-packaging-currentMain",
+    "reason": "Metadata-only source association for the actual currentMain comparison. Preserve the accepted current tests and all prior complete provenance; this adds no behavior or test execution.",
+    "previousBehavior": "The current1533/1534 corrected native fixture and1517 VM source had accepted exact-byte evidence, but this specific complete comparison fingerprint lacked its current base-bound metadata association.",
+    "intendedBehavior": "Retain every consumer assertion and all1029 prior complete rationale objects/raw prefix, and bind the actual unchanged current source to this exact requested comparison and effective merge base for private packaging.",
+    "replacementTests": [
+      "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+    ],
+    "preservedCoverage": [
+      "All1029 prior complete rationale objects and their complete-object raw prefix remain byte-exact; no fingerprint-only deduplication or rewrite of original chronology.",
+      "The accepted1517 full VM block6f9552b0, all77 prior native T5 assertion lines, corrected current native consumers, existing synchronous guard, RISK map and group assignments remain byte-exact.",
+      "Current whole e9ad6e3d proof passed11/11 with zero failures/cancelled/skipped/todo, both engines and full source/typed/draft/authority/status/geometry/Close/file/count/error tails; this metadata creates no fresh native or full qualification proof.",
+      "Original01018816 remains failed3/6 with full corrected trace diagnosis; previous Luna and all earlier RED/GREEN/source records remain exact. Device-only and cloud/service/OS clipboard/physical-device/release evidence remain distinct."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED or consumer execution in this metadata packaging. Original01018816 recorder command/source/raw output remains in transfer-sol-handoff/native1524/runs/2026-10-30T02-13-03-292Z-01018816-025a-4b7b-b325-1d04cb937954.json; accepted current proof command is retained in owner/proof/ACTUAL-LAUNCH.json.",
+      "failure": "Original native01018816 observed6tests3pass3fail before either refusal case because a newly async wait returned before the normal save debounce; accepted live board/journal remained intact. The complete1533 fixture correction and actual1534 whole11/11 success retain their actual chronology. This additive association is not preimplementation RED and changes no test or application bytes."
+    },
+    "sourceAssociation": {
+      "requestedCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "effectiveMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+      "acceptedTestSha256": "e7f764f4396ca559eebe68be0e46e10df973c3b7d406f8cf16c2dcca7ed6e23d",
+      "nativeHandoffSha256": "01e495ebf4a4de60aa5a81d3d738306473a645f48d219b2c94531dff7a52b19d",
+      "metadataOnly": true
+    }
+  },
+  {
+    "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "comparisonMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "testChangesSha256": "93e912a8a02aa032093d899faa1836099fe202a11b4ea734b3d39643f1404440",
+    "cycle": "1529-private-transfer-packaging-effectiveMainMergeBase",
+    "reason": "Metadata-only source association for the actual effectiveMainMergeBase comparison. Preserve the accepted current tests and all prior complete provenance; this adds no behavior or test execution.",
+    "previousBehavior": "The current1533/1534 corrected native fixture and1517 VM source had accepted exact-byte evidence, but this specific complete comparison fingerprint lacked its current base-bound metadata association.",
+    "intendedBehavior": "Retain every consumer assertion and all1029 prior complete rationale objects/raw prefix, and bind the actual unchanged current source to this exact requested comparison and effective merge base for private packaging.",
+    "replacementTests": [
+      "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive"
+    ],
+    "preservedCoverage": [
+      "All1029 prior complete rationale objects and their complete-object raw prefix remain byte-exact; no fingerprint-only deduplication or rewrite of original chronology.",
+      "The accepted1517 full VM block6f9552b0, all77 prior native T5 assertion lines, corrected current native consumers, existing synchronous guard, RISK map and group assignments remain byte-exact.",
+      "Current whole e9ad6e3d proof passed11/11 with zero failures/cancelled/skipped/todo, both engines and full source/typed/draft/authority/status/geometry/Close/file/count/error tails; this metadata creates no fresh native or full qualification proof.",
+      "Original01018816 remains failed3/6 with full corrected trace diagnosis; previous Luna and all earlier RED/GREEN/source records remain exact. Device-only and cloud/service/OS clipboard/physical-device/release evidence remain distinct."
+    ],
+    "redEvidence": {
+      "command": "Historical source-bound evidence only; no new RED or consumer execution in this metadata packaging. Original01018816 recorder command/source/raw output remains in transfer-sol-handoff/native1524/runs/2026-10-30T02-13-03-292Z-01018816-025a-4b7b-b325-1d04cb937954.json; accepted current proof command is retained in owner/proof/ACTUAL-LAUNCH.json.",
+      "failure": "Original native01018816 observed6tests3pass3fail before either refusal case because a newly async wait returned before the normal save debounce; accepted live board/journal remained intact. The complete1533 fixture correction and actual1534 whole11/11 success retain their actual chronology. This additive association is not preimplementation RED and changes no test or application bytes."
+    },
+    "sourceAssociation": {
+      "requestedCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+      "effectiveMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+      "acceptedTestSha256": "e7f764f4396ca559eebe68be0e46e10df973c3b7d406f8cf16c2dcca7ed6e23d",
+      "nativeHandoffSha256": "01e495ebf4a4de60aa5a81d3d738306473a645f48d219b2c94531dff7a52b19d",
+      "metadataOnly": true
+    }
   }
 ]
