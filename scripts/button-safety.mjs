@@ -17,7 +17,8 @@ if(path.resolve(process.argv[1]||'')===fileURLToPath(import.meta.url)){
   const retentionFlags=args.map((arg,index)=>arg==='--startup-retention-profile'?index:-1).filter(index=>index>=0);
   if(retentionFlags.length>1)throw Error('Duplicate startup retention profile option');
   const startupRetentionProfile=retentionFlags.length?args[retentionFlags[0]+1]:undefined;
-  if(retentionFlags.length&&!['canonical-json-48mib-memory-png-v1','canonical-json-56mib-memory-png-v1'].includes(startupRetentionProfile))throw Error('Unknown startup retention profile: '+startupRetentionProfile);
+  if(retentionFlags.length&&!['canonical-json-48mib-memory-png-v1','canonical-json-56mib-memory-png-v1','canonical-json-4216mib-memory-png-v1'].includes(startupRetentionProfile))throw Error('Unknown startup retention profile: '+startupRetentionProfile);
+  if(startupRetentionProfile==='canonical-json-4216mib-memory-png-v1'&&args.includes('--verify-report')&&startupEvidenceView!=='canonical-reference-v1')throw Error('Full-domain startup retention profile requires explicit canonical-reference-v1 evidence view');
   const startupCapture=args.includes('--startup-capture')?value('--startup-capture'):null;
   if(startupRetentionProfile!==undefined&&!(args.includes('--startup-opening')&&(profile===undefined||profile==='ordinary')&&(args.includes('--verify-report')||args.includes('--run')&&startupCapture==='timeline')))throw Error('Native Timeline retention profile requires ordinary startup Timeline run or explicit startup verification');
   if(args.includes('--startup-capture')&&!['jpeg','timeline'].includes(startupCapture))throw Error('Startup capture selection requires explicit jpeg or timeline mode');

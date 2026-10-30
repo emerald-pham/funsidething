@@ -10,7 +10,7 @@ export const TIMELINE_PROVENANCE=Object.freeze({playwright:'1.62.1',webkitRevisi
 export const TIMELINE_BOUNDS=Object.freeze({maxDurationMs:12000,maxEvents:4096,maxEventBytes:1048576,maxTotalBytes:33554432,maxFrames:120,maxFrameBytes:1048576});
 const RETENTION_PROFILE='canonical-json-48mib-memory-png-v1';
 const RETENTION_PROFILE_BOUNDS=Object.freeze({...TIMELINE_BOUNDS,maxTotalBytes:50331648,maxPhysicalPayloadBytes:33554432,maxPersistentPngBytes:0,maxDecodedPngInFlightBytes:1048576});
-const RETENTION_PROFILES=Object.freeze({[RETENTION_PROFILE]:RETENTION_PROFILE_BOUNDS,'canonical-json-56mib-memory-png-v1':Object.freeze({...RETENTION_PROFILE_BOUNDS,maxTotalBytes:58720256})});
+const RETENTION_PROFILES=Object.freeze({[RETENTION_PROFILE]:RETENTION_PROFILE_BOUNDS,'canonical-json-56mib-memory-png-v1':Object.freeze({...RETENTION_PROFILE_BOUNDS,maxTotalBytes:58720256}),'canonical-json-4216mib-memory-png-v1':Object.freeze({...RETENTION_PROFILE_BOUNDS,maxTotalBytes:4420796416,maxPhysicalPayloadBytes:4294967296})});
 const hash=b=>createHash('sha256').update(b).digest('hex'),finite=n=>Number.isFinite(n)&&n>=0;
 const check=(ok,message)=>assert.ok(ok,'Native Timeline '+message);
 export function verifyNativeTimelineCapture(c,{retentionProfile}={}){
