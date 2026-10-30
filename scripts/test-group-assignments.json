@@ -13720,6 +13720,11 @@
       "root": "RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
