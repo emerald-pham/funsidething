@@ -2469,3 +2469,9 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 
 - `RISK repository process: trusted planner declares ordinary engines separately from optional workloads` — Pure public current-source planner declares independently fixed ordinary Chromium+WebKit context and default-off separate workload admission; descriptor is zero-execution context only.
 - `test group public workflow retains selected workload evidence without admitting it as ordinary proof` — Actual existing workflow aggregate command with complete ordinary profiles, exact seven selected optional public CLI fixture callbacks, complete statuses/artifacts, mandatory source/action/repeat/trust/accounting/cleanup negatives and no runtime/native execution.
+
+## Integrated optional-policy consumer index
+
+- `RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict` — The existing aggregate preserves all optional mobile outcomes separately from the required ordinary verdict, without converting failed/unavailable diagnostics into passes.
+- `RISK repository process: optional mobile diagnostics do not block ordinary reuse` — The existing current-source reuse planner disregards optional mobile failures while still refusing missing, failed or ambiguous mandatory producers.
+- `RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission` — The existing hosted optional mobile route requires explicit branch workflow-dispatch selection and retains raw event/ref/source admission; unselected or forged policy refuses before runtime.

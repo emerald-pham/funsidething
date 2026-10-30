@@ -33579,5 +33579,225 @@
       "failure": "No new product RED was observed or asserted before authoring this coverage control. Any actual unexpected failure will be preserved separately and will halt further edits or reruns."
     },
     "sourceParent": "d8de8276642eabe735ba2ebae8d9b7b73626f763"
+  },
+  {
+    "baseCommit": "5eda580d631f5532430162369775b1ed6777d978",
+    "comparisonMergeBase": "5eda580d631f5532430162369775b1ed6777d978",
+    "testChangesSha256": "a5b1edaac0be914b8c11dcfb7b1c363884aec26bc3f630d22f3e73aaadb274a6",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "d8de8276642eabe735ba2ebae8d9b7b73626f763",
+    "comparisonMergeBase": "d8de8276642eabe735ba2ebae8d9b7b73626f763",
+    "testChangesSha256": "226ad4394202c1bf582fc4d36788dae302977f203299c28326a4308616eed892",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "d0427557554d10c926dbb1959ee01988bd629833",
+    "comparisonMergeBase": "d0427557554d10c926dbb1959ee01988bd629833",
+    "testChangesSha256": "8b5ffaf93b653c06f9de373565b9a253e8eace7c20c60067430bdceb70831262",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "505ee67c076445c959c725d8afcc46eda8879e6a",
+    "comparisonMergeBase": "505ee67c076445c959c725d8afcc46eda8879e6a",
+    "testChangesSha256": "ce5cb271b0ffabcbb42f953a87dfafd27546ea4e1e56ce6e85a1605c01c73893",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "comparisonMergeBase": "3bd119a52d6fd1c65210f7241144cff8302af7dd",
+    "testChangesSha256": "7c30c005bf24db0fcd41473ec3354b3c4d0495bf577ba7631f4db7d6bf2309c7",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "testChangesSha256": "8cd60f9779e481b53d7f27029d85822702ecc9b86ae8b79ae830506ba4787cbe",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "testChangesSha256": "4e33027db00f1054ae01d5c9012fb51432ac0ee43eac7a84152b2f0f47424544",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "38c6cd2606e0519ab306ae25654218a592d0b9093b0d683316c21c45784caa6d",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "comparisonMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "16c21b941de4299a83698a81cdf766b9aa6d37b72b8297da6cb8957c4bcb9f95",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
+  },
+  {
+    "baseCommit": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "comparisonMergeBase": "2962c18f0d34c8c233df48f80a2dd248bceba8da",
+    "testChangesSha256": "e2253cd75c85cf568fffae7d99e8fa57f85ad19f7d06f0aa07eeada5609f45c3",
+    "cycle": "coverage-correction-1560",
+    "reason": "Correct only the new350ms case obsolete error phrase and list the three existing optional policy roots missing from the complete feature index.",
+    "previousBehavior": "Whole combined proof7ca241c6 finished70cases67pass with one missing-three-name inventory failure and one newcase error-matcher failure plus its parent aggregate; actual required failed outcome correctly refused.",
+    "intendedBehavior": "Preserve exact350ms full-report equality and all three required-outcome negatives, match the precise existing consumer failure cause, retain all other assertions and record all existing policy risk names.",
+    "replacementTests": [
+      "ordinary retains correct350ms observations with exact required-outcome failure causes"
+    ],
+    "preservedCoverage": [
+      "All prior seven profile-admission nested cases, complete114actions/60ordinaryscenarios/tenrepeat controls, all timing values and required-outcome assertions remain unchanged.",
+      "All1146prior complete rationale objects stay their original raw prefix; original5eda/67of70record/source and all earlier app/fixture failures retain truthful chronology.",
+      "No runtime guard, ordinary correctness threshold, optional workload/cap assertion or native/source data changed; this is a coverage-only owner repair."
+    ],
+    "redEvidence": {
+      "command": "Actual ONE recorded10-root70-case combined cohort7ca241c6-e5f8-4a68-9390-1b65da2b23c4 on clean5eda/tree6b6b, full rawsource/TAP retained under1559execution.",
+      "failure": "Inventory guard listed three missing existing optional-policy names; new350ms failed-status control expected obsolete must pass words although real consumer correctly threw Button action must execute successfully. No product RED asserted."
+    },
+    "sourceParent": "5eda580d631f5532430162369775b1ed6777d978"
   }
 ]
