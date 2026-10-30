@@ -1,0 +1,1 @@
+{"record":{"startTime":1.3387140833074227,"data":{"id":89},"children":[{"startTime":1.3387164166779257,"data":{"scriptName":"web-inspector://bootstrap.js","scriptLine":781,"scriptColumn":184},"children":[],"endTime":1.3387418749625795,"type":"FunctionCall"}],"endTime":1.3387425833498128,"type":"FireAnimationFrame"}}

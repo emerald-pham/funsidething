@@ -1,0 +1,1 @@
+{"record":{"startTime":1.345962833322119,"data":{"id":94},"children":[{"startTime":1.345963625004515,"data":{"scriptName":"http://127.0.0.1:53623/button-61f95aa9-0b54-4b2e-a366-5cb2a5f0365b/landscape.js","scriptLine":1464,"scriptColumn":16},"children":[],"endTime":1.3459702916443348,"type":"FunctionCall"}],"endTime":1.3459704999695532,"type":"FireAnimationFrame"}}

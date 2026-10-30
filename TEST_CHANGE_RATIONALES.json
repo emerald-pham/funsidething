@@ -26778,5 +26778,633 @@
       "command": "Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
       "failure": "Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
     }
+  },
+  {
+    "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "testChangesSha256": "a3e90ada4b02b02612d4ffb245e2bf6f5af726ef602445efbd70cc9890e9f5be",
+    "reason": "Add the independently specified1470 native Timeline raw evidence consumer contract before provider or consumer implementation, preserving all982 prior rationale objects.",
+    "previousBehavior": "The current consumer accepts only the public JPEG provider and rejects valid source-bound native Timeline raw evidence at its explicit known-public-provider assertion.",
+    "intendedBehavior": "Accept well-formed bounded native raw evidence while timing remains incomplete, and reject false source, engine, session, context, epoch, drop, host-time, presentation, caller, mark and rate claims.",
+    "replacementTests": [
+      "RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance"
+    ],
+    "preservedCoverage": [
+      "Existing public JPEG artifact guards and honest incomplete paint/work semantics remain protected.",
+      "All application saved-board, source, authority, action and release boundaries remain unchanged; synthetic evidence is not a measured startup."
+    ],
+    "redEvidence": {
+      "command": "Node24.19 recorder preimplementation-red -- node --test --test-name-pattern=^RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance$ tests.js",
+      "failure": "Actual bb974470-48b9-4f12-ba50-9679d16aa8db on exact CPf207 failed ERR_ASSERTION: Startup capture known selected public provider required; one test, one assertion failure, zero skips/cancel, child/wrapper1. No consumer/provider edits preceded the run.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-provider/sol-owner/1470-red/2026-10-29T23-12-46-344Z-bb974470-48b9-4f12-ba50-9679d16aa8db.json"
+    }
+  },
+  {
+    "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "testChangesSha256": "e244d59488248f76137d9f29a4c42373285321e224707bb310d7ab63fb0e6543",
+    "reason": "Preserve original1470 raw-provider consumer RED and add pure deliberate external-session controls for the same bounded1471 provider, with actual later drain and interrupted-arming REDs before those repairs.",
+    "previousBehavior": "CP rejects native raw evidence; initial owner implementation additionally dropped the final stop-delivered native work record and did not register cleanup before async arming. Malformed context input could remain captured.",
+    "intendedBehavior": "Bound native provenance and owned sessions, retain raw native nesting/PNG/work and document anchors, drain pending records, restore only the owned lifecycle hook and retain incomplete first-occurrence semantics. No browser/app/protocol executes in these unit controls.",
+    "replacementTests": [
+      "RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance",
+      "RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks"
+    ],
+    "preservedCoverage": [
+      "All982 original rationale objects and the1470 original rationale remain byte-equivalent as JSON objects; existing public JPEG malformed-artifact guards and incomplete clock/work semantics remain protected.",
+      "Application/fixture/accepted-decision/source authority and full native/release qualification remain unchanged; deliberate SDK doubles are not actual runtime evidence."
+    ],
+    "redEvidence": {
+      "command": "Node24 recorder --purpose preimplementation-red -- node --test --test-name-pattern=^RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks$ tests.js",
+      "failure": "Original CP raw-consumer RED bb974470 reached known-public-provider assertion before any implementation. Later owner-source1ae7e085 failed dropped count1!==0 before the drain repair; later72ad531c failed cleanup-registration/context assertions before those repairs. These later records are not CP/product RED. Original setup FileNotFound and separate1481 bundled-route admission remain preserved.",
+      "records": [
+        "bb974470-48b9-4f12-ba50-9679d16aa8db",
+        "1ae7e085-75f2-4970-926e-59b2151da560",
+        "72ad531c-9425-4e39-8c6c-e70004d61438"
+      ]
+    }
+  },
+  {
+    "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "testChangesSha256": "219b371b6dffa46e394442da75810f7d7e3e39e05edde76fa79461e68168b8b3",
+    "reason": "Add a producer late-attachment refusal after self-review of1471; preserve every earlier rationale and the actual test-first failure before this minimal guard.",
+    "previousBehavior": "The consumer rejected a false pre-navigation flag, but the owner producer accepted an already-navigated owned Page and declared later arming pre-navigation.",
+    "intendedBehavior": "Refuse nonblank client Page or server main-frame before directory creation, lifecycle hooks or native commands; keep all previous raw-evidence/incomplete/public controls intact.",
+    "replacementTests": [
+      "RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance",
+      "RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks"
+    ],
+    "preservedCoverage": [
+      "All982 original rationale objects and the1470 original rationale remain byte-equivalent as JSON objects; existing public JPEG malformed-artifact guards and incomplete clock/work semantics remain protected.",
+      "Application/fixture/accepted-decision/source authority and full native/release qualification remain unchanged; deliberate SDK doubles are not actual runtime evidence."
+    ],
+    "redEvidence": {
+      "command": "Node24 recorder --purpose preimplementation-red -- node --test --test-name-pattern=^RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks$ tests.js",
+      "failure": "Original CP raw-consumer RED bb974470 reached known-public-provider assertion before any implementation. Later owner-source1ae7e085 failed dropped count1!==0 before the drain repair; later72ad531c failed cleanup-registration/context assertions before those repairs. These later records are not CP/product RED. Original setup FileNotFound and separate1481 bundled-route admission remain preserved. Later owner-source7be56add failed Missing expected rejection on the independently specified late-page control before the blank Page/main-frame guard.",
+      "records": [
+        "bb974470-48b9-4f12-ba50-9679d16aa8db",
+        "1ae7e085-75f2-4970-926e-59b2151da560",
+        "72ad531c-9425-4e39-8c6c-e70004d61438",
+        "7be56add-890b-473b-bf66-d8f8a5e5f9d0"
+      ]
+    }
+  },
+  {
+    "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "testChangesSha256": "925dd6b65712c6f6b775173a441185ac989bcfeaeaef7f1973755051f1c804e2",
+    "reason": "Define independently specified complete retained-native raw consumer and portable SDK/session controls under1493 before implementation.",
+    "previousBehavior": "Existing classifier ignores nativeInputs and exposes no separate typed native evidence; SDK double setup acquires actual Mac provenance and accepts an unvalidated provisional branch.",
+    "intendedBehavior": "Separate source-located intervals from point stack names, keep raw producer bytes intact, enforce typed provenance/path/clock/document/initial-only controls and portable explicit verifier.",
+    "replacementTests": [
+      "RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks",
+      "RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary",
+      "RISK repository process: initial-only native Timeline evidence refuses unvalidated branches"
+    ],
+    "preservedCoverage": [
+      "All985 prior complete rationale objects and original passing public/raw/drain/refusal/cleanup assertions remain at definition; no runtime source or oldSDK test edits in1493."
+    ],
+    "redEvidence": {
+      "command": "Planned1494 exact recorder three-root TAP command after definition closes; no test executed under1493.",
+      "failure": "Definition only: expected existing classifier nativeEvidence assertion mismatch is independently specified, not yet observed and earns no1494 RED credit."
+    }
+  },
+  {
+    "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "testChangesSha256": "76e6278e539164e9907242ec51cc27f548e835ce54fe888c8fb1c888ceb92717",
+    "reason": "Implement agreed1486 pure native evidence and portable lazy SDK boundary after actual1494 meaningful consumer RED; replace only inaccurate old synthetic stack/name and provisional continuation assumptions.",
+    "previousBehavior": "Actual full raw input reached classifier but nativeEvidence was absent. Old SDK double acquired host-native files, invented array FunctionCall stacks/names, and positively accepted an unvalidated provisional branch.",
+    "intendedBehavior": "Retain complete typed source-located intervals and separate point stacks/clock/snapshot evidence; fail closed on wrong identities and unsupported branches; explicit unit verifier stays portable while real start retains exact1468 guard.",
+    "replacementTests": [
+      "RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks",
+      "RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary",
+      "RISK repository process: initial-only native Timeline evidence refuses unvalidated branches",
+      "RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks"
+    ],
+    "preservedCoverage": [
+      "All985 original complete objects and rawprefix unchanged; every raw/drain/onStop-before-await/cancel/back-map/late/context/debugger/foreign-hook refusal and cleanup assertion remains.",
+      "Old synthetic named work assertion is replaced by verbatim source-located drained FunctionCall bytes; current raw facts.work stays empty. Positive provisional continuation is deliberately narrowed to refusal before foreign commands with owned restoration. Actual1472 provisional behavior was never validated.",
+      "No app/shell/FAQ/version/public JPEG changes, native execution or complete startup claim."
+    ],
+    "redEvidence": {
+      "record": "830ca7de-c79a-4ba1-9ac1-8e62a0e26d16",
+      "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"scripts/agent-tools/record-run.mjs\", \"--repo\", \"/Users/emeraldpham/.codex/worktrees/1469-native-timeline/funsidething\", \"--evidence-dir\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-provider/sol-owner/1493-1498/1494-red\", \"--purpose\", \"preimplementation-red\", \"--\", \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^(?:RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches)$\", \"tests.js\"]",
+      "failure": "Actual valid complete retained bytes at existing classifier failed nativeEvidence assertion, ERR_ASSERTION; other two API-presence failures are enforcement-only. Child/wrapper1; no setup/import/native failure."
+    }
+  },
+  {
+    "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "testChangesSha256": "37aae8e4605d63c505d22ae68db93decc28b1ad175e1b59cedfdfcba87417fa1",
+    "reason": "Define agreed1501 ordinary app-binding/observed-state/role/source serializer controls before1510 actual RED and any implementation.",
+    "previousBehavior": "1498 classifier derives generic raw native facts but ignores appBinding and has no ordinary schema2 state/source/custody/receipt derivation.",
+    "intendedBehavior": "Only exact source/fixture/document/trusted input/full custody/independently declared PNG states produce bounded firstObserved; deliberate controls remain synthetic and wrong original1472-as-app attribution is rejected.",
+    "replacementTests": [
+      "RISK repository process: ordinary startup observations bind exact app sources and complete saved data",
+      "RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels",
+      "RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work",
+      "RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts"
+    ],
+    "preservedCoverage": [
+      "All987 prior complete rationale objects/rawprefix and all original1472/1498 tests/source/raw bytes retained. No provider/runtime source edit under1509."
+    ],
+    "redEvidence": {
+      "command": "Planned1510 exact four-root public classifier TAP command; no test executed under1509.",
+      "failure": "Definition-only: expected schema2 derivation assertion and actual1472 wrong-app rejection mismatch are not yet observed and earn no RED credit."
+    }
+  },
+  {
+    "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "testChangesSha256": "8b3f58781ab21d8bd9e1127a76a1c5e8bb0ddb500bd42c7fe013df50a1adc389",
+    "reason": "Implement root-agreed1501 D source binding after observed1510 public-consumer RED; strengthen same four roots with exact canonical provider marker/URL and explicit CLI controls, preserving all previous assertions.",
+    "previousBehavior": "Valid synthetic schema2 inputs had no derived board/work result; actual1472 falsely offered as ordinary app was accepted. API absence is enforcement-only, not the functional RED.",
+    "intendedBehavior": "Exact source/fixture/document/typed custody/input/pixel binding and bounded firstObserved states with explicit unknown names/roles; mandatory lazy real guard remains unchanged. Synthetic controls never become actual app evidence.",
+    "replacementTests": [
+      "RISK repository process: ordinary startup observations bind exact app sources and complete saved data",
+      "RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels",
+      "RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work",
+      "RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts"
+    ],
+    "preservedCoverage": [
+      "All987 prior complete rationale objects/rawprefix retained. Current source migrates only SDK doubles to required explicit owned sourceURL/canonical content; all drain/refusal/context/cancel/onStop/cleanup assertions remain.",
+      "Strictness/negative-zero args/async return/throw/open-close payloads/init ordering/final same-context href and diagnostic CLI checks are pure controls strengthened after actual consumer RED, not retroactively claimed as preimplementation assertion failures.",
+      "Original1472 raw files/capture/work=[] and oldJPEG/source identities remain immutable; no native run or app edit."
+    ],
+    "redEvidence": {
+      "record": "eb170bc4-0009-4be4-9117-0bebe86b3494",
+      "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1469-native-timeline/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-contract/sol-owner/1509-1514/1510-red\",\"--purpose\",\"preimplementation-red\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--test\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+      "failure": "Three substantive actual public-classifier assertions failed: absent schema2 state, acceptance of controlled1472 as ordinary app, absent source-located ordinary work. Fourth serializer-presence assertion is enforcement-only; no setup/import/native failure. Child/wrapper1."
+    }
+  },
+{
+  "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "testChangesSha256": "298963f744fffb6164f44df7d7752285d1c5c6d43943e9c405406e14f56ba0d2",
+  "reason": "Implement root-admitted1549 independent public canonical-event producer, separate schema1/schema2 consumer and actual controller/finally external-SDK controls; preserve all prior989 complete objects/rawprefix.",
+  "previousBehavior": "Native writer synchronously persists decoded PNG duplicates; actual failed controller closes browser early and emits no terminal source/capture/spec or typed custody availability.",
+  "intendedBehavior": "Whole original JSON and exact derived PNG occurrences preserve fields with unchanged logical caps; failed actual controller finalizes available evidence once before close with truthful unavailable clock/input/custody.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All989 predecessor complete rationale objects/rawprefix and all old1472/ordinary-control assertions/fixtures remain exact.",
+    "Strict provenance/runtime wrapper, oldschema1 physical PNG, clocks, caller/typed stacks, source/64-task unknown fields and cleanup are preserved; no fullcapture/app cause/native admission."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"scripts/agent-tools/record-run.mjs\", \"--repo\", \"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\", \"--evidence-dir\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1550/recorder\", \"--purpose\", \"preimplementation-red\", \"--summary\", \"--\", \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"--experimental-vm-modules\", \"--test\", \"--test-concurrency=1\", \"--test-reporter=tap\", \"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\", \"tests.js\"]",
+    "failure": "NOT EXECUTED at1549 definition. Actual1550 whole-cohort assertion evidence must replace this explicit pending marker before any implementation/gate credit."
   }
+}
+,
+{
+  "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "testChangesSha256": "8b86dd0ff7b7abf092d63e816630498c6a861ab7db5fb6e9b09b8a1bd5599e00",
+  "reason": "Root-admitted1556 substantive external process-adapter setup correction and durable actual fixture-error/output retention after unaccepted mixed1550 RED. No production module or existing oracle changes.",
+  "previousBehavior": "Spreading process dropped inherited on/off methods before the real controller try; controller fixtures showed running status and deleted their actual caught exception/report before diagnosis.",
+  "intendedBehavior": "Private real EventEmitter owns signal on/off; full real controller and portable provider execute unchanged. Actual name/message/stack/report/trace/read count/owned outputs persist before assertions and disposal, zero fixture listeners recorded/asserted.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All990 preceding complete rationale objects/rawprefix including explicit pending1549RED history remain exact;989predecessorD objects/fixtures,605corpus files and six runtime modules stay byteexact.",
+    "The exact16root/126case declarations and all original behavioral assertions/caps remain unchanged.1550old126statuses remain unaccepted, no schema/diagnostic-absence failure becomes behavioralRED credit."
+  ],
+  "redEvidence": {
+    "record": "dea2c80a-d19d-43c0-8c27-16d79f84c6eb",
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"scripts/agent-tools/record-run.mjs\", \"--repo\", \"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\", \"--evidence-dir\", \"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1550/recorder\", \"--purpose\", \"preimplementation-red\", \"--summary\", \"--\", \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"--experimental-vm-modules\", \"--test\", \"--test-concurrency=1\", \"--test-reporter=tap\", \"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\", \"tests.js\"]",
+    "failure": "Actual1550 mixedRED126cases106pass20fail0skipcancel: three actual-controller variants unexpectedly asserted running vs failed before intended finalization. Complete diagnosis proves missing inherited process adapter on/off if native120 reached, with historical caughtstack deleted/unavailable. This correction is fixture-only and1557 is NOT EXECUTED or accepted at this definition."
+  }
+}
+,
+{
+  "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "testChangesSha256": "386290190534931d678f24cbfa6a61c9dd49b1b9ffc81e9d3904b3e4f8f281ce",
+  "reason": "Root-admitted1558 source-only external initialization-dispatch correction after static prelaunch catch; preserve all991 preceding complete rationale objects/rawprefix and the single1557 RED allowance.",
+  "previousBehavior": "Ordinary input init mentions __nativeTimelineDocument but carries inputPrefix, so the generic substring fixture dispatcher would incorrectly call the existing clock-only prefix parser before real provider start. No controller/test probe was run after1556.",
+  "intendedBehavior": "Only the exact native-timeline UUID literal-prefix and owned clock-init.js envelope reaches the existing clock parser. Existing ordinary/other synthetic initialization treatment stays unchanged; full script category/content hash/byte count is retained with actual controller diagnostics. Real runtime/provider/controller and every original oracle remain exact.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All991 preceding complete objects and rawprefix preserved without dedupe; all753source paths,605corpus files, six runtime modules,16roots/126case declarations and every original assertion/cap remain exact except this established adapter/diagnostic seam.",
+    "Private EventEmitter on/off, complete actual errors/report/trace/readcount/output retention and zero-listener assertion from1556 unchanged. Entire setup through deliberate debugger pause and awaited finalization statically mapped; no extra interface/runtime/helper/API introduced."
+  ],
+  "redEvidence": {
+    "record": "dea2c80a-d19d-43c0-8c27-16d79f84c6eb",
+    "command": "NOT EXECUTED under1558: syntax/source-only. The same ONE corrected1557 whole-cohort argv will be source/env-bound in live1557 before launch.",
+    "failure": "Original1550 mixed126case attempt stays failed/unaccepted.1556 fixture repair and1558 static init-routing correction earn no runtime RED credit; actual corrected1557 remains pending."
+  }
+}
+,
+{
+  "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "testChangesSha256": "b6c54cb4cf135e8f029837bb708057c2efef53ba145b70587d8e196c5569d29c",
+  "reason": "Root-admitted1567 materially changed fixture module graph after independent CLOSED1566 real serializer/decoder realm proof; exact actual startup SourceTextModule now shares the actual native controller vcontext. No runtime or oracle changes.",
+  "previousBehavior": "Actual1568 predecessor1557 C controls failed at native171 VM-created plain argument because fixture SyntheticModule forwarded host canonical function with host Object.prototype; all original errors/126statuses remain unaccepted and retained.",
+  "intendedBehavior": "Same unchanged startup module loads in controller vcontext, with imports resolved against referencing module identity and actual module cached before link. Its real node:assert/strict and node:crypto dependencies keep existing unmodified namespace boundary; five native-used exports retain exact actual implementation. No normalization or prototype/typed guard relaxation.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All992 preceding complete objects and rawprefix unchanged; all original16roots/126case names/assertions and605corpus files byteexact; six runtime modules and strict acquisition wrapper unchanged.",
+    "Existing private EventEmitter, exact clock-init envelope routing, durable whole diagnostic/error/report/file retention, zero-listener assertion and real provider/external SDK boundaries unchanged. No controller/provider/test/probe execution under source-only1567."
+  ],
+  "redEvidence": {
+    "record": "2ec697d4-0611-4cd0-a156-0df609995eda",
+    "failure": "Predecessor whole1557 remains unaccepted106pass20failed: actual C prototype setup refusal before provider. Independent1566 serializer-only RESULT SHA88ec28ede6aa8d50f817ac96d7cefb5768de7225646721a6d080f17b35ec0962 proves exact hostreject/sameVMaccept and strict/typed controls, not controller RED.1568 ONE whole RED pending actual source/env/argv binding; no new behavioral credit at definition.",
+    "command": "Source-only1567 syntax/static audit; no test, provider/controller call or serializer probe. Exact original16root whole1568 command will be bound before its ONE launch."
+  }
+}
+,
+{
+  "baseCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "comparisonMergeBase": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "testChangesSha256": "b6c54cb4cf135e8f029837bb708057c2efef53ba145b70587d8e196c5569d29c",
+  "cycle": "1553-private-timeline-retention-parent",
+  "reason": "Metadata-only complete source comparison association for parent against its actual requested commit/effective merge base, preserving all993 prior objects and all passed tests/runtime/corpus bytes.",
+  "previousBehavior": "Distinct accepted1568 whole RED proved eager persisted PNG duplicates, late synchronous intake and actual failed-controller missing terminal artifacts after the real debugger pause. Older1550/1557 attempts remain unaccepted; their fixture errors and all raw records are unchanged.",
+  "intendedBehavior": "Bind the unchanged actual1552 whole126case GREEN source and exact accepted1568 RED chronology to this actual comparison for private packaging. No behavior, test/oracle, capacity or native evidence is created by this metadata association.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All993 preceding complete rationale objects and their raw prefix remain byteexact; no fingerprint-only deduplication, deletion or rewrite of failed or pending historical chronology.",
+    "Whole original16roots126cases pass with zero fail/cancel/skip, including all92old strictschema1/runtime/caller/source/typed/ordinary controls and full current canonical/raw/hash/PNG/physical/logical/duration/cleanup tails.",
+    "All162actual controller files+3whole diagnostics preserve one stop→custody→context→browser→server sequence, one read/one browser close, full typed opaque values and truthful read/cleanup failures. Tests/core/wrapper/corpus source bytes remain exact from actual GREEN.",
+    "OriginalD148source/native684/old1472raw99 and earlier unaccepted1550/1557 packets remain exact. Physical saving does not extend the32MiB full-occurrence logical cap or admit a new native capture/app-cause/release claim."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1568/recorder\",\"--purpose\",\"preimplementation-red\",\"--summary\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--experimental-vm-modules\",\"--test\",\"--test-concurrency=1\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+    "failure": "Accepted actual1568 record 2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc:126cases106pass20failed records including4aggregates, all92old pass. A1/A2 eager PNG and D9 deadline genuine RED; all3 C variants reached real debugger pause/error/unavailable calibration/docs[] then intended missing startup-native-capture.json assertion. Schema/new diagnostic absence separate; old unaccepted attempts retained. Actual1552 2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6 then passes126/126 complete unchanged cases/tails. This metadata-only association is not a new RED or rerun."
+  },
+  "sourceAssociation": {
+    "requestedCommit": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "effectiveMergeBase": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "acceptedGreenRecord": "2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6",
+    "acceptedGreenFullPatch": "84f76ffa1b73f987481e1d4b054db00c27911e5f0bf73b2c6d8ce7177a3d8ab6",
+    "acceptedRedRecord": "2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc",
+    "acceptedTestsSha256": "7b88a28a82b5ca0bb5a3bf13ecb50c59ab2fd02b8dc54472be0535c9f9ed59f3",
+    "metadataOnly": true
+  }
+},
+{
+  "baseCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+  "comparisonMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+  "testChangesSha256": "732de039f1f41491f4523d9b0b2aae6f755c4520c3a54367569509b2dc093dce",
+  "cycle": "1553-private-timeline-retention-frozen",
+  "reason": "Metadata-only complete source comparison association for frozen against its actual requested commit/effective merge base, preserving all993 prior objects and all passed tests/runtime/corpus bytes.",
+  "previousBehavior": "Distinct accepted1568 whole RED proved eager persisted PNG duplicates, late synchronous intake and actual failed-controller missing terminal artifacts after the real debugger pause. Older1550/1557 attempts remain unaccepted; their fixture errors and all raw records are unchanged.",
+  "intendedBehavior": "Bind the unchanged actual1552 whole126case GREEN source and exact accepted1568 RED chronology to this actual comparison for private packaging. No behavior, test/oracle, capacity or native evidence is created by this metadata association.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All993 preceding complete rationale objects and their raw prefix remain byteexact; no fingerprint-only deduplication, deletion or rewrite of failed or pending historical chronology.",
+    "Whole original16roots126cases pass with zero fail/cancel/skip, including all92old strictschema1/runtime/caller/source/typed/ordinary controls and full current canonical/raw/hash/PNG/physical/logical/duration/cleanup tails.",
+    "All162actual controller files+3whole diagnostics preserve one stop→custody→context→browser→server sequence, one read/one browser close, full typed opaque values and truthful read/cleanup failures. Tests/core/wrapper/corpus source bytes remain exact from actual GREEN.",
+    "OriginalD148source/native684/old1472raw99 and earlier unaccepted1550/1557 packets remain exact. Physical saving does not extend the32MiB full-occurrence logical cap or admit a new native capture/app-cause/release claim."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1568/recorder\",\"--purpose\",\"preimplementation-red\",\"--summary\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--experimental-vm-modules\",\"--test\",\"--test-concurrency=1\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+    "failure": "Accepted actual1568 record 2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc:126cases106pass20failed records including4aggregates, all92old pass. A1/A2 eager PNG and D9 deadline genuine RED; all3 C variants reached real debugger pause/error/unavailable calibration/docs[] then intended missing startup-native-capture.json assertion. Schema/new diagnostic absence separate; old unaccepted attempts retained. Actual1552 2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6 then passes126/126 complete unchanged cases/tails. This metadata-only association is not a new RED or rerun."
+  },
+  "sourceAssociation": {
+    "requestedCommit": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "effectiveMergeBase": "f22f28be699f10a766ce9a90d01469b65457bfed",
+    "acceptedGreenRecord": "2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6",
+    "acceptedGreenFullPatch": "84f76ffa1b73f987481e1d4b054db00c27911e5f0bf73b2c6d8ce7177a3d8ab6",
+    "acceptedRedRecord": "2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc",
+    "acceptedTestsSha256": "7b88a28a82b5ca0bb5a3bf13ecb50c59ab2fd02b8dc54472be0535c9f9ed59f3",
+    "metadataOnly": true
+  }
+},
+{
+  "baseCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+  "comparisonMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+  "testChangesSha256": "919f825c4e09dd13859b5f4770f02645a6fcfac60f46bfc58ff37923f228e076",
+  "cycle": "1553-private-timeline-retention-c920",
+  "reason": "Metadata-only complete source comparison association for c920 against its actual requested commit/effective merge base, preserving all993 prior objects and all passed tests/runtime/corpus bytes.",
+  "previousBehavior": "Distinct accepted1568 whole RED proved eager persisted PNG duplicates, late synchronous intake and actual failed-controller missing terminal artifacts after the real debugger pause. Older1550/1557 attempts remain unaccepted; their fixture errors and all raw records are unchanged.",
+  "intendedBehavior": "Bind the unchanged actual1552 whole126case GREEN source and exact accepted1568 RED chronology to this actual comparison for private packaging. No behavior, test/oracle, capacity or native evidence is created by this metadata association.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All993 preceding complete rationale objects and their raw prefix remain byteexact; no fingerprint-only deduplication, deletion or rewrite of failed or pending historical chronology.",
+    "Whole original16roots126cases pass with zero fail/cancel/skip, including all92old strictschema1/runtime/caller/source/typed/ordinary controls and full current canonical/raw/hash/PNG/physical/logical/duration/cleanup tails.",
+    "All162actual controller files+3whole diagnostics preserve one stop→custody→context→browser→server sequence, one read/one browser close, full typed opaque values and truthful read/cleanup failures. Tests/core/wrapper/corpus source bytes remain exact from actual GREEN.",
+    "OriginalD148source/native684/old1472raw99 and earlier unaccepted1550/1557 packets remain exact. Physical saving does not extend the32MiB full-occurrence logical cap or admit a new native capture/app-cause/release claim."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1568/recorder\",\"--purpose\",\"preimplementation-red\",\"--summary\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--experimental-vm-modules\",\"--test\",\"--test-concurrency=1\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+    "failure": "Accepted actual1568 record 2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc:126cases106pass20failed records including4aggregates, all92old pass. A1/A2 eager PNG and D9 deadline genuine RED; all3 C variants reached real debugger pause/error/unavailable calibration/docs[] then intended missing startup-native-capture.json assertion. Schema/new diagnostic absence separate; old unaccepted attempts retained. Actual1552 2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6 then passes126/126 complete unchanged cases/tails. This metadata-only association is not a new RED or rerun."
+  },
+  "sourceAssociation": {
+    "requestedCommit": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "effectiveMergeBase": "c920ccffc11af487ec84277c33fe2e370541e384",
+    "acceptedGreenRecord": "2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6",
+    "acceptedGreenFullPatch": "84f76ffa1b73f987481e1d4b054db00c27911e5f0bf73b2c6d8ce7177a3d8ab6",
+    "acceptedRedRecord": "2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc",
+    "acceptedTestsSha256": "7b88a28a82b5ca0bb5a3bf13ecb50c59ab2fd02b8dc54472be0535c9f9ed59f3",
+    "metadataOnly": true
+  }
+},
+{
+  "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+  "comparisonMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+  "testChangesSha256": "929b4c20590ef21b7debdd30b19e3440d1f492551c96f57495606584d3129f3a",
+  "cycle": "1553-private-timeline-retention-b176",
+  "reason": "Metadata-only complete source comparison association for b176 against its actual requested commit/effective merge base, preserving all993 prior objects and all passed tests/runtime/corpus bytes.",
+  "previousBehavior": "Distinct accepted1568 whole RED proved eager persisted PNG duplicates, late synchronous intake and actual failed-controller missing terminal artifacts after the real debugger pause. Older1550/1557 attempts remain unaccepted; their fixture errors and all raw records are unchanged.",
+  "intendedBehavior": "Bind the unchanged actual1552 whole126case GREEN source and exact accepted1568 RED chronology to this actual comparison for private packaging. No behavior, test/oracle, capacity or native evidence is created by this metadata association.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All993 preceding complete rationale objects and their raw prefix remain byteexact; no fingerprint-only deduplication, deletion or rewrite of failed or pending historical chronology.",
+    "Whole original16roots126cases pass with zero fail/cancel/skip, including all92old strictschema1/runtime/caller/source/typed/ordinary controls and full current canonical/raw/hash/PNG/physical/logical/duration/cleanup tails.",
+    "All162actual controller files+3whole diagnostics preserve one stop→custody→context→browser→server sequence, one read/one browser close, full typed opaque values and truthful read/cleanup failures. Tests/core/wrapper/corpus source bytes remain exact from actual GREEN.",
+    "OriginalD148source/native684/old1472raw99 and earlier unaccepted1550/1557 packets remain exact. Physical saving does not extend the32MiB full-occurrence logical cap or admit a new native capture/app-cause/release claim."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1568/recorder\",\"--purpose\",\"preimplementation-red\",\"--summary\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--experimental-vm-modules\",\"--test\",\"--test-concurrency=1\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+    "failure": "Accepted actual1568 record 2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc:126cases106pass20failed records including4aggregates, all92old pass. A1/A2 eager PNG and D9 deadline genuine RED; all3 C variants reached real debugger pause/error/unavailable calibration/docs[] then intended missing startup-native-capture.json assertion. Schema/new diagnostic absence separate; old unaccepted attempts retained. Actual1552 2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6 then passes126/126 complete unchanged cases/tails. This metadata-only association is not a new RED or rerun."
+  },
+  "sourceAssociation": {
+    "requestedCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "effectiveMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "acceptedGreenRecord": "2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6",
+    "acceptedGreenFullPatch": "84f76ffa1b73f987481e1d4b054db00c27911e5f0bf73b2c6d8ce7177a3d8ab6",
+    "acceptedRedRecord": "2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc",
+    "acceptedTestsSha256": "7b88a28a82b5ca0bb5a3bf13ecb50c59ab2fd02b8dc54472be0535c9f9ed59f3",
+    "metadataOnly": true
+  }
+},
+{
+  "baseCommit": "578b756136209228aa7cba5d37194187c0c2847f",
+  "comparisonMergeBase": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "testChangesSha256": "b6c54cb4cf135e8f029837bb708057c2efef53ba145b70587d8e196c5569d29c",
+  "cycle": "1553-private-timeline-retention-currentRoot",
+  "reason": "Metadata-only complete source comparison association for currentRoot against its actual requested commit/effective merge base, preserving all993 prior objects and all passed tests/runtime/corpus bytes.",
+  "previousBehavior": "Distinct accepted1568 whole RED proved eager persisted PNG duplicates, late synchronous intake and actual failed-controller missing terminal artifacts after the real debugger pause. Older1550/1557 attempts remain unaccepted; their fixture errors and all raw records are unchanged.",
+  "intendedBehavior": "Bind the unchanged actual1552 whole126case GREEN source and exact accepted1568 RED chronology to this actual comparison for private packaging. No behavior, test/oracle, capacity or native evidence is created by this metadata association.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All993 preceding complete rationale objects and their raw prefix remain byteexact; no fingerprint-only deduplication, deletion or rewrite of failed or pending historical chronology.",
+    "Whole original16roots126cases pass with zero fail/cancel/skip, including all92old strictschema1/runtime/caller/source/typed/ordinary controls and full current canonical/raw/hash/PNG/physical/logical/duration/cleanup tails.",
+    "All162actual controller files+3whole diagnostics preserve one stop→custody→context→browser→server sequence, one read/one browser close, full typed opaque values and truthful read/cleanup failures. Tests/core/wrapper/corpus source bytes remain exact from actual GREEN.",
+    "OriginalD148source/native684/old1472raw99 and earlier unaccepted1550/1557 packets remain exact. Physical saving does not extend the32MiB full-occurrence logical cap or admit a new native capture/app-cause/release claim."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1568/recorder\",\"--purpose\",\"preimplementation-red\",\"--summary\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--experimental-vm-modules\",\"--test\",\"--test-concurrency=1\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+    "failure": "Accepted actual1568 record 2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc:126cases106pass20failed records including4aggregates, all92old pass. A1/A2 eager PNG and D9 deadline genuine RED; all3 C variants reached real debugger pause/error/unavailable calibration/docs[] then intended missing startup-native-capture.json assertion. Schema/new diagnostic absence separate; old unaccepted attempts retained. Actual1552 2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6 then passes126/126 complete unchanged cases/tails. This metadata-only association is not a new RED or rerun."
+  },
+  "sourceAssociation": {
+    "requestedCommit": "578b756136209228aa7cba5d37194187c0c2847f",
+    "effectiveMergeBase": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "acceptedGreenRecord": "2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6",
+    "acceptedGreenFullPatch": "84f76ffa1b73f987481e1d4b054db00c27911e5f0bf73b2c6d8ce7177a3d8ab6",
+    "acceptedRedRecord": "2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc",
+    "acceptedTestsSha256": "7b88a28a82b5ca0bb5a3bf13ecb50c59ab2fd02b8dc54472be0535c9f9ed59f3",
+    "metadataOnly": true
+  }
+},
+{
+  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+  "comparisonMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+  "testChangesSha256": "7483530625e24db52300a3a76666e84ef4ec13aa4bb2592b5614436923da5ac8",
+  "cycle": "1553-private-timeline-retention-currentMain",
+  "reason": "Metadata-only complete source comparison association for currentMain against its actual requested commit/effective merge base, preserving all993 prior objects and all passed tests/runtime/corpus bytes.",
+  "previousBehavior": "Distinct accepted1568 whole RED proved eager persisted PNG duplicates, late synchronous intake and actual failed-controller missing terminal artifacts after the real debugger pause. Older1550/1557 attempts remain unaccepted; their fixture errors and all raw records are unchanged.",
+  "intendedBehavior": "Bind the unchanged actual1552 whole126case GREEN source and exact accepted1568 RED chronology to this actual comparison for private packaging. No behavior, test/oracle, capacity or native evidence is created by this metadata association.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All993 preceding complete rationale objects and their raw prefix remain byteexact; no fingerprint-only deduplication, deletion or rewrite of failed or pending historical chronology.",
+    "Whole original16roots126cases pass with zero fail/cancel/skip, including all92old strictschema1/runtime/caller/source/typed/ordinary controls and full current canonical/raw/hash/PNG/physical/logical/duration/cleanup tails.",
+    "All162actual controller files+3whole diagnostics preserve one stop→custody→context→browser→server sequence, one read/one browser close, full typed opaque values and truthful read/cleanup failures. Tests/core/wrapper/corpus source bytes remain exact from actual GREEN.",
+    "OriginalD148source/native684/old1472raw99 and earlier unaccepted1550/1557 packets remain exact. Physical saving does not extend the32MiB full-occurrence logical cap or admit a new native capture/app-cause/release claim."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1568/recorder\",\"--purpose\",\"preimplementation-red\",\"--summary\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--experimental-vm-modules\",\"--test\",\"--test-concurrency=1\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+    "failure": "Accepted actual1568 record 2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc:126cases106pass20failed records including4aggregates, all92old pass. A1/A2 eager PNG and D9 deadline genuine RED; all3 C variants reached real debugger pause/error/unavailable calibration/docs[] then intended missing startup-native-capture.json assertion. Schema/new diagnostic absence separate; old unaccepted attempts retained. Actual1552 2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6 then passes126/126 complete unchanged cases/tails. This metadata-only association is not a new RED or rerun."
+  },
+  "sourceAssociation": {
+    "requestedCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "effectiveMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "acceptedGreenRecord": "2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6",
+    "acceptedGreenFullPatch": "84f76ffa1b73f987481e1d4b054db00c27911e5f0bf73b2c6d8ce7177a3d8ab6",
+    "acceptedRedRecord": "2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc",
+    "acceptedTestsSha256": "7b88a28a82b5ca0bb5a3bf13ecb50c59ab2fd02b8dc54472be0535c9f9ed59f3",
+    "metadataOnly": true
+  }
+},
+{
+  "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+  "comparisonMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+  "testChangesSha256": "7483530625e24db52300a3a76666e84ef4ec13aa4bb2592b5614436923da5ac8",
+  "cycle": "1553-private-timeline-retention-effectiveMainMergeBase",
+  "reason": "Metadata-only complete source comparison association for effectiveMainMergeBase against its actual requested commit/effective merge base, preserving all993 prior objects and all passed tests/runtime/corpus bytes.",
+  "previousBehavior": "Distinct accepted1568 whole RED proved eager persisted PNG duplicates, late synchronous intake and actual failed-controller missing terminal artifacts after the real debugger pause. Older1550/1557 attempts remain unaccepted; their fixture errors and all raw records are unchanged.",
+  "intendedBehavior": "Bind the unchanged actual1552 whole126case GREEN source and exact accepted1568 RED chronology to this actual comparison for private packaging. No behavior, test/oracle, capacity or native evidence is created by this metadata association.",
+  "replacementTests": [
+    "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+    "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+    "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+    "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup"
+  ],
+  "preservedCoverage": [
+    "All993 preceding complete rationale objects and their raw prefix remain byteexact; no fingerprint-only deduplication, deletion or rewrite of failed or pending historical chronology.",
+    "Whole original16roots126cases pass with zero fail/cancel/skip, including all92old strictschema1/runtime/caller/source/typed/ordinary controls and full current canonical/raw/hash/PNG/physical/logical/duration/cleanup tails.",
+    "All162actual controller files+3whole diagnostics preserve one stop→custody→context→browser→server sequence, one read/one browser close, full typed opaque values and truthful read/cleanup failures. Tests/core/wrapper/corpus source bytes remain exact from actual GREEN.",
+    "OriginalD148source/native684/old1472raw99 and earlier unaccepted1550/1557 packets remain exact. Physical saving does not extend the32MiB full-occurrence logical cap or admit a new native capture/app-cause/release claim."
+  ],
+  "redEvidence": {
+    "command": "[\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"scripts/agent-tools/record-run.mjs\",\"--repo\",\"/Users/emeraldpham/.codex/worktrees/1299-timeline-retention/funsidething\",\"--evidence-dir\",\"/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1568/recorder\",\"--purpose\",\"preimplementation-red\",\"--summary\",\"--\",\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"--experimental-vm-modules\",\"--test\",\"--test-concurrency=1\",\"--test-reporter=tap\",\"--test-name-pattern=^(?:RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes|RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness|RISK repository process: failed Timeline controller finalizes available custody before browser close|RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup|RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app|RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness|RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch|RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance|RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks|RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks|RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary|RISK repository process: initial-only native Timeline evidence refuses unvalidated branches|RISK repository process: ordinary startup observations bind exact app sources and complete saved data|RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels|RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work|RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts)$\",\"tests.js\"]",
+    "failure": "Accepted actual1568 record 2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc:126cases106pass20failed records including4aggregates, all92old pass. A1/A2 eager PNG and D9 deadline genuine RED; all3 C variants reached real debugger pause/error/unavailable calibration/docs[] then intended missing startup-native-capture.json assertion. Schema/new diagnostic absence separate; old unaccepted attempts retained. Actual1552 2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6 then passes126/126 complete unchanged cases/tails. This metadata-only association is not a new RED or rerun."
+  },
+  "sourceAssociation": {
+    "requestedCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "effectiveMergeBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "acceptedGreenRecord": "2026-10-30T06-46-12-073Z-e6596f15-cb32-42ba-adef-3e7b9b6437b6",
+    "acceptedGreenFullPatch": "84f76ffa1b73f987481e1d4b054db00c27911e5f0bf73b2c6d8ce7177a3d8ab6",
+    "acceptedRedRecord": "2026-10-30T06-16-38-293Z-f3eb6c1e-db35-459b-8b68-ef5872ed15dc",
+    "acceptedTestsSha256": "7b88a28a82b5ca0bb5a3bf13ecb50c59ab2fd02b8dc54472be0535c9f9ed59f3",
+    "metadataOnly": true
+  }
+}
+,
+{
+  "baseCommit": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+  "comparisonHead": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+  "testChangesSha256": "164339361ebf168a5d67ec7d3f0d068bf507ba7b622e63fb3dca47a3df51e0f2",
+  "cycle": "1575-historical-committed-parent-public-preflight-association",
+  "reason": "Append one truthful retrospective association for the actual historical COMMITTED99b5-to-f207 protected tests diff consumed by public preflight. #1156 already bound f207 merged collector/Import source to f22/c920/b176; that metadata omitted this separately resolved main mergebase. This association changes no behavior, source commit, test, oracle or original RED chronology.",
+  "previousBehavior": "HEAD f207 already contained the historical merged collector/Import tests and existing constituent evidence, while public preflight selected current-main mergebase99b5 and found no complete rationale for committed fingerprint16433936. Current dirty retention comparisons were already covered; they are different test diffs.",
+  "intendedBehavior": "Bind this exact historical committed diff and its94 genuinely added or updated declarations to the unchanged source-bound historical evidence. Permit the existing committed validator to read the correct association while preserving every1000prior object/raw prefix and all752other current GREEN source files. No current retentionRED is claimed as original f207RED.",
+  "replacementTests": [
+    "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
+    "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
+    "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
+    "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
+    "RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens",
+    "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
+    "RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive",
+    "RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes",
+    "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer",
+    "RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources",
+    "RISK button safety guidance: mounted FAQ states required browser checks and limits",
+    "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
+    "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
+    "RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore",
+    "RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable",
+    "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
+    "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
+    "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
+    "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
+    "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
+    "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+    "RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement",
+    "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening",
+    "RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices",
+    "RISK support diagnostics: Settings points to the single archive Export",
+    "RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes",
+    "RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups",
+    "RISK repository process: button safety rejects incomplete native action evidence",
+    "RISK repository process: button safety rejects false passes and newly untested actions",
+    "RISK repository process: native button gate detects errors raised by a real click",
+    "RISK repository process: required native button actions execute in Chromium and WebKit",
+    "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
+    "RISK repository process: retained native sources seed once without a persistent board bootstrap",
+    "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources",
+    "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+    "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+    "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+    "RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget",
+    "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+    "RISK repository process: native button gate refuses unallocated local launch before browser startup",
+    "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+    "RISK repository process: new and duplicate source buttons require native coverage inventory",
+    "RISK repository process: merged tracked app sources match the reviewed button templates",
+    "RISK repository process: native button gate awaits an asynchronous false outcome",
+    "RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files",
+    "RISK repository process: mobile artifact consumers require reviewed runtime asset hashes",
+    "RISK repository process: native report cannot omit or change reviewed runtime asset bytes",
+    "RISK repository process: native button gate cannot omit a required stress scenario",
+    "RISK repository process: native button safety requires 400-task and rapid-press evidence",
+    "RISK repository process: required button enforcement changes need process coverage",
+    "RISK repository process: every button safety module fails the actual CLI without process coverage",
+    "RISK repository process: intentional Docker OOM control cannot waive capped client failures",
+    "RISK Settings guidance: mounted cleanup and sync FAQs name their current locations",
+    "RISK repository process: CI monitor requires capped mobile job while preserving prior topology",
+    "RISK repository process: routed hosted policies reach native consumers without waiving invalid launches",
+    "RISK repository process: current producer reuse requires successful capped mobile evidence",
+    "RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver",
+    "RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers",
+    "RISK repository process: remote mobile consumer waits for browser owner exit after disconnect",
+    "RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal",
+    "RISK repository process: expected native reload retries only its navigation context loss",
+    "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+    "RISK scenery FAQ: mounted help names scene time without implementation details",
+    "RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other",
+    "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
+    "RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults",
+    "RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures",
+    "RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets",
+    "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+    "RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources",
+    "RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation",
+    "RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix",
+    "RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export",
+    "RISK synced scene intent: interrupted replay and two tab originals never lose pending facts",
+    "RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion",
+    "RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation",
+    "RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head",
+    "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+    "RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation",
+    "RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip",
+    "RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry",
+    "RISK repository process: stress engine loss requires the actual kernel and owned exit evidence",
+    "RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene",
+    "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save",
+    "RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either",
+    "RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices",
+    "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
+    "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+    "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+    "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+    "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app",
+    "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+    "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+    "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch"
+  ],
+  "preservedCoverage": [
+    "All1000 preceding complete rationale objects and their exact raw pre-bracket prefix remain intact, including historical records517/979/980/981 and all993/989earlier prefixes. This record is an association, not a rewrite or fingerprint-only deduplication.",
+    "Historical #1156 source-only collector/Import merge ce92958c61d0869de28cd7266b98252a16978b71 and metadata f207 preserve all original assertions, producer/report REDs and held Import boundaries with their original source identities. Record517 concerns an empty protected diff and is not behavioralRED.",
+    "Original1129native capture/pixels/clocks remain bound to their original source and fixture; later associations do not manufacture calibrated paint/work, app cause, physical-device, CI or release proof. Original D/native684/old1472/canonical corpus, failed attempts and strict runtime wrapper remain exact.",
+    "Accepted1568retentionRED and1552whole126/126GREEN remain separate evidence for later dirty retention source. No consumer replay, new native observation, reporter/gate alteration, oracle or capacity change occurs here; physical savings do not extend the32MiB occurrence cap."
+  ],
+  "redEvidence": {
+    "command": "Historical evidence association only; no new behavioralRED. Existing complete #1156 record980 states: Historical source-bound producer RED only; no new RED in CS02. CN02 actual recorder1106-red a34d3e00: node --test --test-name-pattern=\"^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$\" tests.js; source a9e08924a89a44196a7e8b2b4c536f862705a63c Historical held Import RED: Recorder 2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef (preimplementation-red) on af00e0b07f60b3fd942d5d348234ff02e85e1a56 / tree 695170d86f4fb32acebcd2bde496e4d886078fe4: node --test --test-name-pattern='RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens' tests.js. It used openingBoardFixture/invisibleSavedViewBrowser, isolated fake data, pinned Playwright 1.62.1 ESM, Chromium and loopback:127.0.0.1:52239. Full recorder argv/output are retained in evidence/held-import/rendered-1079/recorder/2026-10-28T21-36-34-747Z-87a7231c-7331-4cb2-a5c0-08f4725305ef.json.",
+    "failure": "Historical evidence association only; current retention1568RED is not originalf207RED. Existing complete #1156 record980 states: Historical observed producer enforcement failure only: Actual ordinary frozen85ce64-task Normal uncapped desktopWebKit opening/action and cleanup passed; subsequent consumer assertion Selected startup operation must retain real bounded JPEG capture evidence failed because report.startupCapture was absent. Exactly one native RED; this is producer enforcement, not app defect. Report RED d9fb096f remains separate. Nonnative affected controls147dbe50 pass before committed producer GREEN. Historical separately observed held Import consumer failure: Observed ERR_ASSERTION at tests.js:16161:325: held Settings keeps the actual Import action enabled (actual false, expected true). In each of five read-failures-2 terminal-hold variants the real import-backup locator existed exactly once but isEnabled() was false; the other three configuration children passed. TAP reported 9 results, 3 pass, and 6 fail counting the aggregate parent plus five children. This was the intended disabled-entry mismatch, not a stale-selector timeout, missing element, ESM/setup failure, or runtime-startup failure. CS02 computes a later combined-source fingerprint; it does not manufacture behavioral RED or rewrite the original source IDs."
+  },
+  "associationEvidence": {
+    "issue": 1575,
+    "historicalIssue": 1156,
+    "historicalSourceHead": "f20796183aa3c85f8854ee7adcabb62a1aff7c48",
+    "actualCommittedBase": "99b5dd01df0bc6fee9fa2f9cac30d5ce0c701ee5",
+    "requestedMainAtFailure": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "committedDeclarationMap": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/startup-d-materiality/retention-repair/sol-max-owner/1553/COMMITTED-DECLARATION-AND-COMPARISON-MAP.json",
+    "committedDeclarationMapSha256": "7be09db6bf3382cc59773c6624ca2158b8438034803071936e816ca542091305",
+    "completeOriginalObjects": [
+      {
+        "index": 517,
+        "sha256": "e26bc2694e15179453cd5820d2cf0f46234e99987e08c4868cdc590bf172d591"
+      },
+      {
+        "index": 979,
+        "sha256": "2af5ad8260baf41704e724feec71fd420ce3c09ca0fbef5381795d28f55a409e"
+      },
+      {
+        "index": 980,
+        "sha256": "04b993495f363c43c30b955ff029392dc22a67a9ecfab9cf212b138031ab92d0"
+      },
+      {
+        "index": 981,
+        "sha256": "dbcd4ed55bb637b716f75f9993db15dd48917386561d5c6743f4e3bba527bef2"
+      }
+    ],
+    "observedMetadataGapOnly": "public preflight1bffff3e failed committed validator after two copy tests passed; retained as failed, not behavioralRED",
+    "newBehaviorExecuted": false,
+    "currentDirtyTestsHeadFingerprint": "b6c54cb4cf135e8f029837bb708057c2efef53ba145b70587d8e196c5569d29c"
+  }
+}
 ]

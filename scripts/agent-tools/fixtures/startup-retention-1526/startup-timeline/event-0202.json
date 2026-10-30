@@ -1,0 +1,1 @@
+{"record":{"startTime":0.6526816666591913,"data":{"type":"MutationObserver"},"children":[{"startTime":0.6526850833324715,"data":{"scriptName":"web-inspector://bootstrap.js","scriptLine":784,"scriptColumn":16},"children":[],"endTime":0.6528686250094324,"type":"FunctionCall"}],"endTime":0.652868999983184,"type":"ObserverCallback"}}

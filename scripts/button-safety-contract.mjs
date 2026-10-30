@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {deriveOrdinaryStartupObservation} from './button-safety-startup.mjs';
+import {verifyNativeTimelineCapture,deriveNativeTimelineEvidence} from './button-safety-timeline-core.mjs';
 export function sourceButtonTemplates(source){
  const counts={};
  for(const match of source.matchAll(/<(?:button|summary)\b[^>]*>|<[a-z][^>]*\b(?:data-act|data-scene-view|data-landscape-motion|data-scene-time|data-scene-preset|data-location-action|role\s*=\s*[\"']button[\"'])[^>]*>|createElement\(\s*['"](?:button|summary)['"]\s*\)/g)){const key=digest(match[0]);counts[key]=(counts[key]||0)+1;}
@@ -11,6 +13,7 @@ export function verifyButtonInventorySource(source,inventory){
 export const digest=value=>createHash('sha256').update(value).digest('hex');
 // Diagnostic timing is independent of the application's functional verdict.
 export function verifyButtonStartupCapture(capture){
+ if(capture?.provider==='webkit-native-timeline')return verifyNativeTimelineCapture(capture);
  const check=(condition,message)=>assert.ok(condition,'Startup capture '+message),finite=value=>Number.isFinite(value)&&value>=0;
  check(capture?.schemaVersion===1&&capture.selected===true&&capture.provider==='playwright-public-screencast','known selected public provider required');
  check(JSON.stringify(capture.bounds)===JSON.stringify({maxDurationMs:12000,maxFrames:120,maxTotalBytes:8388608,maxFrameBytes:262144}),'fixed finite bounds required');
@@ -29,7 +32,8 @@ export function verifyButtonStartupCapture(capture){
  check(total===capture.totalBytes&&total<=8388608,'total byte/count mismatch');check(typeof capture.stopReason==='string'&&capture.stopReason.length>0,'explicit stop reason required');check(capture.cleanup?.stopAttempted===true&&capture.cleanup.stopped===true&&capture.cleanup.timerCleared===true,'owned stop and timer cleanup required');
  check(Array.isArray(capture.errors),'explicit capture errors required');if(capture.status==='captured')check(frames.length>0&&capture.errors.length===0,'captured requires real accepted frames without error');return capture;
 }
-export function classifyButtonStartupTimeline(timeline,capture=null){
+export function classifyButtonStartupTimeline(timeline,capture=null,nativeInputs=null){
+ if(timeline?.schemaVersion===2||nativeInputs?.appBinding){const nativeEvidence=deriveNativeTimelineEvidence({...nativeInputs,capture});if(nativeEvidence.status==='incomplete')return{status:'incomplete',ordinaryRouteEligible:false,nativeEvidence,gaps:['Partial native prefix cannot establish ordinary startup clock/input/custody or completed capture']};return deriveOrdinaryStartupObservation(timeline,capture,nativeInputs,nativeEvidence);}
  const names=['navigationStart','firstBackgroundPaint','completeBoardPaint','firstTrustedInputReceipt','firstVisibleResponse','overlappingWorkIntervals'];
  const observations=timeline?.observations||{},missing=[];
  const clockValid=timeline?.schemaVersion===1&&timeline.clock?.basis==='page-performance'&&Number.isFinite(timeline.clock.timeOrigin);
@@ -41,9 +45,11 @@ export function classifyButtonStartupTimeline(timeline,capture=null){
  }
  if(!missing.length){const times=names.slice(0,5).map(name=>observations[name].atMs);if(times[0]!==0||times.some((value,index)=>index>0&&value<times[index-1]))missing.push('ordered-page-clock');}
  if(capture){verifyButtonStartupCapture(capture);missing.push('supplemental-clock-and-work-provenance');}
- return{...timeline,status:missing.length?'incomplete':'complete',missing};
+ const nativeEvidence=nativeInputs?deriveNativeTimelineEvidence({...nativeInputs,capture}):null;
+ assert.ok(!timeline?.nativeEvidence||nativeEvidence,'Native Timeline derived claim requires its raw inputs');
+ return{...timeline,status:missing.length?'incomplete':'complete',missing,...(nativeEvidence?{nativeEvidence,ordinaryRouteEligible:false}:{})};
 }
-export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candidateCommit,candidateTree,engine}={}){
+export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candidateCommit,candidateTree,engine,nativeInputs}={}){
  assert.equal(report.schemaVersion,1,'Known button report schema');
  assert.equal(report.kind,'button-safety','Native button report kind');
  assert.ok(['chromium','webkit'].includes(report.engine),'Named native engine required');
@@ -120,5 +126,5 @@ export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candi
  for(const action of report.observedActions)assert.ok(actions.includes(action),'New untested button action: '+action);
  assert.deepEqual(report.errors,[],'Native lifecycle or error detector failed');
  for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup?.[key],true,'Button runtime cleanup required: '+key);
- return report.startupTimeline?{...report,startupTimeline:classifyButtonStartupTimeline(report.startupTimeline,report.startupCapture)}:report;
+ return report.startupTimeline?{...report,startupTimeline:classifyButtonStartupTimeline(report.startupTimeline,report.startupCapture,nativeInputs)}:report;
 }

@@ -2,14 +2,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {digest,verifyButtonSafetyReport,verifyButtonInventorySource} from './button-safety-contract.mjs';
+import {digest,verifyButtonSafetyReport,verifyButtonInventorySource,classifyButtonStartupTimeline} from './button-safety-contract.mjs';
 export {digest,verifyButtonSafetyReport,verifyButtonInventorySource,sourceButtonTemplates} from './button-safety-contract.mjs';
 if(path.resolve(process.argv[1]||'')===fileURLToPath(import.meta.url)){
  try{
   const args=process.argv.slice(2),value=name=>args[args.indexOf(name)+1];
   const startupCapture=args.includes('--startup-capture')?value('--startup-capture'):null;
-  if(args.includes('--startup-capture')&&startupCapture!=='jpeg')throw Error('Startup capture selection requires explicit jpeg mode');
-  if(args.includes('--verify-report')){
+  if(args.includes('--startup-capture')&&!['jpeg','timeline'].includes(startupCapture))throw Error('Startup capture selection requires explicit jpeg or timeline mode');
+  if(args.includes('--verify-report')&&args.includes('--startup-opening')){
+   if(!args.includes('--startup-evidence'))throw Error('Ordinary startup explicit evidence manifest required');
+   const specPath=path.resolve(value('--startup-evidence')),root=path.dirname(specPath),read=relative=>{if(typeof relative!=='string'||!relative||path.isAbsolute(relative)||relative.split(/[\\/]/).includes('..'))throw Error('Ordinary startup owned relative file required');const file=path.join(root,relative);if(fs.lstatSync(file).isSymbolicLink()||!fs.lstatSync(file).isFile()||fs.realpathSync(file)!==file)throw Error('Ordinary startup source symlink/escape refused');return fs.readFileSync(file);};
+   if(fs.lstatSync(specPath).isSymbolicLink()||fs.realpathSync(specPath)!==specPath)throw Error('Ordinary startup evidence symlink refused');const spec=JSON.parse(fs.readFileSync(specPath)),reference=JSON.parse(fs.readFileSync(value('--verify-report'))),reportBytes=read(reference.reportPath);if(digest(reportBytes)!==reference.sha256)throw Error('Ordinary startup report reference mismatch');const report=JSON.parse(reportBytes);if(report.kind!=='startup-diagnostic'||report.scope!=='ordinary-startup-diagnostic')throw Error('Ordinary startup diagnostic report required');for(const key of ['contextClosed','browserClosed','serverClosed'])if(report.cleanup?.[key]!==true)throw Error('Ordinary startup owned cleanup required: '+key);
+   const captureBytes=read(spec.capturePath),rawInventoryBytes=read(spec.rawInventoryPath);if(digest(captureBytes)!==spec.captureSha256||digest(rawInventoryBytes)!==spec.rawInventorySha256)throw Error('Ordinary startup original raw identity mismatch');const capture=JSON.parse(captureBytes),inventory=JSON.parse(rawInventoryBytes),rawFiles=new Map(inventory.filter(row=>capture.schemaVersion!==2||row.kind!=='derived-png').map(row=>[row.path,read(row.path)])),sources=spec.sources.map(row=>({...row,bytes:read(row.path)})),appBinding={...spec.appBinding,fixtureBytes:read(spec.fixturePath)};
+   const result=classifyButtonStartupTimeline(report.startupObservation,capture,{captureBytes,expectedCaptureSha256:spec.captureSha256,rawInventoryBytes,rawFiles,sources,producer:spec.producer,consumer:{kind:'explicit-diagnostic-verification',modules:['scripts/button-safety.mjs','scripts/button-safety-contract.mjs','scripts/button-safety-startup.mjs','scripts/button-safety-timeline-core.mjs'].map(file=>({path:file,sha256:digest(fs.readFileSync(file))}))},appBinding});
+   process.stdout.write('Ordinary startup diagnostic artifact valid; observation status='+result.status+'; functional status='+report.status+'; root route decision required.\n'+JSON.stringify(result,null,2)+'\n');
+  }else if(args.includes('--startup-evidence'))throw Error('Ordinary startup evidence requires explicit --verify-report --startup-opening');
+  else if(args.includes('--verify-report')){
    const inventory=args.includes('--inventory')?fs.readFileSync(value('--inventory')):null;
    verifyButtonSafetyReport(JSON.parse(fs.readFileSync(value('--verify-report'),'utf8')),{...(inventory?{inventory:JSON.parse(inventory),inventorySha256:digest(inventory)}:{})});
    process.stdout.write('Button safety report verified.\n');

@@ -1,0 +1,1 @@
+{"record":{"startTime":0.5538576666731387,"data":{"timerId":1},"children":[{"startTime":0.5538737082970329,"data":{"scriptName":"http://127.0.0.1:53619/controlled1472.html","scriptLine":9,"scriptColumn":33},"children":[],"endTime":0.5540468333056197,"type":"FunctionCall"}],"endTime":0.5540478333132342,"type":"TimerFire"}}

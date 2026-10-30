@@ -13451,6 +13451,71 @@
       "root": "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: initial-only native Timeline evidence refuses unvalidated branches",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup observations bind exact app sources and complete saved data",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
