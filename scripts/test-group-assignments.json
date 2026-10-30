@@ -13831,6 +13831,11 @@
       "root": "RISK repository process: startup reference view preserves full values custody bounds and owned leases",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup fixture directories provide isolated portable custody",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

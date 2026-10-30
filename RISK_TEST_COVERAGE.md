@@ -2518,3 +2518,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 
 - RISK repository process: startup reference view completes bounded lossless parent transport
 - RISK repository process: startup reference view preserves full values custody bounds and owned leases
+
+- RISK repository process: startup fixture directories provide isolated portable custody

@@ -6,6 +6,7 @@ import { inspect } from "node:util";
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -51494,7 +51495,37 @@ test('RISK synced scene durability: native accepted scene choices reopen while t
 // Explicit opt-in profile controls use the same SDK, byte consumer and CLI seams.
 const profileName='canonical-json-48mib-memory-png-v1';
 function profileExpectations(){return JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/agent-tools/fixtures/startup-profile-v3/expectations.json')));}
-function profileDirectory(kind){const root=process.env.CHAIN_TIMELINE_FIXTURE_DIAGNOSTICS;assert.ok(root&&path.isAbsolute(root),'Profile fixtures require durable absolute diagnostics');fs.mkdirSync(root,{recursive:true});return fs.mkdtempSync(path.join(root,'profile-'+kind+'-'));}
+const profileFixtureRoots=new WeakMap();
+function profileFixtureRoot(){
+ const fixtures=appFixtureScope.getStore();assert.ok(fixtures,'Profile fixtures require an owned test scope');let owner=profileFixtureRoots.get(fixtures);
+ if(!owner){
+  owner={directory:fs.mkdtempSync(path.join(os.tmpdir(),'startup-fixtures-')),inputs:new Set()};profileFixtureRoots.set(fixtures,owner);
+  fixtures.add({dispose:()=>{for(const directory of owner.inputs)fs.rmSync(directory,{recursive:true,force:true});if(fs.existsSync(owner.directory)&&fs.readdirSync(owner.directory).length===0)fs.rmdirSync(owner.directory);}});
+ }
+ return owner;
+}
+function profileDirectory(kind){
+ const explicit=process.env.CHAIN_TIMELINE_FIXTURE_DIAGNOSTICS,owner=explicit===undefined?profileFixtureRoot():null,root=owner?.directory??explicit;
+ assert.ok(root&&path.isAbsolute(root),'Profile fixtures require durable absolute diagnostics');fs.mkdirSync(root,{recursive:true});const directory=fs.mkdtempSync(path.join(root,'profile-'+kind+'-'));owner?.inputs.add(directory);return directory;
+}
+function referenceCaseDirectory(){
+ const explicit=process.env.CHAIN_REFERENCE_CASES_DIRECTORY,root=explicit===undefined?path.join(profileFixtureRoot().directory,'reference-evidence'):explicit;
+ assert.ok(root&&path.isAbsolute(root),'Reference cases require an absolute evidence directory');fs.mkdirSync(root,{recursive:true});return root;
+}
+test('RISK repository process: startup fixture directories provide isolated portable custody',async()=>{
+ const os=await import('node:os'),saved=new Map(Object.keys(process.env).filter(key=>key.startsWith('CHAIN_')).map(key=>[key,process.env[key]])),owned=new Set(),external=fs.mkdtempSync(path.join(os.tmpdir(),'startup-explicit-control-'));
+ for(const key of saved.keys())delete process.env[key];
+ try{
+  let first,second;await appFixtureScope.run(owned,()=>{first=profileDirectory('portable');second=profileDirectory('portable');});
+  assert.ok(path.isAbsolute(first)&&path.isAbsolute(second));assert.notEqual(first,second);assert.equal(path.dirname(first),path.dirname(second));
+  fs.writeFileSync(path.join(first,'owned-control'),'complete',{flag:'wx'});assert.equal(fs.readFileSync(path.join(first,'owned-control'),'utf8'),'complete');
+  for(const fixture of owned)await fixture.dispose();owned.clear();assert.equal(fs.existsSync(first),false,'Default owned fixture bytes are cleaned after their test scope');assert.equal(fs.existsSync(second),false);
+  process.env.CHAIN_TIMELINE_FIXTURE_DIAGNOSTICS=external;let explicit;await appFixtureScope.run(owned,()=>{explicit=profileDirectory('explicit');});assert.equal(path.dirname(explicit),external);
+  fs.writeFileSync(path.join(explicit,'retained-control'),'preserved',{flag:'wx'});for(const fixture of owned)await fixture.dispose();owned.clear();assert.equal(fs.readFileSync(path.join(explicit,'retained-control'),'utf8'),'preserved','Explicit diagnostic custody survives default cleanup');
+  process.env.CHAIN_TIMELINE_FIXTURE_DIAGNOSTICS='relative-unowned-path';assert.throws(()=>profileDirectory('invalid'),/absolute diagnostics/);
+  const fixture=fs.readFileSync(path.join(__dirname,'scripts/agent-tools/fixtures/startup-ordinary-controls/ordinary-board.json'));assert.equal(fixture.length,1069165);assert.equal(retentionSHA(fixture),'b70ef166ce8f4c470d73c03de3e5aaab3f3d201890d0fa60080719f51496a670');assert.equal(JSON.parse(fixture).tasks.length,64);
+ }finally{for(const fixture of owned)await fixture.dispose();for(const key of Object.keys(process.env))if(key.startsWith('CHAIN_'))delete process.env[key];for(const [key,value]of saved)process.env[key]=value;fs.rmSync(external,{recursive:true,force:true});}
+});
 function profileEvent(){
  const e=profileExpectations(),source=e.sourcePNG,raw=fs.readFileSync(path.join(__dirname,source.canonicalPath));assert.equal(raw.length,source.canonicalBytes);assert.equal(retentionSHA(raw),source.canonicalSha256);let r=JSON.parse(raw).record;for(const i of source.recordPath)r=r.children[i];
  const encoded=r.data.imageData;assert.equal(Buffer.byteLength(encoded),source.encodedBytes);assert.equal(retentionSHA(Buffer.from(encoded)),source.encodedSha256);const png=Buffer.from(encoded.slice(22),'base64');assert.equal(png.length,482487);assert.equal(retentionSHA(png),'ea1280633480d5124cd58d4a0370948dc7a78016fdb34fd460157aa9c4d1be6e');assert.equal(png.toString('base64'),encoded.slice(22));
@@ -51506,7 +51537,7 @@ function profileAppend(x,event){const bytes=Buffer.from(JSON.stringify(event)),i
 function profileInputs(large=false,retentionProfile=profileName){
  const x=retentionInputs(ordinaryStartupControl(),retentionProfile);if(large){const e=profileExpectations(),event=profileEvent();for(let i=0;i<(typeof large==='number'?large:40);i++){const eventIndex=profileAppend(x,event),index=x.capture.frames.length+1;x.capture.frames.push({index,path:'startup-timeline/frame-'+String(index).padStart(4,'0')+'.png',bytes:482487,sha256:e.sourcePNG.sha256,sessionId:x.capture.sessions[0].id,eventIndex,recordPath:[0,0],startSeconds:1.04,endSeconds:1.05});x.capture.derivedFrameBytes+=482487;x.capture.totalBytes+=482487;}}return profileBind(x);
 }
-function profileCLI(x,{select=true,change=null,preparedDirectory=null,extraArgs=[],custodyPath=null}={}){
+function profileCLI(x,{select=true,change=null,preparedDirectory=null,extraArgs=[],custodyPath=null,prepareOnly=false}={}){
  const selectedRetentionProfile=x.inputs.retentionProfile??profileName;
  const directory=preparedDirectory??profileDirectory('cli'),write=(name,value)=>{const file=path.join(directory,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,value,{flag:'wx'});};
  if(!preparedDirectory){
@@ -51514,7 +51545,7 @@ function profileCLI(x,{select=true,change=null,preparedDirectory=null,extraArgs=
  const sources=x.inputs.sources.map((source,i)=>{const relative='sources/'+i+'.txt';write(relative,source.bytes);return{url:source.url,path:relative,sha256:source.sha256,bytes:source.bytes.length,kind:source.kind};});
  const report={schemaVersion:1,kind:'startup-diagnostic',scope:'ordinary-startup-diagnostic',status:'passed',startupObservation:x.timeline,cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}},reportBytes=Buffer.from(JSON.stringify(report));write('report.json',reportBytes);write('reference.json',JSON.stringify({reportPath:'report.json',sha256:retentionSHA(reportBytes)}));write('inputs.json',JSON.stringify({retentionProfile:selectedRetentionProfile,capturePath:'capture.json',captureSha256:x.inputs.expectedCaptureSha256,rawInventoryPath:'inventory.json',rawInventorySha256:retentionSHA(x.inputs.rawInventoryBytes),fixturePath:'fixture.json',sources,producer:x.inputs.producer,appBinding:{...x.inputs.appBinding,fixtureBytes:undefined}}));
  }
- change?.({directory,write});const argv=['--experimental-vm-modules','scripts/button-safety.mjs','--verify-report',path.join(directory,'reference.json'),'--startup-opening','--startup-evidence',path.join(directory,'inputs.json'),...(select?['--startup-retention-profile',selectedRetentionProfile]:[]),...extraArgs],r=spawnSync(process.execPath,argv,{cwd:__dirname,encoding:selectedRetentionProfile===envelopeProfileName?null:'utf8',maxBuffer:selectedRetentionProfile===envelopeProfileName?67108864:128*1024*1024});
+ change?.({directory,write});if(prepareOnly)return{directory};const argv=['--experimental-vm-modules','scripts/button-safety.mjs','--verify-report',path.join(directory,'reference.json'),'--startup-opening','--startup-evidence',path.join(directory,'inputs.json'),...(select?['--startup-retention-profile',selectedRetentionProfile]:[]),...extraArgs],r=spawnSync(process.execPath,argv,{cwd:__dirname,encoding:selectedRetentionProfile===envelopeProfileName?null:'utf8',maxBuffer:selectedRetentionProfile===envelopeProfileName?67108864:128*1024*1024});
  if(Buffer.isBuffer(r.stdout))r.stdout=new TextDecoder('utf-8',{fatal:true}).decode(r.stdout);if(Buffer.isBuffer(r.stderr))r.stderr=new TextDecoder('utf-8',{fatal:true}).decode(r.stderr);
  fs.writeFileSync(custodyPath??path.join(directory,'cli-output-custody.json'),JSON.stringify({argv,status:r.status,error:r.error?{name:r.error.name,code:r.error.code,message:r.error.message,stack:r.error.stack}:null,stdoutBytes:Buffer.byteLength(r.stdout||''),stdoutSha256:retentionSHA(Buffer.from(r.stdout||'')),stdoutComplete:!r.error&&r.status===0,stderr:r.stderr,stdoutRetained:'transient only; no persistent raw/base64 duplicate'},null,2)+'\n');return r;
 }
@@ -52129,9 +52160,15 @@ async function sameCandidateFullStartup(directory){
  const inputs={retentionProfile:capture.schemaVersion===3?spec.retentionProfile:undefined,captureBytes,expectedCaptureSha256:spec.captureSha256,rawInventoryBytes,rawFiles:new Map(inventory.filter(x=>![2,3].includes(capture.schemaVersion)||x.kind!=='derived-png').map(x=>[x.path,read(x.path)])),sources:spec.sources.map(x=>({...x,bytes:read(x.path)})),producer:spec.producer,consumer:{kind:'explicit-diagnostic-verification',modules:['scripts/button-safety.mjs','scripts/button-safety-contract.mjs','scripts/button-safety-startup.mjs','scripts/button-safety-timeline-core.mjs'].map(file=>({path:file,sha256:retentionSHA(fs.readFileSync(path.join(__dirname,file)))}))},appBinding:{...spec.appBinding,fixtureBytes:read(spec.fixturePath)}};
  return(await import('./scripts/button-safety-contract.mjs')).classifyButtonStartupTimeline(report.startupObservation,capture,inputs);
 }
+function referenceDefaultR01Directory(){
+ const x=profileInputs(false,envelopeProfileName),payload='R'.repeat(100000);
+ profileAppend(x,{record:{type:'Composite',startTime:1.04,endTime:1.05,data:{retainedUnknownParent:payload},children:Array.from({length:1000},(_,i)=>({type:'Unknown',startTime:1.04,endTime:1.05,data:{ordinal:i}}))}});profileBind(x);
+ return profileCLI(x,{prepareOnly:true}).directory;
+}
 test('RISK repository process: startup reference view completes bounded lossless parent transport',async()=>{
- const directory=process.env.CHAIN_REFERENCE_R01_DIRECTORY,custody=process.env.CHAIN_REFERENCE_R01_CUSTODY;
+ const directory=process.env.CHAIN_REFERENCE_R01_DIRECTORY??referenceDefaultR01Directory(),custody=process.env.CHAIN_REFERENCE_R01_CUSTODY??path.join(referenceCaseDirectory(),'R01-transport-custody.json');
  assert.ok(directory&&path.isAbsolute(directory)&&custody&&path.isAbsolute(custody),'Frozen R01 input and external custody paths required');
+ const frozen=referenceInputManifest(directory,'R01-frozen');assert.equal(frozen.fileCount,49);assert.equal(frozen.totalBytes,8673584);assert.equal(frozen.files.find(row=>row.path==='fixture.json').sha256,'b70ef166ce8f4c470d73c03de3e5aaab3f3d201890d0fa60080719f51496a670');
  const r=profileCLI({inputs:{retentionProfile:envelopeProfileName}},{preparedDirectory:directory,extraArgs:['--startup-evidence-view','canonical-reference-v1'],custodyPath:custody});
  assert.equal(r.error?.code??null,null,'completed reference transport');
  assert.equal(r.status,0,'completed reference transport exit: '+r.stderr);
@@ -52150,19 +52187,19 @@ test('RISK repository process: startup reference view completes bounded lossless
 function referenceInputManifest(directory,label){
  const files=[],pending=[''];while(pending.length){const relative=pending.pop();for(const name of fs.readdirSync(path.join(directory,relative))){const item=path.join(relative,name),file=path.join(directory,item),stat=fs.lstatSync(file);if(stat.isDirectory()&&!stat.isSymbolicLink())pending.push(item);else{const bytes=stat.isSymbolicLink()?Buffer.from(fs.readlinkSync(file)):fs.readFileSync(file);files.push({path:item,kind:stat.isSymbolicLink()?'symlink':'file',bytes:bytes.length,sha256:retentionSHA(bytes)});}}}
  const result={at:new Date().toISOString(),label,directory,fileCount:files.length,totalBytes:files.reduce((n,x)=>n+x.bytes,0),files};
- assert.ok(result.fileCount<=4144&&result.totalBytes<=12582912,'Prelaunch control file/byte quota');const root=process.env.CHAIN_REFERENCE_CASES_DIRECTORY;assert.ok(root&&path.isAbsolute(root));fs.mkdirSync(root,{recursive:true});fs.writeFileSync(path.join(root,label+'-prelaunch.json'),JSON.stringify(result,null,2)+'\n');return result;
+ assert.ok(result.fileCount<=4144&&result.totalBytes<=12582912,'Prelaunch control file/byte quota');const root=referenceCaseDirectory();assert.ok(root&&path.isAbsolute(root));fs.mkdirSync(root,{recursive:true});fs.writeFileSync(path.join(root,label+'-prelaunch.json'),JSON.stringify(result,null,2)+'\n');return result;
 }
 function referencePreparedCLI(directory,{view=true,select=true,label='prepared'}={}){
  const spec=JSON.parse(fs.readFileSync(path.join(directory,'inputs.json'))),capture=JSON.parse(fs.readFileSync(path.join(directory,spec.capturePath)));referenceInputManifest(directory,label);
- return profileCLI({inputs:{retentionProfile:spec.retentionProfile??envelopeProfileName}},{preparedDirectory:directory,select:select&&capture.schemaVersion===3,extraArgs:view?['--startup-evidence-view','canonical-reference-v1']:[],custodyPath:path.join(process.env.CHAIN_REFERENCE_CASES_DIRECTORY,label+'-transport.json')});
+ return profileCLI({inputs:{retentionProfile:spec.retentionProfile??envelopeProfileName}},{preparedDirectory:directory,select:select&&capture.schemaVersion===3,extraArgs:view?['--startup-evidence-view','canonical-reference-v1']:[],custodyPath:path.join(referenceCaseDirectory(),label+'-transport.json')});
 }
 async function referenceControl(x,label,{select=true}={}){
- let directory;const r=profileCLI(x,{select,extraArgs:['--startup-evidence-view','canonical-reference-v1'],change:c=>{directory=c.directory;referenceInputManifest(directory,label);},custodyPath:path.join(process.env.CHAIN_REFERENCE_CASES_DIRECTORY,label+'-transport.json')});
- assert.equal(r.error,undefined,label+' completed child');assert.equal(r.status,0,label+': '+r.stderr);const manifest=JSON.parse(r.stdout);assert.equal(r.stdout,JSON.stringify(manifest)+'\n');assert.ok(Buffer.byteLength(r.stdout)<=2690817);fs.writeFileSync(path.join(process.env.CHAIN_REFERENCE_CASES_DIRECTORY,label+'-view.json'),r.stdout);
+ let directory;const r=profileCLI(x,{select,extraArgs:['--startup-evidence-view','canonical-reference-v1'],change:c=>{directory=c.directory;referenceInputManifest(directory,label);},custodyPath:path.join(referenceCaseDirectory(),label+'-transport.json')});
+ assert.equal(r.error,undefined,label+' completed child');assert.equal(r.status,0,label+': '+r.stderr);const manifest=JSON.parse(r.stdout);assert.equal(r.stdout,JSON.stringify(manifest)+'\n');assert.ok(Buffer.byteLength(r.stdout)<=2690817);fs.writeFileSync(path.join(referenceCaseDirectory(),label+'-view.json'),r.stdout);
  const context={artifactInput:{reportReferencePath:path.join(directory,'reference.json'),evidencePath:path.join(directory,'inputs.json')},...(select?{retentionProfile:x.inputs.retentionProfile}:{})},reader=(await import('./scripts/button-safety-contract.mjs')).openButtonStartupTimelineReference(manifest,context);return{directory,manifest,context,reader,label};
 }
-async function referenceRoundTrip(control){const actual=referenceDigest(referenceJSONChunks(control.reader,control.reader.root)),expected=referenceDigest(ordinaryJSONChunks(await sameCandidateFullStartup(control.directory)));assert.deepEqual(actual,expected,'Complete same-candidate serialized values and own-key order: '+control.label);fs.writeFileSync(path.join(process.env.CHAIN_REFERENCE_CASES_DIRECTORY,control.label+'-roundtrip.json'),JSON.stringify({actual,expected,audit:control.manifest.plan.audit},null,2)+'\n');}
-function referenceRefusal(label,r,guard){assert.equal(r.error,undefined,label+' child infrastructure');assert.notEqual(r.status,0,label+' must refuse');assert.equal(r.stdout,'',label+' no payload stdout');assert.ok(Buffer.byteLength(r.stderr)<=4096);assert.match(r.stderr,guard);fs.writeFileSync(path.join(process.env.CHAIN_REFERENCE_CASES_DIRECTORY,label+'-refusal.json'),JSON.stringify({status:r.status,stderr:r.stderr,stdoutBytes:Buffer.byteLength(r.stdout)},null,2)+'\n');}
+async function referenceRoundTrip(control){const actual=referenceDigest(referenceJSONChunks(control.reader,control.reader.root)),expected=referenceDigest(ordinaryJSONChunks(await sameCandidateFullStartup(control.directory)));assert.deepEqual(actual,expected,'Complete same-candidate serialized values and own-key order: '+control.label);fs.writeFileSync(path.join(referenceCaseDirectory(),control.label+'-roundtrip.json'),JSON.stringify({actual,expected,audit:control.manifest.plan.audit},null,2)+'\n');}
+function referenceRefusal(label,r,guard){assert.equal(r.error,undefined,label+' child infrastructure');assert.notEqual(r.status,0,label+' must refuse');assert.equal(r.stdout,'',label+' no payload stdout');assert.ok(Buffer.byteLength(r.stderr)<=4096);assert.match(r.stderr,guard);fs.writeFileSync(path.join(referenceCaseDirectory(),label+'-refusal.json'),JSON.stringify({status:r.status,stderr:r.stderr,stdoutBytes:Buffer.byteLength(r.stdout)},null,2)+'\n');}
 async function referenceMutateFile(control,name,change,run){const file=path.join(control.directory,name),before=fs.readFileSync(file);fs.writeFileSync(file,change(before));let completed=false;try{await run();completed=true;}finally{if(completed)fs.writeFileSync(file,before);}}
 function referenceReplaceEvent(x,index,mutate){const entry=x.capture.events[index-1],value=JSON.parse(x.inputs.rawFiles.get(entry.path));mutate(value);const bytes=Buffer.from(JSON.stringify(value)),delta=bytes.length-entry.bytes;x.inputs.rawFiles.set(entry.path,bytes);entry.bytes=bytes.length;entry.sha256=retentionSHA(bytes);x.capture.totalBytes+=delta;x.capture.rawEventBytes+=delta;x.capture.physicalPayloadBytes+=delta;return profileBind(x);}
 function referencePartialControl(){const x=profileInputs(false,envelopeProfileName);x.capture.status='error';x.capture.errors=['deliberate incomplete prefix'];x.capture.documents=[];x.capture.facts.calibration={status:'unavailable',reason:'deliberate missing close'};x.inputs.appBinding.custodyReadbacks[0].state.settings.workedHours=999;return profileBind(x);}
@@ -52173,7 +52210,7 @@ async function referenceDeclaredEventMutation(control,eventIndex,change,label,gu
  for(const [name,value]of [[entry.path,bytes],[spec.capturePath,captureBytes],[spec.rawInventoryPath,inventory],['inputs.json',Buffer.from(JSON.stringify(spec))]])fs.writeFileSync(path.join(directory,name),value);let completed=false;try{referenceRefusal(label,referencePreparedCLI(directory,{label}),guard);completed=true;}finally{if(completed)for(const [name,value]of before)fs.writeFileSync(path.join(directory,name),value);}
 }
 test('RISK repository process: startup reference view preserves full values custody bounds and owned leases',async t=>{
- const root=process.env.CHAIN_REFERENCE_CASES_DIRECTORY;assert.ok(root&&path.isAbsolute(root));fs.mkdirSync(root,{recursive:true});const {openButtonStartupTimelineReference:open,classifyButtonStartupTimeline:classify}=await import('./scripts/button-safety-contract.mjs');let small,rich,failed;const affectedOnly=process.env.CHAIN_REFERENCE_FRONTIER_ONLY==='rich-references',step=async(name,run)=>{if(affectedOnly&&!/^(R03 R04 R05 complete|R06 exact opener)/.test(name))return;await t.test(name,async()=>{try{await run();}catch(error){failed=error;fs.writeFileSync(path.join(root,'FAIL-STOP.json'),JSON.stringify({case:name,status:'failed; dependent cases unexecuted',error:{name:error.name,message:error.message,stack:error.stack}},null,2)+'\n');throw error;}});if(failed)throw failed;};
+ const root=referenceCaseDirectory();assert.ok(root&&path.isAbsolute(root));fs.mkdirSync(root,{recursive:true});const {openButtonStartupTimelineReference:open,classifyButtonStartupTimeline:classify}=await import('./scripts/button-safety-contract.mjs');let small,rich,failed;const affectedOnly=process.env.CHAIN_REFERENCE_FRONTIER_ONLY==='rich-references',step=async(name,run)=>{if(affectedOnly&&!/^(R03 R04 R05 complete|R06 exact opener)/.test(name))return;await t.test(name,async()=>{try{await run();}catch(error){failed=error;fs.writeFileSync(path.join(root,'FAIL-STOP.json'),JSON.stringify({case:name,status:'failed; dependent cases unexecuted',error:{name:error.name,message:error.message,stack:error.stack}},null,2)+'\n');throw error;}});if(failed)throw failed;};
  await step('R02 four legacy descriptors and full Map CLI formatting stay exact',async()=>{
   const controls=[['schema1',ordinaryStartupControl(),false],['schema2',retentionInputs(ordinaryStartupControl()),false],['old48',profileInputs(false,profileName),true],['old56',profileInputs(false,envelopeProfileName),true]];
   for(const [name,x,select]of controls){const c=await referenceControl(x,'R02-'+name,{select});await referenceRoundTrip(c);const r=referencePreparedCLI(c.directory,{view:false,select,label:'R02-'+name+'-legacy'}),expected=await sameCandidateFullStartup(c.directory);assert.equal(r.status,0,r.stderr);assert.equal(r.stdout,'Ordinary startup diagnostic artifact valid; observation status='+expected.status+'; functional status=passed; root route decision required.\n'+JSON.stringify(expected,null,2)+'\n');assert.equal(expected.status,'control-only');assert.equal(expected.ordinaryRouteEligible,false);assert.equal(c.manifest.implementation.length,4);if(name==='old56')small=c;}

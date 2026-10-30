@@ -47798,5 +47798,104 @@
       "strictWrapperSha256": "56d7c1e9bf5e0b0aa2cb5ab24f21b87120d2db191d4b31cfba08f2ab60d02753"
     },
     "limits": "Private finite reader proof only. No new retention profile/native/browser/capture/source admission/integration/push/CI/full qualification/release/RSS/physical-device claim. Focused rich-only selector is explicit test-run selection; default coherent pass registers every required finite case, fail-stop on dependency failure."
+  },
+  {
+    "cycle": "portable-startup-reader-1726-583f1e2757f5",
+    "baseCommit": "583f1e2757f5b0c62d57f6d835959877b231ff12",
+    "comparisonMergeBase": "583f1e2757f5b0c62d57f6d835959877b231ff12",
+    "testChangesSha256": "ee5d57c9c6440dacc8115dcd95d2d07abe3b4a3034cf6eed3601c9e5d73f1253",
+    "reason": "ROOT admission PORTABLE-1 found required startup diagnostics depend on external CHAIN setup. Keep every reader/profile assertion and provide owned default fixtures through existing profileCLI and top-level test fixture cleanup, with exact pre-child manifests.",
+    "previousBehavior": "On583f the ordinary no-CHAIN Node invocation fails required R01 paths, finite-case paths and inherited profileDirectory diagnostics assertions. Prepared transport/custody proofs remain valid and separate.",
+    "intendedBehavior": "Normal runners generate full original64-task/all-opaque fixtures and complete100000-character/1000-occurrence R01 by default, preserve explicit frozen diagnostics, clean only owned temporary inputs and retain bounded reference metadata. Existing64MiB sink, whole-value comparisons and all original guard assertions remain exact.",
+    "replacementTests": [
+      "RISK repository process: startup fixture directories provide isolated portable custody"
+    ],
+    "preservedCoverage": [
+      "All inherited assertions and1416 historical rationale objects remain intact; no source/runtime/runner/CI/profile/native/app fixture or lock change.",
+      "Complete49-file8673584B generated R01 matches every original frozen input hash; all parent values, whole104766644B legacy stream and every finite R02-R10 guard run with no external CHAIN setup.",
+      "Explicit absolute diagnostics and original frozen R01/custody options remain opt-in and retain data; only default per-test owned input directories are cleaned by the existing fixture scope.",
+      "Current required allocation is preserved; actual focused execution plus existing group descriptor and exported TAP parser are scoped coverage, never full native-group/CI qualification."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap --test-concurrency=1 '--test-name-pattern=^(?:RISK\\ repository\\ process:\\ startup\\ fixture\\ directories\\ provide\\ isolated\\ portable\\ custody|RISK\\ repository\\ process:\\ startup\\ reference\\ view\\ completes\\ bounded\\ lossless\\ parent\\ transport|RISK\\ repository\\ process:\\ startup\\ reference\\ view\\ preserves\\ full\\ values\\ custody\\ bounds\\ and\\ owned\\ leases)$' tests.js (all CHAIN_* and NODE_TEST_CONTEXT cleared; exactenv in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-FROZEN.json)",
+      "failure": "Actual2026-10-30T21:04:13Z:0/3passed,3 AssertionError missing-setup portability failures on583f plus frozen test-only detector; missing diagnostics, R01 paths and case directory. Not an import/transport feature RED.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-RED-ACTUAL.json",
+      "tapSha256": "8f14356ebb47da2ee7ebefd31c5eae3287a4947ae656efb077be9979943c2a72",
+      "separateOriginalTransportRed": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-RED-ACTUAL.json"
+    },
+    "greenEvidence": {
+      "sameCommand": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-GREEN-ACTUAL.json",
+      "actual": "2026-10-30T21:06:44Z\u201321:09:36Z SAME no-CHAIN invocation11/11passed,0fail/cancel/skip; source/detector identities frozen before child.",
+      "tapSha256": "35a0b5ec0f6d2db4fb53389c90d7259783212309c54acab2e3d10d7db83c8afb",
+      "defaultInputs": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/DEFAULT-R01-EXACT-INPUT-MATCH.json",
+      "affectedInheritedCohort": "Separate exact committed focused execution and final external handoff bind actual completion; no prospective pass asserted here."
+    },
+    "limits": "Tests/meta-only portable fixture repair; ROOT retains independent admission/integration. Actual focused cases do not claim whole-group qualification, CI, browser/native capture, a new profile, app release or physical-device/RSS proof."
+  },
+  {
+    "cycle": "portable-startup-reader-1726-ea10dfb9bce0",
+    "baseCommit": "ea10dfb9bce0185a524127f466a5bd2c40fd3161",
+    "comparisonMergeBase": "ea10dfb9bce0185a524127f466a5bd2c40fd3161",
+    "testChangesSha256": "391d392bd6762e2333aeb1ad64409e17784498111083917ccdd0e364c81d004b",
+    "reason": "ROOT admission PORTABLE-1 found required startup diagnostics depend on external CHAIN setup. Keep every reader/profile assertion and provide owned default fixtures through existing profileCLI and top-level test fixture cleanup, with exact pre-child manifests.",
+    "previousBehavior": "On583f the ordinary no-CHAIN Node invocation fails required R01 paths, finite-case paths and inherited profileDirectory diagnostics assertions. Prepared transport/custody proofs remain valid and separate.",
+    "intendedBehavior": "Normal runners generate full original64-task/all-opaque fixtures and complete100000-character/1000-occurrence R01 by default, preserve explicit frozen diagnostics, clean only owned temporary inputs and retain bounded reference metadata. Existing64MiB sink, whole-value comparisons and all original guard assertions remain exact.",
+    "replacementTests": [
+      "RISK repository process: startup fixture directories provide isolated portable custody"
+    ],
+    "preservedCoverage": [
+      "All inherited assertions and1416 historical rationale objects remain intact; no source/runtime/runner/CI/profile/native/app fixture or lock change.",
+      "Complete49-file8673584B generated R01 matches every original frozen input hash; all parent values, whole104766644B legacy stream and every finite R02-R10 guard run with no external CHAIN setup.",
+      "Explicit absolute diagnostics and original frozen R01/custody options remain opt-in and retain data; only default per-test owned input directories are cleaned by the existing fixture scope.",
+      "Current required allocation is preserved; actual focused execution plus existing group descriptor and exported TAP parser are scoped coverage, never full native-group/CI qualification."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap --test-concurrency=1 '--test-name-pattern=^(?:RISK\\ repository\\ process:\\ startup\\ fixture\\ directories\\ provide\\ isolated\\ portable\\ custody|RISK\\ repository\\ process:\\ startup\\ reference\\ view\\ completes\\ bounded\\ lossless\\ parent\\ transport|RISK\\ repository\\ process:\\ startup\\ reference\\ view\\ preserves\\ full\\ values\\ custody\\ bounds\\ and\\ owned\\ leases)$' tests.js (all CHAIN_* and NODE_TEST_CONTEXT cleared; exactenv in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-FROZEN.json)",
+      "failure": "Actual2026-10-30T21:04:13Z:0/3passed,3 AssertionError missing-setup portability failures on583f plus frozen test-only detector; missing diagnostics, R01 paths and case directory. Not an import/transport feature RED.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-RED-ACTUAL.json",
+      "tapSha256": "8f14356ebb47da2ee7ebefd31c5eae3287a4947ae656efb077be9979943c2a72",
+      "separateOriginalTransportRed": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-RED-ACTUAL.json"
+    },
+    "greenEvidence": {
+      "sameCommand": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-GREEN-ACTUAL.json",
+      "actual": "2026-10-30T21:06:44Z\u201321:09:36Z SAME no-CHAIN invocation11/11passed,0fail/cancel/skip; source/detector identities frozen before child.",
+      "tapSha256": "35a0b5ec0f6d2db4fb53389c90d7259783212309c54acab2e3d10d7db83c8afb",
+      "defaultInputs": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/DEFAULT-R01-EXACT-INPUT-MATCH.json",
+      "affectedInheritedCohort": "Separate exact committed focused execution and final external handoff bind actual completion; no prospective pass asserted here."
+    },
+    "limits": "Tests/meta-only portable fixture repair; ROOT retains independent admission/integration. Actual focused cases do not claim whole-group qualification, CI, browser/native capture, a new profile, app release or physical-device/RSS proof."
+  },
+  {
+    "cycle": "portable-startup-reader-1726-8cd524a7f0ab",
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "comparisonMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "95ecc3143d76c329b3cde86ffff50622b84b661792f7c7710d2be86bdc9cd501",
+    "reason": "ROOT admission PORTABLE-1 found required startup diagnostics depend on external CHAIN setup. Keep every reader/profile assertion and provide owned default fixtures through existing profileCLI and top-level test fixture cleanup, with exact pre-child manifests.",
+    "previousBehavior": "On583f the ordinary no-CHAIN Node invocation fails required R01 paths, finite-case paths and inherited profileDirectory diagnostics assertions. Prepared transport/custody proofs remain valid and separate.",
+    "intendedBehavior": "Normal runners generate full original64-task/all-opaque fixtures and complete100000-character/1000-occurrence R01 by default, preserve explicit frozen diagnostics, clean only owned temporary inputs and retain bounded reference metadata. Existing64MiB sink, whole-value comparisons and all original guard assertions remain exact.",
+    "replacementTests": [
+      "RISK repository process: startup fixture directories provide isolated portable custody"
+    ],
+    "preservedCoverage": [
+      "All inherited assertions and1416 historical rationale objects remain intact; no source/runtime/runner/CI/profile/native/app fixture or lock change.",
+      "Complete49-file8673584B generated R01 matches every original frozen input hash; all parent values, whole104766644B legacy stream and every finite R02-R10 guard run with no external CHAIN setup.",
+      "Explicit absolute diagnostics and original frozen R01/custody options remain opt-in and retain data; only default per-test owned input directories are cleaned by the existing fixture scope.",
+      "Current required allocation is preserved; actual focused execution plus existing group descriptor and exported TAP parser are scoped coverage, never full native-group/CI qualification."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap --test-concurrency=1 '--test-name-pattern=^(?:RISK\\ repository\\ process:\\ startup\\ fixture\\ directories\\ provide\\ isolated\\ portable\\ custody|RISK\\ repository\\ process:\\ startup\\ reference\\ view\\ completes\\ bounded\\ lossless\\ parent\\ transport|RISK\\ repository\\ process:\\ startup\\ reference\\ view\\ preserves\\ full\\ values\\ custody\\ bounds\\ and\\ owned\\ leases)$' tests.js (all CHAIN_* and NODE_TEST_CONTEXT cleared; exactenv in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-FROZEN.json)",
+      "failure": "Actual2026-10-30T21:04:13Z:0/3passed,3 AssertionError missing-setup portability failures on583f plus frozen test-only detector; missing diagnostics, R01 paths and case directory. Not an import/transport feature RED.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-RED-ACTUAL.json",
+      "tapSha256": "8f14356ebb47da2ee7ebefd31c5eae3287a4947ae656efb077be9979943c2a72",
+      "separateOriginalTransportRed": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-owner/R01-RED-ACTUAL.json"
+    },
+    "greenEvidence": {
+      "sameCommand": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/PORTABILITY-GREEN-ACTUAL.json",
+      "actual": "2026-10-30T21:06:44Z\u201321:09:36Z SAME no-CHAIN invocation11/11passed,0fail/cancel/skip; source/detector identities frozen before child.",
+      "tapSha256": "35a0b5ec0f6d2db4fb53389c90d7259783212309c54acab2e3d10d7db83c8afb",
+      "defaultInputs": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/reference-reader-portability-owner-1726/DEFAULT-R01-EXACT-INPUT-MATCH.json",
+      "affectedInheritedCohort": "Separate exact committed focused execution and final external handoff bind actual completion; no prospective pass asserted here."
+    },
+    "limits": "Tests/meta-only portable fixture repair; ROOT retains independent admission/integration. Actual focused cases do not claim whole-group qualification, CI, browser/native capture, a new profile, app release or physical-device/RSS proof."
   }
 ]
