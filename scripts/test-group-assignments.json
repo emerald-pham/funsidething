@@ -13521,6 +13521,11 @@
       "root": "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "group": "persistence-recovery",
+      "file": "tests.js"
     }
   ],
   "processControls": [
