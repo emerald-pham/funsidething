@@ -49656,5 +49656,79 @@
       "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
       "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
     }
+  },
+  {
+    "baseCommit": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+    "testChangesSha256": "40532b3d11a35407089c3743ca80b7edc830ad3b6bd0abac1ea6aec665300d4d",
+    "reason": "Atomic1802 extends the existing selected public native scene consumer to account for its real original trusted Lock and both original Undo inputs. The source-bound omission was independently diagnosed in1800; the catalog and strict final verifier remain correct and unchanged.",
+    "previousBehavior": "The native scenario accepted and durably retained a23:15 winter Lock, reopened, and performed two task edits/two Undos, but recordRepeatOutcome received only the Undo attempt array. The selected consumer incorrectly required exactlytwo Undo-only report attempts although its independently declared case owns both scene-time:lock and act:undo.",
+    "intendedBehavior": "The same renamed complete-source consumer runs sequentially in Chromium and WebKit and requires the literal Lock/Undo/Undo sequence, three accepted source-bound receipt identities, the original Lock down time, both unchanged Undo inputs, all11 real native actions and all8 complete source phases. The producer prepends the already validated original Lock receipt after full semantic validation without extra input.",
+    "replacementTests": [
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "Both actual independently saved task edits and both original trusted Undo receipts retain their exact source timestamps, ordered undo targets, prior history and complete board invariants.",
+      "All11 original scene/editor/Undo native actions, all8 full source phases, genuine same-route reopen, full current/durable and typed opaque/pending/manual source checks and automatic backup lifecycle remain asserted.",
+      "The independent scene catalog, full ordinary verifier and generic runner, all60 ordinary scenarios,114 action families,10 semantic repeats, minimumAttempts2 and every native timing/transport budget remain unchanged.",
+      "All1449 prior rationale objects remain in original lexical form and order. This additive record does not relabel any old failed/incomplete native report, historical setup failure or full-suite qualification.",
+      "Only report-accounting assertions migrate fromtwo Undo-only entries tothree accepted entries; the oldtwo Undo assertions remain intact on the two-item Undo subset. Existing readiness/Normal/Reduced/repaint coverage and every app asset are unchanged."
+    ],
+    "redEvidence": {
+      "command": "{\"executable\":\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"args\":[\"--experimental-vm-modules\",\"--test\",\"--test-name-pattern=^RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources$\",\"tests.js\"]}",
+      "failure": "Before any producer edit, actual selected public native CLI consumer failed in BOTH Chromium and WebKit with ERR_ASSERTION at tests.js51327: actual [act:undo,act:undo] versus expected [scene-time:lock,act:undo,act:undo]. Both selected app scenarios themselves passed with complete source phases,errors[] and context/browser/server cleanup true. Recorder /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/scene-repeat-repair-owner1802/red/recorder/2026-10-31T10-04-51-698Z-82bd3b61-34d8-4c4f-9bd1-ca119ac68a1e.json SHA256 83193479f711a7e514694754bc2966ed1d1d71cd974387b8080f07a62651e25a; finished 2026-10-31T10:05:03.955Z. This is observed reporting regressionRED, not a fabricated app defect."
+    },
+    "evidenceChronology": {
+      "redRecord": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/scene-repeat-repair-owner1802/red/recorder/2026-10-31T10-04-51-698Z-82bd3b61-34d8-4c4f-9bd1-ca119ac68a1e.json",
+      "redRecordSha256": "83193479f711a7e514694754bc2966ed1d1d71cd974387b8080f07a62651e25a",
+      "redFinishedAt": "2026-10-31T10:05:03.955Z",
+      "redOutcome": "assertion-failure",
+      "producerBeforeEditSha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+      "producerEqualsDebBeforeEdit": true,
+      "rawCompleteBothEngineFailuresRemainFailed": true,
+      "authorityIssue": 1802
+    },
+    "cumulativeEvidence": {
+      "preexistingPrefixCount": 1449,
+      "preexistingRawFileSha256": "f0205863645a4b144b5d280426dc8c011676523acdd96a0b1b2a991cd659d70a",
+      "all1449PriorObjectsLexicallyPreserved": true,
+      "rootMigration": "same selected native consumer deliberately extended and renamed; no extra native replay or new seam"
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "1cc95934e50d1ea69942f3837c69fc3616afc03cba10ab306fc89b7d8986fef1",
+    "reason": "Atomic1802 extends the existing selected public native scene consumer to account for its real original trusted Lock and both original Undo inputs. The source-bound omission was independently diagnosed in1800; the catalog and strict final verifier remain correct and unchanged.",
+    "previousBehavior": "The native scenario accepted and durably retained a23:15 winter Lock, reopened, and performed two task edits/two Undos, but recordRepeatOutcome received only the Undo attempt array. The selected consumer incorrectly required exactlytwo Undo-only report attempts although its independently declared case owns both scene-time:lock and act:undo.",
+    "intendedBehavior": "The same renamed complete-source consumer runs sequentially in Chromium and WebKit and requires the literal Lock/Undo/Undo sequence, three accepted source-bound receipt identities, the original Lock down time, both unchanged Undo inputs, all11 real native actions and all8 complete source phases. The producer prepends the already validated original Lock receipt after full semantic validation without extra input.",
+    "replacementTests": [
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "Both actual independently saved task edits and both original trusted Undo receipts retain their exact source timestamps, ordered undo targets, prior history and complete board invariants.",
+      "All11 original scene/editor/Undo native actions, all8 full source phases, genuine same-route reopen, full current/durable and typed opaque/pending/manual source checks and automatic backup lifecycle remain asserted.",
+      "The independent scene catalog, full ordinary verifier and generic runner, all60 ordinary scenarios,114 action families,10 semantic repeats, minimumAttempts2 and every native timing/transport budget remain unchanged.",
+      "All1449 prior rationale objects remain in original lexical form and order. This additive record does not relabel any old failed/incomplete native report, historical setup failure or full-suite qualification.",
+      "Only report-accounting assertions migrate fromtwo Undo-only entries tothree accepted entries; the oldtwo Undo assertions remain intact on the two-item Undo subset. Existing readiness/Normal/Reduced/repaint coverage and every app asset are unchanged."
+    ],
+    "redEvidence": {
+      "command": "{\"executable\":\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\",\"args\":[\"--experimental-vm-modules\",\"--test\",\"--test-name-pattern=^RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources$\",\"tests.js\"]}",
+      "failure": "Before any producer edit, actual selected public native CLI consumer failed in BOTH Chromium and WebKit with ERR_ASSERTION at tests.js51327: actual [act:undo,act:undo] versus expected [scene-time:lock,act:undo,act:undo]. Both selected app scenarios themselves passed with complete source phases,errors[] and context/browser/server cleanup true. Recorder /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/scene-repeat-repair-owner1802/red/recorder/2026-10-31T10-04-51-698Z-82bd3b61-34d8-4c4f-9bd1-ca119ac68a1e.json SHA256 83193479f711a7e514694754bc2966ed1d1d71cd974387b8080f07a62651e25a; finished 2026-10-31T10:05:03.955Z. This is observed reporting regressionRED, not a fabricated app defect."
+    },
+    "evidenceChronology": {
+      "redRecord": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/scene-repeat-repair-owner1802/red/recorder/2026-10-31T10-04-51-698Z-82bd3b61-34d8-4c4f-9bd1-ca119ac68a1e.json",
+      "redRecordSha256": "83193479f711a7e514694754bc2966ed1d1d71cd974387b8080f07a62651e25a",
+      "redFinishedAt": "2026-10-31T10:05:03.955Z",
+      "redOutcome": "assertion-failure",
+      "producerBeforeEditSha256": "272b30a46c46ac66d149bb4a92260ab4289a40ca46a03eb22256624bf5e9d866",
+      "producerEqualsDebBeforeEdit": true,
+      "rawCompleteBothEngineFailuresRemainFailed": true,
+      "authorityIssue": 1802
+    },
+    "cumulativeEvidence": {
+      "preexistingPrefixCount": 1449,
+      "preexistingRawFileSha256": "f0205863645a4b144b5d280426dc8c011676523acdd96a0b1b2a991cd659d70a",
+      "all1449PriorObjectsLexicallyPreserved": true,
+      "rootMigration": "same selected native consumer deliberately extended and renamed; no extra native replay or new seam"
+    }
   }
 ]

@@ -134,7 +134,7 @@ export async function runSceneScenarios(h){
  await ui.act('scene-time-settings',()=>document.getElementById('sceneTimeDialog')?.open===true,'#modalRoot [data-act="scene-time-settings"]');
  await ui.fill('#sceneTimeInput','23:15');await ui.select('#sceneSeasonInput','winter');
  await ui.click('#sceneTimeDialog [data-scene-time="lock"]',async()=>{const head=await ScannerDeviceStore.readHead();return state.settings.scene.time==='23:15'&&state.settings.scene.season==='winter'&&document.getElementById('sceneTimeDialog')?.open===true&&head?.payload===JSON.stringify(state)&&!Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).some(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'));},'Lock independent23:15 winter scene and verify its complete durable save');
- await capture('locked');
+ const locked=await capture('locked');
  await ui.click('#sceneTimeDialog [data-scene-time="close"]',()=>document.getElementById('sceneTimeDialog')?.open===false,'Close saved scene dialog');
  await ui.act('close-modal',()=>!document.querySelector('#modalRoot .modal'),'#modalRoot [data-act="close-modal"]');await capture('closed');
  await ui.reopenOrdinaryWoop();await capture('reopened');
@@ -145,7 +145,11 @@ export async function runSceneScenarios(h){
  await ui.fill('#etTitle','Scene second independent task edit');
  await ui.act('save-edit',async()=>{const head=await ScannerDeviceStore.readHead();return !document.getElementById('etTitle')&&state.tasks.find(task=>task.id==='synthetic-populated-1')?.title==='Scene second independent task edit'&&head?.payload===JSON.stringify(state);},'#modalRoot [data-act="save-edit"]');await capture('edit-two');
  const attempts=await ui.repeat('act:undo',2,async()=>{const head=await ScannerDeviceStore.readHead(),first=state.tasks.find(task=>task.id==='synthetic-kept'),second=state.tasks.find(task=>task.id==='synthetic-populated-1');return state.settings.scene.time==='23:15'&&state.settings.scene.season==='winter'&&['Scene first independent task edit','Synthetic retained task'].includes(first?.title)&&second?.title==='Synthetic retained task 1'&&head?.payload===JSON.stringify(state);},'#appHeader [data-act="undo"]','Undo each of two separately saved task edits while keeping the chosen scene');
- await capture('undone-two');await capture('final-source');const semantic=verifySceneSources(snapshots);ui.recordRepeatOutcome(scenario,attempts,JSON.stringify(semantic));
+ await capture('undone-two');await capture('final-source');const semantic=verifySceneSources(snapshots);
+ // The validated first-document Lock belongs to this repeat after the reopen.
+ const lockPress=locked.presses.find(row=>row.action==='scene-time:lock');
+ const lockAttempt={receiptId:scenario+':scene-time:lock:'+locked.view.documentId+':'+lockPress.at,actionFamily:lockPress.action,trusted:lockPress.trusted,result:'accepted',receiptAtMs:lockPress.at};
+ ui.recordRepeatOutcome(scenario,[lockAttempt,...attempts],JSON.stringify(semantic));
   });
 
   await h.scenario('theme preference changes through its button',sceneFixture(),async ui=>{
