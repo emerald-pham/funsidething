@@ -7,6 +7,7 @@ import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { inflateSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
@@ -15963,6 +15964,121 @@ async function openingBoardFixture(t){
  process.env.LANDSCAPE_BROWSER_URL='http://127.0.0.1:'+server.address().port+'/';
  t.after(async()=>{if(previous===undefined)delete process.env.LANDSCAPE_BROWSER_URL;else process.env.LANDSCAPE_BROWSER_URL=previous;openingBoardSelfHosted=false;await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));});
 }
+function decodeOpeningPreviewPixels(png){
+ const bytes=Buffer.from(png),signature=Buffer.from([137,80,78,71,13,10,26,10]);assert.deepEqual(bytes.subarray(0,8),signature,'the real preview screenshot is PNG');
+ let width=0,height=0,bitDepth=0,colorType=0,interlace=0;const imageData=[];
+ for(let cursor=8;cursor+12<=bytes.length;){const length=bytes.readUInt32BE(cursor),kind=bytes.toString('ascii',cursor+4,cursor+8),start=cursor+8,end=start+length;if(end+4>bytes.length)throw Error('truncated opening-preview PNG');
+  if(kind==='IHDR'){width=bytes.readUInt32BE(start);height=bytes.readUInt32BE(start+4);bitDepth=bytes[start+8];colorType=bytes[start+9];interlace=bytes[start+12];}
+  if(kind==='IDAT')imageData.push(bytes.subarray(start,end));cursor=end+4;if(kind==='IEND')break;
+ }
+ const channels=({0:1,2:3,4:2,6:4})[colorType];if(!width||!height||bitDepth!==8||!channels||interlace!==0)throw Error('unsupported opening-preview PNG encoding');
+ const rowBytes=width*channels,raw=inflateSync(Buffer.concat(imageData)),previous=Buffer.alloc(rowBytes),colors=new Set();let nonTransparent=0,offset=0;
+ const paeth=(a,b,c)=>{const p=a+b-c,da=Math.abs(p-a),db=Math.abs(p-b),dc=Math.abs(p-c);return da<=db&&da<=dc?a:db<=dc?b:c;};
+ for(let y=0;y<height;y++){
+  const filter=raw[offset++],row=Buffer.from(raw.subarray(offset,offset+rowBytes));offset+=rowBytes;
+  for(let i=0;i<rowBytes;i++){const left=i>=channels?row[i-channels]:0,up=previous[i],upperLeft=i>=channels?previous[i-channels]:0;
+   if(filter===1)row[i]=(row[i]+left)&255;else if(filter===2)row[i]=(row[i]+up)&255;else if(filter===3)row[i]=(row[i]+Math.floor((left+up)/2))&255;else if(filter===4)row[i]=(row[i]+paeth(left,up,upperLeft))&255;else if(filter!==0)throw Error('unsupported opening-preview PNG filter');
+  }
+  for(let x=0;x<width;x++){const i=x*channels,gray=colorType===0||colorType===4,red=row[i],green=gray?row[i]:row[i+1],blue=gray?row[i]:row[i+2],alpha=colorType===4?row[i+1]:colorType===6?row[i+3]:255;
+   if(alpha)nonTransparent++;colors.add(red+','+green+','+blue+','+alpha);
+  }
+  row.copy(previous);
+ }
+ return {width,height,distinctColors:colors.size,nonTransparentPixels:nonTransparent};
+}
+function assertOpeningProjectionPreservesDeclaredSource(actual,source,expectedHours,label){
+ assert.ok(actual&&typeof actual==='object'&&!Array.isArray(actual),label+': the renderer receives one board object');
+ assert.equal(actual.v,2,label+': the observed preview projection has the normalized version');
+ assert.ok(actual.settings&&typeof actual.settings==='object',label+': the observed projection keeps settings');
+ assert.equal(actual.settings.workedHours,expectedHours,label+': the observed projection has the supported worked-hours value');
+ assert.equal(actual.tasks?.length,source.tasks.length,label+': the observed projection keeps the complete task membership');
+ for(const [key,value] of Object.entries(source)){
+  if(key==='v')continue;
+  if(key==='settings'){
+   for(const [setting,settingValue] of Object.entries(value))
+    assert.deepEqual(actual.settings[setting],setting==='workedHours'?expectedHours:settingValue,label+': original setting '+setting+' remains declared and unchanged');
+  }else if(key==='tasks'){
+   for(const [index,task] of value.entries())for(const [field,fieldValue] of Object.entries(task))
+    assert.deepEqual(actual.tasks[index]?.[field],fieldValue,label+': original task '+index+' field '+field+' remains unchanged');
+  }else assert.deepEqual(actual[key],value,label+': original root field '+key+' remains unchanged');
+ }
+}
+async function legacyOpeningPreviewBrowser(raw,label,fixedTime){
+ const {webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright'),browser=await webkit.launch({headless:true});
+ let context,page;
+ try{
+  context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
+  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+  await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+  const seedPage=await context.newPage();await seedPage.route('**/__opening-preview-seed__',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><html><head></head><body></body></html>'}));
+  await seedPage.goto(new URL('__opening-preview-seed__',process.env.LANDSCAPE_BROWSER_URL).href,{waitUntil:'domcontentloaded',timeout:10000});
+  const seed=await seedPage.evaluate(({raw,fixedTime})=>{
+   localStorage.setItem('fvp:chain-scanner:v1',raw);localStorage.setItem('fvp:chain-scanner:theme','light');
+   localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'normal',savedAt:fixedTime}));
+   return {legacy:localStorage.getItem('fvp:chain-scanner:v1'),localKeys:Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).sort()};
+  },{raw,fixedTime});
+  await seedPage.close();
+  await context.addInitScript(()=>{
+   Object.defineProperty(window,'FIREBASE_CONFIG',{configurable:true,value:null,writable:false});
+   window.__cloudsyncEvents=0;window.addEventListener('cloudsync',()=>window.__cloudsyncEvents++);
+   window.__openingPreviewArguments=[];let appearance;
+   Object.defineProperty(window,'SavedAppearance',{configurable:true,enumerable:true,get:()=>appearance,set:value=>{
+    if(value&&typeof value.showBoard==='function'){
+     const showBoard=value.showBoard;
+     value.showBoard=function(...args){window.__openingPreviewArguments.push(JSON.parse(JSON.stringify(args[0])));return showBoard.apply(this,args);};
+    }
+    appearance=value;
+   }});
+   window.__actualLocalRead={started:false,queued:false,settled:false,attempts:0};let releaseQueued;
+   const queuedRelease=new Promise(resolve=>{releaseQueued=resolve;});
+   window.__releaseActualLocalRead=()=>{if(window.__actualLocalRead.released)return;window.__actualLocalRead.released=true;window.__actualLocalRead.releasedAt=performance.now();releaseQueued();};
+   const open=indexedDB.open.bind(indexedDB),success=Object.getOwnPropertyDescriptor(IDBRequest.prototype,'onsuccess');
+   indexedDB.open=(...args)=>{const request=open(...args);if(window.__actualLocalRead.started)return request;
+    window.__actualLocalRead.started=true;window.__actualLocalRead.attempts++;window.__actualLocalRead.startedAt=performance.now();let listener=null;
+    Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>{
+     window.__actualLocalRead.queued=true;window.__actualLocalRead.queuedAt=performance.now();queuedRelease.then(()=>{
+      window.__actualLocalRead.settled=true;window.__actualLocalRead.settledAt=performance.now();fn?.call(request,event);
+     });
+    });}});return request;
+   };
+  });
+  page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.clock.setFixedTime(new Date(fixedTime));await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
+  await page.waitForFunction(()=>window.__actualLocalRead?.queued===true,null,{timeout:2500});
+  const early=await page.evaluate(()=>{
+   const previews=[...document.querySelectorAll('[data-saved-preview]')],preview=previews.find(node=>getComputedStyle(node).visibility==='visible'),list=preview?.querySelector('[data-preview-id="listBody"]');
+   const motion=JSON.parse(localStorage.getItem('fvp:chain-scanner:landscape-motion')||'null');
+   return {stateNull:typeof state!=='undefined'&&state===null,appReady:document.documentElement.dataset.appReady==='true',read:{...window.__actualLocalRead},
+    previewCount:previews.length,previewVisible:!!preview&&preview.getBoundingClientRect().width>0&&preview.getBoundingClientRect().height>0,
+    previewInert:preview?.inert===true,previewAriaHidden:preview?.getAttribute('aria-hidden')??null,
+    rowTitles:[...(list?.querySelectorAll('.trow .tt')||[])].map(node=>node.textContent),listHidden:list?.hidden??null,
+    count:preview?.querySelector('[data-preview-id="listCount"]')?.textContent??null,
+    motion:{choice:motion?.choice??null,savedAt:motion?.savedAt??null,dialogOpen:!!document.querySelector('#motionDialog[open]')},
+    sources:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),protected:localStorage.getItem('fvp:chain-scanner:protected:v1'),
+     appearance:localStorage.getItem('fvp:chain-scanner:appearance:v1'),view:localStorage.getItem('fvp:chain-scanner:saved-view:v1')},
+    observerArguments:window.__openingPreviewArguments.map(board=>board)};
+  });
+  let pixels=null,previewPNG=null;
+  if(early.previewCount===1){previewPNG=await page.locator('[data-saved-preview]').screenshot({animations:'disabled'});pixels=decodeOpeningPreviewPixels(previewPNG);}
+  if(process.env.SAVED_VIEW_ARTIFACT_DIR){fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});const stem='legacy-opening-'+label;
+   await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,stem+'-held.png'),animations:'disabled'});
+   if(previewPNG)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,stem+'-preview-held.png'),previewPNG);
+   fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,stem+'-held.json'),JSON.stringify({early,pixels},null,2)+'\n');
+  }
+  await page.evaluate(()=>window.__releaseActualLocalRead());
+  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:5000});
+  const late=await page.evaluate(async()=>{
+   const live=JSON.parse(JSON.stringify(state)),store=window.ScannerDeviceStore,head=await store.readHead(),snapshot=await store.readRawExportSnapshot();
+   return {live,head,snapshot,local:{legacy:localStorage.getItem('fvp:chain-scanner:v1'),protected:localStorage.getItem('fvp:chain-scanner:protected:v1')},
+    observerArguments:window.__openingPreviewArguments.map(board=>board),read:{...window.__actualLocalRead},
+    cloudEvents:window.__cloudsyncEvents,appReady:document.documentElement.dataset.appReady==='true'};
+  });
+  return {seed,early,pixels,late,errors};
+ }finally{
+  if(page&&!page.isClosed())await page.evaluate(()=>window.__releaseActualLocalRead?.()).catch(()=>{});
+  if(context)await context.close().catch(()=>{});await browser.close().catch(()=>{});
+ }
+}
 async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844},activeScanner=false,startupOptions={}){
  const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
  const engineName=startupOptions.browserEngine==='webkit'?'webkit':'chromium',engine=engineName==='webkit'?webkit:chromium,
@@ -17044,6 +17160,77 @@ test('RISK opening board presentation: shared markup retains released cards cont
  assert.match(markup,/&lt;saved&gt;/);assert.doesNotMatch(markup,/<img/);
  assert.equal(JSON.stringify(current.ctx.state),before,'pure markup never changes authoritative board data');
  assert.deepEqual(keys.map(key=>current.shim.localStorage.getItem(key)),stored,'pure markup does not write any saved board or backup');
+});
+
+test('RISK saved view legacy opening: complete raw legacy boards remain visible before durable startup',async t=>{
+ await openingBoardFixture(t);
+ const {fixture:installedFixture}=await import('./scripts/installed-client-fixture.mjs');
+ const fixtureBoard=installedFixture('signed-out'),legacyRaw=JSON.stringify(fixtureBoard),legacyBytes=Buffer.from(legacyRaw),sha256=value=>createHash('sha256').update(value).digest('hex');
+ assert.equal(legacyBytes.length,1069165,'the exact 64-task installed-client source remains 1 MiB');
+ assert.equal(sha256(legacyBytes),'b70ef166ce8f4c470d73c03de3e5aaab3f3d201890d0fa60080719f51496a670','the installed-client fixture retains the frozen legacy source bytes');
+ const versionTwoBytes=Buffer.from(legacyBytes);versionTwoBytes[5]=0x32;const versionTwoRaw=versionTwoBytes.toString('utf8'),changedOffsets=[];
+ for(let index=0;index<legacyBytes.length;index++)if(legacyBytes[index]!==versionTwoBytes[index])changedOffsets.push(index);
+ assert.deepEqual(changedOffsets,[5],'the v2 positive control changes only the version byte');
+ assert.equal(sha256(versionTwoBytes),'b0e3acf0c81df307be90f571ecdd63553e0709683d170a40fccc67005e616c42');
+ const customBoard=structuredClone(fixtureBoard);customBoard.settings.workedHours=12;
+ const cases=[{label:'v2-control',raw:versionTwoRaw,source:JSON.parse(versionTwoRaw),expectedHours:8},
+  {label:'legacy-default-hours',raw:legacyRaw,source:fixtureBoard,expectedHours:16},
+  {label:'legacy-custom-hours',raw:JSON.stringify(customBoard),source:customBoard,expectedHours:12}];
+ const fixedTime=Date.parse('2026-10-31T00:00:00.000Z');
+ for(const scenario of cases){
+  const result=await legacyOpeningPreviewBrowser(scenario.raw,scenario.label,fixedTime),{early,late}=result;
+  assert.equal(result.seed.legacy,scenario.raw,scenario.label+': the exact legacy source is seeded before the first app navigation');
+  assert.deepEqual(result.seed.localKeys,['fvp:chain-scanner:landscape-motion','fvp:chain-scanner:theme','fvp:chain-scanner:v1'],scenario.label+': no optional appearance or saved-view cache is seeded');
+  assert.equal(early.stateNull,true,scenario.label+': the live application state is still unset while the durable read is held');
+  assert.equal(early.appReady,false,scenario.label+': application readiness still waits for durable startup');
+  assert.equal(early.read.started,true,scenario.label+': the real IndexedDB open has started');
+  assert.equal(early.read.queued,true,scenario.label+': the actual IndexedDB success callback is queued');
+  assert.equal(early.read.settled,false,scenario.label+': the held durable read has not settled');
+  assert.equal(early.previewVisible,true,scenario.label+': the complete raw saved board appears before durable startup');
+  assert.equal(early.previewCount,1,scenario.label+': exactly one opening preview is connected');
+  assert.equal(early.previewInert,true,scenario.label+': the opening preview remains inert');
+  assert.equal(early.previewAriaHidden,'true',scenario.label+': the opening preview remains hidden from assistive technology');
+  assert.deepEqual(early.rowTitles,fixtureBoard.tasks.map(task=>task.title),scenario.label+': the collapsed preview DOM retains every exact task title');
+  assert.equal(early.rowTitles.length,64,scenario.label+': all 64 task rows are in the preview DOM');
+  assert.equal(early.listHidden,true,scenario.label+': the original collapsed-list preference is preserved');
+  assert.match(early.count,/64/,scenario.label+': the preview reports the complete saved task count');
+  assert.equal(early.motion.choice,'normal',scenario.label+': the source opens with the normal motion preference');
+  assert.equal(early.motion.savedAt,fixedTime,scenario.label+': motion uses the fixed fixture timestamp');
+  assert.equal(early.motion.dialogOpen,false,scenario.label+': no motion chooser interrupts opening');
+  assert.equal(early.sources.legacy,scenario.raw,scenario.label+': opening leaves the original legacy bytes untouched');
+  assert.equal(early.sources.protected,null,scenario.label+': the fixture does not invent a second durable browser source');
+  assert.equal(early.sources.appearance,null,scenario.label+': no optional appearance cache substitutes for the saved board');
+  assert.equal(early.sources.view,null,scenario.label+': no saved-view cache substitutes for the saved board');
+  assert.equal(early.observerArguments.length,1,scenario.label+': the unchanged real renderer receives exactly one opening board');
+  const observedProjection=early.observerArguments[0];
+  assertOpeningProjectionPreservesDeclaredSource(observedProjection,scenario.source,scenario.expectedHours,scenario.label+': the actual showBoard argument');
+  assert.ok(result.pixels&&result.pixels.width>0&&result.pixels.height>0,scenario.label+': the visible preview produces rendered pixels');
+  assert.ok(result.pixels.distinctColors>8&&result.pixels.nonTransparentPixels>0,scenario.label+': the preview screenshot contains actual varied visible pixels');
+  assert.equal(late.appReady,true,scenario.label+': application readiness follows the released real read');
+  assert.equal(late.read.settled,true,scenario.label+': the real IndexedDB success callback runs after release');
+  assert.equal(late.read.attempts,1,scenario.label+': the fixture does not retry or replay the held read');
+  assert.ok(late.read.releasedAt-late.read.startedAt<5000,scenario.label+': the held callback is released within the unchanged storage budget');
+  assert.equal(late.live.v,2,scenario.label+': the live v1 board normalizes to v2');
+  assert.equal(late.live.settings.workedHours,scenario.expectedHours,scenario.label+': the live supported worked-hours setting is correct');
+  assert.equal(late.live.tasks.length,64,scenario.label+': the live board retains all 64 tasks');
+  const sourceTaskFieldCount=scenario.source.tasks.reduce((total,task)=>total+Object.keys(task).length,0);
+  assert.equal(sourceTaskFieldCount,1024,scenario.label+': the frozen fixture contains all 1,024 original task fields');
+  assert.deepEqual(late.live.tasks.map((task,index)=>Object.fromEntries(Object.keys(scenario.source.tasks[index]).map(key=>[key,task[key]]))),scenario.source.tasks,
+   scenario.label+': live hydration preserves every original task field');
+  assert.deepEqual(late.live.futureBoard,scenario.source.futureBoard,scenario.label+': unknown root object data remains intact');
+  assert.deepEqual(late.live.futurePopulated,scenario.source.futurePopulated,scenario.label+': the full opaque root value remains intact');
+  assert.equal(Buffer.byteLength(late.live.futurePopulated.opaque,'utf8'),1048576,scenario.label+': the 1 MiB unknown value is not shortened');
+  assert.equal(late.local.legacy,scenario.raw,scenario.label+': live hydration preserves the exact legacy localStorage bytes');
+  assert.equal(late.head.payload,scenario.raw,scenario.label+': the durable head retains the exact seeded raw source');
+  const headHash=sha256(scenario.raw),stores=late.snapshot.stores;
+  assert.deepEqual(Object.keys(stores).sort(),['backups','meta','opaque','snapshots'],scenario.label+': the actual four typed stores remain present');
+  const metaIndex=stores.meta.keys.indexOf('head'),snapshotIndex=stores.snapshots.keys.indexOf(headHash);
+  assert.ok(metaIndex>=0&&snapshotIndex>=0,scenario.label+': the actual typed head and matching snapshot remain bound');
+  assert.equal(stores.meta.values[metaIndex].hash,headHash,scenario.label+': typed metadata names the exact durable source hash');
+  assert.equal(stores.snapshots.values[snapshotIndex].payload,scenario.raw,scenario.label+': the typed snapshot retains the exact durable source bytes');
+  assert.deepEqual(late.observerArguments,[observedProjection],scenario.label+': the transparent observer captures the same actual showBoard argument after release');
+  assert.deepEqual(result.errors,[],scenario.label+': the real app reports no uncaught page errors');
+ }
 });
 
 test('RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits',async t=>{

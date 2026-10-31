@@ -13397,6 +13397,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK saved view legacy opening: complete raw legacy boards remain visible before durable startup",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings",
       "group": "core",
       "file": "tests.js"

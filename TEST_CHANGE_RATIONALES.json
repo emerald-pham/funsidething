@@ -48167,5 +48167,31 @@
       "ownerGuardCoverage": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation9/full-domain-profile-owner-1728/F06-owner-guard-coverage-result.json"
     },
     "limits": "Synthetic SDK and complete byte/reference consumer proof only. A test assertion used a wrong result property in the first guard run, then was repaired without runtime changes; its failure is preserved. No actual native capture, source admission, source join, CI/push/release, workload fit/RSS/paint/cause/physical-device guarantee."
+  },
+  {
+    "testChangesSha256": "9dca95aa11ffe3a6d03a298d289322f14f46f51022d48be88e75ec5ea27fa6cc",
+    "reason": "Add the existing real-HTML held-device-read consumer for complete legacy boards. The preview now validates a detached supported-v1 projection with only its known version and original 8-hour default normalized; raw bytes remain the candidate identity.",
+    "previousBehavior": "A complete supported v1 board with the original 8-hour default was rejected by unchanged strict full-source retention after hydration normalized it to v2 and 16 hours, so no read-only saved-board preview appeared while device storage was still opening.",
+    "intendedBehavior": "A complete agreeing v1 board is shown before durable startup through the existing inert preview using v2 and the current 16-hour default. A v2 board keeps 8 hours, custom v1 hours stay unchanged, and the exact original raw board remains the identity and durable source.",
+    "replacementTests": [
+      "RISK saved view legacy opening: complete raw legacy boards remain visible before durable startup"
+    ],
+    "preservedCoverage": [
+      "The real held IndexedDB read still has null live state, false app readiness and an unsettled first success callback before display; the preview remains one visible inert aria-hidden object with all 64 exact task titles and the collapsed saved list.",
+      "The v2 positive control remains at 8 hours, the v1 default is projected at 16 hours, and the custom v1 control remains at 12 hours in the actual observed SavedAppearance.showBoard argument.",
+      "Original task fields, 1 MiB unknown data, exact local legacy bytes, actual durable head and four typed stores remain checked after releasing the real read.",
+      "Existing broken-board visibility, complete-board safety, account and identity masks, divergent-source refusal, and recovery-warning guidance remain in their original consumers."
+    ],
+    "redEvidence": {
+      "command": "env -u CI -u LANDSCAPE_BROWSER_URL PATH=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH PLAYWRIGHT_MODULE=/Users/emeraldpham/.codex/task-artifacts/implement-293-20261028/private-dependencies/held-import-1126-node24-7149daff/node_modules/playwright/index.mjs CHAIN_NATIVE_PORT=53723 CODEX_COORDINATION_FILE=/Users/emeraldpham/.local/state/codex/coordination.json SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation10/startup-preview-repair-owner-625/owner/rendered node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/legacy-opening-preview/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation10/startup-preview-repair-owner-625/owner/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-name-pattern='^RISK saved view legacy opening: complete raw legacy boards remain visible before durable startup$' tests.js",
+      "failure": "Recorder 71dd8595 reached the actual legacy-default-hours case after the v2 control passed. With the first real IDB success queued and unsettled and live state null/appReady false, previewCount was 0 and the assertion at tests.js:17189 failed: previewVisible false !== true. The exact raw v1 bytes remained seeded; this was browser assertion evidence, not setup failure.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation10/startup-preview-repair-owner-625/owner/recorder/2026-10-31T02-56-47-201Z-71dd8595-6106-4661-8223-061cba8710db.json",
+      "stdout": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation10/startup-preview-repair-owner-625/owner/recorder/2026-10-31T02-56-47-201Z-71dd8595-6106-4661-8223-061cba8710db.stdout.txt"
+    },
+    "greenEvidence": {
+      "command": "Exact same child argv, test pattern, Node 24.19.0, Playwright/WebKit and seeded inputs as the admitted RED; recorder purpose green.",
+      "actual": "Recorder 30ec09fe passed the same top-level real-HTML consumer (1 passed, 0 failed, none skipped). Three fresh held-read contexts observed v2/8 hours, supported v1/default/16 hours, and custom v1/12 hours. Every context showed one visible inert aria-hidden preview with 64 titles before the read settled; release then passed the exact live/raw/head/four-store assertions. Each preview screenshot measured 390x1418, 6054 distinct colors and 552630 nontransparent pixels."
+    },
+    "limits": "Synthetic signed-out native WebKit real-HTML consumer only. The preview observer records the actual unchanged SavedAppearance.showBoard argument transparently and delegates unchanged. No original native replay, accepted edit/reopen, full suite, CI, deployment, release, Beta mirroring or physical-device claim."
   }
 ]
