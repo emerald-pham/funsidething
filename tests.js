@@ -38012,7 +38012,7 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
  assert.match(exports,/one read-only recovery archive.*accepted current board.*readable app-owned saved sources/i);
- assert.match(exports,/Copy sends.*straight to the clipboard.*Download saves the same bytes/i);
+ assert.match(exports,/Copy sends the prepared archive straight to the clipboard; Download stays available while Copy is finishing and saves the same bytes if the browser completes its file download\. Copy reports success after the clipboard write completes; Download reports only that saving those same prepared bytes started\./i);
  assert.match(exports,/full JSON is not rendered/i);
  assert.match(exports,/unavailable or changing source.*clearly marked partial archive/i);
  assert.match(exports,/Import previews and applies only an archive.*current board after confirmation/i);
@@ -47630,6 +47630,35 @@ test('RISK repository process: event routing retains exact merge validation befo
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=workflow avoids a second complete cohort',path.join(__dirname,'scripts/agent-tools/ci-routing.test.mjs')],{cwd:__dirname,encoding:'utf8',timeout:30000,env});
  assert.equal(result.status,0,'The public workflow cohort command must preserve exact canonical merge validation: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: pending Copy repeat catalog preserves precompletion Download and ordinary admission',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const name='test group public workflow retains selected workload evidence without admitting it as ordinary proof';
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ const expectedNestedNames=[
+  'existing selected job executes and retains all seven diagnostics without making their producer fatal to ordinary admission',
+  'unselected not-run','selected unavailable','selected pass','selected failed','selected invalid kind','selected wrong source',
+  'selected wrong attempt','selected missing case','selected duplicate case','selected unknown case','selected corrupt TAP',
+  'selected corrupt artifact','selected missing artifact inventory','selected incomplete cleanup','unselected unexpected result',
+  'unknown selector','inconsistent selected policy','selected mobile app-failed remains raw','missing Chromium','missing WebKit',
+  'missing both','duplicate engine','diagnostic substitutes ordinary','forged diagnostic profile','failed ordinary',
+  'wrong ordinary source','missing action','missing repeat','untrusted input','wrong accounting','incomplete ordinary cleanup'
+ ];
+ const expectedNamedTests=[name,...expectedNestedNames],expectedCompletedNames=[...expectedNestedNames,name];
+ assert.equal(result.error,undefined,'The exact public workflow consumer must start: '+output);
+ assert.equal(result.signal,null,'The exact public workflow consumer must finish: '+output);
+ assert.equal(result.status,0,'The admitted frozen ordinary-repeat inventory and required/optional refusal controls must pass: '+output);
+ const stdout=result.stdout||'',namedTests=[...stdout.matchAll(/^\s*# Subtest: (.+)$/gm)].map(match=>match[1]);
+ const completedTests=[...stdout.matchAll(/^\s*ok \d+ - (.+?)(?:\s+#.*)?$/gm)].map(match=>match[1]);
+ assert.deepEqual(namedTests,expectedNamedTests,'The parent workflow and every required, optional, and negative-control case are named exactly once');
+ assert.deepEqual(completedTests,expectedCompletedNames,'Every named public workflow case and its parent complete successfully exactly once');
+ assert.match(stdout,/^# tests 33$/m,'The selected consumer executes its complete 33-outcome contract');
+ assert.match(stdout,/^# pass 33$/m);
+ assert.match(result.stdout||'',/^# fail 0$/m);
+ assert.match(result.stdout||'',/^# skipped 0$/m);
+ assert.match(result.stdout||'',/^# cancelled 0$/m);
 });
 
 test('RISK repository process: unchanged CI inputs reuse an original successful gate across events',()=>{

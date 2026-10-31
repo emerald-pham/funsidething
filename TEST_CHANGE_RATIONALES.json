@@ -49656,5 +49656,43 @@
       "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
       "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
     }
+  },
+  {
+    "baseCommit": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+    "comparisonBase": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+    "testChangesSha256": "6cd1214d69739f93ec8fc1a55a523a44c8335855a6dbf439fa57884dc0c70267",
+    "reason": "Atomic 1803 updates only the frozen pending-Copy repeat description and adds its exact public-workflow process RISK wrapper. Atomic 1804 updates only the mounted backup Help consumer expectation to the accepted truthful Copy and Download timing language.",
+    "previousBehavior": "The frozen six-field ordinary-repeat assertion still described Download only after Copy completion or refusal, while the accepted public scenario now performs a trusted exact-byte Download before Copy settles. The mounted extended-backup Help consumer also required the obsolete adjacent phrase Download saves the same bytes, although the accepted FAQ keeps Download available while Copy finishes and reports the two outcomes separately.",
+    "intendedBehavior": "Keep the independent repeat inventory and all six fields exact while updating only its stale accepted-behavior text. The new process RISK test runs the exact public workflow consumer and requires every parent, required, optional and negative-control outcome to complete without skips. Update only the obsolete Help regex to require pending Download availability, identical prepared bytes subject to browser file-download completion, and distinct truthful clipboard-completion and Download-start wording.",
+    "replacementTests": [
+      "RISK repository process: pending Copy repeat catalog preserves precompletion Download and ordinary admission"
+    ],
+    "preservedCoverage": [
+      "The six-field ordinary pending-Copy repeat inventory remains a deep equality against its independent literal, and the public consumer still exercises the existing required, optional, malformed-evidence and refusal-control cases. No producer, catalog, runner, strict guard or application source changed.",
+      "The extended backup Help consumer retains its expiry, protected-copy deletion, archive limits, partial-source, import, original-source and word-limit assertions; only its contradictory Download timing expectation changed.",
+      "Both #1803 and #1804 were independently observed RED before their respective consumer edits. Three later #1803 wrapper failures were harness setup assumptions about the 33 actual TAP outcomes and declaration/completion ordering, not feature REDs; the corrected complete wrapper passed once.",
+      "All 1,449 pre-existing rationale objects remain in their original order and unchanged. The source diff contains only tests.js, scripts/agent-tools/test-groups.test.mjs, scripts/test-group-assignments.json, RISK_TEST_COVERAGE.md and this additive rationale entry."
+    ],
+    "redEvidence": {
+      "command": "[\"node\",\"--test\",\"--test-reporter=tap\",\"--test-name-pattern=^test group public workflow retains selected workload evidence without admitting it as ordinary proof$\",\"scripts/agent-tools/test-groups.test.mjs\"] and [\"node\",\"--experimental-vm-modules\",\"--test\",\"--test-reporter=tap\",\"--test-name-pattern=^RISK repository process: pending Copy repeat catalog preserves precompletion Download and ordinary admission$\",\"tests.js\"] and [\"node\",\"--experimental-vm-modules\",\"--test\",\"--test-reporter=tap\",\"--test-name-pattern=^RISK backup help: expiry, protected-copy deletion, and archive limits remain complete$\",\"tests.js\"]",
+      "failure": "At baseline deb8e502, the direct #1803 consumer failed its frozen six-field deepEqual only at ordinary pending Copy refuses reentry because expected text described post-settlement Download, not a trusted exact-byte Download before Copy settles (record 2026-10-31T10-06-28-560Z-6d5afe7e-0d0f-462d-a945-7808251d4ece). After adding the #1803 process RISK wrapper while that literal was still old, its child reached that same downstream deepEqual mismatch and the wrapper observed assertion-failure (record 2026-10-31T10-08-20-665Z-9b887e30-b999-4161-a035-483e02c0fdf4). The independent #1804 mounted Help consumer failed only its stale regex at tests.js:38015; the actual FAQ says Download stays available while Copy is finishing, saves the same prepared bytes if the browser completes its file download, and distinguishes clipboard completion from Download start (record 2026-10-31T10-10-50-994Z-01f3b8ef-feb1-498f-9056-1ac09ad352ac). After the #1803 literal edit, wrapper attempts 2026-10-31T10-08-34-080Z-75c03055-4c15-4659-90b3-73495b77b394, 2026-10-31T10-09-18-378Z-0fffb135-ebad-4f99-b688-1f6a176d17e7 and 2026-10-31T10-10-13-498Z-d01d2196-448e-44b4-8a2c-517f992376fe exposed incorrect 2-versus-33 count and TAP declaration/completion ordering assumptions only; they are retained as harness setup errors. The corrected 33-outcome wrapper passed in record 2026-10-31T10-10-31-681Z-10c02301-2380-433b-a875-e0f4c8ae77ea."
+    },
+    "evidenceChronology": {
+      "comparisonBase": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+      "frozenConsumerRed": "2026-10-31T10-06-28-560Z-6d5afe7e-0d0f-462d-a945-7808251d4ece",
+      "processRiskRedBeforeLiteralEdit": "2026-10-31T10-08-20-665Z-9b887e30-b999-4161-a035-483e02c0fdf4",
+      "processRiskGreenAfterLiteralEdit": "2026-10-31T10-10-31-681Z-10c02301-2380-433b-a875-e0f4c8ae77ea",
+      "helpConsumerRed": "2026-10-31T10-10-50-994Z-01f3b8ef-feb1-498f-9056-1ac09ad352ac",
+      "helpConsumerGreen": "2026-10-31T10-11-24-426Z-26f08920-9bd7-49f9-b9b1-5732d85e9808",
+      "groupCohortInitialEnvironmentMismatch": "2026-10-31T10-11-31-237Z-6cc0ed7f-2efe-4bad-bfb9-07b4bb98d407",
+      "groupCohortCorrectedRuntimeGreen": "2026-10-31T10-13-46-203Z-f393c10d-6ded-4c71-a0ec-7d916721362b",
+      "relatedHelpCohortGreen": "2026-10-31T10-15-18-531Z-eedcc238-a429-4321-aff9-7bd76da11792"
+    },
+    "rationalePreservation": {
+      "preexistingObjectCount": 1449,
+      "preexistingFileSha256": "f0205863645a4b144b5d280426dc8c011676523acdd96a0b1b2a991cd659d70a",
+      "preexistingObjectsCanonicalSha256": "9d6c8fa45b9e53871d29eb96fb8a508cf8191bc3bfa4d210d38f986579b1506e",
+      "allPreexistingObjectsPreserved": true
+    }
   }
 ]
