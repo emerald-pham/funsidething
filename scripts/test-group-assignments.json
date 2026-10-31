@@ -7818,6 +7818,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
       "group": "core",
       "file": "tests.js"

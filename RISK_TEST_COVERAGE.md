@@ -217,6 +217,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status
 - RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
+- RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable
 - RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy
 - RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL
 - RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports
@@ -2463,7 +2464,7 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 
 - `RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources` — OR08: one trusted23:15/winter lock survives genuine reopen; two distinct task edits/two trusted Undo inputs preserve independently literal full current/durable boards, scene/event authority, history, unknown/typed/pending/manual originals and exact automatic backup lifecycle, all native receipts/accounting and cleanup. Existing readiness/Normal/Reduced/repaint coverage remains.
 
-- `RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources` — OR09: two real attempted Copy presses while the existing external clipboard promise is deferred; first accepted/second explicitly refused through trusted native down and neutral release; one actual clipboard operation and independent Download of identical full archive; complete independently literal64task raw/canonical/current/durable/backup/pending/typed/local/IDB source map, all receipts/accounting/report/exit/cleanup. OS clipboard/physical device not claimed.
+- `RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources` — OR09: two real attempted Copy presses while the existing external clipboard promise is deferred; first accepted/second explicitly refused through trusted native down and neutral release; a trusted Download saves identical full archive bytes before clipboard settlement; complete independently literal64task raw/canonical/current/durable/backup/pending/typed/local/IDB source map, all receipts/accounting/report/exit/cleanup. OS clipboard/physical device not claimed.
 
 - `RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources` — OR10: actual old Copy, real close/replacement, newer Copy busy, old clipboard completion leaves every new status/busy/archive field and saved source byte intact, then truthfully settle newer Copy; both independently complete raw/canonical64task/current/durable/history/typed/local/IDB/manual/pending/source/archive maps, exact9native clicks/downs and old/new actualreceipt accounting/cleanup. No OSclipboard/physicaldevice claim.
 

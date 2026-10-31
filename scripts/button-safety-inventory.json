@@ -1173,7 +1173,7 @@
           "actionFamilies": [
             "act:copy-export"
           ],
-          "expected": "Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, preserve archive bytes and independent Download availability after truthful completion/refusal.",
+          "expected": "Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, perform a trusted Download with exact prepared bytes before Copy settles, then preserve both truthful outcomes and all saved sources.",
           "minimumAttempts": 2,
           "assertionId": "pending-copy-refuses-reentry-and-keeps-download"
         },

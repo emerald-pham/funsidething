@@ -1151,7 +1151,7 @@ test('RISK transfer guidance: mounted FAQ and changelog explain one prepared arc
  const exported=answer('What does Export include?');
  assert.ok(exported.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Export FAQ stays within its word limit');
  assert.match(exported,/one read-only recovery archive.*accepted current board/i);
- assert.match(exported,/Copy sends the prepared archive straight to the clipboard; Download saves the same bytes if the browser completes its file download\. Copy reports success after the clipboard write completes; Download reports only that saving those same prepared bytes started/i);
+ assert.match(exported,/Copy sends the prepared archive straight to the clipboard; Download stays available while Copy is finishing and saves the same bytes if the browser completes its file download\. Copy reports success after the clipboard write completes; Download reports only that saving those same prepared bytes started/i);
  assert.match(exported,/clearly marked partial archive/);
  assert.match(exported,/pending work is never replayed.*original sources stay protected/);
  const paste=answer('How do I paste a saved board?');
@@ -1169,7 +1169,7 @@ test('RISK transfer guidance: mounted FAQ and changelog explain one prepared arc
  const changelog=mountedHelp.split('<div class="kv" data-changelog-notes>')[1]?.split('</details>')[0];
  assert.ok(changelog,'the mounted Changelog is available beside the FAQ');
  assert.match(changelog,/Settings now has one Import and one Export, with separate Copy and Download choices\./);
- assert.match(changelog,/Copy reports success after the clipboard write completes; Download reports only that saving the same prepared bytes started\./);
+ assert.match(changelog,/Copy reports success after the clipboard write completes; Download stays available while Copy is pending and saves the same prepared bytes, reporting only that saving started\./);
  assert.match(changelog,/During held opening, Export can preserve readable raw sources in a partial source-only archive when no accepted current board is available; it cannot restore a board\./);
  assert.match(changelog,/Large pastes stay captured in full for Preview while the text box stays bounded\./);
  assert.match(changelog,/Restore applies only a supported selected board after confirmation; sources remain protected\./);
@@ -16695,7 +16695,7 @@ test('RISK saved view held Copy: trusted terminal Copy preserves prepared bytes 
   assert.ok(archive.manifest.failures.some(row=>row.source==='indexedDB'&&row.code==='unavailable'),'the partial manifest explicitly identifies the revoked storage port');
   assert.equal(before.cloud.user,null,'the pending fixture is not the active cloud identity');
   t.diagnostic('Actual trusted Copy control; external clipboard.writeText promise stub only. No OS clipboard permission/content or system-paste claim.');
-  let automaticDownloads=0;view.page.on('download',()=>{automaticDownloads++;});
+  let downloads=0;view.page.on('download',()=>{downloads++;});
   await view.page.evaluate(()=>{window.__heldCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText(raw){return new Promise((resolve,reject)=>window.__heldCopyRequests.push({raw,resolve,reject}));}}});});
   const copyControl=view.page.locator('#exportTransferDialog [data-act="copy-export"]');
   assert.equal(await copyControl.count(),1,'the prepared dialog exposes exactly one real Copy');
@@ -16703,11 +16703,20 @@ test('RISK saved view held Copy: trusted terminal Copy preserves prepared bytes 
   await copyControl.click();
   assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests.length),1);
   assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests[0].raw),raw,'the real Copy consumer sends the exact prepared bytes to the external clipboard boundary');
-  assert.equal(await copyControl.isDisabled(),true);assert.equal(await view.page.locator('#downloadExportButton').isDisabled(),true,'a pending clipboard write keeps both transfer controls busy');
+  const heldDownloadControl=view.page.locator('#downloadExportButton');
+  assert.equal(await copyControl.isDisabled(),true);assert.equal(await heldDownloadControl.isEnabled(),true,'a pending clipboard write owns Copy while the same prepared Download remains available');
   assert.equal(await view.page.evaluate(()=>exportTransferPayload),raw,'pending Copy retains the original prepared archive');
+  const [pendingDownload]=await Promise.all([view.page.waitForEvent('download',{timeout:10000}),heldDownloadControl.click()]);
+  assert.equal(pendingDownload.suggestedFilename(),'chain-scanner-recovery-archive.json');assert.equal(await pendingDownload.failure(),null);
+  const pendingDownloadRaw=fs.readFileSync(await pendingDownload.path(),'utf8');
+  assert.equal(pendingDownloadRaw,raw,'a trusted Download during pending Copy saves the exact prepared bytes');
+  assert.equal(pendingDownloadRaw,await view.page.evaluate(()=>window.__heldCopyRequests[0].raw),'Download and the unresolved clipboard request share the full archive');
+  assert.equal(await view.page.evaluate(()=>exportTransferBusy),true,'Download does not release the unresolved clipboard owner');
+  assert.equal(await copyControl.isDisabled(),true);assert.equal(await heldDownloadControl.isEnabled(),true);
+  assert.equal(await view.page.locator('#exportTransferStatus').innerText(),'Copying the prepared archive… Download started. The archive contains the exact prepared export.');
   await view.page.evaluate(()=>window.__heldCopyRequests[0].resolve());
   await view.page.waitForFunction(()=>exportTransferBusy===false);
-  assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Copied the same recovery archive/);
+  assert.equal(await view.page.locator('#exportTransferStatus').innerText(),'Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.');
   assert.equal(await copyControl.isEnabled(),true);
   await copyControl.click();
   assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests.length),2);
@@ -16716,7 +16725,7 @@ test('RISK saved view held Copy: trusted terminal Copy preserves prepared bytes 
   await view.page.waitForFunction(()=>exportTransferBusy===false);
   assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Clipboard access failed\. Download remains available/);
   assert.equal(await view.page.locator('#downloadExportButton').isEnabled(),true,'clipboard refusal retains the existing Download alternative');
-  assert.equal(await view.page.evaluate(()=>exportTransferPayload),raw);assert.equal(automaticDownloads,0,'clipboard refusal never starts an unsolicited download');
+  assert.equal(await view.page.evaluate(()=>exportTransferPayload),raw);assert.equal(downloads,1,'clipboard refusal never starts another unsolicited download after the deliberate Download');
   await copyControl.click();
   assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests.length),3);
   assert.equal(await view.page.evaluate(()=>window.__heldCopyRequests[2].raw),raw);
@@ -16734,12 +16743,12 @@ test('RISK saved view held Copy: trusted terminal Copy preserves prepared bytes 
   const nextWaiting=await view.page.locator('#exportTransferStatus').innerText();
   await view.page.evaluate(async()=>{window.__heldCopyRequests[2].resolve();await Promise.resolve();await Promise.resolve();});
   assert.equal(await view.page.evaluate(()=>exportTransferBusy),true,'obsolete Copy completion cannot release a newer transfer');
-  assert.equal(await copyControl.isDisabled(),true);assert.equal(await view.page.locator('#downloadExportButton').isDisabled(),true);
+  assert.equal(await copyControl.isDisabled(),true);assert.equal(await view.page.locator('#downloadExportButton').isEnabled(),true);
   assert.equal(await view.page.locator('#exportTransferStatus').innerText(),nextWaiting);
   assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),nextPrepared,'obsolete completion cannot replace the newer prepared instance');
   await view.page.evaluate(()=>window.__heldCopyRequests[3].resolve());
   await view.page.waitForFunction(()=>exportTransferBusy===false);
-  assert.equal(automaticDownloads,0);
+  assert.equal(downloads,1,'settling the obsolete Copy never triggers another Download');
   await view.page.locator('#exportTransferDialog [data-act="close-modal"]').click();
   await view.page.waitForFunction(()=>!document.getElementById('exportTransferDialog'));
   const after=await capture();
@@ -16871,14 +16880,14 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
   const serial=await view.page.evaluate(()=>exportCaptureSerial);
   let downloads=0;view.page.on('download',()=>{downloads++;});
   t.diagnostic('Actual trusted Copy and Download controls; isolated clipboard promise boundary, actual browser download/file readback. No OS clipboard or paste claim.');
-  await view.page.evaluate(()=>{window.__heldDownloadCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{async writeText(raw){window.__heldDownloadCopyRequests.push(raw);}}});});
+  await view.page.evaluate(()=>{window.__heldDownloadCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText(raw){return new Promise(resolve=>window.__heldDownloadCopyRequests.push({raw,resolve}));}}});});
   const copyControl=view.page.locator('#exportTransferDialog [data-act="copy-export"]');
   assert.equal(await copyControl.count(),1);assert.equal(await copyControl.isEnabled(),true);
   await copyControl.click();
-  await view.page.waitForFunction(()=>exportTransferBusy===false&&window.__heldDownloadCopyRequests.length===1);
-  assert.equal(await view.page.evaluate(()=>window.__heldDownloadCopyRequests[0]),raw,'deliberate Copy receives the exact prepared archive later used by Download');
+  await view.page.waitForFunction(()=>exportTransferBusy===true&&window.__heldDownloadCopyRequests.length===1);
+  assert.equal(await view.page.evaluate(()=>window.__heldDownloadCopyRequests[0].raw),raw,'deliberate Copy receives the exact prepared archive while its external promise is still pending');
   assert.equal(downloads,0,'Copy does not start a download');
-  assert.equal(await downloadControl.isEnabled(),true);
+  assert.equal(await copyControl.isDisabled(),true);assert.equal(await downloadControl.isEnabled(),true,'a pending Copy owns only its clipboard action');
   assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial},'Copy leaves the same prepared instance available to Download');
   const [download]=await Promise.all([view.page.waitForEvent('download',{timeout:10000}),downloadControl.click()]);
   assert.equal(download.suggestedFilename(),'chain-scanner-recovery-archive.json');
@@ -16887,7 +16896,7 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
   await download.saveAs(file);assert.equal(await download.failure(),null);
   const bytes=fs.readFileSync(file),downloadedRaw=bytes.toString('utf8');
   assert.equal(downloadedRaw,raw,'actual browser-downloaded file is byte-identical to the prepared archive');
-  assert.equal(downloadedRaw,await view.page.evaluate(()=>window.__heldDownloadCopyRequests[0]),'actual file equals the exact bytes offered to Copy');
+  assert.equal(downloadedRaw,await view.page.evaluate(()=>window.__heldDownloadCopyRequests[0].raw),'actual file equals the exact bytes offered to the still-pending Copy');
   const decoded=JSON.parse(downloadedRaw);
   assert.equal(decoded.format,'chain-scanner.recovery-archive');assert.equal(decoded.currentBoard,null);
   assert.equal(decoded.manifest.status,'partial');assert.deepEqual(decoded.manifest,archive.manifest);
@@ -16895,7 +16904,12 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
   assert.deepEqual(decoded.appSources.indexedDB,{database:before.database,stores:null},'the file never fabricates unavailable indexed database rows');
   assert.deepEqual(decoded.manifest.sources.indexedDB,{database:before.database,schemaVersion:2,status:'unavailable',reason:'unavailable'});
   assert.equal(downloads,1,'only the deliberate Download starts one actual file');
-  assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Download started\. The archive contains the exact prepared export\./);
+  assert.equal(await view.page.evaluate(()=>exportTransferBusy),true,'the Download leaves the unresolved clipboard owner busy');
+  assert.equal(await copyControl.isDisabled(),true);assert.equal(await downloadControl.isEnabled(),true);
+  assert.equal(await view.page.locator('#exportTransferStatus').innerText(),'Copying the prepared archive… Download started. The archive contains the exact prepared export.');
+  await view.page.evaluate(()=>window.__heldDownloadCopyRequests[0].resolve());
+  await view.page.waitForFunction(()=>exportTransferBusy===false);
+  assert.equal(await view.page.locator('#exportTransferStatus').innerText(),'Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.');
   assert.equal(await copyControl.isEnabled(),true);assert.equal(await downloadControl.isEnabled(),true);
   assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial});
   t.diagnostic('Actual held Download artifact: '+JSON.stringify({file,suggestedFilename:download.suggestedFilename(),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),preparedSerial:serial,downloads}));
@@ -17117,7 +17131,7 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
     const beforeCount=downloads;
     await view.page.evaluate(mode=>{window.__nativeRefusedCopyRequests=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:mode==='absent'?undefined:{async writeText(value){window.__nativeRefusedCopyRequests.push(value);throw new DOMException('Isolated clipboard refusal','NotAllowedError');}}});},clipboardOutcome);
     await copyControl.click();
-    const status=clipboardOutcome==='rejected'?'Clipboard access failed. Download remains available for this prepared archive.':'Clipboard is unavailable. Download the same prepared archive instead.';
+    const status=clipboardOutcome==='rejected'?'Clipboard access failed. Download remains available for this prepared archive. Download started. The archive contains the exact prepared export.':'Clipboard is unavailable. Download the same prepared archive instead. Download started. The archive contains the exact prepared export.';
     await view.page.waitForFunction(expected=>exportTransferBusy===false&&document.getElementById('exportTransferStatus')?.textContent===expected,status,{timeout:10000});
     assert.equal(await view.page.locator('#exportTransferStatus').innerText(),status,'the actual Copy reports the correct external failure');
     assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial},'refused Copy retains the exact same prepared archive instance');
@@ -17132,7 +17146,7 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
     assert.equal(downloads,beforeCount+1);assert.deepEqual(await captureCurrent(),currentBeforeRefusal,'Download after refusal preserves all current sources, pending/opaque/typed values and the unfinished draft');
     assert.deepEqual(await view.page.evaluate(()=>({raw:exportTransferPayload,serial:exportCaptureSerial})),{raw,serial});
     assert.equal(await view.page.locator('#exportTransferDialog textarea').count(),0);assert.equal(await view.page.locator('#exportTransferDialog a[download]').count(),0);
-    assert.equal(await view.page.locator('#exportTransferStatus').innerText(),'Download started. The archive contains the exact prepared export.','each later real Download truthfully reports initiation');
+    assert.equal(await view.page.locator('#exportTransferStatus').innerText(),status,'each later real Download preserves the clipboard outcome and truthfully reports initiation');
     assert.equal(await copyControl.isEnabled(),true);assert.equal(await downloadControl.isEnabled(),true,'each later real Download leaves both independent transfer controls enabled');
     await assertExportBounded(clipboardOutcome+'-download');
     sub.diagnostic('Actual refused-Copy Download: '+JSON.stringify({browserEngine,clipboardOutcome,status,file:savedFile,bytes:savedBytes.length,sha256:createHash('sha256').update(savedBytes).digest('hex'),serial,downloads,expectedFile,sourceFile,limits:'External rejected/absent clipboard controls; no OS clipboard permission/write claim.'}));
@@ -21344,7 +21358,7 @@ test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer ex
     shim.document.getElementById=id=>controls?.[id]||original(id);
     async function openExport(){
       ctx.openSettings();assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true);
-      controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()]));
+      controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()]));controls.downloadExportButton.disabled=false;
     }
     await openExport();const first=ctx.onAction('copy-export',{});
     assert.equal(pending.length,1);ctx.closeModal();
@@ -21353,7 +21367,7 @@ test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer ex
     const waiting=controls.exportTransferStatus.textContent;
     pending[0][outcome](outcome==='reject'?Error('late clipboard refusal'):undefined);await first;
     assert.equal(controls.copyExportButton.disabled,true,'the earlier transfer cannot release the pending Copy');
-    assert.equal(controls.downloadExportButton.disabled,true,'the newer transfer remains guarded');
+    assert.equal(controls.downloadExportButton.disabled,false,'pending Copy guards only another clipboard request; Download remains independently available');
     assert.equal(controls.exportTransferStatus.textContent,waiting,'only the active clipboard request may change its status');
     assert.equal(await ctx.onAction('copy-export',{}),false,'another press stays refused while the new request is pending');
     assert.equal(pending.length,2);
@@ -21362,6 +21376,59 @@ test('RISK JSON COPY PASTE: stale clipboard completion cannot release a newer ex
     assert.match(controls.exportTransferStatus.textContent,/Copied/);
     assert.equal(JSON.parse(pending[1].raw).currentBoard.tasks.length,1);
   });
+});
+
+test('RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable',async t=>{
+ const app=await loadApp(),{ctx,shim}=app;t.after(()=>app.dispose());
+ const task=ctx.addTask('Pending Copy still permits the prepared Download');task.futurePendingExport={unknown:['retain',19]};
+ ctx.state.futurePendingExport={unknown:true};ctx.state.syncDirty=true;
+ const currentBefore=JSON.stringify(ctx.state),localBefore=Array.from({length:shim.localStorage.length},(_,index)=>{const key=shim.localStorage.key(index);return[key,shim.localStorage.getItem(key)];});
+ const clipboard=[];let resolveFirst,rejectSecond;
+ ctx.navigator={clipboard:{writeText(raw){clipboard.push(raw);return new Promise((resolve,reject)=>{if(clipboard.length===1)resolveFirst=resolve;else rejectSecond=reject;});}}};
+ const urlBlobs=new Map(),revoked=[],downloads=[],anchors=[];let failNextDownload=false;
+ class ExportURL extends URL{}
+ ExportURL.createObjectURL=blob=>{const href='blob:pending-copy-'+(urlBlobs.size+1);urlBlobs.set(href,blob);return href;};
+ ExportURL.revokeObjectURL=href=>{revoked.push(href);};
+ ctx.URL=ExportURL;ctx.Blob=Blob;
+ shim.document.createElement=tag=>{
+  assert.equal(tag,'a','Download uses its existing temporary anchor');
+  const anchor=makeFakeElement();anchor.href='';anchor.download='';anchor.removed=false;
+  anchor.remove=()=>{anchor.removed=true;};
+  anchor.click=()=>{if(failNextDownload){failNextDownload=false;throw Error('isolated temporary anchor refusal');}downloads.push({name:anchor.download,blob:urlBlobs.get(anchor.href),anchor});};
+  anchors.push(anchor);return anchor;
+ };
+ assert.equal(await ctx.onAction('export-backup',{isConnected:true}),true,'the existing Settings Export action prepares its archive');
+ const copyButton=shim.document.getElementById('copyExportButton'),downloadButton=shim.document.getElementById('downloadExportButton');
+ downloadButton.disabled=false;
+ const firstCopy=ctx.onAction('copy-export',{});assert.equal(clipboard.length,1,'Copy invokes the existing clipboard boundary during the action');
+ const firstRaw=clipboard[0],firstDownload=ctx.onAction('download-export',{});
+ assert.deepEqual({copyDisabled:copyButton.disabled,downloadDisabled:downloadButton.disabled,downloadStarted:firstDownload,copyStatus:shim.document.getElementById('exportTransferStatus').textContent},
+  {copyDisabled:true,downloadDisabled:false,downloadStarted:true,copyStatus:'Copying the prepared archive… Download started. The archive contains the exact prepared export.'},
+  'a pending Copy owns only Copy while the real Download action starts the same prepared archive');
+ assert.equal(downloads.length,1);assert.equal(downloads[0].name,'chain-scanner-recovery-archive.json');
+ assert.equal(await downloads[0].blob.text(),firstRaw,'the downloaded UTF-8 bytes exactly match the complete payload sent to Copy');
+ const firstArchive=JSON.parse(firstRaw);assert.equal(firstArchive.format,'chain-scanner.recovery-archive');
+ assert.ok(firstArchive.currentBoard.tasks.some(row=>row.id===task.id&&row.futurePendingExport?.unknown?.[1]===19));
+ assert.equal(firstArchive.currentBoard.futurePendingExport.unknown,true);
+ assert.equal(ctx.onAction('copy-export',{}),false,'a second clipboard request remains refused while the first Copy is pending');
+ assert.equal(clipboard.length,1);assert.deepEqual(JSON.stringify(ctx.state),currentBefore,'Download and Copy do not save or adopt board state');
+ assert.deepEqual(Array.from({length:shim.localStorage.length},(_,index)=>{const key=shim.localStorage.key(index);return[key,shim.localStorage.getItem(key)];}),localBefore,'Download and Copy leave every local source byte unchanged');
+ resolveFirst();assert.equal(await firstCopy,true,'the original Copy owner settles independently after Download');
+ assert.equal(copyButton.disabled,false);assert.equal(downloadButton.disabled,false);
+ assert.equal(shim.document.getElementById('exportTransferStatus').textContent,'Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.');
+
+ const secondCopy=ctx.onAction('copy-export',{});assert.equal(clipboard.length,2);failNextDownload=true;
+ assert.equal(ctx.onAction('download-export',{}),false,'a failed Download reports its own refusal');
+ assert.deepEqual({copyDisabled:copyButton.disabled,downloadDisabled:downloadButton.disabled,copyStatus:shim.document.getElementById('exportTransferStatus').textContent},
+  {copyDisabled:true,downloadDisabled:false,copyStatus:'Copying the prepared archive… Download could not start while Copy was pending.'},
+  'Download failure keeps the pending clipboard owner and its retry refusal intact');
+ assert.equal(anchors.length,2);assert.equal(anchors[1].removed,true,'the failed Download removes its temporary anchor');
+ assert.deepEqual(revoked,['blob:pending-copy-2'],'the failed Download revokes only its own temporary URL');
+ assert.equal(ctx.onAction('copy-export',{}),false);assert.equal(clipboard.length,2,'Download failure cannot start a duplicate clipboard request');
+ rejectSecond(Error('isolated clipboard refusal'));assert.equal(await secondCopy,false,'the original pending Copy reports its later refusal');
+ assert.equal(copyButton.disabled,false);assert.equal(downloadButton.disabled,false);
+ assert.equal(shim.document.getElementById('exportTransferStatus').textContent,'Clipboard access failed. Download remains available for this prepared archive. Download could not start while Copy was pending.');
+ assert.deepEqual(JSON.stringify(ctx.state),currentBefore);assert.deepEqual(Array.from({length:shim.localStorage.length},(_,index)=>{const key=shim.localStorage.key(index);return[key,shim.localStorage.getItem(key)];}),localBefore);
 });
 
 test('RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources',async t=>{
@@ -21446,7 +21513,7 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
   const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const answer=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'Quick start includes the JSON copy and paste workflow');
-  assert.equal(answer,'Choose Settings → Data and backups → Export → Copy. If copying is unavailable, choose Download; use Import → Paste JSON to bring it back.');
+  assert.equal(answer,'Choose Settings → Data and backups → Export → Copy. If copying is unavailable or still finishing, Download saves the same prepared archive; use Import → Paste JSON to bring it back.');
   const paste=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(paste);
   assert.match(paste,/complete text.*Cancel and Close keep it.*current board stay protected before preview.*Nothing applies until you confirm Restore/,'The separate paste answer retains saved-data safeguards');
   assert.doesNotMatch(answer,/late result|pending|accepted unsaved|read-only/,'The direct Copy answer avoids repeated internal export machinery');
@@ -22042,7 +22109,7 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.ok(exportFaq,'the extended FAQ explains the single Export action');
   assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
   assert.match(exportFaq,/one read-only recovery archive.*accepted current board/i);
-  assert.match(exportFaq,/Copy sends the prepared archive straight to the clipboard.*Download saves the same bytes/i);
+  assert.match(exportFaq,/Copy sends the prepared archive straight to the clipboard; Download stays available while Copy is finishing and saves the same bytes/i);
   assert.match(exportFaq,/pending work is never replayed.*original sources stay protected/i);
   assert.match(exportFaq,/not rendered in the page/i);
   assert.match(exportFaq,/clearly marked partial archive/i);
@@ -22074,7 +22141,7 @@ test('RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor an
   for(const name of ['setItem','removeItem','clear'])if(typeof shim.localStorage[name]==='function'){
     const original=shim.localStorage[name].bind(shim.localStorage);shim.localStorage[name]=(...args)=>{browserWrites.push([name,...args]);return original(...args);};
   }
-  const controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()])),getId=shim.document.getElementById.bind(shim.document);
+  const controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()])),getId=shim.document.getElementById.bind(shim.document);controls.copyExportButton.disabled=false;controls.downloadExportButton.disabled=false;
   shim.document.getElementById=id=>controls[id]||getId(id);
   const downloadUrl='blob:manual-download-resource-refusal',copies=[],blobs=[],attempts=[],removedAnchors=[],revokedUrls=[],link=makeFakeElement(),refusal=Object.assign(Error('Controlled external Download launch refusal'),{code:'CONTROLLED_DOWNLOAD_REFUSAL'});
   link.remove=()=>{removedAnchors.push(link);};
@@ -22165,7 +22232,7 @@ test('RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archi
   for(const name of ['setItem','removeItem','clear'])if(typeof shim.localStorage[name]==='function'){
     const original=shim.localStorage[name].bind(shim.localStorage);shim.localStorage[name]=(...args)=>{browserWrites.push([name,...args]);return original(...args);};
   }
-  const controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()])),getId=shim.document.getElementById.bind(shim.document);
+  const controls=Object.fromEntries(['copyExportButton','downloadExportButton','exportTransferStatus'].map(id=>[id,makeFakeElement()])),getId=shim.document.getElementById.bind(shim.document);controls.copyExportButton.disabled=false;controls.downloadExportButton.disabled=false;
   shim.document.getElementById=id=>controls[id]||getId(id);
   const copies=[],blobs=[],attempts=[],link=makeFakeElement(),refusal=Object.assign(Error('Controlled external Download launch refusal'),{code:'CONTROLLED_DOWNLOAD_REFUSAL'});
   link.remove=()=>{};link.click=()=>{attempts.push({error:refusal,name:link.download,href:link.href,blob:blobs.at(-1)});throw refusal;};
@@ -48343,7 +48410,7 @@ test('RISK repository process: button safety report admission binds ordinary and
   {name:'ordinary repeated saved decision choice',actionFamilies:['act:choose-decision-recovery'],minimumAttempts:2,assertionId:'same-decision-choice-does-not-gain-authority',expected:'Repeat the same Light choice twice without losing selection or gaining authority; explicit Apply saves Light, failed acknowledgement remains pending and exact device/cloud source boundaries remain protected.'},
   {name:'ordinary two distinct scanner decisions',actionFamilies:['act:yes'],minimumAttempts:2,assertionId:'two-yes-inputs-bind-to-two-offered-task-ids',expected:'Deliver two distinct intentional Yes inputs tied to independently captured offered task IDs, account both accepted decisions, and preserve both in ordered current/durable scanner state without dropping or retargeting input.'},
   {name:'ordinary scene choice survives reopen and task Undo',actionFamilies:['scene-time:lock','act:undo'],minimumAttempts:2,assertionId:'scene-lock-survives-reopen-and-task-undo',expected:'Accept a scene lock, reopen and verify its durable identity, perform two distinct task edits and two native Undo inputs, retain the independently chosen scene and exact protected sources. Keep readiness, Normal/Reduced and unchanged-scene repaint checks in existing regression consumers.'},
-  {name:'ordinary pending Copy refuses reentry',actionFamilies:['act:copy-export'],minimumAttempts:2,assertionId:'pending-copy-refuses-reentry-and-keeps-download',expected:'Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, preserve archive bytes and independent Download availability after truthful completion/refusal.'},
+  {name:'ordinary pending Copy refuses reentry',actionFamilies:['act:copy-export'],minimumAttempts:2,assertionId:'pending-copy-refuses-reentry-and-keeps-download',expected:'Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, perform a trusted Download with exact prepared bytes before Copy settles, then preserve both truthful outcomes and all saved sources.'},
   {name:'ordinary obsolete Copy cannot alter replacement transfer',actionFamilies:['act:copy-export'],minimumAttempts:2,assertionId:'obsolete-copy-cannot-change-new-transfer',expected:'Start Copy, replace/close the prepared transfer and start a newer Copy; settle the old completion while the new operation is busy, proving unchanged new status, busy state, archive identity and protected sources.'}
  ];
  const expectedFixtureVariants={
@@ -50381,7 +50448,7 @@ test("RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fa
  const specimen=appSrc.replace(target,'if(false)await fileRestoreCloudWrite(p);');
  const actualSourceHash=createHash('sha256').update(specimen).digest('hex');
  // #1784 retains the current exact specimen independently; historical82ab13b676888945851ff5f94fd3f784cf741ef8d5fd78e8dea5459585105a6f remains prior evidence.
- assert.equal(actualSourceHash,"e9ede93b7bca6bde25014df338e5accd97378e9ffc803b135de29caa88e8a35a",'353 later sensitivity binds its exact independently retained broken source');
+ assert.equal(actualSourceHash,"e4b2abb6bc1b7741e09888784e352490885289c2f05f4918fc49bcded0101115",'353 later sensitivity binds its exact independently retained broken source');
  let failure;
  try{await realFileImportCase353(t,{mode:'success',appSource:specimen});}catch(error){failure=error;}
  assert.equal(failure?.code,'ERR_ASSERTION','353 later sensitivity requires the actual consumer assertion, not setup or another error');
@@ -51329,22 +51396,22 @@ test("RISK repository process: ordinary pending Copy refuses reentry with comple
    exactKeys(archive.repairInfo,['version','debugLog'],'Complete retained metadata-only repair information');assert.equal(archive.repairInfo.version,1);const log=archive.repairInfo.debugLog;exactKeys(log,['schema','version','metadataOnly','boardDataIncluded','capturedAt','localTime','utcOffsetMinutes','app','serviceWorker','restartDiagnostics','save','recoverySources','recentErrors','events','sourceOperations','retention'],'Complete debug metadata is retained, never used as board/source authority');assert.equal(log.schema,'funsidething.support-diagnostics');assert.equal(log.version,1);assert.equal(log.metadataOnly,true);assert.equal(log.boardDataIncluded,false);assert.ok(Buffer.byteLength(JSON.stringify(log))<=24*1024);assert.equal(raw,JSON.stringify(archive,null,2),'The entire original archive JSON is preserved, including all debug metadata');
    assert.ok(phase.capturedAtMs>=Date.parse(archive.capturedAt));return archive;
   };
-  const statuses=[null,null,'Ready. Choose Copy or Download.','Copying the prepared archive…','Copied the same recovery archive available from Download.','Download started. The archive contains the exact prepared export.','Download started. The archive contains the exact prepared export.'];
-  const clickCounts=[0,1,3,4,4,5,5],pressCounts=[0,1,3,5,5,6,6];
+  const statuses=[null,null,'Ready. Choose Copy or Download.','Copying the prepared archive… Download started. The archive contains the exact prepared export.','Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.','Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.','Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.'];
+  const clickCounts=[0,1,3,5,5,5,5],pressCounts=[0,1,3,6,6,6,6];
   for(const[ordinal,phase]of phases.entries()){
    exactKeys(phase.sourceValue,['type','entries'],'Complete lossless Copy source root');assert.equal(phase.sourceValue.type,'object');assert.equal(phase.sourceValueEncoding,'chain-scanner.manual-archive-value/v1');assert.deepEqual(phase.sourceValue.entries.map(row=>row[0]),snapshotKeys);
    assert.deepEqual(Object.keys(phase).filter(key=>!snapshotKeys.includes(key)&&!['sourceValueEncoding','sourceValue','schemaVersion','phase','scenario','sourceIdentity'].includes(key)),[],'No unexamined source field');
    for(const[key,node]of phase.sourceValue.entries){if(key==='opaque')assert.deepEqual(node,opaqueLiteral);else safeValue(node,phase[key],'lossless '+key);assert.ok(Object.hasOwn(phase,key));}
    assert.ok(Number.isSafeInteger(phase.capturedAtMs)&&phase.capturedAtMs>=seed.capturedAtMs);if(ordinal)assert.ok(phase.capturedAtMs>=phases[ordinal-1].capturedAtMs);
    assert.deepEqual(JSON.parse(phase.current),expectedLive,'The complete independently literal hydrated current board remains exact');assert.equal(phase.current,JSON.stringify(expectedLive));assert.equal(phase.currentHash,hash(phase.current));assert.equal(phase.durable,seedRaw,'Every original durable raw byte remains exact');assert.equal(phase.durableHash,seedHash);rowsExact(phase.backups,originalRows,'Copy/Download never creates/replaces/retires any device backup');assert.deepEqual(phase.pending,pendingLiteral);assert.equal(phase.pendingOwner,null);assert.equal(phase.hold,null);assert.equal(phase.timeZone,seed.timeZone);assert.deepEqual(phase.localSources,expectedLocal);assert.deepEqual(phase.indexedDB,expectedStores,'Every raw IDB key/value, metadata, pending/typed/negativezero original stays exact');
-   exactKeys(phase.view,['documentId','ready','database','dialogOpen','status','copyDisabled','downloadDisabled','preparedRaw','clipboard','pendingCount'],'Complete actual Copy/Download UI and external clipboard boundary');assert.ok(phase.view.documentId);assert.equal(phase.view.documentId,seed.view.documentId);assert.equal(phase.view.ready,true);assert.equal(phase.view.database,database);assert.equal(phase.view.dialogOpen,ordinal>=2);assert.equal(phase.view.status,statuses[ordinal]);assert.equal(phase.view.copyDisabled,ordinal<2?null:ordinal===3);assert.equal(phase.view.downloadDisabled,ordinal<2?null:ordinal===3);assert.equal(phase.view.pendingCount,ordinal>=3?1:0);assert.equal(phase.downloadedArchive,ordinal>=5?prepared.view.preparedRaw:null,'The actual complete downloaded file bytes equal the original full archive');assert.deepEqual(phase.view.clipboard,ordinal>=3?[prepared.view.preparedRaw]:[]);
+   exactKeys(phase.view,['documentId','ready','database','dialogOpen','status','copyDisabled','downloadDisabled','preparedRaw','clipboard','pendingCount'],'Complete actual Copy/Download UI and external clipboard boundary');assert.ok(phase.view.documentId);assert.equal(phase.view.documentId,seed.view.documentId);assert.equal(phase.view.ready,true);assert.equal(phase.view.database,database);assert.equal(phase.view.dialogOpen,ordinal>=2);assert.equal(phase.view.status,statuses[ordinal]);assert.equal(phase.view.copyDisabled,ordinal<2?null:ordinal===3);assert.equal(phase.view.downloadDisabled,ordinal<2?null:false);assert.equal(phase.view.pendingCount,ordinal===3?1:0);assert.equal(phase.downloadedArchive,ordinal>=3?prepared.view.preparedRaw:null,'The actual trusted Download while clipboard is pending saves the original full archive');assert.deepEqual(phase.view.clipboard,ordinal>=3?[prepared.view.preparedRaw]:[]);
    if(ordinal<2)assert.equal(phase.view.preparedRaw,null);else{assert.equal(phase.view.preparedRaw,prepared.view.preparedRaw,'Copy completion and Download retain the exact originally prepared full archive');verifyArchive(phase.view.preparedRaw,phase);}
    assert.equal(phase.clicks.length,clickCounts[ordinal]);assert.equal(phase.presses.length,pressCounts[ordinal]);assert.deepEqual(phase.clicks.map(row=>row.action),allClicks.slice(0,clickCounts[ordinal]));assert.deepEqual(phase.presses.map(row=>row.action),allPresses.slice(0,pressCounts[ordinal]));
    for(const[kind,rows]of[['press',phase.presses],['click',phase.clicks]])rows.forEach((row,index)=>{exactKeys(row,kind==='press'?['at','action','pointerType','trusted','offeredTaskId']:['at','action','trusted','offeredTaskId'],'Complete native '+kind);assert.equal(row.trusted,true);assert.equal(row.offeredTaskId,null);if(kind==='press')assert.equal(row.pointerType,'mouse');assert.ok(Number.isFinite(row.at)&&row.at<=phase.capturedAtMs);if(index)assert.ok(row.at>rows[index-1].at);});
    phase.clicks.forEach((click,index)=>{const press=phase.presses[index===4?5:index];assert.ok(click.at>=press.at);assert.equal(click.action,press.action);});
   }
   for(const phase of phases)assert.deepEqual(phase.current,seed.current);
-  return{phases:names,copy:{attempted:2,accepted:1,refused:1,disappeared:0,clipboardOperations:1},archive:{sha256:hash(prepared.view.preparedRaw),bytes:Buffer.byteLength(prepared.view.preparedRaw),complete:true,downloadMatches:true},source:{currentHash:seed.currentHash,durableHash:seedHash,manualIds,stores:counts,localKeys,unchanged:true}};
+  return{phases:names,copy:{attempted:2,accepted:1,refused:1,disappeared:0,clipboardOperations:1},archive:{sha256:hash(prepared.view.preparedRaw),bytes:Buffer.byteLength(prepared.view.preparedRaw),complete:true,downloadMatches:true,downloadedWhileCopyPending:true},source:{currentHash:seed.currentHash,durableHash:seedHash,manualIds,stores:counts,localKeys,unchanged:true}};
  };
  await prepareNativePlaywrightResolution(t);
  const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&port>0,'Healthy allocated WebKit/loopback required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ordinary-pending-copy-'));
@@ -51356,7 +51423,7 @@ test("RISK repository process: ordinary pending Copy refuses reentry with comple
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});const names=['seed','settings','prepared','pending-refused','completed','downloaded','final-source'];assert.deepEqual(report.ordinaryPendingCopyPhases?.map(row=>row.phase),names);
  const phases=report.ordinaryPendingCopyPhases.map(reference=>{assert.equal(reference.file,'ordinary-pending-copy-'+reference.phase+'.json');const bytes=fs.readFileSync(path.join(output,reference.file));assert.equal(hash(bytes),reference.sha256);assert.equal(bytes.byteLength,reference.bytes);const artifact=JSON.parse(bytes);assert.equal(artifact.schemaVersion,1);assert.equal(artifact.phase,reference.phase);assert.equal(artifact.scenario,scenario);assert.deepEqual(artifact.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256});for(const side of['current','durable']){assert.equal(reference[side+'Hash'],hash(artifact[side]));assert.equal(artifact[side+'Hash'],reference[side+'Hash']);assert.equal(Buffer.byteLength(artifact[side]),reference[side+'Bytes']);}return artifact;});
  const semantic=verifyCopySources(phases),rows=(report.repeatOutcomes||[]).filter(row=>row.name===scenario);assert.equal(rows.length,1);const repeat=rows[0],definition=JSON.parse(inventoryBytes).profiles.ordinary.requiredRepeatCases.find(row=>row.name===scenario);
- assert.deepEqual(definition,{name:scenario,file:'scripts/button-safety-rapid.mjs',actionFamilies:['act:copy-export'],expected:'Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, preserve archive bytes and independent Download availability after truthful completion/refusal.',minimumAttempts:2,assertionId:'pending-copy-refuses-reentry-and-keeps-download'});
+ assert.deepEqual(definition,{name:scenario,file:'scripts/button-safety-rapid.mjs',actionFamilies:['act:copy-export'],expected:'Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, perform a trusted Download with exact prepared bytes before Copy settles, then preserve both truthful outcomes and all saved sources.',minimumAttempts:2,assertionId:'pending-copy-refuses-reentry-and-keeps-download'});
  assert.equal(repeat.status,'passed');assert.equal(repeat.attempts.length,2);assert.equal(new Set(repeat.attempts.map(row=>row.receiptId)).size,2);assert.deepEqual(repeat.accounting,{attempted:2,accepted:1,refused:1,disappeared:0});
  assert.deepEqual(report.clicks.map(row=>row.action),allClicks,'Every actual Settings/disclosure/Export/Copy/Download click, zero unrelated clicks');assert.deepEqual(report.presses.map(row=>row.action),allPresses,'The second attempted Copy is an actual trusted neutral down bound to disabled refusal');
  const sourcePresses=phases.at(-1).presses,sourceClicks=phases.at(-1).clicks;assert.deepEqual(report.presses.map(({scenario:owner,...row})=>{assert.equal(owner,scenario);return row;}),sourcePresses);assert.deepEqual(report.clicks.map(({scenario:owner,...row})=>{assert.equal(owner,scenario);return row;}),sourceClicks);
@@ -51440,7 +51507,7 @@ test("RISK repository process: ordinary obsolete Copy cannot alter replacement t
    for(const[key,node]of phase.sourceValue.entries){if(key==='opaque')assert.deepEqual(node,opaqueLiteral);else safeValue(node,phase[key],'lossless '+key);assert.ok(Object.hasOwn(phase,key));}
    assert.ok(Number.isSafeInteger(phase.capturedAtMs)&&phase.capturedAtMs>=seed.capturedAtMs);if(ordinal)assert.ok(phase.capturedAtMs>=phases[ordinal-1].capturedAtMs);
    assert.deepEqual(JSON.parse(phase.current),expectedLive,'The complete independently literal hydrated current board remains exact');assert.equal(phase.current,JSON.stringify(expectedLive));assert.equal(phase.currentHash,hash(phase.current));assert.equal(phase.durable,seedRaw,'Every original durable raw byte remains exact');assert.equal(phase.durableHash,seedHash);rowsExact(phase.backups,originalRows,'Neither transfer nor obsolete completion creates/replaces/retires any device backup');assert.deepEqual(phase.pending,pendingLiteral);assert.equal(phase.pendingOwner,null);assert.equal(phase.hold,null);assert.equal(phase.timeZone,seed.timeZone);assert.deepEqual(phase.localSources,expectedLocal);assert.deepEqual(phase.indexedDB,expectedStores,'Every raw IDB key/value, metadata, pending/typed/negativezero original stays exact');
-   exactKeys(phase.view,['documentId','ready','database','dialogOpen','status','copyDisabled','downloadDisabled','preparedRaw','clipboard','pendingCount'],'Complete actual transfer UI and external clipboard boundary');assert.ok(phase.view.documentId);assert.equal(phase.view.documentId,seed.view.documentId);assert.equal(phase.view.ready,true);assert.equal(phase.view.database,database);assert.equal(phase.view.dialogOpen,dialogIndexes.includes(ordinal));assert.equal(phase.view.status,statuses[ordinal]);assert.equal(phase.view.copyDisabled,dialogIndexes.includes(ordinal)?busyIndexes.includes(ordinal):null);assert.equal(phase.view.downloadDisabled,dialogIndexes.includes(ordinal)?busyIndexes.includes(ordinal):null);assert.equal(phase.view.pendingCount,ordinal>=7?2:ordinal>=3?1:0);assert.deepEqual(phase.view.clipboard,ordinal>=7?[oldRaw,newRaw]:ordinal>=3?[oldRaw]:[],'Both actual clipboard operations retain their own complete source archive bytes');assert.equal(phase.view.preparedRaw,archiveByPhase[ordinal],'Old close retires only its transfer, and old completion never changes the replacement archive');
+   exactKeys(phase.view,['documentId','ready','database','dialogOpen','status','copyDisabled','downloadDisabled','preparedRaw','clipboard','pendingCount'],'Complete actual transfer UI and external clipboard boundary');assert.ok(phase.view.documentId);assert.equal(phase.view.documentId,seed.view.documentId);assert.equal(phase.view.ready,true);assert.equal(phase.view.database,database);assert.equal(phase.view.dialogOpen,dialogIndexes.includes(ordinal));assert.equal(phase.view.status,statuses[ordinal]);assert.equal(phase.view.copyDisabled,dialogIndexes.includes(ordinal)?busyIndexes.includes(ordinal):null);assert.equal(phase.view.downloadDisabled,dialogIndexes.includes(ordinal)?false:null);assert.equal(phase.view.pendingCount,ordinal>=7?2:ordinal>=3?1:0);assert.deepEqual(phase.view.clipboard,ordinal>=7?[oldRaw,newRaw]:ordinal>=3?[oldRaw]:[],'Both actual clipboard operations retain their own complete source archive bytes');assert.equal(phase.view.preparedRaw,archiveByPhase[ordinal],'Old close retires only its transfer, and old completion never changes the replacement archive');
    assert.equal(phase.clicks.length,clickCounts[ordinal]);assert.equal(phase.presses.length,pressCounts[ordinal]);assert.deepEqual(phase.clicks.map(row=>row.action),allClicks.slice(0,clickCounts[ordinal]));assert.deepEqual(phase.presses.map(row=>row.action),allPresses.slice(0,pressCounts[ordinal]));
    for(const[kind,rows]of[['press',phase.presses],['click',phase.clicks]])rows.forEach((row,index)=>{exactKeys(row,kind==='press'?['at','action','pointerType','trusted','offeredTaskId']:['at','action','trusted','offeredTaskId'],'Complete native '+kind);assert.equal(row.trusted,true);assert.equal(row.offeredTaskId,null);if(kind==='press')assert.equal(row.pointerType,'mouse');assert.ok(Number.isFinite(row.at)&&row.at<=phase.capturedAtMs);if(index)assert.ok(row.at>rows[index-1].at);});
    phase.clicks.forEach((click,index)=>{const press=phase.presses[index];assert.ok(click.at>=press.at);assert.equal(click.action,press.action);});
