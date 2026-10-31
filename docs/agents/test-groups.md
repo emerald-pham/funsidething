@@ -343,8 +343,9 @@ workload cases require explicit diagnostic selection, and a local run does not
 claim a Linux memory-cap pass. A macOS functional run or RSS sample cannot
 establish the selected Linux cap diagnostic. This optional diagnostic is not a
 merge or release gate; ordinary required checks still need CI to pass for the
-exact candidate. The original complete 90-scenario Chromium/WebKit button gate
-remains separately required.
+exact candidate. The required ordinary button gate retains 60 scenarios per engine in Chromium
+and WebKit. The original 90-scenario workload retains its strict controls when
+explicitly selected as optional diagnostics.
 
 Hosted button admission preserves `GITHUB_EVENT_NAME`/`GITHUB_REF` separately from
 `CHAIN_TEST_EVENT_POLICY`. Routing emits `canonical-pr-merge-v1`,
