@@ -38012,7 +38012,7 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
  assert.match(exports,/one read-only recovery archive.*accepted current board.*readable app-owned saved sources/i);
- assert.match(exports,/Copy sends.*straight to the clipboard.*Download saves the same bytes/i);
+ assert.match(exports,/Copy sends the prepared archive straight to the clipboard; Download stays available while Copy is finishing and saves the same bytes if the browser completes its file download\. Copy reports success after the clipboard write completes; Download reports only that saving those same prepared bytes started\./i);
  assert.match(exports,/full JSON is not rendered/i);
  assert.match(exports,/unavailable or changing source.*clearly marked partial archive/i);
  assert.match(exports,/Import previews and applies only an archive.*current board after confirmation/i);
@@ -47632,6 +47632,35 @@ test('RISK repository process: event routing retains exact merge validation befo
  assert.equal(result.status,0,'The public workflow cohort command must preserve exact canonical merge validation: '+result.stdout+'\n'+result.stderr);
 });
 
+test('RISK repository process: pending Copy repeat catalog preserves precompletion Download and ordinary admission',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const name='test group public workflow retains selected workload evidence without admitting it as ordinary proof';
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+name+'$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ const expectedNestedNames=[
+  'existing selected job executes and retains all seven diagnostics without making their producer fatal to ordinary admission',
+  'unselected not-run','selected unavailable','selected pass','selected failed','selected invalid kind','selected wrong source',
+  'selected wrong attempt','selected missing case','selected duplicate case','selected unknown case','selected corrupt TAP',
+  'selected corrupt artifact','selected missing artifact inventory','selected incomplete cleanup','unselected unexpected result',
+  'unknown selector','inconsistent selected policy','selected mobile app-failed remains raw','missing Chromium','missing WebKit',
+  'missing both','duplicate engine','diagnostic substitutes ordinary','forged diagnostic profile','failed ordinary',
+  'wrong ordinary source','missing action','missing repeat','untrusted input','wrong accounting','incomplete ordinary cleanup'
+ ];
+ const expectedNamedTests=[name,...expectedNestedNames],expectedCompletedNames=[...expectedNestedNames,name];
+ assert.equal(result.error,undefined,'The exact public workflow consumer must start: '+output);
+ assert.equal(result.signal,null,'The exact public workflow consumer must finish: '+output);
+ assert.equal(result.status,0,'The admitted frozen ordinary-repeat inventory and required/optional refusal controls must pass: '+output);
+ const stdout=result.stdout||'',namedTests=[...stdout.matchAll(/^\s*# Subtest: (.+)$/gm)].map(match=>match[1]);
+ const completedTests=[...stdout.matchAll(/^\s*ok \d+ - (.+?)(?:\s+#.*)?$/gm)].map(match=>match[1]);
+ assert.deepEqual(namedTests,expectedNamedTests,'The parent workflow and every required, optional, and negative-control case are named exactly once');
+ assert.deepEqual(completedTests,expectedCompletedNames,'Every named public workflow case and its parent complete successfully exactly once');
+ assert.match(stdout,/^# tests 33$/m,'The selected consumer executes its complete 33-outcome contract');
+ assert.match(stdout,/^# pass 33$/m);
+ assert.match(result.stdout||'',/^# fail 0$/m);
+ assert.match(result.stdout||'',/^# skipped 0$/m);
+ assert.match(result.stdout||'',/^# cancelled 0$/m);
+});
+
 test('RISK repository process: unchanged CI inputs reuse an original successful gate across events',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow reuses an independently passed gate on main for the same complete inputs$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
@@ -51242,7 +51271,7 @@ test('RISK repository process: ordinary two distinct scanner decisions retain bo
  });
 });
 
-test("RISK repository process: ordinary scene choice survives reopen and two task Undos with complete sources",async t=>{
+test("RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources",async t=>{
  const hash=value=>createHash('sha256').update(value).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value));
  const scenario='ordinary scene choice survives reopen and task Undo',exactKeys=(value,keys,label)=>assert.deepEqual(Object.keys(value).sort(),keys.slice().sort(),label);
  const taskLiteral={id:'synthetic-kept',title:'Synthetic retained task',url:null,due:null,startsAt:null,evergreen:false,evergreenHours:18,evergreenResetAtDay:true,mu:25,sigma:8.333333333,done:false,createdAt:1,completedAt:null,lastDoneAt:null,ctx:[],futureTask:{opaque:['retain',7]}};
@@ -51334,24 +51363,30 @@ test("RISK repository process: ordinary scene choice survives reopen and two tas
   return{phases:names,chosenScene:copy(chosenScene),reopened:true,documentIds:[seed.view.documentId,reopened.view.documentId],editTaskIds:titleEdits.map(row=>row.id),sceneEventIds:expectedEvents.map(row=>row.id),taskEditEventIds:titleEvents.map(row=>row.id),undoEventIds:undoEvents.map(row=>row.id),orderedUndoTargets:titleEvents.slice().reverse().map(row=>row.id),currentHash:undone.currentHash,durableHash:undone.durableHash,fullBoardsPreserved:true,sceneAuthorityRetained:true,priorHistoryPreserved:true,typedOpaquePreserved:true,pendingPreserved:true,allOriginalSourcesPreserved:true,automaticLifecycleValidated:true};
  };
  await prepareNativePlaywrightResolution(t);
- const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&port>0,'Healthy allocated WebKit/loopback required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ordinary-scene-choice-'));
- const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:90000,maxBuffer:2*1024*1024});
+ const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&port>0,'Healthy allocated native engine/loopback required');fs.mkdirSync(base,{recursive:true});
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+ const output=fs.mkdtempSync(path.join(base,'ordinary-scene-choice-'+engine+'-'));
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine',engine,'--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:90000,maxBuffer:2*1024*1024});
  fs.writeFileSync(path.join(output,'child.stdout.txt'),result.stdout||'');fs.writeFileSync(path.join(output,'child.stderr.txt'),result.stderr||'');fs.writeFileSync(path.join(output,'child-result.json'),JSON.stringify({status:result.status,signal:result.signal,error:result.error?{name:result.error.name,code:result.error.code,message:result.error.message}:null},null,2)+'\n');assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);
- const reports=fs.readdirSync(output).filter(file=>file.startsWith('button-safety-webkit-')&&file.endsWith('.json'));assert.equal(reports.length,1);const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));
+ const reports=fs.readdirSync(output).filter(file=>file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1);const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));
  const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);const[candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/),inventoryBytes=fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'));assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);assert.equal(report.inventorySha256,hash(inventoryBytes));assert.equal(report.profile,'ordinary');
  assert.equal(report.scenarios?.length,1,'The public ordinary runner must execute the required scene-choice/reopen/task-Undo selected case');const observed=report.scenarios[0];assert.equal(observed.name,scenario);assert.equal(observed.status,'passed','The whole native selected-case contract must pass: '+result.stderr);assert.deepEqual({current:observed.setup.currentTasks,active:observed.setup.activeTasks,durable:observed.setup.durableTasks,source:observed.setup.source,authMode:observed.setup.authMode,fixtureRole:observed.setup.fixtureRole},{current:64,active:64,durable:64,source:'signed-out-installed',authMode:'signed-out',fixtureRole:'active'});assert.equal(observed.setup.durableHash,seedHash);
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});const names=['seed','locked','closed','reopened','edit-one','edit-two','undone-two','final-source'];assert.deepEqual(report.ordinarySceneChoicePhases?.map(row=>row.phase),names);
  const phases=report.ordinarySceneChoicePhases.map(reference=>{assert.equal(reference.file,'ordinary-scene-choice-'+reference.phase+'.json');const bytes=fs.readFileSync(path.join(output,reference.file));assert.equal(hash(bytes),reference.sha256);assert.equal(bytes.byteLength,reference.bytes);const artifact=JSON.parse(bytes);assert.equal(artifact.schemaVersion,1);assert.equal(artifact.phase,reference.phase);assert.equal(artifact.scenario,scenario);assert.deepEqual(artifact.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256});for(const side of['current','durable']){assert.equal(reference[side+'Hash'],hash(artifact[side]));assert.equal(artifact[side+'Hash'],reference[side+'Hash']);assert.equal(Buffer.byteLength(artifact[side]),reference[side+'Bytes']);}return artifact;});
  const semantic=verifySceneSources(phases),rows=(report.repeatOutcomes||[]).filter(row=>row.name===scenario);assert.equal(rows.length,1);const repeat=rows[0],definition=JSON.parse(inventoryBytes).profiles.ordinary.requiredRepeatCases.find(row=>row.name===scenario);
  assert.deepEqual(definition,{name:scenario,file:'scripts/button-safety-scenes.mjs',actionFamilies:['scene-time:lock','act:undo'],expected:'Accept a scene lock, reopen and verify its durable identity, perform two distinct task edits and two native Undo inputs, retain the independently chosen scene and exact protected sources. Keep readiness, Normal/Reduced and unchanged-scene repaint checks in existing regression consumers.',minimumAttempts:2,assertionId:'scene-lock-survives-reopen-and-task-undo'});
- assert.equal(repeat.status,'passed');assert.equal(repeat.attempts.length,2);assert.equal(new Set(repeat.attempts.map(row=>row.receiptId)).size,2);assert.deepEqual(repeat.accounting,{attempted:2,accepted:2,refused:0,disappeared:0});
+ assert.equal(repeat.status,'passed');assert.deepEqual(repeat.attempts.map(row=>row.actionFamily),['scene-time:lock','act:undo','act:undo'],'The repeat accounts its original accepted Lock and both original native Undo receipts');assert.equal(repeat.attempts.length,3);assert.equal(new Set(repeat.attempts.map(row=>row.receiptId)).size,3);assert.deepEqual(repeat.accounting,{attempted:3,accepted:3,refused:0,disappeared:0});
  const actions=['act:settings','act:scene-time-settings','scene-time:lock','scene-time:close','act:close-modal','act:edit','act:save-edit','act:edit','act:save-edit','act:undo','act:undo'];assert.deepEqual(report.clicks.map(row=>row.action),actions,'All intended scene/editor/Undo actions, no extra disclosure or unrelated click');assert.deepEqual(report.presses.map(row=>row.action),actions);
  const sourcePresses=[...phases[2].presses,...phases[6].presses],sourceClicks=[...phases[2].clicks,...phases[6].clicks];assert.deepEqual(report.presses.map(({scenario:owner,...row})=>{assert.equal(owner,scenario);return row;}),sourcePresses,'Both app documents retain every complete native down');assert.deepEqual(report.clicks.map(({scenario:owner,...row})=>{assert.equal(owner,scenario);return row;}),sourceClicks,'Both app documents retain every complete native click');
- repeat.attempts.forEach((attempt,index)=>{assert.equal(attempt.actionFamily,'act:undo');assert.equal(attempt.result,'accepted');assert.equal(attempt.trusted,true);assert.equal(attempt.receiptAtMs,report.presses[9+index].at);assert.ok(attempt.receiptId.startsWith(scenario+':'));assert.equal(report.clicks[9+index].action,'act:undo');});
+ const locked=phases.find(row=>row.phase==='locked'),lockPresses=locked.presses.filter(row=>row.action==='scene-time:lock'),lockClicks=locked.clicks.filter(row=>row.action==='scene-time:lock');assert.equal(lockPresses.length,1);assert.equal(lockClicks.length,1);const lockPress=lockPresses[0],lockClick=lockClicks[0],lockAttempt=repeat.attempts[0];
+ assert.equal(lockPress.pointerType,'mouse');assert.equal(lockPress.trusted,true);assert.equal(lockClick.trusted,true);assert.ok(lockClick.at>=lockPress.at);assert.deepEqual(lockPress,sourcePresses[2]);assert.deepEqual(lockClick,sourceClicks[2]);
+ assert.deepEqual(lockAttempt,{receiptId:scenario+':scene-time:lock:'+locked.view.documentId+':'+lockPress.at,actionFamily:'scene-time:lock',trusted:true,result:'accepted',receiptAtMs:lockPress.at},'The Lock receipt keeps its actual source document and original trusted down timestamp');
+ const undoAttempts=repeat.attempts.slice(1);assert.equal(undoAttempts.length,2);undoAttempts.forEach((attempt,index)=>{assert.equal(attempt.actionFamily,'act:undo');assert.equal(attempt.result,'accepted');assert.equal(attempt.trusted,true);assert.equal(attempt.receiptAtMs,report.presses[9+index].at);assert.ok(attempt.receiptId.startsWith(scenario+':'));assert.equal(report.clicks[9+index].action,'act:undo');});
  assert.deepEqual(repeat.assertions,[{id:definition.assertionId,status:'passed',expected:definition.expected,evidence:repeat.assertions[0]?.evidence}]);assert.deepEqual(JSON.parse(repeat.assertions[0].evidence),semantic);assert.deepEqual(repeat.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256,durableHash:seedHash});
  assert.equal(report.allowedNavigations?.length,1);exactKeys(report.allowedNavigations[0],['scenario','url','action'],'Complete bounded genuine browser reopen');assert.equal(report.allowedNavigations[0].scenario,scenario);assert.equal(report.allowedNavigations[0].action,'ordinary-scene-browser-reopen');assert.match(report.allowedNavigations[0].url,new RegExp('^http://127\\.0\\.0\\.1:'+port+'/button-[a-z0-9-]+/$'));
  const expectedInputs=[['fill','#sceneTimeInput',5],['select','#sceneSeasonInput',6],['fill','#etTitle',titleEdits[0].title.length],['fill','#etTitle',titleEdits[1].title.length]];assert.equal(report.inputSamples?.length,expectedInputs.length);report.inputSamples.forEach((sample,index)=>{exactKeys(sample,['kind','selector','characters','elapsedMs','maxFrameGapMs'],'Complete native scene/editor input observation');assert.deepEqual([sample.kind,sample.selector,sample.characters],expectedInputs[index]);assert.ok(Number.isFinite(sample.elapsedMs)&&sample.elapsedMs>=0);assert.ok(Number.isFinite(sample.maxFrameGapMs)&&sample.maxFrameGapMs>=0&&sample.maxFrameGapMs<1000);});
- assert.equal(result.status,0,'The entire selected public native consumer must pass: '+result.stderr);assert.equal(report.status,'passed');t.diagnostic('Focused ordinary scene/reopen/task Undo evidence: '+path.join(output,reports[0]));
+ assert.equal(result.status,0,'The entire selected public native consumer must pass: '+result.stderr);assert.equal(report.status,'passed');t.diagnostic('Focused '+engine+' ordinary scene/reopen/task Undo evidence: '+path.join(output,reports[0]));
+ });
 });
 
 test("RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources",async t=>{
