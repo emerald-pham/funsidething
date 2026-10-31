@@ -232,14 +232,22 @@ historical skips remain independently enforced. Synthetic SDK, clipboard, locati
 and isolated storage boundaries establish repeatable regression evidence only;
 they do not establish physical iPhone behavior or recovery of private saved data.
 
-The required workload stories are: “Buttons work with 400 saved tasks without
-crashing” and “Buttons work when pressed ten times within two seconds.” Both run
-in Chromium and WebKit and block the same required aggregate. Each scenario first
-reads back exactly 400 tasks from the real isolated durable device head and its
-current board, recording the saved hash and active count. Ordinary Add, editor,
-list, Settings, scene, cloud and export/import flows use 400 active tasks. Only
-explicitly named sole/final or exhausted scenarios use documented completed or
-ineligible padding; that exception cannot stand in for the ordinary active load.
+The seven extra workload roots are optional diagnostics, separate from the four
+required groups. The Data safety `workflow_dispatch` input
+`optional_mobile_diagnostics` defaults to false; selecting it explicitly runs the
+workload and capped mobile diagnostics. They never supply required group cases or
+change the mandatory verdict.
+
+When selected, the workload diagnostics retain the original 400-task story
+“Buttons work with 400 saved tasks without crashing” and rapid-action story
+“Buttons work when pressed ten times within two seconds.” Desktop workload
+scenarios run in Chromium and WebKit; the capped mobile Yes path runs in mobile
+WebKit. Each 400-task scenario first reads back exactly 400 tasks from the real
+isolated durable device head and its current board, recording the saved hash and
+active count. Ordinary Add, editor, list, Settings, scene, cloud and export/import
+flows use 400 active tasks. Only explicitly named sole/final or exhausted
+scenarios use documented completed or ineligible padding; that exception cannot
+stand in for the ordinary active load.
 
 Every reviewed action family also needs a successful rapid outcome. Each burst
 records ten real native pointer presses, browser-trusted receipt timestamps, its
@@ -254,19 +262,29 @@ those attempts remain explicitly classified and do not earn accepted
 click credit. Any accepted click on a different app action fails immediately.
 The expected state and exact originals are asserted afterward.
 Missing task readback, hidden ordinary load, missing/skipped rapid families,
-untrusted or incomplete counts, a slower burst, or unreconciled outcomes fails.
+untrusted or incomplete counts, a slower burst, or unreconciled outcomes fails
+the selected diagnostic report. It does not add a mandatory coverage case.
 
-## Required capped mobile Yes story
+## Optional capped mobile Yes diagnostic
 
-A separate required `mobile-memory` job runs the existing rapid scanner Yes path
-in mobile WebKit with 400 saved tasks. Normal/full motion and Reduced motion each
-use a fresh container, an explicit 390 × 844 viewport/screen, scale factor 3,
-iPhone user agent and real trusted touch input. Each case must accept ten distinct
-actually offered task IDs within two seconds, retain the expected durable chain
-and all 400 tasks, protect unknown fields and retained sources, and finish without
-lifecycle, frame, transport or cleanup failures. Native `maxTouchPoints` is recorded
-without overriding it; actual trusted touch receipts establish the input used.
-This is an emulated mobile WebKit client, not physical iPhone or private-board proof.
+The `mobile-memory` job runs only when the workflow-dispatch
+`optional_mobile_diagnostics` input is explicitly selected; its default is false.
+The immutable `required-1gb` profile name identifies a retained diagnostic
+profile and does not make this job a mandatory release gate. The aggregate
+records selected versus unselected separately from the diagnostic status:
+`not-run`, `unavailable`, `invalid`, `pass`, `app-failed` or `failed`. None
+supplies ordinary group coverage or changes the mandatory verdict.
+
+When selected, the job runs the existing rapid scanner Yes path in mobile WebKit
+with 400 saved tasks. Normal/full motion and Reduced motion each use a fresh
+container, an explicit 390 × 844 viewport/screen, scale factor 3, iPhone user
+agent and real trusted touch input. Each case must accept ten distinct actually
+offered task IDs within two seconds, retain the expected durable chain and all
+400 tasks, protect unknown fields and retained sources, and finish without
+lifecycle, frame, transport or cleanup failures. Native `maxTouchPoints` is
+recorded without overriding it; actual trusted touch receipts establish the
+input used. This is an emulated mobile WebKit client, not physical iPhone or
+private-board proof.
 
 The pinned official Playwright image and matching package run a minimal Node 22
 `launchServer` owner in a browser container. Its Linux cgroup v2 limit is exactly
@@ -287,48 +305,55 @@ rendering checks. Successful browser cases must have no OOM events and a peak
 within the budget. Owner `BrowserServer.close()` and actual engine/container exit
 are required; remote `Browser.close()` alone is only a disconnection.
 
-Schema version 3 records immutable `required-1gb` and `stress-512mb` profiles and `browser-family-plus-minimal-protocol-server`, separate
-container roles, actual host cgroup/net namespace identities, observed browser
-process start identities and executable hashes, pinned image resolution, raw
-limits, kernel OOM proof and durable native results. Complete artifact hashes,
+Schema version 3 records immutable `required-1gb` and `stress-512mb` diagnostic
+profiles and `browser-family-plus-minimal-protocol-server`, separate container
+roles, actual host cgroup/net namespace identities, observed browser process
+start identities and executable hashes, pinned image resolution, raw limits,
+kernel OOM proof and durable native results. Complete artifact hashes,
 source/tree/run identity and both owned-container removals accompany the report.
-Historical version1 whole-container and version2 512MB browser-family failures remain preserved and cannot be relabeled.
+Historical version1 whole-container and version2 512MB browser-family failures
+remain preserved and cannot be relabeled.
 
-The required1GB profile must pass every original functional and cleanup check.
-A separately recorded512,000,000-byte stress profile also runs a fresh live-WebKit
-kernel OOM control and attempts both motions, even if Normal fails. Its original
-native report keeps any application crash, observed blocked frame or ten-touch
-deadline failure as a failed stress outcome. Such measured app failures are
-nonblocking; missing execution, source/profile mismatch, driver, transport,
-control or cleanup faults remain invalid. Before app navigation, the actual mobile context
-and durable fixture readbacks bind the scenario, viewport, motion, 400 distinct
+Within a selected diagnostic, the `required-1gb` profile retains its original
+functional and cleanup checks. A separately recorded 512,000,000-byte stress
+profile also runs a fresh live-WebKit kernel OOM control and attempts both
+motions, even if Normal fails. Its original native report keeps any application
+crash, observed blocked frame or ten-touch deadline failure as a failed stress
+outcome. Such measured app failures are nonblocking diagnostic outcomes; missing
+execution, source/profile mismatch, driver, transport, control or cleanup faults
+remain invalid outcomes. Before app navigation, the actual mobile context and
+durable fixture readbacks bind the scenario, viewport, motion, 400 distinct
 active tasks, 1 MiB unknown field, two exact protected backups, opaque bytes and
 pending record. A startup crash needs that completed setup even without app-ready
 or successful story evidence. Mixed transport or unexpected-navigation errors
 remain invalid alongside an application crash; only a measured kernel OOM admits
-its corresponding engine disconnect. Passing stress cannot substitute for
-required proof. The aggregate requires both independently hashed, exact-source
-bundles; no arbitrary budget input or historical report relabeling is admitted.
+its corresponding engine disconnect. Passing stress cannot substitute for the
+`required-1gb` profile evidence inside the selected diagnostic. Both
+independently hashed, exact-source bundles remain part of that diagnostic's
+integrity record; no arbitrary budget input or historical report relabeling is
+admitted.
 
-`scanner-tests` consumes this job and its complete artifact bundle independently
-of the four test groups, including when their full-producer result is reused.
-Missing, failed, incomplete, wrong-source, uncapped or malformed memory proof
-blocks the aggregate. Local `npm test` runs both native mobile motion cases plus
-parser, enforcement-refusal and actual aggregation negative controls; it does not
-claim a local memory-cap pass. A macOS functional run or RSS sample cannot replace
-the Linux gate. Prepush reviews may explicitly report the hosted cap proof pending;
-merge and release still require its actual exact-candidate CI pass. Do not create
-a placeholder receipt to satisfy the prepush sequence. The original complete
-90-scenario Chromium/WebKit button gate remains separately required.
+`scanner-tests` records this optional diagnostic bundle separately from the four
+required groups, including when required group coverage is reused. Missing,
+failed, incomplete, wrong-source, uncapped or malformed diagnostic evidence is
+reported as its own diagnostic outcome; it neither supplies group coverage nor
+blocks the mandatory verdict. Local `npm test` retains the parser,
+enforcement-refusal and actual aggregation negative controls. Optional native
+workload cases require explicit diagnostic selection, and a local run does not
+claim a Linux memory-cap pass. A macOS functional run or RSS sample cannot
+establish the selected Linux cap diagnostic. This optional diagnostic is not a
+merge or release gate; ordinary required checks still need CI to pass for the
+exact candidate. The original complete 90-scenario Chromium/WebKit button gate
+remains separately required.
 
 Hosted button admission preserves `GITHUB_EVENT_NAME`/`GITHUB_REF` separately from
 `CHAIN_TEST_EVENT_POLICY`. Routing emits `canonical-pr-merge-v1`,
-`outgoing-branch-push-v1` or `exact-main-push-v1`; these labels remain in report and
-aggregate identity. Native desktop and capped mobile consumers share the same
-explicit event/ref check, and the capped child receives all three values. Raw
-`push`/`pull_request` fixture labels remain supported only with matching hosted
-context. Invalid/missing/local admission cannot waive resource or kernel limits.
-For the current workflow, complete-producer reuse also requires the exact successful
-`mobile-WebKit-1GB-and-512MB-stress` job from the producer run/attempt/source; absent, incomplete,
-failed or ambiguous evidence falls back to a fresh complete cohort. Local
-admission/artifact fixtures never establish an actual hosted cap pass.
+`outgoing-branch-push-v1`, `exact-main-push-v1` or, for selected mobile
+diagnostics, `optional-mobile-dispatch-v1`; these labels remain in report and
+aggregate identity. Native desktop and selected capped mobile consumers share
+the explicit event/ref check, and the capped child receives all three values.
+Raw `push`/`pull_request` fixture labels remain supported only with matching
+hosted context. Invalid, missing or local admission cannot waive resource or
+kernel limits. Optional mobile diagnostics cannot stand in for any of the four
+required groups or another mandatory gate. Local admission/artifact fixtures
+never establish an actual hosted cap diagnostic.
