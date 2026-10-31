@@ -49105,5 +49105,306 @@
       "command": "PATH='/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin':\"$PATH\" /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$' scripts/agent-tools/ci-monitor.test.mjs",
       "failure": "Before the minimal optional-invalidity repair, the corrected existing CLI row returned result=unresolved and optional-mobile=unknown with exit 2 even though every required job and aggregate attestation passed; the raw mobile conclusion was unknown."
     }
+  },
+  {
+    "testChangesSha256": "2cc480af77ff13697ef9fc32107fa694700b19875ce8afe369722c7c1d779154",
+    "reason": "Issues1791-1795 deliberately correct the contradictory both-disabled export expectation to current1299: pending Copy owns only its clipboard operation and independent Download saves the same immutable prepared archive before settlement. Consume deferred fixture records on actual settlement; preserve complete source kernels and prior cumulative protections. Current1797 CLI repair metadata is retained independently in the rationale prefix.",
+    "previousBehavior": "Both Copy and Download were disabled by one pending clipboard owner; several current/native/rapid and complete-kernel assertions encoded that discrepancy. Native fe442cf then correctly required completed pendingCount0 but its settlement retained the resolved queue record. Historical successful and failed captures retain their exact scope.",
+    "intendedBehavior": "A current pending Copy refuses repeated clipboard requests while trusted Download starts the exact prepared file independently; success/failure statuses retain the proper owner. Each controlled clipboard settlement consumes exactly its unresolved request; obsolete completion cannot mutate the newer transfer, all complete saved sources or original accounting. Final guidance, PWA identity and exact ACK specimen match those bytes.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable",
+      "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "Every original1439 rationale object remains verbatim and in order; sibling1797 rationale additions remain intact before these additive records.",
+      "The complete current/durable/head/localStorage/IndexedDB/pending/opaque/unknown source equalities, seven pending phases, eleven obsolete phases, all native accepted/refused/disappeared counts, and exact pre-settlement file equality remain required.",
+      "Copy success and rejection, stale success and rejection, independent Download failure, temporary anchor and object-URL cleanup remain covered; no new UI or test harness, ordinary61st scenario, action expansion, skip, heap, budget or deadline waiver.",
+      "Mounted extended FAQ and Settings changelog retain unrelated content, concise limits and saved-source safeguards; app and worker bytes match the settled source, actual six-service ACK controls retain one exact guard mutation and revision1vs2."
+    ],
+    "redEvidence": {
+      "command": "node --experimental-vm-modules --test --test-name-pattern=^RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable$ tests.js",
+      "failure": "Observed before application implementation on19abc1: ERR_ASSERTION a pending Copy owns only Copy while the real Download action starts the same prepared archive; actual Download disabledtrue/startedfalse versus intendedfalse/true. Original recorder c42de550 retained. Later fe442cf native fixture failure1vs0 is actual acceptance bookkeeping evidence, not new productRED; earlier wait-predicate ReferenceError is also retained."
+    },
+    "comparisonBase": "19abc1b0d98766ae9f721f5433a6f6730585b54b",
+    "cumulativeEvidence": {
+      "comparisonBase": "19abc1b0d98766ae9f721f5433a6f6730585b54b",
+      "actualMergeBase": "19abc1b0d98766ae9f721f5433a6f6730585b54b",
+      "sourceBaseline": "1f88aed4ba80640d1a8f57337444aef0c796080e",
+      "currentTestsSha256": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359",
+      "all1439PriorObjectsPreserved": true,
+      "preexistingPrefixCount": 1440,
+      "preexistingPrefixBytesSha256": "0986a1f739941e6af7ab7053f893478164868132674d333ab4b9567ade603faa",
+      "newEvidenceChronology": {
+        "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+        "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+        "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+        "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+        "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+        "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+        "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+        "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+        "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+      },
+      "metadataHasNoNewBehavioralRedClaim": true
+    },
+    "evidenceChronology": {
+      "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+      "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+      "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+      "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+      "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+      "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+      "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+      "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+      "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+    }
+  },
+  {
+    "testChangesSha256": "045dcf090bc25ad5ff3c1958f47de7febd593c53a7bdf08f541ba830acb6a1a5",
+    "reason": "Issues1791-1795 deliberately correct the contradictory both-disabled export expectation to current1299: pending Copy owns only its clipboard operation and independent Download saves the same immutable prepared archive before settlement. Consume deferred fixture records on actual settlement; preserve complete source kernels and prior cumulative protections. Current1797 CLI repair metadata is retained independently in the rationale prefix.",
+    "previousBehavior": "Both Copy and Download were disabled by one pending clipboard owner; several current/native/rapid and complete-kernel assertions encoded that discrepancy. Native fe442cf then correctly required completed pendingCount0 but its settlement retained the resolved queue record. Historical successful and failed captures retain their exact scope.",
+    "intendedBehavior": "A current pending Copy refuses repeated clipboard requests while trusted Download starts the exact prepared file independently; success/failure statuses retain the proper owner. Each controlled clipboard settlement consumes exactly its unresolved request; obsolete completion cannot mutate the newer transfer, all complete saved sources or original accounting. Final guidance, PWA identity and exact ACK specimen match those bytes.",
+    "replacementTests": [
+      "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "Every original1439 rationale object remains verbatim and in order; sibling1797 rationale additions remain intact before these additive records.",
+      "The complete current/durable/head/localStorage/IndexedDB/pending/opaque/unknown source equalities, seven pending phases, eleven obsolete phases, all native accepted/refused/disappeared counts, and exact pre-settlement file equality remain required.",
+      "Copy success and rejection, stale success and rejection, independent Download failure, temporary anchor and object-URL cleanup remain covered; no new UI or test harness, ordinary61st scenario, action expansion, skip, heap, budget or deadline waiver.",
+      "Mounted extended FAQ and Settings changelog retain unrelated content, concise limits and saved-source safeguards; app and worker bytes match the settled source, actual six-service ACK controls retain one exact guard mutation and revision1vs2."
+    ],
+    "redEvidence": {
+      "command": "node --experimental-vm-modules --test --test-name-pattern=^RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable$ tests.js",
+      "failure": "Observed before application implementation on19abc1: ERR_ASSERTION a pending Copy owns only Copy while the real Download action starts the same prepared archive; actual Download disabledtrue/startedfalse versus intendedfalse/true. Original recorder c42de550 retained. Later fe442cf native fixture failure1vs0 is actual acceptance bookkeeping evidence, not new productRED; earlier wait-predicate ReferenceError is also retained."
+    },
+    "comparisonBase": "fe442cf79a440579a04f7157b75b315187b1b2b2",
+    "cumulativeEvidence": {
+      "comparisonBase": "fe442cf79a440579a04f7157b75b315187b1b2b2",
+      "actualMergeBase": "fe442cf79a440579a04f7157b75b315187b1b2b2",
+      "sourceBaseline": "1f88aed4ba80640d1a8f57337444aef0c796080e",
+      "currentTestsSha256": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359",
+      "all1439PriorObjectsPreserved": true,
+      "preexistingPrefixCount": 1440,
+      "preexistingPrefixBytesSha256": "0986a1f739941e6af7ab7053f893478164868132674d333ab4b9567ade603faa",
+      "newEvidenceChronology": {
+        "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+        "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+        "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+        "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+        "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+        "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+        "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+        "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+        "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+      },
+      "metadataHasNoNewBehavioralRedClaim": true
+    },
+    "evidenceChronology": {
+      "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+      "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+      "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+      "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+      "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+      "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+      "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+      "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+      "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+    }
+  },
+  {
+    "testChangesSha256": "0f5c18d74fd8d24d87e87524fa2c05fcdeca89f203aa609c0776457ddebbcdbb",
+    "reason": "Issues1791-1795 deliberately correct the contradictory both-disabled export expectation to current1299: pending Copy owns only its clipboard operation and independent Download saves the same immutable prepared archive before settlement. Consume deferred fixture records on actual settlement; preserve complete source kernels and prior cumulative protections. Current1797 CLI repair metadata is retained independently in the rationale prefix.",
+    "previousBehavior": "Both Copy and Download were disabled by one pending clipboard owner; several current/native/rapid and complete-kernel assertions encoded that discrepancy. Native fe442cf then correctly required completed pendingCount0 but its settlement retained the resolved queue record. Historical successful and failed captures retain their exact scope.",
+    "intendedBehavior": "A current pending Copy refuses repeated clipboard requests while trusted Download starts the exact prepared file independently; success/failure statuses retain the proper owner. Each controlled clipboard settlement consumes exactly its unresolved request; obsolete completion cannot mutate the newer transfer, all complete saved sources or original accounting. Final guidance, PWA identity and exact ACK specimen match those bytes.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable",
+      "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "All1419 prior rationale objects, all existing tests, default/schema1/schema2 and48/56 descriptors/limits/refusals/legacy formats remain intact. New cases reuse independently literal established SDK/profile controls at the new explicit selection.",
+      "New producer and consumer guards retain event/frame counts,1MiB event/PNG/depth/visits/12s/cleanup/partial writes/collisions, aggregate/typed stacks/1MiB metadata/32MiB source/hash/epoch/clock/owned namespace and complete64-task/opaque/typed ordinary custody.",
+      "A complete56-frame independent53-data public reference output roundtrips every serialized field and own-key order with current source module hashes and retained whole typed store. Original64MiB collector and2690817B compact maximum remain exact; no decoded PNG cache or new reference implementation.",
+      "Default tests use owned portable fixtures with no external CHAIN setup. Actual focused TAP and unchanged parser/current group descriptor prove scoped allocation only; full groups/aggregate/native/release qualification remain ROOT and376.",
+      "Explicit diagnostic paths, loader realpath/symlink/hardlink guards, default per-test ownership/cleanup and all production/runtime/reference code stay exact; no TMPDIR override. Existing1726 evidence had explicitly canonical standard TMPDIR, which did not cover this host default alias.",
+      "New-profile decoded frame metadata1048577B reaches the unchanged frame limit; a real pending external SDK stop reaches the existing1000ms deadline with one stop/no disable and truthful failed-session cleanup. Earlier oversize encoded PNG continues to hit1MiB raw-event first and is not relabeled as decoded-guard execution.",
+      "The real held IndexedDB read still has null live state, false app readiness and an unsettled first success callback before display; the preview remains one visible inert aria-hidden object with all 64 exact task titles and the collapsed saved list.",
+      "The v2 positive control remains at 8 hours, the v1 default is projected at 16 hours, and the custom v1 control remains at 12 hours in the actual observed SavedAppearance.showBoard argument.",
+      "Original task fields, 1 MiB unknown data, exact local legacy bytes, actual durable head and four typed stores remain checked after releasing the real read.",
+      "Existing broken-board visibility, complete-board safety, account and identity masks, divergent-source refusal, and recovery-warning guidance remain in their original consumers.",
+      "Strict complete released cards, contexts, scan, task rows, History, next-dot, escaping, authoritative state and saved-source equality assertions remain unchanged; opaque ownership bindings are retained in the comparison rather than normalized away.",
+      "The complete required ordinary engine command, independent action/scenario inventory, every native action/outcome, all original timeouts, fail-closed verification, exclusive writes and all prior evidence remain. Existing false-pass, missing-action, asynchronous-false, workload and authority controls are retained.",
+      "Native report engine and exact committed source/tree identity are checked per fresh directory. The approved recovery-profile repair has focused ordinary Chromium/WebKit and400 diagnostic evidence. ROOT retains final coherent regression, independent review, CI and release; focused checks do not qualify a release.",
+      "The existing Settings saved-decision scenario passed unchanged under ordinary CLI verification1771 before recovery edits. The assertPublished helper keeps its workload-diagnostic default for that and all unrelated callers; no sameBoardRemote input or other scenario body was changed.",
+      "All existing app, cloud, storage, auth, runtime, native, source-preservation, rendering and callback cleanup assertions remain. No Node internals, app source, data, heap size, GC-turn count, original ten-second consumer caps, required native scenarios/actions or action deadlines were changed.",
+      "Every original callback still executes under Node with exact public TestContext receiver/context arguments and untouched callback completion argument; async return values and thrown/rejected/callback errors propagate through real child processes. Names, function arity, options, original child Promise, skip/todo and timeout cleanup are asserted at the existing self-entry consumer.",
+      "The existing AsyncLocalStorage fixture ownership and automatic teardown order remain. Completed nested tests do not dispose a shared live parent app; recursive tests and hooks execute, Add/persist stays usable, and the final actual scanner timer is cancelled by automatic parent cleanup.",
+      "The original after-only and nested-only eight-plus-one fixtures remain protected with exactly4fresh-turnGC. Additional three-level recursive coverage uses the same eight-plus-one/four-turn input. Intentionally failing child controls verify real failure propagation and are not accepted as passing child outcomes.",
+      "Prior e793 source/handoff, all22 earlier recorder attempts, original failed376, and external1769/1774/1775/1777 observations remain immutable. Reclamation of these confirmed ownership paths does not quantify or prove the original aggregate4GiBOOM cause; the full default-heap suite remains ROOT-owned.",
+      "Issue1778 changes only the stale explanatory comment to ordinary60 versus full/workload90. The independent inventory and every selection/assertion/deadline byte remain unchanged.",
+      "Every prior executable assertion and all1432 prior rationale objects remain intact; no skip, registration omission, default-heap, frame, action, callback-lifetime or cleanup relaxation.",
+      "The original paste scenario retains malformed input, captured large paste outside the DOM, exact raw source hash, Cancel and repeated preview, complete saved head and accepted-board backup, durable three-task import, complete1MiB unknown field, Close and original12second action deadline.",
+      "Exactly one existing literal cloud-ACK guard is replaced; original successful import, fresh-read denial, publication refusal, uncertain acknowledgement and changed-peer service controls remain exact. The original historical source-binding failure and82ab specimen chronology remain immutable.",
+      "Only ordinary profile correctness joins native-process required coverage. Explicit400 workload controls remain optional data, and full-suite, CI, deployment, Beta and physical/private-device acceptance are outside these focused results.",
+      "All12 original public CLI tails, both literal success streams, all precise refusal statuses/messages and no ENOBUFS, syntax or module error substitution remain unchanged.",
+      "All1435 pre-1787 rationale objects remain exact; every native paste, ACK, callback lifecycle, group registration, risk map, app, shell, backend, rules and runtime-source byte is unchanged by1787.",
+      "Default temporary roots still clean their owned fixture after tests; explicit evidence roots retain complete journals and source files. Canonicalizing the owned directory introduces no user data mutation, new process, changed verdict or raised bound.",
+      "Every original1439 rationale object remains verbatim and in order; sibling1797 rationale additions remain intact before these additive records.",
+      "The complete current/durable/head/localStorage/IndexedDB/pending/opaque/unknown source equalities, seven pending phases, eleven obsolete phases, all native accepted/refused/disappeared counts, and exact pre-settlement file equality remain required.",
+      "Copy success and rejection, stale success and rejection, independent Download failure, temporary anchor and object-URL cleanup remain covered; no new UI or test harness, ordinary61st scenario, action expansion, skip, heap, budget or deadline waiver.",
+      "Mounted extended FAQ and Settings changelog retain unrelated content, concise limits and saved-source safeguards; app and worker bytes match the settled source, actual six-service ACK controls retain one exact guard mutation and revision1vs2."
+    ],
+    "redEvidence": {
+      "command": "node --experimental-vm-modules --test --test-name-pattern=^RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable$ tests.js",
+      "failure": "Observed before application implementation on19abc1: ERR_ASSERTION a pending Copy owns only Copy while the real Download action starts the same prepared archive; actual Download disabledtrue/startedfalse versus intendedfalse/true. Original recorder c42de550 retained. Later fe442cf native fixture failure1vs0 is actual acceptance bookkeeping evidence, not new productRED; earlier wait-predicate ReferenceError is also retained."
+    },
+    "evidenceChronology": {
+      "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+      "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+      "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+      "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+      "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+      "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+      "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+      "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+      "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+    },
+    "cumulativeEvidence": {
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "actualMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "sourceBaseline": "1f88aed4ba80640d1a8f57337444aef0c796080e",
+      "priorCumulativeFingerprint": "f72366e0edddcb7c0e3d1fdced14548f9389e60ed8c50634023addf720fc958d",
+      "priorRedEvidence": {
+        "command": "CHAIN_NATIVE_OUTPUT=<allocated-external>/red-native CHAIN_NATIVE_PORT=53723 node scripts/agent-tools/record-run.mjs --repo <own-worktree> --evidence-dir <external>/red-recorder --purpose preimplementation-red --summary -- node --experimental-vm-modules --test --test-name-pattern='^RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts$' tests.js",
+        "failure": "Observed before the transfer edit on210660: both Chromium and WebKit fail ERR_ASSERTION because the actual native CLI exits1 with stalled responsiveness: outcome preview-pasted-recovery; report setup has64 current and durable tasks, correct malformed-input toast and complete cleanup. Original record red-recorder/2026-10-31T07-04-20-479Z-ab74c9a9-b7e5-4ef5-98dd-b9a15a695e96.json."
+      },
+      "priorEvidenceChronology": {
+        "sourceBaseline": "210660516741a4f79cc0d429b7291d8292f237ca",
+        "originalRed": "red-recorder/2026-10-31T07-04-20-479Z-ab74c9a9-b7e5-4ef5-98dd-b9a15a695e96.json",
+        "correctedWrapperAggregation": "The first post-fix run completed both original native scenarios, then exposed the new wrapper assertion incorrectly expecting three outcome rows. Existing reports aggregate three preview steps into one row. The new assertion now requires one row, three assertions/steps and three trusted native clicks; no prior test assertion was changed.",
+        "firstPostFixWrapperFailure": "green-recorder/2026-10-31T07-05-17-901Z-5cddcd50-c6d3-4e7c-933d-deefa8c7eaf8.json",
+        "correctedWrapperGreen": "green-recorder/2026-10-31T07-05-58-315Z-1914f22d-7543-40db-bf8d-94c005902751.json",
+        "correctedWrapperLaterBaseline": "later-baseline-recorder/2026-10-31T07-07-17-627Z-5cf62c89-3342-4bc1-8403-b788dbed6bd0.json; final wrapper discriminates the restored original predicate in both engines. This is later sensitivity, not original preimplementation RED.",
+        "ackCurrentSpecimen": "ack-specimens/INDEPENDENT-SPECIMEN-BINDING.json; complete original and literal-guard-mutated app sources retained independently before binding edit.",
+        "ackRealConsumer": "ack-focused-recorder/2026-10-31T07-06-21-045Z-ebd5964c-6894-4a8c-9b6e-47f1e64fda1b.json;6/6pass zero skips, actual ERR_ASSERTION353 source revision advanced exactly once, actual1 expected2.",
+        "ackBindingIsBookkeepingNotFeatureRed": true,
+        "originalIncompleteFullSuite": "The prior full-suite attempt remains FAILED/EVIDENCE-INCOMPLETE; no final counts, child-exit or aggregate OOM-resolution claim is made."
+      },
+      "currentTestsSha256": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359",
+      "all1435PriorObjectsPreserved": true,
+      "metadataHasNoNewBehavioralRedClaim": true,
+      "all1439PriorObjectsPreserved": true,
+      "preexistingPrefixCount": 1440,
+      "preexistingPrefixBytesSha256": "0986a1f739941e6af7ab7053f893478164868132674d333ab4b9567ade603faa",
+      "newEvidenceChronology": {
+        "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+        "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+        "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+        "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+        "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+        "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+        "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+        "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+        "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+      }
+    },
+    "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8"
+  },
+  {
+    "testChangesSha256": "e7ea52e005fc37350f07a38f2bab96bf71e3e1007e1529b99ea80299475bae59",
+    "reason": "Issues1791-1795 deliberately correct the contradictory both-disabled export expectation to current1299: pending Copy owns only its clipboard operation and independent Download saves the same immutable prepared archive before settlement. Consume deferred fixture records on actual settlement; preserve complete source kernels and prior cumulative protections. Current1797 CLI repair metadata is retained independently in the rationale prefix.",
+    "previousBehavior": "Both Copy and Download were disabled by one pending clipboard owner; several current/native/rapid and complete-kernel assertions encoded that discrepancy. Native fe442cf then correctly required completed pendingCount0 but its settlement retained the resolved queue record. Historical successful and failed captures retain their exact scope.",
+    "intendedBehavior": "A current pending Copy refuses repeated clipboard requests while trusted Download starts the exact prepared file independently; success/failure statuses retain the proper owner. Each controlled clipboard settlement consumes exactly its unresolved request; obsolete completion cannot mutate the newer transfer, all complete saved sources or original accounting. Final guidance, PWA identity and exact ACK specimen match those bytes.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable",
+      "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources"
+    ],
+    "preservedCoverage": [
+      "All1419 prior rationale objects, all existing tests, default/schema1/schema2 and48/56 descriptors/limits/refusals/legacy formats remain intact. New cases reuse independently literal established SDK/profile controls at the new explicit selection.",
+      "New producer and consumer guards retain event/frame counts,1MiB event/PNG/depth/visits/12s/cleanup/partial writes/collisions, aggregate/typed stacks/1MiB metadata/32MiB source/hash/epoch/clock/owned namespace and complete64-task/opaque/typed ordinary custody.",
+      "A complete56-frame independent53-data public reference output roundtrips every serialized field and own-key order with current source module hashes and retained whole typed store. Original64MiB collector and2690817B compact maximum remain exact; no decoded PNG cache or new reference implementation.",
+      "Default tests use owned portable fixtures with no external CHAIN setup. Actual focused TAP and unchanged parser/current group descriptor prove scoped allocation only; full groups/aggregate/native/release qualification remain ROOT and376.",
+      "Explicit diagnostic paths, loader realpath/symlink/hardlink guards, default per-test ownership/cleanup and all production/runtime/reference code stay exact; no TMPDIR override. Existing1726 evidence had explicitly canonical standard TMPDIR, which did not cover this host default alias.",
+      "New-profile decoded frame metadata1048577B reaches the unchanged frame limit; a real pending external SDK stop reaches the existing1000ms deadline with one stop/no disable and truthful failed-session cleanup. Earlier oversize encoded PNG continues to hit1MiB raw-event first and is not relabeled as decoded-guard execution.",
+      "The real held IndexedDB read still has null live state, false app readiness and an unsettled first success callback before display; the preview remains one visible inert aria-hidden object with all 64 exact task titles and the collapsed saved list.",
+      "The v2 positive control remains at 8 hours, the v1 default is projected at 16 hours, and the custom v1 control remains at 12 hours in the actual observed SavedAppearance.showBoard argument.",
+      "Original task fields, 1 MiB unknown data, exact local legacy bytes, actual durable head and four typed stores remain checked after releasing the real read.",
+      "Existing broken-board visibility, complete-board safety, account and identity masks, divergent-source refusal, and recovery-warning guidance remain in their original consumers.",
+      "Strict complete released cards, contexts, scan, task rows, History, next-dot, escaping, authoritative state and saved-source equality assertions remain unchanged; opaque ownership bindings are retained in the comparison rather than normalized away.",
+      "The complete required ordinary engine command, independent action/scenario inventory, every native action/outcome, all original timeouts, fail-closed verification, exclusive writes and all prior evidence remain. Existing false-pass, missing-action, asynchronous-false, workload and authority controls are retained.",
+      "Native report engine and exact committed source/tree identity are checked per fresh directory. The approved recovery-profile repair has focused ordinary Chromium/WebKit and400 diagnostic evidence. ROOT retains final coherent regression, independent review, CI and release; focused checks do not qualify a release.",
+      "The existing Settings saved-decision scenario passed unchanged under ordinary CLI verification1771 before recovery edits. The assertPublished helper keeps its workload-diagnostic default for that and all unrelated callers; no sameBoardRemote input or other scenario body was changed.",
+      "All existing app, cloud, storage, auth, runtime, native, source-preservation, rendering and callback cleanup assertions remain. No Node internals, app source, data, heap size, GC-turn count, original ten-second consumer caps, required native scenarios/actions or action deadlines were changed.",
+      "Every original callback still executes under Node with exact public TestContext receiver/context arguments and untouched callback completion argument; async return values and thrown/rejected/callback errors propagate through real child processes. Names, function arity, options, original child Promise, skip/todo and timeout cleanup are asserted at the existing self-entry consumer.",
+      "The existing AsyncLocalStorage fixture ownership and automatic teardown order remain. Completed nested tests do not dispose a shared live parent app; recursive tests and hooks execute, Add/persist stays usable, and the final actual scanner timer is cancelled by automatic parent cleanup.",
+      "The original after-only and nested-only eight-plus-one fixtures remain protected with exactly4fresh-turnGC. Additional three-level recursive coverage uses the same eight-plus-one/four-turn input. Intentionally failing child controls verify real failure propagation and are not accepted as passing child outcomes.",
+      "Prior e793 source/handoff, all22 earlier recorder attempts, original failed376, and external1769/1774/1775/1777 observations remain immutable. Reclamation of these confirmed ownership paths does not quantify or prove the original aggregate4GiBOOM cause; the full default-heap suite remains ROOT-owned.",
+      "Issue1778 changes only the stale explanatory comment to ordinary60 versus full/workload90. The independent inventory and every selection/assertion/deadline byte remain unchanged.",
+      "Every prior executable assertion and all1432 prior rationale objects remain intact; no skip, registration omission, default-heap, frame, action, callback-lifetime or cleanup relaxation.",
+      "The original paste scenario retains malformed input, captured large paste outside the DOM, exact raw source hash, Cancel and repeated preview, complete saved head and accepted-board backup, durable three-task import, complete1MiB unknown field, Close and original12second action deadline.",
+      "Exactly one existing literal cloud-ACK guard is replaced; original successful import, fresh-read denial, publication refusal, uncertain acknowledgement and changed-peer service controls remain exact. The original historical source-binding failure and82ab specimen chronology remain immutable.",
+      "Only ordinary profile correctness joins native-process required coverage. Explicit400 workload controls remain optional data, and full-suite, CI, deployment, Beta and physical/private-device acceptance are outside these focused results.",
+      "All12 original public CLI tails, both literal success streams, all precise refusal statuses/messages and no ENOBUFS, syntax or module error substitution remain unchanged.",
+      "All1435 pre-1787 rationale objects remain exact; every native paste, ACK, callback lifecycle, group registration, risk map, app, shell, backend, rules and runtime-source byte is unchanged by1787.",
+      "Default temporary roots still clean their owned fixture after tests; explicit evidence roots retain complete journals and source files. Canonicalizing the owned directory introduces no user data mutation, new process, changed verdict or raised bound.",
+      "Every original1439 rationale object remains verbatim and in order; sibling1797 rationale additions remain intact before these additive records.",
+      "The complete current/durable/head/localStorage/IndexedDB/pending/opaque/unknown source equalities, seven pending phases, eleven obsolete phases, all native accepted/refused/disappeared counts, and exact pre-settlement file equality remain required.",
+      "Copy success and rejection, stale success and rejection, independent Download failure, temporary anchor and object-URL cleanup remain covered; no new UI or test harness, ordinary61st scenario, action expansion, skip, heap, budget or deadline waiver.",
+      "Mounted extended FAQ and Settings changelog retain unrelated content, concise limits and saved-source safeguards; app and worker bytes match the settled source, actual six-service ACK controls retain one exact guard mutation and revision1vs2."
+    ],
+    "redEvidence": {
+      "command": "node --experimental-vm-modules --test --test-name-pattern=^RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable$ tests.js",
+      "failure": "Observed before application implementation on19abc1: ERR_ASSERTION a pending Copy owns only Copy while the real Download action starts the same prepared archive; actual Download disabledtrue/startedfalse versus intendedfalse/true. Original recorder c42de550 retained. Later fe442cf native fixture failure1vs0 is actual acceptance bookkeeping evidence, not new productRED; earlier wait-predicate ReferenceError is also retained."
+    },
+    "evidenceChronology": {
+      "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+      "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+      "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+      "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+      "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+      "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+      "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+      "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+      "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+    },
+    "cumulativeEvidence": {
+      "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "actualMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "sourceBaseline": "1f88aed4ba80640d1a8f57337444aef0c796080e",
+      "priorCumulativeFingerprint": "ee5e47fda54d1e3573c8c6228986b2dd1b851ef80d40947a3685a1d174cc563f",
+      "priorRedEvidence": {
+        "command": "CHAIN_NATIVE_OUTPUT=<allocated-external>/red-native CHAIN_NATIVE_PORT=53723 node scripts/agent-tools/record-run.mjs --repo <own-worktree> --evidence-dir <external>/red-recorder --purpose preimplementation-red --summary -- node --experimental-vm-modules --test --test-name-pattern='^RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts$' tests.js",
+        "failure": "Observed before the transfer edit on210660: both Chromium and WebKit fail ERR_ASSERTION because the actual native CLI exits1 with stalled responsiveness: outcome preview-pasted-recovery; report setup has64 current and durable tasks, correct malformed-input toast and complete cleanup. Original record red-recorder/2026-10-31T07-04-20-479Z-ab74c9a9-b7e5-4ef5-98dd-b9a15a695e96.json."
+      },
+      "priorEvidenceChronology": {
+        "sourceBaseline": "210660516741a4f79cc0d429b7291d8292f237ca",
+        "originalRed": "red-recorder/2026-10-31T07-04-20-479Z-ab74c9a9-b7e5-4ef5-98dd-b9a15a695e96.json",
+        "correctedWrapperAggregation": "The first post-fix run completed both original native scenarios, then exposed the new wrapper assertion incorrectly expecting three outcome rows. Existing reports aggregate three preview steps into one row. The new assertion now requires one row, three assertions/steps and three trusted native clicks; no prior test assertion was changed.",
+        "firstPostFixWrapperFailure": "green-recorder/2026-10-31T07-05-17-901Z-5cddcd50-c6d3-4e7c-933d-deefa8c7eaf8.json",
+        "correctedWrapperGreen": "green-recorder/2026-10-31T07-05-58-315Z-1914f22d-7543-40db-bf8d-94c005902751.json",
+        "correctedWrapperLaterBaseline": "later-baseline-recorder/2026-10-31T07-07-17-627Z-5cf62c89-3342-4bc1-8403-b788dbed6bd0.json; final wrapper discriminates the restored original predicate in both engines. This is later sensitivity, not original preimplementation RED.",
+        "ackCurrentSpecimen": "ack-specimens/INDEPENDENT-SPECIMEN-BINDING.json; complete original and literal-guard-mutated app sources retained independently before binding edit.",
+        "ackRealConsumer": "ack-focused-recorder/2026-10-31T07-06-21-045Z-ebd5964c-6894-4a8c-9b6e-47f1e64fda1b.json;6/6pass zero skips, actual ERR_ASSERTION353 source revision advanced exactly once, actual1 expected2.",
+        "ackBindingIsBookkeepingNotFeatureRed": true,
+        "originalIncompleteFullSuite": "The prior full-suite attempt remains FAILED/EVIDENCE-INCOMPLETE; no final counts, child-exit or aggregate OOM-resolution claim is made."
+      },
+      "currentTestsSha256": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359",
+      "all1435PriorObjectsPreserved": true,
+      "metadataHasNoNewBehavioralRedClaim": true,
+      "all1439PriorObjectsPreserved": true,
+      "preexistingPrefixCount": 1440,
+      "preexistingPrefixBytesSha256": "0986a1f739941e6af7ab7053f893478164868132674d333ab4b9567ade603faa",
+      "newEvidenceChronology": {
+        "originalProductRed": "current-continuation14/pending-copy-download-owner-1790/logs/behavioral-red/2026-10-31T07-57-39-925Z-c42de550-a450-4a78-a4d6-b6e59927ae90.json",
+        "originalProductGreen": "current-continuation14/pending-copy-download-owner-1790/logs/final-direct-green/2026-10-31T08-08-53-575Z-1f825d21-dab4-4912-80a0-55bdb907baff.json",
+        "accepted1791": "current-continuation15/pending-copy-1791-admission/1791-PUBLIC-CONSUMER-ROOT-ACCEPTANCE.json",
+        "originalNativeWaitFailure": "85270133/54fc456f064dc4e48e3c23b61a145e062b6e268faeb8c87a90a98f72efe63359",
+        "originalNativeQueueFailure": "fe442cf/aa978977c1887c7929056d606d86544a401860c9c85ee0515dccf9d494f89ba8",
+        "fixtureRepair": "82267f1b323bff93b05fdee79e9043c8ddc14b15; consume exactly the deferred clipboard request at explicit settlement, leaving completed pendingCount0 strict; obsolete count2 to1 to0 is explicit in both complete kernels.",
+        "laterCurrentACK": "e4b2 independently retained exactly-one guard specimen; logs/current-ack-six/2026-10-31T08-31-49-864Z-721c81a7-fb99-4d14-ac49-94867f43ee21.json actual6/6 zero skips and ERR_ASSERTION353 revision1vs2; bookkeeping binding is not featureRED.",
+        "historicalFailures": "All prior V8fatal, ENOSPC-incomplete, owner-interrupted full attempts and all native/setup failures remain immutable and unqualified.",
+        "testsHash": "f0c33a54ffe0415d88fda750f95de60643000e8eea3949a584cfb6a502350359"
+      }
+    },
+    "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288"
   }
 ]
