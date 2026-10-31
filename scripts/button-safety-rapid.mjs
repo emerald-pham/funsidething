@@ -224,8 +224,7 @@ export async function runRapidScenarios(h){
   assert.equal(downloadedArchive,await ui.page.evaluate(()=>window.__buttonClipboard[0]),'The actual complete downloaded file bytes equal the still-pending clipboard payload');
   await capture('pending-refused',downloadedArchive);
   await ui.page.evaluate(()=>window.__buttonClipboardPending[0].resolve());
-  const settledStatus='Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.';
-  await ui.waitFor(()=>document.getElementById('exportTransferStatus')?.textContent===settledStatus&&document.getElementById('copyExportButton')?.disabled===false&&document.getElementById('downloadExportButton')?.disabled===false,12000,'Copy truthfully settles independently after Download');await capture('completed',downloadedArchive);
+  await ui.waitFor(()=>document.getElementById('exportTransferStatus')?.textContent==='Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.'&&document.getElementById('copyExportButton')?.disabled===false&&document.getElementById('downloadExportButton')?.disabled===false,12000,'Copy truthfully settles independently after Download');await capture('completed',downloadedArchive);
   await capture('downloaded',downloadedArchive);await capture('final-source',downloadedArchive);const semantic=verifyCopySources(snapshots);ui.recordRepeatOutcome(scenario,attempts,JSON.stringify(semantic));
  });
 
@@ -277,8 +276,12 @@ export async function runRapidScenarios(h){
  });
  await h.scenario('rapid pending Copy disables reentry without losing the archive',{clipboardDeferred:true},async ui=>{
   const original=await rawIdentity(ui);await ui.act('settings',()=>!!document.getElementById('stHorizon'));await ui.act('export-backup',ready);
-  await ui.burst('copy-export',()=>window.__buttonClipboardPending.length===1&&document.querySelector('[data-act="copy-export"]').disabled&&document.querySelector('[data-act="download-export"]').disabled,{semantics:'The first Copy starts its clipboard promise; the disabled control refuses nine later presses',expectedAccepted:1});
+  await ui.burst('copy-export',()=>window.__buttonClipboardPending.length===1&&document.querySelector('[data-act="copy-export"]').disabled&&!document.querySelector('[data-act="download-export"]').disabled,{semantics:'The first Copy starts its clipboard promise; only Copy refuses nine later presses while the prepared Download remains available',expectedAccepted:1});
   assert.equal(await ui.page.evaluate(()=>window.__buttonClipboard.length),1,'Only one clipboard operation starts');
+  const pendingDownload=ui.page.waitForEvent('download',{timeout:12000});
+  await ui.act('download-export',()=>document.getElementById('exportTransferStatus')?.textContent==='Copying the prepared archive… Download started. The archive contains the exact prepared export.'&&document.getElementById('copyExportButton')?.disabled===true&&document.getElementById('downloadExportButton')?.disabled===false);
+  const download=await pendingDownload;assert.equal(await download.failure(),null,'Download succeeds while the clipboard promise remains pending');
+  const downloadedArchive=fs.readFileSync(await download.path(),'utf8');assert.equal(downloadedArchive,await ui.page.evaluate(()=>window.__buttonClipboard[0]),'The complete trusted Download bytes equal the pending clipboard archive');
   await ui.page.evaluate(()=>window.__buttonClipboardPending[0].resolve());
   await ui.waitFor(()=>!document.querySelector('[data-act="copy-export"]').disabled&&/copied/i.test(document.getElementById('exportTransferStatus').textContent));
   assert.equal(await rawIdentity(ui),original,'Busy Copy reentry retains exact original sources');
@@ -300,7 +303,7 @@ export async function runRapidScenarios(h){
   await ui.page.evaluate(()=>window.__buttonClipboardPending[0].resolve());
   await ui.page.waitForTimeout(30);
   assert.equal(await ui.page.locator('[data-act="copy-export"]').isDisabled(),true,'obsolete clipboard completion must keep the new transfer busy');
-  assert.equal(await ui.page.locator('[data-act="download-export"]').isDisabled(),true,'obsolete clipboard completion cannot unlock the new Download');
+  assert.equal(await ui.page.locator('[data-act="download-export"]').isDisabled(),false,'obsolete clipboard completion preserves the new transfer Download availability');
   assert.equal(await ui.page.locator('#exportTransferStatus').textContent(),before,'obsolete clipboard completion cannot replace the new status');
   await ui.page.evaluate(()=>window.__buttonClipboardPending[1].resolve());
   await ui.waitFor(()=>!document.querySelector('[data-act="copy-export"]').disabled&&/copied/i.test(document.getElementById('exportTransferStatus').textContent));
