@@ -2528,3 +2528,24 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: startup fixture temp aliases preserve canonical owned custody
 
 - RISK repository process: full-domain Timeline preserves PNG metadata and native command deadlines
+
+- RISK repository process: completed after callbacks release ordinary fixture captures
+- RISK app fixture cleanup: after producer retires eight ordinary fixtures
+- RISK app fixture cleanup: after observer collects retired fixtures while a neighbor stays usable
+
+- RISK repository process: completed nested bodies release ordinary fixture captures
+- RISK app fixture cleanup: nested producer retires eight ordinary fixtures
+- RISK app fixture cleanup: nested observer collects retired fixtures while a neighbor stays usable
+
+- RISK repository process: fixture callback ownership preserves actual cleanup and child contracts
+- RISK app fixture cleanup: API success producer
+- RISK app fixture cleanup: API success observer
+- RISK app fixture cleanup: synchronous cleanup error
+- RISK app fixture cleanup: asynchronous cleanup error
+- RISK app fixture cleanup: callback cleanup error
+- RISK app fixture cleanup: synchronous nested body error
+- RISK app fixture cleanup: asynchronous nested body error
+- RISK app fixture cleanup: callback nested body error
+- RISK app fixture cleanup: callback and Promise misuse
+- RISK app fixture cleanup: nested timeout
+- RISK app fixture cleanup: nested skip and todo

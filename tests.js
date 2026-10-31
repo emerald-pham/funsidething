@@ -15,10 +15,46 @@ import { createServer } from "node:http";
 // Every top-level test owns its app fixtures. Nested t.test cases inherit the
 // parent scope so a shared fixture remains live until all its consumers finish.
 const appFixtureScope = new AsyncLocalStorage();
+// Node keeps completed Test/Hook functions. Repository-owned slots retain the
+// real callbacks until public completion, then release their captured fixtures.
+// Forward arity and arguments so Node still owns callback/Promise semantics.
+function retainTestCallback(callback,callbacks,prepare){
+ const slot={callback};callbacks.add(slot);
+ const forwarded=function(...args){prepare?.(args[0]);return Reflect.apply(slot.callback,this,args);};
+ Object.defineProperties(forwarded,{name:{value:callback.name,configurable:true},length:{value:callback.length,configurable:true}});
+ return {slot,forwarded};
+}
+function releaseTestCallbacks(callbacks){for(const slot of callbacks)slot.callback=null;callbacks.clear();}
+function releaseCallbacksOnCompletion(completed,callbacks){
+ const release=()=>releaseTestCallbacks(callbacks);
+ completed.then(release,release);
+ return completed;
+}
+function ownTestContext(context,callbacks){
+ const after=context.after;
+ context.after={after(callback,options){
+  if(typeof callback!=="function")return Reflect.apply(after,this,arguments);
+  const {slot,forwarded}=retainTestCallback(callback,callbacks);
+  const args=Array.from(arguments);args[0]=forwarded;
+  try{return Reflect.apply(after,this,args);}
+  catch(error){slot.callback=null;callbacks.delete(slot);throw error;}
+ }}.after;
+ const start=context.test;
+ context.test={test(name,options,fn){
+  const args=Array.from(arguments),callback=args.at(-1);
+  if(typeof callback!=="function")return Reflect.apply(start,this,args);
+  const childCallbacks=new Set(),{forwarded}=retainTestCallback(callback,childCallbacks,child=>ownTestContext(child,childCallbacks));
+  args[args.length-1]=forwarded;
+  try{return releaseCallbacksOnCompletion(Reflect.apply(start,this,args),childCallbacks);}
+  catch(error){releaseTestCallbacks(childCallbacks);throw error;}
+ }}.test;
+}
 function test(...args){
  const run=args.at(-1);
  if(typeof run!=="function")return nodeTest(...args);
- return nodeTest(...args.slice(0,-1),async context=>{
+ const callbacks=new Set();
+ const completed=nodeTest(...args.slice(0,-1),async context=>{
+  ownTestContext(context,callbacks);
   const fixtures=new Set();
   try{return await appFixtureScope.run(fixtures,()=>run(context));}
   finally{context.after(async()=>{
@@ -26,6 +62,7 @@ function test(...args){
    finally{fixtures.clear();}
   });}
  });
+ return releaseCallbacksOnCompletion(completed,callbacks);
 }
 
 const optionalWorkloadDiagnosticsSelected=process.env.CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS==='1'&&process.env.CHAIN_TEST_GROUP==='optional-workload-diagnostics'&&process.execArgv.some(value=>value.startsWith('--test-name-pattern='));
@@ -23512,6 +23549,131 @@ async function saveEditorChoice(app,id,at,changes={}){
   start:value('startsAt',task.startsAt||''),evergreen:task.evergreen,ctxIds:value('ctxIds',task.ctx)});
  app.ctx.onAction('save-edit',{dataset:{id}});
  return app.ctx.persist();
+}
+
+test('RISK repository process: completed after callbacks release ordinary fixture captures',{timeout:15000},t=>{
+ const required=['RISK app fixture cleanup: after producer retires eight ordinary fixtures','RISK app fixture cleanup: after observer collects retired fixtures while a neighbor stays usable'];
+ const env={...process.env,CHAIN_AFTER_FIXTURE_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--expose-gc','--test','--test-reporter=tap','--test-name-pattern=^RISK app fixture cleanup: after (producer|observer) ','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ const output=[child.stdout,child.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(child.error,undefined);assert.equal(child.signal,null);assert.equal(child.status,0,'Actual ordinary app fixtures must be reclaimed after explicit cleanup callbacks finish: '+output);
+ const lines=(child.stdout||'').split(/\r?\n/);
+ for(const name of required){const outcomes=lines.filter(line=>/^ok \d+ - /.test(line)&&line.replace(/^ok \d+ - /,'').split(' #')[0]===name);assert.equal(outcomes.length,1,'Each real producer and observer must execute exactly once');assert.doesNotMatch(outcomes[0],/ # (?:SKIP|TODO)\b/i);}
+ assert.equal(lines.filter(line=>/^ok \d+ - /.test(line)).length,2);assert.equal(lines.filter(line=>/^1\.\.\d+$/.test(line)).at(-1),'1..2');
+ for(const label of ['cancelled','skipped','todo'])assert.match(child.stdout||'',new RegExp('^# '+label+' 0$','m'));
+ assert.doesNotMatch(child.stdout||'',/^not ok /m);assert.match(child.stdout||'',/AFTER_FIXTURE_GC .*"collected":\{"contexts":8,"shims":8\}/);assert.match(child.stdout||'',/AFTER_FIXTURE_LIVE_ADD_SAVED/);assert.match(child.stdout||'',/AFTER_FIXTURE_LIVE_WAKE_CANCELLED/);
+});
+
+if(process.env.CHAIN_AFTER_FIXTURE_CHILD==='1'){
+ test('RISK app fixture cleanup: after producer retires eight ordinary fixtures',{timeout:10000},async t=>{
+  assert.equal(typeof global.gc,'function');assert.equal(test.afterFixtureReferences,undefined);test.afterFixtureReferences=[];
+  for(let index=0;index<8;index++){
+   const app=await loadApp();t.after(()=>app.dispose());
+   test.afterFixtureReferences.push({ctx:new WeakRef(app.ctx),shim:new WeakRef(app.shim)});await app.dispose();
+  }
+  assert.equal(test.afterFixtureReferences.length,8);t.diagnostic('AFTER_FIXTURE_PRODUCER ordinaryBoots=8 retiredWeakPairs=8 explicitAfterHooks=8');
+ });
+ test('RISK app fixture cleanup: after observer collects retired fixtures while a neighbor stays usable',{timeout:10000},async t=>{
+  assert.equal(typeof global.gc,'function');const retired=test.afterFixtureReferences;delete test.afterFixtureReferences;assert.equal(retired?.length,8);
+  const neighbor=await loadApp(),wake=vm.runInContext('scanWakeTimer',neighbor.ctx);
+  t.after(async()=>{await neighbor.dispose();assert.equal(wake._destroyed,true);t.diagnostic('AFTER_FIXTURE_LIVE_WAKE_CANCELLED');});
+  for(let turn=0;turn<4;turn++){await new Promise(resolve=>setImmediate(resolve));global.gc();}
+  const collected={contexts:retired.filter(row=>row.ctx.deref()===undefined).length,shims:retired.filter(row=>row.shim.deref()===undefined).length};
+  t.diagnostic('AFTER_FIXTURE_GC '+JSON.stringify({ordinaryBoots:9,retired:8,gcTurns:4,collected}));
+  assert.deepEqual(collected,{contexts:8,shims:8},'Retired real ordinary fixtures must be reclaimable after actual after-hook cleanup');
+  assert.equal(wake._destroyed,false,'The live neighbor keeps its own scanner wake');neighbor.shim.document.getElementById('addInput').value='Live ordinary fixture after-cleanup control';await neighbor.ctx.onAction('add',{});assert.equal(await neighbor.ctx.persist(),true);assert.ok(neighbor.ctx.state.tasks.some(row=>row.title==='Live ordinary fixture after-cleanup control'));t.diagnostic('AFTER_FIXTURE_LIVE_ADD_SAVED');
+ });
+}
+
+test('RISK repository process: completed nested bodies release ordinary fixture captures',{timeout:15000},async t=>{
+ const required=['RISK app fixture cleanup: nested producer retires eight ordinary fixtures','RISK app fixture cleanup: nested observer collects retired fixtures while a neighbor stays usable'];
+ for(const variant of [{name:'direct children',depth:'1',count:10},{name:'recursive grandchildren',depth:'3',count:26}])await t.test(variant.name,sub=>{
+ const env={...process.env,CHAIN_NESTED_FIXTURE_CHILD:'1',CHAIN_NESTED_FIXTURE_DEPTH:variant.depth};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--expose-gc','--test','--test-reporter=tap','--test-name-pattern=^RISK app fixture cleanup: nested (producer|observer) ','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ const output=[child.stdout,child.stderr].filter(Boolean).join('\n');sub.diagnostic(output);
+ assert.equal(child.error,undefined);assert.equal(child.signal,null);assert.equal(child.status,0,'Actual ordinary fixtures must be reclaimed after their nested bodies and parent cleanup finish: '+output);
+ const lines=(child.stdout||'').split(/\r?\n/);
+ for(const name of required){const outcomes=lines.filter(line=>/^ok \d+ - /.test(line)&&line.replace(/^ok \d+ - /,'').split(' #')[0]===name);assert.equal(outcomes.length,1);assert.doesNotMatch(outcomes[0],/ # (?:SKIP|TODO)\b/i);}
+ assert.equal(lines.filter(line=>/^ok \d+ - /.test(line)).length,2);assert.equal(lines.filter(line=>/^1\.\.\d+$/.test(line)).at(-1),'1..2');
+ for(const label of ['cancelled','skipped','todo'])assert.match(child.stdout||'',new RegExp('^# '+label+' 0$','m'));
+ assert.doesNotMatch(child.stdout||'',/^not ok /m);assert.match(child.stdout||'',new RegExp('^# tests '+variant.count+'$','m'));assert.match(child.stdout||'',/NESTED_FIXTURE_GC .*"collected":\{"contexts":8,"shims":8\}/);assert.match(child.stdout||'',/NESTED_FIXTURE_LIVE_ADD_SAVED/);assert.match(child.stdout||'',/NESTED_FIXTURE_LIVE_WAKE_CANCELLED/);
+ });
+});
+
+if(process.env.CHAIN_NESTED_FIXTURE_CHILD==='1'){
+ test('RISK app fixture cleanup: nested producer retires eight ordinary fixtures',{timeout:10000},async t=>{
+  assert.equal(typeof global.gc,'function');assert.equal(test.nestedFixtureReferences,undefined);test.nestedFixtureReferences=[];
+  for(let index=0;index<8;index++){
+   const app=await loadApp();test.nestedFixtureReferences.push({ctx:new WeakRef(app.ctx),shim:new WeakRef(app.shim)});
+   if(process.env.CHAIN_NESTED_FIXTURE_DEPTH==='3')await t.test('outer fixture '+index,async outer=>{await outer.test('middle fixture '+index,async middle=>{await middle.test('ordinary fixture '+index,async()=>{const wake=vm.runInContext('scanWakeTimer',app.ctx);assert.equal(wake._destroyed,false,'The nested body owns a live app before disposal');await app.dispose();assert.equal(wake._destroyed,true,'The nested body observes actual scanner-wake cancellation');});});});
+   else await t.test('ordinary fixture '+index,async()=>{const wake=vm.runInContext('scanWakeTimer',app.ctx);assert.equal(wake._destroyed,false,'The nested body owns a live app before disposal');await app.dispose();assert.equal(wake._destroyed,true,'The nested body observes actual scanner-wake cancellation');});
+  }
+  assert.equal(test.nestedFixtureReferences.length,8);t.diagnostic('NESTED_FIXTURE_PRODUCER ordinaryBoots=8 retiredWeakPairs=8 nestedBodies=8 noExplicitRetiredAfterHooks');
+ });
+ test('RISK app fixture cleanup: nested observer collects retired fixtures while a neighbor stays usable',{timeout:10000},async t=>{
+  assert.equal(typeof global.gc,'function');const retired=test.nestedFixtureReferences;delete test.nestedFixtureReferences;assert.equal(retired?.length,8);
+  const neighbor=await loadApp(),wake=vm.runInContext('scanWakeTimer',neighbor.ctx);
+  t.after(async()=>{await neighbor.dispose();assert.equal(wake._destroyed,true);t.diagnostic('NESTED_FIXTURE_LIVE_WAKE_CANCELLED');});
+  for(let turn=0;turn<4;turn++){await new Promise(resolve=>setImmediate(resolve));global.gc();}
+  const collected={contexts:retired.filter(row=>row.ctx.deref()===undefined).length,shims:retired.filter(row=>row.shim.deref()===undefined).length};
+  t.diagnostic('NESTED_FIXTURE_GC '+JSON.stringify({ordinaryBoots:9,retired:8,gcTurns:4,collected}));assert.deepEqual(collected,{contexts:8,shims:8},'Retired real ordinary fixtures must be reclaimable after completed nested body captures');
+  assert.equal(wake._destroyed,false,'The live neighbor keeps its own scanner wake');neighbor.shim.document.getElementById('addInput').value='Live ordinary fixture nested-body control';await neighbor.ctx.onAction('add',{});assert.equal(await neighbor.ctx.persist(),true);assert.ok(neighbor.ctx.state.tasks.some(row=>row.title==='Live ordinary fixture nested-body control'));t.diagnostic('NESTED_FIXTURE_LIVE_ADD_SAVED');
+ });
+}
+
+test('RISK repository process: fixture callback ownership preserves actual cleanup and child contracts',async t=>{
+ const cases=[
+  {name:'sync Promise callback and recursive success',pattern:'API success (producer|observer)',status:0,signal:/LIFECYCLE_SUCCESS_CLEANUP_OBSERVED/,count:2},
+  {name:'synchronous cleanup error',pattern:'synchronous cleanup error',status:1,signal:/error:.*AFTER_THROW_1776/,count:1},
+  {name:'asynchronous cleanup error',pattern:'asynchronous cleanup error',status:1,signal:/error:.*AFTER_REJECT_1776/,count:1},
+  {name:'callback cleanup error',pattern:'callback cleanup error',status:1,signal:/error:.*AFTER_CALLBACK_1776/,count:1},
+  {name:'synchronous nested body error',pattern:'synchronous nested body error',status:1,signal:/error:.*BODY_THROW_1779/,count:1},
+  {name:'asynchronous nested body error',pattern:'asynchronous nested body error',status:1,signal:/error:.*BODY_REJECT_1779/,count:1},
+  {name:'callback nested body error',pattern:'callback nested body error',status:1,signal:/error:.*BODY_CALLBACK_1779/,count:1},
+  {name:'callback and Promise misuse',pattern:'callback and Promise misuse',status:1,signal:/passed a callback but also returned a Promise/,count:1},
+  {name:'nested timeout',pattern:'nested timeout',status:1,signal:/test timed out after 25ms/,count:1},
+  {name:'nested skip and todo',pattern:'nested skip and todo',status:0,signal:/TODO_BODY_EXECUTED/,count:1}
+ ];
+ for(const entry of cases)await t.test(entry.name,sub=>{
+  const env={...process.env,CHAIN_FIXTURE_API_CHILD:'1'};delete env.NODE_TEST_CONTEXT;
+  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^RISK app fixture cleanup: '+entry.pattern+'$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+  const output=[child.stdout,child.stderr].filter(Boolean).join('\n');sub.diagnostic(output);
+  assert.equal(child.error,undefined);assert.equal(child.signal,null);assert.equal(child.status,entry.status,'The real Node child preserves the expected success/failure contract: '+output);assert.match(output,entry.signal);assert.doesNotMatch(output,/SyntaxError|ReferenceError|ERR_MODULE_NOT_FOUND/);
+  assert.equal((child.stdout||'').split(/\r?\n/).filter(line=>/^1\.\.\d+$/.test(line)).at(-1),'1..'+entry.count);
+  if(entry.name==='nested timeout')assert.match(output,/TIMEOUT_CLEANUP_RAN/);
+  if(entry.name==='nested skip and todo'){assert.match(output,/^# skipped 1$/m);assert.match(output,/^# todo 1$/m);assert.match(output,/# SKIP accepted skip reason/);assert.match(output,/# TODO accepted todo reason/);assert.doesNotMatch(output,/SKIPPED_BODY_EXECUTED/);}
+ });
+});
+
+if(process.env.CHAIN_FIXTURE_API_CHILD==='1'){
+ test('RISK app fixture cleanup: API success producer',async t=>{
+  const app=await loadApp(),events=[];let wake=vm.runInContext('scanWakeTimer',app.ctx);assert.equal(wake._destroyed,false);assert.equal(test.fixtureAPIWake,undefined);test.fixtureAPIWake=wake;
+  assert.equal(t.after.name,'after');assert.equal(t.after.length,2);assert.equal(t.test.name,'test');assert.equal(t.test.length,3);
+  const options={timeout:1000,signal:new AbortController().signal};
+  assert.equal(t.after(function cleanupSync(received){assert.equal(received,t);assert.equal(arguments.length,1);assert.equal(this,t);assert.equal(wake._destroyed,false);events.push('sync');},options),undefined);
+  t.after(async function cleanupPromise(received){assert.equal(received,t);assert.equal(arguments.length,1);assert.equal(this,t);events.push('async-start');await new Promise(resolve=>setImmediate(resolve));assert.equal(wake._destroyed,false);events.push('async-end');},options);
+  t.after(function cleanupCallback(received,done){assert.equal(received,t);assert.equal(arguments.length,2);assert.equal(this,t);assert.equal(typeof done,'function');events.push('callback-start');setImmediate(()=>{try{assert.equal(wake._destroyed,false);events.push('callback-end');done();}catch(error){done(error);}});},options);
+  const after=t.after;after.call(t,function cleanupReceiver(received){assert.equal(received,t);assert.deepEqual(events,['sync','async-start','async-end','callback-start','callback-end']);assert.equal(wake._destroyed,false);console.error('LIFECYCLE_SUCCESS_ALL_USER_HOOKS_RAN');},options);
+  assert.deepEqual(Object.keys(options),['timeout','signal']);assert.equal(options.timeout,1000);assert.equal(options.signal.aborted,false);
+  await t.test('sync child',function childSync(child){assert.equal(arguments.length,1);assert.equal(this,child);assert.equal(child.name,'sync child');assert.equal(wake._destroyed,false);});
+  await t.test('Promise child',{timeout:1000},async function childPromise(child){assert.equal(child.name,'Promise child');await new Promise(resolve=>setImmediate(resolve));assert.equal(wake._destroyed,false);});
+  await t.test('callback child',function childCallback(child,done){assert.equal(arguments.length,2);assert.equal(this,child);assert.equal(child.name,'callback child');setImmediate(()=>{try{assert.equal(wake._destroyed,false);done();}catch(error){done(error);}});});
+  await t.test(function inferredChild(child){assert.equal(child.name,'inferredChild');assert.equal(wake._destroyed,false);});
+  await t.test({timeout:1000},function optionsChild(child){assert.equal(child.name,'optionsChild');assert.equal(wake._destroyed,false);});
+  const start=t.test,completion=start.call(t,'explicit receiver child',function explicitReceiver(child){assert.equal(child.name,'explicit receiver child');assert.equal(this,child);});assert.ok(completion instanceof Promise);await completion;
+  await t.test('recursive child',async child=>{await child.test('grandchild',async grandchild=>{assert.equal(wake._destroyed,false);grandchild.after(function recursiveCleanup(received){assert.equal(received,grandchild);assert.equal(wake._destroyed,false);});await grandchild.test('third level callback',function deepest(received,done){assert.equal(received.name,'third level callback');setImmediate(()=>done());});});});
+  assert.equal(wake._destroyed,false,'Nested completion does not dispose the shared parent fixture');app.shim.document.getElementById('addInput').value='Live callback lifetime control';await app.ctx.onAction('add',{});assert.equal(await app.ctx.persist(),true);assert.ok(app.ctx.state.tasks.some(row=>row.title==='Live callback lifetime control'));wake=vm.runInContext('scanWakeTimer',app.ctx);assert.equal(wake._destroyed,false,'Add reschedules a live scanner wake');test.fixtureAPIWake=wake;
+ });
+ test('RISK app fixture cleanup: API success observer',()=>{assert.equal(test.fixtureAPIWake?._destroyed,true,'Actual automatic cleanup runs after every user hook and cancels the parent scanner wake');delete test.fixtureAPIWake;console.error('LIFECYCLE_SUCCESS_CLEANUP_OBSERVED');});
+ test('RISK app fixture cleanup: synchronous cleanup error',t=>{t.after(function cleanupThrow(){console.error('AFTER_THROW_EXECUTED');throw Error('AFTER_THROW_1776');},{timeout:1000});});
+ test('RISK app fixture cleanup: asynchronous cleanup error',t=>{t.after(async function cleanupReject(){await new Promise(resolve=>setImmediate(resolve));console.error('AFTER_REJECT_EXECUTED');throw Error('AFTER_REJECT_1776');},{timeout:1000});});
+ test('RISK app fixture cleanup: callback cleanup error',t=>{t.after(function cleanupDone(received,done){assert.equal(received,t);setImmediate(()=>done(Error('AFTER_CALLBACK_1776')));},{timeout:1000});});
+ test('RISK app fixture cleanup: synchronous nested body error',async t=>{await t.test('throw child',function bodyThrow(){throw Error('BODY_THROW_1779');});});
+ test('RISK app fixture cleanup: asynchronous nested body error',async t=>{await t.test('reject child',async function bodyReject(){await new Promise(resolve=>setImmediate(resolve));throw Error('BODY_REJECT_1779');});});
+ test('RISK app fixture cleanup: callback nested body error',async t=>{await t.test('callback error child',function bodyDone(child,done){assert.equal(child.name,'callback error child');setImmediate(()=>done(Error('BODY_CALLBACK_1779')));});});
+ test('RISK app fixture cleanup: callback and Promise misuse',async t=>{await t.test('invalid mixed completion',function bodyMixed(child,done){done();return Promise.resolve();});});
+ test('RISK app fixture cleanup: nested timeout',async t=>{const keepAlive=setTimeout(()=>{},1000);t.after(()=>{clearTimeout(keepAlive);console.error('TIMEOUT_CLEANUP_RAN');});await t.test('original deadline',{timeout:25},()=>new Promise(()=>{}));});
+ test('RISK app fixture cleanup: nested skip and todo',async t=>{await t.test('skipped child',{skip:'accepted skip reason'},()=>{console.error('SKIPPED_BODY_EXECUTED');assert.fail('Skipped body must remain unexecuted');});await t.test('todo child',{todo:'accepted todo reason'},()=>{console.error('TODO_BODY_EXECUTED');});});
 }
 
 async function loadAppAtTime(at,options={}){
@@ -47747,9 +47909,9 @@ test('RISK repository process: required native button actions execute in Chromiu
  const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
  const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);const [candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/);
- // This bounds the entire 90-scenario engine process, including isolated fixture
- // setup and 173 ten-press bursts. Measured WebKit exceeded five minutes while
- // individual action bounds still passed; those native bounds remain unchanged.
+ // The default ordinary profile selects 60 scenarios; the full/workload
+ // diagnostic inventory contains 90. This bounds the whole engine process,
+ // including setup; existing action and rapid-attempt bounds stay unchanged.
  for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
   const output=fs.mkdtempSync(path.join(base,'button-actions-'+engine+'-'));
   const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:360000,maxBuffer:16*1024*1024});

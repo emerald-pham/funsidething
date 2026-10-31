@@ -12793,6 +12793,21 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: completed after callbacks release ordinary fixture captures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: completed nested bodies release ordinary fixture captures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: ordinary native cloud recovery preserves sources through failures and retry",
       "group": "native-process",
       "file": "tests.js"
@@ -13909,6 +13924,111 @@
     }
   ],
   "processControls": [
+    {
+      "id": "RISK app fixture cleanup: API success producer",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: API success observer",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: synchronous cleanup error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: asynchronous cleanup error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: callback cleanup error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: synchronous nested body error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: asynchronous nested body error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: callback nested body error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: callback and Promise misuse",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested timeout",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested skip and todo",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested producer retires eight ordinary fixtures",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed nested bodies release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested observer collects retired fixtures while a neighbor stays usable",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed nested bodies release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: after producer retires eight ordinary fixtures",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed after callbacks release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: after observer collects retired fixtures while a neighbor stays usable",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed after callbacks release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
     {
       "id": "RISK native installed-client delivery: signed-out",
       "group": "native-process",
