@@ -49052,5 +49052,58 @@
       "all1435PriorObjectsPreserved": true,
       "metadataHasNoNewBehavioralRedClaim": true
     }
+  },
+  {
+    "baseCommit": "19abc1b0d98766ae9f721f5433a6f6730585b54b",
+    "agentTestChangesSha256": "24d07bf09fd0d24ea59a97ee240ef15dfc92b3253fa4ca5fc0af95e3eb16b503",
+    "changedAgentTests": [
+      "parallel workflow observation preserves complete missing skipped canceled and unknown distinctions"
+    ],
+    "reason": "The existing monitor treated a workflow-selected, default-off mobile diagnostic as required on ordinary push and pull-request runs, contradicting the exact current workflow and #1797 acceptance.",
+    "previousBehavior": "A completed ordinary pull-request run failed when the required validation, four regression groups, scanner aggregate, and source attestations all succeeded but the unselected mobile job was skipped.",
+    "intendedBehavior": "Bind the exact optional mobile job separately from the required cohort, retain passed, not-run, failed, canceled, unavailable, or invalid state with its raw conclusion, and let ordinary required success stand without hiding unknown required jobs or failed required gates.",
+    "preservedCoverage": [
+      "The actual public CLI and fake-gh transport fixture still bind the candidate run identity, checkout commit and tree, workflow blob bytes, required group jobs, and exact aggregate attestation.",
+      "Missing, duplicate, skipped, canceled, failed, and unknown required jobs; unknown topology and job identities; and absent or ambiguous aggregate proof remain fail-closed, including when mobile diagnostics also fail.",
+      "Optional mobile not-run, failed, canceled, timed-out, unavailable, and invalid states remain explicitly reported and never become a mobile diagnostic pass; only a successful raw mobile conclusion is labeled passed. An unknown optional conclusion remains raw in summary evidence as invalid and cannot alone block required ordinary success.",
+      "All 1439 earlier rationale objects and their source bytes remain unchanged; tests.js, workflow jobs, application source, required aggregate, and release controls remain untouched."
+    ],
+    "redEvidence": {
+      "command": "PATH='/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin':\"$PATH\" /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$' scripts/agent-tools/ci-monitor.test.mjs",
+      "failure": "Before implementation, the real CLI returned result=failure and exit 1 for a completed ordinary PR whose entire required cohort and aggregate succeeded, because the actual workflow-declared mobile job was skipped; 9 of 21 subtests failed under the contradictory required-mobile policy."
+    },
+    "observedEvidence": {
+      "firstBoundaryRed": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/optional-ci-monitor-owner-1797/RED-FINAL.stdout",
+        "sha256": "662ec69baddbc7baab73f11a0f51cb0661d2c5d9ac120ded01af3dc075bdd525",
+        "bytes": 18457,
+        "exitCode": 1
+      },
+      "correctionRed": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/optional-ci-monitor-owner-1797/RED-OPTIONAL-INVALID.stdout",
+        "sha256": "8e146b22d327ea7e481a580136d29a63623b639e3223a120063435806a029583",
+        "bytes": 3654,
+        "exitCode": 1
+      },
+      "correctedGreen": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/optional-ci-monitor-owner-1797/GREEN-FINAL.stdout",
+        "sha256": "f12787745db27e318e0bb2b077ce6309e537b7f0b551a09354368ad2d115bd91",
+        "bytes": 1638,
+        "exitCode": 0
+      },
+      "fullMonitorGreen": {
+        "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/optional-ci-monitor-owner-1797/MONITOR-FINAL.stdout",
+        "sha256": "2b72a5f927d4bb745339a158391b468eea6068120ea316cd1f055b187e02ac44",
+        "bytes": 2636,
+        "exitCode": 0
+      },
+      "rationaleObjectsPreserved": 1439,
+      "rawOptionalConclusionRetained": true,
+      "positiveControl": "The same focused test combines regression-core=failure with mobile conclusion=failure and asserts required result=failure/exit 1."
+    },
+    "correctionRedEvidence": {
+      "command": "PATH='/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin':\"$PATH\" /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='^parallel workflow observation preserves complete missing skipped canceled and unknown distinctions$' scripts/agent-tools/ci-monitor.test.mjs",
+      "failure": "Before the minimal optional-invalidity repair, the corrected existing CLI row returned result=unresolved and optional-mobile=unknown with exit 2 even though every required job and aggregate attestation passed; the raw mobile conclusion was unknown."
+    }
   }
 ]

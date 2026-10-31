@@ -157,18 +157,21 @@ async function bindWorkflowPolicy(run, logs, state) {
   const legacy=['scanner-tests','release-evidence','deploy-pages'];
   const parallel=['validation-context','event-gates','cohort-routing','regression',...legacy];
   const mobileParallel=['validation-context','event-gates','cohort-routing','regression','mobile-memory',...legacy];
-  let topology,required;
+  let topology,required,optional;
   if(/^  CHAIN_CI_TOPOLOGY: four-groups-v1$/m.test(text)) {
     const hasMobile=JSON.stringify(ids)===JSON.stringify(mobileParallel);
     if((!hasMobile&&JSON.stringify(ids)!==JSON.stringify(parallel))||!text.includes('name: regression-${{ matrix.group }}')||!text.includes('group: ['+GROUP_IDS.join(', ')+']')||!text.includes('needs: [scanner-tests, release-evidence]'))throw new Error('Unknown parallel workflow topology.');
     if(hasMobile){
       const job=id=>text.split(new RegExp('^  '+id+':\\s*$','m'))[1]?.split(/^  [a-z][a-z0-9-]*:\s*$/m)[0]||'';
-      if(!/^    name: mobile-WebKit-1GB-and-512MB-stress$/m.test(job('mobile-memory'))||!/^    needs: \[validation-context, event-gates, cohort-routing, regression, mobile-memory\]$/m.test(job('scanner-tests')))throw new Error('Unknown required mobile workflow policy.');
+      const mobileJob=job('mobile-memory');
+      const selectedInput=/^      optional_mobile_diagnostics:\r?\n        description: .+\r?\n        required: false\r?\n        default: false\r?\n        type: boolean$/m.test(text);
+      const dispatchOnly=/^    if: \$\{\{ github\.event_name == 'workflow_dispatch' && needs\.validation-context\.outputs\.mobile-diagnostics == 'true' \}\}$/m.test(mobileJob);
+      if(!/^    name: mobile-WebKit-1GB-and-512MB-stress$/m.test(mobileJob)||!/^    needs: validation-context$/m.test(mobileJob)||!selectedInput||!dispatchOnly||!/^    needs: \[validation-context, event-gates, cohort-routing, regression, mobile-memory\]$/m.test(job('scanner-tests')))throw new Error('Unknown optional mobile workflow policy.');
     }
-    topology='four-groups-v1';required=['validation-context','event-gates','cohort-routing',...GROUP_IDS.map(id=>'regression-'+id),...(hasMobile?['mobile-WebKit-1GB-and-512MB-stress']:[]),'scanner-tests'];
-  } else if(JSON.stringify(ids)===JSON.stringify(legacy)&&!text.includes('CHAIN_CI_TOPOLOGY')) {topology='legacy-serial';required=['scanner-tests'];}
+    topology='four-groups-v1';required=['validation-context','event-gates','cohort-routing',...GROUP_IDS.map(id=>'regression-'+id),'scanner-tests'];optional=hasMobile?['mobile-WebKit-1GB-and-512MB-stress']:[];
+  } else if(JSON.stringify(ids)===JSON.stringify(legacy)&&!text.includes('CHAIN_CI_TOPOLOGY')) {topology='legacy-serial';required=['scanner-tests'];optional=[];}
   else throw new Error('Unknown actual candidate workflow topology.');
-  const binding={topology,checkoutSha,checkoutTree:commit.tree.sha,comparisonBase:run.event==='pull_request'?commit.parents[0].sha:null,workflowBlob:blob,runId:String(run.databaseId),runAttempt:run.attempt,required,known:[...required,'release-evidence','deploy-pages']};
+  const binding={topology,checkoutSha,checkoutTree:commit.tree.sha,comparisonBase:run.event==='pull_request'?commit.parents[0].sha:null,workflowBlob:blob,runId:String(run.databaseId),runAttempt:run.attempt,required,optional,known:[...required,...optional,'release-evidence','deploy-pages']};
   await writeFile(join(state.attemptDirectory,'workflow-policy.json'),JSON.stringify(binding,null,2)+'\n',{mode:0o600});
   return binding;
 }
@@ -188,7 +191,15 @@ function classifyRun(run, policy = null) {
     const state = String(job.conclusion ?? job.status ?? 'unknown').toLowerCase();
     return `${name}=${state === 'skipped' && expectedSkipped.has(name) ? 'expected-skipped' : state}`;
   }).join(',') ?? 'jobs=unavailable';
-  const classification = (result, exitCode, reason = null) => ({ result, exitCode, jobSummary, reason });
+  const optionalOutcomes=(policy?.optional??[]).map(name=>{
+    const job=jobs?.find(item=>item?.name===name);
+    const rawConclusion=job?.conclusion??null;
+    const conclusion=String(rawConclusion??'').toLowerCase();
+    const outcome=!job?'unavailable':conclusion==='success'?'passed':conclusion==='skipped'?'not-run':conclusion==='cancelled'?'canceled':['failure','timed_out','action_required','stale','startup_failure'].includes(conclusion)?'failed':conclusion?'invalid':'unavailable';
+    return {name,outcome,conclusion:rawConclusion===null?null:String(rawConclusion)};
+  });
+  const optionalMobileOutcome=optionalOutcomes.find(item=>item.name==='mobile-WebKit-1GB-and-512MB-stress')?.outcome??(policy?'not-configured':null);
+  const classification = (result, exitCode, reason = null) => ({ result, exitCode, jobSummary, reason, optionalMobileOutcome, optionalOutcomes });
 
   if (run.workflowName !== 'Data safety') return classification('unresolved', 2, `Unknown workflow policy: ${String(run.workflowName)}.`);
   if (!['push', 'pull_request'].includes(run.event)) return classification('unresolved', 2, `Unknown workflow event policy: ${String(run.event)}.`);
@@ -225,8 +236,10 @@ function classifyRun(run, policy = null) {
     }
     return classification('unresolved', 2, `Required job ${name} has no terminal success.`);
   }
+  const optionalNames=new Set(policy.optional??[]);
   for (const job of jobs) {
     const name = String(job.name);
+    if(optionalNames.has(name))continue;
     const jobConclusion = String(job.conclusion ?? '').toLowerCase();
     if (jobConclusion === 'success') continue;
     if (jobConclusion === 'skipped' && expectedSkipped.has(name)) continue;
@@ -264,11 +277,11 @@ function snapshotKey(run, outcome) {
 }
 
 function progressLine(run, outcome, options) {
-  return `CI monitor progress=run=${options['run-id']} commit=${options.commit.slice(0, 12)} status=${run.status} jobs=${outcome.jobSummary}`;
+  return `CI monitor progress=run=${options['run-id']} commit=${options.commit.slice(0, 12)} status=${run.status} jobs=${outcome.jobSummary}${outcome.optionalMobileOutcome ? ` optional-mobile=${outcome.optionalMobileOutcome}` : ''}`;
 }
 
 function resultLine(outcome, run, options, evidencePath, reason = null) {
-  return `CI monitor result=${outcome.result} run=${options['run-id']} commit=${options.commit}${run ? ` status=${run.status} jobs=${outcome.jobSummary}` : ''}${reason ? ` reason=${reason}` : ''} evidence=${evidencePath}`;
+  return `CI monitor result=${outcome.result} run=${options['run-id']} commit=${options.commit}${run ? ` status=${run.status} jobs=${outcome.jobSummary}` : ''}${outcome.optionalMobileOutcome ? ` optional-mobile=${outcome.optionalMobileOutcome}` : ''}${reason ? ` reason=${reason}` : ''} evidence=${evidencePath}`;
 }
 
 async function writeSummary(attemptDirectory, summary) {
@@ -368,6 +381,8 @@ async function main() {
       conclusion: run.conclusion,
       result: outcome.result,
       jobSummary: outcome.jobSummary,
+      optionalMobileOutcome: outcome.optionalMobileOutcome,
+      optionalOutcomes: outcome.optionalOutcomes,
       nextDelayMs: willPollAgain ? nextDelayMs : 0,
       yielded: nonterminal && !willPollAgain,
     })}\n`, { mode: 0o600 });
@@ -400,6 +415,8 @@ async function main() {
         conclusion: run.conclusion,
         runAttempt: run.attempt,
         workflowPolicy: policy,
+        optionalMobileOutcome: finalOutcome.optionalMobileOutcome,
+        optionalOutcomes: finalOutcome.optionalOutcomes,
         logsState,
         requests: requestsPath,
         progress: progressPath,
@@ -436,6 +453,8 @@ async function main() {
     result: yielded.result,
     polls: pollsCompleted,
     ...(lastRun ? { status: lastRun.status, conclusion: lastRun.conclusion } : {}),
+    optionalMobileOutcome: yielded.optionalMobileOutcome,
+    optionalOutcomes: yielded.optionalOutcomes,
     logsState,
     requests: requestsPath,
     progress: progressPath,
