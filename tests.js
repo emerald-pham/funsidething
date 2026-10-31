@@ -50522,13 +50522,14 @@ test("RISK BACKUP FILE RESTORE real service: committed publication remains unack
 test("RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{await realFileImportCase353(t,{mode:"peer"});});
 
 
-test("RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+test("RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",
+ {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
  const target='if(p.accountBound&&!p.unacceptedSource)await fileRestoreCloudWrite(p);';
  assert.equal(appSrc.split(target).length,2,'353 later sensitivity mutates exactly one existing cloud-ACK guard');
  const specimen=appSrc.replace(target,'if(false)await fileRestoreCloudWrite(p);');
  const actualSourceHash=createHash('sha256').update(specimen).digest('hex');
- // #1784 retains the current exact specimen independently; historical82ab13b676888945851ff5f94fd3f784cf741ef8d5fd78e8dea5459585105a6f remains prior evidence.
- assert.equal(actualSourceHash,"e4b2abb6bc1b7741e09888784e352490885289c2f05f4918fc49bcded0101115",'353 later sensitivity binds its exact independently retained broken source');
+ // #1840 independently rederives this exact current specimen; #1784/C and the earlier82ab specimen remain historical evidence.
+ assert.equal(actualSourceHash,"aac6698810ee120a0c58549060d984aca82aa5d4a36e95a3e0f5800aef2a39b7",'353 later sensitivity binds its exact independently retained broken source');
  let failure;
  try{await realFileImportCase353(t,{mode:'success',appSource:specimen});}catch(error){failure=error;}
  assert.equal(failure?.code,'ERR_ASSERTION','353 later sensitivity requires the actual consumer assertion, not setup or another error');

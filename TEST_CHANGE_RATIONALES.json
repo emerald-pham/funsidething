@@ -50214,5 +50214,145 @@
       "RISK repository process: ordinary cloud sign out keeps the complete64 source at action boundaries",
       "RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures"
     ]
+  },
+  {
+    "testChangesSha256": "19a7a5381864527e536f31cf8c68f3a887034edd960c9f6d8dcbce309e9fd3eb",
+    "reason": "Atomic1840 migrates the existing exact broken-ACK specimen pin after the actual current-source rules gate failed29/30 at its historical C hash. The independently derived current application and one-guard specimen remain exact; no guard or service assertion is weakened.",
+    "previousBehavior": "The five real unmutated service controls passed at D1044fa0c, while the ACK negative stopped before service execution because its exact historical e4b2 pin did not match the actual current aac669 specimen. That failed required gate and raw output remain immutable.",
+    "intendedBehavior": "The same existing named service negative accepts only the newly independently derived aac669 specimen from the unchanged current app and then must reach ERR_ASSERTION source revision1 versus2. The declaration is reflowed without adding or renaming a root so the exact-diff rationale identifies the modified test.",
+    "preservedCoverage": [
+      "All1464 D rationale raw lexical objects remain byte-identical in original order; all744 frozen Git/disk blobs, app/worker/runtime/native/control source bytes, ordinary64 and selected400 evidence remain unchanged.",
+      "The single-guard mutation count, exact-source hash, five real service controls, full real consumer failure code/message and revision1-versus2 assertions remain intact. No app behavior, public copy, workload, heap, CI or release gate is relaxed.",
+      "The actual D29/30 is a failed source-pin precondition and not a product defect or executed service negative. Final current-source rules, first compatibility, preflight, all seven source comparisons, descriptor and focused proof retain separate exact identities."
+    ],
+    "redEvidence": {
+      "command": "The actual npm run test:rules -- --config isolated-rules-firebase.json on clean D1044fa0c is retained at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/final-review-repair-owner1827-1836/recordings/final-rules/2026-10-31T13-26-37-712Z-9e5a7fb2-f1bd-498d-9343-ebe5990a0581.json",
+      "failure": "Actual30 tests,29pass,1fail,0skip/cancel; exact pin guard expected historical e4b2abb6… but independently derived current aac6698810… before the intended negative service assertion. This is honest expectation migration; no original product RED is fabricated.",
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "effectiveMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8"
+    },
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ]
+  },
+  {
+    "testChangesSha256": "4ad9c39f9a6c4c4a6f42de79a34092109d08db46bc6c1757f20521ad9d9ac9bc",
+    "reason": "Atomic1840 migrates the existing exact broken-ACK specimen pin after the actual current-source rules gate failed29/30 at its historical C hash. The independently derived current application and one-guard specimen remain exact; no guard or service assertion is weakened.",
+    "previousBehavior": "The five real unmutated service controls passed at D1044fa0c, while the ACK negative stopped before service execution because its exact historical e4b2 pin did not match the actual current aac669 specimen. That failed required gate and raw output remain immutable.",
+    "intendedBehavior": "The same existing named service negative accepts only the newly independently derived aac669 specimen from the unchanged current app and then must reach ERR_ASSERTION source revision1 versus2. The declaration is reflowed without adding or renaming a root so the exact-diff rationale identifies the modified test.",
+    "preservedCoverage": [
+      "All1464 D rationale raw lexical objects remain byte-identical in original order; all744 frozen Git/disk blobs, app/worker/runtime/native/control source bytes, ordinary64 and selected400 evidence remain unchanged.",
+      "The single-guard mutation count, exact-source hash, five real service controls, full real consumer failure code/message and revision1-versus2 assertions remain intact. No app behavior, public copy, workload, heap, CI or release gate is relaxed.",
+      "The actual D29/30 is a failed source-pin precondition and not a product defect or executed service negative. Final current-source rules, first compatibility, preflight, all seven source comparisons, descriptor and focused proof retain separate exact identities."
+    ],
+    "redEvidence": {
+      "command": "The actual npm run test:rules -- --config isolated-rules-firebase.json on clean D1044fa0c is retained at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/final-review-repair-owner1827-1836/recordings/final-rules/2026-10-31T13-26-37-712Z-9e5a7fb2-f1bd-498d-9343-ebe5990a0581.json",
+      "failure": "Actual30 tests,29pass,1fail,0skip/cancel; exact pin guard expected historical e4b2abb6… but independently derived current aac6698810… before the intended negative service assertion. This is honest expectation migration; no original product RED is fabricated.",
+      "comparisonBase": "4d6da053c64927b67fc39b261477ea378ee0b156",
+      "effectiveMergeBase": "4d6da053c64927b67fc39b261477ea378ee0b156"
+    },
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ]
+  },
+  {
+    "testChangesSha256": "0e37388d69b17c61848ba2b1d5e1f430460a22041c1177f73a057a4c101bb109",
+    "reason": "Atomic1840 migrates the existing exact broken-ACK specimen pin after the actual current-source rules gate failed29/30 at its historical C hash. The independently derived current application and one-guard specimen remain exact; no guard or service assertion is weakened.",
+    "previousBehavior": "The five real unmutated service controls passed at D1044fa0c, while the ACK negative stopped before service execution because its exact historical e4b2 pin did not match the actual current aac669 specimen. That failed required gate and raw output remain immutable.",
+    "intendedBehavior": "The same existing named service negative accepts only the newly independently derived aac669 specimen from the unchanged current app and then must reach ERR_ASSERTION source revision1 versus2. The declaration is reflowed without adding or renaming a root so the exact-diff rationale identifies the modified test.",
+    "preservedCoverage": [
+      "All1464 D rationale raw lexical objects remain byte-identical in original order; all744 frozen Git/disk blobs, app/worker/runtime/native/control source bytes, ordinary64 and selected400 evidence remain unchanged.",
+      "The single-guard mutation count, exact-source hash, five real service controls, full real consumer failure code/message and revision1-versus2 assertions remain intact. No app behavior, public copy, workload, heap, CI or release gate is relaxed.",
+      "The actual D29/30 is a failed source-pin precondition and not a product defect or executed service negative. Final current-source rules, first compatibility, preflight, all seven source comparisons, descriptor and focused proof retain separate exact identities."
+    ],
+    "redEvidence": {
+      "command": "The actual npm run test:rules -- --config isolated-rules-firebase.json on clean D1044fa0c is retained at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/final-review-repair-owner1827-1836/recordings/final-rules/2026-10-31T13-26-37-712Z-9e5a7fb2-f1bd-498d-9343-ebe5990a0581.json",
+      "failure": "Actual30 tests,29pass,1fail,0skip/cancel; exact pin guard expected historical e4b2abb6… but independently derived current aac6698810… before the intended negative service assertion. This is honest expectation migration; no original product RED is fabricated.",
+      "comparisonBase": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+      "effectiveMergeBase": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2"
+    },
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ]
+  },
+  {
+    "testChangesSha256": "bd54a040fc5c1974dc75252d6a84347f4cb0f9567873803bb41c3b2a0e850bfc",
+    "reason": "Atomic1840 migrates the existing exact broken-ACK specimen pin after the actual current-source rules gate failed29/30 at its historical C hash. The independently derived current application and one-guard specimen remain exact; no guard or service assertion is weakened.",
+    "previousBehavior": "The five real unmutated service controls passed at D1044fa0c, while the ACK negative stopped before service execution because its exact historical e4b2 pin did not match the actual current aac669 specimen. That failed required gate and raw output remain immutable.",
+    "intendedBehavior": "The same existing named service negative accepts only the newly independently derived aac669 specimen from the unchanged current app and then must reach ERR_ASSERTION source revision1 versus2. The declaration is reflowed without adding or renaming a root so the exact-diff rationale identifies the modified test.",
+    "preservedCoverage": [
+      "All1464 D rationale raw lexical objects remain byte-identical in original order; all744 frozen Git/disk blobs, app/worker/runtime/native/control source bytes, ordinary64 and selected400 evidence remain unchanged.",
+      "The single-guard mutation count, exact-source hash, five real service controls, full real consumer failure code/message and revision1-versus2 assertions remain intact. No app behavior, public copy, workload, heap, CI or release gate is relaxed.",
+      "The actual D29/30 is a failed source-pin precondition and not a product defect or executed service negative. Final current-source rules, first compatibility, preflight, all seven source comparisons, descriptor and focused proof retain separate exact identities."
+    ],
+    "redEvidence": {
+      "command": "The actual npm run test:rules -- --config isolated-rules-firebase.json on clean D1044fa0c is retained at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/final-review-repair-owner1827-1836/recordings/final-rules/2026-10-31T13-26-37-712Z-9e5a7fb2-f1bd-498d-9343-ebe5990a0581.json",
+      "failure": "Actual30 tests,29pass,1fail,0skip/cancel; exact pin guard expected historical e4b2abb6… but independently derived current aac6698810… before the intended negative service assertion. This is honest expectation migration; no original product RED is fabricated.",
+      "comparisonBase": "36a2469d23eca777aa2438eb32e7d4846d3c6677",
+      "effectiveMergeBase": "36a2469d23eca777aa2438eb32e7d4846d3c6677"
+    },
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ]
+  },
+  {
+    "testChangesSha256": "2d8f7f01617f3c35fb21e29c1e7a6d7d7d6d41a45bf47299606a1b56eb6994e5",
+    "reason": "Atomic1840 migrates the existing exact broken-ACK specimen pin after the actual current-source rules gate failed29/30 at its historical C hash. The independently derived current application and one-guard specimen remain exact; no guard or service assertion is weakened.",
+    "previousBehavior": "The five real unmutated service controls passed at D1044fa0c, while the ACK negative stopped before service execution because its exact historical e4b2 pin did not match the actual current aac669 specimen. That failed required gate and raw output remain immutable.",
+    "intendedBehavior": "The same existing named service negative accepts only the newly independently derived aac669 specimen from the unchanged current app and then must reach ERR_ASSERTION source revision1 versus2. The declaration is reflowed without adding or renaming a root so the exact-diff rationale identifies the modified test.",
+    "preservedCoverage": [
+      "All1464 D rationale raw lexical objects remain byte-identical in original order; all744 frozen Git/disk blobs, app/worker/runtime/native/control source bytes, ordinary64 and selected400 evidence remain unchanged.",
+      "The single-guard mutation count, exact-source hash, five real service controls, full real consumer failure code/message and revision1-versus2 assertions remain intact. No app behavior, public copy, workload, heap, CI or release gate is relaxed.",
+      "The actual D29/30 is a failed source-pin precondition and not a product defect or executed service negative. Final current-source rules, first compatibility, preflight, all seven source comparisons, descriptor and focused proof retain separate exact identities."
+    ],
+    "redEvidence": {
+      "command": "The actual npm run test:rules -- --config isolated-rules-firebase.json on clean D1044fa0c is retained at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/final-review-repair-owner1827-1836/recordings/final-rules/2026-10-31T13-26-37-712Z-9e5a7fb2-f1bd-498d-9343-ebe5990a0581.json",
+      "failure": "Actual30 tests,29pass,1fail,0skip/cancel; exact pin guard expected historical e4b2abb6… but independently derived current aac6698810… before the intended negative service assertion. This is honest expectation migration; no original product RED is fabricated.",
+      "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "effectiveMergeBase": "b176026825e4f9539780f745fe60e09cf348d288"
+    },
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ]
+  },
+  {
+    "testChangesSha256": "fe503002bcc23c1ea122ada97d97b28cd5c602492c6d025de9dc232be967c849",
+    "reason": "Atomic1840 migrates the existing exact broken-ACK specimen pin after the actual current-source rules gate failed29/30 at its historical C hash. The independently derived current application and one-guard specimen remain exact; no guard or service assertion is weakened.",
+    "previousBehavior": "The five real unmutated service controls passed at D1044fa0c, while the ACK negative stopped before service execution because its exact historical e4b2 pin did not match the actual current aac669 specimen. That failed required gate and raw output remain immutable.",
+    "intendedBehavior": "The same existing named service negative accepts only the newly independently derived aac669 specimen from the unchanged current app and then must reach ERR_ASSERTION source revision1 versus2. The declaration is reflowed without adding or renaming a root so the exact-diff rationale identifies the modified test.",
+    "preservedCoverage": [
+      "All1464 D rationale raw lexical objects remain byte-identical in original order; all744 frozen Git/disk blobs, app/worker/runtime/native/control source bytes, ordinary64 and selected400 evidence remain unchanged.",
+      "The single-guard mutation count, exact-source hash, five real service controls, full real consumer failure code/message and revision1-versus2 assertions remain intact. No app behavior, public copy, workload, heap, CI or release gate is relaxed.",
+      "The actual D29/30 is a failed source-pin precondition and not a product defect or executed service negative. Final current-source rules, first compatibility, preflight, all seven source comparisons, descriptor and focused proof retain separate exact identities."
+    ],
+    "redEvidence": {
+      "command": "The actual npm run test:rules -- --config isolated-rules-firebase.json on clean D1044fa0c is retained at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/final-review-repair-owner1827-1836/recordings/final-rules/2026-10-31T13-26-37-712Z-9e5a7fb2-f1bd-498d-9343-ebe5990a0581.json",
+      "failure": "Actual30 tests,29pass,1fail,0skip/cancel; exact pin guard expected historical e4b2abb6… but independently derived current aac6698810… before the intended negative service assertion. This is honest expectation migration; no original product RED is fabricated.",
+      "comparisonBase": "c08e1677ddbf00477d3434434557f54c85d69bcb",
+      "effectiveMergeBase": "c08e1677ddbf00477d3434434557f54c85d69bcb"
+    },
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ]
+  },
+  {
+    "testChangesSha256": "4a0d39e7186032b29b386fce33c8d8afcc1b658738d28e519b674e70ab168714",
+    "reason": "Atomic1840 migrates the existing exact broken-ACK specimen pin after the actual current-source rules gate failed29/30 at its historical C hash. The independently derived current application and one-guard specimen remain exact; no guard or service assertion is weakened.",
+    "previousBehavior": "The five real unmutated service controls passed at D1044fa0c, while the ACK negative stopped before service execution because its exact historical e4b2 pin did not match the actual current aac669 specimen. That failed required gate and raw output remain immutable.",
+    "intendedBehavior": "The same existing named service negative accepts only the newly independently derived aac669 specimen from the unchanged current app and then must reach ERR_ASSERTION source revision1 versus2. The declaration is reflowed without adding or renaming a root so the exact-diff rationale identifies the modified test.",
+    "preservedCoverage": [
+      "All1464 D rationale raw lexical objects remain byte-identical in original order; all744 frozen Git/disk blobs, app/worker/runtime/native/control source bytes, ordinary64 and selected400 evidence remain unchanged.",
+      "The single-guard mutation count, exact-source hash, five real service controls, full real consumer failure code/message and revision1-versus2 assertions remain intact. No app behavior, public copy, workload, heap, CI or release gate is relaxed.",
+      "The actual D29/30 is a failed source-pin precondition and not a product defect or executed service negative. Final current-source rules, first compatibility, preflight, all seven source comparisons, descriptor and focused proof retain separate exact identities."
+    ],
+    "redEvidence": {
+      "command": "The actual npm run test:rules -- --config isolated-rules-firebase.json on clean D1044fa0c is retained at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/final-review-repair-owner1827-1836/recordings/final-rules/2026-10-31T13-26-37-712Z-9e5a7fb2-f1bd-498d-9343-ebe5990a0581.json",
+      "failure": "Actual30 tests,29pass,1fail,0skip/cancel; exact pin guard expected historical e4b2abb6… but independently derived current aac6698810… before the intended negative service assertion. This is honest expectation migration; no original product RED is fabricated.",
+      "comparisonBase": "1044fa0ce1a3c42a46e41cb61e8764c8fee26469",
+      "effectiveMergeBase": "1044fa0ce1a3c42a46e41cb61e8764c8fee26469"
+    },
+    "replacementTests": [
+      "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+    ]
   }
 ]
