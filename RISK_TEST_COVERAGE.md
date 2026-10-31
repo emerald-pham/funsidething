@@ -2552,3 +2552,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK app fixture cleanup: nested skip and todo
 
 - RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts
+
+- RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer

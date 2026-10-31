@@ -49227,13 +49227,18 @@ test('RISK repository process: remote mobile consumer waits for browser owner ex
  await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:directory,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{events.push('owner-exit');return{serverClosed:true,engineExited:true};}}),error=>error===stop);
  assert.deepEqual(events,['connect','newContext','disconnect','owner-exit'],'Remote disconnect must be followed by owner-confirmed engine exit; no local engine may launch');
  const report=JSON.parse(fs.readFileSync(path.join(directory,fs.readdirSync(directory).find(file=>file.startsWith('button-safety-')))));assert.equal(report.cleanup.browserDisconnected,true);assert.equal(report.cleanup.browserServerClosed,true);assert.equal(report.cleanup.browserClosed,true);assert.equal(report.cleanup.serverClosed,true);
- events.length=0;const failed=path.join(directory,'refused');await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:failed,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{throw Error('Owner exit not observed');}}),/Owner exit not observed/);
+ events.length=0;const failed=path.join(directory,'refused');await assert.rejects(runButtonSafety({repo:__dirname,engine:'webkit',outputDir:failed,port,mobileYesMotion:'normal',browserServerEndpoint:'ws://127.0.0.1:1234/owned',closeBrowserServer:async()=>{throw Error('Owner exit not observed');}}),error=>error===stop);
  const partial=JSON.parse(fs.readFileSync(path.join(failed,fs.readdirSync(failed).find(file=>file.startsWith('button-safety-')))));assert.notEqual(partial.cleanup.browserClosed,true);assert.equal(partial.cleanup.serverClosed,true,'An owner-close failure still closes HTTP and persists the failed report');assert.equal(partial.status,'failed');
+ assert.equal(partial.cleanup.browserDisconnected,true);assert.notEqual(partial.cleanup.browserServerClosed,true);
+ assert.match(partial.failure,/Controlled fixture stops before any native context/,'The operation error remains primary');
+ assert.ok(partial.errors.includes('cleanup: Error: Owner exit not observed'),'The secondary owner failure remains visible');
+ assert.deepEqual(partial.cleanupFailures.map(({name,message})=>({name,message})),[{name:'Error',message:'Owner exit not observed'}]);
+ assert.deepEqual(events,['connect','newContext','disconnect']);
 });
 
 test('RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','scripts/agent-tools/mobile-memory-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/mobile-memory-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual mobile CLI must retain unresolved late create ownership and clean positively identified objects: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 5$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
@@ -49252,14 +49257,17 @@ test('RISK repository process: expected native reload retries only its navigatio
       injected++;if(mode==='unexpected navigation')await page.goto(new URL('/unexpected-observer-navigation',page.url()).href);
       throw Error(mode==='unrelated evaluation error'?'Controlled unrelated evaluation error':'page.evaluate: Execution context was destroyed, most likely because of a navigation');
      }return evaluate(fn,arg);};return page;};return context;};return browser;};
-  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',outputDir:output,port:Number(process.env.CHAIN_NATIVE_PORT||0),scenarioFilter:'cloud retry, reload, and sign out preserve the device board during read failures'});}catch(error){failure=error;}finally{playwright.chromium.launch=launch;}
+  let result,failure;try{result=await runButtonSafety({repo:__dirname,engine:'chromium',profile:'ordinary',outputDir:output,port:Number(process.env.CHAIN_NATIVE_PORT||0),scenarioFilter:'cloud retry, reload, and sign out preserve the device board during read failures'});}catch(error){failure=error;}finally{playwright.chromium.launch=launch;}
   assert.equal(injected,1,'The controlled driver race reached the real expected-reload consumer');
   const report=JSON.parse(fs.readFileSync(path.join(output,fs.readdirSync(output).find(name=>name.startsWith('button-safety-')))));
   for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true,'Each outcome closes '+key);
   if(mode==='expected context loss'){
    assert.equal(failure,undefined,'One allowed reload must survive its transient automation context loss: '+failure);
    assert.equal(result.report.status,'passed');assert.deepEqual(result.report.errors,[]);assert.equal(result.report.allowedNavigations.length,1);
-   assert.equal(result.report.scenarios[0].setup.currentTasks,400);assert.equal(result.report.scenarios[0].setup.durableTasks,400);
+   assert.equal(result.report.profile,'ordinary');
+   const {currentTasks,activeTasks,durableTasks,authMode,fixtureRole,source}=result.report.scenarios[0].setup;
+   assert.deepEqual({currentTasks,activeTasks,durableTasks,authMode,fixtureRole,source},{currentTasks:64,activeTasks:64,durableTasks:64,authMode:'reconcile-held',fixtureRole:'active',source:'reconcile-held-installed'});
+   assert.match(result.report.scenarios[0].setup.durableHash,/^[a-f0-9]{64}$/);
   }else{assert.ok(failure,'Other evaluation failures and unexpected navigation still fail');assert.match(String(failure),mode==='unrelated evaluation error'?/Controlled unrelated evaluation error/:/unexpected-navigation-or-reload/);assert.equal(report.status,'failed');}
   t.diagnostic('Actual cloud-read-failure reload consumer with controlled automation race: '+output);
  });
@@ -49270,7 +49278,7 @@ test('RISK repository process: hosted direct native callers retain ephemeral lis
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable caller evidence required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ephemeral-caller-'));
  // This subprocess tests the hosted-policy boundary; it is not hosted proof.
  const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'canonical-pr-merge-v1',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/1/merge',CHAIN_NATIVE_OUTPUT:output};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Actual direct callers must pass an ephemeral port when the hosted environment has no local allocation: '+result.stdout+'\n'+result.stderr);
  assert.match(result.stdout,/^# tests 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });
@@ -49287,7 +49295,7 @@ test('RISK scenery FAQ: mounted help names scene time without implementation det
 
 test('RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles|mobile stress CLI','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=mobile budget profiles|mobile stress CLI','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual public profile planners and immutable validators preserve required versus stress policy: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
@@ -49323,21 +49331,21 @@ if(optionalWorkloadDiagnosticsSelected){
 
 test('RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles reject failed stress setup','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=mobile budget profiles reject failed stress setup','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must reject wrong setup and mixed transport faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
 
 test('RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile budget profiles require attributable primary','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=mobile budget profiles require attributable primary','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must bind the primary thrown failure as well as page events: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
 
 test('RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile kernel page floor','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=mobile kernel page floor','scripts/agent-tools/mobile-memory.test.mjs','scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual kernel-reader and immutable CLI consumers require deterministic page flooring: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
@@ -49541,7 +49549,7 @@ test('RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and t
 
 test('RISK repository process: stress engine loss requires the actual kernel and owned exit evidence',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-name-pattern=mobile stress owned engine loss','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=mobile stress owned engine loss','scripts/agent-tools/mobile-memory.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024});
  assert.equal(result.error,undefined);assert.equal(result.status,0,'The actual immutable stress verifier must report observed owned engine loss while refusing unrelated driver faults: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
@@ -49788,7 +49796,7 @@ test('RISK repository process: scenery consumers use allocated fallback ports an
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'scenery-harness-'));
  const env={...process.env,CHAIN_NATIVE_OUTPUT:path.join(directory,'native'),CHAIN_NATIVE_SMOKE_PORT:process.env.CHAIN_NATIVE_PORT||process.env.CHAIN_NATIVE_SMOKE_PORT||''};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
  await t.test('real scenery source and rendering consumers without CHAIN_NATIVE_PORT',()=>{
-  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^RISK scenery backdrop cache:|^RISK scenery text loading:','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});fs.writeFileSync(path.join(directory,'no-port.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual scenery consumers must launch and retain every rendering/data assertion without CHAIN_NATIVE_PORT: '+result.stdout+result.stderr);assert.match(result.stdout,/# fail 0/);assert.match(result.stdout,/# skipped 0/);
+  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^RISK scenery backdrop cache:|^RISK scenery text loading:','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});fs.writeFileSync(path.join(directory,'no-port.tap'),result.stdout+result.stderr);assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual scenery consumers must launch and retain every rendering/data assertion without CHAIN_NATIVE_PORT: '+result.stdout+result.stderr);assert.match(result.stdout,/# fail 0/);assert.match(result.stdout,/# skipped 0/);
  });
  await t.test('early native launch failure stays primary without bootstrap evidence',async()=>{
   const {pathToFileURL}=await import('node:url'),preload=path.join(directory,'early-launch.mjs');fs.writeFileSync(preload,'const {webkit}=await import('+JSON.stringify(pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href)+');webkit.launch=async()=>{throw Error("Controlled early scenery launch failure");};\n');
@@ -49847,7 +49855,20 @@ test('RISK repository process: supplemental startup capture rejects malformed ar
 });
 
 test('RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command',async()=>{
- const manifestFile=process.env.CHAIN_STARTUP_CAPTURE_MANIFEST;assert.ok(manifestFile,'Immutable allocated native input manifest required');const input=JSON.parse(fs.readFileSync(manifestFile,'utf8'));
+ const manifestFile=process.env.CHAIN_STARTUP_CAPTURE_MANIFEST;
+ let input;
+ if(manifestFile)input=JSON.parse(fs.readFileSync(manifestFile,'utf8'));
+ else{
+  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+  const directory=fs.mkdtempSync(path.join(base,'startup-jpeg-inputs-')),{fixture}=await import('./scripts/installed-client-fixture.mjs');
+  const raw=JSON.stringify(fixture('signed-out')),fixtureSha256=createHash('sha256').update(raw).digest('hex');
+  assert.equal(fixtureSha256,'b70ef166ce8f4c470d73c03de3e5aaab3f3d201890d0fa60080719f51496a670','Fresh public fixture retains the independent frozen bytes');
+  const fixtureFile=path.join(directory,'startup-fixture.json');fs.writeFileSync(fixtureFile,raw,{flag:'wx'});
+  const identity=spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);
+  const port=process.env.CI==='true'?0:Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(Number.isSafeInteger(port)&&(process.env.CI==='true'?port===0:port>0&&port<=65535),'Normal local allocation or hosted ephemeral port required');
+  input={runnerCommit:identity.stdout.trim(),appCommit:'85ce166155087d43a027151f250a100798923e2d',fixtureSha256,fixtureFile,port,nativeOutput:path.join(directory,'native')};
+  fs.writeFileSync(path.join(directory,'input-manifest.json'),JSON.stringify(input,null,2)+'\n',{flag:'wx'});
+ }
  assert.equal(input.runnerCommit,spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim());assert.equal(input.appCommit,'85ce166155087d43a027151f250a100798923e2d');assert.equal(input.fixtureSha256,'b70ef166ce8f4c470d73c03de3e5aaab3f3d201890d0fa60080719f51496a670');
  const command=['scripts/button-safety.mjs','--run','--engine','webkit','--startup-opening','--source-commit',input.appCommit,'--fixture-file',input.fixtureFile,'--port',String(input.port),'--output-dir',input.nativeOutput,'--startup-capture','jpeg'];
  const result=spawnSync(process.execPath,command,{cwd:__dirname,env:{...process.env},encoding:'utf8',timeout:45000,maxBuffer:1024*1024});fs.writeFileSync(input.nativeOutput+'-stdout.txt',result.stdout||'');fs.writeFileSync(input.nativeOutput+'-stderr.txt',result.stderr||'');assert.equal(result.error,undefined);assert.equal(result.status,0,'Real ordinary opening/action must pass independently of selected capture enforcement: '+result.stderr);
@@ -50751,10 +50772,11 @@ test('RISK repository process: ordinary final WOOP repeated Next preserves sole-
    assert.deepEqual(control, {selector:'#scan .woop-saved [data-act="woop-delete"]',tagName:'BUTTON',connected:true,count:1,visible:true,disabled:false,benchmark:targetId,plan:plan.id,head:operation.id,binding:control.binding,text:'Delete WOOP plan'});
   }
   const deletedBoard=JSON.parse(deleted.current),deletedTask=deletedBoard.tasks[0];assert.equal(deletedTask.woopPlan,null);assert.equal(deletedTask.woopPlanOps.length,2);
-  const deletion=deletedTask.woopPlanOps[1];sourceExactKeys(deletion,['v','id','observed','value'],'Complete delete tombstone operation');assert.match(deletion.id,/^t.+/);assert.ok(![plan.id,operation.id].includes(deletion.id));
+  const deletions=deletedTask.woopPlanOps.filter(row=>row.id===deletedTask.woopHead);assert.equal(deletions.length,1,'One immutable deletion head');const deletion=deletions[0];sourceExactKeys(deletion,['v','id','observed','value'],'Complete delete tombstone operation');assert.match(deletion.id,/^t.+/);assert.ok(![plan.id,operation.id].includes(deletion.id));
   const expectedDeletion={v:1,id:deletion.id,observed:[operation.id],value:null};assert.deepEqual(deletion,expectedDeletion);assert.equal(deletedTask.woopHead,deletion.id);
   assert.ok(Number.isSafeInteger(deletedBoard.updatedAt)&&deletedBoard.updatedAt>=Math.floor(deleted.lastInputAtMs)&&deletedBoard.updatedAt<=deleted.capturedAtMs&&deletedBoard.updatedAt>savedBoard.updatedAt,'Actual native Delete owns a later real timestamp');
-  const expectedDeleted=copy(expectedSaved);expectedDeleted.tasks[0].woopPlanOps=[expectedOperation,expectedDeletion];expectedDeleted.tasks[0].woopHead=deletion.id;expectedDeleted.tasks[0].woopPlan=null;expectedDeleted.updatedAt=deletedBoard.updatedAt;
+  // Untimestamped canonical fact rows order by ID; observed IDs establish causality.
+  const expectedDeleted=copy(expectedSaved);expectedDeleted.tasks[0].woopPlanOps=operation.id<deletion.id?[expectedOperation,expectedDeletion]:[expectedDeletion,expectedOperation];expectedDeleted.tasks[0].woopHead=deletion.id;expectedDeleted.tasks[0].woopPlan=null;expectedDeleted.updatedAt=deletedBoard.updatedAt;
   for(const phase of [deleted,deletedReopened,finalSource])for(const side of ['current','durable'])assert.equal(phase[side],JSON.stringify(expectedDeleted),'Exact full deletion board/tombstone/ordered facts survives genuine reopen and final read');
   for(const phase of phases.filter(row=>!['saved','reopened'].includes(row.phase))){assert.deepEqual(phase.view.savedAnswers,[]);assert.equal(phase.view.deleteControl,null);}
   for(const phase of [seed,deleted,deletedReopened,finalSource])assert.equal(phase.view.startVisible,true,'The existing final-task walkthrough control is available');
@@ -53145,4 +53167,44 @@ test('RISK repository process: startup fixture temp aliases preserve canonical o
 test('RISK repository process: full-domain Timeline preserves PNG metadata and native command deadlines',async t=>{
  await t.test('decoded frame metadata over1MiB reaches the exact unchanged consumer guard',async()=>{const {verifyNativeTimelineCapture}=await import('./scripts/button-safety-timeline-core.mjs'),x=fullDomainInputs();assert.equal(verifyNativeTimelineCapture(x.capture,{retentionProfile:fullDomainProfileName}),x.capture);x.capture.frames[0].bytes=1048577;assert.throws(()=>verifyNativeTimelineCapture(x.capture,{retentionProfile:fullDomainProfileName}),/bounded native snapshot interval required/);});
  await t.test('a stalled SDK stop still reaches the1000ms deadline and truthful cleanup',{timeout:5000},async()=>{const f=await timelineSDKDouble(profileDirectory('full-domain-command-deadline')),send=f.initial.send.bind(f.initial);let owner;try{f.initial.send=async(method,...args)=>{if(method==='Timeline.stop'){f.calls.push([f.initial.sessionId,method]);return new Promise(()=>{});}return send(method,...args);};owner=await retentionOwner(f,fullDomainProfileName);f.emit();const started=performance.now(),c=await owner.stop('deliberately-stalled-sdk-stop');assert.ok(performance.now()-started>=950,'The existing native command deadline remains1000ms');assert.equal(c.status,'error');assert.ok(c.errors.some(error=>error.includes('native command deadline')));assert.equal(c.cleanup.sessionsStopped,false);assert.equal(c.cleanup.hookRestored,true);assert.equal(c.cleanup.listenersRemoved,true);assert.equal(c.cleanup.timerCleared,true);assert.equal(f.calls.filter(row=>row[1]==='Timeline.stop').length,1);assert.equal(f.calls.filter(row=>row[1]==='Timeline.disable').length,0);profileSave(f,c,'existing1000ms command deadline; no native SDK acquisition');}finally{if(owner)await owner.stop('finally-same-stop');f.dispose();}});
+});
+
+test('RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer',async t=>{
+ await prepareNativePlaywrightResolution(t);
+ const {pathToFileURL}=await import('node:url'),base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');
+ fs.mkdirSync(base,{recursive:true});const directory=fs.mkdtempSync(path.join(base,'woop-uuid-orders-'));
+ const existing='RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources',scenario='ordinary final WOOP repeated Next retains answers';
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+ for(const direction of ['earlier','later'])await t.test('deletion UUID sorts '+direction,()=>{
+  const output=path.join(directory,direction);fs.mkdirSync(output);const preload=path.join(output,'external-uuid.mjs');
+  const adapter='const {webkit}=await import('+JSON.stringify(pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href)+');\n'+
+   'const launch=webkit.launch.bind(webkit);webkit.launch=async(...args)=>{const browser=await launch(...args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{const context=await newContext(...args);await context.addInitScript(({direction})=>{let sequence=0n;Object.defineProperty(crypto,"randomUUID",{configurable:true,value:()=>{const now=BigInt(Date.now())*65536n;sequence=now>sequence?now:sequence+1n;const key=(direction==="earlier"?0xffffffffffffffffn-sequence:sequence).toString(16).padStart(16,"0");return key.slice(0,8)+"-"+key.slice(8,12)+"-4"+key.slice(12,15)+"-8"+key.slice(15)+"00-000000000000";}});},{direction:'+JSON.stringify(direction)+'});return context;};return browser;};\n';
+  fs.writeFileSync(preload,adapter,{flag:'wx'});const adapterSha256=hash(Buffer.from(adapter));
+  // Only this owned child inherits the preload. Its existing selected test runs
+  // the actual public CLI and complete independent source verifier unchanged.
+  const env={...process.env,NODE_OPTIONS:'--import='+pathToFileURL(preload).href,CHAIN_NATIVE_OUTPUT:output};delete env.NODE_TEST_CONTEXT;
+  const argv=['--experimental-vm-modules','--test','--test-reporter=tap','--test-name-pattern=^'+existing+'$','tests.js'];
+  const result=spawnSync(process.execPath,argv,{cwd:__dirname,env,encoding:'utf8',timeout:90000,maxBuffer:4*1024*1024});
+  fs.writeFileSync(path.join(output,'consumer.stdout.tap'),result.stdout||'');fs.writeFileSync(path.join(output,'consumer.stderr.txt'),result.stderr||'');
+  assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);
+  const runs=fs.readdirSync(output).filter(name=>name.startsWith('ordinary-final-woop-'));assert.equal(runs.length,1,'One unchanged selected consumer executes per UUID direction');
+  const native=path.join(output,runs[0]),reports=fs.readdirSync(native).filter(name=>/^button-safety-webkit-.*\.json$/.test(name));assert.equal(reports.length,1);
+  const report=JSON.parse(fs.readFileSync(path.join(native,reports[0]),'utf8'));
+  const phase=name=>{const ref=report.ordinaryFinalWoopPhases.find(row=>row.phase===name);assert.ok(ref,'The real native consumer reached '+name);const bytes=fs.readFileSync(path.join(native,ref.file));assert.equal(hash(bytes),ref.sha256);assert.equal(bytes.length,ref.bytes);return JSON.parse(bytes);};
+  const saved=JSON.parse(phase('saved').current).tasks[0],deleted=JSON.parse(phase('deleted').current).tasks[0];
+  assert.equal(saved.woopPlanOps.length,1);assert.equal(deleted.woopPlanOps.length,2);
+  const save=saved.woopPlanOps[0],deletions=deleted.woopPlanOps.filter(row=>row.value===null);assert.equal(deletions.length,1);const deletion=deletions[0];
+  assert.deepEqual(deletion.observed,[save.id]);assert.equal(deleted.woopHead,deletion.id);assert.equal(deleted.woopPlan,null);
+  assert.equal(new Set([saved.woopPlan.id,save.id,deletion.id]).size,3);
+  for(const id of [saved.woopPlan.id,save.id,deletion.id])assert.match(id,/^t[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-000000000000$/,'The external UUID control actually supplied each app identity');
+  assert.equal(deletion.id<save.id,direction==='earlier','The actual deletion/save lexical relation must match the selected control');
+  assert.equal(report.assets['index.html'],hash(fs.readFileSync(path.join(__dirname,'index.html'))),'Only randomness changes; actual app bytes stay intact');
+  assert.equal(report.scenarios[0].name,scenario);assert.equal(report.scenarios[0].setup.currentTasks,64);assert.equal(report.scenarios[0].setup.activeTasks,1);assert.equal(report.scenarios[0].setup.durableTasks,64);
+  assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});assert.deepEqual(report.errors,[]);
+  fs.writeFileSync(path.join(output,'control.json'),JSON.stringify({direction,argv,adapterSha256,adapterBytes:Buffer.byteLength(adapter),candidateCommit:report.candidateCommit,candidateTree:report.candidateTree,appSha256:report.assets['index.html'],reportPath:path.join(native,reports[0]),reportSha256:hash(fs.readFileSync(path.join(native,reports[0]))),childStatus:result.status,saveId:save.id,deletionId:deletion.id,storedOrder:deleted.woopPlanOps.map(row=>row.id),failure:report.failure??null},null,2)+'\n');
+  assert.equal(hash(fs.readFileSync(preload)),adapterSha256);
+  assert.equal(result.status,0,'The existing actual native consumer must pass '+direction+' deletion order: '+(report.failure||result.stdout+result.stderr));
+  assert.equal(report.status,'passed');assert.equal(report.scenarios[0].status,'passed');assert.match(result.stdout,/^# tests 1$/m);assert.match(result.stdout,/^# skipped 0$/m);assert.match(result.stdout,/^# fail 0$/m);
+  t.diagnostic('Actual public consumer and external UUID evidence: '+output);
+ });
 });

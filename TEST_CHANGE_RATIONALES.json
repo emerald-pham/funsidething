@@ -49656,5 +49656,176 @@
       "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
       "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
     }
+  },
+  {
+    "baseCommit": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+    "testChangesSha256": "99c5a421ffd6dee618c36954c07e5539a40130bd9cb049a2ab1f1a26c1e69a18",
+    "reason": "Repair the twelve independently diagnosed1807-1818 process/native regression contracts at their existing public child and actual native boundaries; preserve strict consumers and app behavior.",
+    "previousBehavior": "Eight child callers parsed TAP without selecting TAP. Remote-owner cleanup expected its secondary error to replace the primary. Default ordinary64 reload was compared to400 tasks. Required JPEG capture depended on a private missing manifest. Both final-WOOP verifiers mislabeled canonical operation index1 as deletion.",
+    "intendedBehavior": "Each exact public child requests TAP and retains its complete checks. Primary failure and cleanup diagnostics remain distinct. The reload requires explicit ordinary64/source/mode. Required JPEG owns fresh immutable public-fixture inputs. Both independent WOOP verifiers identify the immutable deletion head/causal edge, retain exact canonical operation order and complete current/durable/source equality. Earlier/later UUID controls execute the unchanged app and original full selected consumer.",
+    "replacementTests": [
+      "RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer"
+    ],
+    "updatedConsumers": [
+      "RISK repository process: remote mobile consumer waits for browser owner exit after disconnect",
+      "RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal",
+      "RISK repository process: expected native reload retries only its navigation context loss",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+      "RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other",
+      "RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults",
+      "RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures",
+      "RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets",
+      "RISK repository process: stress engine loss requires the actual kernel and owned exit evidence",
+      "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+      "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources"
+    ],
+    "preservedCoverage": [
+      "All existing count/skip/cancel/error/timeout/filter/source/hosted-policy and actual native positive/negative assertions are retained; eight reporter fixes are confined to their own child argv, with no global reporter override.",
+      "Ordinary64 and optional400-task workload/mobile contracts remain independently selected. Existing primary operation error wins while every owner cleanup error and incomplete browser flag is checked; no real engine-exit claim comes from the stub.",
+      "Required startup JPEG capture retains the frozen b70 fixture digest and historical85ce app identity, real JPEG bytes and exact frame/size/clock/cleanup limits. Input setup failure is not a feature RED; protected originals remain untouched.",
+      "Final WOOP retains every distinct saved operation, null tombstone, causal observed identity, exact complete current/durable board serialization, typed/opaque/pending originals, automatic backup lifecycle, actual trusted controls, all12 phases and real reopen checks. The expected canonical order is independently built from the two validated literal role objects rather than sorting received rows.",
+      "All1449 earlier rationale object slices and order remain exact. No app assets, UUID semantics, catalog/inventory, strict complete verifier, generic runner, public CLI, workflow, CI or release behavior is changed. Earlier failed reports remain failed; focused results do not qualify a complete release."
+    ],
+    "redEvidence": {
+      "command": "Exact recorder invocations are retained in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1807-1818/protocol-eight-red/launch.json, primary-cleanup-red/launch.json, ordinary-reload-red/launch.json, startup-missing-input-baseline/launch.json and woop-uuid-red/launch.json; each names the pinned Node actual public tests.js command.",
+      "failure": "Before the corresponding edits, eight exact callers failed TAP summary assertions while actual inner cases passed; cleanup failed because controlled primary Error replaced the obsolete expected owner-close error; reload failed64!==400; capture stopped at the missing-manifest precondition. Before any producer edit the new real earlier-deletion UUID control reached rapid-core:565 wrong-index assertion after all12 native phases, while the related later control passed. Missing-input/obsolete-expectation baselines are labeled as setup/test migrations, not fabricated application feature RED.",
+      "runs": [
+        {
+          "label": "protocol-eight-red",
+          "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1807-1818/protocol-eight-red/recorder/2026-10-31T10-27-03-240Z-ba8981b1-17a5-4b4d-b496-1aac226c80b0.json",
+          "sha256": "333c289b089c36510157bdc1926f7727762dff9506f83b62e3d524ee962ca0a4",
+          "id": "2026-10-31T10-27-03-240Z-ba8981b1-17a5-4b4d-b496-1aac226c80b0",
+          "startedAt": "2026-10-31T10:27:03.263Z",
+          "finishedAt": "2026-10-31T10:27:45.315Z",
+          "command": {
+            "executable": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--experimental-vm-modules",
+              "--test",
+              "--test-reporter=tap",
+              "--test-name-pattern=^(?:RISK\\ repository\\ process:\\ pending\\ mobile\\ creates\\ retain\\ ownership\\ until\\ daemon\\ completion\\ and\\ owned\\ removal|RISK\\ repository\\ process:\\ hosted\\ direct\\ native\\ callers\\ retain\\ ephemeral\\ listener\\ defaults|RISK\\ repository\\ process:\\ required\\ one\\ GB\\ and\\ reported\\ 512MB\\ stress\\ profiles\\ cannot\\ substitute\\ for\\ each\\ other|RISK\\ repository\\ process:\\ failed\\ mobile\\ stress\\ attempts\\ retain\\ actual\\ setup\\ and\\ reject\\ mixed\\ transport\\ faults|RISK\\ repository\\ process:\\ failed\\ mobile\\ stress\\ primary\\ errors\\ cannot\\ hide\\ unrelated\\ driver\\ failures|RISK\\ repository\\ process:\\ mobile\\ kernel\\ page\\ floor\\ requires\\ actual\\ observations\\ and\\ exact\\ requested\\ budgets|RISK\\ repository\\ process:\\ stress\\ engine\\ loss\\ requires\\ the\\ actual\\ kernel\\ and\\ owned\\ exit\\ evidence|RISK\\ repository\\ process:\\ scenery\\ consumers\\ use\\ allocated\\ fallback\\ ports\\ and\\ preserve\\ early\\ native\\ failures)$",
+              "tests.js"
+            ]
+          },
+          "source": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+          "diffSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "exitCode": 1,
+          "outcome": "assertion-failure"
+        },
+        {
+          "label": "primary-cleanup-red",
+          "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1807-1818/primary-cleanup-red/recorder/2026-10-31T10-29-04-560Z-90fea682-d6c9-45ca-b07a-b57837347f23.json",
+          "sha256": "28811bcdb49b889916d03fbd7b355517bf4c6065fb4ea756945e1703b5637ea4",
+          "id": "2026-10-31T10-29-04-560Z-90fea682-d6c9-45ca-b07a-b57837347f23",
+          "startedAt": "2026-10-31T10:29:04.675Z",
+          "finishedAt": "2026-10-31T10:29:05.521Z",
+          "command": {
+            "executable": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--experimental-vm-modules",
+              "--test",
+              "--test-reporter=tap",
+              "--test-name-pattern=^RISK repository process: remote mobile consumer waits for browser owner exit after disconnect$",
+              "tests.js"
+            ]
+          },
+          "source": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+          "diffSha256": "7e6adc5a433c7a0292ff6bdf5ddc4965a22d30dd1a49ff12ce408e9b23455fba",
+          "exitCode": 1,
+          "outcome": "assertion-failure"
+        },
+        {
+          "label": "ordinary-reload-red",
+          "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1807-1818/ordinary-reload-red/recorder/2026-10-31T10-29-45-324Z-f8fb5939-7590-4a81-8693-951e50c53856.json",
+          "sha256": "3c4530acfb56bdbb1999939754d7b2ca223ebcbbf93a4de958cb0eb0f01dcf57",
+          "id": "2026-10-31T10-29-45-324Z-f8fb5939-7590-4a81-8693-951e50c53856",
+          "startedAt": "2026-10-31T10:29:45.428Z",
+          "finishedAt": "2026-10-31T10:29:49.116Z",
+          "command": {
+            "executable": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--experimental-vm-modules",
+              "--test",
+              "--test-reporter=tap",
+              "--test-name-pattern=^RISK repository process: expected native reload retries only its navigation context loss$",
+              "tests.js"
+            ]
+          },
+          "source": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+          "diffSha256": "7a7c965184751b9a6dc00dc0cc78875f3314e17c8991b88423061e0914d0424c",
+          "exitCode": 1,
+          "outcome": "assertion-failure"
+        },
+        {
+          "label": "startup-missing-input-baseline",
+          "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1807-1818/startup-missing-input-baseline/recorder/2026-10-31T10-30-12-199Z-344b9e70-34a8-4081-ba59-d810bd18f37e.json",
+          "sha256": "0b50669464f3537613811e614f2462e79b1eaa467f23fddbcee455d041d3b977",
+          "id": "2026-10-31T10-30-12-199Z-344b9e70-34a8-4081-ba59-d810bd18f37e",
+          "startedAt": "2026-10-31T10:30:12.300Z",
+          "finishedAt": "2026-10-31T10:30:12.499Z",
+          "command": {
+            "executable": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--experimental-vm-modules",
+              "--test",
+              "--test-reporter=tap",
+              "--test-name-pattern=^RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command$",
+              "tests.js"
+            ]
+          },
+          "source": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+          "diffSha256": "0d6cb5928333750896baf6ad94dda0492b4bd22419ede51af6d6aa4584c756a1",
+          "exitCode": 1,
+          "outcome": "assertion-failure"
+        },
+        {
+          "label": "woop-uuid-red",
+          "record": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1807-1818/woop-uuid-red/recorder/2026-10-31T10-32-34-257Z-9b3c4b12-f1b6-4584-802d-7f5cddb5f9aa.json",
+          "sha256": "477697012170ddf6c0a871f8c7fffdd91db8d1744f808c1ef3c707eaf86ea9ba",
+          "id": "2026-10-31T10-32-34-257Z-9b3c4b12-f1b6-4584-802d-7f5cddb5f9aa",
+          "startedAt": "2026-10-31T10:32:34.371Z",
+          "finishedAt": "2026-10-31T10:32:46.154Z",
+          "command": {
+            "executable": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--experimental-vm-modules",
+              "--test",
+              "--test-reporter=tap",
+              "--test-name-pattern=^RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer$",
+              "tests.js"
+            ]
+          },
+          "source": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+          "diffSha256": "68f5b9c68ad17d92f67678b57982ebf8dcca75887250e967e4e706d9978a1687",
+          "exitCode": 1,
+          "outcome": "assertion-failure"
+        }
+      ]
+    },
+    "comparisonBase": "deb8e502e2e5830861f5258c7523ed4ca3c0fea2",
+    "evidenceChronology": {
+      "actualRoute": "gpt-6.1-sol/MAX normal",
+      "nativeIssues": [
+        1807,
+        1808,
+        1809,
+        1810,
+        1811,
+        1812,
+        1813,
+        1814,
+        1815,
+        1816,
+        1817,
+        1818
+      ],
+      "baselineDiagnosis": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1805/diagnosis.json",
+      "producerEditTime": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/remaining-full-consumers-owner1807-1818/woop-producer-edit-time.json",
+      "preexistingPrefixCount": 1449,
+      "preexistingArraySha256": "f0205863645a4b144b5d280426dc8c011676523acdd96a0b1b2a991cd659d70a",
+      "sourceTestFilesSha256": "b8375fde8ba0befeddc962695a374a950eeb2ef26b584a3b9f88456fc756bc6c",
+      "remainingAcceptance": "ROOT exact admission, subsequent integration/metadata/required full qualification/formal reviews/CI/Stable are separate and unclaimed."
+    }
   }
 ]

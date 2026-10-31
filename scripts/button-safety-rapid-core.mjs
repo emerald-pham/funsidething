@@ -562,10 +562,11 @@ export async function runRapidCoreScenarios(h){
    assert.deepEqual(control, {selector:'#scan .woop-saved [data-act="woop-delete"]',tagName:'BUTTON',connected:true,count:1,visible:true,disabled:false,benchmark:targetId,plan:plan.id,head:operation.id,binding:control.binding,text:'Delete WOOP plan'});
   }
   const deletedBoard=JSON.parse(deleted.current),deletedTask=deletedBoard.tasks[0];assert.equal(deletedTask.woopPlan,null);assert.equal(deletedTask.woopPlanOps.length,2);
-  const deletion=deletedTask.woopPlanOps[1];sourceExactKeys(deletion,['v','id','observed','value'],'Complete delete tombstone operation');assert.match(deletion.id,/^t.+/);assert.ok(![plan.id,operation.id].includes(deletion.id));
+  const deletions=deletedTask.woopPlanOps.filter(row=>row.id===deletedTask.woopHead);assert.equal(deletions.length,1,'One immutable deletion head');const deletion=deletions[0];sourceExactKeys(deletion,['v','id','observed','value'],'Complete delete tombstone operation');assert.match(deletion.id,/^t.+/);assert.ok(![plan.id,operation.id].includes(deletion.id));
   const expectedDeletion={v:1,id:deletion.id,observed:[operation.id],value:null};assert.deepEqual(deletion,expectedDeletion);assert.equal(deletedTask.woopHead,deletion.id);
   assert.ok(Number.isSafeInteger(deletedBoard.updatedAt)&&deletedBoard.updatedAt>=Math.floor(deleted.lastInputAtMs)&&deletedBoard.updatedAt<=deleted.capturedAtMs&&deletedBoard.updatedAt>savedBoard.updatedAt,'Actual native Delete owns a later real timestamp');
-  const expectedDeleted=copy(expectedSaved);expectedDeleted.tasks[0].woopPlanOps=[expectedOperation,expectedDeletion];expectedDeleted.tasks[0].woopHead=deletion.id;expectedDeleted.tasks[0].woopPlan=null;expectedDeleted.updatedAt=deletedBoard.updatedAt;
+  // Untimestamped canonical fact rows order by ID; observed IDs establish causality.
+  const expectedDeleted=copy(expectedSaved);expectedDeleted.tasks[0].woopPlanOps=operation.id<deletion.id?[expectedOperation,expectedDeletion]:[expectedDeletion,expectedOperation];expectedDeleted.tasks[0].woopHead=deletion.id;expectedDeleted.tasks[0].woopPlan=null;expectedDeleted.updatedAt=deletedBoard.updatedAt;
   for(const phase of [deleted,deletedReopened,finalSource])for(const side of ['current','durable'])assert.equal(phase[side],JSON.stringify(expectedDeleted),'Exact full deletion board/tombstone/ordered facts survives genuine reopen and final read');
   for(const phase of phases.filter(row=>!['saved','reopened'].includes(row.phase))){assert.deepEqual(phase.view.savedAnswers,[]);assert.equal(phase.view.deleteControl,null);}
   for(const phase of [seed,deleted,deletedReopened,finalSource])assert.equal(phase.view.startVisible,true,'The existing final-task walkthrough control is available');

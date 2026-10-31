@@ -13931,6 +13931,11 @@
       "root": "RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
