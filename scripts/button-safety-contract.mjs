@@ -501,10 +501,36 @@ export function verifyButtonSafetyReport(report,{inventory,inventorySha256,candi
   }
   assert.deepEqual(fixtureCounts,{'signed-out':54,'reconcile-held':6},'Ordinary profile retains fifty-four signed-out and six existing reconcile-held scenarios');
   // Seed account/revision values describe installed input only; this verifier does not infer post-bootstrap invariants.
+  const verifyObservedAuthority=(value,stage,label)=>{
+   const message='Actual observed authority '+label;
+   assert.ok(value&&typeof value==='object'&&!Array.isArray(value),message+' object required');
+   assert.deepEqual(Object.keys(value).sort(),['stage','mode','authUser','account','identity','revision','dirty','cloudStatus'].sort(),message+' exact fields required');
+   assert.equal(value.stage,stage,message+' current observation stage required');
+   for(const key of ['mode','cloudStatus'])assert.ok(typeof value[key]==='string'&&value[key].trim().length>0,message+' '+key+' required');
+   for(const key of ['authUser','account','identity'])assert.ok(value[key]===null||typeof value[key]==='string'&&value[key].trim().length>0,message+' nullable '+key+' required');
+   assert.ok(Number.isSafeInteger(value.revision)&&value.revision>=0,message+' nonnegative revision required');assert.equal(typeof value.dirty,'boolean',message+' dirty boolean required');
+  };
+  const cloudAuthorityStages={
+   'cloud sync signs out and rejects signed-out authentication safely':['before-sign-out','signed-out','authentication-refused'],
+   'Settings decision review offers Light and saves it while protecting failures':['before-settings','baseline-saved','read-refused','reviewed','selected','write-refused','reviewed-retry','selected-retry','applied']
+  };
+
   for(const row of report.scenarios||[]){
    const setup=row.setup,scenarioFixture=scenarioFixtures[row.name],role=scenarioFixture?.fixtureRole;
    assert.ok(scenarioFixture,'Report cannot add or select an unknown ordinary scenario fixture: '+row.name);
    assert.ok(setup,'Independent ordinary fixture setup required: '+row.name);
+   verifyObservedAuthority(setup.observedAuthority,'post-bootstrap',row.name+' bootstrap');
+   if(cloudAuthorityStages[row.name]){
+    const observations=row.authorityObservations;assert.ok(Array.isArray(observations),'Actual authority observations required at reconciled cloud actions: '+row.name);
+    assert.deepEqual(observations.map(value=>value?.stage),cloudAuthorityStages[row.name],'Actual authority observations retain each cloud action stage: '+row.name);
+    for(const observation of observations){
+     assert.deepEqual(Object.keys(observation).sort(),['stage','authority','currentTasks','durableTasks','currentHash','durableHash'].sort(),'Actual authority observation exact fields required');
+     verifyObservedAuthority(observation.authority,observation.stage,row.name+' '+observation.stage);
+     assert.equal(observation.currentTasks,64,'Actual authority fixture current64 required: '+row.name);assert.equal(observation.durableTasks,64,'Actual authority fixture durable64 required: '+row.name);
+     for(const key of ['currentHash','durableHash'])assert.match(observation[key]||'',/^[a-f0-9]{64}$/,'Actual authority observation source hash required');
+    }
+   }
+
    assert.equal(setup.currentTasks,scenarioFixture.savedTasks,'Required ordinary current fixture count: '+row.name);
    assert.equal(setup.durableTasks,scenarioFixture.savedTasks,'Required ordinary durable fixture count: '+row.name);
    assert.equal(setup.source,scenarioFixture.source,'Required ordinary fixture source: '+row.name);

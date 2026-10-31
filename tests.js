@@ -48528,6 +48528,13 @@ test('RISK repository process: button safety report admission binds ordinary and
  assert.deepEqual(diagnosticProfile.requiredWorkload,sourceInventory.requiredWorkload);assert.deepEqual(diagnosticProfile.requiredRapidActions,sourceInventory.requiredRapidActions);
  const candidateCommit='a'.repeat(40),candidateTree='b'.repeat(40),engine='webkit',durableHash='e'.repeat(64);
  const inventoryHash=manifest=>createHash('sha256').update(JSON.stringify(manifest)).digest('hex');
+ // Explicitly synthetic parser witnesses: these are declared observations for
+ // contract sensitivity, never a browser run or an echo of fixture seed authority.
+ const syntheticAuthority=stage=>({stage,mode:'scan',authUser:'observed@example.invalid',account:'board@example.invalid',identity:'observed-owner',revision:17,dirty:false,cloudStatus:'ok'});
+ const cloudStages={
+  'cloud sync signs out and rejects signed-out authentication safely':['before-sign-out','signed-out','authentication-refused'],
+  'Settings decision review offers Light and saves it while protecting failures':['before-settings','baseline-saved','read-refused','reviewed','selected','write-refused','reviewed-retry','selected-retry','applied']
+ };
  const makeReport=(profile,manifest=inventory)=>{
   const definition=manifest.profiles[profile],taskCount=profile==='ordinary'?64:definition.requiredWorkload.savedTasks;
   const report={schemaVersion:1,kind:'button-safety',engine,status:'passed',candidateCommit,candidateTree,inventorySha256:inventoryHash(manifest),profile,
@@ -48536,10 +48543,10 @@ test('RISK repository process: button safety report admission binds ordinary and
     const fixture=profile==='ordinary'?expectedScenarioFixtures[name]:null;
     if(profile==='ordinary')assert.ok(fixture,'Independently reviewed ordinary fixture required: '+name);
     const fixtureRole=fixture?fixture.fixtureRole:definition.scenarioRoles?.[name]||'active';
-    return{name,status:'passed',setup:{currentTasks:taskCount,durableTasks:taskCount,activeTasks:fixtureRole==='active'?taskCount:1,fixtureRole,durableHash,source:fixture?fixture.source:'workload-diagnostic',authMode:fixture?fixture.authMode:'signed-out'}};
+    return{name,status:'passed',setup:{currentTasks:taskCount,durableTasks:taskCount,activeTasks:fixtureRole==='active'?taskCount:1,fixtureRole,durableHash,source:fixture?fixture.source:'workload-diagnostic',authMode:fixture?fixture.authMode:'signed-out',...(profile==='ordinary'?{observedAuthority:syntheticAuthority('post-bootstrap')}:{})},...(profile==='ordinary'&&cloudStages[name]?{authorityObservations:cloudStages[name].map(stage=>({stage,authority:syntheticAuthority(stage),currentTasks:64,durableTasks:64,currentHash:'d'.repeat(64),durableHash}))}:{})};
    }),
    observedActions:manifest.requiredActions,outcomes:manifest.requiredActions.map(action=>({action,status:'passed',events:['click'],assertions:1,responsive:true})),
-   assets:{...manifest.requiredRuntimeAssets},errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+   limits:['Synthetic parser controls only; no browser authority observations executed.'],assets:{...manifest.requiredRuntimeAssets},errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
   if(profile==='ordinary')report.repeatOutcomes=definition.requiredRepeatCases.map(row=>{
    const attempts=Array.from({length:row.minimumAttempts},(_,index)=>({receiptId:row.name+'-'+(index+1),actionFamily:row.actionFamilies[index%row.actionFamilies.length],trusted:true,result:'accepted',receiptAtMs:10+index}));
    return{name:row.name,status:'passed',attempts,accounting:{attempted:attempts.length,accepted:attempts.length,refused:0,disappeared:0},
@@ -48572,6 +48579,21 @@ test('RISK repository process: button safety report admission binds ordinary and
  await t.test('ordinary admits all shared actions and sixty 64-task scenarios with fifty-four signed-out and six reconcile-held fixtures',()=>{
   const report=makeReport('ordinary');assert.equal(verify(report).profile,'ordinary');assert.equal(report.requiredActions.length,114);assert.equal(report.scenarios.length,60);
   for(const row of report.scenarios){const fixture=expectedScenarioFixtures[row.name];assert.ok(fixture,'Reviewed ordinary fixture exists: '+row.name);assert.equal(row.setup.currentTasks,64);assert.equal(row.setup.durableTasks,64);assert.equal(row.setup.source,fixture.source);assert.equal(row.setup.authMode,fixture.authMode);assert.equal(row.setup.fixtureRole,fixture.fixtureRole);assert.match(row.setup.durableHash,/^[a-f0-9]{64}$/);}
+ });
+ await t.test('ordinary requires actual bootstrap authority observations separate from seed declarations',()=>{
+  const valid=makeReport('ordinary');assert.equal(verify(valid,'ordinary'),valid,'Independently declared synthetic observations retain schema acceptance');
+  assert.equal(valid.scenarios[0].setup.observedAuthority.revision,17,'Post-bootstrap revision is not inferred as the input seed revision');
+  const missing=structuredClone(valid);delete missing.scenarios[0].setup.observedAuthority;
+  assert.throws(()=>verify(missing,'ordinary'),/actual.*authority|observed.*authority/i,'A report without actual post-bootstrap authority must fail even with correct seed labels');
+  for(const [name,mutate]of [
+   ['seed stage',o=>o.stage='seed'],['missing mode',o=>delete o.mode],['empty mode',o=>o.mode=''],['auth user object',o=>o.authUser={}],['board account boolean',o=>o.account=false],['identity number',o=>o.identity=7],['negative revision',o=>o.revision=-1],['fractional revision',o=>o.revision=1.5],['dirty string',o=>o.dirty='true'],['missing status',o=>delete o.cloudStatus],['unknown observation field',o=>o.fromSeed=true]
+  ]){const report=structuredClone(valid);mutate(report.scenarios[0].setup.observedAuthority);assert.throws(()=>verify(report,'ordinary'),/actual.*authority|observed.*authority/i,'Malformed '+name+' cannot qualify actual authority observations');}
+  for(const scenario of Object.keys(cloudStages)){
+   const missing=structuredClone(valid);delete missing.scenarios.find(row=>row.name===scenario).authorityObservations;
+   assert.throws(()=>verify(missing,'ordinary'),/authority.*observation|actual.*authority/i,'The reconciled cloud action boundary needs its own observations: '+scenario);
+   const wrong=structuredClone(valid),row=wrong.scenarios.find(row=>row.name===scenario);row.authorityObservations[0].currentTasks=400;
+   assert.throws(()=>verify(wrong,'ordinary'),/authority.*fixture|actual.*64/i,'Setup64 cannot qualify actual400 at a cloud action boundary');
+  }
  });
  await t.test('ordinary retains correct350ms observations with exact required-outcome failure causes',()=>{
   const report=makeReport('ordinary'),action=report.requiredActions[0],scenario=report.scenarios[0].name;
@@ -53250,4 +53272,42 @@ test('RISK repository process: final WOOP verification preserves both canonical 
   assert.equal(report.status,'passed');assert.equal(report.scenarios[0].status,'passed');assert.match(result.stdout,/^# tests 1$/m);assert.match(result.stdout,/^# skipped 0$/m);assert.match(result.stdout,/^# fail 0$/m);
   t.diagnostic('Actual public consumer and external UUID evidence: '+output);
  });
+});
+
+async function assertNativeCloudProfileCase(t,scenario,phases){
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const output=fs.mkdtempSync(path.join(base,'cloud-profile-'+engine+'-'));
+  const child=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:4*1024*1024});
+  assert.equal(child.error,undefined);assert.equal(child.signal,null);assert.equal(child.status,0,'Actual ordinary64 cloud actions must keep the selected current and durable fixture: '+child.stderr);
+  const files=fs.readdirSync(output).filter(file=>file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(files.length,1);
+  const report=JSON.parse(fs.readFileSync(path.join(output,files[0]),'utf8'));assert.equal(report.status,'passed');assert.equal(report.profile,'ordinary');assert.deepEqual(report.scenarios.map(row=>row.name),[scenario]);assert.equal(report.scenarios[0].status,'passed');
+  const bootstrap=report.scenarios[0].setup.observedAuthority;assert.equal(bootstrap.stage,'post-bootstrap');assert.equal(typeof bootstrap.dirty,'boolean');assert.ok(Number.isSafeInteger(bootstrap.revision));assert.equal(typeof bootstrap.mode,'string');
+  const references=report.cloudProfilePhases;assert.deepEqual(references.map(row=>row.phase),phases,'Actual complete source phases survive each relevant action');
+  for(const ref of references){
+   const bytes=fs.readFileSync(path.join(output,ref.file));assert.equal(createHash('sha256').update(bytes).digest('hex'),ref.sha256);assert.equal(bytes.length,ref.bytes);
+   const snapshot=JSON.parse(bytes);assert.equal(snapshot.scenario,scenario);assert.equal(snapshot.profile,'ordinary');assert.equal(snapshot.sourceIdentity.candidateCommit,report.candidateCommit);assert.equal(snapshot.sourceIdentity.candidateTree,report.candidateTree);
+   assert.equal(ref.currentTasks,64);assert.equal(ref.durableTasks,64);assert.equal(snapshot.head.payload,JSON.stringify(snapshot.stored),'The retained durable source is its actual exact head');
+   const observed=snapshot.observedAuthority;assert.equal(observed.stage,ref.phase);assert.equal(observed.mode,snapshot.current.mode);assert.equal(observed.account,snapshot.current.syncAccount??null);assert.equal(observed.identity,snapshot.current.syncIdentity??null);assert.equal(observed.revision,snapshot.current.syncRev);assert.equal(observed.dirty,snapshot.current.syncDirty);
+   assert.equal(observed.authUser,['signed-out','authentication-refused'].includes(ref.phase)?null:'fixture@example.invalid','Actual auth user is separate from the board-bound account');
+   assert.deepEqual(ref.authority,observed);assert.deepEqual(report.scenarios[0].authorityObservations.find(row=>row.stage===ref.phase).authority,observed,'The report retains the same actual action-boundary observation');
+
+   assert.ok(snapshot.sources?.stores,'Every phase retains its complete readable saved-source stores');
+   for(const board of [snapshot.current,snapshot.stored]){
+    assert.equal(board.tasks.length,64);assert.deepEqual(board.futureBoard,{opaque:['retain',11]});assert.deepEqual(board.futurePopulated,{version:7,opaque:'p'.repeat(1048576)});
+    for(let index=0;index<64;index++){
+     const task=board.tasks[index],id=index?'synthetic-populated-'+index:'synthetic-kept';
+     assert.equal(task.id,id);assert.equal(task.title,index?'Synthetic retained task '+index:'Synthetic retained task');assert.equal(task.createdAt,1+index);assert.equal(task.mu,25);assert.equal(task.sigma,8.333333333);assert.equal(task.done,false);assert.deepEqual(task.ctx,[]);assert.deepEqual(task.futureTask,{opaque:['retain',index||7]});
+    }
+   }
+  }
+  assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);t.diagnostic('Focused actual cloud profile evidence: '+path.join(output,files[0]));
+ });
+}
+test('RISK repository process: ordinary cloud sign out keeps the complete64 source at action boundaries',{timeout:100000},async t=>{
+ await assertNativeCloudProfileCase(t,'cloud sync signs out and rejects signed-out authentication safely',['before-sign-out','signed-out','authentication-refused']);
+});
+
+test('RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures',{timeout:100000},async t=>{
+ await assertNativeCloudProfileCase(t,'Settings decision review offers Light and saves it while protecting failures',['before-settings','baseline-saved','read-refused','reviewed','selected','write-refused','reviewed-retry','selected-retry','applied']);
 });

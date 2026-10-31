@@ -23,16 +23,6 @@ export function canonicalStartupSource(fn,arg,url){
  const body=typeof fn==='function'?'('+Function.prototype.toString.call(fn)+')('+literal(arg)+')':fn;
  const content=body+'\n//# sourceURL='+url;return{url,content,sha256:sha(content),bytes:Buffer.byteLength(content)};
 }
-export function encodeStartupValue(value,depth=0){
- check(depth<=64,'typed custody depth exceeded');
- if(value===null)return{type:'null'};if(value===undefined)return{type:'undefined'};
- if(typeof value==='number')return{type:'number',value:Object.is(value,-0)?'-0':Number.isFinite(value)?value:String(value)};
- if(typeof value==='string'||typeof value==='boolean')return{type:typeof value,value};
- if(value instanceof Uint8Array)return{type:'uint8array',values:Array.from(value)};
- if(value instanceof Date)return{type:'date',value:value.toISOString()};
- check(typeof value==='object'&&Object.prototype.toString.call(value)==='[object Object]','unsupported custody type');
- return Array.isArray(value)?{type:'array',values:value.map(x=>encodeStartupValue(x,depth+1))}:{type:'object',entries:Object.entries(value).map(([k,v])=>[k,encodeStartupValue(v,depth+1)])};
-}
 export function decodeStartupValue(value,depth=0){
  check(value&&typeof value==='object'&&depth<=64,'typed custody value/depth required');
  switch(value.type){

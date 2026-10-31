@@ -204,7 +204,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
 - RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits
-- RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress
+- RISK button safety guidance: mounted Help describes actions and keeps testing evidence internal
 - RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes
 - RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database
 - RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore
@@ -2555,3 +2555,9 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts
 
 - RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer
+
+## Final review repair contracts1827–1833
+
+- RISK repository process: default manual ordinary admission retains capped refusal
+- RISK repository process: ordinary cloud sign out keeps the complete64 source at action boundaries
+- RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures

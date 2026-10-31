@@ -54,6 +54,25 @@ async function assertCurrentAndStoredFixtureBoard(ui,label,profile='workload-dia
   assertFixtureBoard(boards.stored,label+' saved board',profile);
 }
 
+async function captureCloudProfile(ui,phase){
+  const snapshot=await ui.page.evaluate(async stage=>{
+    const head=await window.ScannerDeviceStore.readHead();
+    return{observedAuthority:{stage,mode:state.mode,authUser:window.CloudSync.user??null,account:state.syncAccount??null,identity:state.syncIdentity??null,revision:state.syncRev,dirty:state.syncDirty,cloudStatus:window.CloudSync.status},current:JSON.parse(JSON.stringify(state)),stored:head?.payload?JSON.parse(head.payload):null,head,
+      sources:await window.ScannerDeviceStore.readRawExportSnapshot(),localStorage:Object.fromEntries(Object.keys(localStorage).map(key=>[key,localStorage.getItem(key)]))};
+  },phase);
+  // Retain complete actual sources before checking them; setup metadata cannot
+  // qualify a different board adopted later by cloud reconciliation.
+  ui.recordOrdinaryCloudSourcePhase(phase,snapshot);
+  const expectedCount=ui.profile==='ordinary'?64:400,original=fixture('reconcile-held',{profile:ui.profile});
+  for(const [kind,board]of [['current',snapshot.current],['durable',snapshot.stored]]){
+    assert.equal(board?.tasks?.length,expectedCount,phase+' actual '+kind+' tasks must match the selected profile');
+    for(let index=0;index<original.tasks.length;index++)for(const [key,value]of Object.entries(original.tasks[index]))
+      assert.deepEqual(board.tasks[index][key],value,phase+' retains original '+kind+' task '+index+' field '+key);
+    assertFixtureBoard(board,phase+' '+kind,ui.profile);
+  }
+  return snapshot;
+}
+
 async function assertPublished(remote,label,profile='workload-diagnostic'){
   const root=remote.get(MANIFEST);
   assert.equal(root?.schemaVersion,2,label+' publishes a generation manifest');
@@ -255,24 +274,29 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
   });
 
   await h.scenario('cloud sync signs out and rejects signed-out authentication safely',{
-    authMode:'reconcile-held',remote:sameBoardRemote()
+    authMode:'reconcile-held',remote:sameBoardRemote(h.profile)
   },async ui=>{
+    const expectedTaskCount=ui.profile==='ordinary'?64:400;
+    const forProfile=predicate=>new Function('return ('+predicate.toString().replaceAll('===400','==='+expectedTaskCount)+')')();
     await ui.page.waitForFunction(()=>window.CloudSync?.ready===true&&window.CloudSync.user==='fixture@example.invalid'&&
       window.CloudSync.status==='ok'&&state.syncDirty===false&&!pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy,null,{timeout:10000});
-    await ui.act('sync',async()=>{
+    await captureCloudProfile(ui,'before-sign-out');
+    await ui.act('sync',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.user===null&&window.CloudSync.status==='signed-out'&&
         document.getElementById('syncBtn')?.textContent.includes('sign in')&&state.tasks.length===400&&
         state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
-    },'#syncBtn');
-    await assertCurrentAndStoredFixtureBoard(ui,'Signed-out transition');
-    await ui.act('sync',async()=>{
+    }),'#syncBtn');
+    await assertCurrentAndStoredFixtureBoard(ui,'Signed-out transition',ui.profile);
+    await captureCloudProfile(ui,'signed-out');
+    await ui.act('sync',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return window.CloudSync?.user===null&&window.CloudSync.status==='error'&&window.CloudSync.errorStage==='sign-in'&&
         document.getElementById('syncBtn')?.textContent.includes('error')&&state.tasks.length===400&&
         state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
-    },'#syncBtn');
-    await assertCurrentAndStoredFixtureBoard(ui,'Signed-out authentication failure');
+    }),'#syncBtn');
+    await assertCurrentAndStoredFixtureBoard(ui,'Signed-out authentication failure',ui.profile);
+    await captureCloudProfile(ui,'authentication-refused');
   });
 
   const unavailableSync={authMode:'reconcile-held',remote:new Map(),cloudReadFail:true};
@@ -564,10 +588,13 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
  const semantic=verifySavedDecisionSources(snapshots,cancelSnapshots);ui.recordRepeatOutcome(scenario,attempts,JSON.stringify(semantic));
   });
 
-  const decisionOptions={authMode:'reconcile-held',remote:sameBoardRemote()};
+  const decisionOptions={authMode:'reconcile-held',remote:sameBoardRemote(h.profile)};
   await h.scenario('Settings decision review offers Light and saves it while protecting failures',decisionOptions,async ui=>{
+    const expectedTaskCount=ui.profile==='ordinary'?64:400;
+    const forProfile=predicate=>new Function('return ('+predicate.toString().replaceAll('===400','==='+expectedTaskCount)+')')();
     await ui.page.waitForFunction(()=>window.CloudSync?.ready===true&&window.CloudSync.user==='fixture@example.invalid'&&
       window.CloudSync.status==='ok'&&state.syncDirty===false&&!pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy,null,{timeout:10000});
+    await captureCloudProfile(ui,'before-settings');
     await ui.act('settings',()=>document.querySelector('#modalRoot h2')?.textContent==='Settings');
     await ui.fill('#stHorizon','61');
     await ui.act('save-settings',()=>!document.querySelector('#stHorizon')&&state.settings.horizonMin===61&&
@@ -586,16 +613,17 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
     assert.deepEqual(savedDeviceDecision,{currentHorizon:61,storedHorizon:61,currentDecision:true,storedDecision:true},
       'The real Settings choice is durably saved on this device');
     const savedDecisionBoard=await readRemoteBoard(decisionOptions.remote,'The real Settings save');
-    assertFixtureBoard(savedDecisionBoard,'The real Settings save');
+    assertFixtureBoard(savedDecisionBoard,'The real Settings save',ui.profile);
     assert.equal(savedDecisionBoard.settings.horizonMin,61,'The actual saved setting reaches the cloud fixture');
     assert.equal(savedDecisionBoard.decisionBaseline?.account,'fixture@example.invalid','The cloud fixture contains an account-bound decision baseline');
     assert.ok(savedDecisionBoard.decisionEvents?.some(event=>event.kind==='current-choice'&&event.target?.type==='setting'&&
       event.target.property==='horizonMin'&&event.value===61),'The cloud fixture contains the observed Settings choice');
-    await assertCurrentAndStoredFixtureBoard(ui,'Saved decision baseline setup');
+    await assertCurrentAndStoredFixtureBoard(ui,'Saved decision baseline setup',ui.profile);
+    await captureCloudProfile(ui,'baseline-saved');
     await ui.act('settings',()=>document.querySelector('#modalRoot h2')?.textContent==='Settings');
 
     decisionOptions.cloudReadFail=true;
-    await ui.act('review-decision-recovery',async()=>{
+    await ui.act('review-decision-recovery',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       const modal=document.querySelector('#modalRoot');
       return modal?.querySelector('h2')?.textContent==='Review saved decisions'&&
@@ -603,8 +631,9 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
         !modal.querySelector('[data-act="choose-decision-recovery"]')&&
         modal.querySelector('[data-act="apply-decision-recovery"]')?.disabled===true&&
         state.settings.theme==='light'&&saved?.settings?.theme==='light'&&state.tasks.length===400;
-    },'#modalRoot [data-act="review-decision-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision review read failure');
+    }),'#modalRoot [data-act="review-decision-recovery"]');
+    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision review read failure',ui.profile);
+    await captureCloudProfile(ui,'read-refused');
 
     decisionOptions.cloudReadFail=false;
     await ui.act('review-decision-recovery',()=>{
@@ -614,25 +643,28 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
         light.getAttribute('aria-pressed')==='false'&&modal.querySelector('[data-act="apply-decision-recovery"]')?.disabled===true&&
         !/Reading this device and the current cloud source/i.test(modal.textContent);
     },'#modalRoot [data-act="review-decision-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision review');
+    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision review',ui.profile);
+    await captureCloudProfile(ui,'reviewed');
     await ui.act('choose-decision-recovery',()=>{
       const modal=document.querySelector('#modalRoot'),light=modal?.querySelector('[data-act="choose-decision-recovery"][data-value="light"]');
       return light?.getAttribute('aria-pressed')==='true'&&modal.querySelector('[data-act="apply-decision-recovery"]')?.disabled===false;
     },'#modalRoot [data-act="choose-decision-recovery"][data-value="light"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Selected saved appearance');
+    await assertCurrentAndStoredFixtureBoard(ui,'Selected saved appearance',ui.profile);
+    await captureCloudProfile(ui,'selected');
 
     const rootBeforeFailure=structuredClone(decisionOptions.remote.get(MANIFEST));
     decisionOptions.cloudWriteFail=true;
-    await ui.act('apply-decision-recovery',async()=>{
+    await ui.act('apply-decision-recovery',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       const modal=document.querySelector('#modalRoot');
       return modal?.querySelector('h2')?.textContent==='Review saved decisions'&&
         /cloud sync is not confirmed/i.test(modal.textContent)&&
         state.settings.theme==='light'&&saved?.settings?.theme==='light'&&state.tasks.length===400&&
         modal.querySelector('[data-act="apply-decision-recovery"]')?.disabled===true;
-    },'#modalRoot [data-act="apply-decision-recovery"]');
+    }),'#modalRoot [data-act="apply-decision-recovery"]');
     assert.deepEqual(decisionOptions.remote.get(MANIFEST),rootBeforeFailure,'A refused decision write leaves its current cloud root unchanged');
-    await assertCurrentAndStoredFixtureBoard(ui,'Refused saved-decision publication');
+    await assertCurrentAndStoredFixtureBoard(ui,'Refused saved-decision publication',ui.profile);
+    await captureCloudProfile(ui,'write-refused');
 
     decisionOptions.cloudWriteFail=false;
     await ui.act('review-decision-recovery',()=>{
@@ -642,20 +674,23 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
         !/Cloud sync is not confirmed/i.test(modal.textContent)&&
         !/Reading this device and the current cloud source/i.test(modal.textContent);
     },'#modalRoot [data-act="review-decision-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision review after refused publication');
+    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision review after refused publication',ui.profile);
+    await captureCloudProfile(ui,'reviewed-retry');
     await ui.act('choose-decision-recovery',()=>{
       const modal=document.querySelector('#modalRoot'),light=modal?.querySelector('[data-act="choose-decision-recovery"][data-value="light"]');
       return light?.getAttribute('aria-pressed')==='true'&&modal.querySelector('[data-act="apply-decision-recovery"]')?.disabled===false;
     },'#modalRoot [data-act="choose-decision-recovery"][data-value="light"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Selected saved appearance for retry');
-    await confirmedAction(ui,'apply-decision-recovery',async()=>{
+    await assertCurrentAndStoredFixtureBoard(ui,'Selected saved appearance for retry',ui.profile);
+    await captureCloudProfile(ui,'selected-retry');
+    await confirmedAction(ui,'apply-decision-recovery',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return !document.querySelector('#modalRoot .modal')&&window.CloudSync?.status==='ok'&&state.syncDirty===false&&state.syncRev>4&&
         state.settings.theme==='light'&&state.tasks.length===400&&saved?.settings?.theme==='light'&&
         saved.tasks.length===400&&saved.syncDirty===false;
-    },'#modalRoot [data-act="apply-decision-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision recovery');
-    await assertPublished(decisionOptions.remote,'Saved-decision recovery');
+    }),'#modalRoot [data-act="apply-decision-recovery"]');
+    await assertCurrentAndStoredFixtureBoard(ui,'Saved-decision recovery',ui.profile);
+    await captureCloudProfile(ui,'applied');
+    await assertPublished(decisionOptions.remote,'Saved-decision recovery',ui.profile);
     const appliedDecisionBoard=await readRemoteBoard(decisionOptions.remote,'The saved appearance decision');
     assert.equal(appliedDecisionBoard.settings.theme,'light','The confirmed cloud board keeps the selected appearance');
     assert.ok(appliedDecisionBoard.decisionEvents?.some(event=>event.kind==='current-choice'&&event.target?.type==='setting'&&

@@ -12892,7 +12892,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress",
+      "root": "RISK button safety guidance: mounted Help describes actions and keeps testing evidence internal",
       "group": "core",
       "file": "tests.js"
     },
@@ -13941,6 +13941,26 @@
       "root": "RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: default manual ordinary admission retains capped refusal",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary cloud sign out keeps the complete64 source at action boundaries",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "hosted ordinary native admits default-off manual dispatch while capped consumers refuse it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
     }
   ],
   "processControls": [

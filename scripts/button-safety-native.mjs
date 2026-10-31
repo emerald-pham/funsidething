@@ -293,7 +293,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    if(interrupted)throw Error('Startup capture interrupted: '+interrupted);
    await page.goto(origin+prefix);if(interrupted)throw Error('Startup capture interrupted: '+interrupted);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
-    const result=await evalPage(async({captureFixtureMode,waitForSavedDecision})=>{const head=await ScannerDeviceStore.readHead();if(waitForSavedDecision&&!(CloudSync?.ready===true&&CloudSync.user==='fixture@example.invalid'&&CloudSync.status==='ok'&&state.syncDirty===false&&!pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy&&head?.payload===JSON.stringify(state)&&state.syncAccount==='fixture@example.invalid'&&state.syncIdentity==='owner'&&state.syncRev===4))return null;return{currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,...(captureFixtureMode?{authMode:window.__installedFixture?.authMode}:{})};},{captureFixtureMode:Boolean(scenarioFixture),waitForSavedDecision:name==='ordinary repeated saved decision choice'});
+    const result=await evalPage(async({captureFixtureMode,waitForSavedDecision})=>{const head=await ScannerDeviceStore.readHead();if(waitForSavedDecision&&!(CloudSync?.ready===true&&CloudSync.user==='fixture@example.invalid'&&CloudSync.status==='ok'&&state.syncDirty===false&&!pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy&&head?.payload===JSON.stringify(state)&&state.syncAccount==='fixture@example.invalid'&&state.syncIdentity==='owner'&&state.syncRev===4))return null;return{observedAuthority:{stage:'post-bootstrap',mode:state.mode,authUser:window.CloudSync.user??null,account:state.syncAccount??null,identity:state.syncIdentity??null,revision:state.syncRev,dirty:state.syncDirty,cloudStatus:window.CloudSync.status},currentTasks:state.tasks.length,activeTasks:state.tasks.filter(task=>!task.done).length,durableTasks:head?.payload?JSON.parse(head.payload).tasks.length:0,durableHash:head?.hash,...(captureFixtureMode?{authMode:window.__installedFixture?.authMode}:{})};},{captureFixtureMode:Boolean(scenarioFixture),waitForSavedDecision:name==='ordinary repeated saved decision choice'});
     if(result&&result.currentTasks===(startupOpening?64:fixtureTaskCount)&&result.durableTasks===(startupOpening?64:fixtureTaskCount)){
      const row={...result,fixtureRole};
      if(scenarioFixture){
@@ -610,6 +610,14 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     report.repeatOutcomes.push(outcome);delete report.inFlightRepeat;save();
    };
    const recordOrdinaryWoopPhase=(phase,snapshot)=>{
+    if(['cloud sync signs out and rejects signed-out authentication safely','Settings decision review offers Light and saves it while protecting failures'].includes(name)){
+     const slug=name.startsWith('cloud sync')?'sign-out':'settings-light',file='cloud-profile-'+slug+'-'+phase+'.json';
+     const artifact={schemaVersion:1,phase,scenario:name,profile:selectedProfile,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot},bytes=JSON.stringify(artifact,null,2)+'\n';
+     fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.cloudProfilePhases??=[];
+     const observation={stage:phase,authority:snapshot.observedAuthority,currentTasks:snapshot.current?.tasks?.length,durableTasks:snapshot.stored?.tasks?.length,currentHash:digest(JSON.stringify(snapshot.current)),durableHash:snapshot.head?.hash};record.authorityObservations??=[];record.authorityObservations.push(observation);
+     report.cloudProfilePhases.push({scenario:name,phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),...observation});save();return;
+    }
+
     if(topLayerProbe){
      assert.equal(selectedProfile,'ordinary');const order=['seed','settings','opened','refused','final-source'];report.ordinaryTopLayerPhases??=[];assert.equal(phase,order[report.ordinaryTopLayerPhases.length],'Retain every complete top-layer source phase once in order');
      const file='ordinary-top-layer-release-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
@@ -726,7 +734,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
   else if(scenarioFilter==='ordinary pending Copy refuses reentry'||scenarioFilter==='ordinary obsolete Copy cannot alter replacement transfer'){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   else if(scenarioFilter?.startsWith('rapid ')){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
   else {
-   await runButtonScenarios({scenario});
+   await runButtonScenarios({scenario,profile:selectedProfile});
    if(diagnosticProfile){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
    else{const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});if(!scenarioFilter){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario:async(caseName,options,execute)=>{if(caseName==='ordinary pending Copy refuses reentry'||caseName==='ordinary obsolete Copy cannot alter replacement transfer')await scenario(caseName,options,execute);}});}}
   }
