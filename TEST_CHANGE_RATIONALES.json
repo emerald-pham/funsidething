@@ -50427,5 +50427,29 @@
     "replacementTests": [
       "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources"
     ]
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "45348a1a606c93f884aa4daa25c14c29f27589f7eb8a80cc7a5cb7d5aa48bd48",
+    "reason": "Bind the accumulated protected tests.js comparison from the actual published PR #285 head to the sealed final candidate. Existing component rationales retain the accepted slices and their evidence; outgoing validation needs this exact published-head fingerprint as an additional record.",
+    "previousBehavior": "Published PR #285 head b176026825e4f9539780f745fe60e09cf348d288 had 2,235 named root tests. The later accepted source accumulated a distinct 6,878-line protected test diff, while the already-valid current-main comparison has a different fingerprint; no exact record matched this published-head comparison, so the actual outgoing gate rejected it.",
+    "intendedBehavior": "Retain the candidate’s accumulated consumer and process regressions and bind their exact b176-to-d67 protected diff with one appended rationale. The reviewed diff has 121 newly named root tests and 11 removed or recast root names; the current permanent consumer tests below represent key retained boundaries. This record changes rationale metadata only and does not repair app behavior or change executable tests.",
+    "preservedCoverage": [
+      "All 1,475 rationale objects present before this append retain their original raw JSON slices and order; this record is the only new entry.",
+      "The accepted suite continues to cover saved-board opening and recovery, transfer and source preservation, native button safety, Timeline evidence custody, and CI proof admission through permanent consumer and process tests.",
+      "The cited actual red is specifically the final #1841 observedAuthority expectation mismatch on c101; the exact affected root later passed 3/3 in both Chromium and WebKit on final d67. Earlier slices keep their own red and green chronology in the unchanged prior rationale records.",
+      "Passing this metadata validator only establishes exact-diff rationale coverage for the published-head comparison; it is not app behavior repair, full-suite qualification, or release evidence."
+    ],
+    "redEvidence": {
+      "command": "On c101a7215f4624037463f424c51977069f44de62, the existing full6 recorder executed npm test (node --experimental-vm-modules --test tests.js scripts/agent-tools/*.test.mjs) with the repository qualification-readiness path; exact recorder record: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/local-qualification376-attempt6/full-suite-recorder/2026-10-31T14-06-59-056Z-eb0bf57d-6cdd-466b-8c74-a04261e27d96.json.",
+      "failure": "The retained full6 output at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/full6-terminal-failure/ACTUAL-FAILURE-SUMMARY.stdout.txt shows Chromium and WebKit each failed at tests.js:51662 with AssertionError [ERR_ASSERTION] deepStrictEqual: actual setup included observedAuthority {stage: post-bootstrap, mode: scan, authUser: null, account: null, identity: null, revision: 0, dirty: true, cloudStatus: signed-out}; expected setup omitted it. The parent was the third failed count (4451 tests, 4381 pass, 3 fail, 67 skipped). The original recorder classification infrastructure-failure remains preserved; this is the admitted retained signal, not a rerun or fabricated launch diagnosis."
+    },
+    "replacementTests": [
+      "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources",
+      "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "RISK button safety guidance: mounted Help describes actions and keeps testing evidence internal",
+      "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict",
+      "RISK repository process: CI admission enforces reuse before repeating a passed test child"
+    ]
   }
 ]
