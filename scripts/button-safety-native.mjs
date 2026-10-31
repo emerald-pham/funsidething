@@ -36,7 +36,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
  if(control==='top-layer-release'){assert.equal(probe,true,'Top-layer sensitivity uses the existing public probe');assert.equal(selectedProfile,'ordinary','Top-layer sensitivity uses the accepted ordinary64 fixture');assert.equal(mobileYesMotion,null);assert.equal(startupOpening,null);}
  let hostedPolicy=null;
  if(process.env.CI==='true'){
-  hostedPolicy=hostedButtonPolicy();
+  hostedPolicy=hostedButtonPolicy(process.env,{allowUnselectedDispatch:selectedProfile==='ordinary'});
  }else{
   const ledgerPath=process.env.CODEX_COORDINATION_FILE||process.env.DOW_EMULATOR_COORDINATION_FILE;
   assert.ok(ledgerPath&&path.isAbsolute(ledgerPath),'Local named-engine launch requires explicit canonical coordination ledger');

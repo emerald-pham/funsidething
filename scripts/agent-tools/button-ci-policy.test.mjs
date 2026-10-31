@@ -26,6 +26,23 @@ test('hosted button consumers admit routed event policies before their runtime b
   const result=invoke(kind,boundary(sub),{CI:'true',CHAIN_TEST_EVENT_POLICY:policy,GITHUB_EVENT_NAME:event,GITHUB_REF:ref});assert.match(result.stderr,/EEXIST|file already exists/,'The actual consumer must admit the configured route before the deliberate filesystem stop: '+result.stderr);
  });
 });
+test('hosted ordinary native admits default-off manual dispatch while capped consumers refuse it',async t=>{
+ const policy={CI:'true',CHAIN_TEST_EVENT_POLICY:'workflow-dispatch-unselected-v1',GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/ordinary-manual'};
+ const ordinary=invoke('native',boundary(t),policy);
+ assert.match(ordinary.stderr,/EEXIST|file already exists/,'Required ordinary native execution reaches its deliberate filesystem boundary when optional diagnostics are off: '+ordinary.stderr);
+ const capped=invoke('memory',boundary(t),policy);
+ assert.doesNotMatch(capped.stderr,/EEXIST|file already exists/,'Unselected capped production remains refused before output or Docker');
+ for(const [name,change] of [['tag',{GITHUB_REF:'refs/tags/ordinary'}],['mismatched event',{GITHUB_EVENT_NAME:'push'}],['missing event',{GITHUB_EVENT_NAME:''}],['missing ref',{GITHUB_REF:''}]])await t.test(name,sub=>{
+  const result=invoke('native',boundary(sub),{...policy,...change});assert.doesNotMatch(result.stderr,/EEXIST|file already exists/,'Unselected ordinary dispatch still requires matching raw event and branch ref');
+ });
+ const {createMobileBundle,refreshMobileBundle}=await import('./mobile-memory-fixture.mjs');
+ const {verifyMobileMemoryReport}=await import('../button-safety-mobile-contract.mjs');
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-unselected-cap-report-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const bundle=createMobileBundle(directory,{sourceSha:'c'.repeat(40),eventPolicy:policy.CHAIN_TEST_EVENT_POLICY});
+ const hostedPolicy={eventPolicy:policy.CHAIN_TEST_EVENT_POLICY,eventName:policy.GITHUB_EVENT_NAME,eventRef:policy.GITHUB_REF};
+ bundle.report.hostedPolicy={...hostedPolicy};for(const row of [bundle.report.negativeControl,...bundle.report.cases])row.hostedPolicy={...hostedPolicy};for(const native of Object.values(bundle.native))native.hostedPolicy={...hostedPolicy};refreshMobileBundle(bundle);
+ assert.throws(()=>verifyMobileMemoryReport(bundle.report,{artifactRoot:directory,candidateCommit:'a'.repeat(40),candidateTree:'b'.repeat(40),sourceSha:'c'.repeat(40),eventPolicy:hostedPolicy.eventPolicy}),/supported hosted button policy/,'An unselected dispatch cannot be admitted as capped report evidence');
+});
 test('hosted memory policy admits only explicitly selected mobile workflow dispatch on a branch', t => {
  const selected=invoke('memory',boundary(t),{CI:'true',CHAIN_TEST_EVENT_POLICY:'optional-mobile-dispatch-v1',GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/optional-diagnostic'});
  assert.match(selected.stderr,/EEXIST|file already exists/,'The selected policy must reach the deliberate output sentinel before any capped runtime work: '+selected.stderr);

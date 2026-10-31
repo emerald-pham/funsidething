@@ -1149,11 +1149,14 @@ test('RISK transfer guidance: mounted FAQ and changelog explain one prepared arc
  const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
  const answer=question=>{assert.ok(answers.has(question),'mounted FAQ includes '+question);return answers.get(question);};
  const exported=answer('What does Export include?');
- assert.ok(exported.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Export FAQ stays within its word limit');
  assert.match(exported,/one read-only recovery archive.*accepted current board/i);
- assert.match(exported,/Copy sends the prepared archive straight to the clipboard; Download stays available while Copy is finishing and saves the same bytes if the browser completes its file download\. Copy reports success after the clipboard write completes; Download reports only that saving those same prepared bytes started/i);
- assert.match(exported,/clearly marked partial archive/);
- assert.match(exported,/pending work is never replayed.*original sources stay protected/);
+ assert.match(exported,/accepted unsaved edits.*supported unknown fields/i,'The canonical Export answer retains unsaved and unknown contents');
+ assert.match(exported,/unavailable or changing source.*partial archive/i,'The canonical Export answer retains incomplete capture safety');
+ assert.match(exported,/never saves or syncs.*original sources stay protected/i,'The canonical Export answer retains read-only source safety');
+ assert.doesNotMatch(exported,/Copy sends|Download stays|clipboard write|saving.*started/,'The Export answer keeps action statuses in their distinct answer');
+ const choices=answer('Do Download and Copy use the same archive?');
+ assert.match(choices,/same prepared archive.*Copy succeeds only after the clipboard write completes.*Download stays available while Copy is pending or refused.*reports only that saving started/i,'The direct choice answer retains same bytes, truthful completion and independent Download');
+ assert.doesNotMatch(choices,/unsaved|unknown|partial|pending work|never saves|protected sources|read.only/i,'The choice answer does not repeat the canonical archive inventory and safety explanation');
  const paste=answer('How do I paste a saved board?');
  assert.ok(paste.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ stays within its word limit');
  assert.match(paste,/Large pasted archives stay captured without filling the text box; Preview uses their complete text/);
@@ -21520,18 +21523,16 @@ test('RISK JSON COPY PASTE: Quick start explains the copy button, manual fallbac
 
 });
 
-test('RISK button safety guidance: mounted FAQ distinguishes ordinary checks and optional stress',async t=>{
+test('RISK button safety guidance: mounted Help describes actions and keeps testing evidence internal',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());
   for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
   app.ctx.openHelp();
   const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  const answer=help.match(/<dt>How are button crashes checked\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
-  assert.ok(answer,'the mounted FAQ explains how required button checks work');
-  const plain=answer.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-  assert.equal(plain,'Required checks cover ordinary button use and saved-data protection before release. Large boards and rapid presses provide optional stress checks. These checks cannot cover every device.');
-  assert.doesNotMatch(plain,/RAM|\b(?:512|1\s?GB|WebKit|Chromium|protocol|automation)\b/i,'Player help stays focused on the outcome and real limitation');
-  assert.match(help,/Button checks help catch crashes and unresponsive controls before release\./,'Settings changelog states the outcome briefly');
-  assert.doesNotMatch(help,/enforced 512 MB|browser-process budget|separate mobile WebKit.equivalent check/,'Old testing machinery is not public guidance');
+  assert.doesNotMatch(help,/How are button crashes checked\?|Required checks cover ordinary button use|Large boards and rapid presses provide optional stress checks|Button checks help catch crashes and unresponsive controls before release/,'Mounted player guidance keeps testing and release evidence internal');
+  assert.match(help,/What does Export include\?/,'Player Help retains the actual Export action');
+  assert.match(help,/Do Download and Copy use the same archive\?/,'Player Help retains the transfer choices');
+  assert.match(help,/Nothing applies until you confirm Restore/,'Player Help retains guarded Restore safety');
+  assert.doesNotMatch(help,/enforced 512 MB|browser-process budget|separate mobile WebKit.equivalent check/,'Testing machinery is not public guidance');
 
 });
 
@@ -22109,7 +22110,8 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.ok(exportFaq,'the extended FAQ explains the single Export action');
   assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
   assert.match(exportFaq,/one read-only recovery archive.*accepted current board/i);
-  assert.match(exportFaq,/Copy sends the prepared archive straight to the clipboard; Download stays available while Copy is finishing and saves the same bytes/i);
+  const copyDownloadFaq=help.match(/<dt>Do Download and Copy use the same archive\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.match(copyDownloadFaq,/same prepared archive.*Copy succeeds only after the clipboard write completes.*Download stays available while Copy is pending or refused.*reports only that saving started/i);
   assert.match(exportFaq,/pending work is never replayed.*original sources stay protected/i);
   assert.match(exportFaq,/not rendered in the page/i);
   assert.match(exportFaq,/clearly marked partial archive/i);
@@ -38012,10 +38014,10 @@ test('RISK backup help: expiry, protected-copy deletion, and archive limits rema
  assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
  assert.match(exports,/one read-only recovery archive.*accepted current board.*readable app-owned saved sources/i);
- assert.match(exports,/Copy sends the prepared archive straight to the clipboard; Download stays available while Copy is finishing and saves the same bytes if the browser completes its file download\. Copy reports success after the clipboard write completes; Download reports only that saving those same prepared bytes started\./i);
+ assert.match(answer('Do Download and Copy use the same archive?'),/same prepared archive.*Copy succeeds only after the clipboard write completes.*Download stays available while Copy is pending or refused.*reports only that saving started/i);
  assert.match(exports,/full JSON is not rendered/i);
  assert.match(exports,/unavailable or changing source.*clearly marked partial archive/i);
- assert.match(exports,/Import previews and applies only an archive.*current board after confirmation/i);
+ assert.match(backups,/Archives apply only their current board/);assert.match(answer('How do I paste a saved board?'),/Nothing applies until you confirm Restore/,'Guarded Restore safety stays in the restore answer');
  assert.match(exports,/pending work is never replayed/);
  assert.match(exports,/original sources stay protected/);
  assert.match(answer('How do I paste a saved board?'),/choose saved or recorded ratings when they differ/);
@@ -49182,6 +49184,12 @@ test('RISK repository process: CI monitor requires capped mobile job while prese
 
 test('RISK repository process: routed hosted policies reach native consumers without waiving invalid launches',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;const result=spawnSync(process.execPath,['--test','scripts/agent-tools/button-ci-policy.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4*1024*1024});assert.equal(result.error,undefined);assert.equal(result.status,0,'Actual native/capped admission must retain raw events and routed policies: '+result.stdout+'\n'+result.stderr);
+});
+
+test('RISK repository process: default manual ordinary admission retains capped refusal',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^hosted ordinary native admits default-off manual dispatch while capped consumers refuse it$','scripts/agent-tools/button-ci-policy.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});
+ assert.equal(child.error,undefined);assert.equal(child.signal,null);assert.equal(child.status,0,'The real ordinary native CLI must admit default-off dispatch while both capped consumers refuse it: '+child.stdout+'\n'+child.stderr);
 });
 
 test('RISK repository process: optional mobile diagnostics do not block ordinary reuse',t=>{
