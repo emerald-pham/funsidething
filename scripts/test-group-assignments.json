@@ -12793,6 +12793,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: ordinary native cloud recovery preserves sources through failures and retry",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
       "group": "native-process",
       "file": "tests.js"

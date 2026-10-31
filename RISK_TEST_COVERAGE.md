@@ -2292,6 +2292,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources
 - RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources
 - RISK repository process: native button gate detects errors raised by a real click
+- RISK repository process: ordinary native cloud recovery preserves sources through failures and retry
 - RISK repository process: required native button actions execute in Chromium and WebKit
 - RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes
 - RISK repository process: native rapid cloud selection preserves the two-second input burst

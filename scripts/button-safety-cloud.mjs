@@ -54,7 +54,7 @@ async function assertCurrentAndStoredFixtureBoard(ui,label,profile='workload-dia
   assertFixtureBoard(boards.stored,label+' saved board',profile);
 }
 
-async function assertPublished(remote,label){
+async function assertPublished(remote,label,profile='workload-diagnostic'){
   const root=remote.get(MANIFEST);
   assert.equal(root?.schemaVersion,2,label+' publishes a generation manifest');
   assert.ok(Number.isSafeInteger(root?.rev)&&root.rev>4,label+' advances the confirmed cloud revision');
@@ -65,7 +65,7 @@ async function assertPublished(remote,label){
   const prefix=MANIFEST+'/generations/'+root.activeGeneration+'/chunks/';
   const chunks=[...remote].filter(([key])=>key.startsWith(prefix)).map(([,chunk])=>chunk).sort((a,b)=>a.index-b.index);
   const board=JSON.parse(await globalThis.ChainStorageV2.decodeSnapshot(header,chunks));
-  assertFixtureBoard(board,label+' cloud copy');
+  assertFixtureBoard(board,label+' cloud copy',profile);
 }
 
 async function readRemoteBoard(remote,label){
@@ -311,6 +311,9 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
 
   const cloudOptions={authMode:'reconcile-held',remote:await damagedCurrentRemote()};
   await h.scenario('cloud recovery reviews, protects, and applies a source with read and write failures',cloudOptions,async ui=>{
+    assert.ok(['ordinary','workload-diagnostic'].includes(ui.profile),'Known cloud recovery fixture profile');
+    const expectedTaskCount=ui.profile==='ordinary'?64:400;
+    const forProfile=predicate=>new Function('return ('+predicate.toString().replaceAll('===400','==='+expectedTaskCount)+')')();
     await ui.page.waitForFunction(()=>window.CloudSync?.ready===true&&window.CloudSync.user==='fixture@example.invalid'&&
       window.CloudSync.status==='error'&&window.CloudSync.errorCode==='corrupt-generation'&&
       !pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy,null,{timeout:10000});
@@ -318,7 +321,7 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
     await ui.act('sync',()=>document.querySelector('#modalRoot h2')?.textContent==='Cloud sync needs attention','#syncBtn');
 
     cloudOptions.cloudReadFail=true;
-    await ui.act('review-cloud-source-recovery',async()=>{
+    await ui.act('review-cloud-source-recovery',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       const modal=document.querySelector('#modalRoot');
       return modal?.querySelector('h2')?.textContent==='Review cloud recovery sources'&&
@@ -326,8 +329,8 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
         !modal.querySelector('[data-act="choose-cloud-recovery-source"]')&&
         !modal.querySelector('[data-act="apply-cloud-source-recovery"]')&&state.tasks.length===400&&
         state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
-    },'#modalRoot [data-act="review-cloud-source-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source review read failure');
+    }),'#modalRoot [data-act="review-cloud-source-recovery"]');
+    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source review read failure',ui.profile);
 
     cloudOptions.cloudReadFail=false;
     await ui.act('review-cloud-source-recovery',()=>{
@@ -339,12 +342,12 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
         previous&&!previous.disabled&&modal.querySelectorAll('[data-act="choose-cloud-recovery-source"][aria-pressed="true"]').length===0&&
         modal.querySelector('[data-act="apply-cloud-source-recovery"]')?.disabled===true;
     },'#modalRoot [data-act="review-cloud-source-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source review');
+    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source review',ui.profile);
     await ui.act('choose-cloud-recovery-source',()=>{
       const modal=document.querySelector('#modalRoot'),choice=modal?.querySelector('[data-act="choose-cloud-recovery-source"][data-value="device"]');
       return choice?.getAttribute('aria-pressed')==='true'&&modal.querySelector('[data-act="apply-cloud-source-recovery"]')?.disabled===false;
     },'#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Selected device cloud source');
+    await assertCurrentAndStoredFixtureBoard(ui,'Selected device cloud source',ui.profile);
     // Repeated consent to the same eligible source must leave its mounted review
     // intact, including keyboard focus and the user's place in the long facts.
     await ui.page.evaluate(()=>{
@@ -366,15 +369,15 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
 
     const rootBeforeFailure=structuredClone(cloudOptions.remote.get(MANIFEST));
     cloudOptions.cloudWriteFail=true;
-    await ui.act('apply-cloud-source-recovery',async()=>{
+    await ui.act('apply-cloud-source-recovery',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       const modal=document.querySelector('#modalRoot');
       return modal?.querySelector('h2')?.textContent==='Review cloud recovery sources'&&
         /cloud confirmation is unavailable/i.test(modal.textContent)&&state.tasks.length===400&&
         state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&saved.futurePopulated?.opaque.length===1048576;
-    },'#modalRoot [data-act="apply-cloud-source-recovery"]');
+    }),'#modalRoot [data-act="apply-cloud-source-recovery"]');
     assert.deepEqual(cloudOptions.remote.get(MANIFEST),rootBeforeFailure,'A refused cloud write leaves the damaged root unchanged');
-    await assertCurrentAndStoredFixtureBoard(ui,'Refused cloud source publication');
+    await assertCurrentAndStoredFixtureBoard(ui,'Refused cloud source publication',ui.profile);
 
     cloudOptions.cloudWriteFail=false;
     await ui.act('review-cloud-source-recovery',()=>{
@@ -384,20 +387,20 @@ window.__ordinaryCloudChoiceFocus={snapshot:()=>({schemaVersion:1,installed:true
         !/cloud confirmation is unavailable/i.test(modal.textContent)&&
         !!modal.querySelector('[data-act="choose-cloud-recovery-source"][data-value="device"]');
     },'#modalRoot [data-act="review-cloud-source-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source review after refused publication');
+    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source review after refused publication',ui.profile);
     await ui.act('choose-cloud-recovery-source',()=>{
       const modal=document.querySelector('#modalRoot'),choice=modal?.querySelector('[data-act="choose-cloud-recovery-source"][data-value="device"]');
       return choice?.getAttribute('aria-pressed')==='true'&&modal.querySelector('[data-act="apply-cloud-source-recovery"]')?.disabled===false;
     },'#modalRoot [data-act="choose-cloud-recovery-source"][data-value="device"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Selected device source for retry');
-    await confirmedAction(ui,'apply-cloud-source-recovery',async()=>{
+    await assertCurrentAndStoredFixtureBoard(ui,'Selected device source for retry',ui.profile);
+    await confirmedAction(ui,'apply-cloud-source-recovery',forProfile(async()=>{
       const head=await window.ScannerDeviceStore.readHead(),saved=head?.payload?JSON.parse(head.payload):null;
       return !document.querySelector('#modalRoot .modal')&&window.CloudSync?.status==='ok'&&state.syncDirty===false&&state.syncRev>4&&
         state.tasks.length===400&&state.futurePopulated?.opaque.length===1048576&&saved?.tasks.length===400&&
         saved.futurePopulated?.opaque.length===1048576&&saved.syncDirty===false;
-    },'#modalRoot [data-act="apply-cloud-source-recovery"]');
-    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source recovery');
-    await assertPublished(cloudOptions.remote,'Cloud source recovery');
+    }),'#modalRoot [data-act="apply-cloud-source-recovery"]');
+    await assertCurrentAndStoredFixtureBoard(ui,'Cloud source recovery',ui.profile);
+    await assertPublished(cloudOptions.remote,'Cloud source recovery',ui.profile);
   });
 
   const ordinaryDecisionOptions={authMode:'reconcile-held',remote:sameBoardRemote('ordinary'),retainedCopies:3,viewport:{width:1100,height:600},decorate:board=>{board.protectedBackupIds=['gate-retained-1'];}};

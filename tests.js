@@ -17143,16 +17143,18 @@ test('RISK saved view accepted handover: normal actions and exact local work sur
  }finally{await view.context.setOffline(false);await view.browser.close();}
 });
 
-test('RISK opening board presentation: shared markup retains released cards contexts task rows and history',async()=>{
+test('RISK opening board presentation: shared markup retains released cards contexts task rows and history',async t=>{
  const baseline=spawnSync('git',['show','6c67fb0c9988d3e578579c7bb23a8ed0731aac3f:index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(baseline.status,0,baseline.stderr);
  const tasks=['first','bench','candidate'].map((id,i)=>({...syncTask(id,'Saved <'+id+'> & title'),mu:25+i,ctx:['home'],evergreen:i===2,due:i===2?'2026-10-29':null}));
  tasks.push({...syncTask('done','Finished <saved> task'),done:true,completedAt:1});
  const board=syncState({tasks,contexts:[{id:'home',name:'Home & <garden>',active:true}],chain:['first','bench'],candidateId:'candidate',listOpen:true,ctxOpen:true,histOpen:true,
   workLog:[{id:'work-log',taskId:'first',title:'Earlier <work>',kind:'worked',at:2}],settings:{...syncState().settings,dateFormat:'mdy'}}),raw=JSON.stringify(board);
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
- const old=await loadApp({...options,appSource:extractAppScript(baseline.stdout)}),current=await loadApp(options);
+ const fixtureCrypto=()=>{let serial=0;return {subtle:webcrypto.subtle,getRandomValues:webcrypto.getRandomValues.bind(webcrypto),randomUUID:()=> '17650000-0000-4000-8000-'+String(++serial).padStart(12,'0')};};
+ const at=Date.parse('2026-10-31T12:00:00Z'),old=await loadAppAtTime(at,{...options,cryptoProvider:fixtureCrypto(),appSource:extractAppScript(baseline.stdout)}),current=await loadAppAtTime(at,{...options,cryptoProvider:fixtureCrypto()});
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
  for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
+ t.diagnostic('Strict complete markup equality retains opaque Run WOOP binding '+current.shim.document.getElementById('scan').innerHTML.match(/data-act="run-woop"[^>]*data-binding="([^"]+)"/)?.[1]);
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
  assert.equal(current.shim.document.getElementById('listBody').innerHTML,old.shim.document.getElementById('listBody').innerHTML,'the shared row facts retain next-dot placement');
  const before=JSON.stringify(current.ctx.state),keys=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY],stored=keys.map(key=>current.shim.localStorage.getItem(key));
@@ -47727,16 +47729,33 @@ test('RISK repository process: native button gate detects errors raised by a rea
  });
 });
 
-test('RISK repository process: required native button actions execute in Chromium and WebKit',{timeout:750000},async t=>{
+test('RISK repository process: ordinary native cloud recovery preserves sources through failures and retry',{timeout:45000},t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+ const output=fs.mkdtempSync(path.join(base,'ordinary-cloud-recovery-')),scenario='cloud recovery reviews, protects, and applies a source with read and write failures';
+ const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);const [candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/);
+ const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine','chromium','--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:40000,maxBuffer:16*1024*1024});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The ordinary64 recovery consumer must complete every original read/write failure, protected-source, consent and retry assertion: '+result.stderr);
+ const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1);assert.equal(path.dirname(path.resolve(paths[0])),path.resolve(output));
+ const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));assert.equal(report.status,'passed');assert.equal(report.kind,'button-diagnostic');assert.equal(report.engine,'chromium');assert.equal(report.profile,'ordinary');assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);
+ assert.equal(report.scenarios.length,1);assert.equal(report.scenarios[0].name,scenario);assert.equal(report.scenarios[0].status,'passed');assert.equal(report.scenarios[0].setup.currentTasks,64);assert.equal(report.scenarios[0].setup.durableTasks,64);
+ for(const action of ['act:sync','act:review-cloud-source-recovery','act:choose-cloud-recovery-source','act:apply-cloud-source-recovery']){const outcome=report.outcomes.filter(row=>row.action===action);assert.equal(outcome.length,1);assert.equal(outcome[0].status,'passed');assert.equal(outcome[0].responsive,true);assert.ok(outcome[0].assertions>0);assert.ok(report.clicks.some(row=>row.action===action&&row.trusted===true));}
+ assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);
+ t.diagnostic('Focused ordinary recovery evidence: '+paths[0]);
+});
+
+test('RISK repository process: required native button actions execute in Chromium and WebKit', {timeout:750000},async t=>{
  const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
- const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+ const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);const [candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/);
  // This bounds the entire 90-scenario engine process, including isolated fixture
  // setup and 173 ten-press bursts. Measured WebKit exceeded five minutes while
  // individual action bounds still passed; those native bounds remain unchanged.
  for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const output=fs.mkdtempSync(path.join(base,'button-actions-'+engine+'-'));
   const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:360000,maxBuffer:16*1024*1024});
   assert.equal(result.error,undefined,'Named engine must be available: '+(result.error?.message||result.stderr));assert.equal(result.signal,null);assert.equal(result.status,0,'Every required native button scenario must pass: '+result.stderr);
   const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1,'One exact native button report per engine');
+  assert.equal(path.dirname(path.resolve(paths[0])),path.resolve(output),'The report belongs to this fresh engine attempt');const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));assert.equal(report.engine,engine);assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);
   const verified=spawnSync(process.execPath,['scripts/button-safety.mjs','--verify-report',paths[0],'--inventory','scripts/button-safety-inventory.json'],{cwd:__dirname,encoding:'utf8'});
   assert.equal(verified.status,0,'Actual native report must cover the independent required action inventory: '+verified.stderr);t.diagnostic('Button evidence: '+paths[0]);
  });
