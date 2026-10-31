@@ -52036,12 +52036,14 @@ test('RISK repository process: ordinary startup settings distinguish legacy raw8
  });
 });
 
-test('RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals',async t=>{
+test("RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals",async t=>{
  const {tmpdir}=await import('node:os'),{protectedTestFingerprint}=await import('./scripts/test-first-gate.mjs');
  const configured=process.env.CHAIN_TEST_FIRST_CLI_EVIDENCE_DIR;
  if(configured){assert.ok(path.isAbsolute(configured));assert.equal(fs.existsSync(configured),false,'CLI fixture evidence must start absent');}
- const root=configured||(fs.mkdtempSync(path.join(tmpdir(),'chain-large-diff-gate-')));
- if(configured)fs.mkdirSync(root,{recursive:true});
+ const requestedRoot=configured||(fs.mkdtempSync(path.join(tmpdir(),'chain-large-diff-gate-')));
+ if(configured)fs.mkdirSync(requestedRoot,{recursive:true});
+ // Node canonicalizes module URLs; invoke the copied CLI using that same owned path.
+ const root=fs.realpathSync(requestedRoot);
  const directory=path.join(root,'repository'),journal=path.join(root,'journal');
  fs.mkdirSync(path.join(directory,'scripts'),{recursive:true});fs.mkdirSync(journal);
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
