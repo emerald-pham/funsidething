@@ -50355,4 +50355,23 @@
       "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
     ]
   }
+,
+  {
+    "baseCommit": "c101a7215f4624037463f424c51977069f44de62",
+    "testChangesSha256": "133f0dea5994e55183ceed3aaeff00af9f85279f011c119a17ec945de2d45f98",
+    "reason": "Migrate only the existing #1841 ordinary top-layer report expectation after ordinary reports gained the required actual observedAuthority field. The retained full6 run exposes the same stale exact expectation in Chromium and WebKit.",
+    "previousBehavior": "The exact detector-sensitivity scenario expectation named its signed-out active64 setup fields but omitted observedAuthority. Both engines failed deep equality at that expectation before the root could reach its complete raw-source, geometry, refusal, and cleanup assertions.",
+    "intendedBehavior": "Keep exact deep equality and add this controlled signed-out active64 probe’s independently specified post-bootstrap authority: scan mode, null auth user/account/identity, revision zero, dirty true, and signed-out cloud status. Preserve every existing setup field and every later assertion in the root.",
+    "preservedCoverage": [
+      "The test remains one existing ordinary detector-sensitivity scenario and adds no fixture, report weakening, removed field, universal seed invariant, or product RED. Its exact comparison still includes the complete expected scenario object.",
+      "All later source, geometry, intended-target refusal, five complete phase snapshots, lossless typed source, durable/current state, backup ordering, refusal receipts, and owned-cleanup assertions remain in the same root unchanged."
+    ],
+    "redEvidence": {
+      "command": "On c101a7215f4624037463f424c51977069f44de62, the existing full6 recorder executed npm test (node --experimental-vm-modules --test tests.js scripts/agent-tools/*.test.mjs) with the repository’s qualification-readiness path; exact recorder record: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/local-qualification376-attempt6/full-suite-recorder/2026-10-31T14-06-59-056Z-eb0bf57d-6cdd-466b-8c74-a04261e27d96.json.",
+      "failure": "The retained full6 output at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation17/full6-terminal-failure/ACTUAL-FAILURE-SUMMARY.stdout.txt shows Chromium and WebKit each failed at tests.js:51662 with AssertionError [ERR_ASSERTION] deepStrictEqual: actual setup included observedAuthority {stage: post-bootstrap, mode: scan, authUser: null, account: null, identity: null, revision: 0, dirty: true, cloudStatus: signed-out}; expected setup omitted it. The parent was the third failed count (4451 tests, 4381 pass, 3 fail, 67 skipped). The original recorder classification infrastructure-failure remains preserved; this is the admitted retained signal, not a rerun or fabricated launch diagnosis."
+    },
+    "replacementTests": [
+      "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources"
+    ]
+  }
 ]
