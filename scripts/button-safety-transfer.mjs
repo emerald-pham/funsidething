@@ -107,10 +107,11 @@ export async function runTransferScenarios(h){
   await ui.act('confirm-file-restore',()=>state.tasks.some(task=>task.title==='Gate imported supported task')&&!document.querySelector('[data-act="confirm-file-restore"]'));
  });
  await h.scenario('guarded paste import rejects malformed data and retains cancelled draft',{decorate:transferFixture},async ui=>{
+  const expectedTaskCount=ui.profile==='ordinary'?64:400;
   const headBefore=await ui.page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{hash:head.hash,payload:head.payload};});
   const currentBefore=await ui.page.evaluate(()=>JSON.stringify(state));
   await ui.act('settings',()=>!!document.getElementById('stHorizon'));await ui.select('#backupRestoreSource','paste');await ui.act('import-backup',()=>!!document.getElementById('jsonBox'));
-  await ui.fill('#jsonBox','{broken synthetic JSON');await ui.act('preview-pasted-recovery',()=>!!document.getElementById('jsonBox')&&!document.querySelector('[data-act="confirm-file-restore"]')&&state.tasks.length===400);
+  await ui.fill('#jsonBox','{broken synthetic JSON');await ui.act('preview-pasted-recovery',new Function('return ('+(()=>!!document.getElementById('jsonBox')&&!document.querySelector('[data-act="confirm-file-restore"]')&&state.tasks.length===400).toString().replace('===400','==='+expectedTaskCount)+')()'));
   await ui.page.locator('#jsonBox').press('ControlOrMeta+A');
   await ui.pasteBoundary('#jsonBox',importedRaw,()=>document.getElementById('jsonBox')?.value===''&&/complete text/i.test(document.getElementById('pasteDraftStatus')?.textContent||''));
   const expectedSourceHash=createHash('sha256').update(Buffer.from(importedRaw).toString('base64')).digest('hex');
@@ -120,13 +121,13 @@ export async function runTransferScenarios(h){
   };
   await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));await assertProtectedSource();
   await ui.act('cancel-file-restore',()=>document.getElementById('jsonBox')?.value===''&&/complete text/i.test(document.getElementById('pasteDraftStatus')?.textContent||''));
-  assert.deepEqual(await ui.page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{hash:head.hash,payload:head.payload};}),headBefore,'malformed input, preview and Cancel preserve the exact saved 400-task head');
+  assert.deepEqual(await ui.page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead();return{hash:head.hash,payload:head.payload};}),headBefore,'malformed input, preview and Cancel preserve the exact saved head');
   await ui.act('preview-pasted-recovery',()=>!!document.querySelector('[data-act="confirm-file-restore"]'));await assertProtectedSource();
   await ui.act('confirm-file-restore',()=>state.tasks.some(task=>task.title==='Gate imported supported task')&&!document.querySelector('[data-act="confirm-file-restore"]'));
   await ui.waitFor(async()=>{const head=await ScannerDeviceStore.readHead(),stored=head?.payload?JSON.parse(head.payload):null;return stored?.tasks?.length===3&&stored.tasks[0].title==='Gate imported supported task';},12000,'the confirmed pasted board becomes durable');
   const expectedUnknownHash=createHash('sha256').update(JSON.stringify(imported.futurePopulated)).digest('hex');
   const actual=await ui.page.evaluate(async()=>{const head=await ScannerDeviceStore.readHead(),stored=JSON.parse(head.payload);return{live:await ChainStorageV2.hashPayload(JSON.stringify(state.futurePopulated)),durable:await ChainStorageV2.hashPayload(JSON.stringify(stored.futurePopulated)),backups:(await ScannerDeviceStore.listBackups()).filter(row=>row.kind==='before-file-restore').map(row=>row.payload)};});
-  assert.equal(actual.live,expectedUnknownHash,'the complete one-MiB unknown field survives confirmed paste');assert.equal(actual.durable,expectedUnknownHash,'the complete unknown field is durably read back');assert.ok(actual.backups.includes(currentBefore),'the exact accepted 400-task board stays protected after confirmation');
+  assert.equal(actual.live,expectedUnknownHash,'the complete one-MiB unknown field survives confirmed paste');assert.equal(actual.durable,expectedUnknownHash,'the complete unknown field is durably read back');assert.ok(actual.backups.includes(currentBefore),'the exact accepted board stays protected after confirmation');
   await ui.select('#backupRestoreSource','paste');await ui.act('import-backup',()=>!!document.getElementById('jsonBox'));
   await ui.act('close-paste-recovery',()=>!!document.getElementById('stHorizon')&&!document.getElementById('jsonBox'));
  });

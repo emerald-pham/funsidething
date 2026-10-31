@@ -2549,3 +2549,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK app fixture cleanup: callback and Promise misuse
 - RISK app fixture cleanup: nested timeout
 - RISK app fixture cleanup: nested skip and todo
+
+- RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts

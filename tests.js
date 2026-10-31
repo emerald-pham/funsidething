@@ -47905,6 +47905,25 @@ test('RISK repository process: ordinary native cloud recovery preserves sources 
  t.diagnostic('Focused ordinary recovery evidence: '+paths[0]);
 });
 
+test('RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts',{timeout:90000},async t=>{
+ const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
+ const scenario='guarded paste import rejects malformed data and retains cancelled draft';
+ const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);const [candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/);
+ for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+  const output=fs.mkdtempSync(path.join(base,'ordinary-guarded-paste-'+engine+'-'));
+  const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:40000,maxBuffer:16*1024*1024});
+  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The ordinary64 guarded-paste consumer must complete all malformed-input, byte-source, Cancel, durable import and Close assertions: '+result.stderr);
+  const reports=fs.readdirSync(output).filter(file=>file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1,'Exactly one complete native report per engine');
+  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));assert.equal(report.status,'passed');assert.equal(report.kind,'button-diagnostic');assert.equal(report.engine,engine);assert.equal(report.profile,'ordinary');assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);
+  assert.equal(report.scenarios.length,1);assert.equal(report.scenarios[0].name,scenario);assert.equal(report.scenarios[0].status,'passed');assert.equal(report.scenarios[0].setup.currentTasks,64);assert.equal(report.scenarios[0].setup.durableTasks,64);
+  for(const [action,count]of [['act:preview-pasted-recovery',3],['act:cancel-file-restore',1],['act:confirm-file-restore',1],['act:close-paste-recovery',1]]){
+   const outcomes=report.outcomes.filter(row=>row.action===action);assert.equal(outcomes.length,1,action+' one aggregated native outcome');for(const row of outcomes){assert.equal(row.status,'passed');assert.equal(row.responsive,true);assert.equal(row.assertions,count);assert.equal(row.steps.length,count);}assert.equal(report.clicks.filter(row=>row.action===action&&row.trusted===true).length,count,action+' trusted native clicks');
+  }
+  assert.deepEqual(report.errors,[]);for(const key of ['contextClosed','browserClosed','serverClosed'])assert.equal(report.cleanup[key],true);
+  t.diagnostic('Focused ordinary guarded-paste evidence: '+path.join(output,reports[0]));
+ });
+});
+
 test('RISK repository process: required native button actions execute in Chromium and WebKit', {timeout:750000},async t=>{
  const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'),'utf8'));assert.deepEqual(inventory.requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},'Both explicit user workload stories remain required');assert.deepEqual(inventory.requiredRapidActions,inventory.requiredActions,'Every required button/action family needs rapid coverage');
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable allocated native output required');fs.mkdirSync(base,{recursive:true});
@@ -50361,7 +50380,8 @@ test("RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fa
  assert.equal(appSrc.split(target).length,2,'353 later sensitivity mutates exactly one existing cloud-ACK guard');
  const specimen=appSrc.replace(target,'if(false)await fileRestoreCloudWrite(p);');
  const actualSourceHash=createHash('sha256').update(specimen).digest('hex');
- assert.equal(actualSourceHash,"82ab13b676888945851ff5f94fd3f784cf741ef8d5fd78e8dea5459585105a6f",'353 later sensitivity binds its exact independently retained broken source');
+ // #1784 retains the current exact specimen independently; historical82ab13b676888945851ff5f94fd3f784cf741ef8d5fd78e8dea5459585105a6f remains prior evidence.
+ assert.equal(actualSourceHash,"e9ede93b7bca6bde25014df338e5accd97378e9ffc803b135de29caa88e8a35a",'353 later sensitivity binds its exact independently retained broken source');
  let failure;
  try{await realFileImportCase353(t,{mode:'success',appSource:specimen});}catch(error){failure=error;}
  assert.equal(failure?.code,'ERR_ASSERTION','353 later sensitivity requires the actual consumer assertion, not setup or another error');

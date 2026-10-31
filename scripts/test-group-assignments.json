@@ -13921,6 +13921,11 @@
       "root": "RISK repository process: full-domain Timeline preserves PNG metadata and native command deadlines",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
