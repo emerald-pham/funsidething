@@ -83,13 +83,13 @@ export async function runRapidScenarios(h){
    for(const[key,node]of phase.sourceValue.entries){if(key==='opaque')assert.deepEqual(node,opaqueLiteral);else safeValue(node,phase[key],'lossless '+key);assert.ok(Object.hasOwn(phase,key));}
    assert.ok(Number.isSafeInteger(phase.capturedAtMs)&&phase.capturedAtMs>=seed.capturedAtMs);if(ordinal)assert.ok(phase.capturedAtMs>=phases[ordinal-1].capturedAtMs);
    assert.deepEqual(JSON.parse(phase.current),expectedLive,'The complete independently literal hydrated current board remains exact');assert.equal(phase.current,JSON.stringify(expectedLive));assert.equal(phase.currentHash,hash(phase.current));assert.equal(phase.durable,seedRaw,'Every original durable raw byte remains exact');assert.equal(phase.durableHash,seedHash);rowsExact(phase.backups,originalRows,'Neither transfer nor obsolete completion creates/replaces/retires any device backup');assert.deepEqual(phase.pending,pendingLiteral);assert.equal(phase.pendingOwner,null);assert.equal(phase.hold,null);assert.equal(phase.timeZone,seed.timeZone);assert.deepEqual(phase.localSources,expectedLocal);assert.deepEqual(phase.indexedDB,expectedStores,'Every raw IDB key/value, metadata, pending/typed/negativezero original stays exact');
-   exactKeys(phase.view,['documentId','ready','database','dialogOpen','status','copyDisabled','downloadDisabled','preparedRaw','clipboard','pendingCount'],'Complete actual transfer UI and external clipboard boundary');assert.ok(phase.view.documentId);assert.equal(phase.view.documentId,seed.view.documentId);assert.equal(phase.view.ready,true);assert.equal(phase.view.database,database);assert.equal(phase.view.dialogOpen,dialogIndexes.includes(ordinal));assert.equal(phase.view.status,statuses[ordinal]);assert.equal(phase.view.copyDisabled,dialogIndexes.includes(ordinal)?busyIndexes.includes(ordinal):null);assert.equal(phase.view.downloadDisabled,dialogIndexes.includes(ordinal)?false:null);assert.equal(phase.view.pendingCount,ordinal>=7?2:ordinal>=3?1:0);assert.deepEqual(phase.view.clipboard,ordinal>=7?[oldRaw,newRaw]:ordinal>=3?[oldRaw]:[],'Both actual clipboard operations retain their own complete source archive bytes');assert.equal(phase.view.preparedRaw,archiveByPhase[ordinal],'Old close retires only its transfer, and old completion never changes the replacement archive');
+   exactKeys(phase.view,['documentId','ready','database','dialogOpen','status','copyDisabled','downloadDisabled','preparedRaw','clipboard','pendingCount'],'Complete actual transfer UI and external clipboard boundary');assert.ok(phase.view.documentId);assert.equal(phase.view.documentId,seed.view.documentId);assert.equal(phase.view.ready,true);assert.equal(phase.view.database,database);assert.equal(phase.view.dialogOpen,dialogIndexes.includes(ordinal));assert.equal(phase.view.status,statuses[ordinal]);assert.equal(phase.view.copyDisabled,dialogIndexes.includes(ordinal)?busyIndexes.includes(ordinal):null);assert.equal(phase.view.downloadDisabled,dialogIndexes.includes(ordinal)?false:null);assert.equal(phase.view.pendingCount,[0,0,0,1,1,1,1,2,1,0,0][ordinal]);assert.deepEqual(phase.view.clipboard,ordinal>=7?[oldRaw,newRaw]:ordinal>=3?[oldRaw]:[],'Both actual clipboard operations retain their own complete source archive bytes');assert.equal(phase.view.preparedRaw,archiveByPhase[ordinal],'Old close retires only its transfer, and old completion never changes the replacement archive');
    assert.equal(phase.clicks.length,clickCounts[ordinal]);assert.equal(phase.presses.length,pressCounts[ordinal]);assert.deepEqual(phase.clicks.map(row=>row.action),allClicks.slice(0,clickCounts[ordinal]));assert.deepEqual(phase.presses.map(row=>row.action),allPresses.slice(0,pressCounts[ordinal]));
    for(const[kind,rows]of[['press',phase.presses],['click',phase.clicks]])rows.forEach((row,index)=>{exactKeys(row,kind==='press'?['at','action','pointerType','trusted','offeredTaskId']:['at','action','trusted','offeredTaskId'],'Complete native '+kind);assert.equal(row.trusted,true);assert.equal(row.offeredTaskId,null);if(kind==='press')assert.equal(row.pointerType,'mouse');assert.ok(Number.isFinite(row.at)&&row.at<=phase.capturedAtMs);if(index)assert.ok(row.at>rows[index-1].at);});
    phase.clicks.forEach((click,index)=>{const press=phase.presses[index];assert.ok(click.at>=press.at);assert.equal(click.action,press.action);});
   }
   for(const phase of phases)assert.deepEqual(phase.current,seed.current);
-  assert.deepEqual(obsoleteSettled.view,pendingNew.view,'After the old actual clipboard promise settles, every newer UI/busy/status/archive/clipboard field stays byte exact');assert.equal(JSON.stringify(obsoleteSettled.view),JSON.stringify(pendingNew.view));
+  const pendingNewAfterOldSettlement={...pendingNew.view,pendingCount:1};assert.deepEqual(obsoleteSettled.view,pendingNewAfterOldSettlement,'After the old actual clipboard promise settles, every newer UI/busy/status/archive/clipboard field stays byte exact and only its settled queue entry is consumed');assert.equal(JSON.stringify(obsoleteSettled.view),JSON.stringify(pendingNewAfterOldSettlement));
   assert.deepEqual(obsoleteSettled.presses,pendingNew.presses);assert.deepEqual(obsoleteSettled.clicks,pendingNew.clicks);assert.equal(obsoleteSettled.view.preparedRaw,newRaw);assert.equal(completedNew.view.preparedRaw,newRaw);assert.equal(completedNew.view.copyDisabled,false);assert.equal(completedNew.view.downloadDisabled,false);
   return{phases:names,copy:{attempted:2,accepted:2,refused:0,disappeared:0,clipboardOperations:2},archives:{old:{sha256:hash(oldRaw),bytes:Buffer.byteLength(oldRaw)},replacement:{sha256:hash(newRaw),bytes:Buffer.byteLength(newRaw)},complete:true,oldSettlementPreservedReplacement:true,replacementCompletedTruthfully:true},source:{currentHash:seed.currentHash,durableHash:seedHash,manualIds,stores:counts,localKeys,unchanged:true}};
  };
@@ -111,8 +111,8 @@ export async function runRapidScenarios(h){
  await ui.act('settings',()=>!!document.getElementById('stHorizon'));await capture('settings-new');
  await ui.act('export-backup',ready,'#modalRoot [data-act="export-backup"]');await capture('prepared-new');
  await ui.act('copy-export',()=>window.__buttonClipboardPending.length===2&&document.getElementById('copyExportButton')?.disabled===true&&document.getElementById('downloadExportButton')?.disabled===false);await capture('pending-new');
- await ui.page.evaluate(()=>window.__buttonClipboardPending[0].resolve());await ui.page.waitForTimeout(30);await capture('obsolete-settled');
- await ui.page.evaluate(()=>window.__buttonClipboardPending[1].resolve());
+ await ui.page.evaluate(()=>window.__buttonClipboardPending.shift().resolve());await ui.page.waitForTimeout(30);await capture('obsolete-settled');
+ await ui.page.evaluate(()=>window.__buttonClipboardPending.shift().resolve());
  await ui.waitFor(()=>document.getElementById('exportTransferStatus')?.textContent==='Copied the same recovery archive available from Download.'&&document.getElementById('copyExportButton')?.disabled===false&&document.getElementById('downloadExportButton')?.disabled===false,12000,'Only the newer Copy completion truthfully settles its own transfer');await capture('completed-new');await capture('final-source');
  const semantic=verifyObsoleteCopySources(snapshots);
  // Classifications bind the two already verified real UI Copy click/down pairs;
@@ -223,7 +223,7 @@ export async function runRapidScenarios(h){
   const download=await downloading;assert.equal(await download.failure(),null,'Independent trusted Download completes before clipboard settlement');const downloadedArchive=fs.readFileSync(await download.path(),'utf8');
   assert.equal(downloadedArchive,await ui.page.evaluate(()=>window.__buttonClipboard[0]),'The actual complete downloaded file bytes equal the still-pending clipboard payload');
   await capture('pending-refused',downloadedArchive);
-  await ui.page.evaluate(()=>window.__buttonClipboardPending[0].resolve());
+  await ui.page.evaluate(()=>window.__buttonClipboardPending.shift().resolve());
   await ui.waitFor(()=>document.getElementById('exportTransferStatus')?.textContent==='Copied the same recovery archive available from Download. Download started. The archive contains the exact prepared export.'&&document.getElementById('copyExportButton')?.disabled===false&&document.getElementById('downloadExportButton')?.disabled===false,12000,'Copy truthfully settles independently after Download');await capture('completed',downloadedArchive);
   await capture('downloaded',downloadedArchive);await capture('final-source',downloadedArchive);const semantic=verifyCopySources(snapshots);ui.recordRepeatOutcome(scenario,attempts,JSON.stringify(semantic));
  });
@@ -282,7 +282,7 @@ export async function runRapidScenarios(h){
   await ui.act('download-export',()=>document.getElementById('exportTransferStatus')?.textContent==='Copying the prepared archive… Download started. The archive contains the exact prepared export.'&&document.getElementById('copyExportButton')?.disabled===true&&document.getElementById('downloadExportButton')?.disabled===false);
   const download=await pendingDownload;assert.equal(await download.failure(),null,'Download succeeds while the clipboard promise remains pending');
   const downloadedArchive=fs.readFileSync(await download.path(),'utf8');assert.equal(downloadedArchive,await ui.page.evaluate(()=>window.__buttonClipboard[0]),'The complete trusted Download bytes equal the pending clipboard archive');
-  await ui.page.evaluate(()=>window.__buttonClipboardPending[0].resolve());
+  await ui.page.evaluate(()=>window.__buttonClipboardPending.shift().resolve());
   await ui.waitFor(()=>!document.querySelector('[data-act="copy-export"]').disabled&&/copied/i.test(document.getElementById('exportTransferStatus').textContent));
   assert.equal(await rawIdentity(ui),original,'Busy Copy reentry retains exact original sources');
  });
@@ -300,12 +300,12 @@ export async function runRapidScenarios(h){
   await ui.act('settings',()=>!!document.getElementById('stHorizon'));await ui.act('export-backup',ready);
   await ui.act('copy-export',()=>window.__buttonClipboardPending.length===2&&document.querySelector('[data-act="copy-export"]').disabled);
   const before=await ui.page.locator('#exportTransferStatus').textContent();
-  await ui.page.evaluate(()=>window.__buttonClipboardPending[0].resolve());
+  await ui.page.evaluate(()=>window.__buttonClipboardPending.shift().resolve());
   await ui.page.waitForTimeout(30);
   assert.equal(await ui.page.locator('[data-act="copy-export"]').isDisabled(),true,'obsolete clipboard completion must keep the new transfer busy');
   assert.equal(await ui.page.locator('[data-act="download-export"]').isDisabled(),false,'obsolete clipboard completion preserves the new transfer Download availability');
   assert.equal(await ui.page.locator('#exportTransferStatus').textContent(),before,'obsolete clipboard completion cannot replace the new status');
-  await ui.page.evaluate(()=>window.__buttonClipboardPending[1].resolve());
+  await ui.page.evaluate(()=>window.__buttonClipboardPending.shift().resolve());
   await ui.waitFor(()=>!document.querySelector('[data-act="copy-export"]').disabled&&/copied/i.test(document.getElementById('exportTransferStatus').textContent));
  });
 }
