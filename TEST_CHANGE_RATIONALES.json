@@ -49406,5 +49406,255 @@
       }
     },
     "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288"
+  },
+  {
+    "testChangesSha256": "3006d6b67a3f834d9249397ed533667511473274f6ab228fd1df44faa6502c51",
+    "reason": "Atomic1798 aligns the existing mounted repair-export Help consumer with the explicitly approved independent Download guidance while preserving every other assertion. Atomic1795 binds this narrow migration and the inherited accepted operation contracts to the actual comparison base; earlier1444 rationale objects and their evidence are retained unchanged.",
+    "previousBehavior": "The actual clean cf3387a final acceptance run failed only because this Help consumer expected \"If copying is unavailable, choose Download\", contradicting the already delivered and accepted wording that also covers Copy still finishing. All earlier cumulative test migrations retain their own original rationale records and scope.",
+    "intendedBehavior": "The same mounted Help route and identically named test require \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Only that regex and the declaration quote spelling change; no application, source inventory, fixture, timeout, budget, required set or other assertion changes.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status"
+    ],
+    "preservedCoverage": [
+      "All1444 preexisting rationale objects remain byte-semantically identical and in order; inherited accepted app/native tests and their earlier metadata are preserved.",
+      "The actual openHelp mounted consumer, same root identity, Settings Export Copy, Import Paste JSON, repair archive inclusions, partial sources, exact original protection and debug-log guidance assertions remain present.",
+      "The independent Download behavior, Copy settlement, stale success/rejection, full archive and saved-source equalities, native phase kernels and installed-client required registrations remain unchanged.",
+      "All application and native-consumer inputs remain exact original cf3387a bytes. Root name, file and existing core assignment remain unchanged; no registration, source-inventory or required-coverage edits are needed."
+    ],
+    "redEvidence": {
+      "command": "[\"node\",\"--experimental-vm-modules\",\"--test\",\"--test-name-pattern=^(RISK MANUAL JSON EXPORT:|RISK JSON COPY PASTE:|RISK DATABASE REPAIR EXPORT:|RISK RECOVERY EXPORT:|RISK transfer guidance:|RISK Settings transfer consolidation:|PWA cache contract:|PWA contract:|RISK PWA release metadata:)\",\"tests.js\"]",
+      "failure": "Actual recorded final GREEN attempt at clean cf3387a completed with38tests/37pass/1fail/0skip/0cancelled. The named Help assertion raised ERR_ASSERTION because /If copying is unavailable, choose Download/i did not match approved actual \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Record91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98 is retained before this fresh-owner edit. This is the prior acceptance discrepancy, not a new productRED."
+    },
+    "comparisonBase": "19abc1b0d98766ae9f721f5433a6f6730585b54b",
+    "cumulativeEvidence": {
+      "comparisonBase": "19abc1b0d98766ae9f721f5433a6f6730585b54b",
+      "actualMergeBase": "19abc1b0d98766ae9f721f5433a6f6730585b54b",
+      "sourceBaseline": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "currentTestsSha256": "627b9a0acadd538d7b9f43cd3ab2c990d9feec45edd41b06cb272949281cf45b",
+      "preexistingPrefixCount": 1444,
+      "preexistingPrefixBytesSha256": "8678782b64a0f99f3b89529dd8d796ca90fad76ab45655e2c838a948a43011d6",
+      "all1444PriorObjectsPreserved": true,
+      "inheritedExactBaseRationaleFingerprint": "2cc480af77ff13697ef9fc32107fa694700b19875ce8afe369722c7c1d779154",
+      "metadataHasNoNewBehavioralRedClaim": true
+    },
+    "evidenceChronology": {
+      "baselineSource": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "baselineTree": "dc182aad8bd4c8b9ebe443cbf4071790fc9597c5",
+      "baselineRecord": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/pending-copy-acceptance-owner-1792-1795/logs/final-focused-units/2026-10-31T08-39-20-003Z-33a7f538-553a-46a7-b252-5deacf69129b.json",
+      "baselineRecordSha256": "91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98",
+      "baselineDeclaredPurpose": "green",
+      "baselineFinishedAt": "2026-10-31T08:39:28.258Z",
+      "baselineOutcome": "assertion-failure",
+      "baselineCounts": {
+        "tests": 38,
+        "pass": 37,
+        "fail": 1,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "classification": "Observed clean-source final acceptance discrepancy in a legacy guidance expectation, not a new application defect or a fabricated preimplementation product RED.",
+      "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
+      "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
+    }
+  },
+  {
+    "testChangesSha256": "f5733738d94204cec83fe50679f29fd5f7c19f718e634cc9a414feadd7ec2273",
+    "reason": "Atomic1798 aligns the existing mounted repair-export Help consumer with the explicitly approved independent Download guidance while preserving every other assertion. Atomic1795 binds this narrow migration and the inherited accepted operation contracts to the actual comparison base; earlier1444 rationale objects and their evidence are retained unchanged.",
+    "previousBehavior": "The actual clean cf3387a final acceptance run failed only because this Help consumer expected \"If copying is unavailable, choose Download\", contradicting the already delivered and accepted wording that also covers Copy still finishing. All earlier cumulative test migrations retain their own original rationale records and scope.",
+    "intendedBehavior": "The same mounted Help route and identically named test require \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Only that regex and the declaration quote spelling change; no application, source inventory, fixture, timeout, budget, required set or other assertion changes.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status"
+    ],
+    "preservedCoverage": [
+      "All1444 preexisting rationale objects remain byte-semantically identical and in order; inherited accepted app/native tests and their earlier metadata are preserved.",
+      "The actual openHelp mounted consumer, same root identity, Settings Export Copy, Import Paste JSON, repair archive inclusions, partial sources, exact original protection and debug-log guidance assertions remain present.",
+      "The independent Download behavior, Copy settlement, stale success/rejection, full archive and saved-source equalities, native phase kernels and installed-client required registrations remain unchanged.",
+      "All application and native-consumer inputs remain exact original cf3387a bytes. Root name, file and existing core assignment remain unchanged; no registration, source-inventory or required-coverage edits are needed."
+    ],
+    "redEvidence": {
+      "command": "[\"node\",\"--experimental-vm-modules\",\"--test\",\"--test-name-pattern=^(RISK MANUAL JSON EXPORT:|RISK JSON COPY PASTE:|RISK DATABASE REPAIR EXPORT:|RISK RECOVERY EXPORT:|RISK transfer guidance:|RISK Settings transfer consolidation:|PWA cache contract:|PWA contract:|RISK PWA release metadata:)\",\"tests.js\"]",
+      "failure": "Actual recorded final GREEN attempt at clean cf3387a completed with38tests/37pass/1fail/0skip/0cancelled. The named Help assertion raised ERR_ASSERTION because /If copying is unavailable, choose Download/i did not match approved actual \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Record91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98 is retained before this fresh-owner edit. This is the prior acceptance discrepancy, not a new productRED."
+    },
+    "comparisonBase": "fe442cf79a440579a04f7157b75b315187b1b2b2",
+    "cumulativeEvidence": {
+      "comparisonBase": "fe442cf79a440579a04f7157b75b315187b1b2b2",
+      "actualMergeBase": "fe442cf79a440579a04f7157b75b315187b1b2b2",
+      "sourceBaseline": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "currentTestsSha256": "627b9a0acadd538d7b9f43cd3ab2c990d9feec45edd41b06cb272949281cf45b",
+      "preexistingPrefixCount": 1444,
+      "preexistingPrefixBytesSha256": "8678782b64a0f99f3b89529dd8d796ca90fad76ab45655e2c838a948a43011d6",
+      "all1444PriorObjectsPreserved": true,
+      "inheritedExactBaseRationaleFingerprint": "045dcf090bc25ad5ff3c1958f47de7febd593c53a7bdf08f541ba830acb6a1a5",
+      "metadataHasNoNewBehavioralRedClaim": true
+    },
+    "evidenceChronology": {
+      "baselineSource": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "baselineTree": "dc182aad8bd4c8b9ebe443cbf4071790fc9597c5",
+      "baselineRecord": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/pending-copy-acceptance-owner-1792-1795/logs/final-focused-units/2026-10-31T08-39-20-003Z-33a7f538-553a-46a7-b252-5deacf69129b.json",
+      "baselineRecordSha256": "91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98",
+      "baselineDeclaredPurpose": "green",
+      "baselineFinishedAt": "2026-10-31T08:39:28.258Z",
+      "baselineOutcome": "assertion-failure",
+      "baselineCounts": {
+        "tests": 38,
+        "pass": 37,
+        "fail": 1,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "classification": "Observed clean-source final acceptance discrepancy in a legacy guidance expectation, not a new application defect or a fabricated preimplementation product RED.",
+      "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
+      "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
+    }
+  },
+  {
+    "testChangesSha256": "1e24c6cc03066d5552953817813004b2eb91f70dee70b26771f463ae409d5825",
+    "reason": "Atomic1798 aligns the existing mounted repair-export Help consumer with the explicitly approved independent Download guidance while preserving every other assertion. Atomic1795 binds this narrow migration and the inherited accepted operation contracts to the actual comparison base; earlier1444 rationale objects and their evidence are retained unchanged.",
+    "previousBehavior": "The actual clean cf3387a final acceptance run failed only because this Help consumer expected \"If copying is unavailable, choose Download\", contradicting the already delivered and accepted wording that also covers Copy still finishing. All earlier cumulative test migrations retain their own original rationale records and scope.",
+    "intendedBehavior": "The same mounted Help route and identically named test require \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Only that regex and the declaration quote spelling change; no application, source inventory, fixture, timeout, budget, required set or other assertion changes.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status"
+    ],
+    "preservedCoverage": [
+      "All1444 preexisting rationale objects remain byte-semantically identical and in order; inherited accepted app/native tests and their earlier metadata are preserved.",
+      "The actual openHelp mounted consumer, same root identity, Settings Export Copy, Import Paste JSON, repair archive inclusions, partial sources, exact original protection and debug-log guidance assertions remain present.",
+      "The independent Download behavior, Copy settlement, stale success/rejection, full archive and saved-source equalities, native phase kernels and installed-client required registrations remain unchanged.",
+      "All application and native-consumer inputs remain exact original cf3387a bytes. Root name, file and existing core assignment remain unchanged; no registration, source-inventory or required-coverage edits are needed."
+    ],
+    "redEvidence": {
+      "command": "[\"node\",\"--experimental-vm-modules\",\"--test\",\"--test-name-pattern=^(RISK MANUAL JSON EXPORT:|RISK JSON COPY PASTE:|RISK DATABASE REPAIR EXPORT:|RISK RECOVERY EXPORT:|RISK transfer guidance:|RISK Settings transfer consolidation:|PWA cache contract:|PWA contract:|RISK PWA release metadata:)\",\"tests.js\"]",
+      "failure": "Actual recorded final GREEN attempt at clean cf3387a completed with38tests/37pass/1fail/0skip/0cancelled. The named Help assertion raised ERR_ASSERTION because /If copying is unavailable, choose Download/i did not match approved actual \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Record91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98 is retained before this fresh-owner edit. This is the prior acceptance discrepancy, not a new productRED."
+    },
+    "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "cumulativeEvidence": {
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "actualMergeBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "sourceBaseline": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "currentTestsSha256": "627b9a0acadd538d7b9f43cd3ab2c990d9feec45edd41b06cb272949281cf45b",
+      "preexistingPrefixCount": 1444,
+      "preexistingPrefixBytesSha256": "8678782b64a0f99f3b89529dd8d796ca90fad76ab45655e2c838a948a43011d6",
+      "all1444PriorObjectsPreserved": true,
+      "inheritedExactBaseRationaleFingerprint": "0f5c18d74fd8d24d87e87524fa2c05fcdeca89f203aa609c0776457ddebbcdbb",
+      "metadataHasNoNewBehavioralRedClaim": true
+    },
+    "evidenceChronology": {
+      "baselineSource": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "baselineTree": "dc182aad8bd4c8b9ebe443cbf4071790fc9597c5",
+      "baselineRecord": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/pending-copy-acceptance-owner-1792-1795/logs/final-focused-units/2026-10-31T08-39-20-003Z-33a7f538-553a-46a7-b252-5deacf69129b.json",
+      "baselineRecordSha256": "91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98",
+      "baselineDeclaredPurpose": "green",
+      "baselineFinishedAt": "2026-10-31T08:39:28.258Z",
+      "baselineOutcome": "assertion-failure",
+      "baselineCounts": {
+        "tests": 38,
+        "pass": 37,
+        "fail": 1,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "classification": "Observed clean-source final acceptance discrepancy in a legacy guidance expectation, not a new application defect or a fabricated preimplementation product RED.",
+      "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
+      "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
+    }
+  },
+  {
+    "testChangesSha256": "cddd06f3865cb1fdd0887663ce1ab7a6a91deb7b55ca9f0b4df1da8869dec7e9",
+    "reason": "Atomic1798 aligns the existing mounted repair-export Help consumer with the explicitly approved independent Download guidance while preserving every other assertion. Atomic1795 binds this narrow migration and the inherited accepted operation contracts to the actual comparison base; earlier1444 rationale objects and their evidence are retained unchanged.",
+    "previousBehavior": "The actual clean cf3387a final acceptance run failed only because this Help consumer expected \"If copying is unavailable, choose Download\", contradicting the already delivered and accepted wording that also covers Copy still finishing. All earlier cumulative test migrations retain their own original rationale records and scope.",
+    "intendedBehavior": "The same mounted Help route and identically named test require \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Only that regex and the declaration quote spelling change; no application, source inventory, fixture, timeout, budget, required set or other assertion changes.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status"
+    ],
+    "preservedCoverage": [
+      "All1444 preexisting rationale objects remain byte-semantically identical and in order; inherited accepted app/native tests and their earlier metadata are preserved.",
+      "The actual openHelp mounted consumer, same root identity, Settings Export Copy, Import Paste JSON, repair archive inclusions, partial sources, exact original protection and debug-log guidance assertions remain present.",
+      "The independent Download behavior, Copy settlement, stale success/rejection, full archive and saved-source equalities, native phase kernels and installed-client required registrations remain unchanged.",
+      "All application and native-consumer inputs remain exact original cf3387a bytes. Root name, file and existing core assignment remain unchanged; no registration, source-inventory or required-coverage edits are needed."
+    ],
+    "redEvidence": {
+      "command": "[\"node\",\"--experimental-vm-modules\",\"--test\",\"--test-name-pattern=^(RISK MANUAL JSON EXPORT:|RISK JSON COPY PASTE:|RISK DATABASE REPAIR EXPORT:|RISK RECOVERY EXPORT:|RISK transfer guidance:|RISK Settings transfer consolidation:|PWA cache contract:|PWA contract:|RISK PWA release metadata:)\",\"tests.js\"]",
+      "failure": "Actual recorded final GREEN attempt at clean cf3387a completed with38tests/37pass/1fail/0skip/0cancelled. The named Help assertion raised ERR_ASSERTION because /If copying is unavailable, choose Download/i did not match approved actual \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Record91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98 is retained before this fresh-owner edit. This is the prior acceptance discrepancy, not a new productRED."
+    },
+    "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288",
+    "cumulativeEvidence": {
+      "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "actualMergeBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "sourceBaseline": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "currentTestsSha256": "627b9a0acadd538d7b9f43cd3ab2c990d9feec45edd41b06cb272949281cf45b",
+      "preexistingPrefixCount": 1444,
+      "preexistingPrefixBytesSha256": "8678782b64a0f99f3b89529dd8d796ca90fad76ab45655e2c838a948a43011d6",
+      "all1444PriorObjectsPreserved": true,
+      "inheritedExactBaseRationaleFingerprint": "e7ea52e005fc37350f07a38f2bab96bf71e3e1007e1529b99ea80299475bae59",
+      "metadataHasNoNewBehavioralRedClaim": true
+    },
+    "evidenceChronology": {
+      "baselineSource": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "baselineTree": "dc182aad8bd4c8b9ebe443cbf4071790fc9597c5",
+      "baselineRecord": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/pending-copy-acceptance-owner-1792-1795/logs/final-focused-units/2026-10-31T08-39-20-003Z-33a7f538-553a-46a7-b252-5deacf69129b.json",
+      "baselineRecordSha256": "91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98",
+      "baselineDeclaredPurpose": "green",
+      "baselineFinishedAt": "2026-10-31T08:39:28.258Z",
+      "baselineOutcome": "assertion-failure",
+      "baselineCounts": {
+        "tests": 38,
+        "pass": 37,
+        "fail": 1,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "classification": "Observed clean-source final acceptance discrepancy in a legacy guidance expectation, not a new application defect or a fabricated preimplementation product RED.",
+      "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
+      "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
+    }
+  },
+  {
+    "testChangesSha256": "b2ad088587486b105d43de33a37b0ce7f7cc3e8ccc8e373f2490889222cf45c6",
+    "reason": "Atomic1798 aligns the existing mounted repair-export Help consumer with the explicitly approved independent Download guidance while preserving every other assertion. Atomic1795 binds this narrow migration and the inherited accepted operation contracts to the actual comparison base; earlier1444 rationale objects and their evidence are retained unchanged.",
+    "previousBehavior": "The actual clean cf3387a final acceptance run failed only because this Help consumer expected \"If copying is unavailable, choose Download\", contradicting the already delivered and accepted wording that also covers Copy still finishing. All earlier cumulative test migrations retain their own original rationale records and scope.",
+    "intendedBehavior": "The same mounted Help route and identically named test require \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Only that regex and the declaration quote spelling change; no application, source inventory, fixture, timeout, budget, required set or other assertion changes.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status"
+    ],
+    "preservedCoverage": [
+      "All1444 preexisting rationale objects remain byte-semantically identical and in order; inherited accepted app/native tests and their earlier metadata are preserved.",
+      "The actual openHelp mounted consumer, same root identity, Settings Export Copy, Import Paste JSON, repair archive inclusions, partial sources, exact original protection and debug-log guidance assertions remain present.",
+      "The independent Download behavior, Copy settlement, stale success/rejection, full archive and saved-source equalities, native phase kernels and installed-client required registrations remain unchanged.",
+      "All application and native-consumer inputs remain exact original cf3387a bytes. Root name, file and existing core assignment remain unchanged; no registration, source-inventory or required-coverage edits are needed."
+    ],
+    "redEvidence": {
+      "command": "[\"node\",\"--experimental-vm-modules\",\"--test\",\"--test-name-pattern=^(RISK MANUAL JSON EXPORT:|RISK JSON COPY PASTE:|RISK DATABASE REPAIR EXPORT:|RISK RECOVERY EXPORT:|RISK transfer guidance:|RISK Settings transfer consolidation:|PWA cache contract:|PWA contract:|RISK PWA release metadata:)\",\"tests.js\"]",
+      "failure": "Actual recorded final GREEN attempt at clean cf3387a completed with38tests/37pass/1fail/0skip/0cancelled. The named Help assertion raised ERR_ASSERTION because /If copying is unavailable, choose Download/i did not match approved actual \"If copying is unavailable or still finishing, Download saves the same prepared archive\". Record91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98 is retained before this fresh-owner edit. This is the prior acceptance discrepancy, not a new productRED."
+    },
+    "comparisonBase": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+    "cumulativeEvidence": {
+      "comparisonBase": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "actualMergeBase": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "sourceBaseline": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "currentTestsSha256": "627b9a0acadd538d7b9f43cd3ab2c990d9feec45edd41b06cb272949281cf45b",
+      "preexistingPrefixCount": 1444,
+      "preexistingPrefixBytesSha256": "8678782b64a0f99f3b89529dd8d796ca90fad76ab45655e2c838a948a43011d6",
+      "all1444PriorObjectsPreserved": true,
+      "inheritedExactBaseRationaleFingerprint": null,
+      "metadataHasNoNewBehavioralRedClaim": true
+    },
+    "evidenceChronology": {
+      "baselineSource": "cf3387a5e563d8ad774d47af0967926d5a5c2d4e",
+      "baselineTree": "dc182aad8bd4c8b9ebe443cbf4071790fc9597c5",
+      "baselineRecord": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/current-continuation15/pending-copy-acceptance-owner-1792-1795/logs/final-focused-units/2026-10-31T08-39-20-003Z-33a7f538-553a-46a7-b252-5deacf69129b.json",
+      "baselineRecordSha256": "91ee88c407549f3758829db7c57bf78c09e1f15d81f5b65e43f5bf52133a2d98",
+      "baselineDeclaredPurpose": "green",
+      "baselineFinishedAt": "2026-10-31T08:39:28.258Z",
+      "baselineOutcome": "assertion-failure",
+      "baselineCounts": {
+        "tests": 38,
+        "pass": 37,
+        "fail": 1,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "classification": "Observed clean-source final acceptance discrepancy in a legacy guidance expectation, not a new application defect or a fabricated preimplementation product RED.",
+      "authority": "Atomic1798 deliberately migrates only the contradictory Help expectation to current1299 criterion5/story10 and already accepted1793 independent Download guidance.",
+      "inheritedEvidence": "All1444 prior rationale objects remain ordered and unchanged; their original commands, app/native source identities, accepted protections, and failed/incomplete outcomes remain in custody."
+    }
   }
 ]

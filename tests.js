@@ -21901,11 +21901,11 @@ test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without in
   assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before,'source-only recovery archive changes no saved database row');
 });
 
-test('RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status',async t=>{
+test("RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",async t=>{
   const app=await loadApp();t.after(()=>app.dispose());for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const transfer=help.match(/<li>(Settings now has one Import.*?)<\/li>/)?.[1];assert.equal(transfer,'Settings now has one Import and one Export, with separate Copy and Download choices. Exports include accepted unsaved edits and readable recovery sources; originals stay protected, and incomplete archives are marked partial.','The mounted changelog gives the transfer outcome without late-Copy or draft-rendering mechanics');
   const copy=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(copy);
-  assert.match(copy,/Settings.*Export.*Copy/i);assert.match(copy,/If copying is unavailable, choose Download/i);assert.match(copy,/Import.*Paste JSON/i);
+  assert.match(copy,/Settings.*Export.*Copy/i);assert.match(copy,/If copying is unavailable or still finishing, Download saves the same prepared archive/i);assert.match(copy,/Import.*Paste JSON/i);
   const paste=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.match(paste,/Cancel and Close keep it.*current board stay protected before preview.*Nothing applies until you confirm Restore/);
   const included=help.match(/<dt>What does Export include\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(included);
   assert.match(included,/accepted current board.*readable app-owned saved sources.*Debug log/i);
