@@ -52500,5 +52500,51 @@
     },
     "integrationSourceCommit": "36e0550fb1dc84095425d5cddcbb97db5fb8cbc3",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "920a3cfb25d4cb0597ff169913c6609ac57ac184d10ffb753dedd006950bdfa6",
+    "reason": "Atomic #1931 repairs the existing complete Export verifier observation boundary after its second substantive hosted failure, using real measured time and finite fail-closed re-arming without weakening original feature assertions.",
+    "previousBehavior": "The existing source-preservation check requested one setTimeout450 and treated its resolution as proof of at least450ms, although the independent hrtime assertion could still observe less than450ms. Hosted WebKit actually failed that assertion after the prior1896 repair; diagnostics followed it and did not report the undershoot.",
+    "intendedBehavior": "The existing complete Download consumer begins its full source observation only after actual monotonic Node elapsed time reaches450ms. Each early timer wake re-arms only for the rounded-up measured remainder, stopping after at most16wakes before the unchanged fail-closed assertion. Test-only native, early-once and early-always timer-resolution controls leave actual hrtime and the separately held Playwright app-save clock untouched. Full normal and early-once native consumers pass both engines; repeated immediate wakes stop at16 and fail the original minimum before any source observation. Node24 macOS default-heap local evidence does not establish Node22 Linux CI or release.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+    ],
+    "preservedCoverage": [
+      "All118 original assertion-bearing lines remain exact and ordered, including complete accepted-unsaved/current-versus-durable archive, strict native UTF8 bytes and Copy equality, all saved/unknown/typed/pending/opaque/backup rows, normal-save holding/release, refusal and Close, unfinished draft and device/recovery/cloud authority. Minimum450ms is unchanged; no epsilon, app, fixture, native budget, runtime/package/CI, FAQ or public behavior change. The existing1533 rationale object literals and order are preserved."
+    ],
+    "redEvidence": {
+      "command": "python3 /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-deadline1931-worker/run-focused.py preimplementation-early-once early-once preimplementation-red; recorder 2026-11-01T17-13-22-930Z-75be1915-9a7a-4bd1-8f4f-cc4a026a9dd5 retained under preimplementation-early-once/recorder.",
+      "failure": "Actual preimplementation verifier RED: both Chromium and WebKit fail the unchanged real hrtime >=450 assertion before source observation after an injected early timer resolution (actual elapsed0.021375ms and0.014792ms). This is test-verifier RED, not app RED. Separate actual canonical run41326403783/1 job124907428862 on checkout2e5d3a63613dcd7f997922725dc17d7d6343bd7e failed WebKit at the same assertion; hosted exact undershoot is unreported. Original ZIP sha256c1ba2d017f1adab871d3acd4e3982e3f6193728a70d52f1693c534e4e2554316 remains retained."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "f63e8299025d05275840e1e00c7e682a93327a19643fb250be0738b7e4771683",
+    "reason": "Preserve the exact cumulative #1299/#1923 main-comparison coverage and append the bounded #1931 complete Export timer-observation repair; inherited original RED receipts remain historical, while the new verifier RED is separately recorded.",
+    "previousBehavior": "The prior aggregate f06630bd record matched only the earlier source against8cd524a. The branch has no upstream, so the focused selected-base preflight did not check the distinct outgoing0d41 comparison. On clean b09 the real outgoing gate failed missing exact rationale; after fixture source finalized at36e0550fb1dc84095425d5cddcbb97db5fb8cbc3 the actual outgoing gate again failed for missing exact cumulative metadata. New #1931 boundary: The existing source-preservation check requested one setTimeout450 and treated its resolution as proof of at least450ms, although the independent hrtime assertion could still observe less than450ms. Hosted WebKit actually failed that assertion after the prior1896 repair; diagnostics followed it and did not report the undershoot.",
+    "intendedBehavior": "The existing unchanged validator accepts this exact cumulative tests.js fingerprint against8cd524a7f0ab7a25b6689244722ae3c5baf861c8 while preserving every original source-bound rationale and chronology. The final fixture repair also retains its own exact b09 source record. No upstream, gate, workflow or assertion is bypassed or weakened. New #1931 boundary: The existing complete Download consumer begins its full source observation only after actual monotonic Node elapsed time reaches450ms. Each early timer wake re-arms only for the rounded-up measured remainder, stopping after at most16wakes before the unchanged fail-closed assertion. Test-only native, early-once and early-always timer-resolution controls leave actual hrtime and the separately held Playwright app-save clock untouched. Full normal and early-once native consumers pass both engines; repeated immediate wakes stop at16 and fail the original minimum before any source observation. Node24 macOS default-heap local evidence does not establish Node22 Linux CI or release.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+    ],
+    "preservedCoverage": [
+      "All1530 original rationale object literals remain unchanged and ordered, followed by the unchanged source-bound #1922 record. Cumulative records index their existing meaningful RED/GREEN evidence rather than replacing it.",
+      "The original #1898 pre-title daily-source assertion chronology and #1911 native fractional trusted-click receipt failures remain distinct. Current #1922 static guard RED preceded the first fix; the actual named async callback witness failed later after a passing full selected native lifecycle and is explicitly later-baseline-sensitivity.",
+      "The exact existing ordinary and fractional roots now assert an actual callback-reference constructor witness, with unchanged names, IDs and options, unchanged12-second stable async source capture, complete64-task B0/B1/B2/U1/U2 history/source/typed-byte/pending/backups/order assertions, exact pixels and original time/action limits.",
+      "The inherited #1902/#1904 Linux process/stream/cleanup/clock source-bound RED/GREEN records, independent literal24 hosted native catalog and required uninstrumented verdict remain protected; protocol doubles and diagnostic records claim no actual Linux native qualification.",
+      "No app, rules, assets, FAQ, version, dependency, workflow, inventory, assignment or gate changed for this metadata leaf. Missing metadata is a structural admission failure and is not reported as an app failure or meaningful feature RED.",
+      "All118 original assertion-bearing lines remain exact and ordered, including complete accepted-unsaved/current-versus-durable archive, strict native UTF8 bytes and Copy equality, all saved/unknown/typed/pending/opaque/backup rows, normal-save holding/release, refusal and Close, unfinished draft and device/recovery/cloud authority. Minimum450ms is unchanged; no epsilon, app, fixture, native budget, runtime/package/CI, FAQ or public behavior change. The existing1533 rationale object literals and order are preserved."
+    ],
+    "redEvidence": {
+      "command": "Existing source-bound rationale redEvidence.command fields retain original feature/process commands. For metadata only: absolute Node24.19 scripts/test-first-gate.mjs0d41e482b746622b8f80ba89c9b27a290a7b660b through record-run on clean b09 and on final fixture commit36e0550fb1dc84095425d5cddcbb97db5fb8cbc3. New #1931 command: python3 /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-deadline1931-worker/run-focused.py preimplementation-early-once early-once preimplementation-red; recorder 2026-11-01T17-13-22-930Z-75be1915-9a7a-4bd1-8f4f-cc4a026a9dd5 retained under preimplementation-early-once/recorder.",
+      "failure": "Metadata-only recorder6fd184f1 on clean b09 and828c9e06 on final fixture source both exited1: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json. These failures do not constitute an app/feature RED. Meaningful original chronology remains in unchanged #1898/#1911/#1902/#1904 records; #1922 guard56753168 failed[49172] vs[] before its first functional edit, and later named async challengecb245d9d measured AsyncFunction vs Function after the full selected native child passed. New #1931 observed verifier failure: Actual preimplementation verifier RED: both Chromium and WebKit fail the unchanged real hrtime >=450 assertion before source observation after an injected early timer resolution (actual elapsed0.021375ms and0.014792ms). This is test-verifier RED, not app RED. Separate actual canonical run41326403783/1 job124907428862 on checkout2e5d3a63613dcd7f997922725dc17d7d6343bd7e failed WebKit at the same assertion; hosted exact undershoot is unreported. Original ZIP sha256c1ba2d017f1adab871d3acd4e3982e3f6193728a70d52f1693c534e4e2554316 remains retained."
+    },
+    "inheritedRationale": {
+      "index": 1531,
+      "testChangesSha256": "ef97fc9b479eca811166caa9504f2ee6493d9fb440e7c8e7816d85b2318465b4",
+      "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8"
+    }
   }
 ]

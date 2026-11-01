@@ -16977,8 +16977,10 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
  });
 });
 
-test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources', async t => {
+test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources',async t=>{
  await openingBoardFixture(t);
+ const observationControl=process.env.CHAIN_EXPORT_OBSERVATION_CONTROL||'native';
+ assert.ok(['native','early-once','early-always'].includes(observationControl),'the Export observation control must name its actual timer behavior');
  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs'),{isDeepStrictEqual}=await import('node:util');
  for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
   const backupPayload='{"futureNativeDownloadBackup":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'native-download-proof-backup',day:'2026-10-29',at:1793275200000,kind:'manual',payload:backupPayload};
@@ -17104,11 +17106,26 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.deepEqual(backupRow,{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
    assert.equal(decodedSnapshot.stores.snapshots.values.find(row=>row.hash===backupHash)?.payload,backupPayload);
    assert.deepEqual(decodedSnapshot.stores.opaque.values[decodedSnapshot.stores.opaque.keys.indexOf(opaqueKey)],opaqueValue);
-   const wallChallengeStarted=process.hrtime.bigint();
-   await new Promise(resolve=>setTimeout(resolve,450));
+   const wallChallengeStarted=process.hrtime.bigint(),wallChallengeDeadline=wallChallengeStarted+450_000_000n,wallChallengeWakes=[],maximumWakes=16;
+   // Inject only an early timer resolution for sensitivity; elapsed time still
+   // comes from actual Node hrtime, independently of the held browser clock.
+   const observationSleep=milliseconds=>observationControl==='early-always'||observationControl==='early-once'&&!wallChallengeWakes.length?Promise.resolve():new Promise(resolve=>setTimeout(resolve,milliseconds));
+   // A requested delay is not elapsed-time proof. Re-arm only for the measured
+   // remainder, with a finite fail-closed limit before the original assertion.
+   for(let wake=0;wake<maximumWakes;wake++){
+    const remainingNs=wallChallengeDeadline-process.hrtime.bigint();if(remainingNs<=0n)break;
+    const requestedMs=Math.ceil(Number(remainingNs)/1e6);
+    await observationSleep(requestedMs);
+    wallChallengeWakes.push({requestedMs,elapsedMs:Number(process.hrtime.bigint()-wallChallengeStarted)/1e6});
+   }
    const wallChallengeElapsedMs=Number(process.hrtime.bigint()-wallChallengeStarted)/1e6;
+   t.diagnostic('Measured Export observation timer wakes before source read: '+JSON.stringify({browserEngine,observationControl,wallChallengeWakes,wallChallengeElapsedMs,minimumMs:450,maximumWakes}));
    assert.ok(wallChallengeElapsedMs>=450,'the source-preservation observation follows at least 450 ms of actual Node wall time');
    t.diagnostic('Actual Node wall-clock challenge before the original post-Export source observation: '+JSON.stringify({browserEngine,wallChallengeElapsedMs,minimumMs:450}));
+   if(observationControl==='early-once'){
+    assert.ok(wallChallengeWakes[0]?.elapsedMs<450,'the early-wake control actually resolves its first requested timer before the observation deadline');
+    assert.ok(wallChallengeWakes.length>1,'the observation deadline re-arms after the deliberately early timer wake');
+   }
    const afterPreparation=await view.page.evaluate(async()=>{const observeProducer=()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,deviceHeadHash};};
     const producerBefore=observeProducer(),head=await ScannerDeviceStore.readHead(),sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
     const localSources=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())].map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
