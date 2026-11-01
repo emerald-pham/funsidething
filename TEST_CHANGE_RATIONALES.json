@@ -51990,5 +51990,84 @@
       "command": "env -u CI -u LANDSCAPE_BROWSER_URL -u LANDSCAPE_BROWSER_CHANNEL PATH=\"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:$PATH\" CHAIN_NATIVE_PORT=53731 CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-time-boundary-repair/worker/native-red /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-time-boundary-repair/worker/run-focused-with-heartbeat.mjs /Users/emeraldpham/.codex/worktrees/export-time-1896/funsidething /Users/emeraldpham/.codex/worktrees/export-time-1896/funsidething/scripts/agent-tools/coordination.mjs 1793532372652-3550-9a8e082c -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/worktrees/export-time-1896/funsidething/scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/export-time-1896/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-time-boundary-repair/worker/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap --test-name-pattern='^RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources$' tests.js",
       "failure": "The recorded original-clock chronology RED measured 452.399833 ms in Chromium and 452.136458 ms in WebKit, then both failed the unchanged existing deep equality `preparing Export leaves all original saved, backup, pending and opaque source rows exact` with ERR_ASSERTION. The source mismatch followed the accepted edit completing through its normal 350 ms save after archive preparation; this is fixture chronology evidence, not a product defect. Full recorder metadata and TAP/stdout/stderr are retained under worker/recorded as 2026-11-01T11-30-18-129Z-e5bdd04a-1171-47f5-94a0-e332b6c7a18b."
     }
+  },
+  {
+    "baseCommit": "0d41e482b746622b8f80ba89c9b27a290a7b660b",
+    "testChangesSha256": "bf3e28e9a494208c9dd6d0705f47ff8cf221b6f038e5f67f2e9cbef2eb9b0870",
+    "reason": "Bounded #1897-#1899 native harness repairs correct the observed fixture chronology, first-daily attribution and ephemeral-origin assertions without changing application behavior. One exact-diff rationale covers the related existing Undo, final-WOOP, distinct-decision and scene-repeat consumers.",
+    "previousBehavior": "The final-WOOP fixture called Date.now separately while serializing three complete retained-source payloads, allowing the declared at=epoch-i order to cross a clock tick. The Undo source oracle attributed the actual first list-opening daily to the later title-save interval. The two existing CI port-zero reopen checks expected :0 although the server correctly bound an OS-assigned loopback port.",
+    "intendedBehavior": "Capture one host-clock epoch for the three fixture rows and preserve exact source array order; independently capture the actual trusted list-opening B0 state and its complete first daily before the first title input, then carry it unchanged through B0/B1/B2/U1/U2; capture each initial application goto before reload and compare its actual loopback origin with the single permitted same-path reopen, requiring port0 to bind nonzero and positive requested ports to remain exact.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources",
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "The existing 64-task fixture retains complete typed source payloads, all original opaque/pending/history data, exact array order, unchanged source semantics and the 1000ms timing guard; the external advancing-clock challenge only changes Date.now at the existing observer page.",
+      "The trusted toggle-list save, actual first daily/latest full rows, timestamps, payload hashes and source order remain independently captured before title input and are verified through all five B0/B1/B2/U1/U2 states without deletion, relabeling or timestamp loosening.",
+      "Both port-zero consumers retain two-engine execution, one exact allowed action/navigation/path, empty query/hash, all 64 task/source assertions and positive-port equality; the expected origin comes only from the first actual app goto artifact, never the final reopen URL.",
+      "No application, URL behavior, rules, assets, workflow, FAQ, version or timing threshold changes; unresolved WebKit opening/scene timing and the nested 180-second deadline remain separate boundaries."
+    ],
+    "redEvidence": {
+      "command": "Exact Node invocations, environment and raw streams are retained in /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/native-contract-repairs/worker/issue-1897, issue-1898 and issue-1899 recorder metadata. #1897 used Node23.10.0 with the advancing observer-clock preload; #1898 used Node24.19.0 and the actual first-title-fill durability gate; #1899 used Node24.19.0, CI=true, the canonical PR event triplet and requested port0 for both roots.",
+      "failure": "The contemporaneous original assertions failed: #1897 final-WOOP observed complete source order [2,1,0] against literal [0,1,2]; #1898 B0 lifecycle rejected the actual pre-title first daily as outside the later title-save interval; #1899 distinct-decision observed 127.0.0.1 ports 51306/51313 against :0 and scene-repeat observed 51335/51343 against :0. The first #1898 racing capture and #1899 policy-less preflight attempts are preserved but not counted as the contract RED.",
+      "records": [
+        "2026-11-01T11-40-42-131Z-834f6a87-d2a5-45cc-b348-f9b4125de1a4",
+        "2026-11-01T11-49-50-827Z-df36de3c-ae30-4716-af93-fa8000968f55",
+        "2026-11-01T11-57-35-629Z-31be5624-e5e1-4886-b18c-dd9951d934d2",
+        "2026-11-01T11-57-52-247Z-a8c01ce8-2c1b-4a42-9d96-fa6a1c9609f3"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T11-41-13-190Z-089c2c4b-cd90-44eb-b24f-c2e43fdca9bd",
+        "2026-11-01T11-55-33-817Z-23d6eccb-67c1-4c82-b48d-88339c735b4c",
+        "2026-11-01T12-01-02-883Z-e07df364-c247-46d2-889c-f645957fb57e",
+        "2026-11-01T12-01-13-360Z-91684c25-d1c3-4ce0-84ac-976825216344",
+        "2026-11-01T12-01-27-635Z-8e64d0a0-9342-46bd-9853-a41ba0e0913b",
+        "2026-11-01T12-01-36-547Z-c5b16329-8c56-4069-8f8c-44110e1e626e"
+      ],
+      "summary": "The targeted final-WOOP case passed under its honestly recorded Node23.10.0 run; #1898 passed with Node24.19.0. Both #1899 roots passed under Node24.19.0 in Chromium151.0.7922.34 and WebKit26.5 at CI port0 (actual bound ports 51492,51500,51513,51521) and positive requested port53742, with actual initial-origin capture matching the one reopen and complete cleanup. Intermediate failed outer or setup attempts remain separately preserved."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/native-contract-repairs/worker"
+  },
+  {
+    "baseCommit": "0d41e482b746622b8f80ba89c9b27a290a7b660b",
+    "comparisonMergeBase": "0d41e482b746622b8f80ba89c9b27a290a7b660b",
+    "testChangesSha256": "c6053e87ff81c9c7fbacc1fc55b14cf83b9646a81fdbb8c18461178742b1ad8f",
+    "cycle": "reconciled-source-join-1906",
+    "reason": "The root-admitted #1896 and #1897-#1899 test-only changes share one source candidate; this supplemental exact-diff record binds their combined tests.js fingerprint without altering either worker rationale.",
+    "previousBehavior": "Each worker tests.js change had its own accepted rationale fingerprint, while the joined tests.js diff has one combined fingerprint that neither separate worker record can match.",
+    "intendedBehavior": "Keep all 1515 original rationale objects and both accepted worker records unchanged and in order, then append this integration-only record for the exact joined fingerprint; product behavior remains unchanged.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources",
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "The complete accepted-unsaved Download consumer keeps its existing prepared archive, native event and file readback, full source equality, and later normal save boundary in Chromium and WebKit.",
+      "The existing native Undo, final-WOOP, distinct-decision, and scene-repeat consumers keep their full saved-source, timing, action, and loopback-origin assertions from the admitted worker diff.",
+      "The exact RED and GREEN worker records remain in the two accepted rationale objects and their preserved recorder directories; this supplemental object describes only the combined diff fingerprint.",
+      "No application, rules, assets, FAQ, version, workflow, dependencies, or timing requirements changed in this source join."
+    ],
+    "redEvidence": {
+      "command": "The actual owner RED commands are preserved in the preceding export-time-boundary-1896 and native-contract rationale objects and their raw recorder records; integration ran no new RED.",
+      "failure": "The #1896 original source comparison failed in both engines after the legitimate 350 ms save completed following archive preparation; #1897 observed source order [2,1,0] instead of [0,1,2]; #1898 rejected the real pre-title first daily outside the later title-save interval; #1899 observed ephemeral loopback ports where the test incorrectly expected port zero. These are the worker-reported failures, with no new integration failure claim."
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T11-33-14-193Z-0308bd98-11cf-44ef-9ed6-df9b3a0925c9",
+        "2026-11-01T11-41-13-190Z-089c2c4b-cd90-44eb-b24f-c2e43fdca9bd",
+        "2026-11-01T11-55-33-817Z-23d6eccb-67c1-4c82-b48d-88339c735b4c",
+        "2026-11-01T12-01-02-883Z-e07df364-c247-46d2-889c-f645957fb57e",
+        "2026-11-01T12-01-13-360Z-91684c25-d1c3-4ce0-84ac-976825216344",
+        "2026-11-01T12-01-27-635Z-8e64d0a0-9342-46bd-9853-a41ba0e0913b",
+        "2026-11-01T12-01-36-547Z-c5b16329-8c56-4069-8f8c-44110e1e626e"
+      ],
+      "summary": "The #1896 admitted consumer passed both engines with no skips, and the grouped #1897-#1899 worker records report the admitted focused GREEN results; no native tests were rerun during integration."
+    }
   }
 ]
