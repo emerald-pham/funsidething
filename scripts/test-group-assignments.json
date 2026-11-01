@@ -13967,6 +13967,26 @@
       "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
     },
     {
+      "root": "owned native process binds live TAP stdout browser logs to actual detached child identities",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process charges slow identity setup to the original child deadline",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "Linux proc reader ignores inaccessible foreign enrichment without losing owned scans",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "Linux proc reader preserves valid owned stat identity when enrichment disappears",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
       "root": "owned native process stops on the combined stream cap and retains the accepted prefix",
       "group": "native-process",
       "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
@@ -13978,6 +13998,16 @@
     },
     {
       "root": "owned native process refuses a changed start identity before signaling",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process refuses ambiguous enrichment of a still-live owned identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process reaps its witnessed detached child after the root exits first",
       "group": "native-process",
       "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
     },

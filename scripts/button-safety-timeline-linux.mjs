@@ -48,7 +48,7 @@ function createLinuxSampler({accept,onFailure}){
  const seen=new Map(),initial=readNativeProcessTable().find(row=>row.pid===process.pid);check(initial,'actual observer PID identity required');seen.set(initial.pid,initial);
  let timer,stopped=false,count=0,lastDue=performance.now(),failed=null;
  const same=(a,b)=>a&&b&&a.startIdentity===b.startIdentity&&a.uid===b.uid&&a.pidNamespace===b.pidNamespace;
- const owned=()=>{const all=readNativeProcessTable(),byPid=new Map(all.map(row=>[row.pid,row]));let changed=true;while(changed){changed=false;for(const row of all){if(seen.has(row.pid))continue;const parent=seen.get(row.ppid);if(parent&&same(parent,byPid.get(parent.pid))){seen.set(row.pid,row);changed=true;}}}return[...seen.values()].filter(row=>same(row,byPid.get(row.pid))&&!/^[ZX]/.test(byPid.get(row.pid).state));};
+ const owned=()=>{const all=readNativeProcessTable(),byPid=new Map(all.map(row=>[row.pid,row]));let changed=true;while(changed){changed=false;for(const row of all){if(seen.has(row.pid))continue;const parent=seen.get(row.ppid);if(parent&&same(parent,byPid.get(parent.pid))){check(row.enrichment?.status!=='unavailable'&&row.uid===initial.uid&&row.pidNamespace===initial.pidNamespace,'owned descendant process identity unavailable');seen.set(row.pid,row);changed=true;}}}return[...seen.values()].filter(row=>same(row,byPid.get(row.pid))&&!/^[ZX]/.test(byPid.get(row.pid).state));};
  const before=loadedLinuxFiles(owned());
  const sample=()=>{
   if(stopped)return;const bracketStart=stamp(),due=lastDue;lastDue+=50;

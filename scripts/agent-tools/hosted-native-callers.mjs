@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {spawn,spawnSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
+import {StringDecoder} from 'node:string_decoder';
 import {parseTap} from '../test-groups.mjs';
 
 const MAX_OUTPUT=4194304,MAX_EXECUTION=180000,TERM_MS=3000,KILL_MS=3000;
@@ -17,20 +18,33 @@ const git=(cwd,...args)=>{const r=spawnSync('git',args,{cwd,encoding:'utf8',time
 // to the second; that precision is explicit and never described as /proc ticks.
 export function readNativeProcessTable(){
  const rows=[];
- if(process.platform==='linux'){
-  for(const name of fs.readdirSync('/proc').filter(value=>/^\d+$/.test(value)))try{
-   const base='/proc/'+name,raw=fs.readFileSync(base+'/stat','utf8'),f=raw.slice(raw.lastIndexOf(')')+2).split(' '),status=fs.readFileSync(base+'/status','utf8');
-   rows.push({pid:Number(name),ppid:Number(f[1]),pgid:Number(f[2]),session:Number(f[3]),state:f[0],uid:Number(/^Uid:\s+(\d+)/m.exec(status)?.[1]),startIdentity:f[19],startPrecision:'kernel-clock-ticks',executable:fs.readlinkSync(base+'/exe'),pidNamespace:fs.readlinkSync(base+'/ns/pid')});
-  }catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;}
- }else if(process.platform==='darwin'){
+ if(process.platform==='linux')return readLinuxNativeProcessTable();
+ else if(process.platform==='darwin'){
   const r=spawnSync('/bin/ps',['-axo','pid=,ppid=,pgid=,sess=,uid=,lstart=,stat=,comm='],{encoding:'utf8',timeout:1000,maxBuffer:8388608});
   assert.equal(r.status,0,'macOS process identity table unavailable');
   for(const line of r.stdout.split('\n')){const m=/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(.{24})\s+(\S+)\s+(.+)$/.exec(line);if(m)rows.push({pid:+m[1],ppid:+m[2],pgid:+m[3],session:m[4],uid:+m[5],startIdentity:m[6],startPrecision:'ps-lstart-one-second',state:m[7],executable:m[8],pidNamespace:'unavailable-on-darwin'});}
  }else throw Error('Owned native process OS identity is unavailable on '+process.platform);
  return rows;
 }
+export function readLinuxNativeProcessTable({procRoot='/proc',filesystem=fs}={}){
+ const rows=[];
+ for(const name of filesystem.readdirSync(procRoot).filter(value=>/^\d+$/.test(value))){
+  const base=path.join(procRoot,name),errors=[];let fields;
+  try{const raw=filesystem.readFileSync(base+'/stat','utf8');fields=raw.slice(raw.lastIndexOf(')')+2).split(' ');}
+  catch(error){if(['ENOENT','ESRCH'].includes(error.code))continue;if(!['EACCES','EPERM'].includes(error.code))throw error;rows.push({pid:Number(name),state:null,statStatus:'unavailable',enrichment:{status:'unavailable',errors:[{field:'stat',code:error.code}]}});continue;}
+  let uid=null;try{const match=/^Uid:\s+(\d+)/m.exec(filesystem.readFileSync(base+'/status','utf8'));if(match)uid=Number(match[1]);else errors.push({field:'uid',code:'invalid'});}catch(error){if(!['ENOENT','ESRCH','EACCES','EPERM'].includes(error.code))throw error;errors.push({field:'uid',code:error.code});}
+  // Permission-limited foreign processes are not part of this owner's tree.
+  // Filter their known UID before requesting protected exe/namespace links.
+  if(uid!==null&&uid!==process.getuid())continue;
+  const row={pid:Number(name),ppid:Number(fields[1]),pgid:Number(fields[2]),session:Number(fields[3]),state:fields[0],uid,startIdentity:fields[19],startPrecision:'kernel-clock-ticks',statStatus:'observed',executable:null,pidNamespace:null};
+  for(const [field,suffix]of [['executable','/exe'],['pidNamespace','/ns/pid']])try{row[field]=filesystem.readlinkSync(base+suffix);}catch(error){if(!['ENOENT','ESRCH','EACCES','EPERM'].includes(error.code))throw error;errors.push({field,code:error.code});}
+  row.enrichment={status:errors.length?'unavailable':'complete',errors};rows.push(row);
+ }
+ return rows;
+}
 const same=(a,b)=>a&&b&&['pid','startIdentity','startPrecision','uid','pidNamespace'].every(key=>a[key]===b[key]);
 const live=row=>row&&!/^[ZX]/.test(row.state);
+const usable=row=>row&&row.enrichment?.status!=='unavailable'&&Number.isSafeInteger(row.uid)&&typeof row.startIdentity==='string'&&row.startIdentity.length>0&&typeof row.pidNamespace==='string';
 
 // Only this system seam admits small real-process controls. Production callers
 // cannot raise any of the agreed ceilings through its options.
@@ -46,34 +60,37 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
  const receipt={schemaVersion:1,kind:'owned-native-process',started:stamp(),source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}'),base:env.CHAIN_TEST_COMPARISON_BASE||null,sourceSha:env.CHAIN_TEST_SOURCE_SHA||null,toolSha256:digest(fs.readFileSync(new URL(import.meta.url)))},runtime:{node:process.version,executable:process.execPath,platform:process.platform,arch:process.arch,kernel:os.release(),systemBoundary:Object.keys(system).length?'controlled-test-only':'actual-OS'},hostedPolicy:{CI:env.CI||null,eventPolicy:env.CHAIN_TEST_EVENT_POLICY||null,eventName:env.GITHUB_EVENT_NAME||null,ref:env.GITHUB_REF||null,runId:env.GITHUB_RUN_ID||null,runAttempt:env.GITHUB_RUN_ATTEMPT||null,requestedPort:env.CHAIN_NATIVE_PORT===undefined?'default':env.CHAIN_NATIVE_PORT,debug:env.DEBUG||null},command:{executable,args,cwd},bounds:{executionMs:timeoutMs,termMs:TERM_MS,killMs:KILL_MS,combinedOutputBytes:outputLimitBytes},files,bytes:0,timedOut:false,outputLimit:false,status:null,signal:null,signals:[],processes:[],browserLaunches:[],browserExits:[],refusals:[],cleanup:{complete:false},frontier:null};
  save(path.join(outputDir,'process.json'),receipt);
  let sequence=0,child,closed=false,exitObserved=false,monitor,deadline,reason,doneResolve;
- const done=new Promise(resolve=>doneResolve=resolve),known=new Map(),pending={stdout:'',stderr:''};
+ const done=new Promise(resolve=>doneResolve=resolve),known=new Map(),pending={stdout:'',stderr:''},decoders={stdout:new StringDecoder('utf8'),stderr:new StringDecoder('utf8')},lineOffsets={stdout:0,stderr:0};
  const event=value=>{const row={sequence:++sequence,...stamp(),...value};fs.writeSync(fds.frontier,JSON.stringify(row)+'\n');receipt.frontier=row;};
  const interruptions=Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>{receipt.interruption=signal;reason='interrupted:'+signal;event({kind:'interruption',signal});doneResolve();}]));
  for(const [signal,handler]of Object.entries(interruptions))process.on(signal,handler);
  const refuse=message=>{if(!receipt.refusals.includes(message))receipt.refusals.push(message);};
  const capture=()=>{
   const table=processTable(),byPid=new Map(table.map(row=>[row.pid,row]));
-  for(const [pid,witness]of known){const current=byPid.get(pid);if(live(current)&&!same(witness.identity,current))refuse('PID identity changed; refused '+pid);}
-  let changed=true;while(changed){changed=false;for(const row of table){if(known.has(row.pid)||row.uid!==process.getuid())continue;const parent=known.get(row.ppid);if(parent&&same(parent.identity,byPid.get(row.ppid))){known.set(row.pid,{identity:row,proof:{kind:'observed-owned-ancestry',parentPid:row.ppid,parentStartIdentity:parent.identity.startIdentity},first:stamp()});changed=true;}}}
-  for(const [pid,witness]of known){const current=byPid.get(pid);witness.last={...stamp(),status:!live(current)?'nonlive':!same(witness.identity,current)?'identity-reused':'live',state:current?.state??null,identity:current??null};
+  for(const [pid,witness]of known){const current=byPid.get(pid);if(live(current)&&!usable(current))refuse('Owned process enrichment unavailable; refused '+pid);if(live(current)&&!same(witness.identity,current))refuse('PID identity changed; refused '+pid);}
+  let changed=true;while(changed){changed=false;for(const row of table){if(known.has(row.pid)||row.uid!==process.getuid())continue;const parent=known.get(row.ppid);if(parent&&usable(byPid.get(row.ppid))&&same(parent.identity,byPid.get(row.ppid))){if(!usable(row)){refuse('Owned descendant enrichment unavailable; refused '+row.pid);continue;}known.set(row.pid,{identity:row,proof:{kind:'observed-owned-ancestry',parentPid:row.ppid,parentStartIdentity:parent.identity.startIdentity},first:stamp()});changed=true;}}}
+  for(const [pid,witness]of known){const current=byPid.get(pid);let status;
+   if(current)status=!live(current)?'nonlive':!usable(current)?'identity-unavailable':!same(witness.identity,current)?'identity-reused':'live';
+   else if(witness.nonliveConfirmedAt)status='nonlive';
+   else{let result='still-live-or-ambiguous';try{signalProcess(pid,0);}catch(error){result=error.code||String(error);}witness.absenceProbe={...stamp(),result};status=result==='ESRCH'?'nonlive':'identity-unavailable';if(status!=='nonlive')refuse('Absent owned PID has no kernel nonliveness proof; refused '+pid);}
+   if(status==='nonlive')witness.nonliveConfirmedAt??=stamp();witness.last={...stamp(),status,state:current?.state??null,identity:current??null};
    if(current&&same(witness.identity,current)){const prior=witness.transitions?.at(-1)?.identity??witness.identity;if(['ppid','pgid','session','executable'].some(key=>prior[key]!==current[key])){witness.transitions??=[];witness.transitions.push({identity:current,...stamp()});}}
   }
   receipt.processes=[...known.values()];return byPid;
  };
  const line=(stream,value,offset)=>{
   event({kind:'line',stream,offset,line:value});
-  if(stream!=='stderr')return;
-  let match=/<launched> pid=(\d+)/.exec(value);
+  let match=/(?:^|\s)pw:browser <launched> pid=(\d+)\s*$/.exec(value);
   if(match){const pid=Number(match[1]),table=capture(),witness=known.get(pid),current=table.get(pid);const proven=witness&&same(witness.identity,current)&&live(current);
-   receipt.browserLaunches.push({pid,line:value,offset,...stamp(),identity:proven?witness.identity:null,proof:proven?witness.proof:null,status:proven?'owned':'unavailable'});if(!proven)refuse('Browser launch PID lacks matching live owned OS ancestry: '+pid);
+   receipt.browserLaunches.push({pid,line:value,stream,offset,...stamp(),identity:proven?witness.identity:null,proof:proven?witness.proof:null,status:proven?'owned':'unavailable'});if(!proven)refuse('Browser launch PID lacks matching live owned OS ancestry: '+pid);
   }
-  match=/\[pid=(\d+)\] <process did exit: exitCode=(-?\d+|null), signal=([^>]+)>/.exec(value);
-  if(match){const pid=Number(match[1]);receipt.browserExits.push({pid,line:value,offset,...stamp(),exitCode:match[2]==='null'?null:Number(match[2]),signal:match[3]==='null'?null:match[3],owner:receipt.browserLaunches.some(row=>row.pid===pid&&row.status==='owned')});}
+  match=/(?:^|\s)pw:browser \[pid=(\d+)\] <process did exit: exitCode=(-?\d+|null), signal=([^>]+)>\s*$/.exec(value);
+  if(match){const pid=Number(match[1]);receipt.browserExits.push({pid,line:value,stream,offset,...stamp(),exitCode:match[2]==='null'?null:Number(match[2]),signal:match[3]==='null'?null:match[3],owner:receipt.browserLaunches.some(row=>row.pid===pid&&row.status==='owned')});}
  };
  const intake=(stream,chunk)=>{
   const available=outputLimitBytes-receipt.bytes,accepted=chunk.subarray(0,Math.max(0,available));
   if(accepted.length){const offset=fs.fstatSync(fds[stream]).size;fs.writeSync(fds[stream],accepted);receipt.bytes+=accepted.length;event({kind:'chunk',stream,offset,bytes:accepted.length,sha256:digest(accepted)});
-   pending[stream]+=accepted.toString('utf8');let index;while((index=pending[stream].indexOf('\n'))!==-1){const value=pending[stream].slice(0,index);pending[stream]=pending[stream].slice(index+1);try{line(stream,value,offset);}catch(error){refuse('Live observation: '+String(error));reason??='identity-observation';doneResolve();}}
+   pending[stream]+=decoders[stream].write(accepted);let index;while((index=pending[stream].indexOf('\n'))!==-1){const value=pending[stream].slice(0,index),lineOffset=lineOffsets[stream];lineOffsets[stream]+=Buffer.byteLength(value)+1;pending[stream]=pending[stream].slice(index+1);try{line(stream,value,lineOffset);}catch(error){refuse('Live observation: '+String(error));reason??='identity-observation';doneResolve();}}
   }
   if(accepted.length!==chunk.length){receipt.outputLimit=true;reason??='output-limit';event({kind:'output-limit',receivedChunkBytes:chunk.length,retainedChunkBytes:accepted.length});doneResolve();}
  };
@@ -86,14 +103,15 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
   child.once('error',error=>{receipt.error={name:error.name,code:error.code,message:error.message};reason??='launch-error';doneResolve();});
   child.once('exit',(code,signal)=>{exitObserved=true;receipt.status=code;receipt.signal=signal;receipt.exit={code,signal,...stamp()};event({kind:'root-exit',code,signal});doneResolve();});
   child.once('close',(code,signal)=>{closed=true;receipt.close={code,signal,...stamp()};event({kind:'root-close',code,signal});doneResolve();});
-  const initial=processTable().find(row=>row.pid===child.pid);assert.ok(initial&&initial.ppid===process.pid&&initial.uid===receipt.owner.uid,'Spawned child live OS ancestry required');
+  const initial=processTable().find(row=>row.pid===child.pid);assert.ok(usable(initial)&&initial.ppid===process.pid&&initial.uid===receipt.owner.uid,'Spawned child live OS ancestry required');
   known.set(child.pid,{identity:initial,proof:{kind:'actual-spawn-child',parentPid:process.pid,parentStartIdentity:receipt.owner.startIdentity},first:stamp()});receipt.rootIdentity=initial;capture();event({kind:'root-start',pid:child.pid,identity:initial});
   monitor=setInterval(()=>{try{capture();}catch(error){refuse('Process monitor: '+String(error));reason??='identity-observation';doneResolve();}},20);
-  deadline=setTimeout(()=>{receipt.timedOut=true;reason='deadline';event({kind:'deadline',pid:child.pid});doneResolve();},timeoutMs);
+  const scheduledMonotonicMs=receipt.launched.monotonicMs+timeoutMs;
+  deadline=setTimeout(()=>{receipt.timedOut=true;reason='deadline';receipt.deadline={scheduledMonotonicMs,...stamp()};receipt.deadline.latenessMs=receipt.deadline.monotonicMs-scheduledMonotonicMs;event({kind:'deadline',pid:child.pid,...receipt.deadline});doneResolve();},Math.max(0,scheduledMonotonicMs-performance.now()));
   await done;clearTimeout(deadline);
   // Capture ancestry before a parent can disappear, then signal only one exact
   // witnessed identity at a time. No negative-PGID or name-based host kill.
-  const signalOwned=(signal,until)=>{capture();for(const [pid,witness]of [...known].reverse()){if(performance.now()>=until){refuse('Identity-checked signal phase deadline reached');break;}const current=processTable().find(row=>row.pid===pid);if(!live(current))continue;if(!same(witness.identity,current)){refuse('Signal refused for changed identity '+pid);continue;}let result='sent';try{signalProcess(pid,signal);}catch(error){result=error.code||String(error);if(error.code!=='ESRCH')refuse('Signal '+signal+' failed for '+pid+': '+result);}const row={pid,signal,identity:current,result,...stamp()};receipt.signals.push(row);event({kind:'signal',...row});}};
+  const signalOwned=(signal,until)=>{capture();for(const [pid,witness]of [...known].reverse()){if(performance.now()>=until){refuse('Identity-checked signal phase deadline reached');break;}const current=processTable().find(row=>row.pid===pid);if(!live(current))continue;if(!usable(current)||!same(witness.identity,current)){refuse('Signal refused for changed identity '+pid);continue;}let result='sent';try{signalProcess(pid,signal);}catch(error){result=error.code||String(error);if(error.code!=='ESRCH')refuse('Signal '+signal+' failed for '+pid+': '+result);}const row={pid,signal,identity:current,result,...stamp()};receipt.signals.push(row);event({kind:'signal',...row});}};
   const allGone=()=>{capture();return[...known.values()].every(row=>row.last.status==='nonlive');};
   const settle=async until=>{while(performance.now()<until){if(allGone()&&closed)return true;await delay(20);}return allGone()&&closed;};
   if(reason||!allGone()){
@@ -101,16 +119,16 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
    if(!await settle(termUntil)){signalOwned('SIGKILL',killUntil);await settle(killUntil);}receipt.teardownFinished=stamp();
   }else if(!closed)await settle(performance.now()+KILL_MS);
   clearInterval(monitor);monitor=null;capture();
-  for(const [stream,value]of Object.entries(pending))if(value)event({kind:'partial-line',stream,line:value});
+  for(const stream of Object.keys(pending)){pending[stream]+=decoders[stream].end();if(pending[stream])event({kind:'partial-line',stream,offset:lineOffsets[stream],line:pending[stream]});}
   receipt.stopReason??=reason||'normal-exit';receipt.cleanup={complete:closed&&exitObserved&&[...known.values()].every(row=>row.last.status==='nonlive')&&receipt.refusals.length===0,rootClosed:closed,rootExitObserved:exitObserved,monitorStopped:true,deadlineStopped:true,signalScope:'identity-checked-individual-owned-processes'};
   for(const launch of receipt.browserLaunches){launch.finalState=known.get(launch.pid)?.last??{status:'unavailable'};launch.actualExit=receipt.browserExits.find(row=>row.pid===launch.pid&&row.owner)||{status:'unavailable',reason:'No actual browser ChildProcess close log; attempted signals are not exit status'};if(receipt.stopReason==='normal-exit'&&launch.actualExit.status==='unavailable'){receipt.cleanup.complete=false;refuse('Normal browser close log unavailable for '+launch.pid);}}
  }catch(error){receipt.error??={name:error.name,code:error.code||null,message:error.message};refuse(String(error));receipt.cleanup.complete=false;
   // If observation failed, never broaden signaling to an unproved PID/group.
-  for(const [pid,witness]of known)try{const current=processTable().find(row=>row.pid===pid);if(same(witness.identity,current)&&live(current)){signalProcess(pid,'SIGKILL');receipt.signals.push({pid,signal:'SIGKILL',identity:current,result:'sent-after-owner-error',...stamp()});}}catch(cleanupError){refuse(String(cleanupError));}
+  for(const [pid,witness]of known)try{const current=processTable().find(row=>row.pid===pid);if(usable(current)&&same(witness.identity,current)&&live(current)){signalProcess(pid,'SIGKILL');receipt.signals.push({pid,signal:'SIGKILL',identity:current,result:'sent-after-owner-error',...stamp()});}}catch(cleanupError){refuse(String(cleanupError));}
   const until=performance.now()+KILL_MS;while(child&&!closed&&performance.now()<until)await delay(20);
  }finally{
   for(const [signal,handler]of Object.entries(interruptions))process.off(signal,handler);
-  clearTimeout(deadline);clearInterval(monitor);receipt.finished=stamp();receipt.executionElapsedMs=receipt.timedOut?timeoutMs:(receipt.exit?.monotonicMs??receipt.finished.monotonicMs)-(receipt.launched?.monotonicMs??receipt.started.monotonicMs);
+  clearTimeout(deadline);clearInterval(monitor);receipt.finished=stamp();receipt.executionElapsedMs=(receipt.deadline?.monotonicMs??receipt.exit?.monotonicMs??receipt.finished.monotonicMs)-(receipt.launched?.monotonicMs??receipt.started.monotonicMs);receipt.rootLifetimeMs=receipt.exit?receipt.exit.monotonicMs-receipt.launched.monotonicMs:null;
   if(child&&!closed){child.stdout.removeAllListeners('data');child.stderr.removeAllListeners('data');child.stdout.destroy();child.stderr.destroy();child.removeAllListeners('exit');child.removeAllListeners('close');child.unref();}
   for(const [key,fd]of Object.entries(fds)){fs.closeSync(fd);receipt[key+'Sha256']=digest(fs.readFileSync(files[key]));}
   save(path.join(outputDir,'process.json'),receipt);
@@ -171,10 +189,11 @@ export function verifyHostedNativeCallerReceipts(batches){
  for(const [index,batch]of batches.entries()){
   if(batch.selection!==(index===0?'saved-decision':'remaining-seven'))issues.push('Native selection/order mismatch');
   if(batch.status!==0||batch.signal!==null||batch.timedOut||batch.outputLimit||batch.error||batch.cleanup?.complete!==true)issues.push('Unsuccessful or incompletely cleaned native child '+batch.selection);
+  if(!Array.isArray(batch.browserLaunches)||batch.browserLaunches.length===0||batch.browserLaunches.some(row=>row.status!=='owned'||!row.identity?.startIdentity||row.finalState?.status!=='nonlive'||row.actualExit?.owner!==true))issues.push('Missing complete nonvacuous browser launch/actual-close/OS-nonliveness evidence in '+batch.selection);
   const text=fs.readFileSync(batch.files.stdout,'utf8');
   if(!text.endsWith('\n'))issues.push('Incomplete final TAP line');
   const expectedCount=index===0?3:21;
-  for(const [key,value]of [['tests',expectedCount],['fail',0],['cancelled',0],['skipped',0],['todo',0]])if(!new RegExp('^# '+key+' '+value+'$','m').test(text))issues.push('Missing exact terminal '+key+' count in '+batch.selection);
+  for(const [key,value]of [['tests',expectedCount],['pass',expectedCount],['fail',0],['cancelled',0],['skipped',0],['todo',0]]){const rows=[...text.matchAll(new RegExp('^# '+key+' (\\d+)$','gm'))];if(rows.length!==1||Number(rows[0][1])!==value)issues.push('Missing, duplicate or contradictory terminal '+key+' count in '+batch.selection);}
   try{for(const row of parseTap(text)){
    if(seen.has(row.id))issues.push('Duplicate native case: '+row.id);seen.add(row.id);cases.push(row);
    if(!EXPECTED_CASES.includes(row.id))issues.push('Unknown native case: '+row.id);
