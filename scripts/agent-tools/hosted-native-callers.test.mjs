@@ -53,19 +53,26 @@ test('owned native process reconciles a witnessed executable-only terminal read 
  const retainedRoot=path.resolve(process.env.CHAIN_NATIVE_OUTPUT||os.tmpdir());fs.mkdirSync(retainedRoot,{recursive:true});
  const outputDir=fs.mkdtempSync(path.join(retainedRoot,'chain-owned-terminal-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');
  const before=new Set(readNativeProcessTable().map(row=>row.pid));let prior,partial;
+ const visibility={policy:'delay-terminal-table-view-until-real-absence',reads:[],dropped:0};
  const signals=[];
  const readProcessTable=()=>{
-  const rows=readNativeProcessTable(),row=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
+  const rows=readNativeProcessTable(),row=prior?rows.find(row=>row.pid===prior.pid):rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
   if(row){if(!prior)prior={...row};else if(!partial&&fs.existsSync(ready)){
    partial={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};
    rows[rows.indexOf(row)]=partial;
    // The fixture exits normally only after this actual identity observation.
    fs.writeFileSync(exitRequest,'exit');
+  }else if(partial&&/^[ZX]/.test(row.state)){
+   // This absence-only control delays the terminal table view. The saved raw
+   // row remains literal; only a real later kernel ESRCH can prove absence.
+   rows[rows.indexOf(row)]=partial;
   }}
+  if(prior){const read={observed:{utc:new Date().toISOString(),monotonicMs:performance.now()},raw:row?structuredClone(row):null,view:rows.find(row=>row.pid===prior.pid)??null};if(visibility.reads.length<256)visibility.reads.push(read);else visibility.dropped++;}
   return rows;
  };
  const fixture=`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'ready');const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)})){clearInterval(timer);console.log('actual-normal-exit');}},5);`;
  const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
+ fs.writeFileSync(path.join(outputDir,'fixture-process-reads.json'),JSON.stringify(visibility,null,2)+'\n');
  t.diagnostic('Real terminal identity chronology and receipt: '+outputDir);
  if(process.env.CHAIN_NATIVE_OUTPUT)assert.equal(path.dirname(outputDir),path.resolve(process.env.CHAIN_NATIVE_OUTPUT),'The strict absence control retains its lifecycle receipt in collected native output before asserting');
  for(const file of ['process.json','frontier.jsonl','stdout.tap','stderr.txt'])assert.ok(fs.existsSync(path.join(outputDir,file)),'The strict absence control retains '+file+' before asserting');
