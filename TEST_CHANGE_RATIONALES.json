@@ -50560,5 +50560,133 @@
       "priorMainRedEvidenceSha256": "a54c5976581fef0358c54ca6fae2316072692113962698b41d45fcbc82baa6ea",
       "integrationPreimplementationRunClaimed": false
     }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "5d0df1ec7e5ddcf3205c81bf10d29924c327c6c711f9a821363e9c6e8ac0ac4c",
+    "reason": "Resolve atomic #1873 caller admission through the existing hosted-direct-callers process fixture while retaining each original native consumer and local resource refusal.",
+    "previousBehavior": "Ten direct/focused callers required a positive local port even in an admitted hosted context; four direct invocations converted an absent port to NaN and failed before browser startup. The existing process fixture omitted both faulty forms.",
+    "intendedBehavior": "The same callers allow zero only when CI selects the existing hosted admission branch, and direct arguments preserve the native zero default. Actual native policy validation still requires the matching routed/raw event and ref; local launch still requires the healthy active owner, named engine, allocated positive port and conflict-free claims.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected and must pass with zero skips; selected eligibility and both actual external-close consumers bring its exact reconciliation to seventeen outcomes.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned."
+    ],
+    "redEvidence": {
+      "command": "Existing record-run.mjs --purpose preimplementation-red -- node --experimental-vm-modules --test --test-concurrency=1 --test-name-pattern=^RISK repository process: hosted direct native callers retain ephemeral listener defaults$ tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-red/recorder/2026-11-01T03-34-05-146Z-81038c1e-13f1-4457-998d-2af15326496b.json",
+      "failure": "Before the ten guard/four conversion edits, actual child reconciled17tests=13passed+4failed/0skipped. All thirteen originals passed. Selected eligibility failed its positive-local guard and both external-close engine children failed their complete native consumer assertions after the raw NaN pre-browser refusal; the outer expected-success assertion failed. This is meaningful process-caller RED, not app or lifecycle RED."
+    },
+    "greenEvidence": "Recorded same existing process fixture GREEN9f5908c8 at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-green/recorder/2026-11-01T03-35-00-902Z-9f5908c8-5393-4890-b06f-85c45747a7c7.json reconciles17/17,zero skips. Source-only policy/refusal checks remain in policy-source-checks and local-admission-checks. Broader original affected roots and UUID directions remain required before final handoff.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "comparisonBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "command": "git diff --unified=0 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48 -- tests.js",
+      "nativeAppSource": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "existingRationaleCount": 1480,
+      "scope": "Standalone1873 checkpoint; ROOT must derive a combined exact fingerprint after joins."
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "f593a3542bb7261eac181da9ed7471a953e2375513ffe950d4d6e106583256ca",
+    "reason": "Resolve atomic #1873 caller admission through the existing hosted-direct-callers process fixture while retaining each original native consumer and local resource refusal.",
+    "previousBehavior": "Ten direct/focused callers required a positive local port even in an admitted hosted context; four direct invocations converted an absent port to NaN and failed before browser startup. The existing process fixture omitted both faulty forms.",
+    "intendedBehavior": "The same callers allow zero only when CI selects the existing hosted admission branch, and direct arguments preserve the native zero default. Actual native policy validation still requires the matching routed/raw event and ref; local launch still requires the healthy active owner, named engine, allocated positive port and conflict-free claims.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected and must pass with zero skips; selected eligibility and both actual external-close consumers bring its exact reconciliation to seventeen outcomes.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned."
+    ],
+    "redEvidence": {
+      "command": "Existing record-run.mjs --purpose preimplementation-red -- node --experimental-vm-modules --test --test-concurrency=1 --test-name-pattern=^RISK repository process: hosted direct native callers retain ephemeral listener defaults$ tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-red/recorder/2026-11-01T03-34-05-146Z-81038c1e-13f1-4457-998d-2af15326496b.json",
+      "failure": "Before the ten guard/four conversion edits, actual child reconciled17tests=13passed+4failed/0skipped. All thirteen originals passed. Selected eligibility failed its positive-local guard and both external-close engine children failed their complete native consumer assertions after the raw NaN pre-browser refusal; the outer expected-success assertion failed. This is meaningful process-caller RED, not app or lifecycle RED."
+    },
+    "greenEvidence": "Recorded same existing process fixture GREEN9f5908c8 at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-green/recorder/2026-11-01T03-35-00-902Z-9f5908c8-5393-4890-b06f-85c45747a7c7.json reconciles17/17,zero skips. Source-only policy/refusal checks remain in policy-source-checks and local-admission-checks. Broader original affected roots and UUID directions remain required before final handoff.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "comparisonBase": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "command": "git diff --unified=0 6443761512cd652d02955fb93826dc3baa5daca3 -- tests.js",
+      "nativeAppSource": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "existingRationaleCount": 1480,
+      "scope": "Standalone1873 checkpoint; ROOT must derive a combined exact fingerprint after joins."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "f79cb10bd199fc332e64849c85a2f8d0e5ac41bf0d7418142b503adfd6be3545",
+    "reason": "Resolve atomic #1873 caller admission through the existing hosted-direct-callers process fixture while retaining each original native consumer and local resource refusal.",
+    "previousBehavior": "Ten direct/focused callers required a positive local port even in an admitted hosted context; four direct invocations converted an absent port to NaN and failed before browser startup. The existing process fixture omitted both faulty forms.",
+    "intendedBehavior": "The same callers allow zero only when CI selects the existing hosted admission branch, and direct arguments preserve the native zero default. Actual native policy validation still requires the matching routed/raw event and ref; local launch still requires the healthy active owner, named engine, allocated positive port and conflict-free claims.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected and must pass with zero skips; selected eligibility and both actual external-close consumers bring its exact reconciliation to seventeen outcomes.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned."
+    ],
+    "redEvidence": {
+      "command": "Existing record-run.mjs --purpose preimplementation-red -- node --experimental-vm-modules --test --test-concurrency=1 --test-name-pattern=^RISK repository process: hosted direct native callers retain ephemeral listener defaults$ tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-red/recorder/2026-11-01T03-34-05-146Z-81038c1e-13f1-4457-998d-2af15326496b.json",
+      "failure": "Before the ten guard/four conversion edits, actual child reconciled17tests=13passed+4failed/0skipped. All thirteen originals passed. Selected eligibility failed its positive-local guard and both external-close engine children failed their complete native consumer assertions after the raw NaN pre-browser refusal; the outer expected-success assertion failed. This is meaningful process-caller RED, not app or lifecycle RED."
+    },
+    "greenEvidence": "Recorded same existing process fixture GREEN9f5908c8 at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-green/recorder/2026-11-01T03-35-00-902Z-9f5908c8-5393-4890-b06f-85c45747a7c7.json reconciles17/17,zero skips. Source-only policy/refusal checks remain in policy-source-checks and local-admission-checks. Broader original affected roots and UUID directions remain required before final handoff.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "command": "git diff --unified=0 8cd524a7f0ab7a25b6689244722ae3c5baf861c8 -- tests.js",
+      "nativeAppSource": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "existingRationaleCount": 1480,
+      "scope": "Standalone1873 checkpoint; ROOT must derive a combined exact fingerprint after joins."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "4a19fba15cb61fea856d881d8b96d63a6848149fce2626c95d5de992f6bba4c3",
+    "reason": "Resolve atomic #1873 caller admission through the existing hosted-direct-callers process fixture while retaining each original native consumer and local resource refusal.",
+    "previousBehavior": "Ten direct/focused callers required a positive local port even in an admitted hosted context; four direct invocations converted an absent port to NaN and failed before browser startup. The existing process fixture omitted both faulty forms.",
+    "intendedBehavior": "The same callers allow zero only when CI selects the existing hosted admission branch, and direct arguments preserve the native zero default. Actual native policy validation still requires the matching routed/raw event and ref; local launch still requires the healthy active owner, named engine, allocated positive port and conflict-free claims.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected and must pass with zero skips; selected eligibility and both actual external-close consumers bring its exact reconciliation to seventeen outcomes.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned."
+    ],
+    "redEvidence": {
+      "command": "Existing record-run.mjs --purpose preimplementation-red -- node --experimental-vm-modules --test --test-concurrency=1 --test-name-pattern=^RISK repository process: hosted direct native callers retain ephemeral listener defaults$ tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-red/recorder/2026-11-01T03-34-05-146Z-81038c1e-13f1-4457-998d-2af15326496b.json",
+      "failure": "Before the ten guard/four conversion edits, actual child reconciled17tests=13passed+4failed/0skipped. All thirteen originals passed. Selected eligibility failed its positive-local guard and both external-close engine children failed their complete native consumer assertions after the raw NaN pre-browser refusal; the outer expected-success assertion failed. This is meaningful process-caller RED, not app or lifecycle RED."
+    },
+    "greenEvidence": "Recorded same existing process fixture GREEN9f5908c8 at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1873-green/recorder/2026-11-01T03-35-00-902Z-9f5908c8-5393-4890-b06f-85c45747a7c7.json reconciles17/17,zero skips. Source-only policy/refusal checks remain in policy-source-checks and local-admission-checks. Broader original affected roots and UUID directions remain required before final handoff.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "command": "git diff --unified=0 b176026825e4f9539780f745fe60e09cf348d288 -- tests.js",
+      "nativeAppSource": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "existingRationaleCount": 1480,
+      "scope": "Standalone1873 checkpoint; ROOT must derive a combined exact fingerprint after joins."
+    }
   }
 ]
