@@ -53153,5 +53153,27 @@
       "fetched published PR285 topic",
       "prior ROOT integration"
     ]
+  },
+  {
+    "baseCommit": "e63dac214a6f17af4e05294f7eb58cf1277c2629",
+    "testChangesSha256": "da50eb73102848694fbd8cc7cc0a4f3a804c43198b74413198e0bdba61316e1d",
+    "reason": "Make the existing phase-cap regression prove that one observer begin is retained while its following end is refused, without changing the fixed 4096-event cap.",
+    "previousBehavior": "The test delivered 4094 filler samples after the sampler and open-anchor deliveries had already used the remaining capacity. Both observer marks were refused, while checking unfinished marks with every did not require that any begin existed.",
+    "intendedBehavior": "Deliver one independently accepted protocol prefix event, fill dynamically from the actually retained event count while reserving one slot, and assert exact raw begin custody at event 4096 with no retained end, no completed derived phase, the exact unfinished begin, correct bounded accounting, and complete owned cleanup.",
+    "replacementTests": [
+      "an event cap retains the exact phase begin and refuses its following end"
+    ],
+    "preservedCoverage": [
+      "The existing positive phase-pair case and the unknown-phase, foreign-document, unmatched-end, reversed-interval, unfinished-host-phase, foreign-session, interrupted-arming, unknown-history-mode, cap-cleanup, and closing-clock controls remain in the same RISK root.",
+      "The public Linux provider and protocol/session test-double boundary, literal 4096 event cap, raw-event accounting, byte limits, session identity, derived phase behavior, and cleanup evidence remain protected; this focused protocol-system-double run is not native, browser, physical-device, or release qualification."
+    ],
+    "redEvidence": {
+      "command": "scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: Linux scene observation retains bounded observer phase brackets$\" tests.js; recorder 2026-11-01T21-44-43-900Z-cc812029-de4a-4f6c-903f-0b75f7ed7a57 on base e63dac214a6f17af4e05294f7eb58cf1277c2629.",
+      "failure": "The recorded preimplementation run exited 1 with assertion-failure at the new independent boundary: retained observer marks were [] instead of the exact expected begin at event index 4096. The failure is the intended assertion, not a thrown error or import/infra failure."
+    },
+    "greenEvidence": {
+      "summary": "After the fixture-only repair, recorder 2026-11-01T21-46-43-679Z-de8322e4-fa84-4e3a-8b91-4d4af820e6a8 passed the exact focused RISK root: 13 tests passed, zero failed, skipped, or cancelled. It confirms the begin-only capped capture and all sibling protocol controls; no full suite, browser, native Linux, physical-device, CI, or release qualification is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/phase-cap1953/owner"
   }
 ]
