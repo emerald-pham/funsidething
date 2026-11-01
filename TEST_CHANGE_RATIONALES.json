@@ -52500,5 +52500,55 @@
     },
     "integrationSourceCommit": "36e0550fb1dc84095425d5cddcbb97db5fb8cbc3",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "8586949e6ed13feb1b129ba33c383c36db56b57f2821249cb66776aeb0f2300a",
+    "reason": "Atomic #1934 repairs the independent first-app-navigation preload through the existing unchanged native consumer contracts. Number(undefined) became NaN and JSON null, contradicting both existing callers that request ephemeral numeric0. The single default expression now matches those callers. Parent clarification6561475332 permits one whitespace insertion on each existing affected declaration header solely to attach unchanged consumer names to the exact diff; no new test or behavior contract is claimed.",
+    "previousBehavior": "On exact082ec both real Chromium and WebKit ordinary two-distinct-decisions and scene-repeat children completed successfully and cleaned up, but all four unchanged outer consumers failed requestedPort null!==0 in verifyInitialBoundOriginCapture when CHAIN_NATIVE_PORT was genuinely absent.",
+    "intendedBehavior": "The same preload records requestedPort as numeric0 for an absent or empty variable and retains explicit0 and positive numeric allocations. The unchanged independent verifier still demands the actual nonzero OS-bound initial origin for requested0, exact positive port, pre-navigation capture and the actual later browser reopen origin.",
+    "replacementTests": [
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "All1533 original rationale object literals and their order remain byte-exact. The cumulative main record indexes inherited evidence without replacing any original RED or claiming unrelated repairs.",
+      "Every original verifier and consumer-body byte remains exact, including full64-task scanner/scene/Undo/archive/source/typed-opaque/pending/private-authority assertions, native trusted input, genuine document reopen, complete reports and context/browser/server cleanup.",
+      "No application, native runner, verifier, case inventory, workflow, dependency, runtime, deadline, threshold, source oracle, FAQ or changelog changed. Local Node24.19 macOS arm64 evidence is not Node22 Linux, hosted CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT -u NODE_OPTIONS -u NODE_TEST_CONTEXT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_TEST_GROUP=native-process CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS=0 CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker/red-absent-supported-policy through scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary (two distinct scanner decisions retain both offered IDs and complete sources|scene repeat accounts the original trusted Lock and both Undos with complete sources)$' tests.js",
+      "failure": "Observed before the one-expression implementation on exact082ec: recorder2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14 exited1. Both existing outer cases failed in actual Chromium and WebKit at unchanged verifyInitialBoundOriginCapture: requestedPort null !==0. All four native child scenarios passed with actual nonzero origins and complete owned cleanup. Earlier16b3cd38 attempt stopped before browser on missing hosted policy and is retained/corrected as infrastructure failure, not feature RED.",
+      "records": [
+        "2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14"
+      ]
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker",
+    "scopeClarification": "https://github.com/emerald-pham/funsidething/issues/1934#issuecomment-6561475332"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "6cb1bfec6054417f5b123e10db6346b2ac532b7bdbc79c578c86c328a31df637",
+    "reason": "Atomic #1934 indexes the exact cumulative main comparison while retaining all inherited source-bound rationale literals and chronology. Number(undefined) became NaN and JSON null, contradicting both existing callers that request ephemeral numeric0. The single default expression now matches those callers. Parent clarification6561475332 permits one whitespace insertion on each existing affected declaration header solely to attach unchanged consumer names to the exact diff; no new test or behavior contract is claimed.",
+    "previousBehavior": "On exact082ec both real Chromium and WebKit ordinary two-distinct-decisions and scene-repeat children completed successfully and cleaned up, but all four unchanged outer consumers failed requestedPort null!==0 in verifyInitialBoundOriginCapture when CHAIN_NATIVE_PORT was genuinely absent.",
+    "intendedBehavior": "The same preload records requestedPort as numeric0 for an absent or empty variable and retains explicit0 and positive numeric allocations. The unchanged independent verifier still demands the actual nonzero OS-bound initial origin for requested0, exact positive port, pre-navigation capture and the actual later browser reopen origin.",
+    "replacementTests": [
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+    ],
+    "preservedCoverage": [
+      "All1533 original rationale object literals and their order remain byte-exact. The cumulative main record indexes inherited evidence without replacing any original RED or claiming unrelated repairs.",
+      "Every original verifier and consumer-body byte remains exact, including full64-task scanner/scene/Undo/archive/source/typed-opaque/pending/private-authority assertions, native trusted input, genuine document reopen, complete reports and context/browser/server cleanup.",
+      "No application, native runner, verifier, case inventory, workflow, dependency, runtime, deadline, threshold, source oracle, FAQ or changelog changed. Local Node24.19 macOS arm64 evidence is not Node22 Linux, hosted CI, release or physical-device proof."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT -u NODE_OPTIONS -u NODE_TEST_CONTEXT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_TEST_GROUP=native-process CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS=0 CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker/red-absent-supported-policy through scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary (two distinct scanner decisions retain both offered IDs and complete sources|scene repeat accounts the original trusted Lock and both Undos with complete sources)$' tests.js",
+      "failure": "Observed before the one-expression implementation on exact082ec: recorder2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14 exited1. Both existing outer cases failed in actual Chromium and WebKit at unchanged verifyInitialBoundOriginCapture: requestedPort null !==0. All four native child scenarios passed with actual nonzero origins and complete owned cleanup. Earlier16b3cd38 attempt stopped before browser on missing hosted policy and is retained/corrected as infrastructure failure, not feature RED.",
+      "records": [
+        "2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14"
+      ]
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker",
+    "scopeClarification": "https://github.com/emerald-pham/funsidething/issues/1934#issuecomment-6561475332"
   }
 ]
