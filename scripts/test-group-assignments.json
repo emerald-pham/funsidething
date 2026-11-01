@@ -13332,6 +13332,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: persistence recovery CI installs required matching WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "workflow reuses an independently passed gate on main for the same complete inputs",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"

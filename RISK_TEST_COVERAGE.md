@@ -15,6 +15,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: large original CI artifacts retain verified coverage without buffering native reports
 - RISK repository process: released host locks cannot cause spurious CI migration failures
 - RISK repository process: CI admission enforces reuse before repeating a passed test child
+- RISK repository process: persistence recovery CI installs required matching WebKit
 - RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures

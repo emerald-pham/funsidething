@@ -211,7 +211,7 @@ jobs:
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         run: npx --no-install playwright install --with-deps chromium
       - name: Install matching required native WebKit
-        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group) && matrix.group == 'native-process'
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group) && (matrix.group == 'native-process' || matrix.group == 'persistence-recovery')
         run: npx --no-install playwright install --with-deps webkit
       - name: Execute CI gate ${{ matrix.group }} input ${{ fromJSON(steps.selected.outputs.input-keys)[matrix.group] }}
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
