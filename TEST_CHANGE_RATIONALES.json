@@ -50451,5 +50451,24 @@
       "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict",
       "RISK repository process: CI admission enforces reuse before repeating a passed test child"
     ]
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "6235818921a46990745cda3440675514f77cb778f8dea615f56eaaf057505676",
+    "reason": "Add a process contract for the persistence-recovery workflow group because its protected transfer and legacy-opening consumers require the same pinned WebKit binary that CI already provisions for native-process.",
+    "previousBehavior": "The required matching WebKit installation ran only for native-process, leaving full, uncovered persistence-recovery runs without the executable required by their existing WebKit consumers.",
+    "intendedBehavior": "A full, uncovered native-process or persistence-recovery group installs WebKit through the project-pinned Playwright command; reused groups and full-skip decisions retain their existing no-install behavior.",
+    "preservedCoverage": [
+      "The new process RISK checks the workflow selection condition and the exact no-download, project-pinned WebKit install command; the focused RED observed that persistence-recovery was absent before the workflow edit.",
+      "The existing CI admission, reuse, persistence consumer, and browser-engine application assertions remain intact; the workflow change does not alter app behavior or group membership.",
+      "The process source assertion does not claim that a hosted runner installed or launched WebKit; exact hosted candidate requalification remains the parent checkpoint owner’s responsibility."
+    ],
+    "redEvidence": {
+      "command": "Before the workflow edit, pinned Node 24.19.0 ran: node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: persistence recovery CI installs required matching WebKit$\" tests.js. Captured command record and stdout: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/persistence1868-owner/COMMANDS.ndjson and persistence-webkit-risk-red.stdout.txt.",
+      "failure": "The focused test ran exactly one test and failed at its intended workflow source assertion: Required WebKit must be installed only for full, uncovered native-process or persistence-recovery groups. The actual step condition ended with matrix.group == native-process, omitting persistence-recovery; the matching npx --no-install playwright install --with-deps webkit command was already present. This is a source-selection RED, not an application or browser launch failure."
+    },
+    "replacementTests": [
+      "RISK repository process: persistence recovery CI installs required matching WebKit"
+    ]
   }
 ]

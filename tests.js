@@ -47694,6 +47694,13 @@ test('RISK repository process: CI admission enforces reuse before repeating a pa
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
 
+test('RISK repository process: persistence recovery CI installs required matching WebKit',()=>{
+ const workflow=fs.readFileSync(path.join(__dirname,'.github','workflows','data-safety.yml'),'utf8');
+ const installStep=workflow.match(/^[ \t]*- name: Install matching required native WebKit\n(?<body>(?:(?!^[ \t]*- name:)[\s\S])*)/m)?.groups?.body||'';
+ assert.match(installStep,/^[ \t]+if:\s*steps\.selected\.outputs\.decision == 'full' && !contains\(fromJSON\(steps\.selected\.outputs\.reused\), matrix\.group\) && \(matrix\.group == 'native-process' \|\| matrix\.group == 'persistence-recovery'\)\s*$/m,'Required WebKit must be installed only for full, uncovered native-process or persistence-recovery groups.');
+ assert.match(installStep,/^[ \t]+run:\s*npx --no-install playwright install --with-deps webkit\s*$/m,'The install must use the matching project-pinned Playwright WebKit.');
+});
+
 test('RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group aggregate preserves observer protocol across emulator coverage and fresh fallback$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
