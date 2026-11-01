@@ -52369,5 +52369,136 @@
       "summary": "The #1911 records preserve fractional and unchanged ordinary-clock consumer GREEN. The accepted #1902/#1904 admission records focused 46/46 checks. Full/native/Linux qualification remains pending the owner."
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/reconciled-ci-repair-source-join/merger/final"
+  },
+  {
+    "baseCommit": "b09f430eb79ff8082acf229dcf38f2e79f791042",
+    "testChangesSha256": "aa4994f7475e26a077a151c4b8b513d7fccb6146c6005aa05b1bb6e83de9bdca",
+    "reason": "Atomic #1922 makes the actual shared ordinary/fractional native Undo pre-title waitForFunction callback synchronous while preserving the stronger bounded async durable-source capture, and permanently checks the observed actual callback kind in both existing consumer roots.",
+    "previousBehavior": "The pre-title preload passed an async callback that read device storage to Playwright waitForFunction. The existing static repository guard rejected the actual inline async call at line49172, although the complete native Undo lifecycle itself passed. A named async callback also violates the contract even when the static regex cannot identify it.",
+    "intendedBehavior": "Playwright receives the actual synchronous listOpen state predicate. The unchanged12-second async capture separately requires stable complete current/head/backups/opaque/pending state, trusted list-opening click and first daily before first title fill. The source artifact observes constructor.name from the same callback reference passed to waitForFunction; the shared consumer returns it and both existing named roots assert Function.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time"
+    ],
+    "preservedCoverage": [
+      "The original synchronous-predicate repository guard is unchanged and was observed RED before the first functional fix; its green result does not claim an application crash or native Undo failure.",
+      "Both existing consumer roots retain their exact names, IDs and normal/fractional options. The meaningful root changes assert the actual measured callback constructor returned by the existing shared consumer, including a later named-async baseline challenge that fails after the complete native lifecycle.",
+      "The complete B0/B1/B2/U1/U2 source and history lifecycle,64 tasks, full typed opaque bytes, pending upload, all backup rows/order, saved-state assertions, exact pixels,60/114/10 action contracts and1000ms limits remain intact.",
+      "The original12-second bounded asynchronous capture, stable double-read checks, actual trusted list-toggle receipt and list-opening first daily all remain before the first actual title fill; capture wall time remains safe-integer and high-resolution click time remains finite with the fractional .125 witness unchanged.",
+      "All1530 inherited rationale objects remain literally unchanged and ordered, including the original #1898 first-daily RED/GREEN and #1911 actual fractional receipt RED/GREEN chronology. No app, rules, assets, FAQ, version, dependency, workflow, inventory, assignment or protected guard changes."
+    ],
+    "redEvidence": {
+      "command": "Absolute Node24.19 record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/final-admission-1922/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker/guard-red/record-run --purpose preimplementation-red --summary -- node --test --test-name-pattern=\"^RISK repository process: Playwright waitForFunction predicates are synchronous$\" tests.js",
+      "failure": "On clean b09, recorder 2026-11-01T14-20-55-205Z-56753168-fcb4-445d-b347-088630af7aa2 observed the unchanged static enforcement assertion actual[49172] versus[]. This repository contract RED preceded the initial minimal synchronous edit. It is not an app/native behavior failure. Original #1898 recorded the pre-title first-daily interval assertion RED df36de3c and GREEN23d6eccb; inherited #1911 records7e1925a7 and74159e2c preserve real trusted fractional receipt rejection followed by their focused GREENs. The later named-async challenge below is not relabeled as original preimplementation chronology.",
+      "records": [
+        "2026-11-01T14-20-55-205Z-56753168-fcb4-445d-b347-088630af7aa2",
+        "2026-11-01T11-49-50-827Z-df36de3c-ae30-4716-af93-fa8000968f55",
+        "2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a",
+        "2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180"
+      ]
+    },
+    "laterBaselineSensitivity": {
+      "record": "2026-11-01T14-25-49-423Z-cb245d9d-ad0e-4fc3-b118-717b7b8c6d74",
+      "purpose": "later-baseline-sensitivity",
+      "command": {
+        "executable": "node",
+        "args": [
+          "--test",
+          "--test-name-pattern=^RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources$",
+          "tests.js"
+        ]
+      },
+      "failure": "With the original async callback assigned to the actual callback reference and the new witness/assertions installed, the normal WebKit child passed its full selected lifecycle and closed context/browser/server; the root then failed on measured AsyncFunction versus Function. Earlier attempt b03ec577 stopped before native launch due to an expired owner lease and is retained as setup failure, not meaningful RED."
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T14-26-20-724Z-369967f4-f482-4ad1-9da7-41287cb1ed7f",
+        "2026-11-01T14-26-43-320Z-73904500-65c7-49d4-b727-98554a4c7c7e"
+      ],
+      "summary": "Final measured-witness normal and fractional WebKit consumers both passed the complete existing lifecycle with measured Function. These are focused dirty-runner checks over unchanged committed b09 app assets; recorder retains exact runner bytes. Prior guard/native stage runs remain retained. No full-suite, Chromium, Linux, CI, deployment, live or physical-device qualification claim."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "ef97fc9b479eca811166caa9504f2ee6493d9fb440e7c8e7816d85b2318465b4",
+    "reason": "Atomic #1923 binds the final cumulative protected tests.js diff from the exact current main comparison base after the #1922 shared native Undo predicate repair. This is an admission index for inherited behavior and the new fixture repair, not a new app behavior or metadata-derived behavioral RED.",
+    "previousBehavior": "The prior aggregate f06630bd record matched only the earlier source against8cd524a. The branch has no upstream, so the focused selected-base preflight did not check the distinct outgoing0d41 comparison. On clean b09 the real outgoing gate failed missing exact rationale; after fixture source finalized at36e0550fb1dc84095425d5cddcbb97db5fb8cbc3 the actual outgoing gate again failed for missing exact cumulative metadata.",
+    "intendedBehavior": "The existing unchanged validator accepts this exact cumulative tests.js fingerprint against8cd524a7f0ab7a25b6689244722ae3c5baf861c8 while preserving every original source-bound rationale and chronology. The final fixture repair also retains its own exact b09 source record. No upstream, gate, workflow or assertion is bypassed or weakened.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time"
+    ],
+    "preservedCoverage": [
+      "All1530 original rationale object literals remain unchanged and ordered, followed by the unchanged source-bound #1922 record. Cumulative records index their existing meaningful RED/GREEN evidence rather than replacing it.",
+      "The original #1898 pre-title daily-source assertion chronology and #1911 native fractional trusted-click receipt failures remain distinct. Current #1922 static guard RED preceded the first fix; the actual named async callback witness failed later after a passing full selected native lifecycle and is explicitly later-baseline-sensitivity.",
+      "The exact existing ordinary and fractional roots now assert an actual callback-reference constructor witness, with unchanged names, IDs and options, unchanged12-second stable async source capture, complete64-task B0/B1/B2/U1/U2 history/source/typed-byte/pending/backups/order assertions, exact pixels and original time/action limits.",
+      "The inherited #1902/#1904 Linux process/stream/cleanup/clock source-bound RED/GREEN records, independent literal24 hosted native catalog and required uninstrumented verdict remain protected; protocol doubles and diagnostic records claim no actual Linux native qualification.",
+      "No app, rules, assets, FAQ, version, dependency, workflow, inventory, assignment or gate changed for this metadata leaf. Missing metadata is a structural admission failure and is not reported as an app failure or meaningful feature RED."
+    ],
+    "redEvidence": {
+      "command": "Existing source-bound rationale redEvidence.command fields retain original feature/process commands. For metadata only: absolute Node24.19 scripts/test-first-gate.mjs0d41e482b746622b8f80ba89c9b27a290a7b660b through record-run on clean b09 and on final fixture commit36e0550fb1dc84095425d5cddcbb97db5fb8cbc3.",
+      "failure": "Metadata-only recorder6fd184f1 on clean b09 and828c9e06 on final fixture source both exited1: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json. These failures do not constitute an app/feature RED. Meaningful original chronology remains in unchanged #1898/#1911/#1902/#1904 records; #1922 guard56753168 failed[49172] vs[] before its first functional edit, and later named async challengecb245d9d measured AsyncFunction vs Function after the full selected native child passed.",
+      "records": [
+        "2026-11-01T14-20-55-206Z-6fd184f1-4369-4e1f-b4a8-47c6bafa9aa2",
+        "2026-11-01T14-28-32-005Z-828c9e06-f811-4b71-9efc-04190babef7f",
+        "2026-11-01T14-20-55-205Z-56753168-fcb4-445d-b347-088630af7aa2",
+        "2026-11-01T14-25-49-423Z-cb245d9d-ad0e-4fc3-b118-717b7b8c6d74",
+        "2026-11-01T11-49-50-827Z-df36de3c-ae30-4716-af93-fa8000968f55",
+        "2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a",
+        "2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T14-26-20-724Z-369967f4-f482-4ad1-9da7-41287cb1ed7f",
+        "2026-11-01T14-26-43-320Z-73904500-65c7-49d4-b727-98554a4c7c7e",
+        "2026-11-01T14-28-09-963Z-0b2bd792-c28c-4007-b86d-b09b2931b23b"
+      ],
+      "summary": "Final #1922 normal/fractional WebKit consumer roots passed with actual Function witness, full selected source lifecycle, zero errors and complete cleanup. Unchanged static guard and RISK inventory passed. All three final exact comparison gates, selected-base preflight and complete group descriptor are separate owner handoff checks. No full-suite, CI, deployed, live or device pass claimed here."
+    },
+    "integrationSourceCommit": "36e0550fb1dc84095425d5cddcbb97db5fb8cbc3",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
+  },
+  {
+    "baseCommit": "0d41e482b746622b8f80ba89c9b27a290a7b660b",
+    "testChangesSha256": "e3e29538e3376b278efa5b7ba19e303ac395ebdcffe603f19563fe6f6d766ca5",
+    "reason": "Atomic #1923 binds the final cumulative protected tests.js diff from the exact actual outgoing published PR285 comparison base after the #1922 shared native Undo predicate repair. This is an admission index for inherited behavior and the new fixture repair, not a new app behavior or metadata-derived behavioral RED.",
+    "previousBehavior": "The prior aggregate f06630bd record matched only the earlier source against8cd524a. The branch has no upstream, so the focused selected-base preflight did not check the distinct outgoing0d41 comparison. On clean b09 the real outgoing gate failed missing exact rationale; after fixture source finalized at36e0550fb1dc84095425d5cddcbb97db5fb8cbc3 the actual outgoing gate again failed for missing exact cumulative metadata.",
+    "intendedBehavior": "The existing unchanged validator accepts this exact cumulative tests.js fingerprint against0d41e482b746622b8f80ba89c9b27a290a7b660b while preserving every original source-bound rationale and chronology. The final fixture repair also retains its own exact b09 source record. No upstream, gate, workflow or assertion is bypassed or weakened.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time"
+    ],
+    "preservedCoverage": [
+      "All1530 original rationale object literals remain unchanged and ordered, followed by the unchanged source-bound #1922 record. Cumulative records index their existing meaningful RED/GREEN evidence rather than replacing it.",
+      "The original #1898 pre-title daily-source assertion chronology and #1911 native fractional trusted-click receipt failures remain distinct. Current #1922 static guard RED preceded the first fix; the actual named async callback witness failed later after a passing full selected native lifecycle and is explicitly later-baseline-sensitivity.",
+      "The exact existing ordinary and fractional roots now assert an actual callback-reference constructor witness, with unchanged names, IDs and options, unchanged12-second stable async source capture, complete64-task B0/B1/B2/U1/U2 history/source/typed-byte/pending/backups/order assertions, exact pixels and original time/action limits.",
+      "The inherited #1902/#1904 Linux process/stream/cleanup/clock source-bound RED/GREEN records, independent literal24 hosted native catalog and required uninstrumented verdict remain protected; protocol doubles and diagnostic records claim no actual Linux native qualification.",
+      "No app, rules, assets, FAQ, version, dependency, workflow, inventory, assignment or gate changed for this metadata leaf. Missing metadata is a structural admission failure and is not reported as an app failure or meaningful feature RED."
+    ],
+    "redEvidence": {
+      "command": "Existing source-bound rationale redEvidence.command fields retain original feature/process commands. For metadata only: absolute Node24.19 scripts/test-first-gate.mjs0d41e482b746622b8f80ba89c9b27a290a7b660b through record-run on clean b09 and on final fixture commit36e0550fb1dc84095425d5cddcbb97db5fb8cbc3.",
+      "failure": "Metadata-only recorder6fd184f1 on clean b09 and828c9e06 on final fixture source both exited1: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json. These failures do not constitute an app/feature RED. Meaningful original chronology remains in unchanged #1898/#1911/#1902/#1904 records; #1922 guard56753168 failed[49172] vs[] before its first functional edit, and later named async challengecb245d9d measured AsyncFunction vs Function after the full selected native child passed.",
+      "records": [
+        "2026-11-01T14-20-55-206Z-6fd184f1-4369-4e1f-b4a8-47c6bafa9aa2",
+        "2026-11-01T14-28-32-005Z-828c9e06-f811-4b71-9efc-04190babef7f",
+        "2026-11-01T14-20-55-205Z-56753168-fcb4-445d-b347-088630af7aa2",
+        "2026-11-01T14-25-49-423Z-cb245d9d-ad0e-4fc3-b118-717b7b8c6d74",
+        "2026-11-01T11-49-50-827Z-df36de3c-ae30-4716-af93-fa8000968f55",
+        "2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a",
+        "2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T14-26-20-724Z-369967f4-f482-4ad1-9da7-41287cb1ed7f",
+        "2026-11-01T14-26-43-320Z-73904500-65c7-49d4-b727-98554a4c7c7e",
+        "2026-11-01T14-28-09-963Z-0b2bd792-c28c-4007-b86d-b09b2931b23b"
+      ],
+      "summary": "Final #1922 normal/fractional WebKit consumer roots passed with actual Function witness, full selected source lifecycle, zero errors and complete cleanup. Unchanged static guard and RISK inventory passed. All three final exact comparison gates, selected-base preflight and complete group descriptor are separate owner handoff checks. No full-suite, CI, deployed, live or device pass claimed here."
+    },
+    "integrationSourceCommit": "36e0550fb1dc84095425d5cddcbb97db5fb8cbc3",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
   }
 ]
