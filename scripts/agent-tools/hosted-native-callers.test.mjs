@@ -49,6 +49,52 @@ test('owned native process retains real normal output and closes without teardow
  assert.ok(receipt.processes.every(row=>row.identity.startIdentity&&row.identity.pgid>0&&row.last.status==='nonlive'));
 });
 
+test('owned native process reconciles a witnessed executable-only terminal read after actual exit',async t=>{
+ const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-terminal-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');
+ const before=new Set(readNativeProcessTable().map(row=>row.pid));let prior,partial;
+ const signals=[];
+ const readProcessTable=()=>{
+  const rows=readNativeProcessTable(),row=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
+  if(row){if(!prior)prior={...row};else if(!partial&&fs.existsSync(ready)){
+   partial={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};
+   rows[rows.indexOf(row)]=partial;
+   // The fixture exits normally only after this actual identity observation.
+   fs.writeFileSync(exitRequest,'exit');
+  }}
+  return rows;
+ };
+ const fixture=`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'ready');const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)})){clearInterval(timer);console.log('actual-normal-exit');}},5);`;
+ const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
+ t.diagnostic('Real terminal identity chronology and receipt: '+outputDir);
+ assert.ok(prior&&partial,'The actual child was fully witnessed before executable-only loss');
+ for(const key of ['pid','ppid','startIdentity','startPrecision','uid','pidNamespace'])assert.equal(partial[key],prior[key],key+' remains exact through the partial read');
+ assert.equal(receipt.status,0);assert.equal(receipt.exit.code,0);assert.equal(receipt.close.code,0);assert.equal(alive(prior.pid),false,'Independent kernel probe proves the actual witnessed child is gone');
+ assert.ok(signals.some(row=>row.pid===prior.pid&&row.signal===0),'The consumer independently observed kernel absence');assert.equal(signals.some(row=>row.signal!==0),false,'Executable loss grants no teardown signal authority');
+ assert.equal(receipt.processes.find(row=>row.identity.pid===prior.pid).last.status,'nonlive');
+ assert.equal(receipt.cleanup.complete,true,'A previously witnessed exact child with only terminal executable loss and subsequent actual exit plus ESRCH must complete cleanup');
+ assert.equal(receipt.incidents.length,1);const incident=receipt.incidents[0];
+ assert.equal(incident.status,'resolved');assert.deepEqual(incident.observation,partial);assert.deepEqual(incident.priorIdentity,prior);assert.equal(incident.priorProof.kind,'actual-spawn-child');assert.equal(incident.resolution.proof.kind,'kernel-absence');assert.equal(incident.resolution.proof.result,'ESRCH');assert.ok(incident.observed.monotonicMs<=incident.resolution.observed.monotonicMs);
+ assert.deepEqual(receipt.refusals,[]);
+});
+
+test('owned native process reconciles a witnessed descendant while retaining its actual browser close',async t=>{
+ const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-terminal-descendant-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');let prior,partial,rootPid;
+ const signals=[];
+ const readProcessTable=()=>{
+  const rows=readNativeProcessTable();rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath)?.pid;
+  const row=rows.find(row=>row.ppid===rootPid&&row.executable===process.execPath);
+  if(row){if(!prior)prior={...row};else if(!partial&&fs.existsSync(ready)){partial={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};rows[rows.indexOf(row)]=partial;fs.writeFileSync(exitRequest,'exit');}}
+  return rows;
+ };
+ const child=`const fs=require('node:fs');console.log('ready');const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)}))clearInterval(timer);},5);`;
+ const fixture=`import{spawn}from'node:child_process';import fs from'node:fs';const c=spawn(process.execPath,['-e',${JSON.stringify(child)}],{detached:true,stdio:['ignore','pipe','inherit']});c.stdout.once('data',()=>{console.log('pw:browser <launched> pid='+c.pid);fs.writeFileSync(${JSON.stringify(ready)},'ready');});c.once('close',(code,signal)=>console.log('pw:browser [pid='+c.pid+'] <process did exit: exitCode='+code+', signal='+signal+'>'));`;
+ const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['--input-type=module','-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
+ t.diagnostic('Real descendant terminal chronology and actual browser close: '+outputDir);
+ assert.ok(prior&&partial);assert.equal(receipt.status,0);assert.equal(alive(prior.pid),false);assert.equal(receipt.cleanup.complete,true);assert.deepEqual(receipt.refusals,[]);assert.equal(signals.some(row=>row.signal!==0),false);
+ const incident=receipt.incidents[0];assert.equal(incident.status,'resolved');assert.deepEqual(incident.observation,partial);assert.deepEqual(incident.priorIdentity,prior);assert.equal(incident.priorProof.kind,'observed-owned-ancestry');assert.equal(incident.priorProof.parentIdentity.pid,prior.ppid);assert.equal(incident.resolution.proof.kind,'kernel-absence');assert.equal(incident.resolution.proof.result,'ESRCH');
+ assert.equal(receipt.browserLaunches.length,1);const browser=receipt.browserLaunches[0];assert.equal(browser.pid,prior.pid);assert.equal(browser.status,'owned');assert.equal(browser.actualExit.owner,true);assert.equal(browser.actualExit.exitCode,0);assert.equal(browser.actualExit.signal,null);assert.equal(browser.finalState.status,'nonlive');assert.equal(receipt.browserExits.length,1);
+});
+
 test('owned native process binds live TAP stdout browser logs to actual detached child identities',async()=>{
  const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-stdout-browser-'));
  const child="console.log('ready');setTimeout(()=>{},250)";
@@ -115,6 +161,88 @@ test('owned native process refuses ambiguous enrichment of a still-live owned id
  t.after(async()=>{if(rootIdentity){const current=readNativeProcessTable().find(row=>row.pid===rootIdentity.pid);if(current?.startIdentity===rootIdentity.startIdentity){process.kill(rootIdentity.pid,'SIGKILL');await until(()=>!alive(rootIdentity.pid));}}});
  const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e','setInterval(()=>{},1000)'],timeoutMs:180,system:{readProcessTable,signalProcess:(pid,signal)=>signals.push({pid,signal})}});
  assert.equal(receipt.cleanup.complete,false);assert.ok(receipt.refusals.some(row=>row.includes('enrichment unavailable')));assert.equal(receipt.processes.find(row=>row.identity.pid===rootIdentity.pid).last.status,'identity-unavailable');assert.deepEqual(signals,[]);assert.equal(alive(rootIdentity.pid),true,'Missing enrichment cannot be converted to OS non-liveness or authorize a signal');
+});
+
+test('owned native process retains an unknown partial descendant even after all witnessed processes exit',async t=>{
+ const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-unknown-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');let actual,partial,rootPid;
+ const signals=[];
+ const child=`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)}))clearInterval(timer);},5);`;
+ const fixture=`import{spawn}from'node:child_process';const c=spawn(process.execPath,['-e',${JSON.stringify(child)}],{detached:true,stdio:'ignore'});c.once('close',()=>console.log('actual-descendant-close'));`;
+ const readProcessTable=()=>{
+  const rows=readNativeProcessTable();rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath)?.pid;
+  for(const row of rows)if(row.ppid===rootPid&&row.executable===process.execPath){
+   actual??={...row};const rejected={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};partial??=rejected;rows[rows.indexOf(row)]=rejected;
+   if(fs.existsSync(ready))fs.writeFileSync(exitRequest,'exit');
+  }
+  return rows;
+ };
+ t.after(async()=>{if(actual){const row=readNativeProcessTable().find(row=>row.pid===actual.pid);if(row&&['startIdentity','startPrecision','uid','pidNamespace'].every(key=>row[key]===actual[key])&&alive(actual.pid)){process.kill(actual.pid,'SIGKILL');await until(()=>!alive(actual.pid));}}});
+
+ const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['--input-type=module','-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
+ t.diagnostic('Unknown descendant actual OS row and provisional receipt: '+outputDir);
+ assert.ok(actual&&partial);assert.equal(receipt.status,0);assert.equal(alive(actual.pid),false);assert.ok(receipt.processes.every(row=>row.last.status==='nonlive'),'All independently witnessed identities really ended');
+ assert.equal(receipt.cleanup.complete,false,'An unowned partial row cannot be waived by all known processes exiting');assert.equal(receipt.processes.some(row=>row.identity.pid===actual.pid),false,'Rejected provisional identity never becomes owned');assert.equal(signals.some(row=>row.pid===actual.pid),false,'Unknown descendant never receives even an ownership probe');
+ const incident=receipt.incidents.find(row=>row.observation.pid===actual.pid);assert.ok(incident);assert.equal(incident.kind,'unwitnessed-descendant');assert.equal(incident.status,'active');assert.equal(incident.eligible,false);assert.equal(incident.priorIdentity,null);assert.equal(incident.priorProof,null);assert.deepEqual(incident.observation,partial);assert.equal(incident.parentWitness.identity.pid,actual.ppid);assert.equal(incident.parentWitness.proof.kind,'actual-spawn-child');assert.ok(receipt.refusals.includes(incident.message));assert.ok(incident.observed.utc);assert.ok(incident.observations.length<=8);
+});
+
+test('owned native process never signals a live row whose executable field is absent',async t=>{
+ const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-missing-executable-')),ready=path.join(outputDir,'ready'),before=new Set(readNativeProcessTable().map(row=>row.pid));let prior,partial;
+ const signals=[];
+ const readProcessTable=()=>{
+  const rows=readNativeProcessTable(),row=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
+  if(row){if(!prior)prior={...row};else if(fs.existsSync(ready)){partial={...row,executable:null,enrichment:{status:'complete',errors:[]}};rows[rows.indexOf(row)]=partial;}}return rows;
+ };
+ const fixture=`require('node:fs').writeFileSync(${JSON.stringify(ready)},'ready');setTimeout(()=>{},400);`;
+ const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e',fixture],timeoutMs:180,system:{readProcessTable,signalProcess:(pid,signal)=>{if(signal===0)process.kill(pid,0);else signals.push({pid,signal});}}});
+ t.diagnostic('Actual missing-executable field guard: '+outputDir);
+ assert.ok(prior&&partial);assert.equal(receipt.timedOut,true);assert.equal(receipt.status,0);assert.equal(alive(prior.pid),false);assert.deepEqual(signals,[],'A missing executable field cannot authorize a signal even if enrichment incorrectly reports complete');assert.equal(receipt.cleanup.complete,false);assert.equal(receipt.incidents[0].status,'active');assert.equal(receipt.incidents[0].eligible,false);
+});
+
+test('owned native process never resumes signal authority after an intervening identity ambiguity',async t=>{
+ const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-core-return-')),ready=path.join(outputDir,'ready'),before=new Set(readNativeProcessTable().map(row=>row.pid));let prior,changed=false,restored=false;
+ const signals=[];
+ const readProcessTable=()=>{
+  const rows=readNativeProcessTable(),row=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
+  if(row){if(!prior)prior={...row};else if(fs.existsSync(ready)){if(!changed){rows[rows.indexOf(row)]={...row,startIdentity:row.startIdentity+'-ambiguous'};changed=true;}else restored=true;}}return rows;
+ };
+ const fixture=`require('node:fs').writeFileSync(${JSON.stringify(ready)},'ready');setTimeout(()=>{},400);`;
+ const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e',fixture],timeoutMs:180,system:{readProcessTable,signalProcess:(pid,signal)=>{if(signal===0)process.kill(pid,0);else signals.push({pid,signal});}}});
+ t.diagnostic('Actual intervening core ambiguity and subsequent full OS row: '+outputDir);
+ assert.ok(prior&&changed&&restored);assert.equal(receipt.timedOut,true);assert.equal(receipt.status,0);assert.equal(alive(prior.pid),false);assert.deepEqual(signals,[],'A later matching row cannot erase the unresolved ambiguity and regain signal authority');assert.equal(receipt.cleanup.complete,false);assert.ok(receipt.refusals.some(row=>row.includes('identity changed')));assert.ok(receipt.processes[0].terminalResolutionBlocked);
+});
+
+test('owned native process keeps terminal incidents unresolved after an intervening core ambiguity',async t=>{
+ for(const field of ['startIdentity','startPrecision','uid','pidNamespace'])await t.test(field,async()=>{
+  const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-terminal-core-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit'),before=new Set(readNativeProcessTable().map(row=>row.pid));let prior,phase=0;
+  const signals=[];
+  const readProcessTable=()=>{
+   const rows=readNativeProcessTable(),row=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
+   if(row){if(!prior)prior={...row};else if(fs.existsSync(ready)&&phase<2){
+    const partial={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};
+    if(phase++===1){partial[field]=field==='startIdentity'?row[field]+'-reused':null;partial.enrichment.errors.push({field,code:'ENOENT'});fs.writeFileSync(exitRequest,'exit');}
+    rows[rows.indexOf(row)]=partial;
+   }}return rows;
+  };
+  const fixture=`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'ready');const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)}))clearInterval(timer);},5);`;
+  const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
+  assert.equal(phase,2);assert.equal(receipt.status,0);assert.equal(alive(prior.pid),false);assert.equal(receipt.cleanup.complete,false,field+' ambiguity cannot be repaired by later absence');assert.equal(receipt.incidents[0].status,'active');assert.equal(receipt.incidents[0].eligible,false);assert.ok(receipt.incidents[0].blocked);assert.ok(receipt.refusals.some(row=>row.includes('identity changed')));assert.equal(signals.some(row=>row.signal!==0),false);
+ });
+});
+
+test('owned native process requires independent nonliveness proof after an absent terminal identity',async t=>{
+ const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-terminal-absent-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');let prior,hidden=false,rootPid;
+ const signals=[];
+ const readProcessTable=()=>{
+  const rows=readNativeProcessTable();rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath)?.pid;
+  const row=rows.find(row=>row.ppid===rootPid&&row.executable===process.execPath);
+  if(row){if(!prior)prior={...row};else if(!hidden&&fs.existsSync(ready)){hidden=true;rows[rows.indexOf(row)]={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};fs.writeFileSync(exitRequest,'exit');return rows;}}
+  return hidden?rows.filter(row=>row.pid!==prior.pid):rows;
+ };
+ const child=`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'ready');const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)}))clearInterval(timer);},5);`;
+ const fixture=`import{spawn}from'node:child_process';const c=spawn(process.execPath,['-e',${JSON.stringify(child)}],{detached:true,stdio:'ignore'});c.once('close',()=>console.log('root-finished'));`;
+ const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['--input-type=module','-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});if(pid===prior?.pid){assert.equal(signal,0);/* Deliberately withhold independent descendant ESRCH proof. */}else process.kill(pid,signal);}}});
+ t.diagnostic('Actual descendant exit with deliberately unavailable independent kernel proof: '+outputDir);
+ assert.equal(receipt.status,0);assert.equal(alive(prior.pid),false);assert.equal(receipt.cleanup.complete,false);assert.equal(receipt.incidents[0].status,'active');assert.equal(receipt.incidents[0].resolution,undefined);assert.ok(receipt.refusals.some(row=>row.includes('no kernel nonliveness proof')));assert.ok(signals.some(row=>row.pid===prior.pid&&row.signal===0));assert.equal(receipt.processes.find(row=>row.identity.pid===prior.pid).last.status,'identity-unavailable');
 });
 
 test('owned native process reaps its witnessed detached child after the root exits first',async t=>{

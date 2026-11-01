@@ -9,6 +9,7 @@ import {StringDecoder} from 'node:string_decoder';
 import {parseTap} from '../test-groups.mjs';
 
 const MAX_OUTPUT=4194304,MAX_EXECUTION=180000,TERM_MS=3000,KILL_MS=3000;
+const MAX_IDENTITY_INCIDENTS=256,MAX_INCIDENT_OBSERVATIONS=8;
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const stamp=()=>({utc:new Date().toISOString(),monotonicMs:performance.now()});
 const save=(file,value)=>{fs.writeFileSync(file+'.tmp',JSON.stringify(value,null,2)+'\n');fs.renameSync(file+'.tmp',file);};
@@ -44,7 +45,7 @@ export function readLinuxNativeProcessTable({procRoot='/proc',filesystem=fs}={})
 }
 const same=(a,b)=>a&&b&&['pid','startIdentity','startPrecision','uid','pidNamespace'].every(key=>a[key]===b[key]);
 const live=row=>row&&!/^[ZX]/.test(row.state);
-const usable=row=>row&&row.enrichment?.status!=='unavailable'&&Number.isSafeInteger(row.uid)&&typeof row.startIdentity==='string'&&row.startIdentity.length>0&&typeof row.pidNamespace==='string';
+const usable=row=>row&&row.enrichment?.status!=='unavailable'&&Number.isSafeInteger(row.pid)&&row.pid>0&&Number.isSafeInteger(row.uid)&&typeof row.startIdentity==='string'&&row.startIdentity.length>0&&typeof row.startPrecision==='string'&&row.startPrecision.length>0&&typeof row.pidNamespace==='string'&&row.pidNamespace.length>0&&typeof row.executable==='string'&&row.executable.length>0;
 
 // Only this system seam admits small real-process controls. Production callers
 // cannot raise any of the agreed ceilings through its options.
@@ -57,7 +58,7 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
  fs.mkdirSync(outputDir,{recursive:true});
  const files={stdout:path.join(outputDir,'stdout.tap'),stderr:path.join(outputDir,'stderr.txt'),frontier:path.join(outputDir,'frontier.jsonl')},fds={};
  for(const [key,file]of Object.entries(files))fds[key]=fs.openSync(file,'wx');
- const receipt={schemaVersion:1,kind:'owned-native-process',started:stamp(),source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}'),base:env.CHAIN_TEST_COMPARISON_BASE||null,sourceSha:env.CHAIN_TEST_SOURCE_SHA||null,toolSha256:digest(fs.readFileSync(new URL(import.meta.url)))},runtime:{node:process.version,executable:process.execPath,platform:process.platform,arch:process.arch,kernel:os.release(),systemBoundary:Object.keys(system).length?'controlled-test-only':'actual-OS'},hostedPolicy:{CI:env.CI||null,eventPolicy:env.CHAIN_TEST_EVENT_POLICY||null,eventName:env.GITHUB_EVENT_NAME||null,ref:env.GITHUB_REF||null,runId:env.GITHUB_RUN_ID||null,runAttempt:env.GITHUB_RUN_ATTEMPT||null,requestedPort:env.CHAIN_NATIVE_PORT===undefined?'default':env.CHAIN_NATIVE_PORT,debug:env.DEBUG||null},command:{executable,args,cwd},bounds:{executionMs:timeoutMs,termMs:TERM_MS,killMs:KILL_MS,combinedOutputBytes:outputLimitBytes},files,bytes:0,timedOut:false,outputLimit:false,status:null,signal:null,signals:[],processes:[],browserLaunches:[],browserExits:[],refusals:[],cleanup:{complete:false},frontier:null};
+ const receipt={schemaVersion:1,kind:'owned-native-process',started:stamp(),source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}'),base:env.CHAIN_TEST_COMPARISON_BASE||null,sourceSha:env.CHAIN_TEST_SOURCE_SHA||null,toolSha256:digest(fs.readFileSync(new URL(import.meta.url)))},runtime:{node:process.version,executable:process.execPath,platform:process.platform,arch:process.arch,kernel:os.release(),systemBoundary:Object.keys(system).length?'controlled-test-only':'actual-OS'},hostedPolicy:{CI:env.CI||null,eventPolicy:env.CHAIN_TEST_EVENT_POLICY||null,eventName:env.GITHUB_EVENT_NAME||null,ref:env.GITHUB_REF||null,runId:env.GITHUB_RUN_ID||null,runAttempt:env.GITHUB_RUN_ATTEMPT||null,requestedPort:env.CHAIN_NATIVE_PORT===undefined?'default':env.CHAIN_NATIVE_PORT,debug:env.DEBUG||null},command:{executable,args,cwd},bounds:{executionMs:timeoutMs,termMs:TERM_MS,killMs:KILL_MS,combinedOutputBytes:outputLimitBytes},files,bytes:0,timedOut:false,outputLimit:false,status:null,signal:null,signals:[],processes:[],browserLaunches:[],browserExits:[],refusals:[],incidents:[],cleanup:{complete:false},frontier:null};
  save(path.join(outputDir,'process.json'),receipt);
  let sequence=0,child,closed=false,exitObserved=false,monitor,deadline,reason,doneResolve;
  const done=new Promise(resolve=>doneResolve=resolve),known=new Map(),pending={stdout:'',stderr:''},decoders={stdout:new StringDecoder('utf8'),stderr:new StringDecoder('utf8')},lineOffsets={stdout:0,stderr:0};
@@ -65,15 +66,43 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
  const interruptions=Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>{receipt.interruption=signal;reason='interrupted:'+signal;event({kind:'interruption',signal});doneResolve();}]));
  for(const [signal,handler]of Object.entries(interruptions))process.on(signal,handler);
  const refuse=message=>{if(!receipt.refusals.includes(message))receipt.refusals.push(message);};
+ const incidents=new Map();
+ const enrichmentIncident=(row,witness,parent)=>{
+  const kind=witness?'owned-enrichment':'unwitnessed-descendant',message=(witness?'Owned process':'Owned descendant')+' enrichment unavailable; refused '+row.pid,key=kind+':'+row.pid,observed=stamp();
+  refuse(message);
+  const errors=row.enrichment?.errors;
+  // Only a previously complete exact identity can survive an executable-link
+  // terminal read race. Unknown rows and every core ambiguity stay refused.
+  const eligible=!!witness&&usable(witness.identity)&&usable(receipt.owner)&&usable(witness.proof.parentIdentity)&&same(witness.identity,row)&&!witness.terminalResolutionBlocked&&row.executable===null&&row.enrichment?.status==='unavailable'&&Array.isArray(errors)&&errors.length>0&&errors.every(error=>error.field==='executable'&&['ENOENT','ESRCH'].includes(error.code));
+  let incident=incidents.get(key);
+  if(!incident){
+   if(receipt.incidents.length>=MAX_IDENTITY_INCIDENTS){refuse('Process identity incident retention limit reached');return;}
+   incident={id:key,kind,message,status:'active',observed,observation:structuredClone(row),priorIdentity:witness?structuredClone(witness.identity):null,priorProof:witness?structuredClone(witness.proof):null,parentWitness:parent?{identity:structuredClone(parent.identity),proof:structuredClone(parent.proof)}:null,eligible,occurrences:0,observations:[]};
+   incidents.set(key,incident);receipt.incidents.push(incident);event({kind:'identity-incident',incident});
+  }
+  incident.occurrences++;incident.lastObserved=observed;incident.lastObservation=structuredClone(row);
+  if(incident.observations.length<MAX_INCIDENT_OBSERVATIONS)incident.observations.push({observed,identity:structuredClone(row)});else incident.observationsTruncated=true;
+  incident.eligible&&=eligible;
+  if(incident.status==='resolved'){incident.status='active';incident.reopened=observed;incident.eligible=false;refuse('Owned identity reappeared after terminal proof; refused '+row.pid);}
+ };
+ const blockTerminalResolution=(witness,current)=>{
+  witness.terminalResolutionBlocked??={...stamp(),observation:structuredClone(current)};
+  for(const incident of receipt.incidents)if(incident.priorIdentity?.pid===witness.identity.pid){incident.eligible=false;incident.blocked=witness.terminalResolutionBlocked;}
+ };
  const capture=()=>{
   const table=processTable(),byPid=new Map(table.map(row=>[row.pid,row]));
-  for(const [pid,witness]of known){const current=byPid.get(pid);if(live(current)&&!usable(current))refuse('Owned process enrichment unavailable; refused '+pid);if(live(current)&&!same(witness.identity,current))refuse('PID identity changed; refused '+pid);}
-  let changed=true;while(changed){changed=false;for(const row of table){if(known.has(row.pid)||row.uid!==process.getuid())continue;const parent=known.get(row.ppid);if(parent&&usable(byPid.get(row.ppid))&&same(parent.identity,byPid.get(row.ppid))){if(!usable(row)){refuse('Owned descendant enrichment unavailable; refused '+row.pid);continue;}known.set(row.pid,{identity:row,proof:{kind:'observed-owned-ancestry',parentPid:row.ppid,parentStartIdentity:parent.identity.startIdentity},first:stamp()});changed=true;}}}
+  for(const [pid,witness]of known){const current=byPid.get(pid);if(live(current)&&!usable(current))enrichmentIncident(current,witness);if(current&&!same(witness.identity,current)){blockTerminalResolution(witness,current);refuse('PID identity changed; refused '+pid);}if(live(current)&&witness.nonliveConfirmedAt){blockTerminalResolution(witness,current);refuse('Owned PID reappeared after terminal proof; refused '+pid);}}
+  let changed=true;while(changed){changed=false;for(const row of table){if(known.has(row.pid)||Number.isSafeInteger(row.uid)&&row.uid!==process.getuid())continue;const parent=known.get(row.ppid);if(parent){if(!usable(row)||parent.terminalResolutionBlocked||!usable(byPid.get(row.ppid))||!same(parent.identity,byPid.get(row.ppid))){enrichmentIncident(row,null,parent);continue;}known.set(row.pid,{identity:row,proof:{kind:'observed-owned-ancestry',parentPid:row.ppid,parentStartIdentity:parent.identity.startIdentity,parentIdentity:parent.identity},first:stamp()});changed=true;}}}
   for(const [pid,witness]of known){const current=byPid.get(pid);let status;
-   if(current)status=!live(current)?'nonlive':!usable(current)?'identity-unavailable':!same(witness.identity,current)?'identity-reused':'live';
+   if(current)status=!same(witness.identity,current)?'identity-reused':!live(current)?'nonlive':!usable(current)?'identity-unavailable':'live';
    else if(witness.nonliveConfirmedAt)status='nonlive';
-   else{let result='still-live-or-ambiguous';try{signalProcess(pid,0);}catch(error){result=error.code||String(error);}witness.absenceProbe={...stamp(),result};status=result==='ESRCH'?'nonlive':'identity-unavailable';if(status!=='nonlive')refuse('Absent owned PID has no kernel nonliveness proof; refused '+pid);}
-   if(status==='nonlive')witness.nonliveConfirmedAt??=stamp();witness.last={...stamp(),status,state:current?.state??null,identity:current??null};
+   else{let result='still-live-or-ambiguous';try{signalProcess(pid,0);}catch(error){result=error.code||String(error);}witness.absenceProbe={...stamp(),result};status=result==='ESRCH'?'nonlive':'identity-unavailable';if(status!=='nonlive'){blockTerminalResolution(witness,{pid,absent:true,probe:witness.absenceProbe});refuse('Absent owned PID has no kernel nonliveness proof; refused '+pid);}}
+   if(status==='nonlive'){
+    witness.nonliveConfirmedAt??=stamp();witness.nonliveProof??=current?{kind:'kernel-terminal-state',identity:structuredClone(current),...stamp()}:{kind:'kernel-absence',...witness.absenceProbe};
+    for(const incident of receipt.incidents)if(incident.status==='active'&&incident.eligible&&!witness.terminalResolutionBlocked&&same(incident.priorIdentity,witness.identity)&&witness.nonliveProof.monotonicMs>incident.observed.monotonicMs){
+     incident.status='resolved';incident.resolution={observed:stamp(),proof:structuredClone(witness.nonliveProof)};receipt.refusals=receipt.refusals.filter(message=>message!==incident.message);event({kind:'identity-incident-resolved',id:incident.id,resolution:incident.resolution});
+    }
+   }witness.last={...stamp(),status,state:current?.state??null,identity:current??null};
    if(current&&same(witness.identity,current)){const prior=witness.transitions?.at(-1)?.identity??witness.identity;if(['ppid','pgid','session','executable'].some(key=>prior[key]!==current[key])){witness.transitions??=[];witness.transitions.push({identity:current,...stamp()});}}
   }
   receipt.processes=[...known.values()];return byPid;
@@ -104,14 +133,14 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
   child.once('exit',(code,signal)=>{exitObserved=true;receipt.status=code;receipt.signal=signal;receipt.exit={code,signal,...stamp()};event({kind:'root-exit',code,signal});doneResolve();});
   child.once('close',(code,signal)=>{closed=true;receipt.close={code,signal,...stamp()};event({kind:'root-close',code,signal});doneResolve();});
   const initial=processTable().find(row=>row.pid===child.pid);assert.ok(usable(initial)&&initial.ppid===process.pid&&initial.uid===receipt.owner.uid,'Spawned child live OS ancestry required');
-  known.set(child.pid,{identity:initial,proof:{kind:'actual-spawn-child',parentPid:process.pid,parentStartIdentity:receipt.owner.startIdentity},first:stamp()});receipt.rootIdentity=initial;capture();event({kind:'root-start',pid:child.pid,identity:initial});
+  known.set(child.pid,{identity:initial,proof:{kind:'actual-spawn-child',parentPid:process.pid,parentStartIdentity:receipt.owner.startIdentity,parentIdentity:receipt.owner},first:stamp()});receipt.rootIdentity=initial;capture();event({kind:'root-start',pid:child.pid,identity:initial});
   monitor=setInterval(()=>{try{capture();}catch(error){refuse('Process monitor: '+String(error));reason??='identity-observation';doneResolve();}},20);
   const scheduledMonotonicMs=receipt.launched.monotonicMs+timeoutMs;
   deadline=setTimeout(()=>{receipt.timedOut=true;reason='deadline';receipt.deadline={scheduledMonotonicMs,...stamp()};receipt.deadline.latenessMs=receipt.deadline.monotonicMs-scheduledMonotonicMs;event({kind:'deadline',pid:child.pid,...receipt.deadline});doneResolve();},Math.max(0,scheduledMonotonicMs-performance.now()));
   await done;clearTimeout(deadline);
   // Capture ancestry before a parent can disappear, then signal only one exact
   // witnessed identity at a time. No negative-PGID or name-based host kill.
-  const signalOwned=(signal,until)=>{capture();for(const [pid,witness]of [...known].reverse()){if(performance.now()>=until){refuse('Identity-checked signal phase deadline reached');break;}const current=processTable().find(row=>row.pid===pid);if(!live(current))continue;if(!usable(current)||!same(witness.identity,current)){refuse('Signal refused for changed identity '+pid);continue;}let result='sent';try{signalProcess(pid,signal);}catch(error){result=error.code||String(error);if(error.code!=='ESRCH')refuse('Signal '+signal+' failed for '+pid+': '+result);}const row={pid,signal,identity:current,result,...stamp()};receipt.signals.push(row);event({kind:'signal',...row});}};
+  const signalOwned=(signal,until)=>{capture();for(const [pid,witness]of [...known].reverse()){if(performance.now()>=until){refuse('Identity-checked signal phase deadline reached');break;}const current=processTable().find(row=>row.pid===pid);if(current&&!same(witness.identity,current)){blockTerminalResolution(witness,current);refuse('Signal refused for changed identity '+pid);continue;}if(!live(current))continue;if(witness.terminalResolutionBlocked){refuse('Signal refused after ambiguous owned identity '+pid);continue;}if(!usable(current)){enrichmentIncident(current,witness);continue;}let result='sent';try{signalProcess(pid,signal);}catch(error){result=error.code||String(error);if(error.code!=='ESRCH')refuse('Signal '+signal+' failed for '+pid+': '+result);}const row={pid,signal,identity:current,result,...stamp()};receipt.signals.push(row);event({kind:'signal',...row});}};
   const allGone=()=>{capture();return[...known.values()].every(row=>row.last.status==='nonlive');};
   const settle=async until=>{while(performance.now()<until){if(allGone()&&closed)return true;await delay(20);}return allGone()&&closed;};
   if(reason||!allGone()){
@@ -120,11 +149,11 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
   }else if(!closed)await settle(performance.now()+KILL_MS);
   clearInterval(monitor);monitor=null;capture();
   for(const stream of Object.keys(pending)){pending[stream]+=decoders[stream].end();if(pending[stream])event({kind:'partial-line',stream,offset:lineOffsets[stream],line:pending[stream]});}
-  receipt.stopReason??=reason||'normal-exit';receipt.cleanup={complete:closed&&exitObserved&&[...known.values()].every(row=>row.last.status==='nonlive')&&receipt.refusals.length===0,rootClosed:closed,rootExitObserved:exitObserved,monitorStopped:true,deadlineStopped:true,signalScope:'identity-checked-individual-owned-processes'};
+  receipt.stopReason??=reason||'normal-exit';receipt.cleanup={complete:closed&&exitObserved&&[...known.values()].every(row=>row.last.status==='nonlive')&&receipt.refusals.length===0&&receipt.incidents.every(row=>row.status==='resolved'),rootClosed:closed,rootExitObserved:exitObserved,monitorStopped:true,deadlineStopped:true,signalScope:'identity-checked-individual-owned-processes'};
   for(const launch of receipt.browserLaunches){launch.finalState=known.get(launch.pid)?.last??{status:'unavailable'};launch.actualExit=receipt.browserExits.find(row=>row.pid===launch.pid&&row.owner)||{status:'unavailable',reason:'No actual browser ChildProcess close log; attempted signals are not exit status'};if(receipt.stopReason==='normal-exit'&&launch.actualExit.status==='unavailable'){receipt.cleanup.complete=false;refuse('Normal browser close log unavailable for '+launch.pid);}}
  }catch(error){receipt.error??={name:error.name,code:error.code||null,message:error.message};refuse(String(error));receipt.cleanup.complete=false;
   // If observation failed, never broaden signaling to an unproved PID/group.
-  for(const [pid,witness]of known)try{const current=processTable().find(row=>row.pid===pid);if(usable(current)&&same(witness.identity,current)&&live(current)){signalProcess(pid,'SIGKILL');receipt.signals.push({pid,signal:'SIGKILL',identity:current,result:'sent-after-owner-error',...stamp()});}}catch(cleanupError){refuse(String(cleanupError));}
+  for(const [pid,witness]of known)try{const current=processTable().find(row=>row.pid===pid);if(!witness.terminalResolutionBlocked&&usable(current)&&same(witness.identity,current)&&live(current)){signalProcess(pid,'SIGKILL');receipt.signals.push({pid,signal:'SIGKILL',identity:current,result:'sent-after-owner-error',...stamp()});}}catch(cleanupError){refuse(String(cleanupError));}
   const until=performance.now()+KILL_MS;while(child&&!closed&&performance.now()<until)await delay(20);
  }finally{
   for(const [signal,handler]of Object.entries(interruptions))process.off(signal,handler);

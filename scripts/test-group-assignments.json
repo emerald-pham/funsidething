@@ -14030,6 +14030,46 @@
       "root": "RISK repository process: owned native lifecycle retains stream and exact union controls",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: proven terminal executable incidents retain actual exit custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "owned native process reconciles a witnessed executable-only terminal read after actual exit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process retains an unknown partial descendant even after all witnessed processes exit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process keeps terminal incidents unresolved after an intervening core ambiguity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process requires independent nonliveness proof after an absent terminal identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process reconciles a witnessed descendant while retaining its actual browser close",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process never signals a live row whose executable field is absent",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process never resumes signal authority after an intervening identity ambiguity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
     }
   ],
   "processControls": [
