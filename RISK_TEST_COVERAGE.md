@@ -2562,3 +2562,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: default manual ordinary admission retains capped refusal
 - RISK repository process: ordinary cloud sign out keeps the complete64 source at action boundaries
 - RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures
+
+- `RISK repository process: replaced historical roots reject contradictory live assignments before execution` — #1869: existing renamed-root public CLI rejects obsolete source plus explicit target before body/descriptor publication; valid renamed parent and baseline child identities remain required.

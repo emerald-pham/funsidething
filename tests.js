@@ -53319,3 +53319,14 @@ test('RISK repository process: ordinary cloud sign out keeps the complete64 sour
 test('RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures',{timeout:100000},async t=>{
  await assertNativeCloudProfileCase(t,'Settings decision review offers Light and saves it while protecting failures',['before-settings','baseline-saved','read-refused','reviewed','selected','write-refused','reviewed-retry','selected-retry','applied']);
 });
+
+
+test('RISK repository process: replaced historical roots reject contradictory live assignments before execution',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner reconciles a renamed root and preserves baseline case identities$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ assert.equal(result.error,undefined,'The existing renamed-root public CLI fixture must start: '+output);
+ assert.equal(result.signal,null,'The renamed-root process must finish: '+output);
+ assert.equal(result.status,0,'Contradictory source/target assignments must fail before execution while valid renamed roots retain baseline children: '+output);
+ assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
+});

@@ -50470,5 +50470,95 @@
     "replacementTests": [
       "RISK repository process: persistence recovery CI installs required matching WebKit"
     ]
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "4e6b3057da1fdc00738894fc96605c9eec74ad9028f81947d3f00b17bacdc62c",
+    "reason": "Issue #1869 requires rejecting obsolete historical source assignments that coexist with explicit current replacements before any grouped execution or descriptor publication.",
+    "previousBehavior": "The grouped catalog bypassed the replaced-source rejection because every obsolete source was also a baseline root; all seven obsolete core assignments remained selected alongside valid targets.",
+    "intendedBehavior": "The existing public renamed-root fixture must refuse contradictory old/current assignments before any body or valid descriptor, while a valid renamed root executes its mapped baseline parent and accepted environment child. A new required core process RISK runs this fixture without changing feature tests.",
+    "preservedCoverage": [
+      "All 1476 existing rationale objects and their byte slices/order remain unchanged; this standalone record is appended only.",
+      "Historical inventory remains byte-exact at 2997 cases and 61 accepted skips; explicit replacement records, reasons, targets, group/file bindings and measured durations are unchanged.",
+      "Valid renamed-root children, unknown/unclassified/overlapping assignments, missing required cases and unexpected skip protections remain in the existing grouped-runner process cohort."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/replacements-1869/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK repository process: replaced historical roots reject contradictory live assignments before execution$' tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder/2026-11-01T02-56-31-774Z-03d8b0ac-b92b-4e66-b43c-612c18be7b42.json",
+      "failure": "On baseline644 before runner/catalog edits, existing renamed-root fixture assertion A replaced historical source cannot remain live alongside its explicit current target failed with ERR_ASSERTION notStrictEqual: actual CLI status0, forbidden0. Wrapper RISK failed status1. Recorder outcome assertion-failure, child/wrapper exit1, complete source identity diff1b023a1946340444200002ca332c06ba25c3b07775c9720fb2026229e1ca1d74."
+    },
+    "replacementTests": [
+      "RISK repository process: replaced historical roots reject contradictory live assignments before execution"
+    ]
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "e400178635709b0eef347d7db79e61a14ceb7d78d546ebf234c6f5a3c770980c",
+    "reason": "Reconcile the exact protected tests.js diff for the integration join of #1868 and #1869 against 6443761512cd652d02955fb93826dc3baa5daca3. This metadata derives from both original observed preimplementation REDs and preserves their separate raw standalone records; it records no new integration preimplementation run.",
+    "previousBehavior": "On published source 6443761512cd652d02955fb93826dc3baa5daca3 the persistence CI selection omitted matching WebKit provisioning and the grouped runner admitted contradictory obsolete/current root assignments. Earlier application and process changes since main retain their original rationale records and chronology.",
+    "intendedBehavior": "Retain both complete required process regressions: full uncovered persistence-recovery and native-process provision pinned WebKit; contradictory replaced-source assignments fail before execution while valid replacements preserve baseline case identities. All previously accepted application and native assertions stay unchanged by this join.",
+    "preservedCoverage": [
+      "The original 1476 rationale objects retain their raw bytes and order. Both workers’ standalone records and their actual distinct RED commands, paths, source identities and timestamps remain preserved without fabricated integration chronology.",
+      "The original tests.js assertions remain byte-preserved: the only executable additions relative to published644 are the two worker process RISK roots. The historical 2997-case/61-skip inventory, required mapped baseline cases, replacement reasons/targets/durations and all other groups remain unchanged.",
+      "The seven obsolete assignment rows are removed exactly as in #1869, with both new process RISK roots required in core. No service-skip classification, browser/emulator execution, render replay, full qualification or hosted/release acceptance is claimed."
+    ],
+    "redEvidence": {
+      "command": "#1868 original standalone source 6443761512cd652d02955fb93826dc3baa5daca3, actual worker e5c5c67f05bb1e62caff39cc48369e26cdd0ebe0: Before the workflow edit, pinned Node 24.19.0 ran: node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: persistence recovery CI installs required matching WebKit$\" tests.js. Captured command record and stdout: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/persistence1868-owner/COMMANDS.ndjson and persistence-webkit-risk-red.stdout.txt.\n#1869 original standalone source 6443761512cd652d02955fb93826dc3baa5daca3, actual worker b5e8cdb0996553116da2072f3efe632cf7368174: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/replacements-1869/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK repository process: replaced historical roots reject contradictory live assignments before execution$' tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder/2026-11-01T02-56-31-774Z-03d8b0ac-b92b-4e66-b43c-612c18be7b42.json",
+      "failure": "#1868 distinct actual preimplementation RED: The focused test ran exactly one test and failed at its intended workflow source assertion: Required WebKit must be installed only for full, uncovered native-process or persistence-recovery groups. The actual step condition ended with matrix.group == native-process, omitting persistence-recovery; the matching npx --no-install playwright install --with-deps webkit command was already present. This is a source-selection RED, not an application or browser launch failure.\n#1869 distinct actual preimplementation RED: On baseline644 before runner/catalog edits, existing renamed-root fixture assertion A replaced historical source cannot remain live alongside its explicit current target failed with ERR_ASSERTION notStrictEqual: actual CLI status0, forbidden0. Wrapper RISK failed status1. Recorder outcome assertion-failure, child/wrapper exit1, complete source identity diff1b023a1946340444200002ca332c06ba25c3b07775c9720fb2026229e1ca1d74.\nThese are worker preimplementation observations on published644, not a new integration RED. Earlier main-to644 behavior keeps original evidence in preserved records."
+    },
+    "replacementTests": [
+      "RISK repository process: persistence recovery CI installs required matching WebKit",
+      "RISK repository process: replaced historical roots reject contradictory live assignments before execution"
+    ],
+    "integrationDerivation": {
+      "publishedBaseline": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "comparisonBase": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "workerCommits": [
+        "e5c5c67f05bb1e62caff39cc48369e26cdd0ebe0",
+        "b5e8cdb0996553116da2072f3efe632cf7368174"
+      ],
+      "standaloneFingerprints": [
+        "6235818921a46990745cda3440675514f77cb778f8dea615f56eaaf057505676",
+        "4e6b3057da1fdc00738894fc96605c9eec74ad9028f81947d3f00b17bacdc62c"
+      ],
+      "priorMainFingerprint": "fce973e4356a9fe16d538507c19fc372bc1ec12eceb411483eba4986b5f0de0e",
+      "priorMainRedEvidenceSha256": "a54c5976581fef0358c54ca6fae2316072692113962698b41d45fcbc82baa6ea",
+      "integrationPreimplementationRunClaimed": false
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "b9ce4a3e1c6bac7d7a03c66cdc6992bc0848210668cb938feba5f01942a83abd",
+    "reason": "Reconcile the exact protected tests.js diff for the integration join of #1868 and #1869 against 8cd524a7f0ab7a25b6689244722ae3c5baf861c8. This metadata derives from both original observed preimplementation REDs and preserves their separate raw standalone records; it records no new integration preimplementation run.",
+    "previousBehavior": "On published source 6443761512cd652d02955fb93826dc3baa5daca3 the persistence CI selection omitted matching WebKit provisioning and the grouped runner admitted contradictory obsolete/current root assignments. Earlier application and process changes since main retain their original rationale records and chronology.",
+    "intendedBehavior": "Retain both complete required process regressions: full uncovered persistence-recovery and native-process provision pinned WebKit; contradictory replaced-source assignments fail before execution while valid replacements preserve baseline case identities. All previously accepted application and native assertions stay unchanged by this join.",
+    "preservedCoverage": [
+      "The original 1476 rationale objects retain their raw bytes and order. Both workers’ standalone records and their actual distinct RED commands, paths, source identities and timestamps remain preserved without fabricated integration chronology.",
+      "The original tests.js assertions remain byte-preserved: the only executable additions relative to published644 are the two worker process RISK roots. The historical 2997-case/61-skip inventory, required mapped baseline cases, replacement reasons/targets/durations and all other groups remain unchanged.",
+      "The seven obsolete assignment rows are removed exactly as in #1869, with both new process RISK roots required in core. No service-skip classification, browser/emulator execution, render replay, full qualification or hosted/release acceptance is claimed.",
+      "All earlier main-to-published644 protections and actual evidence remain in original rationale fce973e4356a9fe16d538507c19fc372bc1ec12eceb411483eba4986b5f0de0e; this joined record adds the two worker process roots without replacing the prior full change history."
+    ],
+    "redEvidence": {
+      "command": "#1868 original standalone source 6443761512cd652d02955fb93826dc3baa5daca3, actual worker e5c5c67f05bb1e62caff39cc48369e26cdd0ebe0: Before the workflow edit, pinned Node 24.19.0 ran: node --test --test-reporter=tap --test-name-pattern=\"^RISK repository process: persistence recovery CI installs required matching WebKit$\" tests.js. Captured command record and stdout: /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/persistence1868-owner/COMMANDS.ndjson and persistence-webkit-risk-red.stdout.txt.\n#1869 original standalone source 6443761512cd652d02955fb93826dc3baa5daca3, actual worker b5e8cdb0996553116da2072f3efe632cf7368174: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/replacements-1869/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK repository process: replaced historical roots reject contradictory live assignments before execution$' tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder/2026-11-01T02-56-31-774Z-03d8b0ac-b92b-4e66-b43c-612c18be7b42.json",
+      "failure": "#1868 distinct actual preimplementation RED: The focused test ran exactly one test and failed at its intended workflow source assertion: Required WebKit must be installed only for full, uncovered native-process or persistence-recovery groups. The actual step condition ended with matrix.group == native-process, omitting persistence-recovery; the matching npx --no-install playwright install --with-deps webkit command was already present. This is a source-selection RED, not an application or browser launch failure.\n#1869 distinct actual preimplementation RED: On baseline644 before runner/catalog edits, existing renamed-root fixture assertion A replaced historical source cannot remain live alongside its explicit current target failed with ERR_ASSERTION notStrictEqual: actual CLI status0, forbidden0. Wrapper RISK failed status1. Recorder outcome assertion-failure, child/wrapper exit1, complete source identity diff1b023a1946340444200002ca332c06ba25c3b07775c9720fb2026229e1ca1d74.\nThese are worker preimplementation observations on published644, not a new integration RED. Earlier main-to644 behavior keeps original evidence in preserved records."
+    },
+    "replacementTests": [
+      "RISK repository process: persistence recovery CI installs required matching WebKit",
+      "RISK repository process: replaced historical roots reject contradictory live assignments before execution"
+    ],
+    "integrationDerivation": {
+      "publishedBaseline": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "workerCommits": [
+        "e5c5c67f05bb1e62caff39cc48369e26cdd0ebe0",
+        "b5e8cdb0996553116da2072f3efe632cf7368174"
+      ],
+      "standaloneFingerprints": [
+        "6235818921a46990745cda3440675514f77cb778f8dea615f56eaaf057505676",
+        "4e6b3057da1fdc00738894fc96605c9eec74ad9028f81947d3f00b17bacdc62c"
+      ],
+      "priorMainFingerprint": "fce973e4356a9fe16d538507c19fc372bc1ec12eceb411483eba4986b5f0de0e",
+      "priorMainRedEvidenceSha256": "a54c5976581fef0358c54ca6fae2316072692113962698b41d45fcbc82baa6ea",
+      "integrationPreimplementationRunClaimed": false
+    }
   }
 ]
