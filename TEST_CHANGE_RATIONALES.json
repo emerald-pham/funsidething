@@ -52500,5 +52500,67 @@
     },
     "integrationSourceCommit": "36e0550fb1dc84095425d5cddcbb97db5fb8cbc3",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "f456f869c24837655e2bce6065da2480294ef835259cd466587c5f5828d2dce0",
+    "reason": "Atomic #1936 closes the diagnosed missing-input evidence gap at the existing complete three-case native delayed-bank consumer. Retain full exact paint keys and readable actual context/layer facts with bitmap, source, document and phase provenance. This changes test-only observation, not application rendering or the unresolved original Linux pixel failure.",
+    "previousBehavior": "The original outgoing082ec ordinary reduced pending-scene observation failed exact bank-versus-independent-refresh pixels at one red-channel unit of one pixel, but retained only signatureBytes59985. Equal length, date, scene and visitors could not prove complete paint-input equality; actual drawing context and layer state were absent.",
+    "intendedBehavior": "The unchanged real native consumer preserves complete paint values at actual paint entry and bank/fresh readback, readable actual context attributes/transforms/styles and cached-layer dimensions. New completeness assertions independently cross-check phase scene/date/slot/size and unchanged bitmap/source hashes. Original exact pixel, no-repaint, copy, visitor, full-source and cleanup assertions remain verbatim.",
+    "replacementTests": [
+      "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+    ],
+    "preservedCoverage": [
+      "All1533 inherited rationale object literals remain byte exact and in their original order. These two appended source-bound records index only the current test change and preserve earlier RED/GREEN chronology.",
+      "All original three-case assertions, both ordinary and optional workload branches, retain exact source preservation, paint counts, no-repaint behavior, independent full refresh, exact bitmap equality, copy/current visitors, isolated64-task source authority and native cleanup. Every existing assertion line is unchanged; the deterministic Date/text/location fixture, clock values, browser version, pixels, frame/deadline budgets, application and workflow bytes are unchanged.",
+      "The actual observer captures only the eight-value full painted key, direct geometry/seed inputs, readable canvas context properties and named cached-layer dimensions/offsets. It performs no canvas reset, added draw, new screenshot, app write or arbitrary state dump. Canvas clip/current paths and gradient internals remain explicitly unreadable, so measured equality does not establish their equality or platform raster causation.",
+      "The existing root name and all group, inventory and RISK map entries remain unchanged; no new test root is introduced. No full-suite, Linux, capped-mobile, hosted CI, physical-device, integration, deployment or release claim is made. #1880 remains open and Beta stays paused."
+    ],
+    "redEvidence": {
+      "command": "Allocated WebKit/port53801, exact082ec app, Node24 record-run.mjs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh$ tests.js; complete command/source/output in recorder74f5c5c8.",
+      "failure": "2026-11-01T17:59:23.469Z–17:59:29.600Z: all3 actual complete ordinary64 child observations fail bank retains complete painted input values rather than only signature length: actual undefined, expected string. Each has zero unexpected native errors, full before/after source equality and complete cleanup. This is diagnostic-completeness RED, not application RED; existing original bitmaps equal in this macOS attempt.",
+      "records": [
+        "2026-11-01T17-59-23-364Z-74f5c5c8-7ea6-466b-b86c-195227e73c90"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T18-00-46-975Z-07efe9a0-1094-4424-8926-24dbf758d4ee"
+      ],
+      "summary": "One same complete-root GREEN from18:00:47.094Z to18:00:53.163Z passes root plus all3 children4/4, zero skip/cancel/todo. Both complete phase input keys and original exact bank/fresh bitmaps agree in all3 cases, all full sources preserve exactly, and all native cleanup flags are true. macOS arm64 Node24.19 and existing Playwright1.62.1/WebKit; original hosted Node22 Linux one-pixel defect did not reproduce. Stop after this bounded capture outcome; no unchanged repetition."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/pixel-inputs1936-worker",
+    "scope": "Diagnostic capture only; owner /root/pixel_inputs1936_capture, parent /root."
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "9d6905d0abdae9f328bd7fb549d627f26b1e33425f40a2576306039a7f65dc9e",
+    "reason": "Atomic #1936 closes the diagnosed missing-input evidence gap at the existing complete three-case native delayed-bank consumer. Retain full exact paint keys and readable actual context/layer facts with bitmap, source, document and phase provenance. This changes test-only observation, not application rendering or the unresolved original Linux pixel failure.",
+    "previousBehavior": "The original outgoing082ec ordinary reduced pending-scene observation failed exact bank-versus-independent-refresh pixels at one red-channel unit of one pixel, but retained only signatureBytes59985. Equal length, date, scene and visitors could not prove complete paint-input equality; actual drawing context and layer state were absent.",
+    "intendedBehavior": "The unchanged real native consumer preserves complete paint values at actual paint entry and bank/fresh readback, readable actual context attributes/transforms/styles and cached-layer dimensions. New completeness assertions independently cross-check phase scene/date/slot/size and unchanged bitmap/source hashes. Original exact pixel, no-repaint, copy, visitor, full-source and cleanup assertions remain verbatim.",
+    "replacementTests": [
+      "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+    ],
+    "preservedCoverage": [
+      "All1533 inherited rationale object literals remain byte exact and in their original order. These two appended source-bound records index only the current test change and preserve earlier RED/GREEN chronology.",
+      "All original three-case assertions, both ordinary and optional workload branches, retain exact source preservation, paint counts, no-repaint behavior, independent full refresh, exact bitmap equality, copy/current visitors, isolated64-task source authority and native cleanup. Every existing assertion line is unchanged; the deterministic Date/text/location fixture, clock values, browser version, pixels, frame/deadline budgets, application and workflow bytes are unchanged.",
+      "The actual observer captures only the eight-value full painted key, direct geometry/seed inputs, readable canvas context properties and named cached-layer dimensions/offsets. It performs no canvas reset, added draw, new screenshot, app write or arbitrary state dump. Canvas clip/current paths and gradient internals remain explicitly unreadable, so measured equality does not establish their equality or platform raster causation.",
+      "The existing root name and all group, inventory and RISK map entries remain unchanged; no new test root is introduced. No full-suite, Linux, capped-mobile, hosted CI, physical-device, integration, deployment or release claim is made. #1880 remains open and Beta stays paused."
+    ],
+    "redEvidence": {
+      "command": "Allocated WebKit/port53801, exact082ec app, Node24 record-run.mjs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh$ tests.js; complete command/source/output in recorder74f5c5c8.",
+      "failure": "2026-11-01T17:59:23.469Z–17:59:29.600Z: all3 actual complete ordinary64 child observations fail bank retains complete painted input values rather than only signature length: actual undefined, expected string. Each has zero unexpected native errors, full before/after source equality and complete cleanup. This is diagnostic-completeness RED, not application RED; existing original bitmaps equal in this macOS attempt.",
+      "records": [
+        "2026-11-01T17-59-23-364Z-74f5c5c8-7ea6-466b-b86c-195227e73c90"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T18-00-46-975Z-07efe9a0-1094-4424-8926-24dbf758d4ee"
+      ],
+      "summary": "One same complete-root GREEN from18:00:47.094Z to18:00:53.163Z passes root plus all3 children4/4, zero skip/cancel/todo. Both complete phase input keys and original exact bank/fresh bitmaps agree in all3 cases, all full sources preserve exactly, and all native cleanup flags are true. macOS arm64 Node24.19 and existing Playwright1.62.1/WebKit; original hosted Node22 Linux one-pixel defect did not reproduce. Stop after this bounded capture outcome; no unchanged repetition."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/pixel-inputs1936-worker",
+    "scope": "Diagnostic capture only; owner /root/pixel_inputs1936_capture, parent /root."
   }
 ]
