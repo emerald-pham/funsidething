@@ -16167,7 +16167,10 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
    Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},delay));}});return request;};
  },{theme,fixtureTime});
  const page=await context.newPage(),errors=[],pageErrorDetails=[];page.on('pageerror',error=>{errors.push(error.message);pageErrorDetails.push({message:error.message,stack:error.stack,url:page.url()});});
- if(fixtureTime!==null)await page.clock.setFixedTime(new Date(fixtureTime));
+ if(fixtureTime!==null){
+  if(startupOptions.installClockBeforeNavigation)await page.clock.install({time:new Date(fixtureTime-1000)});
+  await page.clock.setFixedTime(new Date(fixtureTime));
+ }
  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
  // Finish the fresh-profile fixture's unrelated local asset reads before
@@ -16931,14 +16934,14 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
  });
 });
 
-test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources',async t => {
+test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources', async t => {
  await openingBoardFixture(t);
  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs'),{isDeepStrictEqual}=await import('node:util');
  for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
   const backupPayload='{"futureNativeDownloadBackup":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'native-download-proof-backup',day:'2026-10-29',at:1793275200000,kind:'manual',payload:backupPayload};
   const pendingOwner='native-download-proof-owner@example.test',pending={generationId:'native-download-proof-pending',payloadHash:'b'.repeat(64),baseRev:9,updatedAt:1793275200000,futurePendingField:{retain:'unknown pending metadata'}};
   const opaqueKey='native-download-proof-opaque',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',23]},futureTyped:{negativeZero:-0,notANumber:NaN,unknown:undefined}};
-  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,fixedTime:'2026-10-29T12:00:00Z',topOfPage:true});
+  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,fixedTime:'2026-10-29T12:00:00Z',topOfPage:true,installClockBeforeNavigation:true});
   let traceStarted=false;
   try{
    await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.__actualLocalRead?.settled&&liveBoardAccepted&&window.ScannerDeviceStore&&deviceStorageAuthority&&!openingRecoveryHeld,null,{timeout:30000});
@@ -16982,6 +16985,13 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.equal(JSON.parse(seeded.baselineHead.payload).tasks.find(task=>task.id===seeded.targetId).title,seeded.oldTitle);
    assert.equal(seeded.baselineCurrent.tasks.find(task=>task.id===seeded.targetId).title,seeded.oldTitle);
    assert.deepEqual(seeded.baselineCurrent.futureNativeDownloadBoardField,{retain:'unknown accepted board metadata 🌿',sequence:[1,'😀']});
+   const settledFixtureProducer=await view.page.evaluate(()=>({savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,deviceHeadHash}));
+   assert.equal(settledFixtureProducer.savePending,false,'the original startup and independent source seed have no pending app save before the timing boundary');
+   assert.equal(settledFixtureProducer.activePersistCalls,0,'the original startup and source seed have no active app producer before the timing boundary');
+   assert.equal(settledFixtureProducer.deviceHeadHash,seeded.baselineHead.hash,'the settled fixture head remains the exact accepted baseline');
+   await view.page.clock.pauseAt(new Date('2026-10-29T12:00:00Z'));
+   assert.equal(await view.page.evaluate(()=>Date.now()),1793275200000,'the external browser clock is held at the existing literal archive time');
+   t.diagnostic('External Playwright timer hold begins after original startup and full source seeding settle: '+JSON.stringify({browserEngine,savePending:settledFixtureProducer.savePending,activePersistCalls:settledFixtureProducer.activePersistCalls,deviceHeadHash:settledFixtureProducer.deviceHeadHash,heldAt:'2026-10-29T12:00:00.000Z'}));
    const editControl=view.page.locator('#listBody [data-act="edit"]').first();
    assert.equal(await editControl.count()>0,true,'the accepted healthy board exposes a real task editor');
    const targetId=await editControl.getAttribute('data-id'),target=seeded.baselineCurrent.tasks.find(task=>task.id===targetId);
@@ -17051,10 +17061,25 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.deepEqual(backupRow,{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
    assert.equal(decodedSnapshot.stores.snapshots.values.find(row=>row.hash===backupHash)?.payload,backupPayload);
    assert.deepEqual(decodedSnapshot.stores.opaque.values[decodedSnapshot.stores.opaque.keys.indexOf(opaqueKey)],opaqueValue);
-   const afterPreparation=await view.page.evaluate(async()=>{const sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
+   const wallChallengeStarted=process.hrtime.bigint();
+   await new Promise(resolve=>setTimeout(resolve,450));
+   const wallChallengeElapsedMs=Number(process.hrtime.bigint()-wallChallengeStarted)/1e6;
+   assert.ok(wallChallengeElapsedMs>=450,'the source-preservation observation follows at least 450 ms of actual Node wall time');
+   t.diagnostic('Actual Node wall-clock challenge before the original post-Export source observation: '+JSON.stringify({browserEngine,wallChallengeElapsedMs,minimumMs:450}));
+   const afterPreparation=await view.page.evaluate(async()=>{const observeProducer=()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,deviceHeadHash};};
+    const producerBefore=observeProducer(),head=await ScannerDeviceStore.readHead(),sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
     const localSources=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())].map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
     return{localSources,rawSources:await ScannerDeviceStore.readRawExportSnapshot(),
+     head,producer:{before:producerBefore,after:observeProducer()},
      authority:{accepted:liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,revision:state.syncRev??null,user:window.CloudSync?.user??null}};});
+   assert.deepEqual(afterPreparation.producer.before,afterPreparation.producer.after,'the complete source observation leaves the accepted board and producer state unchanged while external time is held');
+   assert.deepEqual(afterPreparation.producer.before.board,acceptedUnsaved.board,'the complete accepted current board remains exact while its normal save is held');
+   assert.equal(afterPreparation.producer.before.savePending,true,'the deliberate normal save remains pending after the real Node wall-clock challenge');
+   assert.equal(afterPreparation.producer.after.savePending,true,'the deliberate normal save remains pending through full source observation');
+   assert.equal(afterPreparation.producer.before.activePersistCalls,0,'no app producer is active during the complete source observation');
+   assert.equal(afterPreparation.producer.after.activePersistCalls,0,'no app producer starts during the complete source observation');
+   assert.equal(afterPreparation.producer.before.deviceHeadHash,seeded.baselineHead.hash,'the accepted edit remains distinct from the complete durable baseline');
+   assert.deepEqual(afterPreparation.head,seeded.baselineHead,'the full durable head and payload remain exact while the save timer is held');
    assert.deepEqual(afterPreparation.localSources,seeded.localSources,'preparing Export performs no app-owned local source write');
    assert.deepEqual(afterPreparation.rawSources,seeded.rawSources,'preparing Export leaves all original saved, backup, pending and opaque source rows exact');
    assert.deepEqual(afterPreparation.authority,{accepted:true,deviceStorageAuthority:true,deviceStorageRequired:seeded.authority.deviceStorageRequired,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,revision:seeded.authority.revision,user:null},'Export grants no device/recovery or cloud authority');
@@ -17079,6 +17104,23 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Download started\. The archive contains the exact prepared export\./,'the app status reports initiation while the native event/file readback separately proves completion');
    assert.equal(await view.page.locator('#exportTransferDialog a[download="chain-scanner-recovery-archive.json"]').count(),0,'the temporary anchor is removed after successful initiation');
    t.diagnostic('Actual complete native Download artifact: '+JSON.stringify({browserEngine,file,suggestedFilename:download.suggestedFilename(),failure:await download.failure(),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),preparedSerial:serial,downloads,acceptedUnsavedTitle:acceptedUnsaved.title,durableTitle:durableTask.title,durableHash:durableHead.hash,currentBoardSha256:createHash('sha256').update(JSON.stringify(acceptedUnsaved.board)).digest('hex')}));
+   const heldAfterDownload=await view.page.evaluate(async()=>{const observe=()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,deviceHeadHash,authority:{accepted:liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,deviceHeadHash,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,revision:state.syncRev??null,user:window.CloudSync?.user??null}};};
+    const before=observe(),head=await ScannerDeviceStore.readHead(),rawSources=await ScannerDeviceStore.readRawExportSnapshot(),sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
+    const keys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())],localSources=keys.map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};}),after=observe();
+    return{before,after,head,rawSources,localSources};});
+   assert.deepEqual(heldAfterDownload.before,heldAfterDownload.after,'the actual first native Download leaves the complete accepted board and producer state exact while external time is held');
+   assert.deepEqual(heldAfterDownload.before.board,acceptedUnsaved.board,'the complete accepted current board remains unchanged through the actual Download');
+   assert.equal(heldAfterDownload.before.savePending,true,'the deliberate normal save remains pending through the actual first Download');
+   assert.equal(heldAfterDownload.after.savePending,true,'the deliberate normal save remains pending until its later release boundary');
+   assert.equal(heldAfterDownload.before.activePersistCalls,0,'no app producer is active at the actual Download boundary');
+   assert.equal(heldAfterDownload.after.activePersistCalls,0,'no app producer starts at the actual Download boundary');
+   assert.deepEqual(heldAfterDownload.head,seeded.baselineHead,'the full durable head and payload remain at the exact original hash through the actual Download');
+   assert.deepEqual(heldAfterDownload.rawSources,seeded.rawSources,'all typed IndexedDB sources remain exact through the actual Download');
+   assert.deepEqual(heldAfterDownload.localSources,seeded.localSources,'all original local sources remain exact through the actual Download');
+   assert.deepEqual(heldAfterDownload.before.authority,{accepted:true,deviceStorageAuthority:true,deviceStorageRequired:seeded.authority.deviceStorageRequired,deviceHeadHash:seeded.baselineHead.hash,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,revision:seeded.authority.revision,user:null},'holding time preserves the accepted device authority without starting a save');
+   t.diagnostic('Complete sources and durable head remain exact through the first actual native Download under the held normal save: '+JSON.stringify({browserEngine,savePending:heldAfterDownload.after.savePending,activePersistCalls:heldAfterDownload.after.activePersistCalls,deviceHeadHash:heldAfterDownload.after.deviceHeadHash,headHash:heldAfterDownload.head.hash,rawStores:Object.fromEntries(Object.entries(heldAfterDownload.rawSources.stores).map(([name,rows])=>[name,rows.keys.length])),localSourceCount:heldAfterDownload.localSources.length}));
+   await view.page.clock.runFor(400);
+   t.diagnostic('Released only the actual app timer at the existing later producer-settle boundary after the first Download: '+JSON.stringify({browserEngine,advancedMs:400}));
    // The original accepted edit may now finish its normal debounce save. Let
    // that actual producer settle before comparing each later refusal boundary;
    // the originally prepared archive/serial must remain the same throughout.
