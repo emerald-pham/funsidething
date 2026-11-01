@@ -1,0 +1,236 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {spawn,spawnSync} from 'node:child_process';
+import {setTimeout as delay} from 'node:timers/promises';
+import {parseTap} from '../test-groups.mjs';
+
+const MAX_OUTPUT=4194304,MAX_EXECUTION=180000,TERM_MS=3000,KILL_MS=3000;
+const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+const stamp=()=>({utc:new Date().toISOString(),monotonicMs:performance.now()});
+const save=(file,value)=>{fs.writeFileSync(file+'.tmp',JSON.stringify(value,null,2)+'\n');fs.renameSync(file+'.tmp',file);};
+const git=(cwd,...args)=>{const r=spawnSync('git',args,{cwd,encoding:'utf8',timeout:3000,maxBuffer:1048576});assert.equal(r.status,0,'Native owner source identity: '+r.stderr);return r.stdout.trim();};
+
+// OS identities are independently observed. macOS ps reports start time only
+// to the second; that precision is explicit and never described as /proc ticks.
+export function readNativeProcessTable(){
+ const rows=[];
+ if(process.platform==='linux'){
+  for(const name of fs.readdirSync('/proc').filter(value=>/^\d+$/.test(value)))try{
+   const base='/proc/'+name,raw=fs.readFileSync(base+'/stat','utf8'),f=raw.slice(raw.lastIndexOf(')')+2).split(' '),status=fs.readFileSync(base+'/status','utf8');
+   rows.push({pid:Number(name),ppid:Number(f[1]),pgid:Number(f[2]),session:Number(f[3]),state:f[0],uid:Number(/^Uid:\s+(\d+)/m.exec(status)?.[1]),startIdentity:f[19],startPrecision:'kernel-clock-ticks',executable:fs.readlinkSync(base+'/exe'),pidNamespace:fs.readlinkSync(base+'/ns/pid')});
+  }catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;}
+ }else if(process.platform==='darwin'){
+  const r=spawnSync('/bin/ps',['-axo','pid=,ppid=,pgid=,sess=,uid=,lstart=,stat=,comm='],{encoding:'utf8',timeout:1000,maxBuffer:8388608});
+  assert.equal(r.status,0,'macOS process identity table unavailable');
+  for(const line of r.stdout.split('\n')){const m=/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(.{24})\s+(\S+)\s+(.+)$/.exec(line);if(m)rows.push({pid:+m[1],ppid:+m[2],pgid:+m[3],session:m[4],uid:+m[5],startIdentity:m[6],startPrecision:'ps-lstart-one-second',state:m[7],executable:m[8],pidNamespace:'unavailable-on-darwin'});}
+ }else throw Error('Owned native process OS identity is unavailable on '+process.platform);
+ return rows;
+}
+const same=(a,b)=>a&&b&&['pid','startIdentity','startPrecision','uid','pidNamespace'].every(key=>a[key]===b[key]);
+const live=row=>row&&!/^[ZX]/.test(row.state);
+
+// Only this system seam admits small real-process controls. Production callers
+// cannot raise any of the agreed ceilings through its options.
+export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,executable=process.execPath,args,timeoutMs=MAX_EXECUTION,outputLimitBytes=MAX_OUTPUT,system={}}){
+ assert.ok(Number.isSafeInteger(timeoutMs)&&timeoutMs>0&&timeoutMs<=MAX_EXECUTION,'Finite native execution ceiling required');
+ assert.ok(Number.isSafeInteger(outputLimitBytes)&&outputLimitBytes>0&&outputLimitBytes<=MAX_OUTPUT,'Finite native output ceiling required');
+ assert.ok(Array.isArray(args)&&args.every(value=>typeof value==='string'));
+ assert.ok(Object.keys(system).every(key=>['readProcessTable','signalProcess'].includes(key)),'Only OS process boundaries may be controlled');
+ const processTable=system.readProcessTable||readNativeProcessTable,signalProcess=system.signalProcess||((pid,signal)=>process.kill(pid,signal));
+ fs.mkdirSync(outputDir,{recursive:true});
+ const files={stdout:path.join(outputDir,'stdout.tap'),stderr:path.join(outputDir,'stderr.txt'),frontier:path.join(outputDir,'frontier.jsonl')},fds={};
+ for(const [key,file]of Object.entries(files))fds[key]=fs.openSync(file,'wx');
+ const receipt={schemaVersion:1,kind:'owned-native-process',started:stamp(),source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}'),base:env.CHAIN_TEST_COMPARISON_BASE||null,sourceSha:env.CHAIN_TEST_SOURCE_SHA||null,toolSha256:digest(fs.readFileSync(new URL(import.meta.url)))},runtime:{node:process.version,executable:process.execPath,platform:process.platform,arch:process.arch,kernel:os.release(),systemBoundary:Object.keys(system).length?'controlled-test-only':'actual-OS'},hostedPolicy:{CI:env.CI||null,eventPolicy:env.CHAIN_TEST_EVENT_POLICY||null,eventName:env.GITHUB_EVENT_NAME||null,ref:env.GITHUB_REF||null,runId:env.GITHUB_RUN_ID||null,runAttempt:env.GITHUB_RUN_ATTEMPT||null,requestedPort:env.CHAIN_NATIVE_PORT===undefined?'default':env.CHAIN_NATIVE_PORT,debug:env.DEBUG||null},command:{executable,args,cwd},bounds:{executionMs:timeoutMs,termMs:TERM_MS,killMs:KILL_MS,combinedOutputBytes:outputLimitBytes},files,bytes:0,timedOut:false,outputLimit:false,status:null,signal:null,signals:[],processes:[],browserLaunches:[],browserExits:[],refusals:[],cleanup:{complete:false},frontier:null};
+ save(path.join(outputDir,'process.json'),receipt);
+ let sequence=0,child,closed=false,exitObserved=false,monitor,deadline,reason,doneResolve;
+ const done=new Promise(resolve=>doneResolve=resolve),known=new Map(),pending={stdout:'',stderr:''};
+ const event=value=>{const row={sequence:++sequence,...stamp(),...value};fs.writeSync(fds.frontier,JSON.stringify(row)+'\n');receipt.frontier=row;};
+ const interruptions=Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>{receipt.interruption=signal;reason='interrupted:'+signal;event({kind:'interruption',signal});doneResolve();}]));
+ for(const [signal,handler]of Object.entries(interruptions))process.on(signal,handler);
+ const refuse=message=>{if(!receipt.refusals.includes(message))receipt.refusals.push(message);};
+ const capture=()=>{
+  const table=processTable(),byPid=new Map(table.map(row=>[row.pid,row]));
+  for(const [pid,witness]of known){const current=byPid.get(pid);if(live(current)&&!same(witness.identity,current))refuse('PID identity changed; refused '+pid);}
+  let changed=true;while(changed){changed=false;for(const row of table){if(known.has(row.pid)||row.uid!==process.getuid())continue;const parent=known.get(row.ppid);if(parent&&same(parent.identity,byPid.get(row.ppid))){known.set(row.pid,{identity:row,proof:{kind:'observed-owned-ancestry',parentPid:row.ppid,parentStartIdentity:parent.identity.startIdentity},first:stamp()});changed=true;}}}
+  for(const [pid,witness]of known){const current=byPid.get(pid);witness.last={...stamp(),status:!live(current)?'nonlive':!same(witness.identity,current)?'identity-reused':'live',state:current?.state??null,identity:current??null};
+   if(current&&same(witness.identity,current)){const prior=witness.transitions?.at(-1)?.identity??witness.identity;if(['ppid','pgid','session','executable'].some(key=>prior[key]!==current[key])){witness.transitions??=[];witness.transitions.push({identity:current,...stamp()});}}
+  }
+  receipt.processes=[...known.values()];return byPid;
+ };
+ const line=(stream,value,offset)=>{
+  event({kind:'line',stream,offset,line:value});
+  if(stream!=='stderr')return;
+  let match=/<launched> pid=(\d+)/.exec(value);
+  if(match){const pid=Number(match[1]),table=capture(),witness=known.get(pid),current=table.get(pid);const proven=witness&&same(witness.identity,current)&&live(current);
+   receipt.browserLaunches.push({pid,line:value,offset,...stamp(),identity:proven?witness.identity:null,proof:proven?witness.proof:null,status:proven?'owned':'unavailable'});if(!proven)refuse('Browser launch PID lacks matching live owned OS ancestry: '+pid);
+  }
+  match=/\[pid=(\d+)\] <process did exit: exitCode=(-?\d+|null), signal=([^>]+)>/.exec(value);
+  if(match){const pid=Number(match[1]);receipt.browserExits.push({pid,line:value,offset,...stamp(),exitCode:match[2]==='null'?null:Number(match[2]),signal:match[3]==='null'?null:match[3],owner:receipt.browserLaunches.some(row=>row.pid===pid&&row.status==='owned')});}
+ };
+ const intake=(stream,chunk)=>{
+  const available=outputLimitBytes-receipt.bytes,accepted=chunk.subarray(0,Math.max(0,available));
+  if(accepted.length){const offset=fs.fstatSync(fds[stream]).size;fs.writeSync(fds[stream],accepted);receipt.bytes+=accepted.length;event({kind:'chunk',stream,offset,bytes:accepted.length,sha256:digest(accepted)});
+   pending[stream]+=accepted.toString('utf8');let index;while((index=pending[stream].indexOf('\n'))!==-1){const value=pending[stream].slice(0,index);pending[stream]=pending[stream].slice(index+1);try{line(stream,value,offset);}catch(error){refuse('Live observation: '+String(error));reason??='identity-observation';doneResolve();}}
+  }
+  if(accepted.length!==chunk.length){receipt.outputLimit=true;reason??='output-limit';event({kind:'output-limit',receivedChunkBytes:chunk.length,retainedChunkBytes:accepted.length});doneResolve();}
+ };
+ try{
+  const before=processTable();receipt.owner=before.find(row=>row.pid===process.pid);assert.ok(receipt.owner,'Actual owner OS identity required');
+  const debug=[...(env.DEBUG||'').split(',').filter(Boolean),'pw:browser'].filter((value,index,all)=>all.indexOf(value)===index).join(',');
+  receipt.hostedPolicy.debug=debug;receipt.launched=stamp();
+  child=spawn(executable,args,{cwd,env:{...env,DEBUG:debug,DEBUG_COLORS:'0',FORCE_COLOR:'0'},detached:true,stdio:['ignore','pipe','pipe']});receipt.pid=child.pid;
+  child.stdout.on('data',chunk=>intake('stdout',chunk));child.stderr.on('data',chunk=>intake('stderr',chunk));
+  child.once('error',error=>{receipt.error={name:error.name,code:error.code,message:error.message};reason??='launch-error';doneResolve();});
+  child.once('exit',(code,signal)=>{exitObserved=true;receipt.status=code;receipt.signal=signal;receipt.exit={code,signal,...stamp()};event({kind:'root-exit',code,signal});doneResolve();});
+  child.once('close',(code,signal)=>{closed=true;receipt.close={code,signal,...stamp()};event({kind:'root-close',code,signal});doneResolve();});
+  const initial=processTable().find(row=>row.pid===child.pid);assert.ok(initial&&initial.ppid===process.pid&&initial.uid===receipt.owner.uid,'Spawned child live OS ancestry required');
+  known.set(child.pid,{identity:initial,proof:{kind:'actual-spawn-child',parentPid:process.pid,parentStartIdentity:receipt.owner.startIdentity},first:stamp()});receipt.rootIdentity=initial;capture();event({kind:'root-start',pid:child.pid,identity:initial});
+  monitor=setInterval(()=>{try{capture();}catch(error){refuse('Process monitor: '+String(error));reason??='identity-observation';doneResolve();}},20);
+  deadline=setTimeout(()=>{receipt.timedOut=true;reason='deadline';event({kind:'deadline',pid:child.pid});doneResolve();},timeoutMs);
+  await done;clearTimeout(deadline);
+  // Capture ancestry before a parent can disappear, then signal only one exact
+  // witnessed identity at a time. No negative-PGID or name-based host kill.
+  const signalOwned=(signal,until)=>{capture();for(const [pid,witness]of [...known].reverse()){if(performance.now()>=until){refuse('Identity-checked signal phase deadline reached');break;}const current=processTable().find(row=>row.pid===pid);if(!live(current))continue;if(!same(witness.identity,current)){refuse('Signal refused for changed identity '+pid);continue;}let result='sent';try{signalProcess(pid,signal);}catch(error){result=error.code||String(error);if(error.code!=='ESRCH')refuse('Signal '+signal+' failed for '+pid+': '+result);}const row={pid,signal,identity:current,result,...stamp()};receipt.signals.push(row);event({kind:'signal',...row});}};
+  const allGone=()=>{capture();return[...known.values()].every(row=>row.last.status==='nonlive');};
+  const settle=async until=>{while(performance.now()<until){if(allGone()&&closed)return true;await delay(20);}return allGone()&&closed;};
+  if(reason||!allGone()){
+   reason??='descendant-outlived-root';receipt.stopReason=reason;receipt.teardownStarted=stamp();const termUntil=receipt.teardownStarted.monotonicMs+TERM_MS,killUntil=termUntil+KILL_MS;signalOwned('SIGTERM',termUntil);
+   if(!await settle(termUntil)){signalOwned('SIGKILL',killUntil);await settle(killUntil);}receipt.teardownFinished=stamp();
+  }else if(!closed)await settle(performance.now()+KILL_MS);
+  clearInterval(monitor);monitor=null;capture();
+  for(const [stream,value]of Object.entries(pending))if(value)event({kind:'partial-line',stream,line:value});
+  receipt.stopReason??=reason||'normal-exit';receipt.cleanup={complete:closed&&exitObserved&&[...known.values()].every(row=>row.last.status==='nonlive')&&receipt.refusals.length===0,rootClosed:closed,rootExitObserved:exitObserved,monitorStopped:true,deadlineStopped:true,signalScope:'identity-checked-individual-owned-processes'};
+  for(const launch of receipt.browserLaunches){launch.finalState=known.get(launch.pid)?.last??{status:'unavailable'};launch.actualExit=receipt.browserExits.find(row=>row.pid===launch.pid&&row.owner)||{status:'unavailable',reason:'No actual browser ChildProcess close log; attempted signals are not exit status'};if(receipt.stopReason==='normal-exit'&&launch.actualExit.status==='unavailable'){receipt.cleanup.complete=false;refuse('Normal browser close log unavailable for '+launch.pid);}}
+ }catch(error){receipt.error??={name:error.name,code:error.code||null,message:error.message};refuse(String(error));receipt.cleanup.complete=false;
+  // If observation failed, never broaden signaling to an unproved PID/group.
+  for(const [pid,witness]of known)try{const current=processTable().find(row=>row.pid===pid);if(same(witness.identity,current)&&live(current)){signalProcess(pid,'SIGKILL');receipt.signals.push({pid,signal:'SIGKILL',identity:current,result:'sent-after-owner-error',...stamp()});}}catch(cleanupError){refuse(String(cleanupError));}
+  const until=performance.now()+KILL_MS;while(child&&!closed&&performance.now()<until)await delay(20);
+ }finally{
+  for(const [signal,handler]of Object.entries(interruptions))process.off(signal,handler);
+  clearTimeout(deadline);clearInterval(monitor);receipt.finished=stamp();receipt.executionElapsedMs=receipt.timedOut?timeoutMs:(receipt.exit?.monotonicMs??receipt.finished.monotonicMs)-(receipt.launched?.monotonicMs??receipt.started.monotonicMs);
+  if(child&&!closed){child.stdout.removeAllListeners('data');child.stderr.removeAllListeners('data');child.stdout.destroy();child.stderr.destroy();child.removeAllListeners('exit');child.removeAllListeners('close');child.unref();}
+  for(const [key,fd]of Object.entries(fds)){fs.closeSync(fd);receipt[key+'Sha256']=digest(fs.readFileSync(files[key]));}
+  save(path.join(outputDir,'process.json'),receipt);
+ }
+ return receipt;
+}
+
+// Node's event reporter exposes starts while TAP can buffer nested outcomes.
+// This second reporter leaves the first reporter's original TAP untouched.
+export default async function* nativeFrontierReporter(source){
+ for await(const event of source)if(['test:start','test:pass','test:fail'].includes(event.type))yield '# native-frontier '+JSON.stringify({event:event.type,name:event.data.name,nesting:event.data.nesting,...stamp()})+'\n';
+}
+
+// Independent literal catalog retained from both original complete native TAPs;
+// this list never learns an expected case from a current observed outcome.
+const EXPECTED_CASES=Object.freeze([
+ "RISK repository process: retained native sources seed once without a persistent board bootstrap > normal",
+ "RISK repository process: retained native sources seed once without a persistent board bootstrap > reduced",
+ "RISK repository process: retained native sources seed once without a persistent board bootstrap > ordinary",
+ "RISK repository process: retained native sources seed once without a persistent board bootstrap",
+ "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources > normal",
+ "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources > reduced",
+ "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources",
+ "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene > normal visible",
+ "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene > normal hidden then visible",
+ "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene > reduced visible",
+ "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene > reduced hidden then visible",
+ "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene > controlled failing probe cleanup",
+ "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+ "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources",
+ "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save",
+ "RISK repository process: refused saved decision capture waits for its refreshed unselected review > chromium",
+ "RISK repository process: refused saved decision capture waits for its refreshed unselected review > webkit",
+ "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+ "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources > chromium",
+ "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources > webkit",
+ "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources",
+ "RISK repository process: external browser termination retains lifecycle classification without app crash credit > chromium owned external browser close",
+ "RISK repository process: external browser termination retains lifecycle classification without app crash credit > webkit owned external browser close",
+ "RISK repository process: external browser termination retains lifecycle classification without app crash credit"
+]);
+const ROOTS=Object.freeze([
+ "RISK repository process: retained native sources seed once without a persistent board bootstrap",
+ "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources",
+ "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+ "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources",
+ "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save",
+ "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+ "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources",
+ "RISK repository process: external browser termination retains lifecycle classification without app crash credit"
+]);
+const SAVED_ROOT="RISK repository process: refused saved decision capture waits for its refreshed unselected review";
+const escapeRegex=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+
+export function verifyHostedNativeCallerReceipts(batches){
+ const issues=[],seen=new Set(),cases=[];
+ if(batches.length!==2)issues.push('Exactly two serial native selections required');
+ for(const [index,batch]of batches.entries()){
+  if(batch.selection!==(index===0?'saved-decision':'remaining-seven'))issues.push('Native selection/order mismatch');
+  if(batch.status!==0||batch.signal!==null||batch.timedOut||batch.outputLimit||batch.error||batch.cleanup?.complete!==true)issues.push('Unsuccessful or incompletely cleaned native child '+batch.selection);
+  const text=fs.readFileSync(batch.files.stdout,'utf8');
+  if(!text.endsWith('\n'))issues.push('Incomplete final TAP line');
+  const expectedCount=index===0?3:21;
+  for(const [key,value]of [['tests',expectedCount],['fail',0],['cancelled',0],['skipped',0],['todo',0]])if(!new RegExp('^# '+key+' '+value+'$','m').test(text))issues.push('Missing exact terminal '+key+' count in '+batch.selection);
+  try{for(const row of parseTap(text)){
+   if(seen.has(row.id))issues.push('Duplicate native case: '+row.id);seen.add(row.id);cases.push(row);
+   if(!EXPECTED_CASES.includes(row.id))issues.push('Unknown native case: '+row.id);
+   if(row.status!=='passed')issues.push('Unsuccessful native case: '+row.id);
+   if(index===0&&row.root!==SAVED_ROOT||index===1&&row.root===SAVED_ROOT)issues.push('Native case in wrong selection: '+row.id);
+  }}catch(error){issues.push('Invalid native TAP: '+error.message);}
+ }
+ for(const id of EXPECTED_CASES)if(!seen.has(id))issues.push('Missing native case: '+id);
+ if(batches.reduce((sum,row)=>sum+row.bytes,0)>MAX_OUTPUT)issues.push('Native combined output ceiling exceeded');
+ if(batches.reduce((sum,row)=>sum+row.executionElapsedMs,0)>360000)issues.push('Native aggregate execution ceiling exceeded');
+ return {issues,cases,expectedCases:[...EXPECTED_CASES],expectedRoots:[...ROOTS]};
+}
+
+export async function runHostedNativeCallers({cwd,outputDir,env}){
+ fs.mkdirSync(outputDir,{recursive:true});const batches=[],started=stamp();
+ const request={schemaVersion:1,kind:'hosted-native-callers',started,source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}')},expectedCases:[...EXPECTED_CASES],expectedRoots:[...ROOTS],policy:{serialSelections:['saved-decision','remaining-seven'],perChildExecutionMs:180000,totalExecutionMs:360000,teardownMsPerFailedChild:6000,combinedOutputBytes:MAX_OUTPUT,originalVerdictUnchanged:true}};
+ save(path.join(outputDir,'hosted-direct-callers.request.json'),request);
+ let bytes=0;
+ for(const selection of ['saved-decision','remaining-seven']){
+  if(bytes>=MAX_OUTPUT)break;
+  const roots=selection==='saved-decision'?[SAVED_ROOT]:ROOTS.filter(root=>root!==SAVED_ROOT),directory=path.join(outputDir,selection),nativeOutput=path.join(directory,'native');
+  fs.mkdirSync(directory,{recursive:true});save(path.join(directory,'selection.json'),{selection,roots,expectedCases:EXPECTED_CASES.filter(id=>roots.some(root=>id===root||id.startsWith(root+' > '))),processPath:'process.json'});
+  const childEnv={...env,CHAIN_NATIVE_OUTPUT:nativeOutput};delete childEnv.NODE_TEST_CONTEXT;
+  const args=['--test','--test-reporter=tap','--test-reporter=./scripts/agent-tools/hosted-native-callers.mjs','--test-reporter-destination=stdout','--test-reporter-destination=stderr','--test-name-pattern=^('+roots.map(escapeRegex).join('|')+')$','tests.js'];
+  const receipt=await runOwnedNativeProcess({cwd,outputDir:directory,env:childEnv,args,outputLimitBytes:MAX_OUTPUT-bytes});
+  receipt.selection=selection;bytes+=receipt.bytes;batches.push(receipt);
+  if(receipt.status!==0||receipt.signal!==null||receipt.timedOut||receipt.outputLimit||receipt.error||!receipt.cleanup.complete)break;
+ }
+ const verification=verifyHostedNativeCallerReceipts(batches),result={...request,finished:stamp(),status:verification.issues.length?'failed':'passed',...verification,batches};
+ save(path.join(outputDir,'hosted-direct-callers.result.json'),result);return result;
+}
+
+const followedWindows=new Set();let diagnosticQueue=Promise.resolve();
+export async function runLinuxNativeFailureFollowup({cwd,outputDir,reportPath,origin,env=process.env}){
+ // A passing required invocation never calls this function. Recheck all facts
+ // here so a generic failure, partial cleanup, foreign runtime or report cannot
+ // admit a diagnostic browser. No environment switch selects an extra capture.
+ if(process.platform!=='linux'||process.version!=='v22.23.4'||env.CI!=='true')return{status:'not-selected',reason:'Actual supported Linux CI runtime required'};
+ const bytes=fs.readFileSync(reportPath),report=JSON.parse(bytes),setup=report.scenarios?.find(row=>row.name===(origin==='pageerror-opening'?'detector sensitivity':'ordinary scene choice survives reopen and task Undo'))?.setup;
+ if(report.status!=='failed'||report.engine!=='webkit'||report.profile!=='ordinary'||report.runtime?.platform!=='linux'||report.runtime?.nodeVersion!=='v22.23.4'||report.runtime?.playwright!=='1.62.1'||report.runtime?.version!=='26.5'||setup?.currentTasks!==64||setup?.durableTasks!==64||['contextClosed','browserClosed','serverClosed'].some(key=>report.cleanup?.[key]!==true)||report.cleanupFailures?.length||report.linuxFailureObservation)return{status:'not-selected',reason:'Exact failed ordinary64 report with complete original cleanup required'};
+ if(report.candidateCommit!==git(cwd,'rev-parse','HEAD')||report.candidateTree!==git(cwd,'rev-parse','HEAD^{tree}'))return{status:'not-selected',reason:'Original report source differs from this child source'};
+ let window;
+ if(origin==='pageerror-opening'&&report.kind==='button-sensitivity'&&report.samples?.some(row=>row.scenario==='detector sensitivity'&&row.action==='act:settings'&&row.phase==='opening-before-input'&&row.inputStatus==='not-reached'&&row.firstTrustedInputAt===null&&Number.isFinite(row.openingMaxFrameGapMs)&&row.openingMaxFrameGapMs>=1000))window='pageerror-opening';
+ if(origin==='required-actions'&&report.kind==='button-safety'&&report.samples?.some(row=>row.scenario==='ordinary scene choice survives reopen and task Undo'&&row.action==='act:scene-time-settings'&&Number.isFinite(row.maxFrameGapMs)&&row.maxFrameGapMs>=1000))window='scene-time-settings';
+ if(!window)return{status:'not-selected',reason:'No exact approved native frame frontier'};
+ if(followedWindows.has(window)||followedWindows.size>=2)return{status:'not-selected',reason:'Matching failure diagnostic already admitted once'};
+ followedWindows.add(window);
+ const task=async()=>{
+  fs.mkdirSync(outputDir);const nativeOutput=path.join(outputDir,'native'),request={schemaVersion:1,kind:'linux-native-failure-followup',window,original:{path:reportPath,sha256:digest(bytes),status:report.status,candidateCommit:report.candidateCommit,candidateTree:report.candidateTree,cleanup:report.cleanup},policy:{originalVerdictUnchanged:true,onceOnly:true,serial:true,maxChildren:2,executionMs:180000,teardownMs:6000,captureMs:12000,rawBytesPerCapture:33554432,maxRawBytesTwoCaptures:67108864}};
+  save(path.join(outputDir,'request.json'),request);
+  const args=['scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',nativeOutput,'--port',env.CHAIN_NATIVE_PORT||'0','--linux-failure-observation','linux-webkit-frontier-v1',...(window==='pageerror-opening'?['--probe','--control','pageerror']:['--scenario','ordinary scene choice survives reopen and task Undo'])];
+  const childEnv={...env};delete childEnv.NODE_TEST_CONTEXT;
+  const processReceipt=await runOwnedNativeProcess({cwd,outputDir:path.join(outputDir,'process'),env:childEnv,args});
+  const reports=fs.existsSync(nativeOutput)?fs.readdirSync(nativeOutput).filter(file=>/^button-safety-webkit-.*\.json$/.test(file)):[];
+  const result={...request,process:processReceipt,diagnosticStatus:reports.length===1?JSON.parse(fs.readFileSync(path.join(nativeOutput,reports[0]))).linuxFailureObservation?.capture?.status||'unavailable':'unavailable',diagnosticReports:reports,status:processReceipt.cleanup.complete?'diagnostic-finished':'diagnostic-cleanup-incomplete',originalBytesUnchanged:fs.readFileSync(reportPath).equals(bytes)};
+  save(path.join(outputDir,'result.json'),result);return result;
+ };
+ const pending=diagnosticQueue.then(task,task);diagnosticQueue=pending.catch(()=>{});return pending;
+}

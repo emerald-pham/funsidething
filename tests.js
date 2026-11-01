@@ -47992,12 +47992,14 @@ test('RISK repository process: native button gate detects errors raised by a rea
  const output=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(output,'Durable allocated native output required');fs.mkdirSync(output,{recursive:true});
  const controls={pageerror:/pageerror/,unhandled:/unhandledrejection/,close:/unexpected-close/,crash:/page-crash/,reload:/unexpected-navigation-or-reload/,navigation:/unexpected-navigation-or-reload/,stall:/stalled responsiveness|blocked frame loop/,'async-pending':/stalled responsiveness/,'new-action':/New untested button action/};
  const cases=Object.entries(controls).map(([control,signal])=>({engine:'chromium',control,signal}));cases.push({engine:'webkit',control:'pageerror',signal:/pageerror/},{engine:'webkit',control:'unhandled',signal:/unhandledrejection/},{engine:'webkit',control:'short-stall',signal:/blocked frame loop/});
- for(const {engine,control,signal}of cases)await t.test(engine+' '+control,()=>{
+ for(const {engine,control,signal}of cases)await t.test(engine+' '+control,async()=>{
   const before=new Set(fs.readdirSync(output));
   const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0','--probe','--control',control],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:45000,maxBuffer:8*1024*1024});
   assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.notEqual(result.status,0,'actual native Settings click must reject '+control);
   const reports=fs.readdirSync(output).filter(file=>!before.has(file)&&file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1,'one preserved real native sensitivity artifact');
-  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));assert.equal(report.kind,'button-sensitivity');assert.equal(report.status,'failed');assert.match(JSON.stringify({errors:report.errors,failure:report.failure}),signal,'actual detector must catch '+control);t.diagnostic('Button sensitivity: '+path.join(output,reports[0]));
+  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));assert.equal(report.kind,'button-sensitivity');assert.equal(report.status,'failed');
+  if(engine==='webkit'&&control==='pageerror')try{const {runLinuxNativeFailureFollowup}=await import('./scripts/agent-tools/hosted-native-callers.mjs');await runLinuxNativeFailureFollowup({cwd:__dirname,outputDir:path.join(output,'linux-pageerror-failure-followup'),reportPath:path.join(output,reports[0]),origin:'pageerror-opening',env:process.env});}catch(error){t.diagnostic('Separate Linux failure observation unavailable: '+String(error));}
+  assert.match(JSON.stringify({errors:report.errors,failure:report.failure}),signal,'actual detector must catch '+control);t.diagnostic('Button sensitivity: '+path.join(output,reports[0]));
  });
 });
 
@@ -48041,9 +48043,10 @@ test('RISK repository process: required native button actions execute in Chromiu
  // The default ordinary profile selects 60 scenarios; the full/workload
  // diagnostic inventory contains 90. This bounds the whole engine process,
  // including setup; existing action and rapid-attempt bounds stay unchanged.
- for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
+ for(const engine of ['chromium','webkit'])await t.test(engine,async()=>{
   const output=fs.mkdtempSync(path.join(base,'button-actions-'+engine+'-'));
   const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--engine',engine,'--output-dir',output,'--port',process.env.CHAIN_NATIVE_PORT||'0'],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:360000,maxBuffer:16*1024*1024});
+  if(engine==='webkit'&&result.status!==0&&!result.error&&result.signal===null){const reports=fs.readdirSync(output).filter(file=>/^button-safety-webkit-.*\.json$/.test(file));if(reports.length===1)try{const {runLinuxNativeFailureFollowup}=await import('./scripts/agent-tools/hosted-native-callers.mjs');await runLinuxNativeFailureFollowup({cwd:__dirname,outputDir:path.join(output,'linux-scene-failure-followup'),reportPath:path.join(output,reports[0]),origin:'required-actions',env:process.env});}catch(error){t.diagnostic('Separate Linux failure observation unavailable: '+String(error));}}
   assert.equal(result.error,undefined,'Named engine must be available: '+(result.error?.message||result.stderr));assert.equal(result.signal,null);assert.equal(result.status,0,'Every required native button scenario must pass: '+result.stderr);
   const paths=result.stdout.split('\n').map(line=>line.match(/^Button evidence: (.+)$/)?.[1]).filter(Boolean);assert.equal(paths.length,1,'One exact native button report per engine');
   assert.equal(path.dirname(path.resolve(paths[0])),path.resolve(output),'The report belongs to this fresh engine attempt');const report=JSON.parse(fs.readFileSync(paths[0],'utf8'));assert.equal(report.engine,engine);assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);
@@ -49345,17 +49348,17 @@ test('RISK repository process: expected native reload retries only its navigatio
 });
 
 
-test('RISK repository process: hosted direct native callers retain ephemeral listener defaults',t=>{
+test('RISK repository process: hosted direct native callers retain ephemeral listener defaults',async t=>{
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable caller evidence required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ephemeral-caller-'));
  // This subprocess tests the hosted-policy boundary; it is not hosted proof.
  const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'canonical-pr-merge-v1',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/1/merge',CHAIN_NATIVE_OUTPUT:output};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene|RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources|RISK repository process: external browser termination retains lifecycle classification without app crash credit|RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save|RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources|RISK repository process: refused saved decision capture waits for its refreshed unselected review)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
- fs.writeFileSync(path.join(output,'consumer.stdout.tap'),result.stdout||'');fs.writeFileSync(path.join(output,'consumer.stderr.txt'),result.stderr||'');
- fs.writeFileSync(path.join(output,'hosted-direct-callers.stdout.tap'),result.stdout||'');fs.writeFileSync(path.join(output,'hosted-direct-callers.stderr.txt'),result.stderr||'');
- fs.writeFileSync(path.join(output,'hosted-direct-callers.result.json'),JSON.stringify({status:result.status,signal:result.signal,error:result.error?{name:result.error.name,code:result.error.code,message:result.error.message}:null},null,2)+'\n');
- assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Actual direct callers must pass an ephemeral port when the hosted environment has no local allocation: '+result.stdout+'\n'+result.stderr);
- assert.match(result.stdout,/^# tests 24$/m);assert.match(result.stdout,/^# skipped 0$/m);
- t.diagnostic('Declared hosted-policy process fixture only; actual child TAP retained at '+path.join(output,'consumer.stdout.tap'));
+ const {runHostedNativeCallers}=await import('./scripts/agent-tools/hosted-native-callers.mjs');
+ const result=await runHostedNativeCallers({cwd:__dirname,outputDir:output,env});
+ assert.equal(result.status,'passed','Both serial actual native selections must pass with exact case union and complete owned cleanup: '+result.issues.join('\n'));
+ assert.equal(result.cases.length,24);assert.ok(result.cases.every(row=>row.status==='passed'));assert.deepEqual(result.batches.map(row=>row.selection),['saved-decision','remaining-seven']);
+ assert.ok(result.batches.every(row=>row.cleanup.complete&&!row.timedOut&&row.executionElapsedMs<180000));
+ assert.ok(result.batches.reduce((total,row)=>total+row.executionElapsedMs,0)<=360000);
+ t.diagnostic('Declared hosted-policy process fixture only; each original TAP and live frontier retained at '+output);
 });
 
 
@@ -51227,7 +51230,10 @@ test('RISK repository process: refused saved decision capture waits for its refr
        // held; this barrier supplies no preview and never changes the outcome.
        if(!held)await fixtureDeadline(entered.promise,'The actual post-refusal refreshed SDK read must enter within the original native deadline',12000);
       }
-      const wasHeld=held&&!released,value=await original.call(this,fn,arg);
+      const captureTiming=arg?.phase?{phase:arg.phase,requestUtc:new Date().toISOString(),requestMonotonicMs:performance.now(),cpuBefore:process.cpuUsage()}:null;
+      let value;const wasHeld=held&&!released;
+      try{value=await original.call(this,fn,arg);}
+      finally{if(captureTiming){const delta=process.cpuUsage(captureTiming.cpuBefore);delete captureTiming.cpuBefore;evidence.captureTimings??=[];evidence.captureTimings.push({...captureTiming,returnUtc:new Date().toISOString(),returnMonotonicMs:performance.now(),nodeCpuMicroseconds:delta,transportStatus:value===undefined?'failed-or-undefined':'returned',scope:'Host page.evaluate transport interval; no page CPU or serialization attribution'});}}
       // Observe the existing refusal postcondition at its browser transport.
       // A false outcome is the actual consumer waiting, and releases the SDK
       // immediately; a true outcome must face its ensuing real source capture.
@@ -51259,6 +51265,9 @@ test('RISK repository process: refused saved decision capture waits for its refr
    assert.equal(nativeError,undefined,'The original complete saved-decision source verifier must pass: '+nativeError?.message);
    const report=result.report;
    assert.equal(report.status,'passed');assert.deepEqual(report.errors,[]);assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});
+   const timedReferences=[...report.ordinarySavedDecisionPhases,...report.ordinarySavedDecisionCancelPhases];
+   assert.equal(evidence.captureTimings.length,16,'All original thirteen main plus three cancellation source captures retain host timing observations');
+   evidence.captureTimings=evidence.captureTimings.map(row=>{const reference=timedReferences.find(item=>item.phase===row.phase);assert.ok(reference,'Each observed transport phase joins its original complete source reference');return{...row,source:{file:reference.file,sha256:reference.sha256,bytes:reference.bytes},elapsedMs:row.returnMonotonicMs-row.requestMonotonicMs};});
    assert.deepEqual(report.scenarios.map(row=>({name:row.name,status:row.status})),[{name:scenario,status:'passed'}]);
    assert.deepEqual(report.ordinarySavedDecisionPhases.map(row=>row.phase),['seed','settings','baseline-saved','settings-review','read-refused','reviewed','selected','repeated','write-refused','reviewed-retry','selected-retry','applied','final-source']);
    const captureReference=report.ordinarySavedDecisionPhases.find(row=>row.phase==='write-refused'),captureBytes=fs.readFileSync(path.join(output,captureReference.file)),capture=JSON.parse(captureBytes);
@@ -51887,6 +51896,72 @@ async function timelineSDKDouble(retainedDirectory=null){
  const page={_type:'Page',_connection:{toImpl:()=>impl},url:()=> 'about:blank',addInitScript:async(fn,args)=>{prefix=args?.prefix??JSON.parse(/"prefix":("(?:[^"\\]|\\.)*")/.exec(fn.content)[1]);}};
  return{directory,page,delegate,initial,Session,calls,emit:()=>{initial.emit('Runtime.executionContextCreated',{context:{id:3,type:'normal',frameId}});initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:1.01,data:{message:prefix+JSON.stringify({phase:'open',documentId:'portable-document',pageMs:10})}}});},dispose:()=>{if(!retainedDirectory)fs.rmSync(directory,{recursive:true,force:true});}};
 }
+test('RISK repository process: Linux native observer retains literal CPU deliveries and bounded clock custody',async t=>{
+ // Existing protocol/session boundary only: this double executes no Linux
+ // browser and cannot establish Linux domain availability or CPU attribution.
+ const {createLinuxNativeTimelineProvider,LINUX_FRONTIER_PROFILE,verifyLinuxNativeRuntime}=await import('./scripts/button-safety-timeline-linux.mjs');
+ const base=process.env.CHAIN_NATIVE_OUTPUT;if(base)fs.mkdirSync(base,{recursive:true});
+ const fixture=async()=>timelineSDKDouble(base?fs.mkdtempSync(path.join(base,'linux-observer-protocol-')):null),f=await fixture();
+ const start=createLinuxNativeTimelineProvider({verifyRuntime:()=>({kind:'protocol-system-double',profile:LINUX_FRONTIER_PROFILE,limits:['No actual Linux runtime executes']})});let owner;
+ const literal={event:{timestamp:1.075,usage:37.5,threads:[{name:'unmapped-worker',usage:12.5,type:'webkit',targetId:'worker-literal'}]}};
+ try{
+  owner=await start({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js'});f.emit();
+  f.initial.emit('CPUProfiler.trackingUpdate',literal);
+  const capture=await owner.stop('first-selected-step-terminal');
+  fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');
+  assert.deepEqual(capture.cpu?.events?.map(row=>JSON.parse(fs.readFileSync(path.join(f.directory,row.path)))),[literal],'The runnable native receiver must retain the independently literal CPU delivery byte-for-byte');
+  assert.equal(capture.facts.calibration.status,'bounded');assert.equal(capture.cleanup.listenersRemoved,true);assert.equal(capture.cleanup.hookRestored,true);assert.equal(capture.cleanup.sessionsStopped,true);
+ }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ const makeStart=()=>createLinuxNativeTimelineProvider({verifyRuntime:()=>({kind:'protocol-system-double',profile:LINUX_FRONTIER_PROFILE,limits:['No actual Linux runtime executes']})});
+ const url='http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js';
+ await t.test('source-located intervals retain full bytes and separate CPU clock availability',async()=>{
+  const f=await fixture(),bytes=Buffer.from('function independentWork(){return 7;}\n'),sha256=createHash('sha256').update(bytes).digest('hex'),sourceURL='http://127.0.0.1:53623/app.js';fs.writeFileSync(path.join(f.directory,'source.js'),bytes);let owner;
+  try{owner=await makeStart()({page:f.page,outputDir:f.directory,sourceURL:url,sources:()=>[{url:sourceURL,path:'source.js',bytes:bytes.length,sha256,kind:'app'}]});f.emit();f.initial.emit('Timeline.eventRecorded',{record:{type:'FunctionCall',startTime:1.05,endTime:1.1,data:{scriptName:sourceURL,scriptLine:0,scriptColumn:0}}});const c=await owner.stop('mapped-control');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(c,null,2)+'\n');
+   assert.deepEqual(c.facts.work[0].sourceBinding,{status:'bound',sha256,bytes:bytes.length,kind:'app'});assert.equal(c.facts.work[0].pageInterval.status,'bounded');assert.ok(Math.abs(c.facts.work[0].pageInterval.startMs-50)<1e-8);assert.ok(Math.abs(c.facts.work[0].pageInterval.endMs-100)<1e-8);assert.equal(c.facts.work[0].cpuUsage,'unmeasured for this scope');assert.equal(c.facts.causalAttribution,'unavailable');assert.equal(c.cpu.clockMapping.status,'unavailable');assert.equal(c.facts.hostPageClock.status,'unavailable','The protocol double supplies no actual host/page return bracket');assert.deepEqual(fs.readFileSync(path.join(f.directory,'source.js')),bytes);
+  }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ });
+ await t.test('duration cap stops intake and retains the accepted prefix',async context=>{
+  const f=await fixture();let owner;context.mock.timers.enable({apis:['setTimeout']});
+  try{owner=await makeStart()({page:f.page,outputDir:f.directory,sourceURL:url});f.emit();context.mock.timers.tick(12000);const c=await owner.stop('duration-control');assert.equal(c.status,'incomplete');assert.ok(c.errors.some(error=>error.includes('duration bound')));assert.ok(c.events.length>0);assert.equal(c.cleanup.timerCleared,true);assert.equal(c.cleanup.listenersRemoved,true);assert.equal(c.cleanup.hookRestored,true);fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(c,null,2)+'\n');}finally{if(owner)await owner.stop('test-finally');context.mock.timers.reset();f.dispose();}
+ });
+ for(const mode of ['unsupported CPU command','foreign active session','bound context replacement','event byte cap','event count cap','raw total cap','native stop failure','source hash mismatch'])await t.test(mode,async()=>{
+  const f=await fixture();let owner,capture;const send=f.initial.send.bind(f.initial);
+  if(mode==='unsupported CPU command')f.initial.send=async(method,...args)=>{if(method==='CPUProfiler.startTracking')throw Error('Actual controlled CPU command is unsupported');return send(method,...args);};
+  if(mode==='native stop failure')f.initial.send=async(method,...args)=>{if(method==='Timeline.stop')throw Error('Actual controlled Timeline stop failure');return send(method,...args);};
+  let sources=()=>[];if(mode==='source hash mismatch'){fs.writeFileSync(path.join(f.directory,'source.js'),'independent bytes');sources=()=>[{url:'http://127.0.0.1:53623/app.js',path:'source.js',bytes:17,sha256:'0'.repeat(64),kind:'app'}];}
+  try{
+   owner=await makeStart()({page:f.page,outputDir:f.directory,sourceURL:url,sources});f.emit();
+   if(mode==='foreign active session')f.delegate._session=new f.Session('foreign');
+   if(mode==='bound context replacement')f.initial.emit('Runtime.executionContextCreated',{context:{id:4,type:'normal',frameId:'main'}});
+   if(mode==='event byte cap')f.initial.emit('CPUProfiler.trackingUpdate',{event:{timestamp:1.075,usage:37.5,opaque:'x'.repeat(1048576)}});
+   if(mode==='event count cap')for(let i=0;i<4097;i++)f.initial.emit('CPUProfiler.trackingUpdate',{event:{timestamp:1.075+i/100000,usage:37.5}});
+   if(mode==='raw total cap')for(let i=0;i<35;i++)f.initial.emit('CPUProfiler.trackingUpdate',{event:{timestamp:1.075+i/100000,usage:37.5,opaque:'x'.repeat(1000000)}});
+   capture=await owner.stop('negative-control-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');
+   assert.equal(capture.status,'incomplete',mode);assert.ok(capture.rawBytes<=33554432);assert.ok(capture.events.length<=4096);assert.ok(capture.events.every(row=>row.bytes<=1048576));assert.equal(capture.cleanup.listenersRemoved,true);assert.equal(capture.cleanup.hookRestored,true);
+   if(mode==='unsupported CPU command'){assert.equal(capture.cpu.status,'unavailable');assert.ok(capture.cpu.commands.some(row=>row.status==='unavailable'));}
+   if(mode==='native stop failure')assert.equal(capture.cleanup.sessionsStopped,false);
+   if(mode==='foreign active session')assert.equal(capture.cleanup.sessionsStopped,true,'Refusing a foreign active session still stops the originally owned native recording');
+   if(mode.includes('cap')){assert.ok(capture.dropped>0);assert.ok(capture.events.length>0,'Accepted prefix survives a cap');}
+   for(const row of capture.events){const bytes=fs.readFileSync(path.join(f.directory,row.path));assert.equal(bytes.length,row.bytes);assert.equal(createHash('sha256').update(bytes).digest('hex'),row.sha256);assert.equal(row.sessionId,'initial');}
+  }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ });
+ await t.test('unknown runtime and profile preserve original Mac admission',async()=>{
+  const f=await fixture();try{
+   await assert.rejects(()=>makeStart()({page:f.page,outputDir:f.directory,sourceURL:url,profile:'unknown'}),/unknown diagnostic profile/);
+   await assert.rejects(()=>createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:'foreign-runtime'})})({page:f.page,outputDir:f.directory,sourceURL:url}),/distinct Linux runtime/);
+   const {createNativeTimelineProvider}=await import('./scripts/button-safety-timeline-core.mjs');
+   await assert.rejects(()=>createNativeTimelineProvider({verifyRuntime:()=>retainedTimelineInputs().capture.provenance})({page:f.page,outputDir:f.directory,sourceURL:url,retentionProfile:LINUX_FRONTIER_PROFILE}),/unknown retention profile/);
+   if(process.platform!=='linux'||process.version!=='v22.23.4')assert.throws(()=>verifyLinuxNativeRuntime({repo:__dirname}),/actual Linux Node22.23.4/);
+   assert.equal(f.calls.length,0);assert.equal(fs.existsSync(path.join(f.directory,'linux-frontier')),false);
+  }finally{f.dispose();}
+ });
+});
+
+test('RISK repository process: owned native lifecycle retains stream and exact union controls',()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/hosted-native-callers.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4194304});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The actual owned-process public seam must retain stream, detached-child cleanup, cap, foreign/PID-reuse refusal and literal union controls: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 6$/m);assert.match(result.stdout,/^# skipped 0$/m);
+});
 test('RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks',async t=>{
  const {classifyButtonStartupTimeline,verifyButtonSafetyReport}=await import('./scripts/button-safety-contract.mjs'),x=retainedTimelineInputs(),before=Buffer.from(x.inputs.captureBytes),classify=x=>classifyButtonStartupTimeline(x.timeline,x.capture,x.inputs),result=classify(x);
  assert.ok(result.nativeEvidence,'Valid retained raw bytes must reach the existing classifier and produce separate nativeEvidence');const e=result.nativeEvidence;
