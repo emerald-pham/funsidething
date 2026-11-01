@@ -52865,5 +52865,293 @@
       "summary": "The same one-case source-recorded literal protocol control passes after the minimal offset-consistency refusal. No actual Linux/native or measured timing result is claimed; final focused/preflight/group-description evidence is recorded separately on the clean repair commit."
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "063c5620245d65ad9acd1f3f5c7416ad3eb38a1fa00914d8a1c4d5308a4a4529",
+    "reason": "Atomic #1939 normal-merges only the five independently ROOT-admitted source heads, preserves every original worker commit and its actual chronology, and binds the exact joined tests.js diff. This is source reconciliation metadata, not a new behavioral RED or final qualification. Retain the accepted cumulative main evidence and separately index each new admitted worker RED.",
+    "previousBehavior": "The prior aggregate f06630bd record matched only the earlier source against8cd524a. The branch has no upstream, so the focused selected-base preflight did not check the distinct outgoing0d41 comparison. On clean b09 the real outgoing gate failed missing exact rationale; after fixture source finalized at36e0550fb1dc84095425d5cddcbb97db5fb8cbc3 the actual outgoing gate again failed for missing exact cumulative metadata. Joined source boundary: Published/prior ROOT C082ec4e6 carried the accepted #1299 source and1533 literal rationale records. The five independent C-based source heads separately repaired the Export observation deadline, absent origin default and proven terminal process custody, and added paint-input and same-history Linux diagnostic observations. No single source previously contained all five admitted deltas.",
+    "intendedBehavior": "The existing unchanged validator accepts this exact cumulative tests.js fingerprint against8cd524a7f0ab7a25b6689244722ae3c5baf861c8 while preserving every original source-bound rationale and chronology. The final fixture repair also retains its own exact b09 source record. No upstream, gate, workflow or assertion is bypassed or weakened. Joined source boundary: The joined source contains exactly those admitted literal deltas,1533 inherited rationale objects and13 literal worker additions, followed by these exact joined comparison records. Original450ms/16wake, bound-origin/reopen, complete source/authority/typed-byte and pixel oracles,60/114/64 inventory,1000ms thresholds,180s per child/360s aggregate,3000ms TERM plus3000ms KILL and4MiB process limits remain intact. No app, asset, FAQ, version, dependency, workflow, inventory baseline or gate changes are introduced by the merger.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time",
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources",
+      "RISK repository process: proven terminal executable incidents retain actual exit custody",
+      "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "RISK repository process: scene source observation brackets stay inactive in ordinary runs",
+      "RISK repository process: Linux observer phases refuse inconsistent retained page clocks"
+    ],
+    "preservedCoverage": [
+      "All1530 original rationale object literals remain unchanged and ordered, followed by the unchanged source-bound #1922 record. Cumulative records index their existing meaningful RED/GREEN evidence rather than replacing it.",
+      "The original #1898 pre-title daily-source assertion chronology and #1911 native fractional trusted-click receipt failures remain distinct. Current #1922 static guard RED preceded the first fix; the actual named async callback witness failed later after a passing full selected native lifecycle and is explicitly later-baseline-sensitivity.",
+      "The exact existing ordinary and fractional roots now assert an actual callback-reference constructor witness, with unchanged names, IDs and options, unchanged12-second stable async source capture, complete64-task B0/B1/B2/U1/U2 history/source/typed-byte/pending/backups/order assertions, exact pixels and original time/action limits.",
+      "The inherited #1902/#1904 Linux process/stream/cleanup/clock source-bound RED/GREEN records, independent literal24 hosted native catalog and required uninstrumented verdict remain protected; protocol doubles and diagnostic records claim no actual Linux native qualification.",
+      "No app, rules, assets, FAQ, version, dependency, workflow, inventory, assignment or gate changed for this metadata leaf. Missing metadata is a structural admission failure and is not reported as an app failure or meaningful feature RED.",
+      "All1533 C rationale object literals and order and all13 worker literal additions remain exact and ordered. Every worker RED and GREEN retains its original source identity, chronology, scope and recorder limitations; original accepted main-comparison evidence remains separately preserved.",
+      "All non-rationale joined file bytes exactly reconstruct from the five literal admitted C-based deltas. Unchanged tracked blobs retain exact C Git blob identities; original app/runtime/assets/FAQ/workflows/packages and immutable historical test inventory remain unchanged from C.",
+      "The original24-case hosted caller catalog and default required reporter remain literal. #1935 custody edits precede that reporter; #1937 changes only the later bounded failure follow-up and named observation files. Both compose without replacing the other worker.",
+      "Actual Linux frame and one-pixel causes remain unproved; original failed CI and unknown70378 stay failed/unresolved. #1937 seven early loops used direct raw TAP and available source copies rather than the required recorder; the first full pre-edit snapshot and per-loop GREEN identity are missing. Final calibration RED/GREEN and final29-case GREEN are source-recorded. No retrospective run can repair that chronology.",
+      "Source-only syntax, whitespace, protected-test gates, copy preflight and a zero-test-execution cohort descriptor are merger checks. They claim no full/native/browser/emulator/Linux/CI/review-receipt/deployment/physical-device acceptance. ROOT owns subsequent exact-candidate qualification and reviews; Beta remains paused."
+    ],
+    "redEvidence": {
+      "command": "Existing source-bound rationale redEvidence.command fields retain original feature/process commands. For metadata only: absolute Node24.19 scripts/test-first-gate.mjs0d41e482b746622b8f80ba89c9b27a290a7b660b through record-run on clean b09 and on final fixture commit36e0550fb1dc84095425d5cddcbb97db5fb8cbc3. Separately admitted new worker commands: #1931: python3 /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-deadline1931-worker/run-focused.py preimplementation-early-once early-once preimplementation-red; recorder 2026-11-01T17-13-22-930Z-75be1915-9a7a-4bd1-8f4f-cc4a026a9dd5 retained under preimplementation-early-once/recorder. | #1934: env -u CHAIN_NATIVE_PORT -u NODE_OPTIONS -u NODE_TEST_CONTEXT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_TEST_GROUP=native-process CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS=0 CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker/red-absent-supported-policy through scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary (two distinct scanner decisions retain both offered IDs and complete sources|scene repeat accounts the original trusted Lock and both Undos with complete sources)$' tests.js | #1935: Absolute Node24 record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<exact new real-process root> scripts/agent-tools/hosted-native-callers.test.mjs. Exact arguments and source bytes are retained in each named recorder record. | #1936: Allocated WebKit/port53801, exact082ec app, Node24 record-run.mjs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh$ tests.js; complete command/source/output in recorder74f5c5c8. | #1937: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap. | #1937: CHAIN_NATIVE_OUTPUT=<frame-history1937-worker/offset-RED-raw> absoluteNode24 scripts/agent-tools/record-run.mjs --repo <same-worktree> --evidence-dir <frame-history1937-worker/recorded> --purpose preimplementation-red --summary -- absoluteNode24 --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux observer phases refuse inconsistent retained page clocks$' tests.js",
+      "failure": "Metadata-only recorder6fd184f1 on clean b09 and828c9e06 on final fixture source both exited1: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json. These failures do not constitute an app/feature RED. Meaningful original chronology remains in unchanged #1898/#1911/#1902/#1904 records; #1922 guard56753168 failed[49172] vs[] before its first functional edit, and later named async challengecb245d9d measured AsyncFunction vs Function after the full selected native child passed. Separately admitted new worker observations: #1931: Actual preimplementation verifier RED: both Chromium and WebKit fail the unchanged real hrtime >=450 assertion before source observation after an injected early timer resolution (actual elapsed0.021375ms and0.014792ms). This is test-verifier RED, not app RED. Separate actual canonical run41326403783/1 job124907428862 on checkout2e5d3a63613dcd7f997922725dc17d7d6343bd7e failed WebKit at the same assertion; hosted exact undershoot is unreported. Original ZIP sha256c1ba2d017f1adab871d3acd4e3982e3f6193728a70d52f1693c534e4e2554316 remains retained. | #1934: Observed before the one-expression implementation on exact082ec: recorder2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14 exited1. Both existing outer cases failed in actual Chromium and WebKit at unchanged verifyInitialBoundOriginCapture: requestedPort null !==0. All four native child scenarios passed with actual nonzero origins and complete owned cleanup. Earlier16b3cd38 attempt stopped before browser on missing hosted policy and is retained/corrected as infrastructure failure, not feature RED. | #1935: 01ad32c6 on unmodified082ec module reached the intended cleanup.complete false versus true assertion after actual complete prior identity, executable-only partial read, real exit/close0 and actual kernel ESRCH. The later source-bound strict-field REDd65e08f5 observed an unauthorized SIGTERM attempt for a live executable-null row before its guard. The subsequent authority RED366deaa6 observed SIGTERM after a transient core ambiguity and later full row, before its sticky authority guard. These later REDs are new bounded risk refinements, not a claim of unchanged-baseline chronology for the whole repair. | #1936: 2026-11-01T17:59:23.469Z\u201317:59:29.600Z: all3 actual complete ordinary64 child observations fail bank retains complete painted input values rather than only signature length: actual undefined, expected string. Each has zero unexpected native errors, full before/after source equality and complete cleanup. This is diagnostic-completeness RED, not application RED; existing original bitmaps equal in this macOS attempt. | #1937: Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance. | #1937: Source-recorded79cddeac-99f2-4e5c-afef-181db1d36a25 on b413e357, identity complete, exited1 assertion-failure: capture.status actual captured vs intended incomplete after literal5ms phase-clock offset disagreement. Actual command, bytes, patch, raw events and complete assertion TAP are retained.",
+      "records": [
+        "2026-11-01T14-20-55-206Z-6fd184f1-4369-4e1f-b4a8-47c6bafa9aa2",
+        "2026-11-01T14-28-32-005Z-828c9e06-f811-4b71-9efc-04190babef7f",
+        "2026-11-01T14-20-55-205Z-56753168-fcb4-445d-b347-088630af7aa2",
+        "2026-11-01T14-25-49-423Z-cb245d9d-ad0e-4fc3-b118-717b7b8c6d74",
+        "2026-11-01T11-49-50-827Z-df36de3c-ae30-4716-af93-fa8000968f55",
+        "2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a",
+        "2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180"
+      ]
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/joined-source1939/merger",
+    "inheritedRedEvidence": {
+      "command": "Existing source-bound rationale redEvidence.command fields retain original feature/process commands. For metadata only: absolute Node24.19 scripts/test-first-gate.mjs0d41e482b746622b8f80ba89c9b27a290a7b660b through record-run on clean b09 and on final fixture commit36e0550fb1dc84095425d5cddcbb97db5fb8cbc3.",
+      "failure": "Metadata-only recorder6fd184f1 on clean b09 and828c9e06 on final fixture source both exited1: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json. These failures do not constitute an app/feature RED. Meaningful original chronology remains in unchanged #1898/#1911/#1902/#1904 records; #1922 guard56753168 failed[49172] vs[] before its first functional edit, and later named async challengecb245d9d measured AsyncFunction vs Function after the full selected native child passed.",
+      "records": [
+        "2026-11-01T14-20-55-206Z-6fd184f1-4369-4e1f-b4a8-47c6bafa9aa2",
+        "2026-11-01T14-28-32-005Z-828c9e06-f811-4b71-9efc-04190babef7f",
+        "2026-11-01T14-20-55-205Z-56753168-fcb4-445d-b347-088630af7aa2",
+        "2026-11-01T14-25-49-423Z-cb245d9d-ad0e-4fc3-b118-717b7b8c6d74",
+        "2026-11-01T11-49-50-827Z-df36de3c-ae30-4716-af93-fa8000968f55",
+        "2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a",
+        "2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180"
+      ]
+    },
+    "inheritedGreenEvidence": {
+      "records": [
+        "2026-11-01T14-26-20-724Z-369967f4-f482-4ad1-9da7-41287cb1ed7f",
+        "2026-11-01T14-26-43-320Z-73904500-65c7-49d4-b727-98554a4c7c7e",
+        "2026-11-01T14-28-09-963Z-0b2bd792-c28c-4007-b86d-b09b2931b23b"
+      ],
+      "summary": "Final #1922 normal/fractional WebKit consumer roots passed with actual Function witness, full selected source lifecycle, zero errors and complete cleanup. Unchanged static guard and RISK inventory passed. All three final exact comparison gates, selected-base preflight and complete group descriptor are separate owner handoff checks. No full-suite, CI, deployed, live or device pass claimed here."
+    },
+    "sourceJoinCommit": "604e7b14455c0550ade11be2c35001fb503463e1",
+    "workerRedEvidence": [
+      {
+        "issue": 1931,
+        "sourceCommit": "cba6bb57f672ff9c686d335b04e81da8fb9acef7",
+        "sourceTestChangesSha256": "920a3cfb25d4cb0597ff169913c6609ac57ac184d10ffb753dedd006950bdfa6",
+        "replacementTests": [
+          "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+        ],
+        "redEvidence": {
+          "command": "python3 /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-deadline1931-worker/run-focused.py preimplementation-early-once early-once preimplementation-red; recorder 2026-11-01T17-13-22-930Z-75be1915-9a7a-4bd1-8f4f-cc4a026a9dd5 retained under preimplementation-early-once/recorder.",
+          "failure": "Actual preimplementation verifier RED: both Chromium and WebKit fail the unchanged real hrtime >=450 assertion before source observation after an injected early timer resolution (actual elapsed0.021375ms and0.014792ms). This is test-verifier RED, not app RED. Separate actual canonical run41326403783/1 job124907428862 on checkout2e5d3a63613dcd7f997922725dc17d7d6343bd7e failed WebKit at the same assertion; hosted exact undershoot is unreported. Original ZIP sha256c1ba2d017f1adab871d3acd4e3982e3f6193728a70d52f1693c534e4e2554316 remains retained."
+        }
+      },
+      {
+        "issue": 1934,
+        "sourceCommit": "5ac9007bf19879af796c3744b8b3b61ce9fa385b",
+        "sourceTestChangesSha256": "8586949e6ed13feb1b129ba33c383c36db56b57f2821249cb66776aeb0f2300a",
+        "replacementTests": [
+          "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+          "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+        ],
+        "redEvidence": {
+          "command": "env -u CHAIN_NATIVE_PORT -u NODE_OPTIONS -u NODE_TEST_CONTEXT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_TEST_GROUP=native-process CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS=0 CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker/red-absent-supported-policy through scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary (two distinct scanner decisions retain both offered IDs and complete sources|scene repeat accounts the original trusted Lock and both Undos with complete sources)$' tests.js",
+          "failure": "Observed before the one-expression implementation on exact082ec: recorder2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14 exited1. Both existing outer cases failed in actual Chromium and WebKit at unchanged verifyInitialBoundOriginCapture: requestedPort null !==0. All four native child scenarios passed with actual nonzero origins and complete owned cleanup. Earlier16b3cd38 attempt stopped before browser on missing hosted policy and is retained/corrected as infrastructure failure, not feature RED.",
+          "records": [
+            "2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14"
+          ]
+        }
+      },
+      {
+        "issue": 1935,
+        "sourceCommit": "edee54f998cf083ca4ff161d446c29a2fb73c089",
+        "sourceTestChangesSha256": "cd6d46d819f1688bf1f964aaa57f1c2efdc8a0c81f53795299a0afab32be18fa",
+        "replacementTests": [
+          "RISK repository process: proven terminal executable incidents retain actual exit custody"
+        ],
+        "redEvidence": {
+          "command": "Absolute Node24 record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<exact new real-process root> scripts/agent-tools/hosted-native-callers.test.mjs. Exact arguments and source bytes are retained in each named recorder record.",
+          "failure": "01ad32c6 on unmodified082ec module reached the intended cleanup.complete false versus true assertion after actual complete prior identity, executable-only partial read, real exit/close0 and actual kernel ESRCH. The later source-bound strict-field REDd65e08f5 observed an unauthorized SIGTERM attempt for a live executable-null row before its guard. The subsequent authority RED366deaa6 observed SIGTERM after a transient core ambiguity and later full row, before its sticky authority guard. These later REDs are new bounded risk refinements, not a claim of unchanged-baseline chronology for the whole repair.",
+          "records": [
+            "2026-11-01T17-52-46-751Z-01ad32c6-8f1c-45f9-a019-a927265e4483",
+            "2026-11-01T18-01-49-686Z-d65e08f5-32c8-4e21-83e9-2dc6878d7fd9",
+            "2026-11-01T18-03-37-832Z-366deaa6-d6ff-4d9c-8ad9-e532a37bddba"
+          ]
+        }
+      },
+      {
+        "issue": 1936,
+        "sourceCommit": "d235af8edc2a105548ffb39a5f9e29d0e2b15bd7",
+        "sourceTestChangesSha256": "f456f869c24837655e2bce6065da2480294ef835259cd466587c5f5828d2dce0",
+        "replacementTests": [
+          "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+        ],
+        "redEvidence": {
+          "command": "Allocated WebKit/port53801, exact082ec app, Node24 record-run.mjs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh$ tests.js; complete command/source/output in recorder74f5c5c8.",
+          "failure": "2026-11-01T17:59:23.469Z\u201317:59:29.600Z: all3 actual complete ordinary64 child observations fail bank retains complete painted input values rather than only signature length: actual undefined, expected string. Each has zero unexpected native errors, full before/after source equality and complete cleanup. This is diagnostic-completeness RED, not application RED; existing original bitmaps equal in this macOS attempt.",
+          "records": [
+            "2026-11-01T17-59-23-364Z-74f5c5c8-7ea6-466b-b86c-195227e73c90"
+          ]
+        }
+      },
+      {
+        "issue": 1937,
+        "sourceCommit": "aacad109a4db2103355ecf8a7f6727042efddbd1",
+        "sourceTestChangesSha256": "45f1ddc9aaf7a271523ff8501cd573c30d2df6430727ac767c6ada0d95c109d4",
+        "replacementTests": [
+          "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+          "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+          "RISK repository process: scene source observation brackets stay inactive in ordinary runs"
+        ],
+        "redEvidence": {
+          "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap.",
+          "failure": "Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance."
+        }
+      },
+      {
+        "issue": 1937,
+        "sourceCommit": "aacad109a4db2103355ecf8a7f6727042efddbd1",
+        "sourceTestChangesSha256": "29bdfeefc2ee0f59e6a17f480653c25b79df7931106b17a134cab57cc10fa538",
+        "replacementTests": [
+          "RISK repository process: Linux observer phases refuse inconsistent retained page clocks"
+        ],
+        "redEvidence": {
+          "command": "CHAIN_NATIVE_OUTPUT=<frame-history1937-worker/offset-RED-raw> absoluteNode24 scripts/agent-tools/record-run.mjs --repo <same-worktree> --evidence-dir <frame-history1937-worker/recorded> --purpose preimplementation-red --summary -- absoluteNode24 --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux observer phases refuse inconsistent retained page clocks$' tests.js",
+          "failure": "Source-recorded79cddeac-99f2-4e5c-afef-181db1d36a25 on b413e357, identity complete, exited1 assertion-failure: capture.status actual captured vs intended incomplete after literal5ms phase-clock offset disagreement. Actual command, bytes, patch, raw events and complete assertion TAP are retained.",
+          "records": [
+            "2026-11-01T18-31-16-384Z-79cddeac-99f2-4e5c-afef-181db1d36a25"
+          ]
+        }
+      }
+    ],
+    "comparisonContexts": [
+      "fetched main"
+    ]
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "e09b38ccd7a4b5b1e54cf7ea8b520fe51128be2c4c3e86814be8ed3e8cc7ddfe",
+    "reason": "Atomic #1939 normal-merges only the five independently ROOT-admitted source heads, preserves every original worker commit and its actual chronology, and binds the exact joined tests.js diff. This is source reconciliation metadata, not a new behavioral RED or final qualification.",
+    "previousBehavior": "Published/prior ROOT C082ec4e6 carried the accepted #1299 source and1533 literal rationale records. The five independent C-based source heads separately repaired the Export observation deadline, absent origin default and proven terminal process custody, and added paint-input and same-history Linux diagnostic observations. No single source previously contained all five admitted deltas.",
+    "intendedBehavior": "The joined source contains exactly those admitted literal deltas,1533 inherited rationale objects and13 literal worker additions, followed by these exact joined comparison records. Original450ms/16wake, bound-origin/reopen, complete source/authority/typed-byte and pixel oracles,60/114/64 inventory,1000ms thresholds,180s per child/360s aggregate,3000ms TERM plus3000ms KILL and4MiB process limits remain intact. No app, asset, FAQ, version, dependency, workflow, inventory baseline or gate changes are introduced by the merger.",
+    "replacementTests": [
+      "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources",
+      "RISK repository process: proven terminal executable incidents retain actual exit custody",
+      "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "RISK repository process: scene source observation brackets stay inactive in ordinary runs",
+      "RISK repository process: Linux observer phases refuse inconsistent retained page clocks"
+    ],
+    "preservedCoverage": [
+      "All1533 C rationale object literals and order and all13 worker literal additions remain exact and ordered. Every worker RED and GREEN retains its original source identity, chronology, scope and recorder limitations; original accepted main-comparison evidence remains separately preserved.",
+      "All non-rationale joined file bytes exactly reconstruct from the five literal admitted C-based deltas. Unchanged tracked blobs retain exact C Git blob identities; original app/runtime/assets/FAQ/workflows/packages and immutable historical test inventory remain unchanged from C.",
+      "The original24-case hosted caller catalog and default required reporter remain literal. #1935 custody edits precede that reporter; #1937 changes only the later bounded failure follow-up and named observation files. Both compose without replacing the other worker.",
+      "Actual Linux frame and one-pixel causes remain unproved; original failed CI and unknown70378 stay failed/unresolved. #1937 seven early loops used direct raw TAP and available source copies rather than the required recorder; the first full pre-edit snapshot and per-loop GREEN identity are missing. Final calibration RED/GREEN and final29-case GREEN are source-recorded. No retrospective run can repair that chronology.",
+      "Source-only syntax, whitespace, protected-test gates, copy preflight and a zero-test-execution cohort descriptor are merger checks. They claim no full/native/browser/emulator/Linux/CI/review-receipt/deployment/physical-device acceptance. ROOT owns subsequent exact-candidate qualification and reviews; Beta remains paused."
+    ],
+    "redEvidence": {
+      "command": "No new behavioral test was run for this source join. Actual admitted worker commands: #1931: python3 /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-deadline1931-worker/run-focused.py preimplementation-early-once early-once preimplementation-red; recorder 2026-11-01T17-13-22-930Z-75be1915-9a7a-4bd1-8f4f-cc4a026a9dd5 retained under preimplementation-early-once/recorder. | #1934: env -u CHAIN_NATIVE_PORT -u NODE_OPTIONS -u NODE_TEST_CONTEXT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_TEST_GROUP=native-process CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS=0 CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker/red-absent-supported-policy through scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary (two distinct scanner decisions retain both offered IDs and complete sources|scene repeat accounts the original trusted Lock and both Undos with complete sources)$' tests.js | #1935: Absolute Node24 record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<exact new real-process root> scripts/agent-tools/hosted-native-callers.test.mjs. Exact arguments and source bytes are retained in each named recorder record. | #1936: Allocated WebKit/port53801, exact082ec app, Node24 record-run.mjs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh$ tests.js; complete command/source/output in recorder74f5c5c8. | #1937: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap. | #1937: CHAIN_NATIVE_OUTPUT=<frame-history1937-worker/offset-RED-raw> absoluteNode24 scripts/agent-tools/record-run.mjs --repo <same-worktree> --evidence-dir <frame-history1937-worker/recorded> --purpose preimplementation-red --summary -- absoluteNode24 --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux observer phases refuse inconsistent retained page clocks$' tests.js",
+      "failure": "No merged-source behavioral RED is claimed. The separately observed original worker failures are: #1931: Actual preimplementation verifier RED: both Chromium and WebKit fail the unchanged real hrtime >=450 assertion before source observation after an injected early timer resolution (actual elapsed0.021375ms and0.014792ms). This is test-verifier RED, not app RED. Separate actual canonical run41326403783/1 job124907428862 on checkout2e5d3a63613dcd7f997922725dc17d7d6343bd7e failed WebKit at the same assertion; hosted exact undershoot is unreported. Original ZIP sha256c1ba2d017f1adab871d3acd4e3982e3f6193728a70d52f1693c534e4e2554316 remains retained. | #1934: Observed before the one-expression implementation on exact082ec: recorder2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14 exited1. Both existing outer cases failed in actual Chromium and WebKit at unchanged verifyInitialBoundOriginCapture: requestedPort null !==0. All four native child scenarios passed with actual nonzero origins and complete owned cleanup. Earlier16b3cd38 attempt stopped before browser on missing hosted policy and is retained/corrected as infrastructure failure, not feature RED. | #1935: 01ad32c6 on unmodified082ec module reached the intended cleanup.complete false versus true assertion after actual complete prior identity, executable-only partial read, real exit/close0 and actual kernel ESRCH. The later source-bound strict-field REDd65e08f5 observed an unauthorized SIGTERM attempt for a live executable-null row before its guard. The subsequent authority RED366deaa6 observed SIGTERM after a transient core ambiguity and later full row, before its sticky authority guard. These later REDs are new bounded risk refinements, not a claim of unchanged-baseline chronology for the whole repair. | #1936: 2026-11-01T17:59:23.469Z\u201317:59:29.600Z: all3 actual complete ordinary64 child observations fail bank retains complete painted input values rather than only signature length: actual undefined, expected string. Each has zero unexpected native errors, full before/after source equality and complete cleanup. This is diagnostic-completeness RED, not application RED; existing original bitmaps equal in this macOS attempt. | #1937: Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance. | #1937: Source-recorded79cddeac-99f2-4e5c-afef-181db1d36a25 on b413e357, identity complete, exited1 assertion-failure: capture.status actual captured vs intended incomplete after literal5ms phase-clock offset disagreement. Actual command, bytes, patch, raw events and complete assertion TAP are retained."
+    },
+    "sourceJoinCommit": "604e7b14455c0550ade11be2c35001fb503463e1",
+    "workerRedEvidence": [
+      {
+        "issue": 1931,
+        "sourceCommit": "cba6bb57f672ff9c686d335b04e81da8fb9acef7",
+        "sourceTestChangesSha256": "920a3cfb25d4cb0597ff169913c6609ac57ac184d10ffb753dedd006950bdfa6",
+        "replacementTests": [
+          "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources"
+        ],
+        "redEvidence": {
+          "command": "python3 /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/export-deadline1931-worker/run-focused.py preimplementation-early-once early-once preimplementation-red; recorder 2026-11-01T17-13-22-930Z-75be1915-9a7a-4bd1-8f4f-cc4a026a9dd5 retained under preimplementation-early-once/recorder.",
+          "failure": "Actual preimplementation verifier RED: both Chromium and WebKit fail the unchanged real hrtime >=450 assertion before source observation after an injected early timer resolution (actual elapsed0.021375ms and0.014792ms). This is test-verifier RED, not app RED. Separate actual canonical run41326403783/1 job124907428862 on checkout2e5d3a63613dcd7f997922725dc17d7d6343bd7e failed WebKit at the same assertion; hosted exact undershoot is unreported. Original ZIP sha256c1ba2d017f1adab871d3acd4e3982e3f6193728a70d52f1693c534e4e2554316 remains retained."
+        }
+      },
+      {
+        "issue": 1934,
+        "sourceCommit": "5ac9007bf19879af796c3744b8b3b61ce9fa385b",
+        "sourceTestChangesSha256": "8586949e6ed13feb1b129ba33c383c36db56b57f2821249cb66776aeb0f2300a",
+        "replacementTests": [
+          "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+          "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources"
+        ],
+        "redEvidence": {
+          "command": "env -u CHAIN_NATIVE_PORT -u NODE_OPTIONS -u NODE_TEST_CONTEXT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_TEST_GROUP=native-process CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS=0 CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/initial-origin1934-worker/red-absent-supported-policy through scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-reporter=tap '--test-name-pattern=^RISK repository process: ordinary (two distinct scanner decisions retain both offered IDs and complete sources|scene repeat accounts the original trusted Lock and both Undos with complete sources)$' tests.js",
+          "failure": "Observed before the one-expression implementation on exact082ec: recorder2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14 exited1. Both existing outer cases failed in actual Chromium and WebKit at unchanged verifyInitialBoundOriginCapture: requestedPort null !==0. All four native child scenarios passed with actual nonzero origins and complete owned cleanup. Earlier16b3cd38 attempt stopped before browser on missing hosted policy and is retained/corrected as infrastructure failure, not feature RED.",
+          "records": [
+            "2026-11-01T17-37-20-563Z-de233f69-3b5f-4e73-a126-9ef407704d14"
+          ]
+        }
+      },
+      {
+        "issue": 1935,
+        "sourceCommit": "edee54f998cf083ca4ff161d446c29a2fb73c089",
+        "sourceTestChangesSha256": "cd6d46d819f1688bf1f964aaa57f1c2efdc8a0c81f53795299a0afab32be18fa",
+        "replacementTests": [
+          "RISK repository process: proven terminal executable incidents retain actual exit custody"
+        ],
+        "redEvidence": {
+          "command": "Absolute Node24 record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<exact new real-process root> scripts/agent-tools/hosted-native-callers.test.mjs. Exact arguments and source bytes are retained in each named recorder record.",
+          "failure": "01ad32c6 on unmodified082ec module reached the intended cleanup.complete false versus true assertion after actual complete prior identity, executable-only partial read, real exit/close0 and actual kernel ESRCH. The later source-bound strict-field REDd65e08f5 observed an unauthorized SIGTERM attempt for a live executable-null row before its guard. The subsequent authority RED366deaa6 observed SIGTERM after a transient core ambiguity and later full row, before its sticky authority guard. These later REDs are new bounded risk refinements, not a claim of unchanged-baseline chronology for the whole repair.",
+          "records": [
+            "2026-11-01T17-52-46-751Z-01ad32c6-8f1c-45f9-a019-a927265e4483",
+            "2026-11-01T18-01-49-686Z-d65e08f5-32c8-4e21-83e9-2dc6878d7fd9",
+            "2026-11-01T18-03-37-832Z-366deaa6-d6ff-4d9c-8ad9-e532a37bddba"
+          ]
+        }
+      },
+      {
+        "issue": 1936,
+        "sourceCommit": "d235af8edc2a105548ffb39a5f9e29d0e2b15bd7",
+        "sourceTestChangesSha256": "f456f869c24837655e2bce6065da2480294ef835259cd466587c5f5828d2dce0",
+        "replacementTests": [
+          "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh"
+        ],
+        "redEvidence": {
+          "command": "Allocated WebKit/port53801, exact082ec app, Node24 record-run.mjs --purpose preimplementation-red --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh$ tests.js; complete command/source/output in recorder74f5c5c8.",
+          "failure": "2026-11-01T17:59:23.469Z\u201317:59:29.600Z: all3 actual complete ordinary64 child observations fail bank retains complete painted input values rather than only signature length: actual undefined, expected string. Each has zero unexpected native errors, full before/after source equality and complete cleanup. This is diagnostic-completeness RED, not application RED; existing original bitmaps equal in this macOS attempt.",
+          "records": [
+            "2026-11-01T17-59-23-364Z-74f5c5c8-7ea6-466b-b86c-195227e73c90"
+          ]
+        }
+      },
+      {
+        "issue": 1937,
+        "sourceCommit": "aacad109a4db2103355ecf8a7f6727042efddbd1",
+        "sourceTestChangesSha256": "45f1ddc9aaf7a271523ff8501cd573c30d2df6430727ac767c6ada0d95c109d4",
+        "replacementTests": [
+          "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+          "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+          "RISK repository process: scene source observation brackets stay inactive in ordinary runs"
+        ],
+        "redEvidence": {
+          "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap.",
+          "failure": "Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance."
+        }
+      },
+      {
+        "issue": 1937,
+        "sourceCommit": "aacad109a4db2103355ecf8a7f6727042efddbd1",
+        "sourceTestChangesSha256": "29bdfeefc2ee0f59e6a17f480653c25b79df7931106b17a134cab57cc10fa538",
+        "replacementTests": [
+          "RISK repository process: Linux observer phases refuse inconsistent retained page clocks"
+        ],
+        "redEvidence": {
+          "command": "CHAIN_NATIVE_OUTPUT=<frame-history1937-worker/offset-RED-raw> absoluteNode24 scripts/agent-tools/record-run.mjs --repo <same-worktree> --evidence-dir <frame-history1937-worker/recorded> --purpose preimplementation-red --summary -- absoluteNode24 --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux observer phases refuse inconsistent retained page clocks$' tests.js",
+          "failure": "Source-recorded79cddeac-99f2-4e5c-afef-181db1d36a25 on b413e357, identity complete, exited1 assertion-failure: capture.status actual captured vs intended incomplete after literal5ms phase-clock offset disagreement. Actual command, bytes, patch, raw events and complete assertion TAP are retained.",
+          "records": [
+            "2026-11-01T18-31-16-384Z-79cddeac-99f2-4e5c-afef-181db1d36a25"
+          ]
+        }
+      }
+    ],
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/joined-source1939/merger",
+    "comparisonContexts": [
+      "fetched published PR285 topic",
+      "prior ROOT integration"
+    ]
   }
 ]
