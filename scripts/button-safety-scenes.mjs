@@ -122,12 +122,16 @@ export async function runSceneScenarios(h){
  };
  const snapshots=[];
  const sourceSnapshot=()=>ui.page.evaluate(async()=>{
+  const observer=window.__nativeLinuxPhase,observationId=observer?.('fixture-source-encode','begin');let sourceGeneration=null;
+  try{
   const head=await ScannerDeviceStore.readHead(),current=JSON.stringify(state),sha256=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),byte=>byte.toString(16).padStart(2,'0')).join('');
+  sourceGeneration=head.hash;
   const snapshot={current,currentHash:await sha256(current),durable:head.payload,durableHash:head.hash,capturedAtMs:Date.now(),backups:await ScannerDeviceStore.listBackups(),opaque:await ScannerDeviceStore.listOpaqueArchives(),pending:await ScannerDeviceStore.getPendingUpload('gate-owner'),pendingOwner:await ScannerDeviceStore.getPendingUpload('owner'),hold:await ScannerDeviceStore.getRecoveryCloudHold(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,
    view:{documentId:window.__installedFixture.documentId,ready:document.documentElement.dataset.appReady==='true',sceneReady:typeof window.applySyncedSceneTime==='function',sceneTime:LivingSky.readSceneTime(localStorage),sceneSeason:LivingSky.readSceneSeason(localStorage),sceneIntents:Array.from({length:localStorage.length},(_,index)=>localStorage.key(index)).filter(key=>key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:')).sort().map(key=>({key,raw:localStorage.getItem(key)})),timeDialogOpen:document.getElementById('sceneTimeDialog')?.open===true,modalOpen:!!document.querySelector('#modalRoot .modal'),undoDisabled:document.querySelector('#appHeader [data-act="undo"]').disabled},presses:structuredClone(window.__buttonNativePresses),clicks:structuredClone(window.__buttonNativeClicks)};
   snapshot.capturedAtMs=Date.now();return{...snapshot,sourceValueEncoding:'chain-scanner.manual-archive-value/v1',sourceValue:encodeManualArchiveValue(snapshot,'ordinary scene choice sourceSnapshot')};
+  }finally{if(observationId)observer('fixture-source-encode','end',observationId,{sourceGeneration});}
  });
- const capture=async phase=>{const snapshot=await sourceSnapshot();ui.recordOrdinaryWoopPhase(phase,snapshot);snapshots.push({phase,...snapshot});return snapshot;};
+ const capture=async phase=>{const snapshot=await (ui.observeFixtureSource?ui.observeFixtureSource(sourceSnapshot):sourceSnapshot());ui.recordOrdinaryWoopPhase(phase,snapshot);snapshots.push({phase,...snapshot});return snapshot;};
  await ui.waitFor(()=>document.documentElement.dataset.appReady==='true'&&typeof window.applySyncedSceneTime==='function',12000,'Existing scene controls finish loading');
  await capture('seed');
  await ui.act('settings',()=>!!document.querySelector('#modalRoot .settings-section'));

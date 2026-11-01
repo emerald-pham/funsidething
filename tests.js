@@ -53818,3 +53818,149 @@ test("RISK repository process: current service skips retain required source-boun
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner accounts for current service skips only without an emulator$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:60000,maxBuffer:8*1024*1024});
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
 });
+
+
+test('RISK repository process: Linux failure follow-up preserves the exact successful scene history',async()=>{
+ const {planLinuxNativeFailureFollowup}=await import('./scripts/agent-tools/hosted-native-callers.mjs');
+ // Independent literal history from both sealed original required reports.
+ const prefix=["populated Add contexts settings and list","editor done-task","editor worked-task","editor dot-task","editor delete-task","scanner yes","scanner no","scanner cant","scanner postpone","scanner cand-done","scanner cand-worked","scanner bench-done","scanner bench-cant","scanner bench-postpone","scanner dislodge","scanner worked","scanner start-working","intervention continue and skipped fresh pass","exhausted scanner rescan and new pass","fresh pass","overdue WOOP native walkthrough","recorded history and final WOOP","manual backup restore delete and reset","debug log refresh selection and return","Help original apology and native backdrop dismissal","native install accepted","native install dismissed","both-mode scan and resume descending","both-mode scan and resume chance","both-mode scan and resume squared"],target='ordinary scene choice survives reopen and task Undo';
+ const inventoryBytes=fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json')),inventory=JSON.parse(inventoryBytes),sha256=value=>createHash('sha256').update(value).digest('hex');
+ const setup={currentTasks:64,durableTasks:64},source={commit:'a'.repeat(40),tree:'b'.repeat(40)};
+ const report={kind:'button-safety',status:'failed',engine:'webkit',profile:'ordinary',runtime:{platform:'linux',nodeVersion:'v22.23.4',playwright:'1.62.1',version:'26.5'},candidateCommit:source.commit,candidateTree:source.tree,inventorySha256:sha256(inventoryBytes),requiredScenarios:inventory.profiles.ordinary.requiredScenarios,requiredActions:inventory.requiredActions,errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true},scenarios:[...prefix.map(name=>({name,status:'passed',setup:{...setup,...inventory.profiles.ordinary.scenarioFixtures[name]}})),{name:target,status:'running',setup:{...setup,...inventory.profiles.ordinary.scenarioFixtures[target]}}],samples:[{scenario:target,action:'act:scene-time-settings',maxFrameGapMs:1436,eventToFirstFrameMs:39}]};
+ const plan=planLinuxNativeFailureFollowup({report,origin:'required-actions',source,inventoryBytes,reportPath:'/owned/original-report.json',nativeOutput:'/owned/followup/native',port:'0'});
+ assert.equal(plan.status,'selected');
+ assert.equal(plan.mode,'same-browser-history-v2','The scene command must replay the original successful browser history instead of starting an isolated scene');
+ assert.deepEqual(plan.history.scenarios,[...prefix,target],'Exactly the original30 successful scenarios precede the original scene frontier in the same browser');
+ assert.deepEqual(plan.args.slice(-4),['--scenario',target,'--linux-failure-history','/owned/original-report.json']);
+ assert.equal(report.samples[0].maxFrameGapMs,1436,'Diagnostic planning preserves the original complete-step failure');assert.equal(report.samples[0].eventToFirstFrameMs,39,'First-frame latency cannot replace the complete-step gap');
+ const options={report,origin:'required-actions',source,inventoryBytes,reportPath:'/owned/original-report.json',nativeOutput:'/owned/followup/native',port:'0'};
+ const changes={passing:r=>r.status='passed',runtime:r=>r.runtime.nodeVersion='v24.19.0',platform:r=>r.runtime.platform='darwin',browser:r=>r.runtime.version='other',package:r=>r.runtime.playwright='other',profile:r=>r.profile='workload-diagnostic',engine:r=>r.engine='chromium',source:r=>r.candidateCommit='c'.repeat(40),tree:r=>r.candidateTree='c'.repeat(40),cleanup:r=>r.cleanup.browserClosed=false,'cleanup failure':r=>r.cleanupFailures=[{message:'owned close failed'}],nested:r=>r.linuxFailureObservation={},frontier:r=>r.samples[0].action='act:settings','fast first frame':r=>{r.samples[0].maxFrameGapMs=999;r.samples[0].eventToFirstFrameMs=39;},'later failure':r=>r.samples.push({scenario:target,action:'scene-time:lock',maxFrameGapMs:1500}),inventory:r=>r.inventorySha256='0'.repeat(64),'required scenario':r=>r.requiredScenarios.pop(),'required action':r=>r.requiredActions.pop(),'missing prefix':r=>r.scenarios.shift(),'extra prefix':r=>r.scenarios.unshift(structuredClone(r.scenarios[0])),'reordered prefix':r=>[r.scenarios[0],r.scenarios[1]]=[r.scenarios[1],r.scenarios[0]],'failed prefix':r=>r.scenarios[2].status='failed','unknown name':r=>r.scenarios[0].name='arbitrary selector','untrusted fixture':r=>r.scenarios[0].setup.source='unknown','unfinished prefix':r=>r.scenarios[4].status='running','finished target':r=>r.scenarios[30].status='passed'};
+ for(const [label,change]of Object.entries(changes)){const wrong=structuredClone(report);change(wrong);assert.equal(planLinuxNativeFailureFollowup({...options,report:wrong}).status,'not-selected',label);}
+ assert.equal(planLinuxNativeFailureFollowup({...options,reportPath:'relative.json'}).status,'not-selected');assert.equal(planLinuxNativeFailureFollowup({...options,origin:'foreign'}).status,'not-selected');
+ const {createLinuxSceneHistoryReplay,reserveLinuxNativeFailureWindow,runLinuxNativeFailureFollowup}=await import('./scripts/agent-tools/hosted-native-callers.mjs'),replay=createLinuxSceneHistoryReplay(plan.history),entered=[];
+ for(const [index,name]of [...prefix,target].entries()){const entry=replay.enter(name);entered.push(entry);assert.deepEqual(entry,{index,target:index===30});replay.complete(name);}replay.finish();assert.equal(replay.enter('later ordinary scenario'),false);assert.equal(entered.filter(row=>row.target).length,1,'The capture window is selected only after the30 completed successful prefix scenarios');
+ const enumerated=createLinuxSceneHistoryReplay(plan.history),actualNames=[];const {runButtonScenarios}=await import('./scripts/button-safety-scenarios.mjs');await runButtonScenarios({profile:'ordinary',scenario:async name=>{const entry=enumerated.enter(name);if(!entry)return;actualNames.push(name);enumerated.complete(name);}});enumerated.finish();assert.deepEqual(actualNames,[...prefix,target],'The existing ordinary scenario consumer enumerates exactly the original successful prefix before the target');
+ const failed=createLinuxSceneHistoryReplay(plan.history);assert.equal(failed.enter(prefix[0]).target,false);failed.fail();assert.throws(()=>failed.enter(prefix[1]),/Failed diagnostic history/);assert.throws(()=>failed.finish());
+ const reordered=createLinuxSceneHistoryReplay(plan.history);assert.throws(()=>reordered.enter(prefix[1]),/original order/);assert.throws(()=>reordered.finish(),/Every approved history/);
+ const opening={...structuredClone(report),kind:'button-sensitivity',scenarios:[{name:'detector sensitivity',setup}],samples:[{scenario:'detector sensitivity',action:'act:settings',phase:'opening-before-input',inputStatus:'not-reached',firstTrustedInputAt:null,openingMaxFrameGapMs:2739}]};
+ const pageerror=planLinuxNativeFailureFollowup({...options,origin:'pageerror-opening',report:opening});assert.equal(pageerror.mode,'fresh-isolated-v1');assert.equal(pageerror.history,null);assert.deepEqual(pageerror.args.slice(-3),['--probe','--control','pageerror']);
+ const windows=new Set();assert.equal(reserveLinuxNativeFailureWindow(plan,windows).status,'selected');assert.equal(reserveLinuxNativeFailureWindow(plan,windows).status,'not-selected');assert.equal(reserveLinuxNativeFailureWindow(pageerror,windows).status,'selected');assert.equal(reserveLinuxNativeFailureWindow(pageerror,windows).status,'not-selected');assert.equal(windows.size,2);assert.equal(reserveLinuxNativeFailureWindow({status:'not-selected'},windows).status,'not-selected');
+ assert.equal((await runLinuxNativeFailureFollowup({cwd:__dirname,outputDir:'/must-not-create-linux-diagnostic',reportPath:'/must-not-read-original.json',origin:'required-actions',env:{CI:'false'}})).status,'not-selected','No environment/manual switch bypasses actual supported CI runtime admission');
+ const cli=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--linux-failure-history','/original.json'],{cwd:__dirname,encoding:'utf8'});assert.equal(cli.status,1);assert.match(cli.stderr,/exact scene diagnostic/);
+ const duplicate=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--linux-failure-history','/original.json','--linux-failure-history','/other.json'],{cwd:__dirname,encoding:'utf8'});assert.equal(duplicate.status,1);assert.match(duplicate.stderr,/duplicate Linux failure history/);
+
+});
+
+test('RISK repository process: Linux scene observation retains bounded observer phase brackets',async t=>{
+ const {createLinuxNativeTimelineProvider,LINUX_FRONTIER_PROFILE}=await import('./scripts/button-safety-timeline-linux.mjs'),base=process.env.CHAIN_NATIVE_OUTPUT;if(base)fs.mkdirSync(base,{recursive:true});
+ const fixture=()=>timelineSDKDouble(base?fs.mkdtempSync(path.join(base,'history1937-protocol-')):null),f=await fixture();let owner;
+ try{
+  owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js'});f.emit();
+  const prefix=JSON.parse(/"prefix":("(?:[^"\\]|\\.)*")/.exec(owner.capture.instrumentation.content)[1]);
+  const begin={phase:'observer',name:'fixture-source-encode',boundary:'begin',id:'literal-source-1',documentId:'portable-document',fixtureDocumentId:'fixture-literal',pageMs:75},end={...begin,boundary:'end',pageMs:100};
+  for(const [mark,time]of [[begin,1.075],[end,1.1]])f.initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:time,data:{message:prefix+JSON.stringify(mark)}}});
+  const capture=await owner.stop('first-selected-step-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');
+  assert.equal(capture.status,'captured','The existing native receiver must retain source-encoding observer phases without losing its complete capture');
+  assert.deepEqual(capture.facts.observerPhases.map(row=>({name:row.name,id:row.id,pageInterval:row.pageInterval})),[{name:'fixture-source-encode',id:'literal-source-1',pageInterval:{status:'bounded',startMs:75,endMs:100,uncertaintyMs:1.001}}]);
+  assert.equal(capture.facts.calibration.status,'bounded');assert.equal(capture.facts.causalAttribution,'unavailable');assert.equal(capture.cpu.clockMapping.status,'unavailable');assert.ok(Object.values(capture.cleanup).every(value=>value===true));
+ }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ await t.test('actual init and stop expressions remove only the owned page observer',async()=>{
+  const f=await fixture(),url='http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js';let owner,source,pageMs=10;
+  const window={__installedFixture:{documentId:'literal-fixture-document'}};window.top=window;
+  const context=vm.createContext({window,crypto:webcrypto,location:{href:'http://127.0.0.1:53623/button-unit/'},performance:{timeOrigin:1700000000000,now:()=>pageMs,mark:(message,{startTime})=>f.initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:(startTime+1000)/1000,data:{message}}})}});
+  f.page.addInitScript=async value=>{source=value.content;};const send=f.initial.send.bind(f.initial);
+  f.initial.send=async(method,params)=>method==='Runtime.evaluate'?{result:{value:vm.runInContext(params.expression,context)}}:send(method,params);
+  try{
+   owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:url,mode:'same-browser-history-v2'});
+   f.initial.emit('Runtime.executionContextCreated',{context:{id:3,type:'normal',frameId:'main'}});vm.runInContext(source,context);
+   const host=owner.phase('fixture-source-transport','begin');pageMs=75;const id=window.__nativeLinuxPhase('fixture-source-encode','begin');pageMs=100;window.__nativeLinuxPhase('fixture-source-encode','end',id,{sourceGeneration:'d'.repeat(64)});owner.phase('fixture-source-transport','end',host);
+   pageMs=200;const capture=await owner.stop('first-selected-step-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');
+   assert.equal(window.__nativeLinuxPhase,undefined,'Stopping the target capture must remove its installed page observer before later scene work');
+   assert.equal(capture.mode,'same-browser-history-v2');assert.equal(capture.status,'captured');assert.equal(capture.facts.calibration.status,'bounded');assert.equal(capture.documents[0].fixtureDocumentId,'literal-fixture-document');assert.equal(capture.facts.observerPhases.length,2);assert.equal(capture.facts.observerPhases.find(row=>row.clock==='host-monotonic').pageInterval.status,'unavailable');assert.equal(capture.facts.observerPhases.find(row=>row.name==='fixture-source-encode').end.detail.sourceGeneration,'d'.repeat(64));
+   assert.equal(await owner.stop('repeated-finally'),capture);assert.ok(Object.values(capture.cleanup).every(value=>value===true));
+  }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ });
+
+ await t.test('an event cap cannot publish a phase end whose raw delivery was refused',async()=>{
+  const f=await fixture();let owner;try{
+   owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js'});f.emit();
+   const prefix=JSON.parse(/"prefix":("(?:[^"\\]|\\.)*")/.exec(owner.capture.instrumentation.content)[1]);
+   for(let i=0;i<4094;i++)f.initial.emit('CPUProfiler.trackingUpdate',{event:{timestamp:1.05,usage:1}});
+   for(const [boundary,pageMs]of [['begin',75],['end',100]])f.initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:1+pageMs/1000,data:{message:prefix+JSON.stringify({phase:'observer',name:'fixture-source-encode',boundary,id:'last-accepted-begin',documentId:'portable-document',fixtureDocumentId:'literal-fixture',pageMs})}}});
+   const capture=await owner.stop('event-cap-control');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');assert.equal(capture.status,'incomplete');assert.equal(capture.events.length,4096);assert.ok(capture.dropped>0);assert.deepEqual(capture.facts.observerPhases,[],'A refused end cannot create a completed scope in the derived evidence');assert.ok(capture.facts.unfinishedObserverPhases.every(mark=>capture.events.some(row=>row.index===mark.eventIndex)));
+  }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ });
+
+ for(const mode of ['unknown phase','foreign document','unmatched end','reversed interval','unfinished host phase','foreign active session'])await t.test(mode,async()=>{
+  const f=await fixture();let owner;try{
+   owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js'});f.emit();
+   const prefix=JSON.parse(/"prefix":("(?:[^"\\]|\\.)*")/.exec(owner.capture.instrumentation.content)[1]),mark=(boundary,pageMs=75)=>({phase:'observer',name:mode==='unknown phase'?'unapproved':'fixture-source-encode',boundary,id:'negative-literal',documentId:mode==='foreign document'?'foreign':'portable-document',fixtureDocumentId:'literal-fixture',pageMs});
+   if(mode==='unfinished host phase')owner.phase('fixture-source-transport','begin');
+   else if(mode==='foreign active session'){f.delegate._session=new f.Session('foreign');owner.phase('fixture-source-transport','begin');}
+   else for(const value of (mode==='unmatched end'?[mark('end')]:[mark('begin'),mark('end',mode==='reversed interval'?74:100)]))f.initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:1+value.pageMs/1000,data:{message:prefix+JSON.stringify(value)}}});
+   const capture=await owner.stop('negative-phase-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');assert.equal(capture.status,'incomplete',mode);assert.equal(capture.cleanup.listenersRemoved,true);assert.equal(capture.cleanup.hookRestored,true);assert.equal(capture.cleanup.timerCleared,true);assert.ok(capture.errors.length>0);assert.ok(capture.events.length<=4096);assert.ok(capture.events.every(row=>row.bytes<=1048576));
+  }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ });
+ await t.test('interrupted target arming restores owned hooks and cannot install late observation',async()=>{
+  const f=await fixture(),original=f.delegate._initializeSession,send=f.initial.send.bind(f.initial);let stop,release;f.initial.send=async(method,...args)=>{if(method==='Timeline.start')await new Promise(resolve=>release=resolve);return send(method,...args);};
+  try{
+   const pending=createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js',onStop:value=>stop=value});
+   for(let attempt=0;attempt<30&&!release;attempt++)await new Promise(resolve=>setImmediate(resolve));assert.equal(typeof stop,'function');assert.equal(typeof release,'function');const stopped=stop('interrupted');release();await assert.rejects(()=>pending,/arming stopped/);const capture=await stopped;fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');assert.equal(capture.startedBeforeNavigation,false);assert.equal(capture.cleanup.hookRestored,true);assert.equal(capture.cleanup.listenersRemoved,true);assert.equal(f.delegate._initializeSession,original);assert.equal(capture.status,'incomplete');
+  }finally{release?.();if(stop)await stop('test-finally');f.dispose();}
+ });
+ await t.test('unknown history mode refuses before native arming',async()=>{
+  const f=await fixture();try{await assert.rejects(()=>createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js',mode:'manual-override'}),/unknown observation mode/);assert.equal(f.calls.length,0);assert.equal(fs.existsSync(path.join(f.directory,'linux-frontier')),false);}finally{f.dispose();}
+ });
+
+ await t.test('a capped target capture still removes its owned page observer',async()=>{
+  const f=await fixture();let source,owner,pageMs=10;const window={__installedFixture:{documentId:'cap-fixture'}};window.top=window;
+  const context=vm.createContext({window,crypto:webcrypto,location:{href:'http://127.0.0.1:53623/button-unit/'},performance:{timeOrigin:1700000000000,now:()=>pageMs,mark:(message,{startTime})=>f.initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:(startTime+1000)/1000,data:{message}}})}});
+  f.page.addInitScript=async value=>{source=value.content;};const send=f.initial.send.bind(f.initial);f.initial.send=async(method,params)=>method==='Runtime.evaluate'?{result:{value:vm.runInContext(params.expression,context)}}:send(method,params);
+  try{
+   owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js',mode:'same-browser-history-v2'});f.initial.emit('Runtime.executionContextCreated',{context:{id:3,type:'normal',frameId:'main'}});vm.runInContext(source,context);
+   f.initial.emit('CPUProfiler.trackingUpdate',{event:{timestamp:1.05,usage:1,opaque:'x'.repeat(1048576)}});pageMs=200;const capture=await owner.stop('byte-cap-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');
+   assert.equal(window.__nativeLinuxPhase,undefined,'A refused raw event must not leave the owned page observer running after capture stop');assert.equal(capture.status,'incomplete');assert.equal(capture.facts.calibration.status,'unavailable','A cleanup-only evaluation supplies no accepted closing clock event');assert.equal(capture.pageObserverHook.status,'removed');assert.ok(capture.rawBytes<=33554432);assert.equal(capture.cleanup.hookRestored,true);assert.equal(capture.cleanup.listenersRemoved,true);
+  }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ });
+
+ await t.test('a refused closing clock event cannot establish calibration',async()=>{
+  const f=await fixture();let owner;try{
+   owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js'});f.emit();for(let i=0;i<4095;i++)f.initial.emit('CPUProfiler.trackingUpdate',{event:{timestamp:1.05,usage:1}});
+   const capture=await owner.stop('full-event-prefix-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');assert.equal(capture.status,'incomplete');assert.equal(capture.events.length,4096);assert.equal(capture.facts.calibration.status,'unavailable','Only accepted closing native bytes may bound page calibration');assert.equal(capture.cleanup.listenersRemoved,true);
+  }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+ });
+
+});
+
+test('RISK repository process: scene source observation brackets stay inactive in ordinary runs',async()=>{
+ const {runSceneScenarios}=await import('./scripts/button-safety-scenes.mjs'),sentinel=Error('stop after actual first source capture');
+ const observe=async({diagnostic=false,fail=false}={})=>{
+  const marks=[],host=[],state={v:2,tasks:[{id:'literal-preserved',future:{bytes:[0,17,255]}}]},raw=JSON.stringify(state),head={payload:raw,hash:'d'.repeat(64)};let snapshot;
+  const pageWindow={__installedFixture:{documentId:'fixture-source-document'},__buttonNativePresses:[],__buttonNativeClicks:[]};
+  if(diagnostic)pageWindow.__nativeLinuxPhase=(name,boundary,id,detail={})=>{const token=id||'literal-source-token';marks.push({name,boundary,id:token,detail});return token;};
+  const context=vm.createContext({window:pageWindow,state,Date:{now:()=>1700000000123},Intl,TextEncoder,Uint8Array,crypto:webcrypto,structuredClone,JSON,LivingSky:{readSceneTime:()=>null,readSceneSeason:()=>null},localStorage:{length:0},document:{documentElement:{dataset:{appReady:'true'}},getElementById:()=>({open:false}),querySelector:selector=>selector==='#appHeader [data-act="undo"]'?{disabled:false}:null},ScannerDeviceStore:{readHead:async()=>head,listBackups:async()=>{if(fail)throw Error('literal snapshot read failure');return[{id:'source-original',payload:raw}];},listOpaqueArchives:async()=>[{key:'literal-opaque',raw:'exact\u0000bytes'}],getPendingUpload:async()=>null,getRecoveryCloudHold:async()=>null},encodeManualArchiveValue:value=>({type:'object',entries:Object.entries(value)})});
+  const ui={page:{evaluate:fn=>vm.runInContext('('+fn.toString()+')()',context)},waitFor:async()=>{},recordOrdinaryWoopPhase:(phase,value)=>{assert.equal(phase,'seed');snapshot=value;throw sentinel;},...(diagnostic?{observeFixtureSource:async work=>{host.push('begin');try{return await work();}finally{host.push('end');}}}:{})};
+  let failure;try{await runSceneScenarios({profile:'ordinary',scenario:async(name,options,execute)=>{if(name==='ordinary scene choice survives reopen and task Undo')await execute(ui);}});}catch(error){failure=error;}
+  assert.equal(failure,fail?failure:sentinel);if(fail)assert.match(failure.message,/literal snapshot read failure/);
+  return{marks,host,snapshot:snapshot&&JSON.stringify(snapshot)};
+ };
+ const ordinary=await observe(),diagnostic=await observe({diagnostic:true});
+ assert.deepEqual(ordinary.marks,[]);assert.deepEqual(ordinary.host,[]);
+ assert.deepEqual(diagnostic.marks.map(({name,boundary,id})=>({name,boundary,id})),[{name:'fixture-source-encode',boundary:'begin',id:'literal-source-token'},{name:'fixture-source-encode',boundary:'end',id:'literal-source-token'}],'The actual existing scene sourceSnapshot must retain paired diagnostic-only page brackets around its original read and typed encoding');
+ assert.deepEqual(diagnostic.host,['begin','end']);assert.equal(diagnostic.snapshot,ordinary.snapshot,'The complete original serialized source observation remains exact');assert.equal(diagnostic.marks[1].detail.sourceGeneration,'d'.repeat(64));
+ const failed=await observe({diagnostic:true,fail:true});assert.deepEqual(failed.marks.map(row=>row.boundary),['begin','end']);assert.deepEqual(failed.host,['begin','end']);assert.equal(failed.snapshot,undefined);
+});
+
+test('RISK repository process: Linux observer phases refuse inconsistent retained page clocks',async()=>{
+ const {createLinuxNativeTimelineProvider,LINUX_FRONTIER_PROFILE}=await import('./scripts/button-safety-timeline-linux.mjs'),base=process.env.CHAIN_NATIVE_OUTPUT;if(base)fs.mkdirSync(base,{recursive:true});
+ const f=await timelineSDKDouble(base?fs.mkdtempSync(path.join(base,'phase-offset1937-')):null);let owner;
+ try{
+  owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js'});f.emit();
+  const prefix=JSON.parse(/"prefix":("(?:[^"\\]|\\.)*")/.exec(owner.capture.instrumentation.content)[1]);
+  // Independent literal native75..100ms interval, with a contradictory5ms page offset.
+  for(const [boundary,pageMs,nativeSeconds]of [['begin',80,1.075],['end',105,1.1]])f.initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:nativeSeconds,data:{message:prefix+JSON.stringify({phase:'observer',name:'fixture-source-encode',boundary,id:'offset-literal',documentId:'portable-document',fixtureDocumentId:'literal-fixture',pageMs})}}});
+  const capture=await owner.stop('literal-offset-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');
+  assert.equal(capture.status,'incomplete','A phase inconsistent with the retained native/page offset cannot claim a calibrated capture');
+  assert.equal(capture.facts.calibration.status,'bounded','The independent open/close calibration remains distinct from a contradictory phase');assert.equal(capture.facts.calibration.uncertaintyMs,1.001);assert.equal(capture.facts.observerPhases[0].pageInterval.status,'unavailable');assert.ok(capture.errors.some(value=>/phase clock.*calibration/i.test(value)));assert.ok(Object.values(capture.cleanup).every(value=>value===true));
+ }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+});

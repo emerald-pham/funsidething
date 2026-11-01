@@ -5,6 +5,7 @@ import http from 'node:http';
 import {execFileSync} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
 import {protectedTestFingerprint} from './test-first-gate.mjs';
+import {planLinuxNativeFailureFollowup,createLinuxSceneHistoryReplay} from './agent-tools/hosted-native-callers.mjs';
 import {browserInit,appModule,authModule,firestoreModule,fixture as installedFixture} from './installed-client-fixture.mjs';
 import {buttonFixture,populateButtonWorkload,TASK_COUNT} from './button-safety-fixture.mjs';
 import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mjs';
@@ -16,12 +17,13 @@ import {canonicalStartupSource,decodeStartupValue,startupDifferences,ordinaryInl
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const fixtureSourceForAuthMode=Object.freeze({'signed-out':'signed-out-installed','reconcile-held':'reconcile-held-installed'});
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.md':'text/markdown; charset=utf-8'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,profile,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null,startupCapture=null,startupRetentionProfile,linuxFailureObservation=null}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,profile,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null,startupCapture=null,startupRetentionProfile,linuxFailureObservation=null,linuxFailureHistory=null}){
  const selectedProfile=mobileYesMotion?'workload-diagnostic':profile??'ordinary';
  assert.ok(['ordinary','workload-diagnostic'].includes(selectedProfile),'Unknown button safety profile');
  if(mobileYesMotion&&profile!==undefined)assert.equal(profile,'workload-diagnostic','Mobile button safety requires the original workload-diagnostic profile');
  const ordinaryTimeline=!!startupOpening&&startupCapture==='timeline';
- const linuxObservation=linuxFailureObservation!==null,sourceLocated=ordinaryTimeline||linuxObservation;
+ const linuxObservation=linuxFailureObservation!==null;let sourceLocated=ordinaryTimeline||linuxObservation&&linuxFailureHistory===null;
+ if(linuxFailureHistory!==null)assert.ok(typeof linuxFailureHistory==='string'&&linuxObservation&&!probe&&scenarioFilter==='ordinary scene choice survives reopen and task Undo','Original failed scene report requires the Linux diagnostic route');
  if(linuxObservation){
   assert.equal(linuxFailureObservation,LINUX_FRONTIER_PROFILE,'Known Linux diagnostic-only profile required');
   assert.ok(engine==='webkit'&&selectedProfile==='ordinary'&&!startupOpening&&!startupCapture&&startupRetentionProfile===undefined&&!mobileYesMotion&&!browserServerEndpoint&&((probe&&control==='pageerror'&&scenarioFilter===null)||(!probe&&control===null&&scenarioFilter==='ordinary scene choice survives reopen and task Undo')),'Linux diagnostic requires exactly the existing opening pageerror probe or initial scene-time-settings window');
@@ -77,12 +79,19 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
  const selectedScenarios=new Set(profileDefinition.requiredScenarios);
  fs.mkdirSync(outputDir,{recursive:true});
  const git=(...args)=>execFileSync('git',args,{cwd:repo,maxBuffer:32*1024*1024}),candidateCommit=git('rev-parse','HEAD').toString().trim(),candidateTree=git('rev-parse','HEAD^{tree}').toString().trim();
+ let linuxHistory=null,historyReplay=null,originalHistoryBytes=null;
+ if(linuxFailureHistory!==null){
+  assert.ok(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json')).equals(git('show',candidateCommit+':scripts/button-safety-inventory.json')),'History requires exact committed ordinary inventory');
+  originalHistoryBytes=fs.readFileSync(linuxFailureHistory);
+  const plan=planLinuxNativeFailureFollowup({report:JSON.parse(originalHistoryBytes),origin:'required-actions',source:{commit:candidateCommit,tree:candidateTree},inventoryBytes,reportPath:linuxFailureHistory,nativeOutput:outputDir,port:String(port)});
+  assert.equal(plan.status,'selected','Original failed report must independently admit the exact scene history: '+plan.reason);linuxHistory=plan.history;historyReplay=createLinuxSceneHistoryReplay(linuxHistory);
+ }
  const diagnosticProfile=selectedProfile==='workload-diagnostic';
  const report={schemaVersion:1,kind:mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),profile:selectedProfile,requiredActions:inventory.requiredActions,requiredScenarios:profileDefinition.requiredScenarios,...(diagnosticProfile?{requiredWorkload:profileDefinition.requiredWorkload,requiredRapidActions:profileDefinition.requiredRapidActions}:{}),inventorySha256:digest(inventoryBytes),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
- if(linuxObservation){report.scope='linux-native-failure-diagnostic';report.linuxFailureObservation={profile:linuxFailureObservation,window:probe?'pageerror-opening':'scene-time-settings',requiredVerdictUnchanged:true,limits:['Fresh instrumented failure follow-up only; no replacement gate credit']};}
+ if(linuxObservation){report.scope='linux-native-failure-diagnostic';report.linuxFailureObservation={profile:linuxFailureObservation,window:probe?'pageerror-opening':'scene-time-settings',mode:linuxHistory?.mode||'fresh-isolated-v1',...(linuxHistory?{history:{...linuxHistory,originalReportSha256:digest(originalHistoryBytes),status:'replaying',completedPrefix:0}}:{}),requiredVerdictUnchanged:true,limits:[linuxHistory?'Instrumented target after the original successful browser history; no replacement gate credit':'Fresh isolated instrumented failure follow-up only; no replacement gate credit']};}
  if(startupOpening){report.kind='startup-diagnostic';report.scope='ordinary-startup-diagnostic';report.limits.push('Ordinary uncapped64-task opening only; no button, mobile memory, release or physical-iOS qualification.');}
- if(sourceLocated){
+ if(ordinaryTimeline||linuxObservation){
   const changed=[...new Set([...git('diff','--name-only','HEAD').toString().split('\n'),...git('ls-files','--others','--exclude-standard').toString().split('\n')].filter(Boolean))].sort();let patch=git('diff','--binary','--full-index','HEAD');
   for(const file of changed)try{git('ls-files','--error-unmatch',file);}catch{try{git('diff','--no-index','--binary','--full-index','/dev/null',file);}catch(error){if(error.status!==1)throw error;patch=Buffer.concat([patch,error.stdout]);}}
   report.toolingSource={commit:candidateCommit,tree:candidateTree,fullPatchSha256:digest(patch),protectedFingerprint:protectedTestFingerprint(git('diff','--unified=0','HEAD','--','tests.js').toString().split('\n')),files:changed.map(file=>({path:file,sha256:digest(fs.lstatSync(path.join(repo,file)).isSymbolicLink()?fs.readlinkSync(path.join(repo,file)):fs.readFileSync(path.join(repo,file)))})),exclusions:['Git-ignored files','External runtime/environment separately bound at launch']};
@@ -97,7 +106,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
  if(!startupOpening)for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
  const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');if(!startupOpening)verifyButtonInventorySource([...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n'),JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show',appCommit+':'+file)),'Button run requires exact committed app bytes: '+file);
- let server,browser,context,page,armed=false,closing=false,stopStartupCapture=null,stopLinuxCapture=null,interrupted=null;
+ let server,browser,context,page,armed=false,closing=false,stopStartupCapture=null,stopLinuxCapture=null,linuxHostPhase=null,interrupted=null;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
  const retainSource=(url,value,kind)=>{
   if(!sourceLocated)return;const bytes=Buffer.isBuffer(value)?value:Buffer.from(value),sha256=digest(bytes),previous=retainedSources.get(url);
@@ -153,7 +162,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    res.writeHead(bytes?200:404,{'Content-Type':generated?'text/javascript':observer?'text/html':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   origin='http://127.0.0.1:'+server.address().port;
-  if(sourceLocated){for(const [file,bytes]of sources)retainSource(origin+prefix+file,bytes,'app');retainSource(origin+prefix,sources.get('index.html'),'app');for(const [file,bytes]of Object.entries(sdkBodies))retainSource(origin+sdk+file,bytes,'synthetic-sdk');sourceManifest={app:report.appSource,inlineSources:ordinaryInlineSources(sources.get('index.html')),operationCatalog:ORDINARY_OPERATION_CATALOG,documentURL:origin+prefix,origin,appPrefix:prefix,assets:[...sources].map(([file,bytes])=>({path:file,sha256:digest(bytes),bytes:bytes.length})),sdk:Object.entries(sdkBodies).map(([name,bytes])=>({name,url:origin+sdk+name,sha256:digest(bytes)})),generated:[],fixture:report.fixture};}
+  const retainRuntimeSources=()=>{for(const [file,bytes]of sources)retainSource(origin+prefix+file,bytes,'app');retainSource(origin+prefix,sources.get('index.html'),'app');for(const [file,bytes]of Object.entries(sdkBodies))retainSource(origin+sdk+file,bytes,'synthetic-sdk');sourceManifest={app:report.appSource,inlineSources:ordinaryInlineSources(sources.get('index.html')),operationCatalog:ORDINARY_OPERATION_CATALOG,documentURL:origin+prefix,origin,appPrefix:prefix,assets:[...sources].map(([file,bytes])=>({path:file,sha256:digest(bytes),bytes:bytes.length})),sdk:Object.entries(sdkBodies).map(([name,bytes])=>({name,url:origin+sdk+name,sha256:digest(bytes)})),generated:[],fixture:report.fixture};};if(sourceLocated)retainRuntimeSources();
   if(interrupted)throw Error('Startup capture interrupted before launch: '+interrupted);
   const playwright=await import('playwright');browser=browserServerEndpoint?await playwright[engine].connect(browserServerEndpoint,{timeout:15000}):await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version,browserConnection:browserServerEndpoint?'remote-owned':'local-owned',...(browserServerEndpoint?{browserEndpointSha256:digest(browserServerEndpoint)}:{})};
   if(linuxObservation)assert.equal(browser.version(),'26.5','Actual Linux WebKit26.5 required');
@@ -169,7 +178,12 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    return 'button-id:'+el.id;
   };
   const scenario=async(name,options,execute)=>{
-   if(scenarioFilter&&name!==scenarioFilter)return;
+   const historyEntry=historyReplay?.enter(name);
+   if(historyReplay&&!historyEntry)return;
+   if(!historyReplay&&scenarioFilter&&name!==scenarioFilter)return;
+   if(historyEntry?.target){sourceLocated=true;retainRuntimeSources();report.linuxFailureObservation.history.status='target';}
+   const linuxSelected=linuxObservation&&(!historyReplay||historyEntry.target);
+
    if(!scenarioFilter&&!probe&&!selectedScenarios.has(name))return;
    const scenarioFixture=selectedProfile==='ordinary'&&!probe&&!startupOpening?profileDefinition.scenarioFixtures?.[name]:null;
    if(selectedProfile==='ordinary'&&!probe&&!startupOpening){
@@ -284,7 +298,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    await page.exposeBinding('__buttonFault',async()=>{if(control==='close')await page.close();if(control==='crash'){const session=await context.newCDPSession(page);void session.send('Page.crash').catch(()=>{});}});
    await page.exposeBinding('__buttonSafetyFailure',(_,message)=>report.errors.push(message));
    await page.exposeBinding('__buttonUnidentified',(_,html)=>{report.unidentifiedButtons??=[];if(!report.unidentifiedButtons.includes(html))report.unidentifiedButtons.push(html);});
-   await page.exposeBinding('__buttonObserved',(_,keys)=>{for(const key of keys)observed.add(key);});
+   await page.exposeBinding('__buttonObserved',(_,keys)=>{const phase=linuxSelected?linuxHostPhase?.('safety-binding','begin'):null;try{for(const key of keys)observed.add(key);}finally{if(phase)linuxHostPhase('safety-binding','end',phase);}});
    await page.exposeBinding('__buttonPressed',(_,receipt)=>{report.presses??=[];report.presses.push({scenario:name,...receipt});});
    await page.exposeBinding('__buttonClicked',(_,receipt)=>{report.clicks??=[];report.clicks.push({scenario:name,...receipt});});
    await initScript(page,({keySource})=>{
@@ -295,12 +309,12 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     window.__buttonHeartbeat={at:performance.now(),maxGapMs:0,frames:0,inputArmed:false,inputAt:null,inputMaxGapMs:0,preInputMaxGapMs:0,timeOrigin:performance.timeOrigin};const pulse=now=>{const h=window.__buttonHeartbeat;h.maxGapMs=Math.max(h.maxGapMs,now-h.at);if(h.inputAt!==null)h.inputMaxGapMs=Math.max(h.inputMaxGapMs,now-Math.max(h.at,h.inputAt));else if(h.inputArmed)h.preInputMaxGapMs=Math.max(h.preInputMaxGapMs,now-h.at);h.at=now;h.frames++;if(h.clickAt!==undefined&&h.firstFrameAfterClickMs===undefined)h.firstFrameAfterClickMs=now-h.clickAt;requestAnimationFrame(pulse);};requestAnimationFrame(pulse);
     addEventListener('unhandledrejection',event=>void window.__buttonSafetyFailure('unhandledrejection: '+String(event.reason)));
     document.addEventListener('click',event=>{const el=event.target.closest('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]');if(el&&event.isTrusted){window.__buttonHeartbeat.clickAt=performance.now();delete window.__buttonHeartbeat.firstFrameAfterClickMs;const receipt={at:performance.timeOrigin+performance.now(),action:key(el),trusted:true,offeredTaskId:key(el)==='act:yes'?state.candidateId:null};window.__buttonNativeClicks.push(receipt);void window.__buttonClicked(receipt);}},true);
-    const scan=()=>{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}};
+    const scan=()=>{const observer=window.__nativeLinuxPhase,phase=observer?.('safety-scan','begin');try{if(document.documentElement){const els=[...document.querySelectorAll('button,summary,[data-act],[role="button"],[data-scene-view],[data-landscape-motion],[data-scene-time],[data-scene-preset],[data-location-action]')];void window.__buttonObserved(els.map(key).filter(value=>value!==null));for(const el of els)if(key(el)?.startsWith('button-id:'))void window.__buttonUnidentified(el.outerHTML.slice(0,1000));}}finally{if(phase)observer('safety-scan','end',phase);}};
     addEventListener('DOMContentLoaded',()=>{scan();new MutationObserver(scan).observe(document.documentElement,{childList:true,subtree:true});});
    },{keySource:actionFor.toString()});
    if(startupCapture==='jpeg')await bounded(beginStartupCapture(),'startup public screencast start');
    if(startupCapture==='timeline')await bounded(startNativeTimelineCapture({page,outputDir,...(startupRetentionProfile===undefined?{}:{retentionProfile:startupRetentionProfile}),sourceURL:origin+prefix+'__startup-diagnostic__/clock-init.js',onStop:stop=>{stopStartupCapture=stop;},onSave:capture=>{report.startupCapture=capture;if(ordinaryTimeline&&capture.instrumentation){diagnosticSources.set(new URL(capture.instrumentation.url).pathname,capture.instrumentation.content);retainSource(capture.instrumentation.url,capture.instrumentation.content,'instrumentation');}save();if(capture.errors.length&&!interrupted){interrupted='native Timeline diagnostic: '+capture.errors[0];closing=true;void(async()=>{await stopStartupCapture?.('native-diagnostic-error');})().catch(error=>{report.errors.push('native diagnostic abort cleanup: '+String(error));});}}}),'startup native Timeline start');
-   if(linuxObservation)await bounded(startLinuxNativeTimelineCapture({page,repo,outputDir,profile:linuxFailureObservation,sourceURL:origin+prefix+'__startup-diagnostic__/linux-clock-init.js',sources:()=>[...retainedSources.values()],onStop:stop=>{stopLinuxCapture=stop;},onSave:capture=>{report.linuxFailureObservation.capture=capture;if(capture.instrumentation){diagnosticSources.set(new URL(capture.instrumentation.url).pathname,capture.instrumentation.content);retainSource(capture.instrumentation.url,capture.instrumentation.content,'instrumentation');}save();}}),'Linux native failure observation start');
+   if(linuxSelected){const owner=await bounded(startLinuxNativeTimelineCapture({page,repo,outputDir,profile:linuxFailureObservation,mode:linuxHistory?.mode||'fresh-isolated-v1',sourceURL:origin+prefix+'__startup-diagnostic__/linux-clock-init.js',sources:()=>[...retainedSources.values()],onStop:stop=>{stopLinuxCapture=stop;},onSave:capture=>{report.linuxFailureObservation.capture=capture;if(capture.instrumentation){diagnosticSources.set(new URL(capture.instrumentation.url).pathname,capture.instrumentation.content);retainSource(capture.instrumentation.url,capture.instrumentation.content,'instrumentation');}save();}}),'Linux native failure observation start');linuxHostPhase=owner.phase;}
    if(interrupted)throw Error('Startup capture interrupted: '+interrupted);
    await page.goto(origin+prefix);if(interrupted)throw Error('Startup capture interrupted: '+interrupted);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
@@ -352,7 +366,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     let linuxTerminal=false;try{
     await expose(selector);const target=page.locator(selector).first();
     const action=await evaluateElement(selector,actionFor);assert.ok(action,'Passive inert appearance replicas cannot earn action coverage');const before=report.clicks?.length||0;
-    linuxTerminal=linuxObservation&&(probe&&action==='act:settings'||!probe&&action==='act:scene-time-settings');
+    linuxTerminal=linuxSelected&&(probe&&action==='act:settings'||!probe&&action==='act:scene-time-settings');
     const opening=await bounded(evalPage(()=>({...window.__buttonHeartbeat})),'opening heartbeat');
     if(opening.inputAt===null&&!(report.presses||[]).length&&opening.maxGapMs>=1000){
      report.samples??=[];report.samples.push({scenario:name,action,phase:'opening-before-input',openingMaxFrameGapMs:opening.maxGapMs,preInputMaxFrameGapMs:opening.preInputMaxGapMs,inputMaxFrameGapMs:opening.inputMaxGapMs,firstTrustedInputAt:null,inputStatus:'not-reached'});
@@ -649,8 +663,11 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     }
     if(name==='ordinary scene choice survives reopen and task Undo'){
      assert.equal(selectedProfile,'ordinary');const order=['seed','locked','closed','reopened','edit-one','edit-two','undone-two','final-source'];report.ordinarySceneChoicePhases??=[];assert.equal(phase,order[report.ordinarySceneChoicePhases.length],'Retain every complete scene/reopen/task-Undo source phase once in order');
+     const observation=linuxSelected?linuxHostPhase?.('host-source-serialization','begin',null,{phase,sourceGeneration:snapshot.durableHash}):null;
+     try{
      const file='ordinary-scene-choice-'+phase+'.json',artifact={schemaVersion:1,phase,scenario:name,sourceIdentity:{candidateCommit,candidateTree,inventorySha256:digest(inventoryBytes)},...snapshot};
      const bytes=JSON.stringify(artifact,null,2)+'\n';fs.writeFileSync(path.join(outputDir,file),bytes,{flag:'wx'});report.ordinarySceneChoicePhases.push({phase,file,sha256:digest(bytes),bytes:Buffer.byteLength(bytes),currentHash:snapshot.currentHash,durableHash:snapshot.durableHash,currentBytes:Buffer.byteLength(snapshot.current),durableBytes:Buffer.byteLength(snapshot.durable)});save();return;
+     }finally{if(observation)linuxHostPhase('host-source-serialization','end',observation,{phase,sourceGeneration:snapshot.durableHash});}
     }
     if(name==='ordinary two distinct scanner decisions'){
      assert.equal(selectedProfile,'ordinary');const order=['seed','accepted-two','reopened','final-source'];report.ordinaryDistinctDecisionPhases??=[];assert.equal(phase,order[report.ordinaryDistinctDecisionPhases.length],'Retain every complete distinct-decision source phase once in order');
@@ -707,7 +724,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     await waitFor(new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"&&window.CloudSync?.ready'),12000,'Actual browser reopen of saved ordinary WOOP');
     assert.equal(allowedNavigation.remaining,0,'Exactly one same-route browser reopen');allowedNavigation=null;check();
    };
-   const ui={page,profile:selectedProfile,...(topLayerProbe?{captureTopLayerPhase}:{}),recordOrdinaryCloudSourcePhase:recordOrdinaryWoopPhase,recordOrdinaryWoopPhase,reopenOrdinaryWoop,mobileYesMotion,recordMobileStory:value=>{report.mobileStory=value;},click:step,waitFor,burst,repeat,recordRepeatOutcome,recordOrdinaryUndoPhase,recordOrdinaryUndoSeedSource,recordOrdinaryUndoFinalSource,ordinaryUndoFixtureSeed:name==='ordinary Undo consumes two saved edit frames'?report.retainedSources?.at(-1)?.ordinaryUndoFixtureSeed:undefined,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await evalPage(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
+   const ui={page,profile:selectedProfile,...(linuxSelected?{observeFixtureSource:async work=>{const phase=linuxHostPhase?.('fixture-source-transport','begin');try{return await work();}finally{if(phase)linuxHostPhase('fixture-source-transport','end',phase);}}}:{}),...(topLayerProbe?{captureTopLayerPhase}:{}),recordOrdinaryCloudSourcePhase:recordOrdinaryWoopPhase,recordOrdinaryWoopPhase,reopenOrdinaryWoop,mobileYesMotion,recordMobileStory:value=>{report.mobileStory=value;},click:step,waitFor,burst,repeat,recordRepeatOutcome,recordOrdinaryUndoPhase,recordOrdinaryUndoSeedSource,recordOrdinaryUndoFinalSource,ordinaryUndoFixtureSeed:name==='ordinary Undo consumes two saved edit frames'?report.retainedSources?.at(-1)?.ordinaryUndoFixtureSeed:undefined,pasteBoundary,backdrop:()=>step('.mback',()=>!document.querySelector('#modalRoot .modal'),'Dismiss dialog backdrop',{position:{x:5,y:5}}),expectReload:async action=>{const before=await evalPage(()=>window.__installedFixture.documentId);allowedNavigation={url:page.url(),remaining:1,action};const expected=new Function('return window.__installedFixture?.documentId!=='+JSON.stringify(before)+'&&document.documentElement.dataset.appReady==="true"');await step('[data-act="'+action+'"]',expected,action+' bounded reload');assert.equal(allowedNavigation.remaining,0,'exactly one expected same-route reload');allowedNavigation=null;},act:async(action,expect,selector)=>{if(!selector){selector='[data-act="'+action+'"]';if(await page.locator('#modalRoot '+selector).count())selector='#modalRoot '+selector;}return step(selector,expect,action);},fill:(selector,value)=>nativeInput('fill',selector,value),select:(selector,value)=>nativeInput('select',selector,value),expose};
    report.scenarios??=[];const record={name,status:'running',setup};report.scenarios.push(record);save();
    if(control==='new-action')await evalPage(()=>{const button=document.createElement('button');button.dataset.act='gate-new-untested';button.textContent='New untested button';document.body.append(button);});
    if(control){
@@ -722,6 +739,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     },true);},control);
    }
    await execute(ui);check();record.status='passed';
+   if(historyReplay){historyReplay.complete(name);if(!historyEntry.target)report.linuxFailureObservation.history.completedPrefix++;else report.linuxFailureObservation.history.status='completed';}
    for(const outcome of report.repeatOutcomes||[])if(outcome.name===name&&outcome.status==='running')outcome.status='passed';
   };
   if(startupOpening)await scenario('ordinary saved-board opening',{},async ui=>{
@@ -752,17 +770,19 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    if(diagnosticProfile){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario});}
    else{const {runRapidCoreScenarios}=await import('./button-safety-rapid-core.mjs');await runRapidCoreScenarios({scenario});if(!scenarioFilter){const {runRapidScenarios}=await import('./button-safety-rapid.mjs');await runRapidScenarios({scenario:async(caseName,options,execute)=>{if(caseName==='ordinary pending Copy refuses reentry'||caseName==='ordinary obsolete Copy cannot alter replacement transfer')await scenario(caseName,options,execute);}});}}
   }
-  if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
+  if(historyReplay)historyReplay.finish();
+  else if(scenarioFilter)assert.equal(report.scenarios?.length,1,'Exactly one requested diagnostic scenario must execute');
   if(!startupOpening)for(const action of observed)assert.ok(report.requiredActions.includes(action),'New untested button action: '+action);
-  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter&&!startupOpening)report.scope='focused-diagnostic';
+  report.observedActions=[...observed].sort();report.outcomes=[...outcomes.values()];report.rapidOutcomes=[...rapidOutcomes.values()];if(scenarioFilter&&!startupOpening&&!linuxObservation)report.scope='focused-diagnostic';
   report.status='passed';
- }catch(error){report.status='failed';report.failure=error.stack;if(startupOpening&&page)try{report.startupTimeline=classifyButtonStartupTimeline(await bounded(evalPage(()=>window.__buttonStartupTimeline),'startup timeline after failure'));}catch{}try{report.failureObservation=await bounded(evalPage(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
+ }catch(error){if(historyReplay){historyReplay.fail();report.linuxFailureObservation.history.status='failed';report.linuxFailureObservation.history.failedFrontier=report.scenarios?.at(-1)?.name||null;}report.status='failed';report.failure=error.stack;if(startupOpening&&page)try{report.startupTimeline=classifyButtonStartupTimeline(await bounded(evalPage(()=>window.__buttonStartupTimeline),'startup timeline after failure'));}catch{}try{report.failureObservation=await bounded(evalPage(()=>({modal:document.getElementById('modalRoot')?.innerText,toast:document.getElementById('toast')?.innerText,heartbeat:{...window.__buttonHeartbeat},mode:state.mode,chain:state.chain,candidateId:state.candidateId,taskTitles:state.tasks.slice(0,10).map(t=>({id:t.id,title:t.title}))})),'failure observation');}catch(observationError){report.failureObservationError=String(observationError);}throw error;}
  finally{
   closing=true;
   let cleanupError;const failedBeforeCleanup=report.status==='failed';
   const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.failure??=error.stack||String(error);report.errors.push('cleanup: '+String(error));(report.cleanupFailures??=[]).push({name:error.name||null,message:error.message||String(error),stack:error.stack||null});}};
   if(stopStartupCapture)await close(async()=>{await stopStartupCapture(interrupted?'interrupted':'case-finished');});
   if(stopLinuxCapture)await close(async()=>{await stopLinuxCapture(interrupted?'interrupted':'consumer-finally');});
+  if(linuxHistory)await close(async()=>{assert.ok(fs.readFileSync(linuxFailureHistory).equals(originalHistoryBytes),'Original failed history report bytes changed');report.linuxFailureObservation.history.originalBytesUnchanged=true;});
   if(ordinaryTimeline)await close(async()=>{
    const capture=report.startupCapture||null,availability={capture:{status:capture?.status||'unavailable',reason:capture?'Actual provider terminal outcome':'Provider did not produce capture metadata'},input:{status:'not-reached',reason:'No trusted operation receipt available'},clock:{status:capture?.facts?.calibration?.status==='bounded'?'available':'unavailable',reason:'Only actual matched same-document native anchors can bound the page clock'},custody:{status:'unavailable',reason:'Owned page unavailable after stop'}};
    let readback;

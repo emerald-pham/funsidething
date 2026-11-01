@@ -52726,5 +52726,144 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/pixel-inputs1936-worker",
     "scope": "Diagnostic capture only; owner /root/pixel_inputs1936_capture, parent /root."
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "a4d719ceab69b5519a403f3712b8c69463c9b2ffb653e953308c831e9d1e6941",
+    "reason": "Implement only the agreed1937 once-only history-preserving diagnostic at the existing Linux failed-scene command, sourceSnapshot and Timeline protocol seams. Append three process RISK contracts without editing any inherited test or source oracle.",
+    "previousBehavior": "The conditional scene follow-up started a fresh isolated scene after an original required failure that occurred after30 successful browser scenarios. Its receiver retained no source/observer phase scopes. In the new bounded observer, refused phase ends or clock anchors could otherwise manufacture derived custody, and a capped stop needed explicit owned page-hook removal.",
+    "intendedBehavior": "The same existing scene window validates exact source, ordinary64 inventory, successful30-name prefix, original failed frontier and complete cleanup; it replays that prefix in the existing browser lifecycle before target-only arming. Distinct same-browser-history-v2 records retain bounded page/host observation scopes, generation and accepted raw/clock custody. Every original required verdict and threshold stays unchanged.",
+    "replacementTests": [
+      "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "RISK repository process: scene source observation brackets stay inactive in ordinary runs"
+    ],
+    "preservedCoverage": [
+      "All1533 inherited rationale object literals/order and all preexisting tests.js bytes remain exact; cumulative records retain their original chronology and claims. The historical test-group inventory stays immutable; new roots append assignments only.",
+      "The original Mac native provider/verifier, ordinary60 scenarios/114 actions/64 tasks, pageerror opening branch, injected1300ms stall, full-step/opening1000ms thresholds, sourceSnapshot/typed-source statements, source and exact pixel assertions remain protected.",
+      "Actual Linux Node22.23.4/Playwright1.62.1/WebKit2336 runtime guards, original source/failed-report/cleanup admission, once per window/two serial children,180s/360s and separate3000ms TERM+KILL bounds,4MiB output and12s/4096events/1MiB-event/32MiB raw/source-code captures remain in force.",
+      "Only existing diagnostic tooling changes. No app, fixture/workload, oracle, asset, FAQ, version, dependency, workflow, deployment or Beta change. Protocol/page doubles execute no native browser or Linux acceptance; original CI failures and causes remain unresolved."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap.",
+      "failure": "Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance."
+    },
+    "greenEvidence": {
+      "summary": "Focused protocol/source controls and unchanged Linux observer regression pass27 cases, zero failed/skipped/cancelled, on Node24.19.0 macOS. Final focused GREEN is source-recorded by record-run; full suite, native Linux, CI and release remain parent-owned."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "45f1ddc9aaf7a271523ff8501cd573c30d2df6430727ac767c6ada0d95c109d4",
+    "reason": "Implement only the agreed1937 once-only history-preserving diagnostic at the existing Linux failed-scene command, sourceSnapshot and Timeline protocol seams. Append three process RISK contracts without editing any inherited test or source oracle.",
+    "previousBehavior": "The conditional scene follow-up started a fresh isolated scene after an original required failure that occurred after30 successful browser scenarios. Its receiver retained no source/observer phase scopes. In the new bounded observer, refused phase ends or clock anchors could otherwise manufacture derived custody, and a capped stop needed explicit owned page-hook removal.",
+    "intendedBehavior": "The same existing scene window validates exact source, ordinary64 inventory, successful30-name prefix, original failed frontier and complete cleanup; it replays that prefix in the existing browser lifecycle before target-only arming. Distinct same-browser-history-v2 records retain bounded page/host observation scopes, generation and accepted raw/clock custody. Every original required verdict and threshold stays unchanged.",
+    "replacementTests": [
+      "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "RISK repository process: scene source observation brackets stay inactive in ordinary runs"
+    ],
+    "preservedCoverage": [
+      "All1533 inherited rationale object literals/order and all preexisting tests.js bytes remain exact; cumulative records retain their original chronology and claims. The historical test-group inventory stays immutable; new roots append assignments only.",
+      "The original Mac native provider/verifier, ordinary60 scenarios/114 actions/64 tasks, pageerror opening branch, injected1300ms stall, full-step/opening1000ms thresholds, sourceSnapshot/typed-source statements, source and exact pixel assertions remain protected.",
+      "Actual Linux Node22.23.4/Playwright1.62.1/WebKit2336 runtime guards, original source/failed-report/cleanup admission, once per window/two serial children,180s/360s and separate3000ms TERM+KILL bounds,4MiB output and12s/4096events/1MiB-event/32MiB raw/source-code captures remain in force.",
+      "Only existing diagnostic tooling changes. No app, fixture/workload, oracle, asset, FAQ, version, dependency, workflow, deployment or Beta change. Protocol/page doubles execute no native browser or Linux acceptance; original CI failures and causes remain unresolved."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap.",
+      "failure": "Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance."
+    },
+    "greenEvidence": {
+      "summary": "Focused protocol/source controls and unchanged Linux observer regression pass27 cases, zero failed/skipped/cancelled, on Node24.19.0 macOS. Final focused GREEN is source-recorded by record-run; full suite, native Linux, CI and release remain parent-owned."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "f205e8383a6f469445b368ce33e3276e154a9a12fd253a939f7bc040f31d6dee",
+    "reason": "Repair the source-only1937 self-review finding: observer phase native-range membership did not establish agreement with the retained Timeline/page offset. ROOT approved one literal protocol double and minimal fail-closed refusal while physical/browser timing fixtures remain held.",
+    "previousBehavior": "A raw phase with native75..100ms timestamps and page80..105ms literals could be labeled bounded and leave capture status captured, despite the independent retained open/close calibration having offset-1000ms and unchanged1.001ms uncertainty.",
+    "intendedBehavior": "Only observer phase endpoints consistent with the retained offset within its existing uncertainty receive bounded page intervals. A contradictory literal phase leaves the raw bytes and independent anchor calibration intact but makes phase availability unavailable and capture status incomplete.",
+    "replacementTests": [
+      "RISK repository process: Linux observer phases refuse inconsistent retained page clocks"
+    ],
+    "preservedCoverage": [
+      "All1533 original rationale object literals and the first1937 commit's two append records remain byte-exact and ordered; b413e357 is preserved as an immutable prior candidate, followed by this repair commit.",
+      "All existing tests.js bytes including the first three1937 RISK roots remain an exact prefix. The ordinary60/114/64 inventory, complete app/source/pixel assertions,1300ms injected stall,1000ms opening/full-step thresholds and Mac provider/verifier remain unchanged.",
+      "No uncertainty or raw/process/event/runtime limit is raised. Host scopes keep actual host clocks, CPU/page and OS-TID mapping remain unavailable, original failed verdicts remain failed, and no browser, native runtime, port, OS sampler or measured timing fixture is launched."
+    ],
+    "redEvidence": {
+      "command": "CHAIN_NATIVE_OUTPUT=<frame-history1937-worker/offset-RED-raw> absoluteNode24 scripts/agent-tools/record-run.mjs --repo <same-worktree> --evidence-dir <frame-history1937-worker/recorded> --purpose preimplementation-red --summary -- absoluteNode24 --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux observer phases refuse inconsistent retained page clocks$' tests.js",
+      "failure": "Source-recorded79cddeac-99f2-4e5c-afef-181db1d36a25 on b413e357, identity complete, exited1 assertion-failure: capture.status actual captured vs intended incomplete after literal5ms phase-clock offset disagreement. Actual command, bytes, patch, raw events and complete assertion TAP are retained.",
+      "records": [
+        "2026-11-01T18-31-16-384Z-79cddeac-99f2-4e5c-afef-181db1d36a25"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T18-31-30-020Z-be2d663b-f731-4e55-9592-20f89665db39"
+      ],
+      "summary": "The same one-case source-recorded literal protocol control passes after the minimal offset-consistency refusal. No actual Linux/native or measured timing result is claimed; final focused/preflight/group-description evidence is recorded separately on the clean repair commit."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "29bdfeefc2ee0f59e6a17f480653c25b79df7931106b17a134cab57cc10fa538",
+    "reason": "Repair the source-only1937 self-review finding: observer phase native-range membership did not establish agreement with the retained Timeline/page offset. ROOT approved one literal protocol double and minimal fail-closed refusal while physical/browser timing fixtures remain held.",
+    "previousBehavior": "A raw phase with native75..100ms timestamps and page80..105ms literals could be labeled bounded and leave capture status captured, despite the independent retained open/close calibration having offset-1000ms and unchanged1.001ms uncertainty.",
+    "intendedBehavior": "Only observer phase endpoints consistent with the retained offset within its existing uncertainty receive bounded page intervals. A contradictory literal phase leaves the raw bytes and independent anchor calibration intact but makes phase availability unavailable and capture status incomplete.",
+    "replacementTests": [
+      "RISK repository process: Linux observer phases refuse inconsistent retained page clocks"
+    ],
+    "preservedCoverage": [
+      "All1533 original rationale object literals and the first1937 commit's two append records remain byte-exact and ordered; b413e357 is preserved as an immutable prior candidate, followed by this repair commit.",
+      "All existing tests.js bytes including the first three1937 RISK roots remain an exact prefix. The ordinary60/114/64 inventory, complete app/source/pixel assertions,1300ms injected stall,1000ms opening/full-step thresholds and Mac provider/verifier remain unchanged.",
+      "No uncertainty or raw/process/event/runtime limit is raised. Host scopes keep actual host clocks, CPU/page and OS-TID mapping remain unavailable, original failed verdicts remain failed, and no browser, native runtime, port, OS sampler or measured timing fixture is launched."
+    ],
+    "redEvidence": {
+      "command": "CHAIN_NATIVE_OUTPUT=<frame-history1937-worker/offset-RED-raw> absoluteNode24 scripts/agent-tools/record-run.mjs --repo <same-worktree> --evidence-dir <frame-history1937-worker/recorded> --purpose preimplementation-red --summary -- absoluteNode24 --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux observer phases refuse inconsistent retained page clocks$' tests.js",
+      "failure": "Source-recorded79cddeac-99f2-4e5c-afef-181db1d36a25 on b413e357, identity complete, exited1 assertion-failure: capture.status actual captured vs intended incomplete after literal5ms phase-clock offset disagreement. Actual command, bytes, patch, raw events and complete assertion TAP are retained.",
+      "records": [
+        "2026-11-01T18-31-16-384Z-79cddeac-99f2-4e5c-afef-181db1d36a25"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T18-31-30-020Z-be2d663b-f731-4e55-9592-20f89665db39"
+      ],
+      "summary": "The same one-case source-recorded literal protocol control passes after the minimal offset-consistency refusal. No actual Linux/native or measured timing result is claimed; final focused/preflight/group-description evidence is recorded separately on the clean repair commit."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
+  },
+  {
+    "baseCommit": "b413e357a3e0cbc2362dd0935b9465570e41fbc3",
+    "testChangesSha256": "d565c0d3262687282c8526749a601479aef9e08fa11b6c2f07319fd0941726f3",
+    "reason": "Repair the source-only1937 self-review finding: observer phase native-range membership did not establish agreement with the retained Timeline/page offset. ROOT approved one literal protocol double and minimal fail-closed refusal while physical/browser timing fixtures remain held.",
+    "previousBehavior": "A raw phase with native75..100ms timestamps and page80..105ms literals could be labeled bounded and leave capture status captured, despite the independent retained open/close calibration having offset-1000ms and unchanged1.001ms uncertainty.",
+    "intendedBehavior": "Only observer phase endpoints consistent with the retained offset within its existing uncertainty receive bounded page intervals. A contradictory literal phase leaves the raw bytes and independent anchor calibration intact but makes phase availability unavailable and capture status incomplete.",
+    "replacementTests": [
+      "RISK repository process: Linux observer phases refuse inconsistent retained page clocks"
+    ],
+    "preservedCoverage": [
+      "All1533 original rationale object literals and the first1937 commit's two append records remain byte-exact and ordered; b413e357 is preserved as an immutable prior candidate, followed by this repair commit.",
+      "All existing tests.js bytes including the first three1937 RISK roots remain an exact prefix. The ordinary60/114/64 inventory, complete app/source/pixel assertions,1300ms injected stall,1000ms opening/full-step thresholds and Mac provider/verifier remain unchanged.",
+      "No uncertainty or raw/process/event/runtime limit is raised. Host scopes keep actual host clocks, CPU/page and OS-TID mapping remain unavailable, original failed verdicts remain failed, and no browser, native runtime, port, OS sampler or measured timing fixture is launched."
+    ],
+    "redEvidence": {
+      "command": "CHAIN_NATIVE_OUTPUT=<frame-history1937-worker/offset-RED-raw> absoluteNode24 scripts/agent-tools/record-run.mjs --repo <same-worktree> --evidence-dir <frame-history1937-worker/recorded> --purpose preimplementation-red --summary -- absoluteNode24 --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux observer phases refuse inconsistent retained page clocks$' tests.js",
+      "failure": "Source-recorded79cddeac-99f2-4e5c-afef-181db1d36a25 on b413e357, identity complete, exited1 assertion-failure: capture.status actual captured vs intended incomplete after literal5ms phase-clock offset disagreement. Actual command, bytes, patch, raw events and complete assertion TAP are retained.",
+      "records": [
+        "2026-11-01T18-31-16-384Z-79cddeac-99f2-4e5c-afef-181db1d36a25"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T18-31-30-020Z-be2d663b-f731-4e55-9592-20f89665db39"
+      ],
+      "summary": "The same one-case source-recorded literal protocol control passes after the minimal offset-consistency refusal. No actual Linux/native or measured timing result is claimed; final focused/preflight/group-description evidence is recorded separately on the clean repair commit."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
   }
 ]

@@ -14070,6 +14070,26 @@
       "root": "owned native process never resumes signal authority after an intervening identity ambiguity",
       "group": "native-process",
       "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scene source observation brackets stay inactive in ordinary runs",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Linux observer phases refuse inconsistent retained page clocks",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [
