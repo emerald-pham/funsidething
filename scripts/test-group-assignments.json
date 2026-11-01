@@ -13382,41 +13382,6 @@
       "file": "scripts/agent-tools/test-groups.test.mjs"
     },
     {
-      "root": "Landscape browser: scene time presets persist and return to live without changing tasks",
-      "group": "core",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
-      "group": "core",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK backup format safety: raw-source qualification remains outside the native selector",
-      "group": "core",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
-      "group": "core",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
-      "group": "core",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
-      "group": "core",
-      "file": "tests.js"
-    },
-    {
-      "root": "RISK support diagnostics: Settings names the existing board export for its contents",
-      "group": "core",
-      "file": "tests.js"
-    },
-    {
       "root": "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
       "group": "persistence-recovery",
       "file": "tests.js"
@@ -13961,6 +13926,11 @@
       "root": "hosted ordinary native admits default-off manual dispatch while capped consumers refuse it",
       "group": "native-process",
       "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "RISK repository process: replaced historical roots reject contradictory live assignments before execution",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

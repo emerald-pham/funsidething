@@ -246,7 +246,6 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
   }
   const allReplacedSources = new Set(replacementByBaseline.keys());
   for (const root of assignedRootIds) {
-    if (baselineRoots.has(root) || replacementTargets.has(root)) continue;
     if (allReplacedSources.has(root)) fail(`Historical root ${JSON.stringify(root)} must be represented through its replacement target only.`);
   }
 

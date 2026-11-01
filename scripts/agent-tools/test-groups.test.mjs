@@ -438,6 +438,18 @@ test('test group runner reconciles a renamed root and preserves baseline case id
     file: 'tests.js',
     reason: 'The renamed fixture title preserves its historical child assertions and case identities.',
   }];
+  const sentinel = path.join(fixture.root, 'contradictory-catalog-body-executed');
+  const contradictoryAssignments = {
+    ...groupAssignments,
+    rootAssignments: [...groupAssignments.rootAssignments, { root: oldRoot, group: 'core', file: 'tests.js' }],
+  };
+  writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), contradictoryAssignments);
+  const contradictory = invoke(fixture, { args: ['--describe'], env: { CHAIN_DESCRIPTOR_SENTINEL: sentinel } });
+  assert.notEqual(contradictory.status, 0, 'A replaced historical source cannot remain live alongside its explicit current target');
+  assert.equal(contradictory.evidence?.status, 'preflight_failed');
+  assert.match(contradictory.evidence?.issues?.join('\n') || contradictory.stderr, /Historical root .* must be represented through its replacement target only/);
+  assert.equal(fs.existsSync(sentinel), false, 'Contradictory catalogs must fail before any test body executes');
+  assert.equal(fs.existsSync(path.join(contradictory.outputDir, 'descriptor.json')), false, 'A contradictory catalog cannot publish a valid descriptor');
   writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), groupAssignments);
   git(fixture.root, 'add', 'tests.js', 'scripts/test-group-assignments.json');
   git(fixture.root, 'commit', '-qm', 'classify a preserved renamed root');

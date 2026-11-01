@@ -50451,5 +50451,24 @@
       "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict",
       "RISK repository process: CI admission enforces reuse before repeating a passed test child"
     ]
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "4e6b3057da1fdc00738894fc96605c9eec74ad9028f81947d3f00b17bacdc62c",
+    "reason": "Issue #1869 requires rejecting obsolete historical source assignments that coexist with explicit current replacements before any grouped execution or descriptor publication.",
+    "previousBehavior": "The grouped catalog bypassed the replaced-source rejection because every obsolete source was also a baseline root; all seven obsolete core assignments remained selected alongside valid targets.",
+    "intendedBehavior": "The existing public renamed-root fixture must refuse contradictory old/current assignments before any body or valid descriptor, while a valid renamed root executes its mapped baseline parent and accepted environment child. A new required core process RISK runs this fixture without changing feature tests.",
+    "preservedCoverage": [
+      "All 1476 existing rationale objects and their byte slices/order remain unchanged; this standalone record is appended only.",
+      "Historical inventory remains byte-exact at 2997 cases and 61 accepted skips; explicit replacement records, reasons, targets, group/file bindings and measured durations are unchanged.",
+      "Valid renamed-root children, unknown/unclassified/overlapping assignments, missing required cases and unexpected skip protections remain in the existing grouped-runner process cohort."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/replacements-1869/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^RISK repository process: replaced historical roots reject contradictory live assignments before execution$' tests.js; actual record /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/replacements1869-owner/recorder/2026-11-01T02-56-31-774Z-03d8b0ac-b92b-4e66-b43c-612c18be7b42.json",
+      "failure": "On baseline644 before runner/catalog edits, existing renamed-root fixture assertion A replaced historical source cannot remain live alongside its explicit current target failed with ERR_ASSERTION notStrictEqual: actual CLI status0, forbidden0. Wrapper RISK failed status1. Recorder outcome assertion-failure, child/wrapper exit1, complete source identity diff1b023a1946340444200002ca332c06ba25c3b07775c9720fb2026229e1ca1d74."
+    },
+    "replacementTests": [
+      "RISK repository process: replaced historical roots reject contradictory live assignments before execution"
+    ]
   }
 ]
