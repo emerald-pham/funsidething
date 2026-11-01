@@ -52268,5 +52268,68 @@
       "command": "Absolute Node24.19 record-run.mjs --purpose preimplementation-red -- node --test scripts/agent-tools/hosted-native-callers.test.mjs; later --purpose green focused tests.js cohort selects lifecycle, literal CPU protocol, original Mac/provider/controller and risk inventory guards.",
       "failure": "Source-bound runnable review RED4e374bf6 reproduced five failures (stdout browser receipt, setup deadline, protected foreign proc, vanished owned enrichment, wrong pass). Duplicate terminal-pass REDd7666c69 and nonvacuous browser receipt REDeb33e419 cover later strict consistency refinements. Final GREEN14728fd3 ran all12 real-process/OS-boundary controls plus protocol caps/clock/stop and original Mac guards with no skips. Exact raw commands, diffs and failed intermediates remain in native-lifecycle1902-implementation. The unchanged c5 native failure8bce7aba remains failed evidence and is not accepted; no duplicate expensive native run was made for these repairs. Linux filesystem/protocol doubles claim no actual Linux execution."
     }
+  },
+  {
+    "baseCommit": "fb953003e4ca5664e8f7718d7dee1333daba719c",
+    "testChangesSha256": "c739dc1709dd05bb1e377457c2b19729f02620bcbc206f8ab2bd69ad7b62ce4c",
+    "reason": "The new #1911 native fractional-clock challenge exercises the existing complete ordinary Undo consumer with a genuine fractional trusted-click receipt, while retaining the ordinary-clock contract unchanged.",
+    "previousBehavior": "The captured trusted click used high-resolution performance time, but the source lifecycle guard rejected that valid fractional receipt before it could verify the actual saved Undo source lifecycle.",
+    "intendedBehavior": "Accept any finite trusted click receipt from the browser high-resolution clock while keeping wall-clock capture safe-integer and retaining the same trusted click, durable sources, exact B0/B1/B2/U1/U2 Undo lifecycle, timings and full existing assertions.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time"
+    ],
+    "preservedCoverage": [
+      "The existing named ordinary Undo RISK still runs with the original normal clock and retains every existing source, action, scene, safe-integer wall capture and timing assertion.",
+      "The new root runs the same public native WebKit Undo CLI consumer with an external pre-navigation preload on only the selected top-level button-UUID app page; actual trusted click receipts are asserted fractional and progressing without replacing or rounding the receipt.",
+      "The complete original B0, B1, B2, U1 and U2 source assertions, undo outcomes, original history, opaque and pending sources, backup ordering and cleanup remain exercised by the same consumer.",
+      "No Date.now behavior, save timer, application/storage authority method, button receipt, app source, interval threshold, browser budget, engine matrix, issue scope, workflow, assets or dependency changed; this controlled-clock contract is separate from ordinary uninstrumented native timing."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/opt/local/bin:$PATH CHAIN_NATIVE_OUTPUT=<worker>/red-attempt-1/native-output CHAIN_NATIVE_PORT=53761 CODEX_COORDINATION_FILE=/Users/emeraldpham/.local/state/codex/coordination.json /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --summary --repo /Users/emeraldpham/.codex/worktrees/fractional-native-1911/funsidething --evidence-dir <worker>/red-attempt-1/record-run --purpose preimplementation-red -- node --test --test-name-pattern='^RISK repository process: fractional native Undo click receipts preserve high-resolution time$' tests.js",
+      "failure": "Recorder 2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a captured a real trusted act:toggle-list click at 1793537866473.125 with integral timeOrigin 1793537865893 and later controlled-clock sample 1233.125. The native child reached the original source lifecycle assertion and failed at scripts/button-safety-rapid-core.mjs:734 because Number.isSafeInteger(listOpenToggleClick.at) rejected that actual fractional receipt; no setup error or skipped action occurred.",
+      "records": [
+        "2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T12-58-23-225Z-c4720cf6-5062-4ad4-81b9-709de39b254e"
+      ],
+      "summary": "The same focused WebKit consumer passed after the finite-receipt guard. Its actual trusted click was 1793537905171.125 with integral timeOrigin 1793537904709 and progressing clock sample 1102.125; native report errors were empty, toggle-list/edit/save-edit/undo passed, and context, browser and server closed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/fractional-native-click-repair/worker"
+  },
+  {
+    "baseCommit": "fb953003e4ca5664e8f7718d7dee1333daba719c",
+    "testChangesSha256": "30d9558d01988794aaed38952830b9faa5186775e688a6c72dbbe80ec0bc7909",
+    "reason": "Unify the ordinary Undo source verifier to accept finite high-resolution click receipts in both normal and fractional clock modes; the clock flag controls only external clock injection and fractional witness assertions.",
+    "previousBehavior": "The shared outer lifecycle verifier selected safe-integer click acceptance in normal mode and finite acceptance in fractional mode. A real trusted fractional performance receipt therefore failed in the ordinary shared verifier even after the native core accepted it.",
+    "intendedBehavior": "The shared verifier accepts only finite actual click timestamps in either mode while wall-clock source capture remains safe-integer. The fractional fixture flag changes only the selected root page clock and the assertions that witness its integral origin, monotonic fractional phase and genuine trusted click.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time"
+    ],
+    "preservedCoverage": [
+      "The original named ordinary Undo RISK remains a no-injection normal-clock root and runs the complete existing public WebKit consumer with the same source, action, scene, wall-clock and timing assertions.",
+      "The fractional root runs that same consumer and changes only an external pre-navigation Playwright clock on the selected top-level button-UUID app page; the captured actual trusted click must retain exactly the injected .125 phase and later root-clock progress.",
+      "Both modes keep the exact B0, B1, B2, U1 and U2 source lifecycle, complete backups/opaque/pending/history verification, saved row intervals and normal undo assertions; only the type predicate for the actual high-resolution click is finite.",
+      "Date.now, save timers, app/storage authority methods, trusted receipts, interval thresholds, application source, engine budget, app version, FAQ, workflow, assets and dependencies remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "PATH=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/opt/local/bin:$PATH CHAIN_NATIVE_OUTPUT=<worker>/e405-red-outer-attempt-1/native-output CHAIN_NATIVE_PORT=53761 CODEX_COORDINATION_FILE=/Users/emeraldpham/.local/state/codex/coordination.json /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --summary --repo /Users/emeraldpham/.codex/worktrees/fractional-native-1911/funsidething --evidence-dir <worker>/e405-red-outer-attempt-1/record-run --purpose preimplementation-red -- node --test --test-name-pattern='^RISK repository process: fractional native Undo click receipts preserve high-resolution time$' tests.js",
+      "failure": "Recorder 2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180 ran with the core finite guard retained. The native WebKit child passed the full selected action lifecycle with errors empty and cleanup complete, then the outer shared verifier rejected the actual trusted act:toggle-list receipt 1793538395711.125 at tests.js:49071 because Number.isSafeInteger(listOpenToggleClick.at) was still required. The external root clock had integral origin 1793538395203 and later sample 1179.125; no setup error or skipped action occurred.",
+      "records": [
+        "2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T13-07-02-547Z-bdc2d3d5-4994-4f34-a94b-6fb244e14522",
+        "2026-11-01T13-07-28-121Z-3bf03c70-5126-47c4-a943-3ed843e80aeb"
+      ],
+      "summary": "After the single unconditional finite-click predicate, the same fractional root passed with genuine trusted click 1793538424447.125, integral origin 1793538423993 and later sample 1114.125. The original ordinary-clock root also passed unchanged with no clock preload; its native report errors were empty, all four actions passed, and browser/context/server cleanup completed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/fractional-native-click-repair/worker"
   }
 ]

@@ -2293,6 +2293,7 @@ The command/report consumer rejects missing, duplicate, skipped, cancelled, unre
 - RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned
 - RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources
 - RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources
+- RISK repository process: fractional native Undo click receipts preserve high-resolution time
 - RISK repository process: pending Copy repeat catalog preserves precompletion Download and ordinary admission
 - RISK repository process: native button gate detects errors raised by a real click
 - RISK repository process: ordinary native cloud recovery preserves sources through failures and retry

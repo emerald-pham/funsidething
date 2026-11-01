@@ -48970,7 +48970,7 @@ test('RISK repository process: ordinary repeated selected eligibility preserves 
  t.diagnostic('Focused ordinary selected-eligibility evidence: '+path.join(output,reports[0]));
 });
 
-test("RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",async t=>{
+const runOrdinaryUndoSourceConsumer=async(t,{fractionalClickClock=false}={})=>{
     const sourceHash=value=>createHash('sha256').update(value).digest('hex');
     const sourceSeedHash='434161b20aa6361220d67e96198d1694023a1ca67dd18e49984febe3fc97a780';
     const sourcePayloadHashes=['30a27913944098e121336a9a3f855ce8c875904fc3f7146ab44304b8b1adfc92','07c3efa01e76bdc9a34416bddd9182a75db7b09347c87804ceb58ac10954c42e','b71ec5d27bfb02cb307b943a9d6d90601ca575b99a67b128ab58f89198743c0b'];
@@ -49071,7 +49071,7 @@ test("RISK repository process: ordinary Undo restores two saved edit frames and 
       assert.equal(listOpen.currentHash,sourceHash(listOpen.current));assert.equal(listOpen.durableHash,sourceHash(listOpen.durable));
       assert.equal(listOpen.headHash,listOpen.durableHash);assert.equal(JSON.parse(listOpen.current).listOpen,true);
       assert.equal(listOpen.listToggleClick?.action,'act:toggle-list');assert.equal(listOpen.listToggleClick?.trusted,true);
-      assert.ok(Number.isSafeInteger(listOpen.listToggleClick.at)&&Number.isSafeInteger(listOpen.capturedAtMs));
+      assert.ok(Number.isFinite(listOpen.listToggleClick.at)&&Number.isSafeInteger(listOpen.capturedAtMs));
       assert.equal(listOpen.backups.length,listOpen.backupProofs.length);
       assert.deepEqual(listOpen.backupProofs.map(row=>row.id),listOpen.backups.map(row=>row.id),'Independent hashes retain the complete pre-title source array order');
       listOpen.backups.forEach((row,index)=>{
@@ -49147,12 +49147,20 @@ test("RISK repository process: ordinary Undo restores two saved edit frames and 
  fs.writeFileSync(listOpenPreload,`import {webkit} from ${JSON.stringify(playwrightModule)};
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
-const sha256=value=>createHash('sha256').update(value).digest('hex'),launch=webkit.launch.bind(webkit),artifactPath=${JSON.stringify(listOpenArtifactPath)};
+ const sha256=value=>createHash('sha256').update(value).digest('hex'),launch=webkit.launch.bind(webkit),artifactPath=${JSON.stringify(listOpenArtifactPath)},fractionalClickClockEnabled=${fractionalClickClock};
 let captured=false;
 webkit.launch=async(...launchArgs)=>{
  const browser=await launch(...launchArgs),newContext=browser.newContext.bind(browser);
  browser.newContext=async(...contextArgs)=>{
-  const context=await newContext(...contextArgs),newPage=context.newPage.bind(context);
+  const context=await newContext(...contextArgs);
+  if(fractionalClickClockEnabled)await context.addInitScript(()=>{
+   const pathname=location.pathname,uuid=pathname.startsWith('/button-')&&pathname.endsWith('/')?pathname.slice('/button-'.length,-1):'';
+   if(window.top!==window||!/^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(uuid))return;
+   const realNow=performance.now.bind(performance),timeOrigin=Math.floor(performance.timeOrigin);let previous=-Infinity;
+   Object.defineProperty(performance,'timeOrigin',{configurable:true,value:timeOrigin});
+   Object.defineProperty(performance,'now',{configurable:true,value:()=>{const current=Math.floor(realNow())+.125;if(current<previous)throw new Error('Fractional native click clock moved backwards');previous=current;return current;}});
+  });
+  const newPage=context.newPage.bind(context);
   context.newPage=async(...pageArgs)=>{
    const page=await newPage(...pageArgs),locator=page.locator.bind(page);
    page.locator=(selector,...locatorArgs)=>{
@@ -49177,7 +49185,7 @@ webkit.launch=async(...launchArgs)=>{
           afterOpaque=await ScannerDeviceStore.listOpaqueArchives(),afterPending=await ScannerDeviceStore.getPendingUpload('gate-owner');
          const listToggleClick=(window.__buttonNativeClicks||[]).findLast(row=>row.action==='act:toggle-list'&&row.trusted===true),daily=backups.filter(row=>row.kind==='daily');
          if(afterCurrent!==current||afterHead?.payload!==current||JSON.stringify(afterBackups)!==JSON.stringify(backups)||JSON.stringify(afterOpaque)!==JSON.stringify(opaque)||JSON.stringify(afterPending)!==JSON.stringify(pending)||!listToggleClick||daily.length!==1||daily[0].payload!==current){await nextFrame();continue;}
-         return{current,durable:afterHead.payload,headHash:afterHead.hash,capturedAtMs,listOpen:true,listToggleClick,backups,opaque,pending,
+         return{current,durable:afterHead.payload,headHash:afterHead.hash,capturedAtMs,timeOriginMs:performance.timeOrigin,clockNowAtCaptureMs:performance.now(),listOpen:true,listToggleClick,backups,opaque,pending,
           timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,timeZoneOffsetMinutes:new Date().getTimezoneOffset()};
         }
         throw new Error('Bounded wait did not observe one stable durable list-opening daily before the first title input');
@@ -49216,6 +49224,12 @@ webkit.launch=async(...launchArgs)=>{
  assert.equal(listOpen.currentHash,listOpenHash(listOpen.current));assert.equal(listOpen.durableHash,listOpenHash(listOpen.durable));assert.equal(listOpen.headHash,listOpen.durableHash);
  assert.ok(Number.isSafeInteger(listOpen.capturedAtMs));assert.equal(typeof listOpen.timeZone,'string');assert.ok(Number.isSafeInteger(listOpen.timeZoneOffsetMinutes));
  assert.equal(listOpen.listToggleClick?.action,'act:toggle-list');assert.equal(listOpen.listToggleClick?.trusted,true,'The retained list-opening save follows its actual trusted control input');
+ if(fractionalClickClock){
+  assert.ok(Number.isSafeInteger(listOpen.timeOriginMs),'The external clock challenge keeps the selected root app timeOrigin integral');
+  assert.equal(listOpen.listToggleClick.at%1,.125,'The actual trusted list-opening click retains the injected fractional receipt');
+  assert.ok(listOpen.clockNowAtCaptureMs>(listOpen.listToggleClick.at-listOpen.timeOriginMs),'The controlled high-resolution clock progresses after the trusted click');
+  assert.equal(listOpen.clockNowAtCaptureMs%1,.125,'The progressing root page clock retains its fractional phase');
+ }
  assert.ok(listOpen.listToggleClick.at<=listOpen.capturedAtMs,'The actual list-opening save precedes first title input');
  assert.equal(listOpen.backups.length,listOpen.backupProofs.length);assert.deepEqual(listOpen.backupProofs.map(row=>row.id),listOpen.backups.map(row=>row.id),'Independent row hashes retain the complete pre-title source array order');
  const listOpenGenerated=listOpen.backups.filter(row=>!sourceOriginalIds.includes(row.id)),listOpenDaily=listOpenGenerated.filter(row=>row.kind==='daily'),listOpenLatest=listOpenGenerated.filter(row=>row.kind==='latest');
@@ -49361,6 +49375,14 @@ webkit.launch=async(...launchArgs)=>{
  assert.throws(()=>readSourceArtifact({...report.ordinaryUndoFinalSource,sha256:'0'.repeat(64)},'final-source',finalBytes),/Exact source artifact file hash/,'Wrong final file hash fails');
  assert.equal(result.status,0,'The ordinary two-frame Undo consumer and its report must pass: '+result.stderr);
  t.diagnostic('Focused ordinary two-frame Undo evidence: '+path.join(output,reports[0]));
+};
+
+test("RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",async t=>{
+ await runOrdinaryUndoSourceConsumer(t);
+});
+
+test("RISK repository process: fractional native Undo click receipts preserve high-resolution time",async t=>{
+ await runOrdinaryUndoSourceConsumer(t,{fractionalClickClock:true});
 });
 
 test('RISK repository process: native button gate cannot omit a required stress scenario',t=>{

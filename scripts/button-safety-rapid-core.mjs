@@ -731,7 +731,7 @@ export async function runRapidCoreScenarios(h){
       };
       assert.ok(listOpenSource,'Complete source captured after the actual list-opening save');
       assert.equal(listOpenToggleClick?.action,'act:toggle-list');assert.equal(listOpenToggleClick?.trusted,true);
-      assert.ok(Number.isSafeInteger(listOpenToggleClick.at)&&Number.isSafeInteger(listOpenSource.capturedAtMs));
+      assert.ok(Number.isFinite(listOpenToggleClick.at)&&Number.isSafeInteger(listOpenSource.capturedAtMs));
       assert.ok(listOpenSource.current===listOpenSource.durable,'The list-opening board is the complete durable head before the first title input');
       assert.equal(listOpenSource.currentHash,sourceHash(listOpenSource.current));assert.equal(listOpenSource.durableHash,sourceHash(listOpenSource.durable));
       assert.equal(JSON.parse(listOpenSource.current).listOpen,true);assert.deepEqual(listOpenSource.pending,sourcePendingLiteral);
