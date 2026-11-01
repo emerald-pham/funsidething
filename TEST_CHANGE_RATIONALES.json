@@ -50560,5 +50560,143 @@
       "priorMainRedEvidenceSha256": "a54c5976581fef0358c54ca6fae2316072692113962698b41d45fcbc82baa6ea",
       "integrationPreimplementationRunClaimed": false
     }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "2833518742277952df1a50cd8a8e0c12d6d8ffe7a7d1d840e64d491c9c01befd",
+    "reason": "Atomic #1877 adds the existing-consumer two-engine SDK-held refused-Apply ordering regression and repairs only that consumer completion predicate. This exact 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48 comparison preserves the original1480 raw rationale objects and inherited standalone chronology; it does not claim this new RED covers unrelated inherited changes.",
+    "previousBehavior": "After a real refused Apply, the existing native completion predicate accepted the refusal notice, not-busy flag and disabled Apply while reviewDecisionRecovery had cleared its preview before awaiting refreshed sources. Both actual native engines then captured preview=null; the complete verifier subsequently rejected it.",
+    "intendedBehavior": "The same native consumer waits for a real non-null current-serial unselected recovery preview and actual eligible unselected Light choice before capturing complete sources. A deterministically held existing SDK root reply must observe the actual consumer waiting, release within the original deadline and let the unchanged full verifier finish.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review"
+    ],
+    "preservedCoverage": [
+      "The original ordinary repeated saved decision choice retains selection authority and complete sources process root is byte-identical; all its complete64-task/device/cloud/opaque/pending/consent/freshness/CAS/ACK/protected-backup assertions remain.",
+      "The native runner full verifySavedDecisionSources function is byte-identical with SHA25662560d8fe3d64f3081c08e5b865672bcc273a72019c31e32104fc08309ad5318. No optional access accepts missing preview; no source assertion is weakened.",
+      "All60 ordinary scenarios,114 actions,10 repeat cases,64-task fixtures, trusted inputs, continuous1000ms heartbeat, original12s native step deadline, source capture identities and cleanup remain unchanged.",
+      "No app behavior, browser framework, emulator route, hosted admission exception, full qualification, physical device or private board recovery claim. Earlier1480 rationale records preserve all inherited changes and their original distinct evidence."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Observed before the functional predicate edit: actual recorder 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 child/wrapper exit1 assertion-failure, both Chromium and WebKit explicit ERR_ASSERTION: Expected wait: refused-Apply native capture must not complete while the refreshed SDK read is held and preview is null; actual true, expected false. Each engine held exactly one actual users/owner SDK read after the real refused apply, actual completion predicate returned true at preview=null/busy=false, and the actual write-refused source artifact captured preview=null while held. Old verifier TypeError is retained secondary evidence, not the RED oracle. Both owned contexts/browsers/servers closed; zero skips/cancellations.",
+      "recordId": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+      "startedAt": "2026-11-01T04:15:45.825Z",
+      "finishedAt": "2026-11-01T04:16:28.261Z",
+      "references": {
+        "metadata": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.json",
+          "sha256": "5b1173051aaa4f7e912bd4614ef488bb89f25b02a5db31e810d9cd4642379e5b"
+        },
+        "stdout": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.stdout.txt",
+          "sha256": "548aaeff183da5a0a8d4543d996bcb550bce75716689f144f016c6a93d1e76b0"
+        },
+        "stderr": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.stderr.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "derivation": {
+      "issue": 1877,
+      "standaloneStartCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "publishedComparison": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "mainComparison": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "originalRationaleCount": 1480,
+      "originalRawSha256": "abf902e3589c9e734958cfd5441d900865349fbe14205ae5a02f8be0cbf9abaf",
+      "unrelatedInheritedPreimplementationClaimed": false
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "420144aa20dfa753210d06e0d2a98c5c0434ce8f6dffc320809d7378ab3c7e00",
+    "reason": "Atomic #1877 adds the existing-consumer two-engine SDK-held refused-Apply ordering regression and repairs only that consumer completion predicate. This exact 6443761512cd652d02955fb93826dc3baa5daca3 comparison preserves the original1480 raw rationale objects and inherited standalone chronology; it does not claim this new RED covers unrelated inherited changes.",
+    "previousBehavior": "After a real refused Apply, the existing native completion predicate accepted the refusal notice, not-busy flag and disabled Apply while reviewDecisionRecovery had cleared its preview before awaiting refreshed sources. Both actual native engines then captured preview=null; the complete verifier subsequently rejected it.",
+    "intendedBehavior": "The same native consumer waits for a real non-null current-serial unselected recovery preview and actual eligible unselected Light choice before capturing complete sources. A deterministically held existing SDK root reply must observe the actual consumer waiting, release within the original deadline and let the unchanged full verifier finish.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review"
+    ],
+    "preservedCoverage": [
+      "The original ordinary repeated saved decision choice retains selection authority and complete sources process root is byte-identical; all its complete64-task/device/cloud/opaque/pending/consent/freshness/CAS/ACK/protected-backup assertions remain.",
+      "The native runner full verifySavedDecisionSources function is byte-identical with SHA25662560d8fe3d64f3081c08e5b865672bcc273a72019c31e32104fc08309ad5318. No optional access accepts missing preview; no source assertion is weakened.",
+      "All60 ordinary scenarios,114 actions,10 repeat cases,64-task fixtures, trusted inputs, continuous1000ms heartbeat, original12s native step deadline, source capture identities and cleanup remain unchanged.",
+      "No app behavior, browser framework, emulator route, hosted admission exception, full qualification, physical device or private board recovery claim. Earlier1480 rationale records preserve all inherited changes and their original distinct evidence."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Observed before the functional predicate edit: actual recorder 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 child/wrapper exit1 assertion-failure, both Chromium and WebKit explicit ERR_ASSERTION: Expected wait: refused-Apply native capture must not complete while the refreshed SDK read is held and preview is null; actual true, expected false. Each engine held exactly one actual users/owner SDK read after the real refused apply, actual completion predicate returned true at preview=null/busy=false, and the actual write-refused source artifact captured preview=null while held. Old verifier TypeError is retained secondary evidence, not the RED oracle. Both owned contexts/browsers/servers closed; zero skips/cancellations.",
+      "recordId": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+      "startedAt": "2026-11-01T04:15:45.825Z",
+      "finishedAt": "2026-11-01T04:16:28.261Z",
+      "references": {
+        "metadata": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.json",
+          "sha256": "5b1173051aaa4f7e912bd4614ef488bb89f25b02a5db31e810d9cd4642379e5b"
+        },
+        "stdout": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.stdout.txt",
+          "sha256": "548aaeff183da5a0a8d4543d996bcb550bce75716689f144f016c6a93d1e76b0"
+        },
+        "stderr": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.stderr.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "derivation": {
+      "issue": 1877,
+      "standaloneStartCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "publishedComparison": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "mainComparison": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "originalRationaleCount": 1480,
+      "originalRawSha256": "abf902e3589c9e734958cfd5441d900865349fbe14205ae5a02f8be0cbf9abaf",
+      "unrelatedInheritedPreimplementationClaimed": false
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "de7720be1ee950c1512b1d7ac8ba8d0a8275bd9485b05bc35902817d9cb97096",
+    "reason": "Atomic #1877 adds the existing-consumer two-engine SDK-held refused-Apply ordering regression and repairs only that consumer completion predicate. This exact 8cd524a7f0ab7a25b6689244722ae3c5baf861c8 comparison preserves the original1480 raw rationale objects and inherited standalone chronology; it does not claim this new RED covers unrelated inherited changes.",
+    "previousBehavior": "After a real refused Apply, the existing native completion predicate accepted the refusal notice, not-busy flag and disabled Apply while reviewDecisionRecovery had cleared its preview before awaiting refreshed sources. Both actual native engines then captured preview=null; the complete verifier subsequently rejected it.",
+    "intendedBehavior": "The same native consumer waits for a real non-null current-serial unselected recovery preview and actual eligible unselected Light choice before capturing complete sources. A deterministically held existing SDK root reply must observe the actual consumer waiting, release within the original deadline and let the unchanged full verifier finish.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review"
+    ],
+    "preservedCoverage": [
+      "The original ordinary repeated saved decision choice retains selection authority and complete sources process root is byte-identical; all its complete64-task/device/cloud/opaque/pending/consent/freshness/CAS/ACK/protected-backup assertions remain.",
+      "The native runner full verifySavedDecisionSources function is byte-identical with SHA25662560d8fe3d64f3081c08e5b865672bcc273a72019c31e32104fc08309ad5318. No optional access accepts missing preview; no source assertion is weakened.",
+      "All60 ordinary scenarios,114 actions,10 repeat cases,64-task fixtures, trusted inputs, continuous1000ms heartbeat, original12s native step deadline, source capture identities and cleanup remain unchanged.",
+      "No app behavior, browser framework, emulator route, hosted admission exception, full qualification, physical device or private board recovery claim. Earlier1480 rationale records preserve all inherited changes and their original distinct evidence."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Observed before the functional predicate edit: actual recorder 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 child/wrapper exit1 assertion-failure, both Chromium and WebKit explicit ERR_ASSERTION: Expected wait: refused-Apply native capture must not complete while the refreshed SDK read is held and preview is null; actual true, expected false. Each engine held exactly one actual users/owner SDK read after the real refused apply, actual completion predicate returned true at preview=null/busy=false, and the actual write-refused source artifact captured preview=null while held. Old verifier TypeError is retained secondary evidence, not the RED oracle. Both owned contexts/browsers/servers closed; zero skips/cancellations.",
+      "recordId": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+      "startedAt": "2026-11-01T04:15:45.825Z",
+      "finishedAt": "2026-11-01T04:16:28.261Z",
+      "references": {
+        "metadata": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.json",
+          "sha256": "5b1173051aaa4f7e912bd4614ef488bb89f25b02a5db31e810d9cd4642379e5b"
+        },
+        "stdout": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.stdout.txt",
+          "sha256": "548aaeff183da5a0a8d4543d996bcb550bce75716689f144f016c6a93d1e76b0"
+        },
+        "stderr": {
+          "path": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8.stderr.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "derivation": {
+      "issue": 1877,
+      "standaloneStartCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "publishedComparison": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "mainComparison": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "originalRationaleCount": 1480,
+      "originalRawSha256": "abf902e3589c9e734958cfd5441d900865349fbe14205ae5a02f8be0cbf9abaf",
+      "unrelatedInheritedPreimplementationClaimed": false
+    }
   }
 ]

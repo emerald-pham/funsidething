@@ -51174,6 +51174,100 @@ test('RISK repository process: ordinary repeated saved decision choice retains s
  });
 });
 
+test('RISK repository process: refused saved decision capture waits for its refreshed unselected review',async t=>{
+ await prepareNativePlaywrightResolution(t);
+ const {runButtonSafety}=await import('./scripts/button-safety-native.mjs'),pw=await import('playwright');
+ const scenario='ordinary repeated saved decision choice',base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);
+ assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&port>0,'Healthy allocated named engines/loopback required');
+ fs.mkdirSync(base,{recursive:true});
+ for(const engine of ['chromium','webkit'])await t.test(engine,async()=>{
+  const output=fs.mkdtempSync(path.join(base,'saved-decision-settled-review-'+engine+'-')),
+   evidence={engine,scenario,events:[],heldReads:0,predicates:[],capture:null,limits:['Existing ordinary64 native scenario and synthetic external SDK boundary only.','Focused desktop-engine process evidence; no complete-cohort, hosted, physical-device or private-board claim.']},
+   runtime=pw[engine],launch=runtime.launch,gate=deferredSyncFixture(),entered=deferredSyncFixture(),restore=[];
+  let page,evaluate,refusedWrite=false,held=false,released=false,nativeError,result;
+  const release=reason=>{if(!released){released=true;evidence.events.push({event:'sdk-read-released',reason,at:Date.now()});gate.resolve();}};
+  runtime.launch=async function(...args){
+   const browser=await launch.apply(this,args),newContext=browser.newContext;
+   restore.push(()=>{browser.newContext=newContext;});
+   browser.newContext=async function(...args){
+    const context=await newContext.apply(this,args),expose=context.exposeBinding,newPage=context.newPage;
+    restore.push(()=>{context.exposeBinding=expose;context.newPage=newPage;});
+    // Delay only the real fixture SDK reply. The app, native steps, source
+    // recorder, heartbeat and complete verifier retain their actual consumers.
+    context.exposeBinding=async function(name,callback,...args){return expose.call(this,name,name==='__installedRPC'?async(...call)=>{
+     const [source,kind,rpcArgs]=call;
+     if(refusedWrite&&!held&&kind==='get'&&rpcArgs[0]==='users/owner'){
+      held=true;evidence.heldReads++;
+      const state=await evaluate(()=>({previewIsNull:decisionRecoveryPreview===null,busy:decisionRecoveryBusy,title:document.querySelector('#modalRoot h2')?.textContent??null,refusalNotice:/cloud sync is not confirmed/i.test(document.getElementById('modalRoot').textContent),applyDisabled:document.querySelector('#modalRoot [data-act="apply-decision-recovery"]')?.disabled===true,at:Date.now()}));
+      evidence.events.push({event:'post-refusal-sdk-read-held',path:rpcArgs[0],samePage:source.page===page,state});
+      entered.resolve();
+      await gate.promise;
+     }
+     const value=await callback(...call);
+     if(kind==='apply'&&value?.fixtureFailure){refusedWrite=true;evidence.events.push({event:'actual-sdk-write-refused',failure:value.fixtureFailure,at:Date.now()});}
+     return value;
+    }:callback,...args);};
+    context.newPage=async function(...args){
+     page=await newPage.apply(this,args);const original=page.evaluate;evaluate=original.bind(page);restore.push(()=>{page.evaluate=original;});
+     page.evaluate=async function(fn,arg){
+      if(arg?.phase==='write-refused'){
+       evidence.events.push({event:'actual-write-refused-capture-requested',whileSdkReadHeld:held&&!released,at:Date.now()});
+       // A fast premature predicate can reach this transport before the SDK
+       // get dispatch. Observe its real capture only once that same read is
+       // held; this barrier supplies no preview and never changes the outcome.
+       if(!held)await fixtureDeadline(entered.promise,'The actual post-refusal refreshed SDK read must enter within the original native deadline',12000);
+      }
+      const wasHeld=held&&!released,value=await original.call(this,fn,arg);
+      // Observe the existing refusal postcondition at its browser transport.
+      // A false outcome is the actual consumer waiting, and releases the SDK
+      // immediately; a true outcome must face its ensuing real source capture.
+      if(wasHeld&&typeof fn==='function'&&fn.toString().includes('/cloud sync is not confirmed/i')){
+       const state=await evaluate(()=>({previewIsNull:decisionRecoveryPreview===null,busy:decisionRecoveryBusy,at:Date.now()}));
+       evidence.predicates.push({value,state});
+       if(value===false)release('consumer-waited-for-review');
+      }
+      if(arg?.phase==='write-refused'){
+       evidence.capture={whileSdkReadHeld:wasHeld,previewIsNull:value.preview===null,at:Date.now(),capturedAtMs:value.capturedAtMs};
+       evidence.events.push({event:'actual-write-refused-source-captured',...evidence.capture});
+       if(wasHeld)release('premature-capture-observed');
+      }
+      return value;
+     };return page;
+    };return context;
+   };return browser;
+  };
+  try{
+   try{result=await runButtonSafety({repo:__dirname,engine,outputDir:output,port,profile:'ordinary',scenarioFilter:scenario});}
+   catch(error){nativeError=error;evidence.nativeError={name:error.name,code:error.code??null,message:error.message,stack:error.stack};}
+   assert.equal(evidence.heldReads,1,'The real refused Apply reaches exactly one controlled refreshed SDK root read');
+   const entry=evidence.events.find(row=>row.event==='post-refusal-sdk-read-held');
+   assert.equal(entry.samePage,true);assert.deepEqual({...entry.state,at:0},{previewIsNull:true,busy:false,title:'Review saved decisions',refusalNotice:true,applyDisabled:true,at:0},'The controlled read exposes the real interim absent preview after the refused native Apply');
+   assert.ok(evidence.capture,'The actual consumer reaches its complete write-refused source capture');
+   assert.equal(evidence.capture.whileSdkReadHeld,false,'Expected wait: refused-Apply native capture must not complete while the refreshed SDK read is held and preview is null');
+   assert.equal(evidence.capture.previewIsNull,false,'The real write-refused source artifact contains a refreshed preview');
+   assert.deepEqual(evidence.predicates.map(row=>({value:row.value,previewIsNull:row.state.previewIsNull,busy:row.state.busy})),[{value:false,previewIsNull:true,busy:false}],'The unchanged consumer waits without treating absent preview as settled');
+   assert.equal(nativeError,undefined,'The original complete saved-decision source verifier must pass: '+nativeError?.message);
+   const report=result.report;
+   assert.equal(report.status,'passed');assert.deepEqual(report.errors,[]);assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});
+   assert.deepEqual(report.scenarios.map(row=>({name:row.name,status:row.status})),[{name:scenario,status:'passed'}]);
+   assert.deepEqual(report.ordinarySavedDecisionPhases.map(row=>row.phase),['seed','settings','baseline-saved','settings-review','read-refused','reviewed','selected','repeated','write-refused','reviewed-retry','selected-retry','applied','final-source']);
+   const captureReference=report.ordinarySavedDecisionPhases.find(row=>row.phase==='write-refused'),captureBytes=fs.readFileSync(path.join(output,captureReference.file)),capture=JSON.parse(captureBytes);
+   assert.equal(createHash('sha256').update(captureBytes).digest('hex'),captureReference.sha256);assert.equal(captureBytes.length,captureReference.bytes);
+   assert.equal(capture.preview.choice,null);assert.deepEqual(capture.view.choices,[{value:'light',selected:'false',disabled:false}]);assert.deepEqual(capture.view.apply,{disabled:true});
+   assert.ok(Number.isSafeInteger(capture.preview.serial)&&capture.preview.serial>0);assert.equal(capture.preview.evidence.pending.generationId,capture.pendingOwner.generationId);
+   assert.ok(report.samples.length>0&&report.samples.every(row=>row.maxFrameGapMs<1000),'The controlled SDK wait preserves every original continuous-heartbeat limit');
+   assert.ok(report.clicks.every(row=>row.trusted)&&report.presses.every(row=>row.trusted),'Every original native input remains trusted');
+   const refusedApply=report.clicks.find(row=>row.action==='act:apply-decision-recovery'),releasedRead=evidence.events.find(row=>row.event==='sdk-read-released');
+   assert.equal(releasedRead.reason,'consumer-waited-for-review');assert.ok(releasedRead.at>=Math.floor(refusedApply.at)&&releasedRead.at-Math.floor(refusedApply.at)<12000,'Release belongs to the original refused Apply deadline');
+   evidence.reportPath=result.reportPath;evidence.passed=true;
+  }finally{
+   release('owned-cleanup');for(const undo of restore.reverse())undo();runtime.launch=launch;
+   fs.writeFileSync(path.join(output,'settled-review-ordering-evidence.json'),JSON.stringify(evidence,null,2)+'\n');
+   t.diagnostic('Focused '+engine+' refused-Apply review ordering evidence: '+output);
+  }
+ });
+});
+
 test('RISK saved decision review guidance: mounted FAQ retains place and explicit save authority',async()=>{
  const {ctx,shim}=await loadApp();await ctx.onAction('help',{});
  const markup=shim.document.getElementById('modalRoot').innerHTML,answer=markup.match(/<dt>What can I do when saved appearances disagree\?<\/dt><dd>(.*?)<\/dd>/)?.[1];

@@ -2564,3 +2564,5 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures
 
 - `RISK repository process: replaced historical roots reject contradictory live assignments before execution` — #1869: existing renamed-root public CLI rejects obsolete source plus explicit target before body/descriptor publication; valid renamed parent and baseline child identities remain required.
+
+- `RISK repository process: refused saved decision capture waits for its refreshed unselected review` — #1877: the existing two-engine ordinary saved-decision consumer holds the actual post-refusal external SDK root reply, requires the consumer to wait while its preview is absent, then releases that reply within the original deadline. The real fresh unselected preview must precede capture, and the unchanged complete source verifier, trusted inputs and continuous1000ms heartbeat remain required. This focused synthetic SDK evidence does not establish full-cohort, hosted or physical-device acceptance.
