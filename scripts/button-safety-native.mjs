@@ -220,7 +220,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
      const raw=JSON.stringify(board),legacyKey='fvp:chain-scanner:v1',legacyBefore=localStorage.getItem(legacyKey);let legacySeeded=false;
      if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')&&legacyBefore===null){localStorage.setItem(legacyKey,raw);legacySeeded=true;}
      const store=ChainStorageV2.createDeviceStore({dbName});await store.open();
-     const backups=Array.from({length:count},(_,i)=>({id:'gate-retained-'+i,kind:'manual',at:Date.now()-i,day:'2026-10-25',payload:JSON.stringify({...board,futureSourceRole:i})}));
+     const retainedEpoch=Date.now(),backups=Array.from({length:count},(_,i)=>({id:'gate-retained-'+i,kind:'manual',at:retainedEpoch-i,day:'2026-10-25',payload:JSON.stringify({...board,futureSourceRole:i})}));
      if(ordinaryUndo){
       if(count!==3)throw Error('The admitted ordinary Undo source fixture requires its exact three originals');
       const kinds=['manual','latest','future-recovery'],roles=['manual','pinned-automatic','unknown-kind'];
