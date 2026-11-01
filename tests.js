@@ -49169,11 +49169,8 @@ webkit.launch=async(...launchArgs)=>{
      const fill=target.fill.bind(target);
      target.fill=async(...fillArgs)=>{
       if(!captured){
-       await page.waitForFunction(async()=>{
-        if(typeof state==='undefined'||state.listOpen!==true)return false;
-        const head=await ScannerDeviceStore.readHead();
-        return typeof head?.payload==='string'&&head.payload===JSON.stringify(state);
-       },null,{timeout:12000});
+       const listOpenPredicate=()=>typeof state!=='undefined'&&state.listOpen===true;
+       await page.waitForFunction(listOpenPredicate,null,{timeout:12000});
        const observed=await page.evaluate(async()=>{
         const deadline=performance.now()+12000,nextFrame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
         while(performance.now()<deadline){
@@ -49191,6 +49188,7 @@ webkit.launch=async(...launchArgs)=>{
         throw new Error('Bounded wait did not observe one stable durable list-opening daily before the first title input');
        });
        const artifact={schemaVersion:1,boundary:'before-first-actual-title-fill',beforeFirstTitleInput:true,...observed,
+        waitForFunctionPredicateConstructor:listOpenPredicate.constructor.name,
         currentHash:sha256(observed.current),durableHash:sha256(observed.durable),
         backupProofs:observed.backups.map(row=>({id:row.id,kind:row.kind,day:row.day,at:row.at,payloadBytes:Buffer.byteLength(row.payload),payloadHash:sha256(row.payload),rowHash:sha256(JSON.stringify(row))}))};
        await fs.promises.writeFile(artifactPath,JSON.stringify(artifact,null,2)+'\\n',{flag:'wx'});captured=true;
@@ -49375,14 +49373,17 @@ webkit.launch=async(...launchArgs)=>{
  assert.throws(()=>readSourceArtifact({...report.ordinaryUndoFinalSource,sha256:'0'.repeat(64)},'final-source',finalBytes),/Exact source artifact file hash/,'Wrong final file hash fails');
  assert.equal(result.status,0,'The ordinary two-frame Undo consumer and its report must pass: '+result.stderr);
  t.diagnostic('Focused ordinary two-frame Undo evidence: '+path.join(output,reports[0]));
+ return{preTitleWaitPredicateConstructor:listOpen.waitForFunctionPredicateConstructor};
 };
 
-test("RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",async t=>{
- await runOrdinaryUndoSourceConsumer(t);
+test("RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",async function verifyOrdinaryUndoPreTitlePredicate(t){
+ const observed=await runOrdinaryUndoSourceConsumer(t);
+ assert.equal(observed.preTitleWaitPredicateConstructor,'Function','The actual pre-title Playwright wait predicate is synchronous');
 });
 
-test("RISK repository process: fractional native Undo click receipts preserve high-resolution time",async t=>{
- await runOrdinaryUndoSourceConsumer(t,{fractionalClickClock:true});
+test("RISK repository process: fractional native Undo click receipts preserve high-resolution time",async function verifyFractionalUndoPreTitlePredicate(t){
+ const observed=await runOrdinaryUndoSourceConsumer(t,{fractionalClickClock:true});
+ assert.equal(observed.preTitleWaitPredicateConstructor,'Function','The actual fractional-clock pre-title Playwright wait predicate is synchronous');
 });
 
 test('RISK repository process: native button gate cannot omit a required stress scenario',t=>{
