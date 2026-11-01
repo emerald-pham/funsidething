@@ -1159,3 +1159,88 @@ test('test group public workflow retains selected workload evidence without admi
  ];
  for(const[label,mutateRequired]of mandatoryCases)await parent.test(label,sub=>{const{child,report}=execute(sub,label,{selected:true,mutateRequired});assert.notEqual(child.status,0,'Selected complete optional diagnostics cannot replace '+label);assert.equal(report.status,'failed');assert.ok(report.issues.length>0);});
 });
+
+
+function currentServiceFixture(t) {
+  const fixture=createFixture(t),file=path.join(fixture.root,'scripts/test-group-assignments.json');
+  const declared=JSON.parse(fs.readFileSync(path.join(repository,'scripts/test-group-assignments.json'),'utf8')).currentServiceCases;
+  assert.equal(declared.length,6,'The diagnosed current service cohort contains exactly six cases');
+  const assignments=JSON.parse(fs.readFileSync(file));
+  assignments.currentServiceCases=declared;
+  assignments.rootAssignments.push(...declared.map(({id,file,group})=>({root:id,file,group})));
+  writeJson(file,assignments);
+  fs.appendFileSync(path.join(fixture.root,'tests.js'),'\n'+declared.map(({id})=>`if(process.env.CHAIN_SERVICE_FIXTURE_OMIT!==${JSON.stringify(id)}){\n test(${JSON.stringify(id)},{skip:!process.env.FIRESTORE_EMULATOR_HOST},t=>{if(process.env.CHAIN_SERVICE_FIXTURE_SKIP===${JSON.stringify(id)})t.skip('intentional emulator-present service skip');});\n}\n`).join(''));
+  git(fixture.root,'add','.');git(fixture.root,'commit','-qm','add current service fixture consumers');
+  fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');fixture.currentServiceCases=declared;
+  return fixture;
+}
+
+test('test group runner accounts for current service skips only without an emulator',async t=>{
+  const fixture=currentServiceFixture(t),result=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:''}});
+  assert.equal(result.status,0,'Declared current service roots must stay required and retain real no-emulator skip outcomes: '+result.stdout+'\n'+result.stderr);
+  assert.deepEqual(result.evidence.currentServiceCases,fixture.currentServiceCases);
+  assert.deepEqual(result.evidence.process.environmentPresence,{FIRESTORE_EMULATOR_HOST:false});
+  assert.equal(result.evidence.inventory.requiredCasesForGroup,8,'The six current cases augment rather than replace the two historical required core cases');
+  assert.equal(result.evidence.inventory.baselineAcceptedSkips,1,'Historical skip inventory stays immutable');
+  for(const {id} of fixture.currentServiceCases)assert.equal(result.evidence.cases.find(item=>item.id===id)?.status,'skipped');
+  const described=invoke(fixture,{args:['--describe'],env:{FIRESTORE_EMULATOR_HOST:''}});assert.equal(described.status,0,described.stdout+described.stderr);
+  const descriptor=JSON.parse(fs.readFileSync(path.join(described.outputDir,'descriptor.json')));
+  assert.deepEqual(descriptor.currentServiceCases,fixture.currentServiceCases);
+  for(const {id} of fixture.currentServiceCases)assert.ok(descriptor.groups.find(item=>item.id==='core').requiredCaseIds.includes(id));
+  const present=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:'127.0.0.1:1'}});assert.equal(present.status,0,present.stdout+present.stderr);
+  assert.deepEqual(present.evidence.process.environmentPresence,{FIRESTORE_EMULATOR_HOST:true});
+  for(const {id} of fixture.currentServiceCases)assert.equal(present.evidence.cases.find(item=>item.id===id)?.status,'passed');
+  const skipped=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:'127.0.0.1:1',CHAIN_SERVICE_FIXTURE_SKIP:fixture.currentServiceCases[0].id}});
+  assert.notEqual(skipped.status,0,'An emulator-present child cannot use the no-emulator service classification');
+  assert.equal(skipped.evidence.process.environmentPresence.FIRESTORE_EMULATOR_HOST,true);
+  assert.match(skipped.evidence.issues.join('\n'),/unexpectedly skipped/);
+  const missing=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:'',CHAIN_SERVICE_FIXTURE_OMIT:fixture.currentServiceCases[0].id}});
+  assert.notEqual(missing.status,0,'No emulator cannot excuse an omitted required service outcome');assert.match(missing.evidence.issues.join('\n'),/did not execute|missing/);
+  await t.test('duplicate actual service outcome is refused',sub=>{
+    const f=currentServiceFixture(sub),id=f.currentServiceCases[0].id;
+    fs.appendFileSync(path.join(f.root,'tests.js'),`\nconst duplicateServiceTitle=${JSON.stringify(id)};test(duplicateServiceTitle,{skip:true},()=>{});\n`);
+    const result=invoke(f,{env:{FIRESTORE_EMULATOR_HOST:''}});assert.notEqual(result.status,0);assert.match(result.evidence.issues.join('\n'),/executed more than once/);
+  });
+  await t.test('unknown assigned skip stays forbidden',sub=>{
+    const f=currentServiceFixture(sub),file=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(file));
+    a.rootAssignments.push({root:'unknown current environment skip',file:'tests.js',group:'core'});writeJson(file,a);
+    fs.appendFileSync(path.join(f.root,'tests.js'),"\ntest('unknown current environment skip',{skip:true},()=>{});\n");
+    const result=invoke(f,{env:{FIRESTORE_EMULATOR_HOST:''}});assert.notEqual(result.status,0);assert.match(result.evidence.issues.join('\n'),/unexpectedly skipped: unknown current environment skip/);
+  });
+  for(const [label,mutate] of [
+    ['missing declaration',a=>{delete a.currentServiceCases;}],
+    ['missing classified ID',a=>a.currentServiceCases.pop()],
+    ['duplicate classified ID',a=>{a.currentServiceCases[0]={...a.currentServiceCases[1]};}],
+    ['unknown classified ID',a=>{a.currentServiceCases[0].id='unknown current service';}],
+    ['broadened classified cohort',a=>a.currentServiceCases.push({...a.currentServiceCases[0],id:'another current service'})],
+    ['wrong group',a=>{a.currentServiceCases[0].group='native-process';}],
+    ['wrong source file',a=>{a.currentServiceCases[0].file='scripts/agent-tools/fixture.test.mjs';}],
+    ['wrong environment',a=>{a.currentServiceCases[0].environment='LANDSCAPE_BROWSER_URL';}],
+    ['wrong mandatory gate',a=>{a.currentServiceCases[0].mandatoryGate='compatibility';}],
+    ['unknown policy field',a=>{a.currentServiceCases[0].allowOtherSkips=true;}],
+  ])await t.test(label,sub=>{
+    const f=currentServiceFixture(sub),file=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(file));mutate(a);writeJson(file,a);
+    const result=invoke(f,{args:['--describe']});assert.notEqual(result.status,0,label+' must fail before a child starts');assert.match(result.stderr,/Current service/);assert.equal(result.evidence.process,null);
+  });
+  await t.test('source guard mismatch is refused',sub=>{
+    const f=currentServiceFixture(sub),file=path.join(f.root,'tests.js');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('skip:!process.env.FIRESTORE_EMULATOR_HOST','skip:false'));
+    const result=invoke(f,{args:['--describe']});assert.notEqual(result.status,0);assert.match(result.stderr,/Current service declaration/);
+  });
+  const assignmentFile=path.join(fixture.root,'scripts/test-group-assignments.json'),before=fs.readFileSync(assignmentFile),a=JSON.parse(before),inventoryFile=path.join(fixture.root,'scripts/test-group-inventory.json'),inventoryBytes=fs.readFileSync(inventoryFile);
+  a.currentServiceCases.reverse();writeJson(assignmentFile,a);const reordered=invoke(fixture,{args:['--describe']});assert.equal(reordered.status,0,reordered.stderr);
+  assert.notEqual(reordered.evidence.resultIdentity.cohortDigestSha256,described.evidence.resultIdentity.cohortDigestSha256,'Complete cohort digest binds the current classification itself');
+  assert.deepEqual(fs.readFileSync(inventoryFile),inventoryBytes);fs.writeFileSync(assignmentFile,before);
+  fixture.originals=new Map();for(const group of groups){const observed=invoke(fixture,{group,env:{FIRESTORE_EMULATOR_HOST:''}});assert.equal(observed.status,0,observed.stdout+observed.stderr);fixture.originals.set(group,observed.outputDir);}
+  const aggregate=aggregateCopy(t,fixture);assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(aggregate.outputDir,'aggregate.json')));assert.deepEqual(report.currentServiceCases,fixture.currentServiceCases);assert.equal(report.caseCount,12);
+  for(const [label,mutate] of [
+    ['missing environment metadata',record=>{delete record.process.environmentPresence;}],
+    ['emulator-present actual skips',record=>{record.process.environmentPresence.FIRESTORE_EMULATOR_HOST=true;}],
+    ['string environment metadata',record=>{record.process.environmentPresence.FIRESTORE_EMULATOR_HOST='false';}],
+    ['mismatched current declaration',record=>record.currentServiceCases.pop()],
+    ['missing current declaration',record=>{delete record.currentServiceCases;}],
+  ])await t.test('aggregate refuses '+label,sub=>{
+    const observed=aggregateCopy(sub,fixture,collected=>{const file=path.join(collected,'core/result.json'),record=JSON.parse(fs.readFileSync(file));mutate(record);writeJson(file,record);});
+    assert.notEqual(observed.status,0,label+' must fail aggregate reconciliation');assert.match(observed.stderr,/environment-presence|unexpectedly skipped|source-bound descriptor/);
+  });
+});

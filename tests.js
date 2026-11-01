@@ -53330,3 +53330,17 @@ test('RISK repository process: replaced historical roots reject contradictory li
  assert.equal(result.status,0,'Contradictory source/target assignments must fail before execution while valid renamed roots retain baseline children: '+output);
  assert.match(result.stdout||'',/^# tests 1$/m);assert.match(result.stdout||'',/^# skipped 0$/m);
 });
+
+
+test("RISK repository process: mandatory rules evidence requires each current service consumer",()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+});
+
+
+test("RISK repository process: current service skips retain required source-bound grouped accounting",()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group runner accounts for current service skips only without an emulator$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:60000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+});

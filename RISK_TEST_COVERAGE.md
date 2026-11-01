@@ -2564,3 +2564,7 @@ The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to 
 - RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures
 
 - `RISK repository process: replaced historical roots reject contradictory live assignments before execution` — #1869: existing renamed-root public CLI rejects obsolete source plus explicit target before body/descriptor publication; valid renamed parent and baseline child identities remain required.
+
+- `RISK repository process: mandatory rules evidence requires each current service consumer`: the existing workflow run-gate consumer rejects coherent passing totals when an exact current Firestore service consumer is absent; the same named process fixture retains ordinary execution, reuse and runtime invalidation.
+
+- `RISK repository process: current service skips retain required source-bound grouped accounting`: the real group CLI retains the six current Firestore roots as required cases, reports their actual skips only without the emulator, and binds their separate current declaration into cohort/result accounting.

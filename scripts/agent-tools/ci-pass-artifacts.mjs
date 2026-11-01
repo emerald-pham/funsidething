@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { emulatorTapEvidence } from './ci-pass-reuse.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const safePath=value=>typeof value==='string'&&/^[A-Za-z0-9_./-]+$/.test(value)&&!value.startsWith('/')&&!value.split('/').some(part=>!part||part==='.'||part==='..');
@@ -64,7 +65,9 @@ export function originalArtifactVerifier(readApi){
     if(identity.repository!==pass.inputs.repository||identity.selectedGroup!==gate||identity.checkoutDirty!==false||report.status!=='passed'||report.coverage||report.process?.exitCode!==0||report.process.signal||report.process.error||report.process.spawnError)throw new Error('Original result is not a clean successful execution.');
     if(emulator){
       if(!(report.tests>=(gate==='rules'?24:15))||report.tests!==report.passed)throw new Error('Original emulator cohort is incomplete.');
-      read('stdout.tap',report.process.stdoutSha256);read('stderr.log',report.process.stderrSha256);
+      const evidence=emulatorTapEvidence(gate,read('stdout.tap',report.process.stdoutSha256).toString('utf8'));
+      if(evidence.issues.length||evidence.tests!==report.tests||evidence.passed!==report.passed)throw new Error('Original emulator TAP does not prove its complete exact service cohort.');
+      read('stderr.log',report.process.stderrSha256);
     }else{
       if(report.issues?.length!==0||!Array.isArray(report.cases)||!report.cases.length||!Array.isArray(report.artifacts))throw new Error('Original group cohort is incomplete.');
       for(const output of [report.process.stdout,report.process.stderr])read(output?.path,output?.sha256);
