@@ -51604,5 +51604,308 @@
       "joined1873HostedFixtureExpected": 24,
       "nativeReplayClaimed": false
     }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "1de9b1d3d2d2ce5921d82a1754c84ce5bdfe182d798b4a8342cece48ecd461e1",
+    "reason": "Reconcile the accepted atomic1870/1873/1874/1875/1876/1877 repairs into one source-preserving integration candidate. This merger unions the hosted-direct selectors and both evidence writers to24 expected outcomes, retains all source assertions and app bytes, and appends exact joined fingerprints without rewriting historical rationale counts or chronology.",
+    "previousBehavior": "The admitted2c integration predates four independently repaired branches. Their individual process/native evidence remains attached to their exact commits; each individual test fingerprint does not identify the joined source and the overlapping hosted fixtures separately expected21 and16 outcomes.",
+    "intendedBehavior": "One normal-merge candidate retains every accepted owner change and all original feature contracts. The hosted-direct fixture includes1873 seven selectors plus1877 refreshed-review selector for24 expected actual outcomes; final joined native/full qualification remains ROOT-owned and has not run.",
+    "replacementTests": [
+      "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "RISK repository process: current service skips retain required source-bound grouped accounting",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+      "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review"
+    ],
+    "preservedCoverage": [
+      "All common1480 rationale objects and all29 unique owner appended objects remain literal raw byte strings and ordered; historic1480/1491/1492 counts remain unchanged in those records.",
+      "Every original source, authority, consent, freshness, pending, CAS, ACK, opaque and protected-backup assertion remains; ordinary60 scenarios114 actions10 repeats64-task fixture and1000ms continuous heartbeat/deadlines/pixel contracts remain exact.",
+      "The six current guarded Firestore service outcomes remain separately source-accounted; actual mandatory rules admission still requires all six passing exact consumers.",
+      "All36 offline entries and31 renderer app assets, rules, version, FAQ/changelog and seven optional workloads remain unchanged from2c; no actual hosted/full/release acceptance is inferred from owner evidence."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs ; Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension. ; env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs ; env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Retained actual owner preimplementation failures, not new merger RED chronology: agent/1299-service-accounting-1870: Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof. | agent/1299-hosted-native-1873: Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure. | agent/1299-hash-pending-scene-1876: At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d. | agent/1299-settled-review-1877: Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "originalOwnerEvidence": [
+        {
+          "ref": "agent/1299-service-accounting-1870",
+          "commit": "bcf0d64213a7f94fb40510987e7cad76188126e2",
+          "sourceRecordCount": 1483,
+          "redEvidence": {
+            "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs",
+            "failure": "Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof.",
+            "records": [
+              "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-20-46-363Z-90779059-c849-4fd2-a19e-11a20164169e.json",
+              "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-23-41-171Z-6f628c1b-72f8-4241-9927-dfc439702a3d.json"
+            ],
+            "observedSourceSha": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+            "observedSourceTree": "e9c0fb9dc667ce24c653b4bf722c4967a52c4682",
+            "chronology": "Rules predicate implementation follows the first RED; grouped accounting implementation follows the separate second RED. Combined base bindings derive from retained earlier admissions plus these new additions; no earlier-base preimplementation run is invented."
+          },
+          "replacementTests": [
+            "RISK repository process: mandatory rules evidence requires each current service consumer",
+            "RISK repository process: current service skips retain required source-bound grouped accounting"
+          ]
+        },
+        {
+          "ref": "agent/1299-hosted-native-1873",
+          "commit": "2b4db5c3b3059ee176ae3740afeef3d5c77dc903",
+          "sourceRecordCount": 1492,
+          "redEvidence": {
+            "command": "Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension.",
+            "failure": "Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure."
+          },
+          "replacementTests": [
+            "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+          ]
+        },
+        {
+          "ref": "agent/1299-hash-pending-scene-1876",
+          "commit": "5eccc86d74e60ea1cd3cd183305039ddaa56e11c",
+          "sourceRecordCount": 1483,
+          "redEvidence": {
+            "command": "env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs",
+            "failure": "At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d."
+          },
+          "replacementTests": [
+            "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+          ]
+        },
+        {
+          "ref": "agent/1299-settled-review-1877",
+          "commit": "b62e0d82abb83789ecd30e6e47f8fb379d2fbe66",
+          "sourceRecordCount": 1491,
+          "redEvidence": {
+            "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+            "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+            "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+            "startedAt": "2026-11-01T04:21:39.675Z",
+            "finishedAt": "2026-11-01T04:21:40.027Z",
+            "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+            "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+            "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+            "metadataCheckFailure": "Later d5cc1ba checks fail Regression rationale must name replacement tests added or updated in this diff; records544a599c,d4064073,8a134d02. They are structural checks, not functional preimplementation RED. Original8cb ordering and5df guard evidence remains unchanged."
+          },
+          "replacementTests": [
+            "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+            "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+          ]
+        }
+      ]
+    },
+    "integrationDerivation": {
+      "joinedSourceCommitBeforeMetadata": "cbab8f5723b9f3491a0ddd62f48f6d701d3324f2",
+      "comparison": "git diff --unified=0 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48...HEAD -- tests.js",
+      "patchSha256": "1db5ea7432a056902939705cd75faeab0c57fd4ddc20ac5748bf1fd7f8d63792",
+      "rawCommonRecords": 1480,
+      "rawUniqueOwnerAdditions": 29,
+      "joinedPriorRecordCount": 1509,
+      "hostedExpectedOutcomeUnion": 24,
+      "newNativeExecution": false,
+      "newBehavioralRedClaimed": false
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "eeac1de8e9f48c2d0999a67c2c7695ab89de43b8b6f1d4b5fb3ee86a75bb409a",
+    "reason": "Reconcile the accepted atomic1870/1873/1874/1875/1876/1877 repairs into one source-preserving integration candidate. This merger unions the hosted-direct selectors and both evidence writers to24 expected outcomes, retains all source assertions and app bytes, and appends exact joined fingerprints without rewriting historical rationale counts or chronology.",
+    "previousBehavior": "The admitted2c integration predates four independently repaired branches. Their individual process/native evidence remains attached to their exact commits; each individual test fingerprint does not identify the joined source and the overlapping hosted fixtures separately expected21 and16 outcomes.",
+    "intendedBehavior": "One normal-merge candidate retains every accepted owner change and all original feature contracts. The hosted-direct fixture includes1873 seven selectors plus1877 refreshed-review selector for24 expected actual outcomes; final joined native/full qualification remains ROOT-owned and has not run.",
+    "replacementTests": [
+      "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "RISK repository process: current service skips retain required source-bound grouped accounting",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+      "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review"
+    ],
+    "preservedCoverage": [
+      "All common1480 rationale objects and all29 unique owner appended objects remain literal raw byte strings and ordered; historic1480/1491/1492 counts remain unchanged in those records.",
+      "Every original source, authority, consent, freshness, pending, CAS, ACK, opaque and protected-backup assertion remains; ordinary60 scenarios114 actions10 repeats64-task fixture and1000ms continuous heartbeat/deadlines/pixel contracts remain exact.",
+      "The six current guarded Firestore service outcomes remain separately source-accounted; actual mandatory rules admission still requires all six passing exact consumers.",
+      "All36 offline entries and31 renderer app assets, rules, version, FAQ/changelog and seven optional workloads remain unchanged from2c; no actual hosted/full/release acceptance is inferred from owner evidence."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs ; Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension. ; env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs ; env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Retained actual owner preimplementation failures, not new merger RED chronology: agent/1299-service-accounting-1870: Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof. | agent/1299-hosted-native-1873: Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure. | agent/1299-hash-pending-scene-1876: At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d. | agent/1299-settled-review-1877: Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "originalOwnerEvidence": [
+        {
+          "ref": "agent/1299-service-accounting-1870",
+          "commit": "bcf0d64213a7f94fb40510987e7cad76188126e2",
+          "sourceRecordCount": 1483,
+          "redEvidence": {
+            "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs",
+            "failure": "Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof.",
+            "records": [
+              "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-20-46-363Z-90779059-c849-4fd2-a19e-11a20164169e.json",
+              "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-23-41-171Z-6f628c1b-72f8-4241-9927-dfc439702a3d.json"
+            ],
+            "observedSourceSha": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+            "observedSourceTree": "e9c0fb9dc667ce24c653b4bf722c4967a52c4682",
+            "chronology": "Rules predicate implementation follows the first RED; grouped accounting implementation follows the separate second RED. Combined base bindings derive from retained earlier admissions plus these new additions; no earlier-base preimplementation run is invented."
+          },
+          "replacementTests": [
+            "RISK repository process: mandatory rules evidence requires each current service consumer",
+            "RISK repository process: current service skips retain required source-bound grouped accounting"
+          ]
+        },
+        {
+          "ref": "agent/1299-hosted-native-1873",
+          "commit": "2b4db5c3b3059ee176ae3740afeef3d5c77dc903",
+          "sourceRecordCount": 1492,
+          "redEvidence": {
+            "command": "Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension.",
+            "failure": "Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure."
+          },
+          "replacementTests": [
+            "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+          ]
+        },
+        {
+          "ref": "agent/1299-hash-pending-scene-1876",
+          "commit": "5eccc86d74e60ea1cd3cd183305039ddaa56e11c",
+          "sourceRecordCount": 1483,
+          "redEvidence": {
+            "command": "env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs",
+            "failure": "At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d."
+          },
+          "replacementTests": [
+            "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+          ]
+        },
+        {
+          "ref": "agent/1299-settled-review-1877",
+          "commit": "b62e0d82abb83789ecd30e6e47f8fb379d2fbe66",
+          "sourceRecordCount": 1491,
+          "redEvidence": {
+            "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+            "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+            "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+            "startedAt": "2026-11-01T04:21:39.675Z",
+            "finishedAt": "2026-11-01T04:21:40.027Z",
+            "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+            "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+            "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+            "metadataCheckFailure": "Later d5cc1ba checks fail Regression rationale must name replacement tests added or updated in this diff; records544a599c,d4064073,8a134d02. They are structural checks, not functional preimplementation RED. Original8cb ordering and5df guard evidence remains unchanged."
+          },
+          "replacementTests": [
+            "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+            "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+          ]
+        }
+      ]
+    },
+    "integrationDerivation": {
+      "joinedSourceCommitBeforeMetadata": "cbab8f5723b9f3491a0ddd62f48f6d701d3324f2",
+      "comparison": "git diff --unified=0 6443761512cd652d02955fb93826dc3baa5daca3...HEAD -- tests.js",
+      "patchSha256": "a97b67eecf53de77915ea720a29a190abbd0192d2ea6940ea19504214dc4e33a",
+      "rawCommonRecords": 1480,
+      "rawUniqueOwnerAdditions": 29,
+      "joinedPriorRecordCount": 1509,
+      "hostedExpectedOutcomeUnion": 24,
+      "newNativeExecution": false,
+      "newBehavioralRedClaimed": false
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "19959b93c010e420b0d91d4635637df5b89f0b85298181887712f502f3b9090a",
+    "reason": "Reconcile the accepted atomic1870/1873/1874/1875/1876/1877 repairs into one source-preserving integration candidate. This merger unions the hosted-direct selectors and both evidence writers to24 expected outcomes, retains all source assertions and app bytes, and appends exact joined fingerprints without rewriting historical rationale counts or chronology.",
+    "previousBehavior": "The admitted2c integration predates four independently repaired branches. Their individual process/native evidence remains attached to their exact commits; each individual test fingerprint does not identify the joined source and the overlapping hosted fixtures separately expected21 and16 outcomes.",
+    "intendedBehavior": "One normal-merge candidate retains every accepted owner change and all original feature contracts. The hosted-direct fixture includes1873 seven selectors plus1877 refreshed-review selector for24 expected actual outcomes; final joined native/full qualification remains ROOT-owned and has not run.",
+    "replacementTests": [
+      "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "RISK repository process: current service skips retain required source-bound grouped accounting",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+      "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review"
+    ],
+    "preservedCoverage": [
+      "All common1480 rationale objects and all29 unique owner appended objects remain literal raw byte strings and ordered; historic1480/1491/1492 counts remain unchanged in those records.",
+      "Every original source, authority, consent, freshness, pending, CAS, ACK, opaque and protected-backup assertion remains; ordinary60 scenarios114 actions10 repeats64-task fixture and1000ms continuous heartbeat/deadlines/pixel contracts remain exact.",
+      "The six current guarded Firestore service outcomes remain separately source-accounted; actual mandatory rules admission still requires all six passing exact consumers.",
+      "All36 offline entries and31 renderer app assets, rules, version, FAQ/changelog and seven optional workloads remain unchanged from2c; no actual hosted/full/release acceptance is inferred from owner evidence."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs ; Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension. ; env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs ; env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Retained actual owner preimplementation failures, not new merger RED chronology: agent/1299-service-accounting-1870: Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof. | agent/1299-hosted-native-1873: Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure. | agent/1299-hash-pending-scene-1876: At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d. | agent/1299-settled-review-1877: Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "originalOwnerEvidence": [
+        {
+          "ref": "agent/1299-service-accounting-1870",
+          "commit": "bcf0d64213a7f94fb40510987e7cad76188126e2",
+          "sourceRecordCount": 1483,
+          "redEvidence": {
+            "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs",
+            "failure": "Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof.",
+            "records": [
+              "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-20-46-363Z-90779059-c849-4fd2-a19e-11a20164169e.json",
+              "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-23-41-171Z-6f628c1b-72f8-4241-9927-dfc439702a3d.json"
+            ],
+            "observedSourceSha": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+            "observedSourceTree": "e9c0fb9dc667ce24c653b4bf722c4967a52c4682",
+            "chronology": "Rules predicate implementation follows the first RED; grouped accounting implementation follows the separate second RED. Combined base bindings derive from retained earlier admissions plus these new additions; no earlier-base preimplementation run is invented."
+          },
+          "replacementTests": [
+            "RISK repository process: mandatory rules evidence requires each current service consumer",
+            "RISK repository process: current service skips retain required source-bound grouped accounting"
+          ]
+        },
+        {
+          "ref": "agent/1299-hosted-native-1873",
+          "commit": "2b4db5c3b3059ee176ae3740afeef3d5c77dc903",
+          "sourceRecordCount": 1492,
+          "redEvidence": {
+            "command": "Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension.",
+            "failure": "Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure."
+          },
+          "replacementTests": [
+            "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+          ]
+        },
+        {
+          "ref": "agent/1299-hash-pending-scene-1876",
+          "commit": "5eccc86d74e60ea1cd3cd183305039ddaa56e11c",
+          "sourceRecordCount": 1483,
+          "redEvidence": {
+            "command": "env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs",
+            "failure": "At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d."
+          },
+          "replacementTests": [
+            "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+          ]
+        },
+        {
+          "ref": "agent/1299-settled-review-1877",
+          "commit": "b62e0d82abb83789ecd30e6e47f8fb379d2fbe66",
+          "sourceRecordCount": 1491,
+          "redEvidence": {
+            "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+            "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+            "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+            "startedAt": "2026-11-01T04:21:39.675Z",
+            "finishedAt": "2026-11-01T04:21:40.027Z",
+            "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+            "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+            "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+            "metadataCheckFailure": "Later d5cc1ba checks fail Regression rationale must name replacement tests added or updated in this diff; records544a599c,d4064073,8a134d02. They are structural checks, not functional preimplementation RED. Original8cb ordering and5df guard evidence remains unchanged."
+          },
+          "replacementTests": [
+            "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+            "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+          ]
+        }
+      ]
+    },
+    "integrationDerivation": {
+      "joinedSourceCommitBeforeMetadata": "cbab8f5723b9f3491a0ddd62f48f6d701d3324f2",
+      "comparison": "git diff --unified=0 8cd524a7f0ab7a25b6689244722ae3c5baf861c8...HEAD -- tests.js",
+      "patchSha256": "c155c37acf12b5d5d3b4373585c1de9a967964768d918206984254de798e67f8",
+      "rawCommonRecords": 1480,
+      "rawUniqueOwnerAdditions": 29,
+      "joinedPriorRecordCount": 1509,
+      "hostedExpectedOutcomeUnion": 24,
+      "newNativeExecution": false,
+      "newBehavioralRedClaimed": false
+    }
   }
 ]
