@@ -81,7 +81,8 @@ test('owned native process reconciles a witnessed executable-only terminal read 
 });
 
 test('owned native process reconciles a witnessed descendant while retaining its actual browser close',async t=>{
- const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-terminal-descendant-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');let prior,partial,rootPid;
+ const retainedRoot=path.resolve(process.env.CHAIN_NATIVE_OUTPUT||os.tmpdir());fs.mkdirSync(retainedRoot,{recursive:true});
+ const outputDir=fs.mkdtempSync(path.join(retainedRoot,'chain-owned-terminal-descendant-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');let prior,partial,rootPid;
  const signals=[];
  const readProcessTable=()=>{
   const rows=readNativeProcessTable();rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath)?.pid;
@@ -93,6 +94,8 @@ test('owned native process reconciles a witnessed descendant while retaining its
  const fixture=`import{spawn}from'node:child_process';import fs from'node:fs';const c=spawn(process.execPath,['-e',${JSON.stringify(child)}],{detached:true,stdio:['ignore','pipe','inherit']});c.stdout.once('data',()=>{console.log('pw:browser <launched> pid='+c.pid);fs.writeFileSync(${JSON.stringify(ready)},'ready');});c.once('close',(code,signal)=>console.log('pw:browser [pid='+c.pid+'] <process did exit: exitCode='+code+', signal='+signal+'>'));`;
  const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['--input-type=module','-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
  t.diagnostic('Real descendant terminal chronology and actual browser close: '+outputDir);
+ if(process.env.CHAIN_NATIVE_OUTPUT)assert.equal(path.dirname(outputDir),path.resolve(process.env.CHAIN_NATIVE_OUTPUT),'The witnessed descendant control retains its lifecycle receipt in collected native output before asserting');
+ for(const file of ['process.json','frontier.jsonl','stdout.tap','stderr.txt'])assert.ok(fs.existsSync(path.join(outputDir,file)),'The witnessed descendant control retains '+file+' before asserting');
  assert.ok(prior&&partial);assert.equal(receipt.status,0);assert.equal(alive(prior.pid),false);assert.equal(receipt.cleanup.complete,true);assert.deepEqual(receipt.refusals,[]);assert.equal(signals.some(row=>row.signal!==0),false);
  const incident=receipt.incidents[0];assert.equal(incident.status,'resolved');assert.deepEqual(incident.observation,partial);assert.deepEqual(incident.priorIdentity,prior);assert.equal(incident.priorProof.kind,'observed-owned-ancestry');assert.equal(incident.priorProof.parentIdentity.pid,prior.ppid);assert.equal(incident.resolution.proof.kind,'kernel-absence');assert.equal(incident.resolution.proof.result,'ESRCH');
  assert.equal(receipt.browserLaunches.length,1);const browser=receipt.browserLaunches[0];assert.equal(browser.pid,prior.pid);assert.equal(browser.status,'owned');assert.equal(browser.actualExit.owner,true);assert.equal(browser.actualExit.exitCode,0);assert.equal(browser.actualExit.signal,null);assert.equal(browser.finalState.status,'nonlive');assert.equal(receipt.browserExits.length,1);
