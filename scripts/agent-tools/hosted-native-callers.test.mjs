@@ -50,7 +50,8 @@ test('owned native process retains real normal output and closes without teardow
 });
 
 test('owned native process reconciles a witnessed executable-only terminal read after actual exit',async t=>{
- const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-terminal-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');
+ const retainedRoot=path.resolve(process.env.CHAIN_NATIVE_OUTPUT||os.tmpdir());fs.mkdirSync(retainedRoot,{recursive:true});
+ const outputDir=fs.mkdtempSync(path.join(retainedRoot,'chain-owned-terminal-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');
  const before=new Set(readNativeProcessTable().map(row=>row.pid));let prior,partial;
  const signals=[];
  const readProcessTable=()=>{
@@ -66,6 +67,8 @@ test('owned native process reconciles a witnessed executable-only terminal read 
  const fixture=`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},'ready');const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)})){clearInterval(timer);console.log('actual-normal-exit');}},5);`;
  const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
  t.diagnostic('Real terminal identity chronology and receipt: '+outputDir);
+ if(process.env.CHAIN_NATIVE_OUTPUT)assert.equal(path.dirname(outputDir),path.resolve(process.env.CHAIN_NATIVE_OUTPUT),'The strict absence control retains its lifecycle receipt in collected native output before asserting');
+ for(const file of ['process.json','frontier.jsonl','stdout.tap','stderr.txt'])assert.ok(fs.existsSync(path.join(outputDir,file)),'The strict absence control retains '+file+' before asserting');
  assert.ok(prior&&partial,'The actual child was fully witnessed before executable-only loss');
  for(const key of ['pid','ppid','startIdentity','startPrecision','uid','pidNamespace'])assert.equal(partial[key],prior[key],key+' remains exact through the partial read');
  assert.equal(receipt.status,0);assert.equal(receipt.exit.code,0);assert.equal(receipt.close.code,0);assert.equal(alive(prior.pid),false,'Independent kernel probe proves the actual witnessed child is gone');
