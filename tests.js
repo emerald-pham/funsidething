@@ -49068,7 +49068,7 @@ const runOrdinaryUndoSourceConsumer=async(t,{fractionalClickClock=false}={})=>{
       assert.equal(listOpen.currentHash,sourceHash(listOpen.current));assert.equal(listOpen.durableHash,sourceHash(listOpen.durable));
       assert.equal(listOpen.headHash,listOpen.durableHash);assert.equal(JSON.parse(listOpen.current).listOpen,true);
       assert.equal(listOpen.listToggleClick?.action,'act:toggle-list');assert.equal(listOpen.listToggleClick?.trusted,true);
-      assert.ok((fractionalClickClock?Number.isFinite(listOpen.listToggleClick.at):Number.isSafeInteger(listOpen.listToggleClick.at))&&Number.isSafeInteger(listOpen.capturedAtMs));
+      assert.ok(Number.isFinite(listOpen.listToggleClick.at)&&Number.isSafeInteger(listOpen.capturedAtMs));
       assert.equal(listOpen.backups.length,listOpen.backupProofs.length);
       assert.deepEqual(listOpen.backupProofs.map(row=>row.id),listOpen.backups.map(row=>row.id),'Independent hashes retain the complete pre-title source array order');
       listOpen.backups.forEach((row,index)=>{
