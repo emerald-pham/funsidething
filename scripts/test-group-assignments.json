@@ -14045,6 +14045,11 @@
       "root": "RISK repository process: scene source observation brackets stay inactive in ordinary runs",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Linux observer phases refuse inconsistent retained page clocks",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

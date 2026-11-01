@@ -53905,3 +53905,17 @@ test('RISK repository process: scene source observation brackets stay inactive i
  assert.deepEqual(diagnostic.host,['begin','end']);assert.equal(diagnostic.snapshot,ordinary.snapshot,'The complete original serialized source observation remains exact');assert.equal(diagnostic.marks[1].detail.sourceGeneration,'d'.repeat(64));
  const failed=await observe({diagnostic:true,fail:true});assert.deepEqual(failed.marks.map(row=>row.boundary),['begin','end']);assert.deepEqual(failed.host,['begin','end']);assert.equal(failed.snapshot,undefined);
 });
+
+test('RISK repository process: Linux observer phases refuse inconsistent retained page clocks',async()=>{
+ const {createLinuxNativeTimelineProvider,LINUX_FRONTIER_PROFILE}=await import('./scripts/button-safety-timeline-linux.mjs'),base=process.env.CHAIN_NATIVE_OUTPUT;if(base)fs.mkdirSync(base,{recursive:true});
+ const f=await timelineSDKDouble(base?fs.mkdtempSync(path.join(base,'phase-offset1937-')):null);let owner;
+ try{
+  owner=await createLinuxNativeTimelineProvider({verifyRuntime:()=>({profile:LINUX_FRONTIER_PROFILE,kind:'protocol-system-double'})})({page:f.page,outputDir:f.directory,sourceURL:'http://127.0.0.1:53623/button-unit/__startup-diagnostic__/clock-init.js'});f.emit();
+  const prefix=JSON.parse(/"prefix":("(?:[^"\\]|\\.)*")/.exec(owner.capture.instrumentation.content)[1]);
+  // Independent literal native75..100ms interval, with a contradictory5ms page offset.
+  for(const [boundary,pageMs,nativeSeconds]of [['begin',80,1.075],['end',105,1.1]])f.initial.emit('Timeline.eventRecorded',{record:{type:'TimeStamp',startTime:nativeSeconds,data:{message:prefix+JSON.stringify({phase:'observer',name:'fixture-source-encode',boundary,id:'offset-literal',documentId:'portable-document',fixtureDocumentId:'literal-fixture',pageMs})}}});
+  const capture=await owner.stop('literal-offset-terminal');fs.writeFileSync(path.join(f.directory,'capture.json'),JSON.stringify(capture,null,2)+'\n');
+  assert.equal(capture.status,'incomplete','A phase inconsistent with the retained native/page offset cannot claim a calibrated capture');
+  assert.equal(capture.facts.calibration.status,'bounded','The independent open/close calibration remains distinct from a contradictory phase');assert.equal(capture.facts.calibration.uncertaintyMs,1.001);assert.equal(capture.facts.observerPhases[0].pageInterval.status,'unavailable');assert.ok(capture.errors.some(value=>/phase clock.*calibration/i.test(value)));assert.ok(Object.values(capture.cleanup).every(value=>value===true));
+ }finally{if(owner)await owner.stop('test-finally');f.dispose();}
+});
