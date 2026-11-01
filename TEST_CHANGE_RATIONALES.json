@@ -52331,5 +52331,43 @@
       "summary": "After the single unconditional finite-click predicate, the same fractional root passed with genuine trusted click 1793538424447.125, integral origin 1793538423993 and later sample 1114.125. The original ordinary-clock root also passed unchanged with no clock preload; its native report errors were empty, all four actions passed, and browser/context/server cleanup completed."
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/fractional-native-click-repair/worker"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "f06630bd7c2799442c9b9d76000f9e13b251a75edfba908ea149a29a472e074d",
+    "reason": "Integration-only fingerprint for the cumulative protected tests.js diff against the exact 8cd524a main boundary. It covers the existing integration branch and both newly admitted source joins; it introduces no behavior or behavioral RED.",
+    "previousBehavior": "Each accepted worker rationale binds its own exact tests.js diff and source base. The full integration candidate has one cumulative protected-test diff against origin/main, so its exact joined fingerprint differs from each individual worker fingerprint.",
+    "intendedBehavior": "Retain every preexisting rationale record and admitted worker RED/GREEN record unchanged and append this exact cumulative fingerprint as an integration index. It neither replaces source-level rationale nor claims new RED/GREEN evidence.",
+    "replacementTests": [
+      "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "RISK repository process: fractional native Undo click receipts preserve high-resolution time",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+      "RISK repository process: Linux native observer retains literal CPU deliveries and bounded clock custody",
+      "RISK repository process: owned native lifecycle retains stream and exact union controls"
+    ],
+    "preservedCoverage": [
+      "The cumulative main-boundary test changes retain their prior source-bound rationale objects and recorded RED/GREEN evidence in the unchanged prefix; this entry only binds the joined aggregate fingerprint.",
+      "The native hosted caller source keeps the independent literal 24-case catalog, fixed saved-decision 3 and remaining 21 selections, original TAP records, zero-skip checks and cleanup requirements.",
+      "Linux failure observation remains diagnostic-only; neither protocol doubles nor this source join claim actual Linux runtime execution or Mac attestation.",
+      "Fractional clock coverage runs the same ordinary Undo consumer with unchanged normal-clock behavior and a selected .125 trusted-click challenge while retaining safe-integer wall capture and complete source/history assertions.",
+      "The exact 1,518-object inherited rationale prefix, all 9 admitted #1902/#1904 records and both corrected #1911 records are preserved before this cumulative integration-only record."
+    ],
+    "redEvidence": {
+      "command": "Use the unchanged per-change redEvidence.command fields in the inherited and admitted worker rationale records, including the source-bound #1902/#1904 and #1911 focused commands; the merger ran no behavioral RED.",
+      "failure": "Existing worker records preserve observed REDs for their own changes. In particular, #1911 record 1 captures an actual trusted .125 receipt rejected by Number.isSafeInteger in scripts/button-safety-rapid-core.mjs:734, and record 2 captures the same receipt rejected by tests.js:49071; #1902/#1904 records retain their process and Timeline REDs. This combined record creates no new failure evidence.",
+      "records": [
+        "2026-11-01T12-57-43-905Z-7e1925a7-a950-485e-b065-2409f366f44a",
+        "2026-11-01T13-06-33-317Z-74159e2c-d97f-4b3b-a749-425b68f12180"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T12-58-23-225Z-c4720cf6-5062-4ad4-81b9-709de39b254e",
+        "2026-11-01T13-07-02-547Z-bdc2d3d5-4994-4f34-a94b-6fb244e14522",
+        "2026-11-01T13-07-28-121Z-3bf03c70-5126-47c4-a943-3ed843e80aeb"
+      ],
+      "summary": "The #1911 records preserve fractional and unchanged ordinary-clock consumer GREEN. The accepted #1902/#1904 admission records focused 46/46 checks. Full/native/Linux qualification remains pending the owner."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/reconciled-ci-repair-source-join/merger/final"
   }
 ]
