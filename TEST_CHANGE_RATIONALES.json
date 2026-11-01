@@ -50846,5 +50846,165 @@
       "joined1873HostedFixtureExpected": 24,
       "unrelatedInheritedPreimplementationClaimed": false
     }
+  },
+  {
+    "baseCommit": "f42bc32cd7c587ecb309d588c0dab4a33654694a",
+    "testChangesSha256": "c1cc0cfcc29fc732466d464afc6f8dfa53553dffeae38a1172a1c61d3818c9d4",
+    "reason": "Atomic #1877 append-only structural metadata correction: the existing validator requires every named replacement registration on an added diff line. Two actually updated test registrations now use whitespace-only parameter formatting to expose their unchanged names in each protected comparison. Actual test bodies/semantics and coherent d5cc1ba native GREEN remain unchanged; preserve all prior1487 raw records.",
+    "previousBehavior": "The actual d5cc1ba native batch passed outer7/7 and hosted child16/16. Final standalone2c/644/f42 diff gates rejected rationale replacementTests because the existing named tests had body-only edits without added registration lines; main comparison already passed. This was a structural metadata failure, not another native/functional RED.",
+    "intendedBehavior": "Show both unchanged updated test registrations explicitly in each protected diff, retain their exact names and case bodies, and append fresh exact fingerprints for the unmodified gate. Preserve original ordering and guard REDs and the actual d5cc1ba GREEN identity separately. Current hosted fixture16 remains original13+new3; merger must union1873 expanded21+new3=24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness.",
+      "Reverse only the two parameter-whitespace changes and tests.js is byte-identical to actual native GREEN d5cc1ba. No assertion, callback body, selector, registration name, case count, source fixture, native consumer, app asset, full verifier or behavior changed. Five existing causal raw report failures retain nonacceptance labels."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+      "metadataCheckFailure": "Later d5cc1ba checks fail Regression rationale must name replacement tests added or updated in this diff; records544a599c,d4064073,8a134d02. They are structural checks, not functional preimplementation RED. Original8cb ordering and5df guard evidence remains unchanged."
+    },
+    "derivation": {
+      "issue": 1877,
+      "actualNativeGreenCommit": "d5cc1baf643bb280caa1ad2483e6a2ebe9c9234c",
+      "priorRawRecordCount": 1487,
+      "priorRawSha256": "eb106415f5c7c2c476ce67839b2e91238068d15d236f0bbc2468c437d01022a5",
+      "onlyTwoRegistrationParameterWhitespaceChanges": true,
+      "testBodiesAndNamesUnchanged": true,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "nativeReplayClaimed": false
+    }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "7f941163865f624c69584697bc945234dab0daf4cd35f2d0cd4f9daf25c8b1ee",
+    "reason": "Atomic #1877 append-only structural metadata correction: the existing validator requires every named replacement registration on an added diff line. Two actually updated test registrations now use whitespace-only parameter formatting to expose their unchanged names in each protected comparison. Actual test bodies/semantics and coherent d5cc1ba native GREEN remain unchanged; preserve all prior1487 raw records.",
+    "previousBehavior": "The actual d5cc1ba native batch passed outer7/7 and hosted child16/16. Final standalone2c/644/f42 diff gates rejected rationale replacementTests because the existing named tests had body-only edits without added registration lines; main comparison already passed. This was a structural metadata failure, not another native/functional RED.",
+    "intendedBehavior": "Show both unchanged updated test registrations explicitly in each protected diff, retain their exact names and case bodies, and append fresh exact fingerprints for the unmodified gate. Preserve original ordering and guard REDs and the actual d5cc1ba GREEN identity separately. Current hosted fixture16 remains original13+new3; merger must union1873 expanded21+new3=24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness.",
+      "Reverse only the two parameter-whitespace changes and tests.js is byte-identical to actual native GREEN d5cc1ba. No assertion, callback body, selector, registration name, case count, source fixture, native consumer, app asset, full verifier or behavior changed. Five existing causal raw report failures retain nonacceptance labels."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+      "metadataCheckFailure": "Later d5cc1ba checks fail Regression rationale must name replacement tests added or updated in this diff; records544a599c,d4064073,8a134d02. They are structural checks, not functional preimplementation RED. Original8cb ordering and5df guard evidence remains unchanged."
+    },
+    "derivation": {
+      "issue": 1877,
+      "actualNativeGreenCommit": "d5cc1baf643bb280caa1ad2483e6a2ebe9c9234c",
+      "priorRawRecordCount": 1487,
+      "priorRawSha256": "eb106415f5c7c2c476ce67839b2e91238068d15d236f0bbc2468c437d01022a5",
+      "onlyTwoRegistrationParameterWhitespaceChanges": true,
+      "testBodiesAndNamesUnchanged": true,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "nativeReplayClaimed": false
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "45674c2221348f46906f9bad72645b65f1f81f6a093dd66fd8790056bf274da4",
+    "reason": "Atomic #1877 append-only structural metadata correction: the existing validator requires every named replacement registration on an added diff line. Two actually updated test registrations now use whitespace-only parameter formatting to expose their unchanged names in each protected comparison. Actual test bodies/semantics and coherent d5cc1ba native GREEN remain unchanged; preserve all prior1487 raw records.",
+    "previousBehavior": "The actual d5cc1ba native batch passed outer7/7 and hosted child16/16. Final standalone2c/644/f42 diff gates rejected rationale replacementTests because the existing named tests had body-only edits without added registration lines; main comparison already passed. This was a structural metadata failure, not another native/functional RED.",
+    "intendedBehavior": "Show both unchanged updated test registrations explicitly in each protected diff, retain their exact names and case bodies, and append fresh exact fingerprints for the unmodified gate. Preserve original ordering and guard REDs and the actual d5cc1ba GREEN identity separately. Current hosted fixture16 remains original13+new3; merger must union1873 expanded21+new3=24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness.",
+      "Reverse only the two parameter-whitespace changes and tests.js is byte-identical to actual native GREEN d5cc1ba. No assertion, callback body, selector, registration name, case count, source fixture, native consumer, app asset, full verifier or behavior changed. Five existing causal raw report failures retain nonacceptance labels."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+      "metadataCheckFailure": "Later d5cc1ba checks fail Regression rationale must name replacement tests added or updated in this diff; records544a599c,d4064073,8a134d02. They are structural checks, not functional preimplementation RED. Original8cb ordering and5df guard evidence remains unchanged."
+    },
+    "derivation": {
+      "issue": 1877,
+      "actualNativeGreenCommit": "d5cc1baf643bb280caa1ad2483e6a2ebe9c9234c",
+      "priorRawRecordCount": 1487,
+      "priorRawSha256": "eb106415f5c7c2c476ce67839b2e91238068d15d236f0bbc2468c437d01022a5",
+      "onlyTwoRegistrationParameterWhitespaceChanges": true,
+      "testBodiesAndNamesUnchanged": true,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "nativeReplayClaimed": false
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "9ea152971f69efc54ffa43a89deb5ee0451fc2143629efa0482f86b70ffa7b97",
+    "reason": "Atomic #1877 append-only structural metadata correction: the existing validator requires every named replacement registration on an added diff line. Two actually updated test registrations now use whitespace-only parameter formatting to expose their unchanged names in each protected comparison. Actual test bodies/semantics and coherent d5cc1ba native GREEN remain unchanged; preserve all prior1487 raw records.",
+    "previousBehavior": "The actual d5cc1ba native batch passed outer7/7 and hosted child16/16. Final standalone2c/644/f42 diff gates rejected rationale replacementTests because the existing named tests had body-only edits without added registration lines; main comparison already passed. This was a structural metadata failure, not another native/functional RED.",
+    "intendedBehavior": "Show both unchanged updated test registrations explicitly in each protected diff, retain their exact names and case bodies, and append fresh exact fingerprints for the unmodified gate. Preserve original ordering and guard REDs and the actual d5cc1ba GREEN identity separately. Current hosted fixture16 remains original13+new3; merger must union1873 expanded21+new3=24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness.",
+      "Reverse only the two parameter-whitespace changes and tests.js is byte-identical to actual native GREEN d5cc1ba. No assertion, callback body, selector, registration name, case count, source fixture, native consumer, app asset, full verifier or behavior changed. Five existing causal raw report failures retain nonacceptance labels."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8",
+      "metadataCheckFailure": "Later d5cc1ba checks fail Regression rationale must name replacement tests added or updated in this diff; records544a599c,d4064073,8a134d02. They are structural checks, not functional preimplementation RED. Original8cb ordering and5df guard evidence remains unchanged."
+    },
+    "derivation": {
+      "issue": 1877,
+      "actualNativeGreenCommit": "d5cc1baf643bb280caa1ad2483e6a2ebe9c9234c",
+      "priorRawRecordCount": 1487,
+      "priorRawSha256": "eb106415f5c7c2c476ce67839b2e91238068d15d236f0bbc2468c437d01022a5",
+      "onlyTwoRegistrationParameterWhitespaceChanges": true,
+      "testBodiesAndNamesUnchanged": true,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "nativeReplayClaimed": false
+    }
   }
 ]

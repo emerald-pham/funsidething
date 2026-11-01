@@ -49340,7 +49340,7 @@ test('RISK repository process: expected native reload retries only its navigatio
 });
 
 
-test('RISK repository process: hosted direct native callers retain ephemeral listener defaults',()=>{
+test('RISK repository process: hosted direct native callers retain ephemeral listener defaults',() => {
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable caller evidence required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ephemeral-caller-'));
  // This subprocess tests the hosted-policy boundary; it is not hosted proof.
  const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'canonical-pr-merge-v1',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/1/merge',CHAIN_NATIVE_OUTPUT:output};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
@@ -51176,7 +51176,7 @@ test('RISK repository process: ordinary repeated saved decision choice retains s
  });
 });
 
-test('RISK repository process: refused saved decision capture waits for its refreshed unselected review',async t=>{
+test('RISK repository process: refused saved decision capture waits for its refreshed unselected review',async (t)=>{
  await prepareNativePlaywrightResolution(t);
  const {runButtonSafety}=await import('./scripts/button-safety-native.mjs'),pw=await import('playwright');
  const scenario='ordinary repeated saved decision choice',base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);
