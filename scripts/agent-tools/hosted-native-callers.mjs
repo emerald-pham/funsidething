@@ -226,25 +226,78 @@ export async function runHostedNativeCallers({cwd,outputDir,env}){
  save(path.join(outputDir,'hosted-direct-callers.result.json'),result);return result;
 }
 
+// Pure planning at the existing caller boundary. Actual host/runtime and once-only
+// admission remain in runLinuxNativeFailureFollowup; this function launches nothing.
+export function planLinuxNativeFailureFollowup({report,origin,source,nativeOutput,port='0',inventoryBytes,reportPath}){
+ const setup=report.scenarios?.find(row=>row.name===(origin==='pageerror-opening'?'detector sensitivity':'ordinary scene choice survives reopen and task Undo'))?.setup;
+ if(report.status!=='failed'||report.engine!=='webkit'||report.profile!=='ordinary'||report.runtime?.platform!=='linux'||report.runtime?.nodeVersion!=='v22.23.4'||report.runtime?.playwright!=='1.62.1'||report.runtime?.version!=='26.5'||setup?.currentTasks!==64||setup?.durableTasks!==64||['contextClosed','browserClosed','serverClosed'].some(key=>report.cleanup?.[key]!==true)||report.cleanupFailures?.length||report.linuxFailureObservation)return{status:'not-selected',reason:'Exact failed ordinary64 report with complete original cleanup required'};
+ if(report.candidateCommit!==source.commit||report.candidateTree!==source.tree)return{status:'not-selected',reason:'Original report source differs from this child source'};
+ let window;
+ if(origin==='pageerror-opening'&&report.kind==='button-sensitivity'&&report.samples?.some(row=>row.scenario==='detector sensitivity'&&row.action==='act:settings'&&row.phase==='opening-before-input'&&row.inputStatus==='not-reached'&&row.firstTrustedInputAt===null&&Number.isFinite(row.openingMaxFrameGapMs)&&row.openingMaxFrameGapMs>=1000))window='pageerror-opening';
+ if(origin==='required-actions'&&report.kind==='button-safety'&&report.samples?.some(row=>row.scenario==='ordinary scene choice survives reopen and task Undo'&&row.action==='act:scene-time-settings'&&Number.isFinite(row.maxFrameGapMs)&&row.maxFrameGapMs>=1000))window='scene-time-settings';
+ if(!window)return{status:'not-selected',reason:'No exact approved native frame frontier'};
+ let history=null;
+ if(window==='scene-time-settings'){
+  // This approved frontier occurs after exactly the ordinary inventory's first
+  // 30 scenarios. Inventory order after that prefix is not execution order.
+  try{
+   const inventory=JSON.parse(inventoryBytes),ordinary=inventory.profiles.ordinary,target='ordinary scene choice survives reopen and task Undo',names=[...ordinary.requiredScenarios.slice(0,30),target];
+   assert.equal(report.inventorySha256,digest(inventoryBytes));assert.equal(ordinary.fixture.savedTasks,64);
+   assert.equal(ordinary.requiredScenarios.length,60);assert.equal(inventory.requiredActions.length,114);
+   assert.deepEqual(report.requiredScenarios,ordinary.requiredScenarios);assert.deepEqual(report.requiredActions,inventory.requiredActions);
+   assert.equal(names.length,31);assert.equal(new Set(names).size,31);assert.ok(ordinary.requiredScenarios.includes(target));
+   assert.deepEqual(report.scenarios.map(row=>row.name),names);
+   for(const [index,row]of report.scenarios.entries()){
+    assert.equal(row.status,index===30?'running':'passed');assert.equal(row.setup.currentTasks,64);assert.equal(row.setup.durableTasks,64);
+    const fixture=ordinary.scenarioFixtures[row.name];assert.equal(row.setup.authMode,fixture.authMode);assert.equal(row.setup.source,fixture.source);assert.equal(row.setup.fixtureRole,fixture.fixtureRole);
+   }
+   const frontier=report.samples.at(-1);assert.equal(frontier.scenario,target);assert.equal(frontier.action,'act:scene-time-settings');assert.ok(Number.isFinite(frontier.maxFrameGapMs)&&frontier.maxFrameGapMs>=1000);assert.deepEqual(report.errors,[]);
+   assert.ok(path.isAbsolute(reportPath),'Original owned report path required');
+   history={mode:'same-browser-history-v2',inventorySha256:report.inventorySha256,scenarios:names,targetScenario:target,targetAction:'act:scene-time-settings',successfulPrefix:30,originalReportPath:reportPath};
+  }catch{return{status:'not-selected',reason:'Exact approved successful ordinary history, inventory and failed scene frontier required'};}
+ }
+ const mode=history?.mode||'fresh-isolated-v1';
+ const args=['scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',nativeOutput,'--port',port,'--linux-failure-observation','linux-webkit-frontier-v1',...(window==='pageerror-opening'?['--probe','--control','pageerror']:['--scenario','ordinary scene choice survives reopen and task Undo','--linux-failure-history',reportPath])];
+ return{status:'selected',window,mode,history,args};
+}
+
+export function createLinuxSceneHistoryReplay(history){
+ assert.equal(history.mode,'same-browser-history-v2');assert.equal(history.successfulPrefix,30);
+ assert.equal(history.scenarios.length,31);assert.equal(history.scenarios[30],history.targetScenario);
+ let index=0,active=false,failed=false;
+ return{
+  enter(name){
+   assert.equal(failed,false,'Failed diagnostic history cannot advance');
+   if(index===history.scenarios.length)return false;
+   assert.equal(active,false,'One diagnostic history scenario at a time');assert.equal(name,history.scenarios[index],'Diagnostic history must keep original order');active=true;
+   return{index,target:index===30};
+  },
+  complete(name){assert.equal(failed,false);assert.equal(active,true);assert.equal(name,history.scenarios[index]);active=false;index++;},
+  fail(){failed=true;},
+  finish(){assert.equal(failed,false);assert.equal(active,false);assert.equal(index,31,'Every approved history scenario must complete');},
+ };
+}
+
+export function reserveLinuxNativeFailureWindow(plan,windows){
+ if(plan.status!=='selected')return plan;
+ assert.ok(['pageerror-opening','scene-time-settings'].includes(plan.window),'Only approved Linux failure windows may be reserved');
+ if(windows.has(plan.window)||windows.size>=2)return{status:'not-selected',reason:'Matching failure diagnostic already admitted once'};
+ windows.add(plan.window);return plan;
+}
+
 const followedWindows=new Set();let diagnosticQueue=Promise.resolve();
 export async function runLinuxNativeFailureFollowup({cwd,outputDir,reportPath,origin,env=process.env}){
  // A passing required invocation never calls this function. Recheck all facts
  // here so a generic failure, partial cleanup, foreign runtime or report cannot
  // admit a diagnostic browser. No environment switch selects an extra capture.
  if(process.platform!=='linux'||process.version!=='v22.23.4'||env.CI!=='true')return{status:'not-selected',reason:'Actual supported Linux CI runtime required'};
- const bytes=fs.readFileSync(reportPath),report=JSON.parse(bytes),setup=report.scenarios?.find(row=>row.name===(origin==='pageerror-opening'?'detector sensitivity':'ordinary scene choice survives reopen and task Undo'))?.setup;
- if(report.status!=='failed'||report.engine!=='webkit'||report.profile!=='ordinary'||report.runtime?.platform!=='linux'||report.runtime?.nodeVersion!=='v22.23.4'||report.runtime?.playwright!=='1.62.1'||report.runtime?.version!=='26.5'||setup?.currentTasks!==64||setup?.durableTasks!==64||['contextClosed','browserClosed','serverClosed'].some(key=>report.cleanup?.[key]!==true)||report.cleanupFailures?.length||report.linuxFailureObservation)return{status:'not-selected',reason:'Exact failed ordinary64 report with complete original cleanup required'};
- if(report.candidateCommit!==git(cwd,'rev-parse','HEAD')||report.candidateTree!==git(cwd,'rev-parse','HEAD^{tree}'))return{status:'not-selected',reason:'Original report source differs from this child source'};
- let window;
- if(origin==='pageerror-opening'&&report.kind==='button-sensitivity'&&report.samples?.some(row=>row.scenario==='detector sensitivity'&&row.action==='act:settings'&&row.phase==='opening-before-input'&&row.inputStatus==='not-reached'&&row.firstTrustedInputAt===null&&Number.isFinite(row.openingMaxFrameGapMs)&&row.openingMaxFrameGapMs>=1000))window='pageerror-opening';
- if(origin==='required-actions'&&report.kind==='button-safety'&&report.samples?.some(row=>row.scenario==='ordinary scene choice survives reopen and task Undo'&&row.action==='act:scene-time-settings'&&Number.isFinite(row.maxFrameGapMs)&&row.maxFrameGapMs>=1000))window='scene-time-settings';
- if(!window)return{status:'not-selected',reason:'No exact approved native frame frontier'};
- if(followedWindows.has(window)||followedWindows.size>=2)return{status:'not-selected',reason:'Matching failure diagnostic already admitted once'};
- followedWindows.add(window);
+ const bytes=fs.readFileSync(reportPath),report=JSON.parse(bytes),nativeOutput=path.join(outputDir,'native'),plan=planLinuxNativeFailureFollowup({report,origin,source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}')},nativeOutput,port:env.CHAIN_NATIVE_PORT||'0',reportPath,inventoryBytes:fs.readFileSync(path.join(cwd,'scripts/button-safety-inventory.json'))});
+ const selection=reserveLinuxNativeFailureWindow(plan,followedWindows);if(selection.status!=='selected')return selection;const{window}=selection;
  const task=async()=>{
-  fs.mkdirSync(outputDir);const nativeOutput=path.join(outputDir,'native'),request={schemaVersion:1,kind:'linux-native-failure-followup',window,original:{path:reportPath,sha256:digest(bytes),status:report.status,candidateCommit:report.candidateCommit,candidateTree:report.candidateTree,cleanup:report.cleanup},policy:{originalVerdictUnchanged:true,onceOnly:true,serial:true,maxChildren:2,executionMs:180000,teardownMs:6000,captureMs:12000,rawBytesPerCapture:33554432,maxRawBytesTwoCaptures:67108864}};
+  assert.ok(fs.readFileSync(reportPath).equals(bytes),'Original failed report bytes changed before diagnostic launch');
+  fs.mkdirSync(outputDir);const request={schemaVersion:1,kind:'linux-native-failure-followup',window,mode:plan.mode,history:plan.history,original:{path:reportPath,sha256:digest(bytes),status:report.status,candidateCommit:report.candidateCommit,candidateTree:report.candidateTree,cleanup:report.cleanup},policy:{originalVerdictUnchanged:true,onceOnly:true,serial:true,maxChildren:2,executionMs:180000,teardownMs:6000,captureMs:12000,rawBytesPerCapture:33554432,maxRawBytesTwoCaptures:67108864}};
   save(path.join(outputDir,'request.json'),request);
-  const args=['scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',nativeOutput,'--port',env.CHAIN_NATIVE_PORT||'0','--linux-failure-observation','linux-webkit-frontier-v1',...(window==='pageerror-opening'?['--probe','--control','pageerror']:['--scenario','ordinary scene choice survives reopen and task Undo'])];
+  const args=plan.args;
   const childEnv={...env};delete childEnv.NODE_TEST_CONTEXT;
   const processReceipt=await runOwnedNativeProcess({cwd,outputDir:path.join(outputDir,'process'),env:childEnv,args});
   const reports=fs.existsSync(nativeOutput)?fs.readdirSync(nativeOutput).filter(file=>/^button-safety-webkit-.*\.json$/.test(file)):[];

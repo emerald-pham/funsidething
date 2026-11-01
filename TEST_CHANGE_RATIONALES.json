@@ -52500,5 +52500,57 @@
     },
     "integrationSourceCommit": "36e0550fb1dc84095425d5cddcbb97db5fb8cbc3",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "a4d719ceab69b5519a403f3712b8c69463c9b2ffb653e953308c831e9d1e6941",
+    "reason": "Implement only the agreed1937 once-only history-preserving diagnostic at the existing Linux failed-scene command, sourceSnapshot and Timeline protocol seams. Append three process RISK contracts without editing any inherited test or source oracle.",
+    "previousBehavior": "The conditional scene follow-up started a fresh isolated scene after an original required failure that occurred after30 successful browser scenarios. Its receiver retained no source/observer phase scopes. In the new bounded observer, refused phase ends or clock anchors could otherwise manufacture derived custody, and a capped stop needed explicit owned page-hook removal.",
+    "intendedBehavior": "The same existing scene window validates exact source, ordinary64 inventory, successful30-name prefix, original failed frontier and complete cleanup; it replays that prefix in the existing browser lifecycle before target-only arming. Distinct same-browser-history-v2 records retain bounded page/host observation scopes, generation and accepted raw/clock custody. Every original required verdict and threshold stays unchanged.",
+    "replacementTests": [
+      "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "RISK repository process: scene source observation brackets stay inactive in ordinary runs"
+    ],
+    "preservedCoverage": [
+      "All1533 inherited rationale object literals/order and all preexisting tests.js bytes remain exact; cumulative records retain their original chronology and claims. The historical test-group inventory stays immutable; new roots append assignments only.",
+      "The original Mac native provider/verifier, ordinary60 scenarios/114 actions/64 tasks, pageerror opening branch, injected1300ms stall, full-step/opening1000ms thresholds, sourceSnapshot/typed-source statements, source and exact pixel assertions remain protected.",
+      "Actual Linux Node22.23.4/Playwright1.62.1/WebKit2336 runtime guards, original source/failed-report/cleanup admission, once per window/two serial children,180s/360s and separate3000ms TERM+KILL bounds,4MiB output and12s/4096events/1MiB-event/32MiB raw/source-code captures remain in force.",
+      "Only existing diagnostic tooling changes. No app, fixture/workload, oracle, asset, FAQ, version, dependency, workflow, deployment or Beta change. Protocol/page doubles execute no native browser or Linux acceptance; original CI failures and causes remain unresolved."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap.",
+      "failure": "Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance."
+    },
+    "greenEvidence": {
+      "summary": "Focused protocol/source controls and unchanged Linux observer regression pass27 cases, zero failed/skipped/cancelled, on Node24.19.0 macOS. Final focused GREEN is source-recorded by record-run; full suite, native Linux, CI and release remain parent-owned."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "45f1ddc9aaf7a271523ff8501cd573c30d2df6430727ac767c6ada0d95c109d4",
+    "reason": "Implement only the agreed1937 once-only history-preserving diagnostic at the existing Linux failed-scene command, sourceSnapshot and Timeline protocol seams. Append three process RISK contracts without editing any inherited test or source oracle.",
+    "previousBehavior": "The conditional scene follow-up started a fresh isolated scene after an original required failure that occurred after30 successful browser scenarios. Its receiver retained no source/observer phase scopes. In the new bounded observer, refused phase ends or clock anchors could otherwise manufacture derived custody, and a capped stop needed explicit owned page-hook removal.",
+    "intendedBehavior": "The same existing scene window validates exact source, ordinary64 inventory, successful30-name prefix, original failed frontier and complete cleanup; it replays that prefix in the existing browser lifecycle before target-only arming. Distinct same-browser-history-v2 records retain bounded page/host observation scopes, generation and accepted raw/clock custody. Every original required verdict and threshold stays unchanged.",
+    "replacementTests": [
+      "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "RISK repository process: scene source observation brackets stay inactive in ordinary runs"
+    ],
+    "preservedCoverage": [
+      "All1533 inherited rationale object literals/order and all preexisting tests.js bytes remain exact; cumulative records retain their original chronology and claims. The historical test-group inventory stays immutable; new roots append assignments only.",
+      "The original Mac native provider/verifier, ordinary60 scenarios/114 actions/64 tasks, pageerror opening branch, injected1300ms stall, full-step/opening1000ms thresholds, sourceSnapshot/typed-source statements, source and exact pixel assertions remain protected.",
+      "Actual Linux Node22.23.4/Playwright1.62.1/WebKit2336 runtime guards, original source/failed-report/cleanup admission, once per window/two serial children,180s/360s and separate3000ms TERM+KILL bounds,4MiB output and12s/4096events/1MiB-event/32MiB raw/source-code captures remain in force.",
+      "Only existing diagnostic tooling changes. No app, fixture/workload, oracle, asset, FAQ, version, dependency, workflow, deployment or Beta change. Protocol/page doubles execute no native browser or Linux acceptance; original CI failures and causes remain unresolved."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure follow-up preserves the exact successful scene history$' tests.js; subsequent same-entry protocol/source bracket roots and their complete raw outputs are retained separately in frame-history1937-worker/*-RED.tap.",
+      "failure": "Observed before each corresponding functional edit: runnable original plan returned fresh-isolated-v1 vs required same-browser-history-v2; existing Timeline receiver returned incomplete on literal observer phases; actual sourceSnapshot emitted[] vs paired brackets; actual init/stop expressions left an owned page observer installed; a refused phase end generated an unretained event4097; a capped capture left its hook active; a refused closing clock falsely reported bounded calibration. Complete raw TAPs and available pre-edit source snapshots are retained. Initial REDs ran directly rather than through record-run; this is explicitly not a claim of recorder-sealed RED provenance."
+    },
+    "greenEvidence": {
+      "summary": "Focused protocol/source controls and unchanged Linux observer regression pass27 cases, zero failed/skipped/cancelled, on Node24.19.0 macOS. Final focused GREEN is source-recorded by record-run; full suite, native Linux, CI and release remain parent-owned."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/frame-history1937-worker"
   }
 ]
