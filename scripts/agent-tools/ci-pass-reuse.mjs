@@ -11,6 +11,47 @@ const decimal = value => /^[1-9][0-9]*$/.test(String(value));
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const successful = step => step.status === 'completed' && step.conclusion === 'success';
 
+// Current service cases are declared separately from the immutable historical
+// skip inventory. Bind the declaration to the actual guarded source roots;
+// neither a broad environment exemption nor a renamed alias grants coverage.
+export function currentServiceDeclarations(root = process.cwd(), assignments, { required = false } = {}) {
+  assignments ||= JSON.parse(readFileSync(path.join(root, 'scripts/test-group-assignments.json'), 'utf8'));
+  const source = readFileSync(path.join(root, 'tests.js'), 'utf8');
+  const registered = [...source.matchAll(/\btest\(\s*(["'])(RISK BACKUP FILE RESTORE real service(?: control)?: [^"'\n]+\(Firestore rules: import [^"'\n]+\))\1\s*,\s*\{\s*skip\s*:\s*!process\.env\.FIRESTORE_EMULATOR_HOST\s*\}/g)].map(match => match[2]);
+  const declared = assignments.currentServiceCases;
+  if (!required && declared === undefined && registered.length === 0) return [];
+  if (!Array.isArray(declared) || declared.length !== 6 || registered.length !== 6 || new Set(registered).size !== 6) throw new Error('Current service declaration requires exactly six unique guarded source cases.');
+  const seen = new Set();
+  for (const item of declared) {
+    const rows = assignments.rootAssignments?.filter(row => row.root === item?.id) || [];
+    if (!item || JSON.stringify(Object.keys(item).sort()) !== JSON.stringify(['environment','file','group','id','mandatoryGate']) ||
+        item.file !== 'tests.js' || item.group !== 'core' || item.environment !== 'FIRESTORE_EMULATOR_HOST' || item.mandatoryGate !== 'rules' ||
+        !registered.includes(item.id) || seen.has(item.id) || rows.length !== 1 || rows[0].file !== item.file || rows[0].group !== item.group || rows[0].admission !== undefined) throw new Error('Current service cases must uniquely match their required tests.js/core source, emulator environment and mandatory rules gate.');
+    seen.add(item.id);
+  }
+  return declared;
+}
+
+// Fresh execution and retained originals must satisfy the same raw TAP rule.
+// Passing totals alone cannot prove that an exact service consumer executed.
+export function emulatorTapEvidence(gate, stdout) {
+  const declarations = gate === 'rules' ? currentServiceDeclarations(process.cwd(), undefined, { required: true }) : [];
+  const count = name => Number([...stdout.matchAll(new RegExp('^# ' + name + ' (\\d+)$', 'gm'))].at(-1)?.[1] ?? NaN);
+  const tests = count('tests'), passed = count('pass'), issues = [];
+  if (!(tests >= (gate === 'rules' ? 24 : 15)) || passed !== tests || ['fail','cancelled','skipped'].some(name => count(name) !== 0)) issues.push('The emulator gate did not execute its complete zero-skip cohort.');
+  const outcomes = [...stdout.matchAll(/^(not ok|ok) \d+ - (.+)$/gm)].map(match => {
+    const directive = match[2].match(/\s+#\s+(SKIP|TODO)\b/i);
+    const id = (directive ? match[2].slice(0, directive.index) : match[2]).replace(/\\([\\#])/g, '$1');
+    return { id, status: directive ? directive[1].toLowerCase() : match[1] === 'ok' ? 'passed' : 'failed' };
+  });
+  const currentServiceCases = declarations.map(item => {
+    const matches = outcomes.filter(outcome => outcome.id === item.id);
+    if (matches.length !== 1 || matches[0].status !== 'passed') issues.push('Required rules service consumer must pass exactly once without skip: ' + item.id);
+    return { id: item.id, outcomes: matches.map(outcome => outcome.status) };
+  });
+  return { tests, passed, declarations, currentServiceCases, issues };
+}
+
 export function ciInputContext(validationContext) {
   return {
     policy: 'complete-ci-inputs-v1', repository: validationContext.repository,
@@ -194,10 +235,10 @@ function runGate(options) {
     const result=spawnSync('npm',['run',gate==='rules'?'test:rules':'test:compatibility'],{encoding:'utf8',maxBuffer:16*1024*1024,env:{...process.env,COMPATIBILITY_BASE_SHA:identity.comparisonBase}});
     const stdout=result.stdout||'',stderr=result.stderr||'';process.stdout.write(stdout);process.stderr.write(stderr);
     writeFileSync(path.join(outputDir,'stdout.tap'),stdout);writeFileSync(path.join(outputDir,'stderr.log'),stderr);
-    const count=name=>Number([...stdout.matchAll(new RegExp('^# '+name+' (\\d+)$','gm'))].at(-1)?.[1]??NaN);
-    const complete=result.status===0&&!result.error&&!result.signal&&count('tests')>=(gate==='rules'?24:15)&&count('pass')===count('tests')&&['fail','cancelled','skipped'].every(name=>count(name)===0);
+    const evidence=emulatorTapEvidence(gate,stdout);
+    const complete=result.status===0&&!result.error&&!result.signal&&evidence.issues.length===0;
     report={status:complete?'passed':'failed',resultIdentity:identity,inputs,process:{exitCode:result.status,signal:result.signal,error:result.error?.message||null,
-      stdoutSha256:createHash('sha256').update(stdout).digest('hex'),stderrSha256:createHash('sha256').update(stderr).digest('hex')},tests:count('tests'),passed:count('pass')};
+      stdoutSha256:createHash('sha256').update(stdout).digest('hex'),stderrSha256:createHash('sha256').update(stderr).digest('hex')},...evidence};
   }
   const bytes=JSON.stringify(report,null,2)+'\n';writeFileSync(path.join(outputDir,'result.json'),bytes);
   if(report.status==='failed')throw new Error('Required emulator gate failed or did not execute its complete zero-skip cohort.');

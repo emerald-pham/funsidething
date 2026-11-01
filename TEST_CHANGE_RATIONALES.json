@@ -50560,5 +50560,113 @@
       "priorMainRedEvidenceSha256": "a54c5976581fef0358c54ca6fae2316072692113962698b41d45fcbc82baa6ea",
       "integrationPreimplementationRunClaimed": false
     }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "4cf01cdac8230cbf9df0217c286763b6d58ac4c5aa283ca4a8f7ce6ae682c732",
+    "reason": "Implement atomic #1870 at the agreed existing group and mandatory rules process consumers: preserve required source-bound current service outcomes while refusing rules coverage that omits any exact service consumer. Combined bindings retain all previously admitted test changes without reclassifying their history.",
+    "previousBehavior": "Six current Firestore roots were selected and actually skipped without an emulator but lacked explicit grouped accounting. Rules admission accepted coherent passing totals without requiring their six exact service identities in fresh or retained TAP.",
+    "intendedBehavior": "A single current declaration binds exactly six guarded tests.js/core required roots separately from the historical inventory. No-emulator actual skips remain visible; missing, duplicate, unknown, source-mismatched or emulator-present skips fail. Mandatory rules evidence requires one actual non-skipped passed TAP outcome per exact service ID in fresh and retained proof.",
+    "replacementTests": [
+      "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "RISK repository process: current service skips retain required source-bound grouped accounting"
+    ],
+    "preservedCoverage": [
+      "Every prior tests.js byte remains unchanged as an exact prefix, including all six real-service bodies, existing emulator guards and ACK-bypass sensitivity assertions.",
+      "The immutable independent baseline remains 2997 cases with 61 historical accepted skips; required group roots, existing feature assertions, native registrations, required engines and the seven optional workload identities retain prior semantics.",
+      "Whole committed-tree/base/runtime CI input binding, original result/archive/raw-output/native evidence retention and aggregate predecessor/event-gates success checks remain enforced.",
+      "All earlier rationale records and raw objects remain byte-identical and in their original order; no old local, hosted, native or real-service proof is promoted to the changed tree."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof.",
+      "records": [
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-20-46-363Z-90779059-c849-4fd2-a19e-11a20164169e.json",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-23-41-171Z-6f628c1b-72f8-4241-9927-dfc439702a3d.json"
+      ],
+      "observedSourceSha": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "observedSourceTree": "e9c0fb9dc667ce24c653b4bf722c4967a52c4682",
+      "chronology": "Rules predicate implementation follows the first RED; grouped accounting implementation follows the separate second RED. Combined base bindings derive from retained earlier admissions plus these new additions; no earlier-base preimplementation run is invented."
+    },
+    "derivation": {
+      "kind": "append-only exact combined test-diff binding",
+      "currentImplementationBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "priorRecordCount": 1480,
+      "priorRawFileSha256": "abf902e3589c9e734958cfd5441d900865349fbe14205ae5a02f8be0cbf9abaf",
+      "retainedCombinedJoinFingerprint": null,
+      "priorRawObjectsPreserved": true
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "ff914f109ddcf32a16f448c165f35b29431c8b7c2713097dcf262b75c7b79d8f",
+    "reason": "Implement atomic #1870 at the agreed existing group and mandatory rules process consumers: preserve required source-bound current service outcomes while refusing rules coverage that omits any exact service consumer. Combined bindings retain all previously admitted test changes without reclassifying their history.",
+    "previousBehavior": "Six current Firestore roots were selected and actually skipped without an emulator but lacked explicit grouped accounting. Rules admission accepted coherent passing totals without requiring their six exact service identities in fresh or retained TAP.",
+    "intendedBehavior": "A single current declaration binds exactly six guarded tests.js/core required roots separately from the historical inventory. No-emulator actual skips remain visible; missing, duplicate, unknown, source-mismatched or emulator-present skips fail. Mandatory rules evidence requires one actual non-skipped passed TAP outcome per exact service ID in fresh and retained proof.",
+    "replacementTests": [
+      "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "RISK repository process: current service skips retain required source-bound grouped accounting"
+    ],
+    "preservedCoverage": [
+      "Every prior tests.js byte remains unchanged as an exact prefix, including all six real-service bodies, existing emulator guards and ACK-bypass sensitivity assertions.",
+      "The immutable independent baseline remains 2997 cases with 61 historical accepted skips; required group roots, existing feature assertions, native registrations, required engines and the seven optional workload identities retain prior semantics.",
+      "Whole committed-tree/base/runtime CI input binding, original result/archive/raw-output/native evidence retention and aggregate predecessor/event-gates success checks remain enforced.",
+      "All earlier rationale records and raw objects remain byte-identical and in their original order; no old local, hosted, native or real-service proof is promoted to the changed tree."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof.",
+      "records": [
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-20-46-363Z-90779059-c849-4fd2-a19e-11a20164169e.json",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-23-41-171Z-6f628c1b-72f8-4241-9927-dfc439702a3d.json"
+      ],
+      "observedSourceSha": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "observedSourceTree": "e9c0fb9dc667ce24c653b4bf722c4967a52c4682",
+      "chronology": "Rules predicate implementation follows the first RED; grouped accounting implementation follows the separate second RED. Combined base bindings derive from retained earlier admissions plus these new additions; no earlier-base preimplementation run is invented."
+    },
+    "derivation": {
+      "kind": "append-only exact combined test-diff binding",
+      "currentImplementationBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "priorRecordCount": 1480,
+      "priorRawFileSha256": "abf902e3589c9e734958cfd5441d900865349fbe14205ae5a02f8be0cbf9abaf",
+      "retainedCombinedJoinFingerprint": "e400178635709b0eef347d7db79e61a14ceb7d78d546ebf234c6f5a3c770980c",
+      "priorRawObjectsPreserved": true
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "593767cb5d1098e6b91f5c06ac87170cfba54caeba5ae78f8cc2f85f24d05604",
+    "reason": "Implement atomic #1870 at the agreed existing group and mandatory rules process consumers: preserve required source-bound current service outcomes while refusing rules coverage that omits any exact service consumer. Combined bindings retain all previously admitted test changes without reclassifying their history.",
+    "previousBehavior": "Six current Firestore roots were selected and actually skipped without an emulator but lacked explicit grouped accounting. Rules admission accepted coherent passing totals without requiring their six exact service identities in fresh or retained TAP.",
+    "intendedBehavior": "A single current declaration binds exactly six guarded tests.js/core required roots separately from the historical inventory. No-emulator actual skips remain visible; missing, duplicate, unknown, source-mismatched or emulator-present skips fail. Mandatory rules evidence requires one actual non-skipped passed TAP outcome per exact service ID in fresh and retained proof.",
+    "replacementTests": [
+      "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "RISK repository process: current service skips retain required source-bound grouped accounting"
+    ],
+    "preservedCoverage": [
+      "Every prior tests.js byte remains unchanged as an exact prefix, including all six real-service bodies, existing emulator guards and ACK-bypass sensitivity assertions.",
+      "The immutable independent baseline remains 2997 cases with 61 historical accepted skips; required group roots, existing feature assertions, native registrations, required engines and the seven optional workload identities retain prior semantics.",
+      "Whole committed-tree/base/runtime CI input binding, original result/archive/raw-output/native evidence retention and aggregate predecessor/event-gates success checks remain enforced.",
+      "All earlier rationale records and raw objects remain byte-identical and in their original order; no old local, hosted, native or real-service proof is promoted to the changed tree."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^workflow emulator gate reuses a verified pass and executes an uncovered gate$ scripts/agent-tools/ci-routing.test.mjs ; /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern=^test group runner accounts for current service skips only without an emulator$ scripts/agent-tools/test-groups.test.mjs",
+      "failure": "Actual first RED on 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48: coherent 30-pass rules TAP missing the exact ACK consumer was incorrectly accepted, causing ERR_ASSERTION actual 0 for expected nonzero admission. Actual separate second RED: the group CLI rejected six correctly guarded no-emulator skipped outcomes, causing ERR_ASSERTION actual 1 versus expected 0. Both ran before their corresponding enforcement edits; these are process admission REDs, not application-feature or new final qualification proof.",
+      "records": [
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-20-46-363Z-90779059-c849-4fd2-a19e-11a20164169e.json",
+        "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/service1870-owner/recorder/2026-11-01T03-23-41-171Z-6f628c1b-72f8-4241-9927-dfc439702a3d.json"
+      ],
+      "observedSourceSha": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "observedSourceTree": "e9c0fb9dc667ce24c653b4bf722c4967a52c4682",
+      "chronology": "Rules predicate implementation follows the first RED; grouped accounting implementation follows the separate second RED. Combined base bindings derive from retained earlier admissions plus these new additions; no earlier-base preimplementation run is invented."
+    },
+    "derivation": {
+      "kind": "append-only exact combined test-diff binding",
+      "currentImplementationBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "priorRecordCount": 1480,
+      "priorRawFileSha256": "abf902e3589c9e734958cfd5441d900865349fbe14205ae5a02f8be0cbf9abaf",
+      "retainedCombinedJoinFingerprint": "b9ce4a3e1c6bac7d7a03c66cdc6992bc0848210668cb938feba5f01942a83abd",
+      "priorRawObjectsPreserved": true
+    }
   }
 ]

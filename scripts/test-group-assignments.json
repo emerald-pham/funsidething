@@ -13785,8 +13785,7 @@
       "root": "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status",
       "group": "native-process",
       "file": "tests.js"
-    }
-  ,
+    },
     {
       "root": "RISK repository process: additional56 Timeline profile requires exact explicit selection at existing consumers",
       "group": "native-process",
@@ -13935,6 +13934,21 @@
     {
       "root": "RISK repository process: replaced historical roots reject contradictory live assignments before execution",
       "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group runner accounts for current service skips only without an emulator",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: current service skips retain required source-bound grouped accounting",
+      "group": "native-process",
       "file": "tests.js"
     }
   ],
@@ -14171,6 +14185,50 @@
       "group": "core",
       "file": "tests.js",
       "reason": "Ticket #1393 binds the unchanged recovery-copy expectations to their retained October28 dated entry while allowing a newer WOOP note above it. Every original content assertion remains protected and the historical baseline duration/group are retained."
+    }
+  ],
+  "currentServiceCases": [
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
     }
   ]
 }
