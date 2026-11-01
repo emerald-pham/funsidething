@@ -10,16 +10,43 @@ import {parseTap} from '../test-groups.mjs';
 
 const MAX_OUTPUT=4194304,MAX_EXECUTION=180000,TERM_MS=3000,KILL_MS=3000;
 const MAX_IDENTITY_INCIDENTS=256,MAX_INCIDENT_OBSERVATIONS=8;
+const READ_DIAGNOSTIC_LIMITS={windows:8,statBytes:2048,linkBytes:1024,windowBytes:8192,totalBytes:65536};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const stamp=()=>({utc:new Date().toISOString(),monotonicMs:performance.now()});
 const save=(file,value)=>{fs.writeFileSync(file+'.tmp',JSON.stringify(value,null,2)+'\n');fs.renameSync(file+'.tmp',file);};
 const git=(cwd,...args)=>{const r=spawnSync('git',args,{cwd,encoding:'utf8',timeout:3000,maxBuffer:1048576});assert.equal(r.status,0,'Native owner source identity: '+r.stderr);return r.stdout.trim();};
 
+const initializeReadDiagnostics=diagnostics=>{
+ diagnostics.schemaVersion??=1;diagnostics.limits??={...READ_DIAGNOSTIC_LIMITS};diagnostics.tableReads??=0;diagnostics.windows??=[];diagnostics.retainedBytes??=2;diagnostics.omittedWindows??=0;diagnostics.status??='complete';return diagnostics;
+};
+const completedKernelRead=read=>{const result={started:stamp()};try{result.value=read();}catch(error){result.error=error;}result.finished=stamp();return result;};
+const readError=read=>read.error?{code:read.error.code||null}:null;
+const statReadEvidence=(read,pid)=>{
+ if(read.error)return{started:read.started,finished:read.finished,status:'unavailable',error:readError(read),identity:null};
+ const bytes=Buffer.isBuffer(read.value)?read.value:Buffer.from(read.value),raw=bytes.toString('utf8'),fields=raw.slice(raw.lastIndexOf(')')+2).split(' ');
+ return{started:read.started,finished:read.finished,status:'observed',bytes:bytes.length,sha256:digest(bytes),rawBase64:bytes.subarray(0,READ_DIAGNOSTIC_LIMITS.statBytes).toString('base64'),truncated:bytes.length>READ_DIAGNOSTIC_LIMITS.statBytes,identity:{pid,ppid:Number(fields[1]),pgid:Number(fields[2]),session:Number(fields[3]),state:fields[0],startIdentity:fields[19],startPrecision:'kernel-clock-ticks'}};
+};
+const fieldReadEvidence=(read,value)=>{
+ const evidence={started:read.started,finished:read.finished,status:read.error?'unavailable':'observed',value:read.error?null:value,error:readError(read)};
+ if(typeof value==='string'&&Buffer.byteLength(value)>READ_DIAGNOSTIC_LIMITS.linkBytes){const bytes=Buffer.from(value);Object.assign(evidence,{value:null,bytes:bytes.length,sha256:digest(bytes),prefixBase64:bytes.subarray(0,READ_DIAGNOSTIC_LIMITS.linkBytes).toString('base64'),truncated:true});}
+ return evidence;
+};
+const retainReadWindow=(diagnostics,window)=>{
+ let bytes=Buffer.byteLength(JSON.stringify(window));
+ // Oversized diagnostic payloads lose explicitly marked evidence, never a
+ // process identity field or a refusal. They cannot become ownership proof.
+ for(const key of ['statAfter','statBefore','executable','pidNamespace'])if(bytes>READ_DIAGNOSTIC_LIMITS.windowBytes){const field=window[key];if(!field)continue;delete field.rawBase64;delete field.prefixBase64;if(typeof field.value==='string')field.value=null;field.truncated=true;field.unavailableReason='window-byte-cap';bytes=Buffer.byteLength(JSON.stringify(window));}
+ if(bytes>READ_DIAGNOSTIC_LIMITS.windowBytes){window={tableReadId:window.tableReadId,rowOrdinal:window.rowOrdinal,pid:window.pid,status:'unavailable',reason:'window-byte-cap'};diagnostics.status='truncated';}
+ const nextBytes=Buffer.byteLength(JSON.stringify([...diagnostics.windows,window]));
+ if(diagnostics.windows.length>=READ_DIAGNOSTIC_LIMITS.windows||nextBytes>READ_DIAGNOSTIC_LIMITS.totalBytes){diagnostics.omittedWindows++;diagnostics.status='truncated';return;}
+ diagnostics.windows.push(window);diagnostics.retainedBytes=nextBytes;if(Object.values(window).some(value=>value?.truncated))diagnostics.status='truncated';
+};
+
 // OS identities are independently observed. macOS ps reports start time only
 // to the second; that precision is explicit and never described as /proc ticks.
-export function readNativeProcessTable(){
+export function readNativeProcessTable(options={}){
  const rows=[];
- if(process.platform==='linux')return readLinuxNativeProcessTable();
+ if(process.platform==='linux')return readLinuxNativeProcessTable(options);
  else if(process.platform==='darwin'){
   const r=spawnSync('/bin/ps',['-axo','pid=,ppid=,pgid=,sess=,uid=,lstart=,stat=,comm='],{encoding:'utf8',timeout:1000,maxBuffer:8388608});
   assert.equal(r.status,0,'macOS process identity table unavailable');
@@ -27,20 +54,31 @@ export function readNativeProcessTable(){
  }else throw Error('Owned native process OS identity is unavailable on '+process.platform);
  return rows;
 }
-export function readLinuxNativeProcessTable({procRoot='/proc',filesystem=fs}={}){
- const rows=[];
- for(const name of filesystem.readdirSync(procRoot).filter(value=>/^\d+$/.test(value))){
-  const base=path.join(procRoot,name),errors=[];let fields;
-  try{const raw=filesystem.readFileSync(base+'/stat','utf8');fields=raw.slice(raw.lastIndexOf(')')+2).split(' ');}
-  catch(error){if(['ENOENT','ESRCH'].includes(error.code))continue;if(!['EACCES','EPERM'].includes(error.code))throw error;rows.push({pid:Number(name),state:null,statStatus:'unavailable',enrichment:{status:'unavailable',errors:[{field:'stat',code:error.code}]}});continue;}
-  let uid=null;try{const match=/^Uid:\s+(\d+)/m.exec(filesystem.readFileSync(base+'/status','utf8'));if(match)uid=Number(match[1]);else errors.push({field:'uid',code:'invalid'});}catch(error){if(!['ENOENT','ESRCH','EACCES','EPERM'].includes(error.code))throw error;errors.push({field:'uid',code:error.code});}
+export function readLinuxNativeProcessTable({procRoot='/proc',filesystem=fs,diagnostics,readContext}={}){
+ const rows=[],pending=[];if(diagnostics)initializeReadDiagnostics(diagnostics);
+ const context=readContext||{id:diagnostics?++diagnostics.tableReads:null,started:stamp()},names=filesystem.readdirSync(procRoot).filter(value=>/^\d+$/.test(value)),directoryListed=stamp();
+ const partialWindow=(name,rowOrdinal,base,statBefore,reads={})=>{
+  if(!diagnostics)return;
+  if(diagnostics.windows.length+pending.length>=READ_DIAGNOSTIC_LIMITS.windows){diagnostics.omittedWindows++;diagnostics.status='truncated';return;}
+  const statAfter=completedKernelRead(()=>filesystem.readFileSync(base+'/stat'));
+  pending.push({tableReadId:context.id,tableStarted:context.started,directoryListed,rowOrdinal,pid:Number(name),statBefore:statReadEvidence(statBefore,Number(name)),...reads,statAfter:statReadEvidence(statAfter,Number(name))});
+ };
+ for(const [rowOrdinal,name]of names.entries()){
+  const base=path.join(procRoot,name),errors=[],statBefore=completedKernelRead(()=>filesystem.readFileSync(base+'/stat'));let fields;
+  if(statBefore.error){const error=statBefore.error;if(['ENOENT','ESRCH'].includes(error.code))continue;if(!['EACCES','EPERM'].includes(error.code))throw error;rows.push({pid:Number(name),state:null,statStatus:'unavailable',enrichment:{status:'unavailable',errors:[{field:'stat',code:error.code}]}});partialWindow(name,rowOrdinal,base,statBefore);continue;}
+  {const raw=Buffer.isBuffer(statBefore.value)?statBefore.value.toString('utf8'):statBefore.value;fields=raw.slice(raw.lastIndexOf(')')+2).split(' ');}
+  const uidRead=completedKernelRead(()=>filesystem.readFileSync(base+'/status','utf8'));let uid=null;
+  if(uidRead.error){const error=uidRead.error;if(!['ENOENT','ESRCH','EACCES','EPERM'].includes(error.code))throw error;errors.push({field:'uid',code:error.code});}else{const match=/^Uid:\s+(\d+)/m.exec(uidRead.value);if(match)uid=Number(match[1]);else errors.push({field:'uid',code:'invalid'});}
   // Permission-limited foreign processes are not part of this owner's tree.
   // Filter their known UID before requesting protected exe/namespace links.
   if(uid!==null&&uid!==process.getuid())continue;
   const row={pid:Number(name),ppid:Number(fields[1]),pgid:Number(fields[2]),session:Number(fields[3]),state:fields[0],uid,startIdentity:fields[19],startPrecision:'kernel-clock-ticks',statStatus:'observed',executable:null,pidNamespace:null};
-  for(const [field,suffix]of [['executable','/exe'],['pidNamespace','/ns/pid']])try{row[field]=filesystem.readlinkSync(base+suffix);}catch(error){if(!['ENOENT','ESRCH','EACCES','EPERM'].includes(error.code))throw error;errors.push({field,code:error.code});}
+  const reads={uid:fieldReadEvidence(uidRead,uid)};
+  for(const [field,suffix]of [['executable','/exe'],['pidNamespace','/ns/pid']]){const read=completedKernelRead(()=>filesystem.readlinkSync(base+suffix));if(read.error){const error=read.error;if(!['ENOENT','ESRCH','EACCES','EPERM'].includes(error.code))throw error;errors.push({field,code:error.code});}else row[field]=read.value;reads[field]=fieldReadEvidence(read,row[field]);}
   row.enrichment={status:errors.length?'unavailable':'complete',errors};rows.push(row);
+  if(errors.length)partialWindow(name,rowOrdinal,base,statBefore,reads);
  }
+ const finished=stamp();for(const window of pending){window.tableFinished=finished;retainReadWindow(diagnostics,window);}
  return rows;
 }
 const same=(a,b)=>a&&b&&['pid','startIdentity','startPrecision','uid','pidNamespace'].every(key=>a[key]===b[key]);
@@ -54,11 +92,12 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
  assert.ok(Number.isSafeInteger(outputLimitBytes)&&outputLimitBytes>0&&outputLimitBytes<=MAX_OUTPUT,'Finite native output ceiling required');
  assert.ok(Array.isArray(args)&&args.every(value=>typeof value==='string'));
  assert.ok(Object.keys(system).every(key=>['readProcessTable','signalProcess'].includes(key)),'Only OS process boundaries may be controlled');
- const processTable=system.readProcessTable||readNativeProcessTable,signalProcess=system.signalProcess||((pid,signal)=>process.kill(pid,signal));
+ const tableReader=system.readProcessTable||readNativeProcessTable,signalProcess=system.signalProcess||((pid,signal)=>process.kill(pid,signal));
  fs.mkdirSync(outputDir,{recursive:true});
  const files={stdout:path.join(outputDir,'stdout.tap'),stderr:path.join(outputDir,'stderr.txt'),frontier:path.join(outputDir,'frontier.jsonl')},fds={};
  for(const [key,file]of Object.entries(files))fds[key]=fs.openSync(file,'wx');
- const receipt={schemaVersion:1,kind:'owned-native-process',started:stamp(),source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}'),base:env.CHAIN_TEST_COMPARISON_BASE||null,sourceSha:env.CHAIN_TEST_SOURCE_SHA||null,toolSha256:digest(fs.readFileSync(new URL(import.meta.url)))},runtime:{node:process.version,executable:process.execPath,platform:process.platform,arch:process.arch,kernel:os.release(),systemBoundary:Object.keys(system).length?'controlled-test-only':'actual-OS'},hostedPolicy:{CI:env.CI||null,eventPolicy:env.CHAIN_TEST_EVENT_POLICY||null,eventName:env.GITHUB_EVENT_NAME||null,ref:env.GITHUB_REF||null,runId:env.GITHUB_RUN_ID||null,runAttempt:env.GITHUB_RUN_ATTEMPT||null,requestedPort:env.CHAIN_NATIVE_PORT===undefined?'default':env.CHAIN_NATIVE_PORT,debug:env.DEBUG||null},command:{executable,args,cwd},bounds:{executionMs:timeoutMs,termMs:TERM_MS,killMs:KILL_MS,combinedOutputBytes:outputLimitBytes},files,bytes:0,timedOut:false,outputLimit:false,status:null,signal:null,signals:[],processes:[],browserLaunches:[],browserExits:[],refusals:[],incidents:[],cleanup:{complete:false},frontier:null};
+ const receipt={schemaVersion:1,kind:'owned-native-process',started:stamp(),source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}'),base:env.CHAIN_TEST_COMPARISON_BASE||null,sourceSha:env.CHAIN_TEST_SOURCE_SHA||null,toolSha256:digest(fs.readFileSync(new URL(import.meta.url)))},runtime:{node:process.version,executable:process.execPath,platform:process.platform,arch:process.arch,kernel:os.release(),systemBoundary:Object.keys(system).length?'controlled-test-only':'actual-OS'},hostedPolicy:{CI:env.CI||null,eventPolicy:env.CHAIN_TEST_EVENT_POLICY||null,eventName:env.GITHUB_EVENT_NAME||null,ref:env.GITHUB_REF||null,runId:env.GITHUB_RUN_ID||null,runAttempt:env.GITHUB_RUN_ATTEMPT||null,requestedPort:env.CHAIN_NATIVE_PORT===undefined?'default':env.CHAIN_NATIVE_PORT,debug:env.DEBUG||null},command:{executable,args,cwd},bounds:{executionMs:timeoutMs,termMs:TERM_MS,killMs:KILL_MS,combinedOutputBytes:outputLimitBytes},files,bytes:0,timedOut:false,outputLimit:false,status:null,signal:null,signals:[],processes:[],browserLaunches:[],browserExits:[],refusals:[],incidents:[],processReadDiagnostics:initializeReadDiagnostics({}),cleanup:{complete:false},frontier:null};
+ const processTable=()=>{const diagnostics=receipt.processReadDiagnostics,readContext={id:++diagnostics.tableReads,started:stamp()};try{return tableReader({diagnostics,readContext});}finally{diagnostics.latestRead={...readContext,finished:stamp()};}};
  save(path.join(outputDir,'process.json'),receipt);
  let sequence=0,child,closed=false,exitObserved=false,monitor,deadline,reason,doneResolve;
  const done=new Promise(resolve=>doneResolve=resolve),known=new Map(),pending={stdout:'',stderr:''},decoders={stdout:new StringDecoder('utf8'),stderr:new StringDecoder('utf8')},lineOffsets={stdout:0,stderr:0};
@@ -77,11 +116,11 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
   let incident=incidents.get(key);
   if(!incident){
    if(receipt.incidents.length>=MAX_IDENTITY_INCIDENTS){refuse('Process identity incident retention limit reached');return;}
-   incident={id:key,kind,message,status:'active',observed,observation:structuredClone(row),priorIdentity:witness?structuredClone(witness.identity):null,priorProof:witness?structuredClone(witness.proof):null,parentWitness:parent?{identity:structuredClone(parent.identity),proof:structuredClone(parent.proof)}:null,eligible,occurrences:0,observations:[]};
+   incident={id:key,kind,message,status:'active',observed,observation:structuredClone(row),observationReadId:receipt.processReadDiagnostics.latestRead.id,priorIdentity:witness?structuredClone(witness.identity):null,priorProof:witness?structuredClone(witness.proof):null,priorReadId:witness?.firstReadId??null,parentWitness:parent?{identity:structuredClone(parent.identity),proof:structuredClone(parent.proof),readId:parent.firstReadId}:null,eligible,occurrences:0,observations:[]};
    incidents.set(key,incident);receipt.incidents.push(incident);event({kind:'identity-incident',incident});
   }
   incident.occurrences++;incident.lastObserved=observed;incident.lastObservation=structuredClone(row);
-  if(incident.observations.length<MAX_INCIDENT_OBSERVATIONS)incident.observations.push({observed,identity:structuredClone(row)});else incident.observationsTruncated=true;
+  if(incident.observations.length<MAX_INCIDENT_OBSERVATIONS)incident.observations.push({observed,identity:structuredClone(row),tableReadId:receipt.processReadDiagnostics.latestRead.id});else incident.observationsTruncated=true;
   incident.eligible&&=eligible;
   if(incident.status==='resolved'){incident.status='active';incident.reopened=observed;incident.eligible=false;refuse('Owned identity reappeared after terminal proof; refused '+row.pid);}
  };
@@ -92,7 +131,7 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
  const capture=()=>{
   const table=processTable(),byPid=new Map(table.map(row=>[row.pid,row]));
   for(const [pid,witness]of known){const current=byPid.get(pid);if(live(current)&&!usable(current))enrichmentIncident(current,witness);if(current&&!same(witness.identity,current)){blockTerminalResolution(witness,current);refuse('PID identity changed; refused '+pid);}if(live(current)&&witness.nonliveConfirmedAt){blockTerminalResolution(witness,current);refuse('Owned PID reappeared after terminal proof; refused '+pid);}}
-  let changed=true;while(changed){changed=false;for(const row of table){if(known.has(row.pid)||Number.isSafeInteger(row.uid)&&row.uid!==process.getuid())continue;const parent=known.get(row.ppid);if(parent){if(!usable(row)||parent.terminalResolutionBlocked||!usable(byPid.get(row.ppid))||!same(parent.identity,byPid.get(row.ppid))){enrichmentIncident(row,null,parent);continue;}known.set(row.pid,{identity:row,proof:{kind:'observed-owned-ancestry',parentPid:row.ppid,parentStartIdentity:parent.identity.startIdentity,parentIdentity:parent.identity},first:stamp()});changed=true;}}}
+  let changed=true;while(changed){changed=false;for(const row of table){if(known.has(row.pid)||Number.isSafeInteger(row.uid)&&row.uid!==process.getuid())continue;const parent=known.get(row.ppid);if(parent){if(!usable(row)||parent.terminalResolutionBlocked||!usable(byPid.get(row.ppid))||!same(parent.identity,byPid.get(row.ppid))){enrichmentIncident(row,null,parent);continue;}known.set(row.pid,{identity:row,proof:{kind:'observed-owned-ancestry',parentPid:row.ppid,parentStartIdentity:parent.identity.startIdentity,parentIdentity:parent.identity},first:stamp(),firstReadId:receipt.processReadDiagnostics.latestRead.id});changed=true;}}}
   for(const [pid,witness]of known){const current=byPid.get(pid);let status;
    if(current)status=!same(witness.identity,current)?'identity-reused':!live(current)?'nonlive':!usable(current)?'identity-unavailable':'live';
    else if(witness.nonliveConfirmedAt)status='nonlive';
@@ -111,10 +150,10 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
   event({kind:'line',stream,offset,line:value});
   let match=/(?:^|\s)pw:browser <launched> pid=(\d+)\s*$/.exec(value);
   if(match){const pid=Number(match[1]),table=capture(),witness=known.get(pid),current=table.get(pid);const proven=witness&&same(witness.identity,current)&&live(current);
-   receipt.browserLaunches.push({pid,line:value,stream,offset,...stamp(),identity:proven?witness.identity:null,proof:proven?witness.proof:null,status:proven?'owned':'unavailable'});if(!proven)refuse('Browser launch PID lacks matching live owned OS ancestry: '+pid);
+   receipt.browserLaunches.push({pid,line:value,stream,offset,lineSha256:digest(Buffer.from(value)),tableReadId:receipt.processReadDiagnostics.latestRead.id,...stamp(),identity:proven?witness.identity:null,proof:proven?witness.proof:null,status:proven?'owned':'unavailable'});if(!proven)refuse('Browser launch PID lacks matching live owned OS ancestry: '+pid);
   }
   match=/(?:^|\s)pw:browser \[pid=(\d+)\] <process did exit: exitCode=(-?\d+|null), signal=([^>]+)>\s*$/.exec(value);
-  if(match){const pid=Number(match[1]);receipt.browserExits.push({pid,line:value,stream,offset,...stamp(),exitCode:match[2]==='null'?null:Number(match[2]),signal:match[3]==='null'?null:match[3],owner:receipt.browserLaunches.some(row=>row.pid===pid&&row.status==='owned')});}
+  if(match){const pid=Number(match[1]);receipt.browserExits.push({pid,line:value,stream,offset,lineSha256:digest(Buffer.from(value)),lastTableReadId:receipt.processReadDiagnostics.latestRead.id,...stamp(),exitCode:match[2]==='null'?null:Number(match[2]),signal:match[3]==='null'?null:match[3],owner:receipt.browserLaunches.some(row=>row.pid===pid&&row.status==='owned')});}
  };
  const intake=(stream,chunk)=>{
   const available=outputLimitBytes-receipt.bytes,accepted=chunk.subarray(0,Math.max(0,available));
@@ -133,7 +172,7 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
   child.once('exit',(code,signal)=>{exitObserved=true;receipt.status=code;receipt.signal=signal;receipt.exit={code,signal,...stamp()};event({kind:'root-exit',code,signal});doneResolve();});
   child.once('close',(code,signal)=>{closed=true;receipt.close={code,signal,...stamp()};event({kind:'root-close',code,signal});doneResolve();});
   const initial=processTable().find(row=>row.pid===child.pid);assert.ok(usable(initial)&&initial.ppid===process.pid&&initial.uid===receipt.owner.uid,'Spawned child live OS ancestry required');
-  known.set(child.pid,{identity:initial,proof:{kind:'actual-spawn-child',parentPid:process.pid,parentStartIdentity:receipt.owner.startIdentity,parentIdentity:receipt.owner},first:stamp()});receipt.rootIdentity=initial;capture();event({kind:'root-start',pid:child.pid,identity:initial});
+  known.set(child.pid,{identity:initial,proof:{kind:'actual-spawn-child',parentPid:process.pid,parentStartIdentity:receipt.owner.startIdentity,parentIdentity:receipt.owner},first:stamp(),firstReadId:receipt.processReadDiagnostics.latestRead.id});receipt.processReadDiagnostics.spawn={pid:child.pid,launched:receipt.launched,initialReadId:receipt.processReadDiagnostics.latestRead.id};receipt.rootIdentity=initial;capture();event({kind:'root-start',pid:child.pid,identity:initial});
   monitor=setInterval(()=>{try{capture();}catch(error){refuse('Process monitor: '+String(error));reason??='identity-observation';doneResolve();}},20);
   const scheduledMonotonicMs=receipt.launched.monotonicMs+timeoutMs;
   deadline=setTimeout(()=>{receipt.timedOut=true;reason='deadline';receipt.deadline={scheduledMonotonicMs,...stamp()};receipt.deadline.latenessMs=receipt.deadline.monotonicMs-scheduledMonotonicMs;event({kind:'deadline',pid:child.pid,...receipt.deadline});doneResolve();},Math.max(0,scheduledMonotonicMs-performance.now()));
