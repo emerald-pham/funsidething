@@ -11,15 +11,22 @@ import {MOBILE_PROFILE,MOBILE_SCENARIO} from './button-safety-mobile-contract.mj
 import {hostedButtonPolicy} from './button-safety-ci-policy.mjs';
 import {classifyButtonStartupTimeline,verifyButtonSafetyReport} from './button-safety-contract.mjs';
 import {startNativeTimelineCapture,verifyNativeTimelineRuntime} from './button-safety-timeline.mjs';
+import {LINUX_FRONTIER_PROFILE,verifyLinuxNativeRuntime,startLinuxNativeTimelineCapture} from './button-safety-timeline-linux.mjs';
 import {canonicalStartupSource,decodeStartupValue,startupDifferences,ordinaryInlineSources,ORDINARY_OPERATION_CATALOG} from './button-safety-startup.mjs';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const fixtureSourceForAuthMode=Object.freeze({'signed-out':'signed-out-installed','reconcile-held':'reconcile-held-installed'});
 const MIME={'.js':'text/javascript','.html':'text/html','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json','.md':'text/markdown; charset=utf-8'};
-export async function runButtonSafety({repo,engine,outputDir,port=0,profile,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null,startupCapture=null,startupRetentionProfile}){
+export async function runButtonSafety({repo,engine,outputDir,port=0,profile,control=null,probe=false,scenarioFilter=null,mobileYesMotion=null,browserServerEndpoint=null,closeBrowserServer=null,startupOpening=null,startupCapture=null,startupRetentionProfile,linuxFailureObservation=null}){
  const selectedProfile=mobileYesMotion?'workload-diagnostic':profile??'ordinary';
  assert.ok(['ordinary','workload-diagnostic'].includes(selectedProfile),'Unknown button safety profile');
  if(mobileYesMotion&&profile!==undefined)assert.equal(profile,'workload-diagnostic','Mobile button safety requires the original workload-diagnostic profile');
  const ordinaryTimeline=!!startupOpening&&startupCapture==='timeline';
+ const linuxObservation=linuxFailureObservation!==null,sourceLocated=ordinaryTimeline||linuxObservation;
+ if(linuxObservation){
+  assert.equal(linuxFailureObservation,LINUX_FRONTIER_PROFILE,'Known Linux diagnostic-only profile required');
+  assert.ok(engine==='webkit'&&selectedProfile==='ordinary'&&!startupOpening&&!startupCapture&&startupRetentionProfile===undefined&&!mobileYesMotion&&!browserServerEndpoint&&((probe&&control==='pageerror'&&scenarioFilter===null)||(!probe&&control===null&&scenarioFilter==='ordinary scene choice survives reopen and task Undo')),'Linux diagnostic requires exactly the existing opening pageerror probe or initial scene-time-settings window');
+  verifyLinuxNativeRuntime({repo});
+ }
  if(startupRetentionProfile!==undefined)assert.ok(['canonical-json-48mib-memory-png-v1','canonical-json-56mib-memory-png-v1','canonical-json-4216mib-memory-png-v1'].includes(startupRetentionProfile)&&ordinaryTimeline&&selectedProfile==='ordinary'&&!mobileYesMotion&&!probe&&!scenarioFilter&&!control&&!browserServerEndpoint,'Explicit startup retention profile requires the known ordinary startup Timeline route');
  assert.ok(['chromium','webkit'].includes(engine),'Explicit supported engine');
  if(startupCapture!==null)assert.ok(['jpeg','timeline'].includes(startupCapture)&&startupOpening&&!mobileYesMotion&&!probe&&!scenarioFilter&&!control&&!browserServerEndpoint,'Startup capture selection requires known mode on the ordinary startup operation only');
@@ -73,8 +80,9 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
  const diagnosticProfile=selectedProfile==='workload-diagnostic';
  const report={schemaVersion:1,kind:mobileYesMotion?'button-mobile-functional':probe?'button-sensitivity':scenarioFilter?'button-diagnostic':'button-safety',engine,candidateCommit,candidateTree,hostedPolicy,status:'running',startedAt:new Date().toISOString(),profile:selectedProfile,requiredActions:inventory.requiredActions,requiredScenarios:profileDefinition.requiredScenarios,...(diagnosticProfile?{requiredWorkload:profileDefinition.requiredWorkload,requiredRapidActions:profileDefinition.requiredRapidActions}:{}),inventorySha256:digest(inventoryBytes),observedActions:[],outcomes:[],errors:[],cleanup:{},limits:['Synthetic isolated browser storage and Firebase/clipboard/geolocation boundaries.',mobileYesMotion?'Emulated mobile WebKit; uncapped functional evidence unless independently bound to a verified Linux cgroup report; no physical iPhone or private-board recovery claim.':'Native desktop engine; no physical iPhone or private-board recovery claim.']};
  const reportPath=path.join(outputDir,'button-safety-'+engine+'-'+randomUUID()+'.json'),save=()=>fs.writeFileSync(reportPath,JSON.stringify(report,null,2)+'\n');save();
+ if(linuxObservation){report.scope='linux-native-failure-diagnostic';report.linuxFailureObservation={profile:linuxFailureObservation,window:probe?'pageerror-opening':'scene-time-settings',requiredVerdictUnchanged:true,limits:['Fresh instrumented failure follow-up only; no replacement gate credit']};}
  if(startupOpening){report.kind='startup-diagnostic';report.scope='ordinary-startup-diagnostic';report.limits.push('Ordinary uncapped64-task opening only; no button, mobile memory, release or physical-iOS qualification.');}
- if(ordinaryTimeline){
+ if(sourceLocated){
   const changed=[...new Set([...git('diff','--name-only','HEAD').toString().split('\n'),...git('ls-files','--others','--exclude-standard').toString().split('\n')].filter(Boolean))].sort();let patch=git('diff','--binary','--full-index','HEAD');
   for(const file of changed)try{git('ls-files','--error-unmatch',file);}catch{try{git('diff','--no-index','--binary','--full-index','/dev/null',file);}catch(error){if(error.status!==1)throw error;patch=Buffer.concat([patch,error.stdout]);}}
   report.toolingSource={commit:candidateCommit,tree:candidateTree,fullPatchSha256:digest(patch),protectedFingerprint:protectedTestFingerprint(git('diff','--unified=0','HEAD','--','tests.js').toString().split('\n')),files:changed.map(file=>({path:file,sha256:digest(fs.lstatSync(path.join(repo,file)).isSymbolicLink()?fs.readlinkSync(path.join(repo,file)):fs.readFileSync(path.join(repo,file)))})),exclusions:['Git-ignored files','External runtime/environment separately bound at launch']};
@@ -89,17 +97,18 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
  if(!startupOpening)for(const [file,hash]of Object.entries(runtimeAssets))assert.equal(report.assets[file],hash,'Reviewed runtime asset missing or changed: '+file);
  const {verifyButtonInventorySource}=await import('./button-safety-contract.mjs');if(!startupOpening)verifyButtonInventorySource([...sources].filter(([file])=>/\.(?:js|html)$/.test(file)).map(([,bytes])=>bytes.toString()).join('\n'),JSON.parse(fs.readFileSync(path.join(repo,'scripts/button-safety-inventory.json'),'utf8')));
  for(const [file,bytes]of sources)assert.equal(digest(bytes),digest(git('show',appCommit+':'+file)),'Button run requires exact committed app bytes: '+file);
- let server,browser,context,page,armed=false,closing=false,stopStartupCapture=null,interrupted=null;
+ let server,browser,context,page,armed=false,closing=false,stopStartupCapture=null,stopLinuxCapture=null,interrupted=null;
  const check=()=>{assert.equal(report.errors.length,0,'Native button safety detected '+report.errors.join(', '));};
  const retainSource=(url,value,kind)=>{
-  if(!ordinaryTimeline)return;const bytes=Buffer.isBuffer(value)?value:Buffer.from(value),sha256=digest(bytes),previous=retainedSources.get(url);
+  if(!sourceLocated)return;const bytes=Buffer.isBuffer(value)?value:Buffer.from(value),sha256=digest(bytes),previous=retainedSources.get(url);
   if(previous){assert.equal(previous.sha256,sha256,'Owned source URL bytes changed');return previous;}
-  const directory=path.join(outputDir,'startup-sources');fs.mkdirSync(directory,{recursive:true});const relative='startup-sources/source-'+String(retainedSources.size+1).padStart(4,'0')+'.txt';fs.writeFileSync(path.join(outputDir,relative),bytes,{flag:'wx'});const row={url,kind,path:relative,sha256,bytes:bytes.length};retainedSources.set(url,row);return row;
+  if(linuxObservation)assert.ok([...retainedSources.values()].reduce((sum,row)=>sum+row.bytes,0)+bytes.length+(report.linuxFailureObservation.capture?.rawBytes||0)<=33554432,'Linux diagnostic shared raw/source byte bound');
+  const sourceDirectory=linuxObservation?'linux-sources':'startup-sources',directory=path.join(outputDir,sourceDirectory);fs.mkdirSync(directory,{recursive:true});const relative=sourceDirectory+'/source-'+String(retainedSources.size+1).padStart(4,'0')+'.txt';fs.writeFileSync(path.join(outputDir,relative),bytes,{flag:'wx'});const row={url,kind,path:relative,sha256,bytes:bytes.length};retainedSources.set(url,row);return row;
  };
  const diagnostic=(fn,arg,name)=>{const source=canonicalStartupSource(fn,arg,origin+prefix+'__startup-diagnostic__/'+(name||'source-'+(++scriptSequence))+'.js');diagnosticSources.set(new URL(source.url).pathname,source.content);retainSource(source.url,source.content,'instrumentation');return source;};
- const evalPage=(fn,arg)=>ordinaryTimeline?page.evaluate(diagnostic(fn,arg).content):page.evaluate(fn,arg);
- const initScript=(owner,fn,arg)=>ordinaryTimeline?owner.addInitScript({content:diagnostic(typeof fn==='object'?fn.content:fn,arg).content}):owner.addInitScript(fn,arg);
- const evaluateElement=(selector,fn)=>ordinaryTimeline?evalPage('('+fn.toString()+')(document.querySelector('+JSON.stringify(selector)+'))'):page.locator(selector).first().evaluate(fn);
+ const evalPage=(fn,arg)=>sourceLocated?page.evaluate(diagnostic(fn,arg).content):page.evaluate(fn,arg);
+ const initScript=(owner,fn,arg)=>sourceLocated?owner.addInitScript({content:diagnostic(typeof fn==='object'?fn.content:fn,arg).content}):owner.addInitScript(fn,arg);
+ const evaluateElement=(selector,fn)=>sourceLocated?evalPage('('+fn.toString()+')(document.querySelector('+JSON.stringify(selector)+'))'):page.locator(selector).first().evaluate(fn);
 
  const bounded=async(work,label,timeoutMs=2500)=>{let timer;try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Native button safety detected stalled responsiveness: '+label)),timeoutMs);})]);}finally{clearTimeout(timer);}};
  const beginStartupCapture=async()=>{
@@ -129,7 +138,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    }});if(halted)await page.screencast.stop();capture.startedBeforeNavigation=true;save();
   }catch(error){capture.errors.push('capture: '+String(error).slice(0,240));await stopStartupCapture('capture-error');}
  };
- const captureSignals=startupCapture?Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>{interrupted??=signal;void(async()=>{await stopStartupCapture?.('interrupted');})().catch(error=>{report.errors.push('capture interruption cleanup: '+String(error));});}])):{};
+ const captureSignals=startupCapture||linuxObservation?Object.fromEntries(['SIGINT','SIGTERM'].map(signal=>[signal,()=>{interrupted??=signal;void(async()=>{await stopStartupCapture?.('interrupted');await stopLinuxCapture?.('interrupted');})().catch(error=>{report.errors.push('capture interruption cleanup: '+String(error));});}])):{};
  for(const [signal,handler]of Object.entries(captureSignals))process.on(signal,handler);
 
  try{
@@ -138,15 +147,16 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    const pathname=new URL(req.url,'http://127.0.0.1').pathname;
    const name=pathname.slice(prefix.length)||'index.html',module=pathname.startsWith(sdk)?pathname.slice(sdk.length):null;
    const observer=pathname===prefix+'__button-observer';
-   const generated=ordinaryTimeline?diagnosticSources.get(pathname):null;
+   const generated=sourceLocated?diagnosticSources.get(pathname):null;
    const bytes=generated|| (observer?'<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Isolated storage fixture</title>':module?sdkBodies[module]:pathname.startsWith(prefix)&&!name.includes('..')?sources.get(name):null);
-   if(ordinaryTimeline){report.sourceResponses??=[];report.sourceResponses.push({url:origin+pathname,status:bytes?200:404,mime:generated||module?'text/javascript':MIME[path.extname(name)]||'text/plain',sha256:bytes?digest(bytes):null});}
+   if(sourceLocated){report.sourceResponses??=[];report.sourceResponses.push({url:origin+pathname,status:bytes?200:404,mime:generated||module?'text/javascript':MIME[path.extname(name)]||'text/plain',sha256:bytes?digest(bytes):null});}
    res.writeHead(bytes?200:404,{'Content-Type':generated?'text/javascript':observer?'text/html':module?'text/javascript':MIME[path.extname(name)]||'text/plain','Cache-Control':'no-store'});res.end(bytes||'Not found');
   });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   origin='http://127.0.0.1:'+server.address().port;
-  if(ordinaryTimeline){for(const [file,bytes]of sources)retainSource(origin+prefix+file,bytes,'app');retainSource(origin+prefix,sources.get('index.html'),'app');for(const [file,bytes]of Object.entries(sdkBodies))retainSource(origin+sdk+file,bytes,'synthetic-sdk');sourceManifest={app:report.appSource,inlineSources:ordinaryInlineSources(sources.get('index.html')),operationCatalog:ORDINARY_OPERATION_CATALOG,documentURL:origin+prefix,origin,appPrefix:prefix,assets:[...sources].map(([file,bytes])=>({path:file,sha256:digest(bytes),bytes:bytes.length})),sdk:Object.entries(sdkBodies).map(([name,bytes])=>({name,url:origin+sdk+name,sha256:digest(bytes)})),generated:[],fixture:report.fixture};}
+  if(sourceLocated){for(const [file,bytes]of sources)retainSource(origin+prefix+file,bytes,'app');retainSource(origin+prefix,sources.get('index.html'),'app');for(const [file,bytes]of Object.entries(sdkBodies))retainSource(origin+sdk+file,bytes,'synthetic-sdk');sourceManifest={app:report.appSource,inlineSources:ordinaryInlineSources(sources.get('index.html')),operationCatalog:ORDINARY_OPERATION_CATALOG,documentURL:origin+prefix,origin,appPrefix:prefix,assets:[...sources].map(([file,bytes])=>({path:file,sha256:digest(bytes),bytes:bytes.length})),sdk:Object.entries(sdkBodies).map(([name,bytes])=>({name,url:origin+sdk+name,sha256:digest(bytes)})),generated:[],fixture:report.fixture};}
   if(interrupted)throw Error('Startup capture interrupted before launch: '+interrupted);
   const playwright=await import('playwright');browser=browserServerEndpoint?await playwright[engine].connect(browserServerEndpoint,{timeout:15000}):await playwright[engine].launch({headless:true});browser.on('disconnected',()=>{if(!closing)report.errors.push('browser-disconnected');});report.runtime={engine,version:browser.version(),playwright:'1.62.1',platform:process.platform,nodeVersion:process.version,browserConnection:browserServerEndpoint?'remote-owned':'local-owned',...(browserServerEndpoint?{browserEndpointSha256:digest(browserServerEndpoint)}:{})};
+  if(linuxObservation)assert.equal(browser.version(),'26.5','Actual Linux WebKit26.5 required');
   const {runButtonScenarios}=await import('./button-safety-scenarios.mjs');
   const observed=new Set(),outcomes=new Map(),rapidOutcomes=new Map();
   const actionFor=el=>{
@@ -290,6 +300,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
    },{keySource:actionFor.toString()});
    if(startupCapture==='jpeg')await bounded(beginStartupCapture(),'startup public screencast start');
    if(startupCapture==='timeline')await bounded(startNativeTimelineCapture({page,outputDir,...(startupRetentionProfile===undefined?{}:{retentionProfile:startupRetentionProfile}),sourceURL:origin+prefix+'__startup-diagnostic__/clock-init.js',onStop:stop=>{stopStartupCapture=stop;},onSave:capture=>{report.startupCapture=capture;if(ordinaryTimeline&&capture.instrumentation){diagnosticSources.set(new URL(capture.instrumentation.url).pathname,capture.instrumentation.content);retainSource(capture.instrumentation.url,capture.instrumentation.content,'instrumentation');}save();if(capture.errors.length&&!interrupted){interrupted='native Timeline diagnostic: '+capture.errors[0];closing=true;void(async()=>{await stopStartupCapture?.('native-diagnostic-error');})().catch(error=>{report.errors.push('native diagnostic abort cleanup: '+String(error));});}}}),'startup native Timeline start');
+   if(linuxObservation)await bounded(startLinuxNativeTimelineCapture({page,repo,outputDir,profile:linuxFailureObservation,sourceURL:origin+prefix+'__startup-diagnostic__/linux-clock-init.js',sources:()=>[...retainedSources.values()],onStop:stop=>{stopLinuxCapture=stop;},onSave:capture=>{report.linuxFailureObservation.capture=capture;if(capture.instrumentation){diagnosticSources.set(new URL(capture.instrumentation.url).pathname,capture.instrumentation.content);retainSource(capture.instrumentation.url,capture.instrumentation.content,'instrumentation');}save();}}),'Linux native failure observation start');
    if(interrupted)throw Error('Startup capture interrupted: '+interrupted);
    await page.goto(origin+prefix);if(interrupted)throw Error('Startup capture interrupted: '+interrupted);await page.waitForFunction(()=>typeof state!=='undefined'&&state&&window.ScannerDeviceStore);await page.waitForFunction(()=>window.CloudSync?.ready);if(mobileYesMotion)await page.waitForFunction(motion=>document.documentElement.dataset.landscapeMotion===motion,mobileYesMotion,{timeout:12000});localArmed=true;
    const setup=await bounded((async()=>{for(let attempt=0;attempt<200;attempt++){
@@ -338,8 +349,10 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     await new Promise(resolve=>setTimeout(resolve,25));
    }})(),label,timeoutMs);
    const step=async(selector,expect,description=selector,clickOptions={})=>{
+    let linuxTerminal=false;try{
     await expose(selector);const target=page.locator(selector).first();
     const action=await evaluateElement(selector,actionFor);assert.ok(action,'Passive inert appearance replicas cannot earn action coverage');const before=report.clicks?.length||0;
+    linuxTerminal=linuxObservation&&(probe&&action==='act:settings'||!probe&&action==='act:scene-time-settings');
     const opening=await bounded(evalPage(()=>({...window.__buttonHeartbeat})),'opening heartbeat');
     if(opening.inputAt===null&&!(report.presses||[]).length&&opening.maxGapMs>=1000){
      report.samples??=[];report.samples.push({scenario:name,action,phase:'opening-before-input',openingMaxFrameGapMs:opening.maxGapMs,preInputMaxFrameGapMs:opening.preInputMaxGapMs,inputMaxFrameGapMs:opening.inputMaxGapMs,firstTrustedInputAt:null,inputStatus:'not-reached'});
@@ -369,6 +382,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
     assert.ok(heartbeat.maxGapMs<1000,'Native button safety detected blocked frame loop: '+(heartbeat.preInputMaxGapMs>=1000&&heartbeat.inputMaxGapMs<1000?'pre-input / ':'')+description+' '+heartbeat.maxGapMs+'ms');
     assert.ok((report.clicks||[]).slice(before).some(row=>row.action===action),'Trusted native click observed: '+description);
     const row=outcomes.get(action)||{action,status:'passed',events:['click'],assertions:0,responsive:true,steps:[]};row.assertions++;report.outcomes=[...outcomes.values(),...(outcomes.has(action)?[]:[row])];row.steps.push({scenario:name,description,elapsedMs:Date.now()-started,maxFrameGapMs:heartbeat.maxGapMs,frames:heartbeat.frames});outcomes.set(action,row);return action;
+    }finally{if(linuxTerminal)await stopLinuxCapture?.('first-selected-step-terminal');}
    };
    const nativeInput=async(kind,selector,value)=>{
     await expose(selector);const target=page.locator(selector);await evalPage(()=>{window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=performance.now();});const started=Date.now();
@@ -748,6 +762,7 @@ export async function runButtonSafety({repo,engine,outputDir,port=0,profile,cont
   let cleanupError;const failedBeforeCleanup=report.status==='failed';
   const close=async work=>{try{await work();}catch(error){cleanupError??=error;report.status='failed';report.failure??=error.stack||String(error);report.errors.push('cleanup: '+String(error));(report.cleanupFailures??=[]).push({name:error.name||null,message:error.message||String(error),stack:error.stack||null});}};
   if(stopStartupCapture)await close(async()=>{await stopStartupCapture(interrupted?'interrupted':'case-finished');});
+  if(stopLinuxCapture)await close(async()=>{await stopLinuxCapture(interrupted?'interrupted':'consumer-finally');});
   if(ordinaryTimeline)await close(async()=>{
    const capture=report.startupCapture||null,availability={capture:{status:capture?.status||'unavailable',reason:capture?'Actual provider terminal outcome':'Provider did not produce capture metadata'},input:{status:'not-reached',reason:'No trusted operation receipt available'},clock:{status:capture?.facts?.calibration?.status==='bounded'?'available':'unavailable',reason:'Only actual matched same-document native anchors can bound the page clock'},custody:{status:'unavailable',reason:'Owned page unavailable after stop'}};
    let readback;
