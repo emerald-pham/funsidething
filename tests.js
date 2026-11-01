@@ -84,7 +84,7 @@ browserType.launch=async(...args)=>{
      const parsed=new URL(initialUrl);
      if(parsed.protocol==='http:'&&parsed.hostname==='127.0.0.1'&&/^\\/button-[a-f0-9-]+\\/$/.test(parsed.pathname)&&!parsed.search&&!parsed.hash){
       captured=true;
-      fs.writeFileSync(capturePath,JSON.stringify({schemaVersion:1,engine,requestedPort:Number(process.env.CHAIN_NATIVE_PORT),initialUrl,origin:parsed.origin,pathname:parsed.pathname,search:parsed.search,hash:parsed.hash,capturedBeforeNavigation:true,capturedAtMs:Date.now(),processId:process.pid,nodeVersion:process.version},null,2)+'\\n');
+      fs.writeFileSync(capturePath,JSON.stringify({schemaVersion:1,engine,requestedPort:Number(process.env.CHAIN_NATIVE_PORT||0),initialUrl,origin:parsed.origin,pathname:parsed.pathname,search:parsed.search,hash:parsed.hash,capturedBeforeNavigation:true,capturedAtMs:Date.now(),processId:process.pid,nodeVersion:process.version},null,2)+'\\n');
      }
     }
     return goto(url,...gotoArgs);
@@ -51571,7 +51571,7 @@ test('RISK saved decision review guidance: mounted changelog records selected re
  assert.equal(JSON.stringify(ctx.state),before,'Reading the note does not save or alter the board');
 });
 
-test("RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",async t=>{
+test("RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources", async t=>{
  const hash=value=>createHash('sha256').update(value).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value));
  const scenario='ordinary two distinct scanner decisions',exactKeys=(value,keys,label)=>assert.deepEqual(Object.keys(value).sort(),keys.slice().sort(),label);
  const taskLiteral={id:'synthetic-kept',title:'Synthetic retained task',url:null,due:null,startsAt:null,evergreen:false,evergreenHours:18,evergreenResetAtDay:true,mu:25,sigma:8.333333333,done:false,createdAt:1,completedAt:null,lastDoneAt:null,ctx:[],futureTask:{opaque:['retain',7]}};
@@ -51685,7 +51685,7 @@ test("RISK repository process: ordinary two distinct scanner decisions retain bo
  });
 });
 
-test('RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources',async t=>{
+test('RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources', async t=>{
  const hash=value=>createHash('sha256').update(value).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value));
  const scenario='ordinary scene choice survives reopen and task Undo',exactKeys=(value,keys,label)=>assert.deepEqual(Object.keys(value).sort(),keys.slice().sort(),label);
  const taskLiteral={id:'synthetic-kept',title:'Synthetic retained task',url:null,due:null,startsAt:null,evergreen:false,evergreenHours:18,evergreenResetAtDay:true,mu:25,sigma:8.333333333,done:false,createdAt:1,completedAt:null,lastDoneAt:null,ctx:[],futureTask:{opaque:['retain',7]}};
