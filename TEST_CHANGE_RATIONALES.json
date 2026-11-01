@@ -50824,5 +50824,145 @@
       "originalRationaleCount": 1480,
       "scope": "Standalone1873+1874 checkpoint; retain actual1873 chronology and append combined exact fingerprints after integration."
     }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "a9f11398c9e055da4d01d9a3042e29f3eced3abc0d0aad699612de23ab76a417",
+    "reason": "Resolve atomic #1875 exact hosted versus local top-layer provenance through the existing real native probe and process fixture, preserving the complete1873/1874 caller and origin repair group.",
+    "previousBehavior": "Both successful hosted top-layer native reports carried their legitimate exact routed policy,raw event and raw ref. The unchanged outer test required hostedPolicy to be null,so it rejected each successful hosted probe and its parent.",
+    "intendedBehavior": "Deeply compare the complete report policy with the independently declared execution context triplet when CI is true; require exactly null locally. The existing fixture independently fixes canonical-pr-merge-v1,pull_request,refs/pull/1/merge and selects the unchanged real two-engine top-layer root. Existing production policy validation still rejects invalid contexts before runtime.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility,both external-close engines,task-Undo and both top-layer engines now reconcile exactly to twenty-one outcomes. Earlier17/18-outcome checkpoints retain their own recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "The prior1874 eighteen-outcome hosted checkpoint and one-case allocated-port control remain preserved with exact owned renderer URL,original/instrumented hashes,two native task Undo inputs,no unchanged-scene repaint,changed-scene paint/save and complete current/durable task/scene sources.",
+      "Both real ordinary top-layer native probes retain every intended-control refusal,source/authority,typed/raw complete original,1000ms frame and owned cleanup assertion. Exact provenance uses the independently declared external execution context; there is no production policy helper in the oracle,report provenance erasure,generic truthy acceptance or full ordinary coverage claim."
+    ],
+    "redEvidence": {
+      "command": "Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension.",
+      "failure": "Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure."
+    },
+    "greenEvidence": "Recorded0e281964 passes the same21/21-outcome declared hosted fixture with zero skips. Local positive control52df49d8 passes3/3 outcomes with both actual native hostedPolicy values exactly null and complete cleanup. Original fifteen-root/thirty-one-outcome affected consumer regression remains the required final focused acceptance; ROOT owns full exact-candidate/hosted/release qualification.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "comparisonBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "command": "git diff --unified=0 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48 -- tests.js",
+      "nativeAppSource": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone complete1873/1874/1875 owner group before final focused regression; ROOT derives the combined exact fingerprint after integration."
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "33b20da22d571841ff9bec95df6491f246f4964c4b073ddb35c6a2495cc3d005",
+    "reason": "Resolve atomic #1875 exact hosted versus local top-layer provenance through the existing real native probe and process fixture, preserving the complete1873/1874 caller and origin repair group.",
+    "previousBehavior": "Both successful hosted top-layer native reports carried their legitimate exact routed policy,raw event and raw ref. The unchanged outer test required hostedPolicy to be null,so it rejected each successful hosted probe and its parent.",
+    "intendedBehavior": "Deeply compare the complete report policy with the independently declared execution context triplet when CI is true; require exactly null locally. The existing fixture independently fixes canonical-pr-merge-v1,pull_request,refs/pull/1/merge and selects the unchanged real two-engine top-layer root. Existing production policy validation still rejects invalid contexts before runtime.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility,both external-close engines,task-Undo and both top-layer engines now reconcile exactly to twenty-one outcomes. Earlier17/18-outcome checkpoints retain their own recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "The prior1874 eighteen-outcome hosted checkpoint and one-case allocated-port control remain preserved with exact owned renderer URL,original/instrumented hashes,two native task Undo inputs,no unchanged-scene repaint,changed-scene paint/save and complete current/durable task/scene sources.",
+      "Both real ordinary top-layer native probes retain every intended-control refusal,source/authority,typed/raw complete original,1000ms frame and owned cleanup assertion. Exact provenance uses the independently declared external execution context; there is no production policy helper in the oracle,report provenance erasure,generic truthy acceptance or full ordinary coverage claim."
+    ],
+    "redEvidence": {
+      "command": "Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension.",
+      "failure": "Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure."
+    },
+    "greenEvidence": "Recorded0e281964 passes the same21/21-outcome declared hosted fixture with zero skips. Local positive control52df49d8 passes3/3 outcomes with both actual native hostedPolicy values exactly null and complete cleanup. Original fifteen-root/thirty-one-outcome affected consumer regression remains the required final focused acceptance; ROOT owns full exact-candidate/hosted/release qualification.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "comparisonBase": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "command": "git diff --unified=0 6443761512cd652d02955fb93826dc3baa5daca3 -- tests.js",
+      "nativeAppSource": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone complete1873/1874/1875 owner group before final focused regression; ROOT derives the combined exact fingerprint after integration."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "70891662dbd06167e7c0aecedefe6517202c2f7c784a148eec667c402e44cda0",
+    "reason": "Resolve atomic #1875 exact hosted versus local top-layer provenance through the existing real native probe and process fixture, preserving the complete1873/1874 caller and origin repair group.",
+    "previousBehavior": "Both successful hosted top-layer native reports carried their legitimate exact routed policy,raw event and raw ref. The unchanged outer test required hostedPolicy to be null,so it rejected each successful hosted probe and its parent.",
+    "intendedBehavior": "Deeply compare the complete report policy with the independently declared execution context triplet when CI is true; require exactly null locally. The existing fixture independently fixes canonical-pr-merge-v1,pull_request,refs/pull/1/merge and selects the unchanged real two-engine top-layer root. Existing production policy validation still rejects invalid contexts before runtime.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility,both external-close engines,task-Undo and both top-layer engines now reconcile exactly to twenty-one outcomes. Earlier17/18-outcome checkpoints retain their own recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "The prior1874 eighteen-outcome hosted checkpoint and one-case allocated-port control remain preserved with exact owned renderer URL,original/instrumented hashes,two native task Undo inputs,no unchanged-scene repaint,changed-scene paint/save and complete current/durable task/scene sources.",
+      "Both real ordinary top-layer native probes retain every intended-control refusal,source/authority,typed/raw complete original,1000ms frame and owned cleanup assertion. Exact provenance uses the independently declared external execution context; there is no production policy helper in the oracle,report provenance erasure,generic truthy acceptance or full ordinary coverage claim."
+    ],
+    "redEvidence": {
+      "command": "Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension.",
+      "failure": "Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure."
+    },
+    "greenEvidence": "Recorded0e281964 passes the same21/21-outcome declared hosted fixture with zero skips. Local positive control52df49d8 passes3/3 outcomes with both actual native hostedPolicy values exactly null and complete cleanup. Original fifteen-root/thirty-one-outcome affected consumer regression remains the required final focused acceptance; ROOT owns full exact-candidate/hosted/release qualification.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "command": "git diff --unified=0 8cd524a7f0ab7a25b6689244722ae3c5baf861c8 -- tests.js",
+      "nativeAppSource": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone complete1873/1874/1875 owner group before final focused regression; ROOT derives the combined exact fingerprint after integration."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "3607e96867276f1d2fe76252ea27117e351a6da3d86e53c6dec0063a9c03357a",
+    "reason": "Resolve atomic #1875 exact hosted versus local top-layer provenance through the existing real native probe and process fixture, preserving the complete1873/1874 caller and origin repair group.",
+    "previousBehavior": "Both successful hosted top-layer native reports carried their legitimate exact routed policy,raw event and raw ref. The unchanged outer test required hostedPolicy to be null,so it rejected each successful hosted probe and its parent.",
+    "intendedBehavior": "Deeply compare the complete report policy with the independently declared execution context triplet when CI is true; require exactly null locally. The existing fixture independently fixes canonical-pr-merge-v1,pull_request,refs/pull/1/merge and selects the unchanged real two-engine top-layer root. Existing production policy validation still rejects invalid contexts before runtime.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility,both external-close engines,task-Undo and both top-layer engines now reconcile exactly to twenty-one outcomes. Earlier17/18-outcome checkpoints retain their own recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "The prior1874 eighteen-outcome hosted checkpoint and one-case allocated-port control remain preserved with exact owned renderer URL,original/instrumented hashes,two native task Undo inputs,no unchanged-scene repaint,changed-scene paint/save and complete current/durable task/scene sources.",
+      "Both real ordinary top-layer native probes retain every intended-control refusal,source/authority,typed/raw complete original,1000ms frame and owned cleanup assertion. Exact provenance uses the independently declared external execution context; there is no production policy helper in the oracle,report provenance erasure,generic truthy acceptance or full ordinary coverage claim."
+    ],
+    "redEvidence": {
+      "command": "Recorded preimplementation-red257b423a at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1875-red/recorder/2026-11-01T03-44-20-555Z-257b423a-6259-49bf-9745-e6957740b7e9.json on committed2134829a1a5ed2cc0dd94b7e564b154679654951 after only the21-outcome process selection extension.",
+      "failure": "Before the oracle repair,actual child21=18passed+3failed/0skipped. All prior18passed. Both actual top-layer native reports passed with complete cleanup and the exact independently fixed hosted triplet; each outer null assertion and their parent failed. This is a report-provenance oracle RED,not application or intended-input failure."
+    },
+    "greenEvidence": "Recorded0e281964 passes the same21/21-outcome declared hosted fixture with zero skips. Local positive control52df49d8 passes3/3 outcomes with both actual native hostedPolicy values exactly null and complete cleanup. Original fifteen-root/thirty-one-outcome affected consumer regression remains the required final focused acceptance; ROOT owns full exact-candidate/hosted/release qualification.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "command": "git diff --unified=0 b176026825e4f9539780f745fe60e09cf348d288 -- tests.js",
+      "nativeAppSource": "2134829a1a5ed2cc0dd94b7e564b154679654951",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone complete1873/1874/1875 owner group before final focused regression; ROOT derives the combined exact fingerprint after integration."
+    }
   }
 ]
