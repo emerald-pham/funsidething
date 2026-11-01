@@ -14037,6 +14037,26 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: partial OS read diagnostics retain literal bounded evidence without custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "Linux partial read diagnostics retain literal ordered kernel observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "Linux partial read diagnostics keep invocation and raw payload bounds explicit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned partial read diagnostics survive the receipt without granting unknown custody",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
       "root": "owned native process reconciles a witnessed executable-only terminal read after actual exit",
       "group": "native-process",
       "file": "scripts/agent-tools/hosted-native-callers.test.mjs"

@@ -52252,7 +52252,12 @@ test('RISK repository process: proven terminal executable incidents retain actua
 test('RISK repository process: owned native lifecycle retains stream and exact union controls',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','scripts/agent-tools/hosted-native-callers.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:4194304});
- assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The actual owned-process public seam must retain stream, detached-child cleanup, cap, foreign/PID-reuse refusal and literal union controls: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 23$/m);assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('All23 real-process and OS-boundary controls completed without skipped cases');
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The actual owned-process public seam must retain stream, detached-child cleanup, cap, foreign/PID-reuse refusal and literal union controls: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 26$/m);assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('All26 real-process and OS-boundary controls, including all23 prior cases, completed without skipped cases');
+});
+test('RISK repository process: partial OS read diagnostics retain literal bounded evidence without custody',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(Linux partial read diagnostics|owned partial read diagnostics)','scripts/agent-tools/hosted-native-callers.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:10000,maxBuffer:4194304});
+ assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'The existing OS reader retains ordered raw diagnostics without changing returned identity or custody: '+result.stdout+'\n'+result.stderr);assert.match(result.stdout,/^# tests 3$/m);assert.match(result.stdout,/^# skipped 0$/m);t.diagnostic('Literal Linux filesystem read evidence is diagnostic only; genuine unknown custody remains refused');
 });
 test('RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks',async t=>{
  const {classifyButtonStartupTimeline,verifyButtonSafetyReport}=await import('./scripts/button-safety-contract.mjs'),x=retainedTimelineInputs(),before=Buffer.from(x.inputs.captureBytes),classify=x=>classifyButtonStartupTimeline(x.timeline,x.capture,x.inputs),result=classify(x);

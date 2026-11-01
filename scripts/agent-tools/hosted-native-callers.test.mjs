@@ -7,6 +7,7 @@ import {spawn} from 'node:child_process';
 import {runOwnedNativeProcess,readNativeProcessTable,readLinuxNativeProcessTable,verifyHostedNativeCallerReceipts} from './hosted-native-callers.mjs';
 import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
+import {createHash} from 'node:crypto';
 
 const cwd=fileURLToPath(new URL('../..',import.meta.url));
 const owner=new URL('./hosted-native-callers.mjs',import.meta.url).href;
@@ -55,8 +56,8 @@ test('owned native process reconciles a witnessed executable-only terminal read 
  const before=new Set(readNativeProcessTable().map(row=>row.pid));let prior,partial;
  const visibility={policy:'delay-terminal-table-view-until-real-absence',reads:[],dropped:0};
  const signals=[];
- const readProcessTable=()=>{
-  const rows=readNativeProcessTable(),row=prior?rows.find(row=>row.pid===prior.pid):rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
+ const readProcessTable=options=>{
+  const rows=readNativeProcessTable(options),row=prior?rows.find(row=>row.pid===prior.pid):rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
   if(row){if(!prior)prior={...row};else if(!partial&&fs.existsSync(ready)){
    partial={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};
    rows[rows.indexOf(row)]=partial;
@@ -92,8 +93,8 @@ test('owned native process reconciles a witnessed descendant while retaining its
  const outputDir=fs.mkdtempSync(path.join(retainedRoot,'chain-owned-terminal-descendant-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit'),reapRequest=path.join(outputDir,'reap');let prior,partial,rootPid,terminal;
  const before=new Set(readNativeProcessTable().map(row=>row.pid)),visibility={policy:'retain-actual-terminal-row-before-parent-reap',reads:[],dropped:0};
  const signals=[];
- const readProcessTable=()=>{
-  const rows=readNativeProcessTable();rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid))?.pid;
+ const readProcessTable=options=>{
+  const rows=readNativeProcessTable(options);rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid))?.pid;
   const row=prior?rows.find(row=>row.pid===prior.pid):rows.find(row=>row.ppid===rootPid&&row.executable===process.execPath);
   if(row){if(!prior)prior={...row};else if(!partial&&fs.existsSync(ready)){partial={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};rows[rows.indexOf(row)]=partial;fs.writeFileSync(exitRequest,'exit');}}
   if(row&&partial&&/^[ZX]/.test(row.state)&&!terminal){terminal={observed:{utc:new Date().toISOString(),monotonicMs:performance.now()},identity:structuredClone(row)};fs.writeFileSync(reapRequest,'reap');}
@@ -145,6 +146,54 @@ test('Linux proc reader ignores inaccessible foreign enrichment without losing o
 test('Linux proc reader preserves valid owned stat identity when enrichment disappears',()=>{
  const rows=readLinuxNativeProcessTable(linuxProcDouble({enrichmentLost:true}));
  assert.equal(rows.length,1,'A valid live stat must not disappear because one later enrichment link vanished');assert.equal(rows[0].state,'S');assert.equal(rows[0].startIdentity,'987654');assert.equal(rows[0].enrichment.status,'unavailable');assert.equal(rows[0].enrichment.errors[0].field,'executable');
+});
+
+test('Linux partial read diagnostics retain literal ordered kernel observations',()=>{
+ const uid=process.getuid(),fields=Array.from({length:30},()=> '0');Object.assign(fields,{0:'R',1:'123',2:'41001',3:'41001',19:'987654'});
+ const before='41001 (literal-read) '+fields.join(' '),after=before.replace(') R ',') Z ');let statReads=0;
+ const filesystem={readdirSync:()=>['41001'],readFileSync:file=>file.endsWith('/stat')?(++statReads===1?before:after):'Uid:\t'+uid+'\t'+uid+'\n',readlinkSync:file=>{if(file.endsWith('/exe'))throw Object.assign(Error('literal executable read vanished'),{code:'ENOENT'});return 'pid:[41001]';}};
+ const diagnostics={},rows=readLinuxNativeProcessTable({procRoot:'/controlled/proc',filesystem,diagnostics});
+ assert.equal(rows.length,1);assert.equal(rows[0].state,'R');assert.equal(rows[0].startIdentity,'987654');assert.equal(rows[0].executable,null);assert.equal(rows[0].enrichment.errors[0].code,'ENOENT');
+ assert.equal(diagnostics.windows?.length,1,'The existing Linux reader retains the ordered raw partial read rather than losing the first-observation evidence');
+ const window=diagnostics.windows[0];assert.equal(window.tableReadId,1);assert.equal(window.rowOrdinal,0);assert.equal(window.pid,41001);
+ assert.equal(Buffer.from(window.statBefore.rawBase64,'base64').toString(),before);assert.equal(Buffer.from(window.statAfter.rawBase64,'base64').toString(),after);
+ assert.equal(window.statBefore.identity.state,'R');assert.equal(window.statAfter.identity.state,'Z');assert.equal(window.statAfter.identity.startIdentity,'987654');assert.equal(window.statAfter.identity.startPrecision,'kernel-clock-ticks');
+ assert.equal(window.uid.value,uid);assert.equal(window.executable.error.code,'ENOENT');assert.equal(window.pidNamespace.value,'pid:[41001]');assert.equal(statReads,2,'One diagnostic after-stat read is the only additional kernel read');
+ const reads=[window.statBefore,window.uid,window.executable,window.pidNamespace,window.statAfter];
+ assert.ok(window.directoryListed.monotonicMs<=reads[0].started.monotonicMs);for(let index=0;index<reads.length;index++){assert.ok(reads[index].started.monotonicMs<=reads[index].finished.monotonicMs);if(index)assert.ok(reads[index-1].finished.monotonicMs<=reads[index].started.monotonicMs);}
+ assert.equal(diagnostics.retainedBytes,Buffer.byteLength(JSON.stringify(diagnostics.windows)));assert.ok(diagnostics.retainedBytes<=65536);
+});
+
+test('Linux partial read diagnostics keep invocation and raw payload bounds explicit',()=>{
+ const full=linuxProcDouble(),fullDiagnostics={};let fullStatReads=0;const fullRead=full.filesystem.readFileSync;full.filesystem.readFileSync=file=>{if(file.endsWith('/stat'))fullStatReads++;return fullRead(file);};
+ const fullRows=readLinuxNativeProcessTable({...full,diagnostics:fullDiagnostics});assert.equal(fullRows[0].executable,'/owned/runtime/node');assert.equal(fullRows[0].enrichment.status,'complete');assert.equal(fullStatReads,1);assert.deepEqual(fullDiagnostics.windows,[],'A complete first observation gains no extra diagnostic kernel read');
+ const diagnostics={},partial=linuxProcDouble({enrichmentLost:true});let statReads=0;const read=partial.filesystem.readFileSync;partial.filesystem.readFileSync=file=>{if(file.endsWith('/stat'))statReads++;return read(file);};
+ for(let index=0;index<10;index++)readLinuxNativeProcessTable({...partial,diagnostics});
+ assert.equal(diagnostics.windows.length,8);assert.equal(diagnostics.omittedWindows,2);assert.equal(statReads,18,'Only the first eight partial windows get one additional read across repeated table invocations');assert.equal(diagnostics.tableReads,10);assert.equal(diagnostics.status,'truncated');assert.equal(diagnostics.retainedBytes,Buffer.byteLength(JSON.stringify(diagnostics.windows)));assert.ok(diagnostics.retainedBytes<=65536);assert.ok(diagnostics.windows.every(window=>Buffer.byteLength(JSON.stringify(window))<=8192));
+ const large=linuxProcDouble({enrichmentLost:true}),largeRead=large.filesystem.readFileSync,largeLink=large.filesystem.readlinkSync;large.filesystem.readFileSync=file=>file.endsWith('/stat')?largeRead(file).replace('(controlled)','('+'x'.repeat(5000)+')'):largeRead(file);large.filesystem.readlinkSync=file=>file.endsWith('/ns/pid')?'n'.repeat(2000):largeLink(file);
+ const largeDiagnostics={},largeRows=readLinuxNativeProcessTable({...large,diagnostics:largeDiagnostics}),largeWindow=largeDiagnostics.windows[0];assert.equal(largeRows[0].pidNamespace,'n'.repeat(2000),'Diagnostic byte bounds leave the actual returned row unchanged');assert.equal(largeWindow.statBefore.truncated,true);assert.ok(Buffer.from(largeWindow.statBefore.rawBase64||'','base64').length<=2048);assert.equal(largeWindow.statBefore.sha256,createHash('sha256').update(large.filesystem.readFileSync('/controlled/proc/41001/stat')).digest('hex'));assert.equal(largeWindow.pidNamespace.truncated,true);assert.equal(largeWindow.pidNamespace.value,null);assert.ok(Buffer.from(largeWindow.pidNamespace.prefixBase64||'','base64').length<=1024);assert.ok(Buffer.byteLength(JSON.stringify(largeWindow))<=8192);assert.equal(largeDiagnostics.status,'truncated');
+ const afterFailure=linuxProcDouble({enrichmentLost:true}),beforeRead=afterFailure.filesystem.readFileSync;let reads=0;afterFailure.filesystem.readFileSync=file=>{if(file.endsWith('/stat')&&++reads===2)throw Object.assign(Error('literal after-stat failure'),{code:'EIO'});return beforeRead(file);};const failedDiagnostics={},failedRows=readLinuxNativeProcessTable({...afterFailure,diagnostics:failedDiagnostics});assert.equal(failedRows[0].state,'S');assert.equal(failedDiagnostics.windows[0].statAfter.status,'unavailable');assert.equal(failedDiagnostics.windows[0].statAfter.error.code,'EIO');
+ const oversized=linuxProcDouble({enrichmentLost:true}),oversizedRead=oversized.filesystem.readFileSync;oversized.filesystem.readFileSync=file=>file.endsWith('/stat')?oversizedRead(file).replace('987654','9'.repeat(10000)):oversizedRead(file);const oversizedDiagnostics={},oversizedRows=readLinuxNativeProcessTable({...oversized,diagnostics:oversizedDiagnostics});assert.equal(oversizedRows[0].startIdentity,'9'.repeat(10000));assert.equal(oversizedDiagnostics.windows[0].status,'unavailable');assert.equal(oversizedDiagnostics.windows[0].reason,'window-byte-cap');assert.equal(oversizedDiagnostics.status,'truncated','A window replaced by bounded unavailable evidence cannot claim complete diagnostics');assert.ok(oversizedDiagnostics.retainedBytes<=65536);
+});
+
+test('owned partial read diagnostics survive the receipt without granting unknown custody',async t=>{
+ const retainedRoot=path.resolve(process.env.CHAIN_NATIVE_OUTPUT||os.tmpdir());fs.mkdirSync(retainedRoot,{recursive:true});const outputDir=fs.mkdtempSync(path.join(retainedRoot,'chain-owned-read-diagnostic-'));
+ const before=new Set(readNativeProcessTable().map(row=>row.pid)),unknownPid=2147483000,signals=[];let actualRoot;
+ const readProcessTable=(options={})=>{
+  const rows=readNativeProcessTable();actualRoot??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!before.has(row.pid));
+  if(actualRoot&&rows.some(row=>row.pid===actualRoot.pid)){
+   const fields=Array.from({length:30},()=> '0');Object.assign(fields,{0:'R',1:String(actualRoot.pid),2:String(unknownPid),3:String(unknownPid),19:'987654'});const raw=unknownPid+' (literal-unknown) '+fields.join(' ');let statReads=0;
+   const filesystem={readdirSync:()=>[String(unknownPid)],readFileSync:file=>file.endsWith('/stat')?(++statReads===1?raw:raw.replace(') R ',') Z ')):'Uid:\t'+process.getuid()+'\n',readlinkSync:file=>{if(file.endsWith('/exe'))throw Object.assign(Error('literal unknown executable'),{code:'ENOENT'});return 'pid:[41001]';}};
+   rows.push(...readLinuxNativeProcessTable({procRoot:'/controlled/proc',filesystem,...options}));
+  }
+  return rows;
+ };
+ const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['-e',"console.log('actual-root-output');setTimeout(()=>{},100)"],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
+ t.diagnostic('Bounded controlled Linux read evidence and actual root receipt: '+outputDir);
+ assert.ok(receipt.processReadDiagnostics?.windows.length>0,'The existing owned-process receipt retains its bounded literal first-observation read evidence');
+ const saved=JSON.parse(fs.readFileSync(path.join(outputDir,'process.json')));assert.deepEqual(saved.processReadDiagnostics,receipt.processReadDiagnostics);assert.ok(receipt.processReadDiagnostics.windows.length<=8);assert.ok(receipt.processReadDiagnostics.retainedBytes<=65536);
+ const incident=receipt.incidents.find(row=>row.observation.pid===unknownPid);assert.ok(incident);assert.equal(incident.status,'active');assert.equal(incident.priorIdentity,null);assert.equal(incident.priorProof,null);assert.equal(incident.priorReadId,null);assert.equal(incident.eligible,false);assert.equal(incident.observation.state,'R');assert.equal(receipt.cleanup.complete,false);assert.equal(receipt.status,0);assert.equal(receipt.close.code,0);assert.equal(signals.some(row=>row.pid===unknownPid),false,'A diagnostic terminal after-read grants an unknown no signal or zero-probe authority');assert.equal(receipt.processes.some(row=>row.identity.pid===unknownPid),false);
+ const window=receipt.processReadDiagnostics.windows.find(row=>row.tableReadId===incident.observationReadId&&row.pid===unknownPid);assert.ok(window);assert.equal(window.statBefore.identity.state,'R');assert.equal(window.statAfter.identity.state,'Z');assert.equal(receipt.processReadDiagnostics.spawn.pid,actualRoot.pid);assert.ok(receipt.processReadDiagnostics.spawn.initialReadId>0);
 });
 
 test('owned native process stops on the combined stream cap and retains the accepted prefix',async()=>{
