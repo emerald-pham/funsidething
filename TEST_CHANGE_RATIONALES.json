@@ -50688,5 +50688,141 @@
       "existingRationaleCount": 1480,
       "scope": "Standalone1873 checkpoint; ROOT must derive a combined exact fingerprint after joins."
     }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "ea5a3776f7dd4fdac5c0b962dca0269af817e1ace35bf4d99c3ac4b83f5e71e4",
+    "reason": "Resolve atomic #1874 actual owned renderer-origin binding through the existing task-Undo consumer and hosted-direct-callers process fixture, preserving the completed1873 caller repair.",
+    "previousBehavior": "The existing task-Undo clock adapter required a positive environment port before routing its candidate renderer. A valid hosted listener uses port zero as input and receives a fresh actual port, so this adapter refused before its unchanged scene/source assertions.",
+    "intendedBehavior": "Match only landscape.js resolved against the currently owned loopback document URL after listener allocation. Require actual bound port and exact request/response URL and candidate renderer bytes. Local execution additionally checks the positive allocated environment port against that owned origin. The existing closure-only clock and complete scene/task Undo consumer remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility, both actual external-close engine consumers and the task-Undo renderer consumer now reconcile to eighteen outcomes. The earlier1873 seventeencase checkpoint remains its original recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "All eighteen outcomes now execute in the declared hosted child, including the prior seventeen and the unchanged task-Undo consumer. The fixed-port local control independently retains exactly one owned renderer route, two native Undo inputs, no repaint for unchanged scenery, changed-scene paint/save and exact current/durable task/scene sources."
+    ],
+    "redEvidence": {
+      "command": "Existing recorder preimplementation-red at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1874-red/recorder/2026-11-01T03-37-31-446Z-4ff71e2e-3fe9-42d2-8601-2a614c09ab2e.json selects the same hosted-direct-callers process root after its one-consumer18-outcome test-only extension, on committed1873base05e8324231212757cabbdf62bfa7896d893baf02.",
+      "failure": "Actual child18tests=17passed+1failed/0skipped before adapter edit. The sole failure is the existing task-Undo assertion An explicit allocated native port binds the renderer fixture. All prior seventeen outcomes pass. This is ephemeral-origin fixture RED, not application scenery RED."
+    },
+    "greenEvidence": "Recorded0f25f00b hosted process fixture passed18/18 with zero skips. Recorded local positive-port task-Undo control02617a22 passed1/1 with exact origin http://127.0.0.1:18733. Exact owned ephemeral renderer URL, original/instrumented byte hashes and all paint/source observations remain under1874-green and1874-local-control.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "comparisonBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "command": "git diff --unified=0 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48 -- tests.js",
+      "nativeAppSource": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone1873+1874 checkpoint; retain actual1873 chronology and append combined exact fingerprints after integration."
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "04288ac7962faed2d476c6d15491fd5325e03aaec26291933c4c0d7faabfafb8",
+    "reason": "Resolve atomic #1874 actual owned renderer-origin binding through the existing task-Undo consumer and hosted-direct-callers process fixture, preserving the completed1873 caller repair.",
+    "previousBehavior": "The existing task-Undo clock adapter required a positive environment port before routing its candidate renderer. A valid hosted listener uses port zero as input and receives a fresh actual port, so this adapter refused before its unchanged scene/source assertions.",
+    "intendedBehavior": "Match only landscape.js resolved against the currently owned loopback document URL after listener allocation. Require actual bound port and exact request/response URL and candidate renderer bytes. Local execution additionally checks the positive allocated environment port against that owned origin. The existing closure-only clock and complete scene/task Undo consumer remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility, both actual external-close engine consumers and the task-Undo renderer consumer now reconcile to eighteen outcomes. The earlier1873 seventeencase checkpoint remains its original recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "All eighteen outcomes now execute in the declared hosted child, including the prior seventeen and the unchanged task-Undo consumer. The fixed-port local control independently retains exactly one owned renderer route, two native Undo inputs, no repaint for unchanged scenery, changed-scene paint/save and exact current/durable task/scene sources."
+    ],
+    "redEvidence": {
+      "command": "Existing recorder preimplementation-red at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1874-red/recorder/2026-11-01T03-37-31-446Z-4ff71e2e-3fe9-42d2-8601-2a614c09ab2e.json selects the same hosted-direct-callers process root after its one-consumer18-outcome test-only extension, on committed1873base05e8324231212757cabbdf62bfa7896d893baf02.",
+      "failure": "Actual child18tests=17passed+1failed/0skipped before adapter edit. The sole failure is the existing task-Undo assertion An explicit allocated native port binds the renderer fixture. All prior seventeen outcomes pass. This is ephemeral-origin fixture RED, not application scenery RED."
+    },
+    "greenEvidence": "Recorded0f25f00b hosted process fixture passed18/18 with zero skips. Recorded local positive-port task-Undo control02617a22 passed1/1 with exact origin http://127.0.0.1:18733. Exact owned ephemeral renderer URL, original/instrumented byte hashes and all paint/source observations remain under1874-green and1874-local-control.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "comparisonBase": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "command": "git diff --unified=0 6443761512cd652d02955fb93826dc3baa5daca3 -- tests.js",
+      "nativeAppSource": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone1873+1874 checkpoint; retain actual1873 chronology and append combined exact fingerprints after integration."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "0bc2df3bbffdf777b0d6c84747d69b0aa8706bb96b5b8b8944865ec2ed692345",
+    "reason": "Resolve atomic #1874 actual owned renderer-origin binding through the existing task-Undo consumer and hosted-direct-callers process fixture, preserving the completed1873 caller repair.",
+    "previousBehavior": "The existing task-Undo clock adapter required a positive environment port before routing its candidate renderer. A valid hosted listener uses port zero as input and receives a fresh actual port, so this adapter refused before its unchanged scene/source assertions.",
+    "intendedBehavior": "Match only landscape.js resolved against the currently owned loopback document URL after listener allocation. Require actual bound port and exact request/response URL and candidate renderer bytes. Local execution additionally checks the positive allocated environment port against that owned origin. The existing closure-only clock and complete scene/task Undo consumer remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility, both actual external-close engine consumers and the task-Undo renderer consumer now reconcile to eighteen outcomes. The earlier1873 seventeencase checkpoint remains its original recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "All eighteen outcomes now execute in the declared hosted child, including the prior seventeen and the unchanged task-Undo consumer. The fixed-port local control independently retains exactly one owned renderer route, two native Undo inputs, no repaint for unchanged scenery, changed-scene paint/save and exact current/durable task/scene sources."
+    ],
+    "redEvidence": {
+      "command": "Existing recorder preimplementation-red at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1874-red/recorder/2026-11-01T03-37-31-446Z-4ff71e2e-3fe9-42d2-8601-2a614c09ab2e.json selects the same hosted-direct-callers process root after its one-consumer18-outcome test-only extension, on committed1873base05e8324231212757cabbdf62bfa7896d893baf02.",
+      "failure": "Actual child18tests=17passed+1failed/0skipped before adapter edit. The sole failure is the existing task-Undo assertion An explicit allocated native port binds the renderer fixture. All prior seventeen outcomes pass. This is ephemeral-origin fixture RED, not application scenery RED."
+    },
+    "greenEvidence": "Recorded0f25f00b hosted process fixture passed18/18 with zero skips. Recorded local positive-port task-Undo control02617a22 passed1/1 with exact origin http://127.0.0.1:18733. Exact owned ephemeral renderer URL, original/instrumented byte hashes and all paint/source observations remain under1874-green and1874-local-control.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "command": "git diff --unified=0 8cd524a7f0ab7a25b6689244722ae3c5baf861c8 -- tests.js",
+      "nativeAppSource": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone1873+1874 checkpoint; retain actual1873 chronology and append combined exact fingerprints after integration."
+    }
+  },
+  {
+    "baseCommit": "b176026825e4f9539780f745fe60e09cf348d288",
+    "testChangesSha256": "a6c649e3fdaf136dba80539065c764d4fa8fe0ac8f580e1e2d6d6feebe334729",
+    "reason": "Resolve atomic #1874 actual owned renderer-origin binding through the existing task-Undo consumer and hosted-direct-callers process fixture, preserving the completed1873 caller repair.",
+    "previousBehavior": "The existing task-Undo clock adapter required a positive environment port before routing its candidate renderer. A valid hosted listener uses port zero as input and receives a fresh actual port, so this adapter refused before its unchanged scene/source assertions.",
+    "intendedBehavior": "Match only landscape.js resolved against the currently owned loopback document URL after listener allocation. Require actual bound port and exact request/response URL and candidate renderer bytes. Local execution additionally checks the positive allocated environment port against that owned origin. The existing closure-only clock and complete scene/task Undo consumer remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "All original thirteen process-fixture outcomes remain selected with zero skips; selected eligibility, both actual external-close engine consumers and the task-Undo renderer consumer now reconcile to eighteen outcomes. The earlier1873 seventeencase checkpoint remains its original recorded evidence.",
+      "All ten guarded roots and four raw-argument roots keep their complete existing task, source, authority, trusted-input, deadline and owned cleanup assertions. Both final-WOOP UUID directions remain protected and require focused regression before final handoff.",
+      "Existing pre-browser invalid/missing/mismatched hosted-policy and local-allocation refusals passed; native production admission source is unchanged. A CI environment flag alone does not establish valid admission or actual hosted execution.",
+      "The original ordinary sixty scenarios,114 actions,ten repeat cases,64-task/source fixture,continuous heartbeat and strict1000ms budget remain unchanged; no app,inventory,policy,cleanup or runtime route is replaced.",
+      "Current integration2c includes previously accepted1868/1869 test/provisioning/catalog repairs. All1480 preceding raw rationale objects remain byte-preserved in order; older comparison fingerprints cover that inherited source plus this narrowly additive fixture extension.",
+      "Declared hosted child execution here is Darwin/Node24 process evidence only. Raw NaN failures earn no application,lifecycle or opening sensitivity credit; final Linux CI,reviews,exact-candidate qualification and Stable release remain ROOT-owned.",
+      "All eighteen outcomes now execute in the declared hosted child, including the prior seventeen and the unchanged task-Undo consumer. The fixed-port local control independently retains exactly one owned renderer route, two native Undo inputs, no repaint for unchanged scenery, changed-scene paint/save and exact current/durable task/scene sources."
+    ],
+    "redEvidence": {
+      "command": "Existing recorder preimplementation-red at /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/hosted-native1873-owner/1874-red/recorder/2026-11-01T03-37-31-446Z-4ff71e2e-3fe9-42d2-8601-2a614c09ab2e.json selects the same hosted-direct-callers process root after its one-consumer18-outcome test-only extension, on committed1873base05e8324231212757cabbdf62bfa7896d893baf02.",
+      "failure": "Actual child18tests=17passed+1failed/0skipped before adapter edit. The sole failure is the existing task-Undo assertion An explicit allocated native port binds the renderer fixture. All prior seventeen outcomes pass. This is ephemeral-origin fixture RED, not application scenery RED."
+    },
+    "greenEvidence": "Recorded0f25f00b hosted process fixture passed18/18 with zero skips. Recorded local positive-port task-Undo control02617a22 passed1/1 with exact origin http://127.0.0.1:18733. Exact owned ephemeral renderer URL, original/instrumented byte hashes and all paint/source observations remain under1874-green and1874-local-control.",
+    "integrationDerivation": {
+      "ownerBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "atomicBaseline": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "comparisonBase": "b176026825e4f9539780f745fe60e09cf348d288",
+      "command": "git diff --unified=0 b176026825e4f9539780f745fe60e09cf348d288 -- tests.js",
+      "nativeAppSource": "05e8324231212757cabbdf62bfa7896d893baf02",
+      "runnerDirtyTestsCapturedByRecorder": true,
+      "originalRationaleCount": 1480,
+      "scope": "Standalone1873+1874 checkpoint; retain actual1873 chronology and append combined exact fingerprints after integration."
+    }
   }
 ]

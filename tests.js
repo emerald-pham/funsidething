@@ -49344,10 +49344,10 @@ test('RISK repository process: hosted direct native callers retain ephemeral lis
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable caller evidence required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ephemeral-caller-'));
  // This subprocess tests the hosted-policy boundary; it is not hosted proof.
  const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'canonical-pr-merge-v1',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/1/merge',CHAIN_NATIVE_OUTPUT:output};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene|RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources|RISK repository process: external browser termination retains lifecycle classification without app crash credit)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene|RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources|RISK repository process: external browser termination retains lifecycle classification without app crash credit|RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
  fs.writeFileSync(path.join(output,'consumer.stdout.tap'),result.stdout||'');fs.writeFileSync(path.join(output,'consumer.stderr.txt'),result.stderr||'');
  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Actual direct callers must pass an ephemeral port when the hosted environment has no local allocation: '+result.stdout+'\n'+result.stderr);
- assert.match(result.stdout,/^# tests 17$/m);assert.match(result.stdout,/^# skipped 0$/m);
+ assert.match(result.stdout,/^# tests 18$/m);assert.match(result.stdout,/^# skipped 0$/m);
  t.diagnostic('Declared hosted-policy process fixture only; actual child TAP retained at '+path.join(output,'consumer.stdout.tap'));
 });
 
@@ -49641,14 +49641,15 @@ test('RISK repository process: ordinary task Undo keeps unchanged scenery while 
  t.after(()=>{playwright.chromium.launch=launch;});
  playwright.chromium.launch=async(...args)=>{const browser=await launch.apply(playwright.chromium,args),newContext=browser.newContext.bind(browser);browser.newContext=async(...args)=>{
   const context=await newContext(...args),close=context.close.bind(context),newPage=context.newPage.bind(context);
-  const nativePort=Number(process.env.CHAIN_NATIVE_PORT);assert.ok(Number.isInteger(nativePort)&&nativePort>0&&nativePort<=65535,'An explicit allocated native port binds the renderer fixture');const nativeOrigin='http://127.0.0.1:'+nativePort;
   context.newPage=async(...args)=>{const page=await newPage(...args);
-  await page.route(nativeOrigin+'/**/landscape.js',async route=>{
+  await page.route(url=>{const document=page.url();return document.startsWith('http://127.0.0.1:')&&url.href===new URL('landscape.js',document).href;},async route=>{
+   const document=new URL(page.url());assert.equal(document.protocol,'http:');assert.equal(document.hostname,'127.0.0.1');assert.ok(Number.isInteger(Number(document.port))&&Number(document.port)>0&&Number(document.port)<=65535,'The actual owned listener has a positive bound port');
+   if(process.env.CI!=='true'){const nativePort=Number(process.env.CHAIN_NATIVE_PORT);assert.ok(Number.isInteger(nativePort)&&nativePort>0&&nativePort<=65535,'An explicit allocated native port binds the local renderer fixture');assert.equal(document.origin,'http://127.0.0.1:'+nativePort,'The local renderer uses the allocated owned origin');}
    assert.equal(route.request().url(),new URL('landscape.js',page.url()).href,'The renderer fixture matches only this owned application document');
    const response=await route.fetch({maxRedirects:0});assert.equal(response.status(),200);assert.equal(response.url(),route.request().url(),'The owned renderer fetch does not redirect');const original=await response.text(),candidate=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
    assert.equal(original,candidate,'The clock fixture starts with the exact candidate renderer');const anchor="  'use strict';";assert.equal(original.split(anchor).length,2,'One renderer closure clock anchor');
    const clock="  const __undoPaintNativeDate=globalThis.Date,__undoPaintAt=__undoPaintNativeDate.parse('2026-10-06T03:23:42.125Z');\n  const Date=class extends __undoPaintNativeDate{constructor(...args){super(...(args.length?args:[__undoPaintAt]));}static now(){return __undoPaintAt;}};";
-   const body=original.replace(anchor,anchor+'\n'+clock);evidence.rendererClockRoutes??=[];evidence.rendererClockRoutes.push({originalSha256:createHash('sha256').update(original).digest('hex'),instrumentedSha256:createHash('sha256').update(body).digest('hex'),fixedAt:'2026-10-06T03:23:42.125Z',scope:'landscape.js closure only'});
+   const body=original.replace(anchor,anchor+'\n'+clock);evidence.rendererClockRoutes??=[];evidence.rendererClockRoutes.push({origin:document.origin,rendererUrl:route.request().url(),originalSha256:createHash('sha256').update(original).digest('hex'),instrumentedSha256:createHash('sha256').update(body).digest('hex'),fixedAt:'2026-10-06T03:23:42.125Z',scope:'landscape.js closure only'});
    await route.fulfill({response,body});
   });return page;};
   await context.addInitScript(()=>{
