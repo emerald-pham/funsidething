@@ -710,7 +710,7 @@ export async function runRapidCoreScenarios(h){
       }
       assertLosslessSource(seed);return expected;
     };
-    const inspectSourceLifecycle=(input,seed,sourcePhases,final,expectedBoards)=>{
+    const inspectSourceLifecycle=(input,seed,sourcePhases,final,expectedBoards,listOpenSource,listOpenToggleClick)=>{
       const originals=assertSourceFixture(input,seed),daily=new Map(),seenGeneratedIds=new Set(),seenNonces=new Set(),oldLatest=[];
       const originalChecks=[],lifecycleChecks=[],opaqueChecks=[],pendingChecks=[];
       assert.equal(sourcePhases.length,5);assert.equal(expectedBoards.length,5);
@@ -729,6 +729,27 @@ export async function runRapidCoreScenarios(h){
         assert.equal(row.payload,expected.current,kind+' complete independently expected current payload');
         assert.equal(row.payload,expected.durable,kind+' complete independently expected durable payload');
       };
+      assert.ok(listOpenSource,'Complete source captured after the actual list-opening save');
+      assert.equal(listOpenToggleClick?.action,'act:toggle-list');assert.equal(listOpenToggleClick?.trusted,true);
+      assert.ok(Number.isSafeInteger(listOpenToggleClick.at)&&Number.isSafeInteger(listOpenSource.capturedAtMs));
+      assert.ok(listOpenSource.current===listOpenSource.durable,'The list-opening board is the complete durable head before the first title input');
+      assert.equal(listOpenSource.currentHash,sourceHash(listOpenSource.current));assert.equal(listOpenSource.durableHash,sourceHash(listOpenSource.durable));
+      assert.equal(JSON.parse(listOpenSource.current).listOpen,true);assert.deepEqual(listOpenSource.pending,sourcePendingLiteral);
+      assertLosslessSource(listOpenSource);
+      const listOpenGenerated=listOpenSource.backups.filter(row=>!sourceOriginalIds.includes(row.id)),
+        listOpenDailyRows=listOpenGenerated.filter(row=>row.kind==='daily'),listOpenLatestRows=listOpenGenerated.filter(row=>row.kind==='latest');
+      assert.equal(listOpenDailyRows.length,1,'The actual toggle-list save retains its first daily source');
+      assert.equal(listOpenLatestRows.length,1,'The actual toggle-list save retains its rolling latest source');
+      assert.equal(listOpenGenerated.length,2,'The actual list-opening source contains no unexamined generated rows');
+      const listOpenDaily=listOpenDailyRows[0],listOpenLatest=listOpenLatestRows[0],listOpenExpected={current:listOpenSource.current,durable:listOpenSource.durable};
+      automatic(listOpenDaily,'daily',listOpenSource,listOpenExpected,listOpenToggleClick.at);
+      automatic(listOpenLatest,'latest',listOpenSource,listOpenExpected,listOpenToggleClick.at);
+      assert.equal(listOpenDaily.at,listOpenLatest.at,'The list-opening daily/latest rows belong to the same actual save');
+      assertSourceRows(listOpenSource.backups,[...originals,listOpenDaily,listOpenLatest],'Complete actual list-opening source set');
+      const listOpenImmutableIds=new Set([...sourceOriginalIds,listOpenDaily.id]),
+        listOpenImmutableOrder=listOpenSource.backups.filter(row=>listOpenImmutableIds.has(row.id)).map(row=>row.id);
+      daily.set(listOpenDaily.day,listOpenDaily);oldLatest.push(listOpenLatest.id);
+      let baselineRollingId=null,baselineImmutableOrder=null;
       for(let index=0;index<sourcePhases.length;index++){
         const phase=sourcePhases[index],expected=expectedBoards[index],clickAt=index<3?phase.lastSaveClickAtMs:phase.lastUndoClickAtMs;
         assert.equal(phase.current,expected.current);assert.equal(phase.durable,expected.durable);
@@ -748,18 +769,28 @@ export async function runRapidCoreScenarios(h){
           daily.set(fresh[0].day,fresh[0]);
         }
         const immutable=[...originals,...daily.values()],expectedRows=[...immutable,latest[0]];
+        const immutableIds=new Set(immutable.map(row=>row.id)),immutableOrder=phase.backups.filter(row=>immutableIds.has(row.id)).map(row=>row.id);
+        if(index===0){
+          assert.deepEqual(immutableOrder.filter(id=>listOpenImmutableIds.has(id)),listOpenImmutableOrder,'The first title save preserves every pre-title immutable source in its original array order');
+          baselineRollingId=latest[0].id;
+        }else assert.deepEqual(immutableOrder.filter(id=>baselineImmutableOrder.includes(id)),baselineImmutableOrder.filter(id=>immutableIds.has(id)&&phase.backups.some(row=>row.id===id)),'Later Undo phases preserve the complete immutable source array order');
+        baselineImmutableOrder=immutableOrder;
         lifecycleChecks.push(assertSourceRows(phase.backups,expectedRows,'phase '+index));
         originalChecks.push(immutable.every(row=>phase.backups.some(value=>sourceSame(value,row))));
         opaqueChecks.push(assertLosslessSource(phase));
       }
       const last=sourcePhases[4];assert.equal(final.current,expectedBoards[4].current);assert.equal(final.durable,expectedBoards[4].durable);
       lifecycleChecks.push(assertSourceRows(final.backups,last.backups,'final U2 readback'));
+      assert.deepEqual(final.backups.map(row=>row.id),last.backups.map(row=>row.id),'Final U2 readback preserves the complete source row array order');
       assert.deepEqual(final.pending,sourcePendingLiteral,'Final pending original remains exact');pendingChecks.push(sourceSame(final.pending,sourcePendingLiteral));
       for(const side of ['current','durable'])assert.deepEqual(JSON.parse(final[side]).protectedBackupIds,['gate-retained-1']);
       opaqueChecks.push(assertLosslessSource(final));
       return{originalBackupsPreserved:originalChecks.every(Boolean)&&lifecycleChecks.every(Boolean),automaticBackupLifecycleValidated:lifecycleChecks.every(Boolean),
         originalOpaqueSourcesPreserved:opaqueChecks.every(Boolean),pendingUploadPreserved:pendingChecks.every(Boolean),
-        baselineRollingId:oldLatest[0],immutableOriginalIds:[...originals,...daily.values()].map(row=>row.id),dailyOriginals:[...daily.values()]};
+        baselineRollingId,listOpenDailyId:listOpenDaily.id,listOpenDailyAt:listOpenDaily.at,listOpenDailyDay:listOpenDaily.day,
+        listOpenDailyPayloadHash:hash(listOpenDaily.payload),listOpenDailyRowHash:hash(JSON.stringify(listOpenDaily)),listOpenDailyPayloadBytes:Buffer.byteLength(listOpenDaily.payload),
+        listOpenLatestId:listOpenLatest.id,listOpenToggleClickAtMs:listOpenToggleClick.at,listOpenCapturedAtMs:listOpenSource.capturedAtMs,listOpenBoardHash:listOpenSource.currentHash,
+        listOpenDailyCapturedBeforeTitle:true,immutableOriginalIds:[...originals,...daily.values()].map(row=>row.id),dailyOriginals:[...daily.values()]};
     };
     const sourceSnapshot=()=>ui.page.evaluate(async()=>{
       const head=await ScannerDeviceStore.readHead(),current=JSON.stringify(state);
@@ -796,6 +827,13 @@ export async function runRapidCoreScenarios(h){
     assert.equal(typeof initialTitles.prior,'string','The ordinary fixture has a separate prior-history task');
     assert.equal(typeof initialTitles.target,'string','The ordinary fixture has the exact target task');
     await ensureListOpen(ui,true);
+    await ui.waitFor(new Function('return async()=>{const current=JSON.stringify(state),head=await ScannerDeviceStore.readHead(),daily=(await ScannerDeviceStore.listBackups()).filter(row=>row.kind==="daily");return state.listOpen===true&&head?.payload===current&&daily.length===1&&daily[0].payload===current;}')(),
+      12000,'The actual list-opening save durably retains its complete first daily before any title input');
+    const listOpenSource=await sourceSnapshot(),listOpenToggleClick=await ui.page.evaluate(()=>window.__buttonNativeClicks.findLast(row=>row.action==='act:toggle-list'&&row.trusted===true));
+    assert.ok(listOpenSource.current===listOpenSource.durable,'The full list-opening source is durably saved before the prior title edit');
+    assert.equal(listOpenSource.currentHash,hash(listOpenSource.current));assert.equal(listOpenSource.durableHash,hash(listOpenSource.durable));
+    assert.equal(JSON.parse(listOpenSource.current).listOpen,true);
+    assert.deepEqual(listOpenSource.pending,sourcePendingLiteral,'The actual list-opening save preserves the original pending-upload source');
     const priorTitle='Ordinary prior edit remains available';
     const priorSave=await saveTitle(priorId,priorTitle,'Prior history edit');
     const baseline=await sourceSnapshot();ui.recordOrdinaryUndoPhase('B0',baseline);
@@ -930,7 +968,7 @@ export async function runRapidCoreScenarios(h){
       const matches=after.filter(candidate=>candidate[key]===row[key]);
       return matches.length===1&&JSON.stringify(matches[0])===JSON.stringify(row);
     })&&after.filter(row=>before.some(previous=>previous[key]===row[key])).length===before.length;
-    const sourceProof=inspectSourceLifecycle(fixtureSeed,seededSources,phases,restored,expectedHashes);
+    const sourceProof=inspectSourceLifecycle(fixtureSeed,seededSources,phases,restored,expectedHashes,listOpenSource,listOpenToggleClick);
     const originalBackupsPreserved=preservesRows(baseline.backups.filter(row=>row.id!==sourceProof.baselineRollingId),restored.backups,'id')&&sourceProof.originalBackupsPreserved;
     const originalOpaqueSourcesPreserved=preservesRows(baseline.opaque,restored.opaque,'key')&&sourceProof.originalOpaqueSourcesPreserved;
     assert.equal(originalBackupsPreserved,true,'Every protected backup present before the target edits remains byte-for-byte intact');
@@ -943,6 +981,10 @@ export async function runRapidCoreScenarios(h){
       baselineDurableHash:baseline.durableHash,restoredDurableHash:restored.durableHash,expectedDurableHash:expectedHashes[4].durableHash,
       currentRestored:true,durableRestored:true,priorHistoryPreserved:true,originalBackupsPreserved,originalOpaqueSourcesPreserved,pendingUploadPreserved:sourceProof.pendingUploadPreserved,
       automaticBackupLifecycleValidated:sourceProof.automaticBackupLifecycleValidated,typedSourceValuesPreserved:sourceProof.originalOpaqueSourcesPreserved,
+      listOpenDailyId:sourceProof.listOpenDailyId,listOpenDailyAt:sourceProof.listOpenDailyAt,listOpenDailyDay:sourceProof.listOpenDailyDay,
+      listOpenDailyPayloadHash:sourceProof.listOpenDailyPayloadHash,listOpenDailyRowHash:sourceProof.listOpenDailyRowHash,listOpenDailyPayloadBytes:sourceProof.listOpenDailyPayloadBytes,
+      listOpenLatestId:sourceProof.listOpenLatestId,listOpenToggleClickAtMs:sourceProof.listOpenToggleClickAtMs,listOpenCapturedAtMs:sourceProof.listOpenCapturedAtMs,
+      listOpenBoardHash:sourceProof.listOpenBoardHash,listOpenDailyCapturedBeforeTitle:sourceProof.listOpenDailyCapturedBeforeTitle,
       fullTaskArraysPreserved:true,immutableFactsPreserved:true,freshSaveMetadataValidated:true,phases:['B0','B1','B2','U1','U2']}));
   });
 

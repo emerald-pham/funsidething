@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { inflateSync } from "node:zlib";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 
@@ -63,6 +63,49 @@ function test(...args){
   });}
  });
  return releaseCallbacksOnCompletion(completed,callbacks);
+}
+
+function retainInitialBoundOrigin(outputDir,engine){
+ const capturePath=path.join(outputDir,'initial-bound-origin.json'),preloadPath=path.join(outputDir,'initial-bound-origin-preload.mjs'),playwrightEntry=pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href;
+ fs.writeFileSync(preloadPath,`import fs from 'node:fs';
+import * as playwright from ${JSON.stringify(playwrightEntry)};
+const capturePath=${JSON.stringify(capturePath)},engine=${JSON.stringify(engine)};
+let captured=false;
+const browserType=playwright[engine],launch=browserType.launch.bind(browserType);
+browserType.launch=async(...args)=>{
+ const browser=await launch(...args),newContext=browser.newContext.bind(browser);
+ browser.newContext=async(...contextArgs)=>{
+  const context=await newContext(...contextArgs),newPage=context.newPage.bind(context);
+  context.newPage=async(...pageArgs)=>{
+   const page=await newPage(...pageArgs),goto=page.goto.bind(page);
+   page.goto=async function(url,...gotoArgs){
+    const initialUrl=String(url);
+    if(!captured){
+     const parsed=new URL(initialUrl);
+     if(parsed.protocol==='http:'&&parsed.hostname==='127.0.0.1'&&/^\\/button-[a-f0-9-]+\\/$/.test(parsed.pathname)&&!parsed.search&&!parsed.hash){
+      captured=true;
+      fs.writeFileSync(capturePath,JSON.stringify({schemaVersion:1,engine,requestedPort:Number(process.env.CHAIN_NATIVE_PORT),initialUrl,origin:parsed.origin,pathname:parsed.pathname,search:parsed.search,hash:parsed.hash,capturedBeforeNavigation:true,capturedAtMs:Date.now(),processId:process.pid,nodeVersion:process.version},null,2)+'\\n');
+     }
+    }
+    return goto(url,...gotoArgs);
+   };
+   return page;
+  };
+  return context;
+ };
+ return browser;
+};
+`);
+ return {capturePath,preloadPath};
+}
+
+function verifyInitialBoundOriginCapture(capturePath,report,engine,requestedPort){
+ const retained=JSON.parse(fs.readFileSync(capturePath,'utf8'));
+ assert.deepEqual(Object.keys(retained).sort(),['capturedAtMs','capturedBeforeNavigation','engine','hash','initialUrl','nodeVersion','origin','pathname','processId','requestedPort','schemaVersion','search'].sort(),'Complete independent first-app-navigation origin capture');
+ assert.equal(retained.schemaVersion,1);assert.equal(retained.engine,engine);assert.equal(report.runtime.engine,engine);assert.equal(retained.requestedPort,requestedPort);assert.equal(retained.capturedBeforeNavigation,true);assert.equal(retained.nodeVersion,report.runtime.nodeVersion);assert.ok(Number.isSafeInteger(retained.capturedAtMs));assert.ok(Number.isSafeInteger(retained.processId)&&retained.processId>0);
+ const initial=new URL(retained.initialUrl);assert.equal(initial.origin,retained.origin);assert.equal(initial.pathname,retained.pathname);assert.equal(initial.search,retained.search);assert.equal(initial.hash,retained.hash);assert.equal(initial.protocol,'http:');assert.equal(initial.hostname,'127.0.0.1');assert.match(initial.pathname,/^\/button-[a-f0-9-]+\/$/);assert.equal(initial.search,'');assert.equal(initial.hash,'');
+ if(requestedPort===0)assert.ok(Number(initial.port)>0,'A requested ephemeral port retains the actual nonzero OS-bound listener port');else assert.equal(initial.port,String(requestedPort),'An allocated positive port remains exact');
+ return retained;
 }
 
 const optionalWorkloadDiagnosticsSelected=process.env.CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS==='1'&&process.env.CHAIN_TEST_GROUP==='optional-workload-diagnostics'&&process.execArgv.some(value=>value.startsWith('--test-name-pattern='));
@@ -16167,7 +16210,10 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
    Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},delay));}});return request;};
  },{theme,fixtureTime});
  const page=await context.newPage(),errors=[],pageErrorDetails=[];page.on('pageerror',error=>{errors.push(error.message);pageErrorDetails.push({message:error.message,stack:error.stack,url:page.url()});});
- if(fixtureTime!==null)await page.clock.setFixedTime(new Date(fixtureTime));
+ if(fixtureTime!==null){
+  if(startupOptions.installClockBeforeNavigation)await page.clock.install({time:new Date(fixtureTime-1000)});
+  await page.clock.setFixedTime(new Date(fixtureTime));
+ }
  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded',timeout:10000});
  await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:10000});
  // Finish the fresh-profile fixture's unrelated local asset reads before
@@ -16931,14 +16977,14 @@ test('RISK saved view held Download: trusted terminal Download preserves the sam
  });
 });
 
-test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources',async t => {
+test('RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources', async t => {
  await openingBoardFixture(t);
  const {waitForTruthyProbe}=await import('./scripts/agent-tools/async-probe.mjs'),{isDeepStrictEqual}=await import('node:util');
  for(const browserEngine of ['chromium','webkit'])await t.test(browserEngine,async t=>{
   const backupPayload='{"futureNativeDownloadBackup":{"retain":"unknown 🌿\\u0000 bytes"}}',backup={id:'native-download-proof-backup',day:'2026-10-29',at:1793275200000,kind:'manual',payload:backupPayload};
   const pendingOwner='native-download-proof-owner@example.test',pending={generationId:'native-download-proof-pending',payloadHash:'b'.repeat(64),baseRev:9,updatedAt:1793275200000,futurePendingField:{retain:'unknown pending metadata'}};
   const opaqueKey='native-download-proof-opaque',opaqueValue={key:opaqueKey,raw:'opaque exact bytes\u0000🌿',futureOpaqueField:{retain:['unknown',23]},futureTyped:{negativeZero:-0,notANumber:NaN,unknown:undefined}};
-  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,fixedTime:'2026-10-29T12:00:00Z',topOfPage:true});
+  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{browserEngine,fixedTime:'2026-10-29T12:00:00Z',topOfPage:true,installClockBeforeNavigation:true});
   let traceStarted=false;
   try{
    await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.__actualLocalRead?.settled&&liveBoardAccepted&&window.ScannerDeviceStore&&deviceStorageAuthority&&!openingRecoveryHeld,null,{timeout:30000});
@@ -16982,6 +17028,13 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.equal(JSON.parse(seeded.baselineHead.payload).tasks.find(task=>task.id===seeded.targetId).title,seeded.oldTitle);
    assert.equal(seeded.baselineCurrent.tasks.find(task=>task.id===seeded.targetId).title,seeded.oldTitle);
    assert.deepEqual(seeded.baselineCurrent.futureNativeDownloadBoardField,{retain:'unknown accepted board metadata 🌿',sequence:[1,'😀']});
+   const settledFixtureProducer=await view.page.evaluate(()=>({savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,deviceHeadHash}));
+   assert.equal(settledFixtureProducer.savePending,false,'the original startup and independent source seed have no pending app save before the timing boundary');
+   assert.equal(settledFixtureProducer.activePersistCalls,0,'the original startup and source seed have no active app producer before the timing boundary');
+   assert.equal(settledFixtureProducer.deviceHeadHash,seeded.baselineHead.hash,'the settled fixture head remains the exact accepted baseline');
+   await view.page.clock.pauseAt(new Date('2026-10-29T12:00:00Z'));
+   assert.equal(await view.page.evaluate(()=>Date.now()),1793275200000,'the external browser clock is held at the existing literal archive time');
+   t.diagnostic('External Playwright timer hold begins after original startup and full source seeding settle: '+JSON.stringify({browserEngine,savePending:settledFixtureProducer.savePending,activePersistCalls:settledFixtureProducer.activePersistCalls,deviceHeadHash:settledFixtureProducer.deviceHeadHash,heldAt:'2026-10-29T12:00:00.000Z'}));
    const editControl=view.page.locator('#listBody [data-act="edit"]').first();
    assert.equal(await editControl.count()>0,true,'the accepted healthy board exposes a real task editor');
    const targetId=await editControl.getAttribute('data-id'),target=seeded.baselineCurrent.tasks.find(task=>task.id===targetId);
@@ -17051,10 +17104,25 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.deepEqual(backupRow,{id:backup.id,day:backup.day,at:backup.at,kind:backup.kind,payloadHash:backupHash});
    assert.equal(decodedSnapshot.stores.snapshots.values.find(row=>row.hash===backupHash)?.payload,backupPayload);
    assert.deepEqual(decodedSnapshot.stores.opaque.values[decodedSnapshot.stores.opaque.keys.indexOf(opaqueKey)],opaqueValue);
-   const afterPreparation=await view.page.evaluate(async()=>{const sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
+   const wallChallengeStarted=process.hrtime.bigint();
+   await new Promise(resolve=>setTimeout(resolve,450));
+   const wallChallengeElapsedMs=Number(process.hrtime.bigint()-wallChallengeStarted)/1e6;
+   assert.ok(wallChallengeElapsedMs>=450,'the source-preservation observation follows at least 450 ms of actual Node wall time');
+   t.diagnostic('Actual Node wall-clock challenge before the original post-Export source observation: '+JSON.stringify({browserEngine,wallChallengeElapsedMs,minimumMs:450}));
+   const afterPreparation=await view.page.evaluate(async()=>{const observeProducer=()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,deviceHeadHash};};
+    const producerBefore=observeProducer(),head=await ScannerDeviceStore.readHead(),sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
     const localSources=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())].map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
     return{localSources,rawSources:await ScannerDeviceStore.readRawExportSnapshot(),
+     head,producer:{before:producerBefore,after:observeProducer()},
      authority:{accepted:liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,revision:state.syncRev??null,user:window.CloudSync?.user??null}};});
+   assert.deepEqual(afterPreparation.producer.before,afterPreparation.producer.after,'the complete source observation leaves the accepted board and producer state unchanged while external time is held');
+   assert.deepEqual(afterPreparation.producer.before.board,acceptedUnsaved.board,'the complete accepted current board remains exact while its normal save is held');
+   assert.equal(afterPreparation.producer.before.savePending,true,'the deliberate normal save remains pending after the real Node wall-clock challenge');
+   assert.equal(afterPreparation.producer.after.savePending,true,'the deliberate normal save remains pending through full source observation');
+   assert.equal(afterPreparation.producer.before.activePersistCalls,0,'no app producer is active during the complete source observation');
+   assert.equal(afterPreparation.producer.after.activePersistCalls,0,'no app producer starts during the complete source observation');
+   assert.equal(afterPreparation.producer.before.deviceHeadHash,seeded.baselineHead.hash,'the accepted edit remains distinct from the complete durable baseline');
+   assert.deepEqual(afterPreparation.head,seeded.baselineHead,'the full durable head and payload remain exact while the save timer is held');
    assert.deepEqual(afterPreparation.localSources,seeded.localSources,'preparing Export performs no app-owned local source write');
    assert.deepEqual(afterPreparation.rawSources,seeded.rawSources,'preparing Export leaves all original saved, backup, pending and opaque source rows exact');
    assert.deepEqual(afterPreparation.authority,{accepted:true,deviceStorageAuthority:true,deviceStorageRequired:seeded.authority.deviceStorageRequired,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,revision:seeded.authority.revision,user:null},'Export grants no device/recovery or cloud authority');
@@ -17079,6 +17147,23 @@ test('RISK complete accepted-unsaved Download: native files match the prepared C
    assert.match(await view.page.locator('#exportTransferStatus').innerText(),/Download started\. The archive contains the exact prepared export\./,'the app status reports initiation while the native event/file readback separately proves completion');
    assert.equal(await view.page.locator('#exportTransferDialog a[download="chain-scanner-recovery-archive.json"]').count(),0,'the temporary anchor is removed after successful initiation');
    t.diagnostic('Actual complete native Download artifact: '+JSON.stringify({browserEngine,file,suggestedFilename:download.suggestedFilename(),failure:await download.failure(),bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),preparedSerial:serial,downloads,acceptedUnsavedTitle:acceptedUnsaved.title,durableTitle:durableTask.title,durableHash:durableHead.hash,currentBoardSha256:createHash('sha256').update(JSON.stringify(acceptedUnsaved.board)).digest('hex')}));
+   const heldAfterDownload=await view.page.evaluate(async()=>{const observe=()=>{const board=JSON.parse(JSON.stringify(state));for(const key of ['syncRev','syncAccount','syncIdentity','lastCloudServerAt','syncDirty','protectedBackupIds','decisionBase'])delete board[key];return{board,savePending:saveTimer!==null,activePersistCalls:supportDiagnosticsActivePersistCalls,deviceHeadHash,authority:{accepted:liveBoardAccepted,deviceStorageAuthority,deviceStorageRequired,deviceHeadHash,unaccepted:JSON.stringify(unacceptedDeviceSource),hold:JSON.stringify(deviceRecoveryCloudHold),account:state.syncAccount??null,revision:state.syncRev??null,user:window.CloudSync?.user??null}};};
+    const before=observe(),head=await ScannerDeviceStore.readHead(),rawSources=await ScannerDeviceStore.readRawExportSnapshot(),sceneKeys=[];for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(typeof key==='string'&&key.startsWith('fvp:chain-scanner:pending-scene-choice:v1:'))sceneKeys.push(key);}
+    const keys=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2',...new Set(sceneKeys.sort())],localSources=keys.map(key=>{const raw=localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};}),after=observe();
+    return{before,after,head,rawSources,localSources};});
+   assert.deepEqual(heldAfterDownload.before,heldAfterDownload.after,'the actual first native Download leaves the complete accepted board and producer state exact while external time is held');
+   assert.deepEqual(heldAfterDownload.before.board,acceptedUnsaved.board,'the complete accepted current board remains unchanged through the actual Download');
+   assert.equal(heldAfterDownload.before.savePending,true,'the deliberate normal save remains pending through the actual first Download');
+   assert.equal(heldAfterDownload.after.savePending,true,'the deliberate normal save remains pending until its later release boundary');
+   assert.equal(heldAfterDownload.before.activePersistCalls,0,'no app producer is active at the actual Download boundary');
+   assert.equal(heldAfterDownload.after.activePersistCalls,0,'no app producer starts at the actual Download boundary');
+   assert.deepEqual(heldAfterDownload.head,seeded.baselineHead,'the full durable head and payload remain at the exact original hash through the actual Download');
+   assert.deepEqual(heldAfterDownload.rawSources,seeded.rawSources,'all typed IndexedDB sources remain exact through the actual Download');
+   assert.deepEqual(heldAfterDownload.localSources,seeded.localSources,'all original local sources remain exact through the actual Download');
+   assert.deepEqual(heldAfterDownload.before.authority,{accepted:true,deviceStorageAuthority:true,deviceStorageRequired:seeded.authority.deviceStorageRequired,deviceHeadHash:seeded.baselineHead.hash,unaccepted:seeded.authority.unaccepted,hold:seeded.authority.hold,account:null,revision:seeded.authority.revision,user:null},'holding time preserves the accepted device authority without starting a save');
+   t.diagnostic('Complete sources and durable head remain exact through the first actual native Download under the held normal save: '+JSON.stringify({browserEngine,savePending:heldAfterDownload.after.savePending,activePersistCalls:heldAfterDownload.after.activePersistCalls,deviceHeadHash:heldAfterDownload.after.deviceHeadHash,headHash:heldAfterDownload.head.hash,rawStores:Object.fromEntries(Object.entries(heldAfterDownload.rawSources.stores).map(([name,rows])=>[name,rows.keys.length])),localSourceCount:heldAfterDownload.localSources.length}));
+   await view.page.clock.runFor(400);
+   t.diagnostic('Released only the actual app timer at the existing later producer-settle boundary after the first Download: '+JSON.stringify({browserEngine,advancedMs:400}));
    // The original accepted edit may now finish its normal debounce save. Let
    // that actual producer settle before comparing each later refusal boundary;
    // the originally prepared archive/serial must remain the same throughout.
@@ -48885,7 +48970,7 @@ test('RISK repository process: ordinary repeated selected eligibility preserves 
  t.diagnostic('Focused ordinary selected-eligibility evidence: '+path.join(output,reports[0]));
 });
 
-test('RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources',async t=>{
+test("RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",async t=>{
     const sourceHash=value=>createHash('sha256').update(value).digest('hex');
     const sourceSeedHash='434161b20aa6361220d67e96198d1694023a1ca67dd18e49984febe3fc97a780';
     const sourcePayloadHashes=['30a27913944098e121336a9a3f855ce8c875904fc3f7146ab44304b8b1adfc92','07c3efa01e76bdc9a34416bddd9182a75db7b09347c87804ceb58ac10954c42e','b71ec5d27bfb02cb307b943a9d6d90601ca575b99a67b128ab58f89198743c0b'];
@@ -48962,7 +49047,7 @@ test('RISK repository process: ordinary Undo restores two saved edit frames and 
       }
       assertLosslessSource(seed);return expected;
     };
-    const inspectSourceLifecycle=(input,seed,sourcePhases,final,expectedBoards)=>{
+    const inspectSourceLifecycle=(input,seed,sourcePhases,final,expectedBoards,listOpen)=>{
       const originals=assertSourceFixture(input,seed),daily=new Map(),seenGeneratedIds=new Set(),seenNonces=new Set(),oldLatest=[];
       const originalChecks=[],lifecycleChecks=[],opaqueChecks=[],pendingChecks=[];
       assert.equal(sourcePhases.length,5);assert.equal(expectedBoards.length,5);
@@ -48981,6 +49066,34 @@ test('RISK repository process: ordinary Undo restores two saved edit frames and 
         assert.equal(row.payload,expected.current,kind+' complete independently expected current payload');
         assert.equal(row.payload,expected.durable,kind+' complete independently expected durable payload');
       };
+      assert.equal(listOpen.boundary,'before-first-actual-title-fill');assert.equal(listOpen.beforeFirstTitleInput,true);
+      assert.ok(listOpen.current===listOpen.durable,'The pre-title list-opening state is the exact durable board');
+      assert.equal(listOpen.currentHash,sourceHash(listOpen.current));assert.equal(listOpen.durableHash,sourceHash(listOpen.durable));
+      assert.equal(listOpen.headHash,listOpen.durableHash);assert.equal(JSON.parse(listOpen.current).listOpen,true);
+      assert.equal(listOpen.listToggleClick?.action,'act:toggle-list');assert.equal(listOpen.listToggleClick?.trusted,true);
+      assert.ok(Number.isSafeInteger(listOpen.listToggleClick.at)&&Number.isSafeInteger(listOpen.capturedAtMs));
+      assert.equal(listOpen.backups.length,listOpen.backupProofs.length);
+      assert.deepEqual(listOpen.backupProofs.map(row=>row.id),listOpen.backups.map(row=>row.id),'Independent hashes retain the complete pre-title source array order');
+      listOpen.backups.forEach((row,index)=>{
+        const proof=listOpen.backupProofs[index];sourceExactKeys(proof,['id','kind','day','at','payloadBytes','payloadHash','rowHash'],'Complete independent pre-title source hash');
+        assert.deepEqual(proof,{id:row.id,kind:row.kind,day:row.day,at:row.at,payloadBytes:Buffer.byteLength(row.payload),
+          payloadHash:sourceHash(row.payload),rowHash:sourceHash(JSON.stringify(row))},'Independent pre-title source payload, time and exact-row hashes');
+      });
+      const listOpenGenerated=listOpen.backups.filter(row=>!sourceOriginalIds.includes(row.id)),
+        listOpenDailyRows=listOpenGenerated.filter(row=>row.kind==='daily'),listOpenLatestRows=listOpenGenerated.filter(row=>row.kind==='latest');
+      assert.equal(listOpenDailyRows.length,1,'The actual trusted list-opening save creates one first daily source');
+      assert.equal(listOpenLatestRows.length,1,'The actual trusted list-opening save creates one rolling latest source');
+      assert.equal(listOpenGenerated.length,2,'Every complete pre-title generated source row is examined');
+      const listOpenDaily=listOpenDailyRows[0],listOpenLatest=listOpenLatestRows[0],listOpenExpected={current:listOpen.current,durable:listOpen.durable};
+      assert.equal(listOpenDaily.payload,listOpen.current,'The exact actual daily payload is the independently retained list-open board');
+      automatic(listOpenDaily,'daily',listOpen,listOpenExpected,listOpen.listToggleClick.at);
+      automatic(listOpenLatest,'latest',listOpen,listOpenExpected,listOpen.listToggleClick.at);
+      assert.equal(listOpenDaily.at,listOpenLatest.at,'The actual pre-title daily/latest pair shares its save time');
+      assertSourceRows(listOpen.backups,[...originals,listOpenDaily,listOpenLatest],'Complete actual list-opening source set');
+      const listOpenImmutableIds=new Set([...sourceOriginalIds,listOpenDaily.id]),
+        listOpenImmutableOrder=listOpen.backups.filter(row=>listOpenImmutableIds.has(row.id)).map(row=>row.id);
+      daily.set(listOpenDaily.day,listOpenDaily);oldLatest.push(listOpenLatest.id);
+      let baselineRollingId=null,baselineImmutableOrder=null;
       for(let index=0;index<sourcePhases.length;index++){
         const phase=sourcePhases[index],expected=expectedBoards[index],clickAt=index<3?phase.lastSaveClickAtMs:phase.lastUndoClickAtMs;
         assert.equal(phase.current,expected.current);assert.equal(phase.durable,expected.durable);
@@ -49000,25 +49113,93 @@ test('RISK repository process: ordinary Undo restores two saved edit frames and 
           daily.set(fresh[0].day,fresh[0]);
         }
         const immutable=[...originals,...daily.values()],expectedRows=[...immutable,latest[0]];
+        const immutableIds=new Set(immutable.map(row=>row.id)),immutableOrder=phase.backups.filter(row=>immutableIds.has(row.id)).map(row=>row.id);
+        if(index===0){
+          assert.deepEqual(immutableOrder.filter(id=>listOpenImmutableIds.has(id)),listOpenImmutableOrder,'The first title save preserves every pre-title immutable source in its original array order');
+          baselineRollingId=latest[0].id;
+        }else assert.deepEqual(immutableOrder.filter(id=>baselineImmutableOrder.includes(id)),baselineImmutableOrder.filter(id=>immutableIds.has(id)&&phase.backups.some(row=>row.id===id)),'Later Undo phases preserve the complete immutable source array order');
+        baselineImmutableOrder=immutableOrder;
         lifecycleChecks.push(assertSourceRows(phase.backups,expectedRows,'phase '+index));
         originalChecks.push(immutable.every(row=>phase.backups.some(value=>sourceSame(value,row))));
         opaqueChecks.push(assertLosslessSource(phase));
       }
       const last=sourcePhases[4];assert.equal(final.current,expectedBoards[4].current);assert.equal(final.durable,expectedBoards[4].durable);
       lifecycleChecks.push(assertSourceRows(final.backups,last.backups,'final U2 readback'));
+      assert.deepEqual(final.backups.map(row=>row.id),last.backups.map(row=>row.id),'Final U2 readback retains the complete source row array order');
       assert.deepEqual(final.pending,sourcePendingLiteral,'Final pending original remains exact');pendingChecks.push(sourceSame(final.pending,sourcePendingLiteral));
       for(const side of ['current','durable'])assert.deepEqual(JSON.parse(final[side]).protectedBackupIds,['gate-retained-1']);
       opaqueChecks.push(assertLosslessSource(final));
       return{originalBackupsPreserved:originalChecks.every(Boolean)&&lifecycleChecks.every(Boolean),automaticBackupLifecycleValidated:lifecycleChecks.every(Boolean),
         originalOpaqueSourcesPreserved:opaqueChecks.every(Boolean),pendingUploadPreserved:pendingChecks.every(Boolean),
-        baselineRollingId:oldLatest[0],immutableOriginalIds:[...originals,...daily.values()].map(row=>row.id),dailyOriginals:[...daily.values()]};
+        baselineRollingId,listOpenDailyId:listOpenDaily.id,listOpenDailyAt:listOpenDaily.at,listOpenDailyDay:listOpenDaily.day,
+        listOpenDailyPayloadHash:sourceHash(listOpenDaily.payload),listOpenDailyRowHash:sourceHash(JSON.stringify(listOpenDaily)),
+        listOpenDailyPayloadBytes:Buffer.byteLength(listOpenDaily.payload),listOpenLatestId:listOpenLatest.id,
+        listOpenToggleClickAtMs:listOpen.listToggleClick.at,listOpenCapturedAtMs:listOpen.capturedAtMs,listOpenBoardHash:listOpen.currentHash,
+        listOpenDailyCapturedBeforeTitle:true,immutableOriginalIds:[...originals,...daily.values()].map(row=>row.id),dailyOriginals:[...daily.values()]};
     };
  await prepareNativePlaywrightResolution(t);
  const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);
  assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&(port>0||(process.env.CI==='true'&&port===0)),'Healthy named WebKit and loopback allocation required');
  fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ordinary-two-frame-undo-'));
  const scenario='ordinary Undo consumes two saved edit frames';
- const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+ const {pathToFileURL}=await import('node:url'),listOpenArtifactPath=path.join(output,'ordinary-undo-list-open-source.json'),listOpenPreload=path.join(output,'ordinary-undo-list-open-preload.mjs');
+ const playwrightModule=pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href;
+ fs.writeFileSync(listOpenPreload,`import {webkit} from ${JSON.stringify(playwrightModule)};
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+const sha256=value=>createHash('sha256').update(value).digest('hex'),launch=webkit.launch.bind(webkit),artifactPath=${JSON.stringify(listOpenArtifactPath)};
+let captured=false;
+webkit.launch=async(...launchArgs)=>{
+ const browser=await launch(...launchArgs),newContext=browser.newContext.bind(browser);
+ browser.newContext=async(...contextArgs)=>{
+  const context=await newContext(...contextArgs),newPage=context.newPage.bind(context);
+  context.newPage=async(...pageArgs)=>{
+   const page=await newPage(...pageArgs),locator=page.locator.bind(page);
+   page.locator=(selector,...locatorArgs)=>{
+    const target=locator(selector,...locatorArgs);
+    if(selector==='#etTitle'){
+     const fill=target.fill.bind(target);
+     target.fill=async(...fillArgs)=>{
+      if(!captured){
+       await page.waitForFunction(async()=>{
+        if(typeof state==='undefined'||state.listOpen!==true)return false;
+        const head=await ScannerDeviceStore.readHead();
+        return typeof head?.payload==='string'&&head.payload===JSON.stringify(state);
+       },null,{timeout:12000});
+       const observed=await page.evaluate(async()=>{
+        const deadline=performance.now()+12000,nextFrame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+        while(performance.now()<deadline){
+         if(typeof state==='undefined'||state.listOpen!==true){await nextFrame();continue;}
+         const current=JSON.stringify(state),head=await ScannerDeviceStore.readHead();
+         if(JSON.stringify(state)!==current||head?.payload!==current){await nextFrame();continue;}
+         const backups=await ScannerDeviceStore.listBackups(),opaque=await ScannerDeviceStore.listOpaqueArchives(),pending=await ScannerDeviceStore.getPendingUpload('gate-owner');
+         const capturedAtMs=Date.now(),afterCurrent=JSON.stringify(state),afterHead=await ScannerDeviceStore.readHead(),afterBackups=await ScannerDeviceStore.listBackups(),
+          afterOpaque=await ScannerDeviceStore.listOpaqueArchives(),afterPending=await ScannerDeviceStore.getPendingUpload('gate-owner');
+         const listToggleClick=(window.__buttonNativeClicks||[]).findLast(row=>row.action==='act:toggle-list'&&row.trusted===true),daily=backups.filter(row=>row.kind==='daily');
+         if(afterCurrent!==current||afterHead?.payload!==current||JSON.stringify(afterBackups)!==JSON.stringify(backups)||JSON.stringify(afterOpaque)!==JSON.stringify(opaque)||JSON.stringify(afterPending)!==JSON.stringify(pending)||!listToggleClick||daily.length!==1||daily[0].payload!==current){await nextFrame();continue;}
+         return{current,durable:afterHead.payload,headHash:afterHead.hash,capturedAtMs,listOpen:true,listToggleClick,backups,opaque,pending,
+          timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone,timeZoneOffsetMinutes:new Date().getTimezoneOffset()};
+        }
+        throw new Error('Bounded wait did not observe one stable durable list-opening daily before the first title input');
+       });
+       const artifact={schemaVersion:1,boundary:'before-first-actual-title-fill',beforeFirstTitleInput:true,...observed,
+        currentHash:sha256(observed.current),durableHash:sha256(observed.durable),
+        backupProofs:observed.backups.map(row=>({id:row.id,kind:row.kind,day:row.day,at:row.at,payloadBytes:Buffer.byteLength(row.payload),payloadHash:sha256(row.payload),rowHash:sha256(JSON.stringify(row))}))};
+       await fs.promises.writeFile(artifactPath,JSON.stringify(artifact,null,2)+'\\n',{flag:'wx'});captured=true;
+      }
+      return fill(...fillArgs);
+     };
+    }
+    return target;
+   };
+   return page;
+  };
+  return context;
+ };
+ return browser;
+};
+`);
+ const result=spawnSync(process.execPath,['--import',listOpenPreload,'scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
  fs.writeFileSync(path.join(output,'child.stdout.txt'),result.stdout||'');
  fs.writeFileSync(path.join(output,'child.stderr.txt'),result.stderr||'');
  fs.writeFileSync(path.join(output,'child-result.json'),JSON.stringify({status:result.status,signal:result.signal,
@@ -49029,12 +49210,30 @@ test('RISK repository process: ordinary Undo restores two saved edit frames and 
  const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));
  const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.error,undefined);assert.equal(identity.status,0,identity.stderr);
  const [candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/),inventoryBytes=fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'));
+ const listOpenBytes=fs.readFileSync(listOpenArtifactPath),listOpen=JSON.parse(listOpenBytes),listOpenHash=value=>createHash('sha256').update(value).digest('hex');
+ assert.equal(listOpen.boundary,'before-first-actual-title-fill');assert.equal(listOpen.beforeFirstTitleInput,true,'The first native title input waits for its independently retained list-opening source');
+ assert.equal(listOpen.listOpen,true);assert.ok(listOpen.current===listOpen.durable,'The actual list-opening board is fully durable before title input');
+ assert.equal(listOpen.currentHash,listOpenHash(listOpen.current));assert.equal(listOpen.durableHash,listOpenHash(listOpen.durable));assert.equal(listOpen.headHash,listOpen.durableHash);
+ assert.ok(Number.isSafeInteger(listOpen.capturedAtMs));assert.equal(typeof listOpen.timeZone,'string');assert.ok(Number.isSafeInteger(listOpen.timeZoneOffsetMinutes));
+ assert.equal(listOpen.listToggleClick?.action,'act:toggle-list');assert.equal(listOpen.listToggleClick?.trusted,true,'The retained list-opening save follows its actual trusted control input');
+ assert.ok(listOpen.listToggleClick.at<=listOpen.capturedAtMs,'The actual list-opening save precedes first title input');
+ assert.equal(listOpen.backups.length,listOpen.backupProofs.length);assert.deepEqual(listOpen.backupProofs.map(row=>row.id),listOpen.backups.map(row=>row.id),'Independent row hashes retain the complete pre-title source array order');
+ const listOpenGenerated=listOpen.backups.filter(row=>!sourceOriginalIds.includes(row.id)),listOpenDaily=listOpenGenerated.filter(row=>row.kind==='daily'),listOpenLatest=listOpenGenerated.filter(row=>row.kind==='latest');
+ assert.equal(listOpenDaily.length,1,'The durable list-opening transition actually created its first daily source');assert.equal(listOpenLatest.length,1,'The durable list-opening transition retains its rolling latest source');assert.equal(listOpenGenerated.length,2,'Every pre-title generated source row is examined');
+ const listOpenDailyRow=listOpenDaily[0],listOpenLatestRow=listOpenLatest[0],listOpenDailyProof=listOpen.backupProofs.find(row=>row.id===listOpenDailyRow.id);
+ assert.equal(listOpenDailyRow.payload,listOpen.current,'The independently retained daily contains the exact durable list-open board');
+ assert.equal(listOpenDailyProof?.payloadHash,listOpenHash(listOpenDailyRow.payload));assert.equal(listOpenDailyProof?.payloadBytes,Buffer.byteLength(listOpenDailyRow.payload));
+ assert.equal(listOpenDailyProof?.rowHash,listOpenHash(JSON.stringify(listOpenDailyRow)),'The independently retained complete daily row has an exact serialization hash');
+ assert.ok(Number.isSafeInteger(listOpenDailyRow.at)&&listOpenDailyRow.at>=Math.floor(listOpen.listToggleClick.at)&&listOpenDailyRow.at<=listOpen.capturedAtMs,'The actual daily retains its original list-opening save time');
+ const listOpenLatestProof=listOpen.backupProofs.find(row=>row.id===listOpenLatestRow.id);
+ assert.equal(listOpenLatestRow.payload,listOpen.current);assert.equal(listOpenLatestRow.at,listOpenDailyRow.at);
+ assert.equal(listOpenLatestProof?.payloadHash,listOpenHash(listOpenLatestRow.payload));assert.equal(listOpenLatestProof?.rowHash,listOpenHash(JSON.stringify(listOpenLatestRow)));
  assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);
  assert.equal(report.inventorySha256,createHash('sha256').update(inventoryBytes).digest('hex'));
  assert.equal(report.profile,'ordinary');assert.equal(report.cleanup?.contextClosed,true);assert.equal(report.cleanup?.browserClosed,true);assert.equal(report.cleanup?.serverClosed,true);
  assert.deepEqual(report.errors,[],'Native consumer lifecycle and unrelated-action controls remain clear');
  assert.equal(report.scenarios?.length,1,'The ordinary native consumer must execute the inventory-admitted two-frame Undo scenario');
- const observed=report.scenarios[0];assert.equal(observed.name,scenario);assert.equal(observed.status,'passed');
+ const observed=report.scenarios[0];assert.equal(observed.name,scenario);assert.equal(observed.status,'passed','Original two-frame Undo source/lifecycle verifier must pass: '+(report.failure||'no native scenario failure recorded'));
  assert.deepEqual({current:observed.setup.currentTasks,durable:observed.setup.durableTasks,source:observed.setup.source,authMode:observed.setup.authMode,fixtureRole:observed.setup.fixtureRole},
   {current:64,durable:64,source:'signed-out-installed',authMode:'signed-out',fixtureRole:'active'});
  const sourceArtifacts=[];
@@ -49075,6 +49274,14 @@ test('RISK repository process: ordinary Undo restores two saved edit frames and 
   originalOpaqueSourcesPreserved:semantic.originalOpaqueSourcesPreserved,pendingUploadPreserved:semantic.pendingUploadPreserved},
   {frameTitles:['Ordinary undo frame one','Ordinary undo frame two'],currentRestored:true,durableRestored:true,priorHistoryPreserved:true,
    originalBackupsPreserved:true,originalOpaqueSourcesPreserved:true,pendingUploadPreserved:true});
+ assert.deepEqual({id:semantic.listOpenDailyId,at:semantic.listOpenDailyAt,day:semantic.listOpenDailyDay,payloadHash:semantic.listOpenDailyPayloadHash,
+  rowHash:semantic.listOpenDailyRowHash,payloadBytes:semantic.listOpenDailyPayloadBytes,latestId:semantic.listOpenLatestId,
+  clickAt:semantic.listOpenToggleClickAtMs,boardHash:semantic.listOpenBoardHash,capturedBeforeTitle:semantic.listOpenDailyCapturedBeforeTitle},
+  {id:listOpenDailyRow.id,at:listOpenDailyRow.at,day:listOpenDailyRow.day,payloadHash:listOpenDailyProof.payloadHash,rowHash:listOpenDailyProof.rowHash,
+   payloadBytes:listOpenDailyProof.payloadBytes,latestId:listOpenLatestRow.id,clickAt:listOpen.listToggleClick.at,
+   boardHash:listOpen.currentHash,capturedBeforeTitle:true},'Native semantic evidence independently binds to the exact pre-title list-opening daily source');
+ assert.ok(semantic.listOpenCapturedAtMs>=listOpenDailyRow.at,'Rapid-core captured the actual daily after its saved row existed');
+ assert.ok(listOpen.capturedAtMs>=semantic.listOpenCapturedAtMs,'The independent preload captured the same stable source at the first title-fill boundary');
  assert.equal(semantic.expectedCurrentHash,semantic.restoredCurrentHash);assert.equal(semantic.expectedDurableHash,semantic.restoredDurableHash);
  assert.notEqual(semantic.baselineCurrentHash,semantic.restoredCurrentHash,'Honest immutable facts and fresh save metadata remain present');
  assert.deepEqual({tasks:semantic.fullTaskArraysPreserved,facts:semantic.immutableFactsPreserved,save:semantic.freshSaveMetadataValidated,phases:semantic.phases},
@@ -49103,20 +49310,32 @@ test('RISK repository process: ordinary Undo restores two saved edit frames and 
   finalBytes=fs.readFileSync(path.join(output,'ordinary-undo-final-source.json'));
  const seedArtifact=readSourceArtifact(report.ordinaryUndoSeedSource,'seed-source',seedBytes),
   finalArtifact=readSourceArtifact(report.ordinaryUndoFinalSource,'final-source',finalBytes);
+ const listOpenOriginalRows=listOpen.backups.filter(row=>sourceOriginalIds.includes(row.id));
+ assert.deepEqual(listOpenOriginalRows.map(row=>row.id),seedArtifact.backups.map(row=>row.id),'The pre-title full source capture retains the original source array order');
+ assert.deepEqual(listOpenOriginalRows,seedArtifact.backups,'Every pre-title original source row is byte-for-byte unchanged from the complete seed source');
+ assert.deepEqual(listOpen.opaque,seedArtifact.opaque,'The pre-title list-opening save preserves the complete opaque source');
+ assert.deepEqual(listOpen.pending,seedArtifact.pending,'The pre-title list-opening save preserves the exact pending-upload source');
  const expectedSourceBoards=sourceArtifacts.map(artifact=>({current:artifact.current,durable:artifact.durable}));
- const sourceProof=inspectSourceLifecycle(fixtureSeed,seedArtifact,sourceArtifacts,finalArtifact,expectedSourceBoards);
+ const sourceProof=inspectSourceLifecycle(fixtureSeed,seedArtifact,sourceArtifacts,finalArtifact,expectedSourceBoards,listOpen);
  assert.deepEqual({originals:sourceProof.originalBackupsPreserved,lifecycle:sourceProof.automaticBackupLifecycleValidated,
   opaque:sourceProof.originalOpaqueSourcesPreserved,pending:sourceProof.pendingUploadPreserved},
   {originals:true,lifecycle:true,opaque:true,pending:true},'All complete nonvacuous source and lifecycle assertions pass');
  assert.equal(semantic.automaticBackupLifecycleValidated,sourceProof.automaticBackupLifecycleValidated);
  assert.equal(semantic.typedSourceValuesPreserved,sourceProof.originalOpaqueSourcesPreserved);
+ assert.deepEqual({id:sourceProof.listOpenDailyId,at:sourceProof.listOpenDailyAt,day:sourceProof.listOpenDailyDay,payloadHash:sourceProof.listOpenDailyPayloadHash,
+  rowHash:sourceProof.listOpenDailyRowHash,payloadBytes:sourceProof.listOpenDailyPayloadBytes,latestId:sourceProof.listOpenLatestId,
+  clickAt:sourceProof.listOpenToggleClickAtMs,boardHash:sourceProof.listOpenBoardHash,capturedBeforeTitle:sourceProof.listOpenDailyCapturedBeforeTitle},
+  {id:semantic.listOpenDailyId,at:semantic.listOpenDailyAt,day:semantic.listOpenDailyDay,payloadHash:semantic.listOpenDailyPayloadHash,
+   rowHash:semantic.listOpenDailyRowHash,payloadBytes:semantic.listOpenDailyPayloadBytes,latestId:semantic.listOpenLatestId,
+   clickAt:semantic.listOpenToggleClickAtMs,boardHash:semantic.listOpenBoardHash,capturedBeforeTitle:semantic.listOpenDailyCapturedBeforeTitle},
+  'The rapid-core independently preserved daily source matches the external pre-title full-payload capture');
  // Pure artifact sensitivity after the one actual native consumer; no extra launch.
  // Clone only mutation targets, retaining immutable large strings without duplication.
  const sourceMutation=(label,mutate,pattern)=>{
   const clone=snapshot=>({...snapshot,backups:snapshot.backups.map(row=>({...row})),pending:{...snapshot.pending},
    sourceValue:{...snapshot.sourceValue,entries:snapshot.sourceValue.entries.map(([key,node])=>[key,key==='opaque'?structuredClone(node):node])}});
   const changed={phases:sourceArtifacts.map(clone),final:clone(finalArtifact)};
-  mutate(changed);assert.throws(()=>inspectSourceLifecycle(fixtureSeed,seedArtifact,changed.phases,changed.final,expectedSourceBoards),pattern,label);
+  mutate(changed);assert.throws(()=>inspectSourceLifecycle(fixtureSeed,seedArtifact,changed.phases,changed.final,expectedSourceBoards,listOpen),pattern,label);
  };
  const original=(phase,id)=>phase.backups.find(row=>row.id===id),
   rolling=phase=>phase.backups.find(row=>row.kind==='latest'&&!sourceOriginalIds.includes(row.id));
@@ -50743,7 +50962,7 @@ test('RISK repository process: ordinary overdue WOOP repeated Next preserves ans
  t.diagnostic('Focused ordinary overdue-WOOP evidence: '+path.join(output,reports[0]));
 });
 
-test('RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources',async t=>{
+test("RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources",async t=>{
  const sourceHash=value=>createHash('sha256').update(value).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value));
  const targetId='synthetic-kept',scenario='ordinary final WOOP repeated Next retains answers';
  // Independent literal fixture authority: 64 saved tasks, one active final task,
@@ -50889,7 +51108,10 @@ test('RISK repository process: ordinary final WOOP repeated Next preserves sole-
  await prepareNativePlaywrightResolution(t);
  const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&(port>0||(process.env.CI==='true'&&port===0)),'Healthy allocated WebKit and loopback required');
  fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ordinary-final-woop-'));
- const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+ const {pathToFileURL}=await import('node:url'),observerClockPreload=path.join(output,'observer-advancing-clock.mjs');
+ const playwrightModule=pathToFileURL(path.join(__dirname,'node_modules/playwright/index.mjs')).href;
+ fs.writeFileSync(observerClockPreload,`import {webkit} from ${JSON.stringify(playwrightModule)};\nconst launch=webkit.launch.bind(webkit);\nwebkit.launch=async(...args)=>{const browser=await launch(...args),newContext=browser.newContext.bind(browser);browser.newContext=async(...contextArgs)=>{const context=await newContext(...contextArgs);await context.addInitScript(()=>{if(location.pathname.endsWith('/__button-observer')){const epoch=Date.now();let tick=0;Date.now=()=>epoch+tick++*10;}});return context;};return browser;};\n`);
+ const result=spawnSync(process.execPath,['--import',observerClockPreload,'scripts/button-safety.mjs','--run','--profile','ordinary','--engine','webkit','--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
  fs.writeFileSync(path.join(output,'child.stdout.txt'),result.stdout||'');fs.writeFileSync(path.join(output,'child.stderr.txt'),result.stderr||'');fs.writeFileSync(path.join(output,'child-result.json'),JSON.stringify({status:result.status,signal:result.signal,error:result.error?{name:result.error.name,code:result.error.code,message:result.error.message}:null},null,2)+'\n');
  assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);
  const reports=fs.readdirSync(output).filter(file=>file.startsWith('button-safety-webkit-')&&file.endsWith('.json'));assert.equal(reports.length,1,'One real selected-case runner report');const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));
@@ -51309,7 +51531,7 @@ test('RISK saved decision review guidance: mounted changelog records selected re
  assert.equal(JSON.stringify(ctx.state),before,'Reading the note does not save or alter the board');
 });
 
-test('RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources',async t=>{
+test("RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",async t=>{
  const hash=value=>createHash('sha256').update(value).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value));
  const scenario='ordinary two distinct scanner decisions',exactKeys=(value,keys,label)=>assert.deepEqual(Object.keys(value).sort(),keys.slice().sort(),label);
  const taskLiteral={id:'synthetic-kept',title:'Synthetic retained task',url:null,due:null,startsAt:null,evergreen:false,evergreenHours:18,evergreenResetAtDay:true,mu:25,sigma:8.333333333,done:false,createdAt:1,completedAt:null,lastDoneAt:null,ctx:[],futureTask:{opaque:['retain',7]}};
@@ -51403,12 +51625,13 @@ test('RISK repository process: ordinary two distinct scanner decisions retain bo
  };
  await prepareNativePlaywrightResolution(t);
  for(const engine of['chromium','webkit'])await t.test(engine,async t=>{
- const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&(port>0||(process.env.CI==='true'&&port===0)),'Healthy allocated named engines/loopback required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ordinary-distinct-decisions-'+engine+'-'));
- const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine',engine,'--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:90000,maxBuffer:2*1024*1024});
+ const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&(port>0||(process.env.CI==='true'&&port===0)),'Healthy allocated named engines/loopback required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ordinary-distinct-decisions-'+engine+'-')),initialOriginCapture=retainInitialBoundOrigin(output,engine);
+ const result=spawnSync(process.execPath,['--import',initialOriginCapture.preloadPath,'scripts/button-safety.mjs','--run','--profile','ordinary','--engine',engine,'--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:90000,maxBuffer:2*1024*1024});
  fs.writeFileSync(path.join(output,'child.stdout.txt'),result.stdout||'');fs.writeFileSync(path.join(output,'child.stderr.txt'),result.stderr||'');fs.writeFileSync(path.join(output,'child-result.json'),JSON.stringify({status:result.status,signal:result.signal,error:result.error?{name:result.error.name,code:result.error.code,message:result.error.message}:null},null,2)+'\n');assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);
  const reports=fs.readdirSync(output).filter(file=>file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1);const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));
  const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);const[candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/),inventoryBytes=fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'));assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);assert.equal(report.inventorySha256,hash(inventoryBytes));assert.equal(report.profile,'ordinary');assert.equal(report.engine,engine);
  assert.equal(report.scenarios?.length,1,'The public ordinary runner must execute the required two-distinct-scanner-decisions selected case');const observed=report.scenarios[0];assert.equal(observed.name,scenario);assert.equal(observed.status,'passed','The whole native selected-case contract must pass: '+result.stderr);assert.deepEqual({current:observed.setup.currentTasks,active:observed.setup.activeTasks,durable:observed.setup.durableTasks,source:observed.setup.source,authMode:observed.setup.authMode,fixtureRole:observed.setup.fixtureRole},{current:64,active:64,durable:64,source:'signed-out-installed',authMode:'signed-out',fixtureRole:'active'});assert.equal(observed.setup.durableHash,seedHash);
+ const initialBoundOrigin=verifyInitialBoundOriginCapture(initialOriginCapture.capturePath,report,engine,port);
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});const names=['seed','accepted-two','reopened','final-source'];assert.deepEqual(report.ordinaryDistinctDecisionPhases?.map(row=>row.phase),names);
  const phases=report.ordinaryDistinctDecisionPhases.map(reference=>{assert.equal(reference.file,'ordinary-distinct-decision-'+reference.phase+'.json');const bytes=fs.readFileSync(path.join(output,reference.file));assert.equal(hash(bytes),reference.sha256);assert.equal(bytes.byteLength,reference.bytes);const artifact=JSON.parse(bytes);assert.equal(artifact.schemaVersion,1);assert.equal(artifact.phase,reference.phase);assert.equal(artifact.scenario,scenario);assert.deepEqual(artifact.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256});for(const side of['current','durable']){assert.equal(reference[side+'Hash'],hash(artifact[side]));assert.equal(artifact[side+'Hash'],reference[side+'Hash']);assert.equal(Buffer.byteLength(artifact[side]),reference[side+'Bytes']);}return artifact;});
  const rows=(report.repeatOutcomes||[]).filter(row=>row.name===scenario);assert.equal(rows.length,1);const repeat=rows[0],semantic=verifyDistinctSources(phases,repeat.attempts),definition=JSON.parse(inventoryBytes).profiles.ordinary.requiredRepeatCases.find(row=>row.name===scenario);
@@ -51417,12 +51640,12 @@ test('RISK repository process: ordinary two distinct scanner decisions retain bo
  assert.deepEqual(report.clicks.map(row=>row.action),['act:yes','act:yes'],'Exactly two intentional Yes clicks and no unrelated input');assert.deepEqual(report.presses.map(row=>row.action),['act:yes','act:yes'],'No missing, disappeared or retargeted down receipt');
  assert.deepEqual(report.presses.map(({scenario:owner,...row})=>{assert.equal(owner,scenario);return row;}),phases[1].presses,'The external raw report retains every complete native pre-app down receipt');assert.deepEqual(report.clicks.map(({scenario:owner,...row})=>{assert.equal(owner,scenario);return row;}),phases[1].clicks,'The external raw report retains every complete native pre-app click receipt');
  repeat.attempts.forEach((attempt,index)=>{exactKeys(attempt,['receiptId','actionFamily','trusted','result','receiptAtMs','afterCurrent','targetAcknowledgement'],'Every complete accepted attempt is retained');assert.equal(attempt.actionFamily,'act:yes');assert.equal(attempt.result,'accepted');assert.equal(attempt.trusted,true);assert.equal(attempt.receiptAtMs,report.presses[index].at);assert.ok(attempt.receiptId.startsWith(scenario+':'));assert.equal(report.presses[index].offeredTaskId,semantic.offeredTaskIds[index]);assert.equal(report.clicks[index].offeredTaskId,semantic.offeredTaskIds[index]);});
- assert.deepEqual(repeat.assertions,[{id:definition.assertionId,status:'passed',expected:definition.expected,evidence:repeat.assertions[0]?.evidence}]);assert.deepEqual(JSON.parse(repeat.assertions[0].evidence),semantic);assert.deepEqual(repeat.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256,durableHash:seedHash});assert.equal(report.allowedNavigations?.length,1,'Exactly one genuine same-route browser reopen');exactKeys(report.allowedNavigations[0],['scenario','url','action'],'Complete allowed reopen receipt');assert.equal(report.allowedNavigations[0].scenario,scenario);assert.equal(report.allowedNavigations[0].action,'ordinary-distinct-decisions-browser-reopen');const reopenedUrl=new URL(report.allowedNavigations[0].url);assert.equal(reopenedUrl.origin,'http://127.0.0.1:'+port);assert.match(reopenedUrl.pathname,/^\/button-[a-f0-9-]+\/$/);assert.equal(reopenedUrl.search,'');assert.equal(reopenedUrl.hash,'');
+ assert.deepEqual(repeat.assertions,[{id:definition.assertionId,status:'passed',expected:definition.expected,evidence:repeat.assertions[0]?.evidence}]);assert.deepEqual(JSON.parse(repeat.assertions[0].evidence),semantic);assert.deepEqual(repeat.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256,durableHash:seedHash});assert.equal(report.allowedNavigations?.length,1,'Exactly one genuine same-route browser reopen');exactKeys(report.allowedNavigations[0],['scenario','url','action'],'Complete allowed reopen receipt');assert.equal(report.allowedNavigations[0].scenario,scenario);assert.equal(report.allowedNavigations[0].action,'ordinary-distinct-decisions-browser-reopen');const reopenedUrl=new URL(report.allowedNavigations[0].url);assert.equal(reopenedUrl.origin,initialBoundOrigin.origin,'The actual reopen retains the independently captured initial bound origin');assert.match(reopenedUrl.pathname,/^\/button-[a-f0-9-]+\/$/);assert.equal(reopenedUrl.search,'');assert.equal(reopenedUrl.hash,'');
  assert.equal(report.samples?.length,2,'Each native input retains its original heartbeat/RAF proxy sample');report.samples.forEach((sample,index)=>{assert.equal(sample.scenario,scenario);assert.equal(sample.action,'act:yes');assert.ok(Number.isFinite(sample.firstTrustedInputAt)&&sample.firstTrustedInputAt<=report.presses[index].at&&sample.firstTrustedInputAt>=phases[0].capturedAtMs,'Heartbeat and down receipt retain their separate real page-clock observations');if(index)assert.ok(sample.firstTrustedInputAt>report.clicks[index-1].at);assert.ok(Number.isFinite(sample.eventToFirstFrameMs),'Finite signed raw RAF callback timestamp minus click performance.now; descriptive proxy only, no acknowledgement/paint/response verdict');});assert.deepEqual(report.inputSamples||[],[]);assert.equal(result.status,0,'The entire selected public native consumer must pass: '+result.stderr);assert.equal(report.status,'passed');t.diagnostic('Focused '+engine+' ordinary two distinct scanner decisions evidence: '+path.join(output,reports[0])+'; target DOM observation is an upper bound, RAF is proxy, compositor/pixel time unavailable, signed-out cloud N/A; optional200ms is not a verdict.');
  });
 });
 
-test("RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources",async t=>{
+test('RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources',async t=>{
  const hash=value=>createHash('sha256').update(value).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value));
  const scenario='ordinary scene choice survives reopen and task Undo',exactKeys=(value,keys,label)=>assert.deepEqual(Object.keys(value).sort(),keys.slice().sort(),label);
  const taskLiteral={id:'synthetic-kept',title:'Synthetic retained task',url:null,due:null,startsAt:null,evergreen:false,evergreenHours:18,evergreenResetAtDay:true,mu:25,sigma:8.333333333,done:false,createdAt:1,completedAt:null,lastDoneAt:null,ctx:[],futureTask:{opaque:['retain',7]}};
@@ -51516,12 +51739,13 @@ test("RISK repository process: ordinary scene repeat accounts the original trust
  await prepareNativePlaywrightResolution(t);
  const base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&(port>0||(process.env.CI==='true'&&port===0)),'Healthy allocated native engine/loopback required');fs.mkdirSync(base,{recursive:true});
  for(const engine of ['chromium','webkit'])await t.test(engine,()=>{
- const output=fs.mkdtempSync(path.join(base,'ordinary-scene-choice-'+engine+'-'));
- const result=spawnSync(process.execPath,['scripts/button-safety.mjs','--run','--profile','ordinary','--engine',engine,'--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:90000,maxBuffer:2*1024*1024});
+ const output=fs.mkdtempSync(path.join(base,'ordinary-scene-choice-'+engine+'-')),initialOriginCapture=retainInitialBoundOrigin(output,engine);
+ const result=spawnSync(process.execPath,['--import',initialOriginCapture.preloadPath,'scripts/button-safety.mjs','--run','--profile','ordinary','--engine',engine,'--output-dir',output,'--port',String(port),'--scenario',scenario],{cwd:__dirname,env:process.env,encoding:'utf8',timeout:90000,maxBuffer:2*1024*1024});
  fs.writeFileSync(path.join(output,'child.stdout.txt'),result.stdout||'');fs.writeFileSync(path.join(output,'child.stderr.txt'),result.stderr||'');fs.writeFileSync(path.join(output,'child-result.json'),JSON.stringify({status:result.status,signal:result.signal,error:result.error?{name:result.error.name,code:result.error.code,message:result.error.message}:null},null,2)+'\n');assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,null);
  const reports=fs.readdirSync(output).filter(file=>file.startsWith('button-safety-'+engine+'-')&&file.endsWith('.json'));assert.equal(reports.length,1);const report=JSON.parse(fs.readFileSync(path.join(output,reports[0]),'utf8'));
  const identity=spawnSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:__dirname,encoding:'utf8'});assert.equal(identity.status,0,identity.stderr);const[candidateCommit,candidateTree]=identity.stdout.trim().split(/\r?\n/),inventoryBytes=fs.readFileSync(path.join(__dirname,'scripts/button-safety-inventory.json'));assert.equal(report.candidateCommit,candidateCommit);assert.equal(report.candidateTree,candidateTree);assert.equal(report.inventorySha256,hash(inventoryBytes));assert.equal(report.profile,'ordinary');
  assert.equal(report.scenarios?.length,1,'The public ordinary runner must execute the required scene-choice/reopen/task-Undo selected case');const observed=report.scenarios[0];assert.equal(observed.name,scenario);assert.equal(observed.status,'passed','The whole native selected-case contract must pass: '+result.stderr);assert.deepEqual({current:observed.setup.currentTasks,active:observed.setup.activeTasks,durable:observed.setup.durableTasks,source:observed.setup.source,authMode:observed.setup.authMode,fixtureRole:observed.setup.fixtureRole},{current:64,active:64,durable:64,source:'signed-out-installed',authMode:'signed-out',fixtureRole:'active'});assert.equal(observed.setup.durableHash,seedHash);
+ const initialBoundOrigin=verifyInitialBoundOriginCapture(initialOriginCapture.capturePath,report,engine,port);
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.cleanup,{contextClosed:true,browserClosed:true,serverClosed:true});const names=['seed','locked','closed','reopened','edit-one','edit-two','undone-two','final-source'];assert.deepEqual(report.ordinarySceneChoicePhases?.map(row=>row.phase),names);
  const phases=report.ordinarySceneChoicePhases.map(reference=>{assert.equal(reference.file,'ordinary-scene-choice-'+reference.phase+'.json');const bytes=fs.readFileSync(path.join(output,reference.file));assert.equal(hash(bytes),reference.sha256);assert.equal(bytes.byteLength,reference.bytes);const artifact=JSON.parse(bytes);assert.equal(artifact.schemaVersion,1);assert.equal(artifact.phase,reference.phase);assert.equal(artifact.scenario,scenario);assert.deepEqual(artifact.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256});for(const side of['current','durable']){assert.equal(reference[side+'Hash'],hash(artifact[side]));assert.equal(artifact[side+'Hash'],reference[side+'Hash']);assert.equal(Buffer.byteLength(artifact[side]),reference[side+'Bytes']);}return artifact;});
  const semantic=verifySceneSources(phases),rows=(report.repeatOutcomes||[]).filter(row=>row.name===scenario);assert.equal(rows.length,1);const repeat=rows[0],definition=JSON.parse(inventoryBytes).profiles.ordinary.requiredRepeatCases.find(row=>row.name===scenario);
@@ -51534,7 +51758,7 @@ test("RISK repository process: ordinary scene repeat accounts the original trust
  assert.deepEqual(lockAttempt,{receiptId:scenario+':scene-time:lock:'+locked.view.documentId+':'+lockPress.at,actionFamily:'scene-time:lock',trusted:true,result:'accepted',receiptAtMs:lockPress.at},'The Lock receipt keeps its actual source document and original trusted down timestamp');
  const undoAttempts=repeat.attempts.slice(1);assert.equal(undoAttempts.length,2);undoAttempts.forEach((attempt,index)=>{assert.equal(attempt.actionFamily,'act:undo');assert.equal(attempt.result,'accepted');assert.equal(attempt.trusted,true);assert.equal(attempt.receiptAtMs,report.presses[9+index].at);assert.ok(attempt.receiptId.startsWith(scenario+':'));assert.equal(report.clicks[9+index].action,'act:undo');});
  assert.deepEqual(repeat.assertions,[{id:definition.assertionId,status:'passed',expected:definition.expected,evidence:repeat.assertions[0]?.evidence}]);assert.deepEqual(JSON.parse(repeat.assertions[0].evidence),semantic);assert.deepEqual(repeat.sourceIdentity,{candidateCommit,candidateTree,inventorySha256:report.inventorySha256,durableHash:seedHash});
- assert.equal(report.allowedNavigations?.length,1);exactKeys(report.allowedNavigations[0],['scenario','url','action'],'Complete bounded genuine browser reopen');assert.equal(report.allowedNavigations[0].scenario,scenario);assert.equal(report.allowedNavigations[0].action,'ordinary-scene-browser-reopen');assert.match(report.allowedNavigations[0].url,new RegExp('^http://127\\.0\\.0\\.1:'+port+'/button-[a-z0-9-]+/$'));
+ assert.equal(report.allowedNavigations?.length,1);exactKeys(report.allowedNavigations[0],['scenario','url','action'],'Complete bounded genuine browser reopen');assert.equal(report.allowedNavigations[0].scenario,scenario);assert.equal(report.allowedNavigations[0].action,'ordinary-scene-browser-reopen');const reopenedUrl=new URL(report.allowedNavigations[0].url);assert.equal(reopenedUrl.origin,initialBoundOrigin.origin,'The actual scene reopen retains the independently captured initial bound origin');assert.match(reopenedUrl.pathname,/^\/button-[a-f0-9-]+\/$/);assert.equal(reopenedUrl.search,'');assert.equal(reopenedUrl.hash,'');
  const expectedInputs=[['fill','#sceneTimeInput',5],['select','#sceneSeasonInput',6],['fill','#etTitle',titleEdits[0].title.length],['fill','#etTitle',titleEdits[1].title.length]];assert.equal(report.inputSamples?.length,expectedInputs.length);report.inputSamples.forEach((sample,index)=>{exactKeys(sample,['kind','selector','characters','elapsedMs','maxFrameGapMs'],'Complete native scene/editor input observation');assert.deepEqual([sample.kind,sample.selector,sample.characters],expectedInputs[index]);assert.ok(Number.isFinite(sample.elapsedMs)&&sample.elapsedMs>=0);assert.ok(Number.isFinite(sample.maxFrameGapMs)&&sample.maxFrameGapMs>=0&&sample.maxFrameGapMs<1000);});
  assert.equal(result.status,0,'The entire selected public native consumer must pass: '+result.stderr);assert.equal(report.status,'passed');t.diagnostic('Focused '+engine+' ordinary scene/reopen/task Undo evidence: '+path.join(output,reports[0]));
  });
