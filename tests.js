@@ -49344,9 +49344,11 @@ test('RISK repository process: hosted direct native callers retain ephemeral lis
  const base=process.env.CHAIN_NATIVE_OUTPUT;assert.ok(base,'Durable caller evidence required');fs.mkdirSync(base,{recursive:true});const output=fs.mkdtempSync(path.join(base,'ephemeral-caller-'));
  // This subprocess tests the hosted-policy boundary; it is not hosted proof.
  const env={...process.env,CI:'true',CHAIN_TEST_EVENT_POLICY:'canonical-pr-merge-v1',GITHUB_EVENT_NAME:'pull_request',GITHUB_REF:'refs/pull/1/merge',CHAIN_NATIVE_OUTPUT:output};delete env.CHAIN_NATIVE_PORT;delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(RISK repository process: retained native sources seed once without a persistent board bootstrap|RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources|RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene|RISK repository process: refused saved decision capture waits for its refreshed unselected review)$','tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:180000,maxBuffer:4*1024*1024});
+ fs.writeFileSync(path.join(output,'hosted-direct-callers.stdout.tap'),result.stdout||'');fs.writeFileSync(path.join(output,'hosted-direct-callers.stderr.txt'),result.stderr||'');
+ fs.writeFileSync(path.join(output,'hosted-direct-callers.result.json'),JSON.stringify({status:result.status,signal:result.signal,error:result.error?{name:result.error.name,code:result.error.code,message:result.error.message}:null},null,2)+'\n');
  assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,'Actual direct callers must pass an ephemeral port when the hosted environment has no local allocation: '+result.stdout+'\n'+result.stderr);
- assert.match(result.stdout,/^# tests 13$/m);assert.match(result.stdout,/^# skipped 0$/m);
+ assert.match(result.stdout,/^# tests 16$/m);assert.match(result.stdout,/^# skipped 0$/m);
 });
 
 
@@ -51178,7 +51180,7 @@ test('RISK repository process: refused saved decision capture waits for its refr
  await prepareNativePlaywrightResolution(t);
  const {runButtonSafety}=await import('./scripts/button-safety-native.mjs'),pw=await import('playwright');
  const scenario='ordinary repeated saved decision choice',base=process.env.CHAIN_NATIVE_OUTPUT,port=Number(process.env.CHAIN_NATIVE_PORT||0);
- assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&port>0,'Healthy allocated named engines/loopback required');
+ assert.ok(base,'Durable allocated native output required');assert.ok(Number.isSafeInteger(port)&&(port>0||(process.env.CI==='true'&&port===0)),'Hosted listener default or allocated local native port required');
  fs.mkdirSync(base,{recursive:true});
  for(const engine of ['chromium','webkit'])await t.test(engine,async()=>{
   const output=fs.mkdtempSync(path.join(base,'saved-decision-settled-review-'+engine+'-')),

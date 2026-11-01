@@ -50698,5 +50698,153 @@
       "originalRawSha256": "abf902e3589c9e734958cfd5441d900865349fbe14205ae5a02f8be0cbf9abaf",
       "unrelatedInheritedPreimplementationClaimed": false
     }
+  },
+  {
+    "baseCommit": "f42bc32cd7c587ecb309d588c0dab4a33654694a",
+    "testChangesSha256": "75185a0c34d5bc028d826d13d209c8f2089c36f6b6c45792ead283ed39abdb2a",
+    "reason": "Atomic #1877 repairs its new process caller guard using the established1873 hosted0/local-positive contract and permanently includes its ordering consumer in the existing hosted-direct fixture. Preserve all prior1483 raw records, including the distinct original ordering RED and original three fingerprints; append this exact amended comparison without rewriting chronology.",
+    "previousBehavior": "The newly added ordering RISK required a positive port even in a declared valid canonical hosted context where CHAIN_NATIVE_PORT is absent and the native runner supports ephemeral0. The existing hosted-direct fixture selected its original three roots/13 outcomes and could not catch this new caller.",
+    "intendedBehavior": "Allow integer positive ports locally, or CI=true with port0; underlying runButtonSafety still validates the canonical hosted policy/event/ref and requires healthy named local resources. Add the ordering root and its two engines to the existing fixture, preserving all original selectors and assertions; expected child outcomes13+3=16. Preserve its actual child TAP/stderr/result for review. The reconciled1873 merger must retain its expanded21 old outcomes plus this root3 for24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8"
+    },
+    "derivation": {
+      "issue": 1877,
+      "initialCandidate": "f42bc32cd7c587ecb309d588c0dab4a33654694a",
+      "priorRawRationaleCount": 1483,
+      "priorRawSha256": "8706103deac074d5c540ce6610d3fe12616bf47833f7c42a020e29f13ab9f59e",
+      "originalBaseCount": 1480,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "unrelatedInheritedPreimplementationClaimed": false
+    }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "41c348e72349775a4487fbb01c4ef4f8783e938a3bd9b0961211f821601d102f",
+    "reason": "Atomic #1877 repairs its new process caller guard using the established1873 hosted0/local-positive contract and permanently includes its ordering consumer in the existing hosted-direct fixture. Preserve all prior1483 raw records, including the distinct original ordering RED and original three fingerprints; append this exact amended comparison without rewriting chronology.",
+    "previousBehavior": "The newly added ordering RISK required a positive port even in a declared valid canonical hosted context where CHAIN_NATIVE_PORT is absent and the native runner supports ephemeral0. The existing hosted-direct fixture selected its original three roots/13 outcomes and could not catch this new caller.",
+    "intendedBehavior": "Allow integer positive ports locally, or CI=true with port0; underlying runButtonSafety still validates the canonical hosted policy/event/ref and requires healthy named local resources. Add the ordering root and its two engines to the existing fixture, preserving all original selectors and assertions; expected child outcomes13+3=16. Preserve its actual child TAP/stderr/result for review. The reconciled1873 merger must retain its expanded21 old outcomes plus this root3 for24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8"
+    },
+    "derivation": {
+      "issue": 1877,
+      "initialCandidate": "f42bc32cd7c587ecb309d588c0dab4a33654694a",
+      "priorRawRationaleCount": 1483,
+      "priorRawSha256": "8706103deac074d5c540ce6610d3fe12616bf47833f7c42a020e29f13ab9f59e",
+      "originalBaseCount": 1480,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "unrelatedInheritedPreimplementationClaimed": false
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "3d036c095a7f46a33a3fabdb51bd6bfcf9724c56e9f8b83f8feb371549782535",
+    "reason": "Atomic #1877 repairs its new process caller guard using the established1873 hosted0/local-positive contract and permanently includes its ordering consumer in the existing hosted-direct fixture. Preserve all prior1483 raw records, including the distinct original ordering RED and original three fingerprints; append this exact amended comparison without rewriting chronology.",
+    "previousBehavior": "The newly added ordering RISK required a positive port even in a declared valid canonical hosted context where CHAIN_NATIVE_PORT is absent and the native runner supports ephemeral0. The existing hosted-direct fixture selected its original three roots/13 outcomes and could not catch this new caller.",
+    "intendedBehavior": "Allow integer positive ports locally, or CI=true with port0; underlying runButtonSafety still validates the canonical hosted policy/event/ref and requires healthy named local resources. Add the ordering root and its two engines to the existing fixture, preserving all original selectors and assertions; expected child outcomes13+3=16. Preserve its actual child TAP/stderr/result for review. The reconciled1873 merger must retain its expanded21 old outcomes plus this root3 for24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8"
+    },
+    "derivation": {
+      "issue": 1877,
+      "initialCandidate": "f42bc32cd7c587ecb309d588c0dab4a33654694a",
+      "priorRawRationaleCount": 1483,
+      "priorRawSha256": "8706103deac074d5c540ce6610d3fe12616bf47833f7c42a020e29f13ab9f59e",
+      "originalBaseCount": 1480,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "unrelatedInheritedPreimplementationClaimed": false
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "5544a5e3acab5f4678436a8b1c6af9e71ebd23ec16d1d4285bc6bb8f62f1bd58",
+    "reason": "Atomic #1877 repairs its new process caller guard using the established1873 hosted0/local-positive contract and permanently includes its ordering consumer in the existing hosted-direct fixture. Preserve all prior1483 raw records, including the distinct original ordering RED and original three fingerprints; append this exact amended comparison without rewriting chronology.",
+    "previousBehavior": "The newly added ordering RISK required a positive port even in a declared valid canonical hosted context where CHAIN_NATIVE_PORT is absent and the native runner supports ephemeral0. The existing hosted-direct fixture selected its original three roots/13 outcomes and could not catch this new caller.",
+    "intendedBehavior": "Allow integer positive ports locally, or CI=true with port0; underlying runButtonSafety still validates the canonical hosted policy/event/ref and requires healthy named local resources. Add the ordering root and its two engines to the existing fixture, preserving all original selectors and assertions; expected child outcomes13+3=16. Preserve its actual child TAP/stderr/result for review. The reconciled1873 merger must retain its expanded21 old outcomes plus this root3 for24.",
+    "replacementTests": [
+      "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "RISK repository process: hosted direct native callers retain ephemeral listener defaults"
+    ],
+    "preservedCoverage": [
+      "Original1480 base rationale objects and the initial1877 three raw rationale records retain their exact bytes/order. Actual8cb ordering RED remains preimplementation evidence for the unchanged narrow native completion-predicate repair.",
+      "Original complete saved-decision process root and native complete verifier remain byte-identical; source/authority/64-task/opaque/pending/consent/freshness/CAS/ACK/protected-backup, all60scenarios/114actions/10repeats, trusted inputs,1000ms continuous heartbeat and original deadlines unchanged.",
+      "All three prior hosted fixture root selectors and their13 outcomes remain required; current branch adds exactly the new three-outcome root. Preserve1873 merger union and its stronger21-outcome assertions, changing total to24. Child TAP retention is evidence collection at this existing process seam.",
+      "Declared CI0 local fixture is process-policy evidence, not actual Linux hosted, full-cohort, real service, physical-device or private-board proof. No new policy helper, CI exception, emulator route or harness."
+    ],
+    "redEvidence": {
+      "command": "env -u CHAIN_NATIVE_PORT CI=true CHAIN_TEST_EVENT_POLICY=canonical-pr-merge-v1 GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/hosted-zero-red-native /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --experimental-vm-modules --test --test-concurrency=1 --test-reporter=tap --test-name-pattern=^RISK repository process: refused saved decision capture waits for its refreshed unselected review$ tests.js",
+      "failure": "Actual clean f42bc32 pre-guard-repair recorder 2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692 failed ERR_ASSERTION Healthy allocated named engines/loopback required; expected true, actual false, before the engine/server loop. One test, one failure, zero skips/cancellations; no native output directory or browser/server created. This is the caller-guard RED. Separate actual original ordering RED 2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8 on2c remains preserved: both engines explicitly rejected premature capture with preview=null while the refreshed SDK read was held; old verifier TypeError secondary.",
+      "recordId": "2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692",
+      "startedAt": "2026-11-01T04:21:39.675Z",
+      "finishedAt": "2026-11-01T04:21:40.027Z",
+      "metadataPath": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/settled1877-owner/recorder/2026-11-01T04-21-39-646Z-5df945de-cb2c-4a02-a69a-e0d4ff206692.json",
+      "metadataSha256": "ec0a9ffd3e51b9d46cb9d3c5482277c8c6a9cb2504160c6144a6154e07d6392e",
+      "priorOrderingRecord": "2026-11-01T04-15-45-699Z-8cb11717-e930-409b-9461-533c5ce6dfc8"
+    },
+    "derivation": {
+      "issue": 1877,
+      "initialCandidate": "f42bc32cd7c587ecb309d588c0dab4a33654694a",
+      "priorRawRationaleCount": 1483,
+      "priorRawSha256": "8706103deac074d5c540ce6610d3fe12616bf47833f7c42a020e29f13ab9f59e",
+      "originalBaseCount": 1480,
+      "currentHostedFixtureExpected": 16,
+      "joined1873HostedFixtureExpected": 24,
+      "unrelatedInheritedPreimplementationClaimed": false
+    }
   }
 ]
