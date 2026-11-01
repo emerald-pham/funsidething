@@ -53153,5 +53153,50 @@
       "fetched published PR285 topic",
       "prior ROOT integration"
     ]
+  },
+  {
+    "baseCommit": "e63dac214a6f17af4e05294f7eb58cf1277c2629",
+    "testChangesSha256": "c102cb218235f2c7490d707f2f46bc03f79d50be15f65fe645992c493a4e3bfd",
+    "reason": "Atomic #1958 adds one bounded literal-measurement probe at the existing public runButtonSafety consumer. Its deterministic Playwright/time boundary executes the callback source actually supplied by that consumer; it adds no browser run or Linux-verifier bypass.",
+    "previousBehavior": "The selected Linux failure observation retained only aggregate heartbeat maxima. A reproduced gap therefore lacked the adjacent page-clock endpoints and the exact initialization, step-reset, document and trusted-input boundary needed to compare it with existing same-document Timeline evidence.",
+    "intendedBehavior": "Only the already-selected Linux observation retains at most eight largest finite nonnegative heartbeat intervals measured by the existing RAF callback. Each record carries literal previous/current page times, their measured gap, the true initialization/step-reset/RAF boundary, the existing Timeline document ID or explicit null, and the same page-clock trusted input time or null. Existing sample maxima, input calculations, trusted-input rules, verdicts, capture limits, source custody and history remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: Linux failure observation retains bounded literal heartbeat intervals"
+    ],
+    "preservedCoverage": [
+      "The unchanged complete-step maxGapMs and 1000ms refusal, pre-input and post-input maxima, trusted pointer input, RAF count and click evidence remain the acceptance path.",
+      "Interval capture is enabled only for the selected Linux failure observation and retains no more than eight exact rows; absent Timeline document identity stays explicit null and establishes no clock alignment.",
+      "No CPU/page conversion, thread inference, causal statement, browser profile, harness, app hook, ordinary qualification or physical-device evidence is introduced; the original finite Linux capture/source/process/teardown caps remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/heartbeat1958/owner/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure observation retains bounded literal heartbeat intervals$' tests.js",
+      "failure": "Recorder attempt 2026-11-01T21-59-18-732Z-8d13698d-84cd-4a30-8acd-323fe8e6f031 on source D e63dac214a6f17af4e05294f7eb58cf1277c2629 had complete identity and exited 1 with assertion-failure: the actual consumer-supplied callback, run with literal controlled RAF/pointer events, retained [] instead of the eight independently expected intervals and exact boundaries.",
+      "records": [
+        "2026-11-01T21-59-18-732Z-8d13698d-84cd-4a30-8acd-323fe8e6f031"
+      ]
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/heartbeat1958/owner"
+  },
+  {
+    "baseCommit": "e63dac214a6f17af4e05294f7eb58cf1277c2629",
+    "testChangesSha256": "bff530aa8e7568393ec8fb059543e01b07f4ad01fc75d5f9c049ac592f5d0844",
+    "reason": "Atomic #1958 test-boundary correction normalizes callback values from the isolated VM realm before comparing exact literals. It changes only the deterministic assertion boundary; the retained behavior contract and source RED remain the same.",
+    "previousBehavior": "The exact interval assertions compared objects created inside a separate VM context directly with host objects, so Node rejected differing prototypes after displaying matching interval fields.",
+    "intendedBehavior": "The callback output is converted to host JSON values before the same exact eight-record endpoint, boundary, document and input comparison; no expected values or product behavior are changed.",
+    "replacementTests": [
+      "RISK repository process: Linux failure observation retains bounded literal heartbeat intervals"
+    ],
+    "preservedCoverage": [
+      "The prior recorded intended RED still shows the callback returned [] instead of the independent literal interval set before the implementation.",
+      "All existing Linux-only selection, interval cap, same-document identity, frame calculations and acceptance boundaries are unchanged."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/heartbeat1958/owner/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap --test-name-pattern='^RISK repository process: Linux failure observation retains bounded literal heartbeat intervals$' tests.js",
+      "failure": "The preimplementation RED at source D e63dac214a6f17af4e05294f7eb58cf1277c2629 remains the behavioral trigger for this test-only realm normalization. The first GREEN then confirmed the literal eight rows but exposed a cross-realm prototype mismatch; its recorder output is preserved separately and is not treated as a product failure.",
+      "records": [
+        "2026-11-01T21-59-18-732Z-8d13698d-84cd-4a30-8acd-323fe8e6f031"
+      ]
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/heartbeat1958/owner"
   }
 ]

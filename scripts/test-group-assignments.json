@@ -14090,6 +14090,11 @@
       "root": "RISK repository process: Linux observer phases refuse inconsistent retained page clocks",
       "group": "native-process",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Linux failure observation retains bounded literal heartbeat intervals",
+      "group": "native-process",
+      "file": "tests.js"
     }
   ],
   "processControls": [

@@ -49966,6 +49966,53 @@ test('RISK repository process: native frame accounting separates pre-input and p
  });
 });
 
+test('RISK repository process: Linux failure observation retains bounded literal heartbeat intervals',async()=>{
+ const playwright=await import('playwright'),launch=playwright.chromium.launch,stop=Error('Captured the public native heartbeat callback');let captured=null;
+ const fakePage={setDefaultTimeout(){},on(){},exposeBinding:async()=>{},addInitScript:async(fn,args)=>{
+  if(typeof fn==='function'&&fn.toString().includes('window.__buttonHeartbeat=')){captured={fn,args};throw stop;}
+ }};
+ const fakeContext={close:async()=>{},exposeBinding:async()=>{},addInitScript:async()=>{},route:async()=>{},newPage:async()=>fakePage};
+ const fakeBrowser={on(){},version:()=> 'deterministic-external-boundary',newContext:async()=>fakeContext,close:async()=>{}};
+ const envKeys=['CI','CHAIN_TEST_EVENT_POLICY','GITHUB_EVENT_NAME','GITHUB_REF'],savedEnv=Object.fromEntries(envKeys.map(key=>[key,process.env[key]]));
+ let outputRoot;
+ try{
+  process.env.CI='true';process.env.CHAIN_TEST_EVENT_POLICY='workflow-dispatch-unselected-v1';process.env.GITHUB_EVENT_NAME='workflow_dispatch';process.env.GITHUB_REF='refs/heads/heartbeat-time-boundary-fixture';
+  playwright.chromium.launch=async()=>fakeBrowser;
+  const {runButtonSafety}=await import('./scripts/button-safety-native.mjs');outputRoot=fs.mkdtempSync(path.join(os.tmpdir(),'button-heartbeat-intervals-'));
+  await assert.rejects(()=>runButtonSafety({repo:__dirname,engine:'chromium',outputDir:path.join(outputRoot,'output'),port:0,profile:'ordinary',probe:true}),error=>error===stop);
+ }finally{
+  playwright.chromium.launch=launch;for(const key of envKeys){if(savedEnv[key]===undefined)delete process.env[key];else process.env[key]=savedEnv[key];}
+  if(outputRoot)fs.rmSync(outputRoot,{recursive:true,force:true});
+ }
+ if(!captured)throw Error('The public runButtonSafety consumer did not supply its existing heartbeat callback to the external Playwright boundary');
+ if(captured.args&&Object.hasOwn(captured.args,'captureHeartbeatIntervals')&&captured.args.captureHeartbeatIntervals!==false)throw Error('The ordinary external boundary must not select Linux-only interval retention');
+ const frameCallbacks=[],documentListeners=new Map(),globalListeners=new Map();let pageNow=100;
+ const window={};window.top=window;window.__nativeTimelineDocument={id:'linuxdoc-1958'};window.__buttonPressed=()=>{};window.__buttonClicked=()=>{};window.__buttonObserved=()=>{};window.__buttonUnidentified=()=>{};window.__buttonSafetyFailure=()=>{};
+ const document={documentElement:{},addEventListener:(name,fn)=>documentListeners.set(name,fn),querySelectorAll:()=>[]};
+ const performance={timeOrigin:1000,now:()=>pageNow};
+ const sandbox={window,document,performance,requestAnimationFrame:fn=>frameCallbacks.push(fn),addEventListener:(name,fn)=>globalListeners.set(name,fn)};
+ const heartbeatCallback=vm.runInNewContext('('+captured.fn.toString()+')',sandbox);
+ heartbeatCallback({...captured.args,captureHeartbeatIntervals:true});
+ const fireFrame=at=>{const fn=frameCallbacks.shift();if(!fn)throw Error('Expected the actual heartbeat callback to request its next animation frame');pageNow=at;fn(at);};
+ fireFrame(200);
+ pageNow=300;window.__buttonHeartbeat.maxGapMs=0;window.__buttonHeartbeat.at=pageNow;window.__buttonHeartbeat.inputArmed=true;window.__buttonHeartbeat.inputAt=null;window.__buttonHeartbeat.inputMaxGapMs=0;window.__buttonHeartbeat.preInputMaxGapMs=0;window.__buttonHeartbeat.previousBoundary='step-reset';
+ fireFrame(410);
+ pageNow=420;documentListeners.get('pointerdown')({isTrusted:true,target:{dataset:{act:'settings'},id:'settings',matches:()=>false,hasAttribute:()=>false,closest(selector){return selector.startsWith('[data-saved-preview]')?null:this;}},pointerType:'mouse'});
+ fireFrame(530);for(const gap of [10,20,30,40,50,60,70,80,90]){const previous=window.__buttonHeartbeat.at;fireFrame(previous+gap);}
+ const expected=[
+  {measuredPreviousPageMs:630,measuredCurrentPageMs:680,gapMs:50,previousBoundary:'raf',documentId:'linuxdoc-1958',inputAtPageMs:420},
+  {measuredPreviousPageMs:680,measuredCurrentPageMs:740,gapMs:60,previousBoundary:'raf',documentId:'linuxdoc-1958',inputAtPageMs:420},
+  {measuredPreviousPageMs:740,measuredCurrentPageMs:810,gapMs:70,previousBoundary:'raf',documentId:'linuxdoc-1958',inputAtPageMs:420},
+  {measuredPreviousPageMs:810,measuredCurrentPageMs:890,gapMs:80,previousBoundary:'raf',documentId:'linuxdoc-1958',inputAtPageMs:420},
+  {measuredPreviousPageMs:890,measuredCurrentPageMs:980,gapMs:90,previousBoundary:'raf',documentId:'linuxdoc-1958',inputAtPageMs:420},
+  {measuredPreviousPageMs:100,measuredCurrentPageMs:200,gapMs:100,previousBoundary:'initialization',documentId:'linuxdoc-1958',inputAtPageMs:null},
+  {measuredPreviousPageMs:300,measuredCurrentPageMs:410,gapMs:110,previousBoundary:'step-reset',documentId:'linuxdoc-1958',inputAtPageMs:null},
+  {measuredPreviousPageMs:410,measuredCurrentPageMs:530,gapMs:120,previousBoundary:'raf',documentId:'linuxdoc-1958',inputAtPageMs:420}
+ ];
+ const actual=JSON.parse(JSON.stringify(window.__buttonHeartbeat.intervals||[])).sort((left,right)=>left.gapMs-right.gapMs);
+ assert.deepEqual(actual,expected,'Retain the eight largest literal page intervals with exact reset, document and trusted-input boundaries');
+});
+
 
 test('RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices',()=>{
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=source.match(/<dt>Can I undo, restore, or remove a task\?<\/dt><dd>(.*?)<\/dd>/s)?.[1],changelog=source.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
