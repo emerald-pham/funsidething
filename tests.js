@@ -51984,9 +51984,10 @@ test('RISK repository process: canonical Timeline bounds preserve logical occurr
  await t.test('strict actual acquisition wrapper is byteexact',()=>{assert.equal(retentionSHA(fs.readFileSync(path.join(__dirname,'scripts/button-safety-timeline.mjs'))),'56d7c1e9bf5e0b0aa2cb5ab24f21b87120d2db191d4b31cfba08f2ab60d02753');});
 });
 
-test('RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending',async t=>{
+ await openingBoardFixture(t);
  const playwright=await import(process.env.LANDSCAPE_PLAYWRIGHT||'playwright'),{buttonFixture}=await import('./scripts/button-safety-fixture.mjs');
- const directory=process.env.SCENE_NATIVE_ARTIFACT_DIR;assert.ok(directory,'Durable source-bound native scene output required');fs.mkdirSync(directory,{recursive:true});
+ let directory=process.env.SCENE_NATIVE_ARTIFACT_DIR;if(!directory){assert.ok(process.env.CHAIN_NATIVE_OUTPUT&&path.isAbsolute(process.env.CHAIN_NATIVE_OUTPUT),'Durable source-bound native scene output requires allocated CHAIN_NATIVE_OUTPUT or explicit SCENE_NATIVE_ARTIFACT_DIR');directory=fs.mkdtempSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,'synced-scene-hash-pending-'));}fs.mkdirSync(directory,{recursive:true});
  for(const engine of ['chromium','webkit'])await t.test(engine,async()=>{
   const browser=await playwright[engine].launch({headless:true}),context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage(),evidence={engine,browserVersion:browser.version(),contextOptions:{viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'},limits:['Isolated signed-out native desktop engine at a phone-sized viewport; no physical-device, private-account or OS clipboard claim.'],errors:[]};
   page.on('pageerror',error=>evidence.errors.push({message:error.message,stack:error.stack}));

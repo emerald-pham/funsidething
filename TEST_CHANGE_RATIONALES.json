@@ -51071,5 +51071,92 @@
       "originalRationaleCount": 1480,
       "scope": "Standalone complete1873/1874/1875 owner group before final focused regression; ROOT derives the combined exact fingerprint after integration."
     }
+  },
+  {
+    "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+    "testChangesSha256": "a627e88d51dc850eeca361c7f32a89b5e9a096d2982d6259010fc70f6ad777e3",
+    "reason": "Make the existing required pending-hash scene durability consumer run through its already-owned self-hosted fixture when external QA URL and artifact overrides are absent.",
+    "previousBehavior": "The test declaration skipped before openingBoardFixture could start a local app, and its artifact path required SCENE_NATIVE_ARTIFACT_DIR.",
+    "intendedBehavior": "The existing consumer starts the real local app on the allocated port and keeps each invocation durable beneath CHAIN_NATIVE_OUTPUT while retaining both explicit QA overrides.",
+    "preservedCoverage": [
+      "Both Chromium and WebKit still exercise the accepted scene choice while the actual save hash remains deferred.",
+      "The complete independent board payload, source authority, exact durable bytes, immediate full-document reopen, and existing cleanup assertions stay in the same root.",
+      "An explicit LANDSCAPE_BROWSER_URL still bypasses the self-hosted server and an explicit SCENE_NATIVE_ARTIFACT_DIR still controls evidence output."
+    ],
+    "redEvidence": {
+      "command": "Pinned Node 24.19.0 recorder invocation with CI, LANDSCAPE_BROWSER_URL, SCENE_NATIVE_ARTIFACT_DIR, CHAIN_NATIVE_OUTPUT, CHAIN_NATIVE_PORT, and LANDSCAPE_PLAYWRIGHT removed; the external assertion wrapper set only CHAIN_NATIVE_OUTPUT=/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/green/native and CHAIN_NATIVE_PORT=18736, then selected only the exact existing RISK root.",
+      "failure": "The actual Node root produced exactly one top-level SKIP and no engine children; the outside existing-parseTap identity assertion failed because the required root status was skipped instead of passed. Recorder id 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 reports assertion-failure, child and wrapper exit 1. This skip occurred before fixture/server/browser code ran. The earlier all-overrides-absent RED is separately retained at recorder id 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d."
+    },
+    "replacementTests": [
+      "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+    ],
+    "integrationDerivation": {
+      "baseCommit": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "worktree": "/Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething",
+      "branch": "agent/1299-hash-pending-scene-1876",
+      "initialAllExternalInputsAbsentRedRecorderId": "2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d",
+      "matchedLocalInputsRedRecorderId": "2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51",
+      "existingRawRationaleCountBeforeAppend": 1480
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "c5bb186c703127a7d4b63fda2786f4a2f0bcb2a82c116ee519d3875ef8ee5b66",
+    "reason": "Append the exact main-comparison fingerprint for the existing #1876 self-hosted pending-hash scene consumer so the required baseline-specific test-first gate can verify this scoped fixture change.",
+    "previousBehavior": "The required scene consumer skipped when its external QA URL was absent, and output required an explicit artifact directory instead of its allocated native output.",
+    "intendedBehavior": "The same required Chromium and WebKit consumer runs through openingBoardFixture on the allocated local port and writes uniquely rooted evidence below CHAIN_NATIVE_OUTPUT while retaining explicit QA overrides.",
+    "preservedCoverage": [
+      "The existing complete accepted-scene and deferred real-hash scenario, independent payload oracle, exact source authority, and immediate document reopen remain intact.",
+      "Both Chromium and WebKit must execute successfully with no skip when external QA URL and scene-artifact variables are absent.",
+      "Explicit LANDSCAPE_BROWSER_URL and SCENE_NATIVE_ARTIFACT_DIR continue to control QA runs when supplied."
+    ],
+    "redEvidence": {
+      "command": "env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs",
+      "failure": "At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d."
+    },
+    "replacementTests": [
+      "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+    ],
+    "integrationDerivation": {
+      "comparisonBase": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+      "comparisonLabel": "main",
+      "candidateCommit": "29ba71647c651b6bf77778e0a2f4abf276516436",
+      "behaviorRedBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "matchedLocalInputsRedRecorderId": "2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51",
+      "initialAllExternalInputsAbsentRedRecorderId": "2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d",
+      "preAppendGateOutput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/gates/before-append/main-8cd524a.json",
+      "preAppendGateFailure": "The committed candidate gate against this exact comparison base exited 1 with stderr: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.",
+      "existingRawRationaleCountBeforeAppend": 1481
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "ff09d7421dc961ed7d0285fa21d9209ef638d03695eea65973e1c16ee361929f",
+    "reason": "Append the exact published-comparison fingerprint for the existing #1876 self-hosted pending-hash scene consumer so the required baseline-specific test-first gate can verify this scoped fixture change.",
+    "previousBehavior": "The required scene consumer skipped when its external QA URL was absent, and output required an explicit artifact directory instead of its allocated native output.",
+    "intendedBehavior": "The same required Chromium and WebKit consumer runs through openingBoardFixture on the allocated local port and writes uniquely rooted evidence below CHAIN_NATIVE_OUTPUT while retaining explicit QA overrides.",
+    "preservedCoverage": [
+      "The existing complete accepted-scene and deferred real-hash scenario, independent payload oracle, exact source authority, and immediate document reopen remain intact.",
+      "Both Chromium and WebKit must execute successfully with no skip when external QA URL and scene-artifact variables are absent.",
+      "Explicit LANDSCAPE_BROWSER_URL and SCENE_NATIVE_ARTIFACT_DIR continue to control QA runs when supplied."
+    ],
+    "redEvidence": {
+      "command": "env -u CI -u LANDSCAPE_BROWSER_URL -u SCENE_NATIVE_ARTIFACT_DIR -u CHAIN_NATIVE_OUTPUT -u CHAIN_NATIVE_PORT -u LANDSCAPE_PLAYWRIGHT /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/hash-pending-scene-1876/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/recorder --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/red/matched-local-inputs/no-skip-assertion.mjs",
+      "failure": "At the actual preimplementation source 2c557b5e0ac73b1e46d52092a7658e0d13a0ba48, this exact root produced one top-level SKIP and zero engine children; the outside parseTap identity assertion failed because root status was skipped instead of passed. Recorder 2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51 records assertion-failure with child and wrapper exit 1. The skip happened before openingBoardFixture or browser/server launch. The earlier all-overrides-absent RED remains separately recorded as 2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d."
+    },
+    "replacementTests": [
+      "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending"
+    ],
+    "integrationDerivation": {
+      "comparisonBase": "6443761512cd652d02955fb93826dc3baa5daca3",
+      "comparisonLabel": "published",
+      "candidateCommit": "29ba71647c651b6bf77778e0a2f4abf276516436",
+      "behaviorRedBase": "2c557b5e0ac73b1e46d52092a7658e0d13a0ba48",
+      "matchedLocalInputsRedRecorderId": "2026-11-01T03-50-55-967Z-c8f7b75e-351b-4e98-9bd4-e17952fc3f51",
+      "initialAllExternalInputsAbsentRedRecorderId": "2026-11-01T03-49-50-062Z-77fb7a43-2019-461c-b07a-771f986c851d",
+      "preAppendGateOutput": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/scene1876-owner/gates/before-append/published-6443761.json",
+      "preAppendGateFailure": "The committed candidate gate against this exact comparison base exited 1 with stderr: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.",
+      "existingRawRationaleCountBeforeAppend": 1481
+    }
   }
 ]
