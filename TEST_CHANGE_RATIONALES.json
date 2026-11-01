@@ -52500,5 +52500,73 @@
     },
     "integrationSourceCommit": "36e0550fb1dc84095425d5cddcbb97db5fb8cbc3",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/final-admission1922-1923/worker"
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "daab160c413bd37c5e5355ede4fc442c1526977586d736dd1f71879e09bd93df",
+    "reason": "Atomic #1935 reconciles only proven executable-only terminal incidents at the existing owned-native-process consumer and retains every unresolved process-identity failure. This exact cumulative comparison indexes the original source-bound chronology; all1533 inherited rationale object literals and their order remain unchanged.",
+    "previousBehavior": "The original082ec consumer permanently retained an executable-enrichment refusal after a fully witnessed exact child had actually exited and an independent kernel probe returned ESRCH. A live row with a missing executable field but inconsistent complete enrichment could still receive a signal, and a later matching core row could regain signal authority after an intervening ambiguity.",
+    "intendedBehavior": "Timestamped bounded incidents retain the actual rejected row, prior complete owned child/parent identity and field errors, and resolve only after subsequent independent exact kernel nonliveness with no intervening core ambiguity. Unknown/provisional or live identities, changed/missing core identity and unproved absence stay failed. Missing executable and previously ambiguous ownership never grant signal authority.",
+    "replacementTests": [
+      "RISK repository process: proven terminal executable incidents retain actual exit custody"
+    ],
+    "preservedCoverage": [
+      "The original12 public-seam controls and every original assertion remain; the existing RISK aggregate count increases to23 because seven real-process roots and four core-ambiguity children are added. The new RISK root executes the actual primary terminal regression without skips.",
+      "Actual child and witnessed descendant normal exit/close plus kernel ESRCH resolve executable-only terminal incidents; the descendant still needs its real owned browser launch and actual close log. Retained resolved incidents remain inspectable separately from active refusal strings.",
+      "Still-live missing enrichment, changed/reused PID identity, missing start precision/UID/namespace, absent descendant without independent proof and unknown/provisional descendant remain failures. A foreign sentinel, forged browser PID, detached TERM-ignoring descendant, root-first exit, original absolute deadline and combined stdout/stderr cap controls remain unchanged.",
+      "The independent literal24 native cases and exact saved-decision3 then remaining-seven21 selections, zero skips/cancels/todos,180000ms each/360000ms total,3000ms TERM plus3000ms KILL and4MiB combined output are unchanged. Diagnostic12-second/event/raw ceilings and the original required native verdict remain unchanged.",
+      "No application, native action runner, workflow, runtime, dependency, FAQ, public changelog, frame/pixel oracle, full inventory, skip or release policy changed. Local Darwin Node24 process controls and hosted-policy fixture do not establish actual Linux Node22 CI acceptance."
+    ],
+    "redEvidence": {
+      "command": "Absolute Node24 record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<exact new real-process root> scripts/agent-tools/hosted-native-callers.test.mjs. Exact arguments and source bytes are retained in each named recorder record.",
+      "failure": "01ad32c6 on unmodified082ec module reached the intended cleanup.complete false versus true assertion after actual complete prior identity, executable-only partial read, real exit/close0 and actual kernel ESRCH. The later source-bound strict-field REDd65e08f5 observed an unauthorized SIGTERM attempt for a live executable-null row before its guard. The subsequent authority RED366deaa6 observed SIGTERM after a transient core ambiguity and later full row, before its sticky authority guard. These later REDs are new bounded risk refinements, not a claim of unchanged-baseline chronology for the whole repair.",
+      "records": [
+        "2026-11-01T17-52-46-751Z-01ad32c6-8f1c-45f9-a019-a927265e4483",
+        "2026-11-01T18-01-49-686Z-d65e08f5-32c8-4e21-83e9-2dc6878d7fd9",
+        "2026-11-01T18-03-37-832Z-366deaa6-d6ff-4d9c-8ad9-e532a37bddba"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T18-03-55-648Z-60377dd1-5dc3-45a6-b30c-aebfc4286dce",
+        "2026-11-01T18-05-04-832Z-1e4f6bc8-66be-4c36-851f-888e39215b5b"
+      ],
+      "summary": "Final focused tests.js RISK wrapper, original owned-lifecycle wrapper and risk inventory pass; the lifecycle child executes all23 real-process/OS-boundary cases with zero skips. A complete actual24-case hosted-policy consumer remains separately required under the final clean commit. These focused local Darwin controls establish no actual Linux acceptance, which remains pending ROOT."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/terminal-identity1935-worker"
+  },
+  {
+    "baseCommit": "082ec4e6bf4d787a71f741ee095c904dd7341da5",
+    "testChangesSha256": "cd6d46d819f1688bf1f964aaa57f1c2efdc8a0c81f53795299a0afab32be18fa",
+    "reason": "Atomic #1935 reconciles only proven executable-only terminal incidents at the existing owned-native-process consumer and retains every unresolved process-identity failure. This exact cumulative comparison indexes the original source-bound chronology; all1533 inherited rationale object literals and their order remain unchanged.",
+    "previousBehavior": "The original082ec consumer permanently retained an executable-enrichment refusal after a fully witnessed exact child had actually exited and an independent kernel probe returned ESRCH. A live row with a missing executable field but inconsistent complete enrichment could still receive a signal, and a later matching core row could regain signal authority after an intervening ambiguity.",
+    "intendedBehavior": "Timestamped bounded incidents retain the actual rejected row, prior complete owned child/parent identity and field errors, and resolve only after subsequent independent exact kernel nonliveness with no intervening core ambiguity. Unknown/provisional or live identities, changed/missing core identity and unproved absence stay failed. Missing executable and previously ambiguous ownership never grant signal authority.",
+    "replacementTests": [
+      "RISK repository process: proven terminal executable incidents retain actual exit custody"
+    ],
+    "preservedCoverage": [
+      "The original12 public-seam controls and every original assertion remain; the existing RISK aggregate count increases to23 because seven real-process roots and four core-ambiguity children are added. The new RISK root executes the actual primary terminal regression without skips.",
+      "Actual child and witnessed descendant normal exit/close plus kernel ESRCH resolve executable-only terminal incidents; the descendant still needs its real owned browser launch and actual close log. Retained resolved incidents remain inspectable separately from active refusal strings.",
+      "Still-live missing enrichment, changed/reused PID identity, missing start precision/UID/namespace, absent descendant without independent proof and unknown/provisional descendant remain failures. A foreign sentinel, forged browser PID, detached TERM-ignoring descendant, root-first exit, original absolute deadline and combined stdout/stderr cap controls remain unchanged.",
+      "The independent literal24 native cases and exact saved-decision3 then remaining-seven21 selections, zero skips/cancels/todos,180000ms each/360000ms total,3000ms TERM plus3000ms KILL and4MiB combined output are unchanged. Diagnostic12-second/event/raw ceilings and the original required native verdict remain unchanged.",
+      "No application, native action runner, workflow, runtime, dependency, FAQ, public changelog, frame/pixel oracle, full inventory, skip or release policy changed. Local Darwin Node24 process controls and hosted-policy fixture do not establish actual Linux Node22 CI acceptance."
+    ],
+    "redEvidence": {
+      "command": "Absolute Node24 record-run.mjs --purpose preimplementation-red -- node --test --test-reporter=tap --test-name-pattern=<exact new real-process root> scripts/agent-tools/hosted-native-callers.test.mjs. Exact arguments and source bytes are retained in each named recorder record.",
+      "failure": "01ad32c6 on unmodified082ec module reached the intended cleanup.complete false versus true assertion after actual complete prior identity, executable-only partial read, real exit/close0 and actual kernel ESRCH. The later source-bound strict-field REDd65e08f5 observed an unauthorized SIGTERM attempt for a live executable-null row before its guard. The subsequent authority RED366deaa6 observed SIGTERM after a transient core ambiguity and later full row, before its sticky authority guard. These later REDs are new bounded risk refinements, not a claim of unchanged-baseline chronology for the whole repair.",
+      "records": [
+        "2026-11-01T17-52-46-751Z-01ad32c6-8f1c-45f9-a019-a927265e4483",
+        "2026-11-01T18-01-49-686Z-d65e08f5-32c8-4e21-83e9-2dc6878d7fd9",
+        "2026-11-01T18-03-37-832Z-366deaa6-d6ff-4d9c-8ad9-e532a37bddba"
+      ]
+    },
+    "greenEvidence": {
+      "records": [
+        "2026-11-01T18-03-55-648Z-60377dd1-5dc3-45a6-b30c-aebfc4286dce",
+        "2026-11-01T18-05-04-832Z-1e4f6bc8-66be-4c36-851f-888e39215b5b"
+      ],
+      "summary": "Final focused tests.js RISK wrapper, original owned-lifecycle wrapper and risk inventory pass; the lifecycle child executes all23 real-process/OS-boundary cases with zero skips. A complete actual24-case hosted-policy consumer remains separately required under the final clean commit. These focused local Darwin controls establish no actual Linux acceptance, which remains pending ROOT."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/terminal-identity1935-worker"
   }
 ]
