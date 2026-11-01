@@ -36587,12 +36587,13 @@ test('RISK evergreen scan reconciliation: held editor and pointer delay resting 
  }
 });
 
-test('RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership',async()=>{
- const now=Date.now();
+test('RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership',async () => {
+ // Explicit local dates cross the actual 2 AM reset even on the 25-hour fall-back day.
+ const now=new Date(2026,10,1,3).getTime();
  for(const boundary of ['hours-expired','day-expired','early-return','context','future-start']){
-  const {ctx}=await loadApp({seed:619}),anchor=ctx.addTask('Anchor'),task=ctx.addTask('Boundary task');
+  const {ctx}=await loadAppAtTime(now,{seed:619}),anchor=ctx.addTask('Anchor'),task=ctx.addTask('Boundary task');
   Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now-18*HOUR});
-  if(boundary==='day-expired')Object.assign(task,{evergreenHours:168,evergreenResetAtDay:true,lastDoneAt:now-24*HOUR});
+  if(boundary==='day-expired')Object.assign(task,{evergreenHours:168,evergreenResetAtDay:true,lastDoneAt:new Date(2026,9,31,12).getTime()});
   if(boundary==='early-return'){task.lastDoneAt=now;ctx.reopenTask(task);}
   if(boundary==='context'){task.lastDoneAt=null;task.ctx=['c_home'];ctx.state.contexts.find(c=>c.id==='c_home').active=false;}
   if(boundary==='future-start'){task.lastDoneAt=null;task.startsAt='2099-01-01';}
@@ -36600,14 +36601,18 @@ test('RISK evergreen scan reconciliation: cooldown expiry day reset and explicit
   assert.deepEqual([...ctx.state.chain],[anchor.id,task.id],boundary+': only an active completion rest removes evergreen membership');
   assert.equal(ctx.isEligible(task),!['context','future-start'].includes(boundary));
  }
- const {ctx}=await loadApp(),task=ctx.addTask('Legacy resting task');
+ const {ctx}=await loadAppAtTime(now),task=ctx.addTask('Legacy resting task');
  Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now});ctx.state.chain=[task.id];
  ctx.initializeReplacedScan();assert.deepEqual([...ctx.state.chain],[],'legacy saved rest without a considered Done mark is still completion evidence');
- for(const dayReset of [false,true])for(const offset of [-1,0,1]){
-  const {ctx}=await loadApp(),anchor=ctx.addTask('Boundary anchor'),task=ctx.addTask('Exact boundary');
-  const at=new Date(2026,9,6,10).getTime();
+ for(const [at,dayUntil] of [
+  [new Date(2026,9,6,10).getTime(),new Date(2026,9,7,2).getTime()],
+  [new Date(2026,9,31,12).getTime(),new Date(2026,10,1,2).getTime()]
+ ])for(const dayReset of [false,true])for(const offset of [-1,0,1]){
+  const {ctx}=await loadAppAtTime(at),anchor=ctx.addTask('Boundary anchor'),task=ctx.addTask('Exact boundary');
   Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:dayReset,lastDoneAt:at});
-  const until=ctx.evergreenUntil(task);setFakeTime(ctx,until+offset);ctx.state.chain=[anchor.id,task.id];
+  const until=dayReset?dayUntil:at+18*HOUR;
+  assert.equal(ctx.evergreenUntil(task),until,'the rest ends at the literal duration or next local 2 AM, including the fall-back day');
+  setFakeTime(ctx,until+offset);ctx.state.chain=[anchor.id,task.id];
   ctx.initializeReplacedScan();assert.deepEqual([...ctx.state.chain],offset<0?[anchor.id]:[anchor.id,task.id],`day reset ${dayReset}, expiry offset ${offset}: use the exact eligibility boundary`);
  }
 });

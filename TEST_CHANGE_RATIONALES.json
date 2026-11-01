@@ -51907,5 +51907,65 @@
       "newNativeExecution": false,
       "newBehavioralRedClaimed": false
     }
+  },
+  {
+    "baseCommit": "e494c0f1bb1ed46be6630b2213fe0d7a5cff9f29",
+    "testChangesSha256": "1df319e4127f6ac34b34bb8945331a162a17e4fe5f412949253605c36ad58f48",
+    "reason": "Atomic #1887 corrects the original evergreen reconciliation fixture chronology after the sole full-qualification failure, without changing product behavior or weakening its protected assertions. Append this exact comparison and preserve all 1512 inherited rationale objects unchanged.",
+    "previousBehavior": "The day-expired fixture used process wall time and now minus 24 hours. During New York fall-back at 2026-11-01 01:45 EST this meant completion at 2026-10-31 02:45 EDT, whose next local 2 AM was still 15 minutes ahead. The app correctly treated the task as resting, contradicting the fixture label and chain expectation.",
+    "intendedBehavior": "Use the established loadAppAtTime/setFakeTime seam with explicit local completion and observation dates crossing the real 2 AM reset. Retain all original boundary and membership assertions, and exercise literal hour and 2 AM expiry boundaries before, exactly at, and after expiry on both ordinary and fall-back dates.",
+    "replacementTests": [
+      "RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership"
+    ],
+    "preservedCoverage": [
+      "All original hours-expired, day-expired, early-return, inactive-context, future-start, unrelated anchor, legacy active-rest, day-reset enabled/disabled, and -1/0/+1 millisecond chain-membership assertions remain. Existing feature expectations and product source are unchanged.",
+      "The original October 6 ordinary boundary remains and October 31 through November 1 adds the actual fall-back calendar boundary. Literal expected expiry timestamps are independent of the product calculation; the previous eligibility and chain expectations are preserved.",
+      "No native scenario, action, repeat, source-count, timing, exact-pixel, installed-client, immutable baseline, group assignment, CI, or release contract changes. Same test root name and coverage map/assignment remain current.",
+      "Current cumulative comparison includes previously accepted integration work covered by the 1512 inherited immutable records. This appended record authorises only #1887 chronology and added boundary observations; original prior RED and GREEN evidence retains its own source identity."
+    ],
+    "redEvidence": {
+      "command": "TZ=America/New_York node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/evergreen-boundary-1887/funsidething --evidence-dir <external>/evergreen1887-owner/permanent-red --purpose preimplementation-red --summary -- node --experimental-vm-modules --test --test-reporter=spec --test-name-pattern='^RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership$' tests.js",
+      "failure": "Original exact e494 focused consumer unexpectedly GREEN dabb0a93 at current time, retained honestly. Pinning only its clock through the existing seam to 2026-11-01T06:45Z produced original day-expired chain omission e79a9c24; minimised b3a0c54b also failed. After restoring every original case and adding permanent literal boundary controls, f55d8d25 failed the same day-expired chain assertion before the fixture correction. Diagnostic b36149ed observed eligible=false and correct local 2 AM expiry 1793516400000 > now 1793515500000; single-variable earlier-completion probe a5e92a3f passed. Permanent fixture correction then passed original focused consumer 32181939 and 16-test related cohort 8d39b5e3, plus UTC portability dc0cab6e. Raw recorder metadata and streams remain under the external evergreen1887-owner directory."
+    }
+  },
+  {
+    "baseCommit": "6443761512cd652d02955fb93826dc3baa5daca3",
+    "testChangesSha256": "79949543fd95697ee5d1364493eeeb311aa7902a4dcf499e216384d13401ba2e",
+    "reason": "Atomic #1887 corrects the original evergreen reconciliation fixture chronology after the sole full-qualification failure, without changing product behavior or weakening its protected assertions. Append this exact comparison and preserve all 1512 inherited rationale objects unchanged.",
+    "previousBehavior": "The day-expired fixture used process wall time and now minus 24 hours. During New York fall-back at 2026-11-01 01:45 EST this meant completion at 2026-10-31 02:45 EDT, whose next local 2 AM was still 15 minutes ahead. The app correctly treated the task as resting, contradicting the fixture label and chain expectation.",
+    "intendedBehavior": "Use the established loadAppAtTime/setFakeTime seam with explicit local completion and observation dates crossing the real 2 AM reset. Retain all original boundary and membership assertions, and exercise literal hour and 2 AM expiry boundaries before, exactly at, and after expiry on both ordinary and fall-back dates.",
+    "replacementTests": [
+      "RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership"
+    ],
+    "preservedCoverage": [
+      "All original hours-expired, day-expired, early-return, inactive-context, future-start, unrelated anchor, legacy active-rest, day-reset enabled/disabled, and -1/0/+1 millisecond chain-membership assertions remain. Existing feature expectations and product source are unchanged.",
+      "The original October 6 ordinary boundary remains and October 31 through November 1 adds the actual fall-back calendar boundary. Literal expected expiry timestamps are independent of the product calculation; the previous eligibility and chain expectations are preserved.",
+      "No native scenario, action, repeat, source-count, timing, exact-pixel, installed-client, immutable baseline, group assignment, CI, or release contract changes. Same test root name and coverage map/assignment remain current.",
+      "Current cumulative comparison includes previously accepted integration work covered by the 1512 inherited immutable records. This appended record authorises only #1887 chronology and added boundary observations; original prior RED and GREEN evidence retains its own source identity."
+    ],
+    "redEvidence": {
+      "command": "TZ=America/New_York node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/evergreen-boundary-1887/funsidething --evidence-dir <external>/evergreen1887-owner/permanent-red --purpose preimplementation-red --summary -- node --experimental-vm-modules --test --test-reporter=spec --test-name-pattern='^RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership$' tests.js",
+      "failure": "Original exact e494 focused consumer unexpectedly GREEN dabb0a93 at current time, retained honestly. Pinning only its clock through the existing seam to 2026-11-01T06:45Z produced original day-expired chain omission e79a9c24; minimised b3a0c54b also failed. After restoring every original case and adding permanent literal boundary controls, f55d8d25 failed the same day-expired chain assertion before the fixture correction. Diagnostic b36149ed observed eligible=false and correct local 2 AM expiry 1793516400000 > now 1793515500000; single-variable earlier-completion probe a5e92a3f passed. Permanent fixture correction then passed original focused consumer 32181939 and 16-test related cohort 8d39b5e3, plus UTC portability dc0cab6e. Raw recorder metadata and streams remain under the external evergreen1887-owner directory."
+    }
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "testChangesSha256": "b3c6ea12fd2c94787e8d4ce455468904aeb147a979d6571d6631eee853519b39",
+    "reason": "Atomic #1887 corrects the original evergreen reconciliation fixture chronology after the sole full-qualification failure, without changing product behavior or weakening its protected assertions. Append this exact comparison and preserve all 1512 inherited rationale objects unchanged.",
+    "previousBehavior": "The day-expired fixture used process wall time and now minus 24 hours. During New York fall-back at 2026-11-01 01:45 EST this meant completion at 2026-10-31 02:45 EDT, whose next local 2 AM was still 15 minutes ahead. The app correctly treated the task as resting, contradicting the fixture label and chain expectation.",
+    "intendedBehavior": "Use the established loadAppAtTime/setFakeTime seam with explicit local completion and observation dates crossing the real 2 AM reset. Retain all original boundary and membership assertions, and exercise literal hour and 2 AM expiry boundaries before, exactly at, and after expiry on both ordinary and fall-back dates.",
+    "replacementTests": [
+      "RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership"
+    ],
+    "preservedCoverage": [
+      "All original hours-expired, day-expired, early-return, inactive-context, future-start, unrelated anchor, legacy active-rest, day-reset enabled/disabled, and -1/0/+1 millisecond chain-membership assertions remain. Existing feature expectations and product source are unchanged.",
+      "The original October 6 ordinary boundary remains and October 31 through November 1 adds the actual fall-back calendar boundary. Literal expected expiry timestamps are independent of the product calculation; the previous eligibility and chain expectations are preserved.",
+      "No native scenario, action, repeat, source-count, timing, exact-pixel, installed-client, immutable baseline, group assignment, CI, or release contract changes. Same test root name and coverage map/assignment remain current.",
+      "Current cumulative comparison includes previously accepted integration work covered by the 1512 inherited immutable records. This appended record authorises only #1887 chronology and added boundary observations; original prior RED and GREEN evidence retains its own source identity."
+    ],
+    "redEvidence": {
+      "command": "TZ=America/New_York node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/evergreen-boundary-1887/funsidething --evidence-dir <external>/evergreen1887-owner/permanent-red --purpose preimplementation-red --summary -- node --experimental-vm-modules --test --test-reporter=spec --test-name-pattern='^RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership$' tests.js",
+      "failure": "Original exact e494 focused consumer unexpectedly GREEN dabb0a93 at current time, retained honestly. Pinning only its clock through the existing seam to 2026-11-01T06:45Z produced original day-expired chain omission e79a9c24; minimised b3a0c54b also failed. After restoring every original case and adding permanent literal boundary controls, f55d8d25 failed the same day-expired chain assertion before the fixture correction. Diagnostic b36149ed observed eligible=false and correct local 2 AM expiry 1793516400000 > now 1793515500000; single-variable earlier-completion probe a5e92a3f passed. Permanent fixture correction then passed original focused consumer 32181939 and 16-test related cohort 8d39b5e3, plus UTC portability dc0cab6e. Raw recorder metadata and streams remain under the external evergreen1887-owner directory."
+    }
   }
 ]
