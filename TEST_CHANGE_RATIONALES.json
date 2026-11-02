@@ -53433,5 +53433,94 @@
     ],
     "inheritedEvidence": "All earlier D literal records are preserved before these appends, including the existing comparison against published main. This record binds the joined diff and does not replace their historical evidence.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/next-source1960/merger"
+  },
+  {
+    "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+    "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+    "testChangesSha256": "9c278de8975f80419700dfb6bbc65bef8310327d4655cc1fd321aee753878add",
+    "reason": "Atomic #1976 extends the existing literal Linux filesystem and actual-owned-child diagnostic consumers to expose same-UID prefix starvation, then preserves exact incident evidence while every ownership and refusal contract stays strict. This fingerprint uses the existing protectedTestFingerprint function on the named .mjs test diff; tests.js and its inventory are unchanged.",
+    "previousBehavior": "At exact E, unrelated same-UID systemd/sudo/sd-pam-shaped EACCES rows spend all eight raw read windows before a later relevant direct-child row or the actual unknown incident's tableReadId can be retained. The existing simple literal read and unscoped cap assertions already pass.",
+    "intendedBehavior": "The existing read context selects diagnostic evidence for the actual root, previously witnessed PIDs and observed direct children, counts filtered and capacity-omitted windows separately, and leaves every process row and authority decision unchanged. The same three diagnostic cases additionally distinguish full prior identity then exact Z then Z with missing core fields from observed changed non-null namespace/UID/start then actual absence; all remain blocked cleanup=false. No new root, fixture reduction, timeout relaxation, application byte or browser/CI execution is introduced.",
+    "replacementTests": [
+      "Linux partial read diagnostics retain literal ordered kernel observations",
+      "owned partial read diagnostics survive the receipt without granting unknown custody"
+    ],
+    "preservedCoverage": [
+      "Every prior literal raw read/order/hash, first-eight unscoped retention, eight-window/2048-stat/1024-link/8192-window/65536-total bound and post-cap no-extra-read assertion remains intact; scoped filtering adds no after-stat syscall to unrelated noise and preserves every returned same-UID row.",
+      "First-seen partial descendants remain active, ineligible, unwitnessed, outside known custody and unsignaled even with a diagnostic Z and every known child nonlive. Prior exact Z cannot erase later missing UID/namespace/executable core ambiguity; actual changed non-null core observations cannot be erased by absence.",
+      "The complete prior26-case lifecycle cohort retains foreign UID exclusion and sentinel protection, PID reuse, incomplete enrichment, strict executable-only eligible resolution, actual descendant browser close, unknown refusal, streams/frontiers and exact execution/TERM/KILL ceilings. The UID-change consumer mutates only its controlled returned OS row; it does not claim the foreign UID Linux reader produced a protected-link window.",
+      "The existing tests.js diagnostic and complete-lifecycle wrappers, their three/26 expected outcomes, 10000ms/30000ms deadlines, all global test assignments and historical rationale objects remain unchanged. Independent review, Linux/native qualification, original failed CI and release remain ROOT responsibilities."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^(Linux partial read diagnostics|owned partial read diagnostics)' scripts/agent-tools/hosted-native-callers.test.mjs",
+      "failure": "Original recorder2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1 ran before implementation at E with only the test changed, dirty identity eb5b3c3b08fd9717e3189c31cb4fbb010e5823cf6065c2bad15e7f5f58ab952e. TAP has3 tests,1 pass,2 intended ERR_ASSERTION/AssertionError failures: the later direct-child window and exact actual unknown incident tableReadId+PID window are absent. The unchanged bounds case passes. The recorder labels this infrastructure-failure because its EACCES regex matches that literal word inside the assertion message; there is no launch/import/syntax failure. Its original JSON and complete TAP remain unchanged; no repeat was used to obtain a different label.",
+      "record": "2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1",
+      "outputSha256": "74b599730c194bc46d963b8089642bcf8021f37e4c4e3ef06203797ea807f396"
+    },
+    "greenEvidence": {
+      "focusedRecord": "2026-11-02T01-50-35-563Z-330f3add-7d27-46d6-9673-50a758e7ad0b",
+      "focusedOutcome": "Identical selection:3 passed,0 failed/skipped/cancelled; output SHA256 c577a75c151f9daa9c9d172793f7339bb11a859063449d41ce59d9366ddc9ad9.",
+      "lifecycleRecord": "2026-11-02T01-50-57-863Z-e0c81481-caaf-4182-bb12-4f7ad71c18bd",
+      "lifecycleOutcome": "One complete direct lifecycle cohort:26 passed,0 failed/skipped/cancelled; output SHA256 6c2eff71ce9604290edacf403e2d4b9e1d1381f99c65afae6eeb764f1496369b. TAP duration30948.191125ms on this macOS host exceeds the unchanged tests.js outer30000ms wrapper margin. ROOT then authorized one distinct existing-caller acceptance, recorded separately below; the direct pass does not qualify that wrapper.",
+      "wrapperRecord": "2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753",
+      "wrapperOutcome": "FAILED: the existing exact RISK repository process: owned native lifecycle retains stream and exact union controls wrapper returned spawnSync ETIMEDOUT at its unchanged30000ms limit, then ERR_ASSERTION at tests.js:52302 because result.error was not undefined. One root failed,0 passed/skipped/cancelled; wrapper test duration30012.186834ms. Source work stopped; no repair, timeout relaxation or behavioral retry followed."
+    },
+    "checkpointStatus": "FAILING-GATE CHECKPOINT ONLY; NOT admitted for integration or release. Atomic #1976 remains OPEN because the existing lifecycle caller is unqualified. ROOT explicitly authorized preserving a clean failing-gate commit after the wrapper timeout; all original passes and failures remain separate.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976"
+  },
+  {
+    "baseCommit": "3627c4402651a7a0e4ab99a6af0e7dc81066063e",
+    "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+    "testChangesSha256": "5b807554323c9d2ad4d6ea734b91b44bb0acbf125a7221fcdf0172548de2b4ae",
+    "reason": "Atomic #1980 consolidates only the four post-E redundant owned-child launches into the existing literal Linux filesystem case after the unchanged complete lifecycle caller timed out. The full explicit64-evaluation before/after coverage migration map is retained in owner evidence; every original E guard assertion and actual process fixture stays unchanged.",
+    "previousBehavior": "Checkpoint3627 retained the #1976 diagnostic selection but launched four extra140ms children with2000ms execution budgets for literal read trace variants. They added1455.62ms measured; the complete direct26-case cohort took30948ms, and its unchanged30000ms/4MiB tests.js wrapper actually failed ETIMEDOUT before this repair. No pristine-E benchmark or sole-cause claim is made.",
+    "intendedBehavior": "The same three diagnostic case names and26 total outcomes retain literal full prior then exact Z then missing UID/executable/namespace, changed non-null namespace/start, and actual raw foreign UID filtering through the existing filesystem boundary. Original real-process core/unknown/reuse/sentinel controls independently retain refusal, signal and cleanup verdicts. Filesystem doubles never claim actual kernel custody, and the production module and caller remain byte-exact checkpoint.",
+    "replacementTests": [
+      "Linux partial read diagnostics retain literal ordered kernel observations",
+      "owned partial read diagnostics survive the receipt without granting unknown custody"
+    ],
+    "preservedCoverage": [
+      "All original E assertions, actual guard fixtures,22 roots/26 outcomes, original waits/ceilings, tests.js wrappers and4MiB stream cap remain unchanged. The original unknown receipt still joins the exact incident tableReadId+PID after noisy scoped reads and refuses custody while real known children exit.",
+      "Every removed new experimental assertion is mapped to literal trace coverage or the existing actual core/unknown/changed-start/terminal consumer. Actual authority logic is byte-exact E; controlled exact Z is separately labeled filesystem-only.",
+      "The Linux reader still filters a known non-null foreign UID before protected links. The consolidated raw UID trace asserts that exclusion and the observed status bytes instead of mutating a returned row into fictitious literal foreign-UID evidence.",
+      "All original unscoped first-eight, scoped filtering, raw order/hash/read/byte limits, independent ESRCH, actual terminal row, browser close, PID reuse, foreign sentinel, unresolved-core and no-signal protections remain. No application, native/Linux qualification, CI or release credit is inferred."
+    ],
+    "redEvidence": {
+      "command": "Existing unchanged preimplementation caller: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose green --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: owned native lifecycle retains stream and exact union controls$ tests.js. Exact executable, command and streams are retained in original recordf7175ec3.",
+      "failure": "Actual preimplementation failure recorder2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753: spawnSync ETIMEDOUT at unchanged30000ms, then ERR_ASSERTION at tests.js:52302; one root fails with no inner26 completion claim. Production SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6 and test SHA2568289d5aba9f46f1d35d0a16d0dcd69cc47ffa23af8a73bb132fae8f15a736b69 match baseline3627/tree d14746c65cac926ab2d929397336f232921c0bba. Original purpose label remains green for the earlier1976 step; it is preimplementation failure evidence for this later1980 repair, without retroactive relabeling or repeat RED.",
+      "record": "2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753"
+    },
+    "additionalComparisonFingerprints": [
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "6d48302355675ceb1e8f80b7a4df23cb614c832e144031769e6e134fc6853d26"
+      },
+      {
+        "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "0bd6f1844ac0e6aa35277b378533a08957ec5cc1ed396811443101a4622b7607"
+      }
+    ],
+    "coverageMigration": "COVERAGE-MIGRATION-BEFORE.json and COVERAGE-MIGRATION-AFTER.json enumerate every removed post-E assertion and its correct-seam replacement.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-fixture-budget1980/sol-owner1980",
+    "originalAssertionRestoration": "ROOT authorized restoring the exact original E assert.ok(window); alongside the unchanged inherited1976 diagnostic-message assertion after recorded static audits ef8cd145 and74a8cfff. No original predicate or inherited added assertion is removed. Those external audit failures are preserved; a fresh static audit follows this concrete source correction before any behavioral run.",
+    "greenEvidence": {
+      "wrapperRecord": "2026-11-02T02-27-41-858Z-db3b29e2-9d3f-4282-a537-df2153566aff",
+      "wrapperOutcome": "The unchanged tests.js complete lifecycle caller passed its one outer root in29560.04ms under the original30000ms/4MiB budget; its original assertions require exact26 inner outcomes and zero skips. The caller does not emit its successful captured inner TAP, and no missing stream is reconstructed.",
+      "focusedRecord": "2026-11-02T02-28-19-422Z-9b20ea15-ce5d-4578-82bf-d8e07c63f55e",
+      "focusedOutcome": "The identical existing three-case diagnostic selection passed3/3,0 failed/skipped/cancelled; complete TAP duration403.325917ms. No behavior retry or extra direct26 run was performed.",
+      "sourceSha256": "362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6",
+      "testSha256": "3d3879f2efa21d9402335b00aaee99888c273002b0eb5ab102ad7af163f13df8",
+      "actualBehaviorDiffSha256": "4c706531da41df48ab4f50178ae3cccdf0f21fdd4da88a27a8b983eeff401d1d",
+      "cleanupRecord": "2026-11-02T02-32-02-160Z-b95738b2-0726-4cc2-97ff-d914f7cd3e85",
+      "cleanupOutcome": "Recorded current macOS process/listener readback:21 retained actual receipts,30 positively identified actual macOS identities and two foreign sentinel controls absent, zero owned listeners; no audit signal or historical Linux PID probe. Synthetic filesystem PIDs remain diagnostic only."
+    },
+    "staticEvidence": {
+      "originalFailure": "2026-11-02T02-22-56-941Z-ef8cd145-0306-4a8e-8881-51178edf1ee5 preserved; external audit erroneously included an adjacent inherited helper in the preceding test block.",
+      "linkedCorrection": "2026-11-02T02-25-00-164Z-74a8cfff-16a2-4a08-81f9-c25044b5d0b9 preserved; corrected boundary exposed inherited1976 message-only replacement of original assert.ok(window);. ROOT explicitly authorized exact original assertion restoration alongside the inherited added assertion.",
+      "finalPass": "2026-11-02T02-27-14-852Z-b53711ae-2dc4-46ed-86ec-a2858ea70a7c passed after that concrete restoration:20 unaffected original E test bodies byte-exact,45 original assertions in the two extended diagnostic cases retained literally, exact executable diff reconstruction, source/wrapper hashes and all3 base fingerprints/test-first comparisons pass. Neither failed audit launched behavioral test bodies."
+    },
+    "completionBoundary": "Local source fixture repair only. Existing complete lifecycle caller now passes; #1976 admission/closure and fresh source integration remain ROOT responsibilities. No original hosted Linux failure, native qualification, CI, Stable or Beta success is claimed."
   }
 ]

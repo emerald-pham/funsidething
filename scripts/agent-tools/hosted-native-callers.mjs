@@ -17,7 +17,7 @@ const save=(file,value)=>{fs.writeFileSync(file+'.tmp',JSON.stringify(value,null
 const git=(cwd,...args)=>{const r=spawnSync('git',args,{cwd,encoding:'utf8',timeout:3000,maxBuffer:1048576});assert.equal(r.status,0,'Native owner source identity: '+r.stderr);return r.stdout.trim();};
 
 const initializeReadDiagnostics=diagnostics=>{
- diagnostics.schemaVersion??=1;diagnostics.limits??={...READ_DIAGNOSTIC_LIMITS};diagnostics.tableReads??=0;diagnostics.windows??=[];diagnostics.retainedBytes??=2;diagnostics.omittedWindows??=0;diagnostics.status??='complete';return diagnostics;
+ diagnostics.schemaVersion??=1;diagnostics.limits??={...READ_DIAGNOSTIC_LIMITS};diagnostics.tableReads??=0;diagnostics.windows??=[];diagnostics.retainedBytes??=2;diagnostics.filteredWindows??=0;diagnostics.omittedWindows??=0;diagnostics.status??='complete';return diagnostics;
 };
 const completedKernelRead=read=>{const result={started:stamp()};try{result.value=read();}catch(error){result.error=error;}result.finished=stamp();return result;};
 const readError=read=>read.error?{code:read.error.code||null}:null;
@@ -57,9 +57,13 @@ export function readNativeProcessTable(options={}){
 export function readLinuxNativeProcessTable({procRoot='/proc',filesystem=fs,diagnostics,readContext}={}){
  const rows=[],pending=[];if(diagnostics)initializeReadDiagnostics(diagnostics);
  const context=readContext||{id:diagnostics?++diagnostics.tableReads:null,started:stamp()},names=filesystem.readdirSync(procRoot).filter(value=>/^\d+$/.test(value)),directoryListed=stamp();
- const partialWindow=(name,rowOrdinal,base,statBefore,reads={})=>{
+ const diagnosticPids=Array.isArray(readContext?.diagnosticPids)?new Set(readContext.diagnosticPids):null;
+ const partialWindow=(name,rowOrdinal,base,statBefore,reads={},parentPid)=>{
   if(!diagnostics)return;
-  if(diagnostics.windows.length+pending.length>=READ_DIAGNOSTIC_LIMITS.windows){diagnostics.omittedWindows++;diagnostics.status='truncated';return;}
+  // A numeric parent match selects evidence only. All rows still reach the
+  // existing ownership checks; unscoped readers retain their first-eight policy.
+  if(diagnosticPids&&!diagnosticPids.has(Number(name))&&!diagnosticPids.has(parentPid)){diagnostics.filteredWindows++;return;}
+  if(diagnostics.omittedWindows>0||diagnostics.windows.length+pending.length>=READ_DIAGNOSTIC_LIMITS.windows){diagnostics.omittedWindows++;diagnostics.status='truncated';return;}
   const statAfter=completedKernelRead(()=>filesystem.readFileSync(base+'/stat'));
   pending.push({tableReadId:context.id,tableStarted:context.started,directoryListed,rowOrdinal,pid:Number(name),statBefore:statReadEvidence(statBefore,Number(name)),...reads,statAfter:statReadEvidence(statAfter,Number(name))});
  };
@@ -76,7 +80,7 @@ export function readLinuxNativeProcessTable({procRoot='/proc',filesystem=fs,diag
   const reads={uid:fieldReadEvidence(uidRead,uid)};
   for(const [field,suffix]of [['executable','/exe'],['pidNamespace','/ns/pid']]){const read=completedKernelRead(()=>filesystem.readlinkSync(base+suffix));if(read.error){const error=read.error;if(!['ENOENT','ESRCH','EACCES','EPERM'].includes(error.code))throw error;errors.push({field,code:error.code});}else row[field]=read.value;reads[field]=fieldReadEvidence(read,row[field]);}
   row.enrichment={status:errors.length?'unavailable':'complete',errors};rows.push(row);
-  if(errors.length)partialWindow(name,rowOrdinal,base,statBefore,reads);
+  if(errors.length)partialWindow(name,rowOrdinal,base,statBefore,reads,row.ppid);
  }
  const finished=stamp();for(const window of pending){window.tableFinished=finished;retainReadWindow(diagnostics,window);}
  return rows;
@@ -97,7 +101,7 @@ export async function runOwnedNativeProcess({cwd,outputDir,env=process.env,execu
  const files={stdout:path.join(outputDir,'stdout.tap'),stderr:path.join(outputDir,'stderr.txt'),frontier:path.join(outputDir,'frontier.jsonl')},fds={};
  for(const [key,file]of Object.entries(files))fds[key]=fs.openSync(file,'wx');
  const receipt={schemaVersion:1,kind:'owned-native-process',started:stamp(),source:{commit:git(cwd,'rev-parse','HEAD'),tree:git(cwd,'rev-parse','HEAD^{tree}'),base:env.CHAIN_TEST_COMPARISON_BASE||null,sourceSha:env.CHAIN_TEST_SOURCE_SHA||null,toolSha256:digest(fs.readFileSync(new URL(import.meta.url)))},runtime:{node:process.version,executable:process.execPath,platform:process.platform,arch:process.arch,kernel:os.release(),systemBoundary:Object.keys(system).length?'controlled-test-only':'actual-OS'},hostedPolicy:{CI:env.CI||null,eventPolicy:env.CHAIN_TEST_EVENT_POLICY||null,eventName:env.GITHUB_EVENT_NAME||null,ref:env.GITHUB_REF||null,runId:env.GITHUB_RUN_ID||null,runAttempt:env.GITHUB_RUN_ATTEMPT||null,requestedPort:env.CHAIN_NATIVE_PORT===undefined?'default':env.CHAIN_NATIVE_PORT,debug:env.DEBUG||null},command:{executable,args,cwd},bounds:{executionMs:timeoutMs,termMs:TERM_MS,killMs:KILL_MS,combinedOutputBytes:outputLimitBytes},files,bytes:0,timedOut:false,outputLimit:false,status:null,signal:null,signals:[],processes:[],browserLaunches:[],browserExits:[],refusals:[],incidents:[],processReadDiagnostics:initializeReadDiagnostics({}),cleanup:{complete:false},frontier:null};
- const processTable=()=>{const diagnostics=receipt.processReadDiagnostics,readContext={id:++diagnostics.tableReads,started:stamp()};try{return tableReader({diagnostics,readContext});}finally{diagnostics.latestRead={...readContext,finished:stamp()};}};
+ const processTable=()=>{const diagnostics=receipt.processReadDiagnostics,readContext={id:++diagnostics.tableReads,started:stamp(),diagnosticPids:[...known.keys(),...(child?.pid?[child.pid]:[])]};try{return tableReader({diagnostics,readContext});}finally{diagnostics.latestRead={id:readContext.id,started:readContext.started,finished:stamp()};}};
  save(path.join(outputDir,'process.json'),receipt);
  let sequence=0,child,closed=false,exitObserved=false,monitor,deadline,reason,doneResolve;
  const done=new Promise(resolve=>doneResolve=resolve),known=new Map(),pending={stdout:'',stderr:''},decoders={stdout:new StringDecoder('utf8'),stderr:new StringDecoder('utf8')},lineOffsets={stdout:0,stderr:0};
