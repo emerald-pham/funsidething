@@ -53128,7 +53128,8 @@ test('RISK repository process: external disconnect classification rejects an omi
  await runExternal('chromium',true);
 });
 
-test('RISK repository process: opening frame gaps refuse native input before reset and retain missing input status',async t=>{
+test('RISK repository process: opening frame gaps refuse native input before reset and retain missing input status',
+ async t=>{
  const hash=value=>createHash('sha256').update(value).digest('hex'),copy=value=>structuredClone(value);
  // Independent literals: installed fixture; hydrateState/default settings/prerequisite producers.
  const account=null;
@@ -53193,7 +53194,7 @@ test('RISK repository process: opening frame gaps refuse native input before res
     await page.addInitScript(({delay})=>{
      if(window.top!==window)return;
      document.addEventListener('DOMContentLoaded',()=>{
-      const h=window.__buttonHeartbeat,started=performance.now();window.__openingControl={configuredDelayMs:delay,documentId:window.__installedFixture?.documentId??null,timeOrigin:performance.timeOrigin,heartbeatPresent:!!h,heartbeatBefore:h?{...h}:null,startedAtMs:started,readyBefore:document.documentElement.dataset.appReady??null};
+      const h=window.__buttonHeartbeat,started=performance.now();window.__openingControl={configuredDelayMs:delay,documentId:window.__installedFixture?.documentId??null,nativeTimelineDocumentId:typeof window.__nativeTimelineDocument?.id==='string'?window.__nativeTimelineDocument.id:null,timeOrigin:performance.timeOrigin,heartbeatPresent:!!h,heartbeatBefore:h?{...h}:null,startedAtMs:started,readyBefore:document.documentElement.dataset.appReady??null};
       while(performance.now()-started<delay){}
       window.__openingControl.endedAtMs=performance.now();window.__openingControl.readyAfter=document.documentElement.dataset.appReady??null;
      },{once:true});
@@ -53208,6 +53209,17 @@ test('RISK repository process: opening frame gaps refuse native input before res
    if(delay){
     preserved(evidence.before,evidence.after);localTransition(evidence.before,evidence.after);assert.equal(evidence.after.documentId,evidence.before.documentId);assert.deepEqual(evidence.afterOpeningObserver,evidence.openingObserver);assert.ok(Array.isArray(evidence.before.presses)&&Array.isArray(evidence.before.clicks)&&Array.isArray(evidence.after.presses)&&Array.isArray(evidence.after.clicks));assert.deepEqual(evidence.after.presses,[]);assert.deepEqual(evidence.after.clicks,[]);assert.equal(evidence.after.settings,false);assert.equal(evidence.after.heartbeat.inputAt,null);evidence.actualInput={firstTrustedInputAt:evidence.after.heartbeat.inputAt,inputStatus:'not-reached',presses:evidence.after.presses,clicks:evidence.after.clicks};assert.equal(Object.hasOwn(evidence.actualInput,'firstTrustedInputAt'),true);assert.equal(evidence.actualInput.firstTrustedInputAt,null);assert.ok(nativeError);assert.equal(report.status,'failed');
     assert.equal(evidence.fenceReached,false,'The native detector must refuse the actual opening gap before the first-dispatch fence');assert.deepEqual(evidence.dispatches,[],'No later dispatch is attempted');assert.match(report.failure,/Native button safety detected blocked opening frame loop/);assert.equal(report.samples.length,1);const sample=report.samples[0];assert.equal(sample.phase,'opening-before-input');assert.equal(sample.openingMaxFrameGapMs,evidence.before.heartbeat.maxGapMs);assert.ok(sample.openingMaxFrameGapMs>=1000);assert.equal(sample.preInputMaxFrameGapMs,0);assert.equal(sample.inputMaxFrameGapMs,0);assert.equal(Object.hasOwn(sample,'firstTrustedInputAt'),true);assert.equal(sample.firstTrustedInputAt,null);assert.equal(sample.inputStatus,'not-reached');assert.deepEqual(report.outcomes,[]);
+    const interval=sample.openingMaxGapInterval;
+    assert.ok(interval,'The original opening refusal retains its literal measured maximum interval');
+    assert.ok(Number.isFinite(interval.measuredPreviousPageMs)&&Number.isFinite(interval.measuredCurrentPageMs)&&Number.isFinite(interval.gapMs));
+    assert.ok(interval.measuredPreviousPageMs>=0&&interval.measuredCurrentPageMs>=interval.measuredPreviousPageMs&&interval.gapMs>=0);
+    assert.equal(interval.measuredCurrentPageMs-interval.measuredPreviousPageMs,interval.gapMs,'Literal page endpoints reproduce the reported interval exactly');
+    assert.equal(interval.gapMs,sample.openingMaxFrameGapMs,'The retained interval is the exact reported opening maximum');
+    assert.equal(interval.timeOrigin,evidence.before.timeOrigin,'The interval retains the original page performance time origin');
+    assert.equal(interval.documentId,evidence.openingObserver.nativeTimelineDocumentId,'Timeline identity is the same observed document or explicit null');
+    assert.equal(interval.fixtureDocumentId,evidence.openingObserver.documentId,'Fixture document identity is the same original page');
+    assert.ok(['initialization','raf','step-reset'].includes(interval.previousBoundary),'The predecessor boundary is one actually observed by the heartbeat');
+    assert.equal(interval.inputAtPageMs,null,'The maximum interval was observed before trusted input');
    }else{
     assert.equal(nativeError,undefined,'Healthy same-caller ordinary probe passes');assert.equal(report.status,'passed');assert.equal(evidence.fenceReached,false);assert.deepEqual(evidence.dispatches.map(row=>({action:row.action,originalInvoked:row.originalInvoked})),[{action:'settings',originalInvoked:true}]);assert.ok(evidence.completedReceipt?.trusted);assert.equal(evidence.after.settings,true);preserved(evidence.before,evidence.after,true);localTransition(evidence.before,evidence.after);assert.deepEqual(evidence.after.clicks.map(row=>({action:row.action,trusted:row.trusted})),[{action:'act:settings',trusted:true}]);assert.deepEqual(evidence.after.presses.map(row=>({action:row.action,trusted:row.trusted})),[{action:'act:settings',trusted:true}]);assert.equal(report.samples.length,1);assert.equal(report.samples[0].action,'act:settings');assert.ok(Number.isFinite(report.samples[0].firstTrustedInputAt));assert.equal(Object.hasOwn(report.samples[0],'phase'),false);assert.equal(Object.hasOwn(report.samples[0],'inputStatus'),false);assert.equal(Object.hasOwn(report.samples[0],'openingMaxFrameGapMs'),false);assert.equal(report.outcomes.length,1);assert.equal(report.outcomes[0].action,'act:settings');evidence.plainHealthyPairFor1623And1624=true;
    }

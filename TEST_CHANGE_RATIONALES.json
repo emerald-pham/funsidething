@@ -53522,5 +53522,368 @@
       "finalPass": "2026-11-02T02-27-14-852Z-b53711ae-2dc4-46ed-86ec-a2858ea70a7c passed after that concrete restoration:20 unaffected original E test bodies byte-exact,45 original assertions in the two extended diagnostic cases retained literally, exact executable diff reconstruction, source/wrapper hashes and all3 base fingerprints/test-first comparisons pass. Neither failed audit launched behavioral test bodies."
     },
     "completionBoundary": "Local source fixture repair only. Existing complete lifecycle caller now passes; #1976 admission/closure and fresh source integration remain ROOT responsibilities. No original hosted Linux failure, native qualification, CI, Stable or Beta success is claimed."
+  },
+  {
+    "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+    "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+    "reason": "Issue #1978 strengthens the existing original-opening process RISK at the ROOT-acknowledged seam. Preserve literal maximum-gap endpoints at original refusal instead of requiring an instrumented follow-up; declaration is reflowed without a new test, changed name or selection. Earlier integration coverage/evidence remains protected and unchanged.",
+    "previousBehavior": "The original deliberate opening refusal retained only scalar openingMaxFrameGapMs; no literal same-run predecessor/current endpoints or predecessor boundary survived in that sample. Both healthy controls already passed.",
+    "intendedBehavior": "The original refusal retains one finite literal maximum interval, matching page time origin, available document identities and observed predecessor boundary before input. Existing1000ms guard, arithmetic, arming, native click, complete64-source custody and cleanup remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status"
+    ],
+    "preservedCoverage": [
+      "Both real Chromium/WebKit healthy0 Settings clicks and deliberate1300 opening refusals retain the existing exact source custody, account authority and native first-input fence.",
+      "The selected Linux eight-interval observation keeps literal boundaries and its bounded history, without enabling history or additional callbacks on ordinary Darwin.",
+      "All inherited E and published-main regression evidence and assertion protections remain unchanged; this entry adds only the bounded #1978 diagnostic contract."
+    ],
+    "redEvidence": {
+      "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+      "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+      "records": [
+        "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+      ],
+      "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+      "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978"
+  },
+  {
+    "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "reason": "Issue #1978 strengthens the existing original-opening process RISK at the ROOT-acknowledged seam. Preserve literal maximum-gap endpoints at original refusal instead of requiring an instrumented follow-up; declaration is reflowed without a new test, changed name or selection. Earlier integration coverage/evidence remains protected and unchanged.",
+    "previousBehavior": "The original deliberate opening refusal retained only scalar openingMaxFrameGapMs; no literal same-run predecessor/current endpoints or predecessor boundary survived in that sample. Both healthy controls already passed.",
+    "intendedBehavior": "The original refusal retains one finite literal maximum interval, matching page time origin, available document identities and observed predecessor boundary before input. Existing1000ms guard, arithmetic, arming, native click, complete64-source custody and cleanup remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status"
+    ],
+    "preservedCoverage": [
+      "Both real Chromium/WebKit healthy0 Settings clicks and deliberate1300 opening refusals retain the existing exact source custody, account authority and native first-input fence.",
+      "The selected Linux eight-interval observation keeps literal boundaries and its bounded history, without enabling history or additional callbacks on ordinary Darwin.",
+      "All inherited E and published-main regression evidence and assertion protections remain unchanged; this entry adds only the bounded #1978 diagnostic contract."
+    ],
+    "redEvidence": {
+      "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+      "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+      "records": [
+        "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+      ],
+      "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+      "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+    "inheritedEvidence": "Prior exact-E aggregate rationale and its comparison records above remain unchanged; the published-main fingerprint covers that inherited work plus only the new #1978 assertions."
+  },
+  {
+    "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+    "protectedTestPath": "tests.js",
+    "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+    "reason": "Atomic1982 source-preserving integration of ROOT-admitted cumulative1976/1980 and opening1978 diagnostics; bind exact combined comparison without rewriting historical literal evidence.",
+    "previousBehavior": "E retained eight unscoped partial process reads and scalar opening maxima, with the original process authority and responsiveness assertions. The original hosted Linux process and opening failures remain failed.",
+    "intendedBehavior": "Keep the admitted diagnostic selection, consolidated literal filesystem coverage and one maximum opening interval together. Application bytes, original assertions, timing bounds, signal authority, refusal and cleanup predicates retain their accepted identities.",
+    "replacementTests": [
+      "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status"
+    ],
+    "preservedCoverage": [
+      "All1555 E rationale object literals and all four admitted cumulative/opening worker literals remain exact and in original order within each input. No prior failure or chronology is relabeled.",
+      "All original E process tests, root names/counts, assertions, 30000ms/4MiB lifecycle wrapper, identity/signal/refusal/cleanup decisions and 1000ms opening guard remain protected. Only diagnostic metadata is added.",
+      "No app/UI/FAQ/assets/service worker/rules/workflow/dependency changes, extra native scenario, source fixture duplication, ordinary interval history or observer callback are introduced. Original Linux failures, final full/native qualification, CI and Stable acceptance remain separate."
+    ],
+    "redEvidence": {
+      "command": "The original commands and complete raw RED/GREEN records remain in the four literal worker rationale objects and sealed owner artifacts, indexed by sourceRationales. Atomic1982 joins source and runs focused GREEN/static checks only; it creates no retrospective RED.",
+      "failure": "1976 actual missing relevant-window assertions preceded implementation; its EACCES heuristic label remains unchanged. The failed original30000ms wrapper is1980 actual preimplementation evidence, followed by one unchanged wrapper26-case GREEN29560.04ms.1978 actual missing-interval RED preceded one-record implementation and identical four-case GREEN. Earlier prelaunch and static-audit failures remain separately classified."
+    },
+    "sourceRationales": [
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "9c278de8975f80419700dfb6bbc65bef8310327d4655cc1fd321aee753878add",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976",
+        "redEvidence": {
+          "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^(Linux partial read diagnostics|owned partial read diagnostics)' scripts/agent-tools/hosted-native-callers.test.mjs",
+          "failure": "Original recorder2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1 ran before implementation at E with only the test changed, dirty identity eb5b3c3b08fd9717e3189c31cb4fbb010e5823cf6065c2bad15e7f5f58ab952e. TAP has3 tests,1 pass,2 intended ERR_ASSERTION/AssertionError failures: the later direct-child window and exact actual unknown incident tableReadId+PID window are absent. The unchanged bounds case passes. The recorder labels this infrastructure-failure because its EACCES regex matches that literal word inside the assertion message; there is no launch/import/syntax failure. Its original JSON and complete TAP remain unchanged; no repeat was used to obtain a different label.",
+          "record": "2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1",
+          "outputSha256": "74b599730c194bc46d963b8089642bcf8021f37e4c4e3ef06203797ea807f396"
+        }
+      },
+      {
+        "baseCommit": "3627c4402651a7a0e4ab99a6af0e7dc81066063e",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "5b807554323c9d2ad4d6ea734b91b44bb0acbf125a7221fcdf0172548de2b4ae",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-fixture-budget1980/sol-owner1980",
+        "redEvidence": {
+          "command": "Existing unchanged preimplementation caller: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose green --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: owned native lifecycle retains stream and exact union controls$ tests.js. Exact executable, command and streams are retained in original recordf7175ec3.",
+          "failure": "Actual preimplementation failure recorder2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753: spawnSync ETIMEDOUT at unchanged30000ms, then ERR_ASSERTION at tests.js:52302; one root fails with no inner26 completion claim. Production SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6 and test SHA2568289d5aba9f46f1d35d0a16d0dcd69cc47ffa23af8a73bb132fae8f15a736b69 match baseline3627/tree d14746c65cac926ab2d929397336f232921c0bba. Original purpose label remains green for the earlier1976 step; it is preimplementation failure evidence for this later1980 repair, without retroactive relabeling or repeat RED.",
+          "record": "2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753"
+        }
+      },
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      },
+      {
+        "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      }
+    ],
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/joined-diagnostics1982/merger",
+    "completionBoundary": "Source integration only; no original Linux causal repair, new runtime qualification, CI, push, main merge, Stable or Beta claim."
+  },
+  {
+    "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+    "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+    "testChangesSha256": "6d48302355675ceb1e8f80b7a4df23cb614c832e144031769e6e134fc6853d26",
+    "reason": "Atomic1982 source-preserving integration of ROOT-admitted cumulative1976/1980 and opening1978 diagnostics; bind exact combined comparison without rewriting historical literal evidence.",
+    "previousBehavior": "E retained eight unscoped partial process reads and scalar opening maxima, with the original process authority and responsiveness assertions. The original hosted Linux process and opening failures remain failed.",
+    "intendedBehavior": "Keep the admitted diagnostic selection, consolidated literal filesystem coverage and one maximum opening interval together. Application bytes, original assertions, timing bounds, signal authority, refusal and cleanup predicates retain their accepted identities.",
+    "replacementTests": [
+      "Linux partial read diagnostics retain literal ordered kernel observations",
+      "Linux partial read diagnostics keep invocation and raw payload bounds explicit",
+      "owned partial read diagnostics survive the receipt without granting unknown custody"
+    ],
+    "preservedCoverage": [
+      "All1555 E rationale object literals and all four admitted cumulative/opening worker literals remain exact and in original order within each input. No prior failure or chronology is relabeled.",
+      "All original E process tests, root names/counts, assertions, 30000ms/4MiB lifecycle wrapper, identity/signal/refusal/cleanup decisions and 1000ms opening guard remain protected. Only diagnostic metadata is added.",
+      "No app/UI/FAQ/assets/service worker/rules/workflow/dependency changes, extra native scenario, source fixture duplication, ordinary interval history or observer callback are introduced. Original Linux failures, final full/native qualification, CI and Stable acceptance remain separate."
+    ],
+    "redEvidence": {
+      "command": "The original commands and complete raw RED/GREEN records remain in the four literal worker rationale objects and sealed owner artifacts, indexed by sourceRationales. Atomic1982 joins source and runs focused GREEN/static checks only; it creates no retrospective RED.",
+      "failure": "1976 actual missing relevant-window assertions preceded implementation; its EACCES heuristic label remains unchanged. The failed original30000ms wrapper is1980 actual preimplementation evidence, followed by one unchanged wrapper26-case GREEN29560.04ms.1978 actual missing-interval RED preceded one-record implementation and identical four-case GREEN. Earlier prelaunch and static-audit failures remain separately classified."
+    },
+    "sourceRationales": [
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "9c278de8975f80419700dfb6bbc65bef8310327d4655cc1fd321aee753878add",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976",
+        "redEvidence": {
+          "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^(Linux partial read diagnostics|owned partial read diagnostics)' scripts/agent-tools/hosted-native-callers.test.mjs",
+          "failure": "Original recorder2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1 ran before implementation at E with only the test changed, dirty identity eb5b3c3b08fd9717e3189c31cb4fbb010e5823cf6065c2bad15e7f5f58ab952e. TAP has3 tests,1 pass,2 intended ERR_ASSERTION/AssertionError failures: the later direct-child window and exact actual unknown incident tableReadId+PID window are absent. The unchanged bounds case passes. The recorder labels this infrastructure-failure because its EACCES regex matches that literal word inside the assertion message; there is no launch/import/syntax failure. Its original JSON and complete TAP remain unchanged; no repeat was used to obtain a different label.",
+          "record": "2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1",
+          "outputSha256": "74b599730c194bc46d963b8089642bcf8021f37e4c4e3ef06203797ea807f396"
+        }
+      },
+      {
+        "baseCommit": "3627c4402651a7a0e4ab99a6af0e7dc81066063e",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "5b807554323c9d2ad4d6ea734b91b44bb0acbf125a7221fcdf0172548de2b4ae",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-fixture-budget1980/sol-owner1980",
+        "redEvidence": {
+          "command": "Existing unchanged preimplementation caller: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose green --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: owned native lifecycle retains stream and exact union controls$ tests.js. Exact executable, command and streams are retained in original recordf7175ec3.",
+          "failure": "Actual preimplementation failure recorder2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753: spawnSync ETIMEDOUT at unchanged30000ms, then ERR_ASSERTION at tests.js:52302; one root fails with no inner26 completion claim. Production SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6 and test SHA2568289d5aba9f46f1d35d0a16d0dcd69cc47ffa23af8a73bb132fae8f15a736b69 match baseline3627/tree d14746c65cac926ab2d929397336f232921c0bba. Original purpose label remains green for the earlier1976 step; it is preimplementation failure evidence for this later1980 repair, without retroactive relabeling or repeat RED.",
+          "record": "2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753"
+        }
+      },
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      },
+      {
+        "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      }
+    ],
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/joined-diagnostics1982/merger",
+    "completionBoundary": "Source integration only; no original Linux causal repair, new runtime qualification, CI, push, main merge, Stable or Beta claim."
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "protectedTestPath": "tests.js",
+    "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+    "reason": "Atomic1982 source-preserving integration of ROOT-admitted cumulative1976/1980 and opening1978 diagnostics; bind exact combined comparison without rewriting historical literal evidence.",
+    "previousBehavior": "E retained eight unscoped partial process reads and scalar opening maxima, with the original process authority and responsiveness assertions. The original hosted Linux process and opening failures remain failed.",
+    "intendedBehavior": "Keep the admitted diagnostic selection, consolidated literal filesystem coverage and one maximum opening interval together. Application bytes, original assertions, timing bounds, signal authority, refusal and cleanup predicates retain their accepted identities.",
+    "replacementTests": [
+      "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status"
+    ],
+    "preservedCoverage": [
+      "All1555 E rationale object literals and all four admitted cumulative/opening worker literals remain exact and in original order within each input. No prior failure or chronology is relabeled.",
+      "All original E process tests, root names/counts, assertions, 30000ms/4MiB lifecycle wrapper, identity/signal/refusal/cleanup decisions and 1000ms opening guard remain protected. Only diagnostic metadata is added.",
+      "No app/UI/FAQ/assets/service worker/rules/workflow/dependency changes, extra native scenario, source fixture duplication, ordinary interval history or observer callback are introduced. Original Linux failures, final full/native qualification, CI and Stable acceptance remain separate."
+    ],
+    "redEvidence": {
+      "command": "The original commands and complete raw RED/GREEN records remain in the four literal worker rationale objects and sealed owner artifacts, indexed by sourceRationales. Atomic1982 joins source and runs focused GREEN/static checks only; it creates no retrospective RED.",
+      "failure": "1976 actual missing relevant-window assertions preceded implementation; its EACCES heuristic label remains unchanged. The failed original30000ms wrapper is1980 actual preimplementation evidence, followed by one unchanged wrapper26-case GREEN29560.04ms.1978 actual missing-interval RED preceded one-record implementation and identical four-case GREEN. Earlier prelaunch and static-audit failures remain separately classified."
+    },
+    "sourceRationales": [
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "9c278de8975f80419700dfb6bbc65bef8310327d4655cc1fd321aee753878add",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976",
+        "redEvidence": {
+          "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^(Linux partial read diagnostics|owned partial read diagnostics)' scripts/agent-tools/hosted-native-callers.test.mjs",
+          "failure": "Original recorder2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1 ran before implementation at E with only the test changed, dirty identity eb5b3c3b08fd9717e3189c31cb4fbb010e5823cf6065c2bad15e7f5f58ab952e. TAP has3 tests,1 pass,2 intended ERR_ASSERTION/AssertionError failures: the later direct-child window and exact actual unknown incident tableReadId+PID window are absent. The unchanged bounds case passes. The recorder labels this infrastructure-failure because its EACCES regex matches that literal word inside the assertion message; there is no launch/import/syntax failure. Its original JSON and complete TAP remain unchanged; no repeat was used to obtain a different label.",
+          "record": "2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1",
+          "outputSha256": "74b599730c194bc46d963b8089642bcf8021f37e4c4e3ef06203797ea807f396"
+        }
+      },
+      {
+        "baseCommit": "3627c4402651a7a0e4ab99a6af0e7dc81066063e",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "5b807554323c9d2ad4d6ea734b91b44bb0acbf125a7221fcdf0172548de2b4ae",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-fixture-budget1980/sol-owner1980",
+        "redEvidence": {
+          "command": "Existing unchanged preimplementation caller: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose green --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: owned native lifecycle retains stream and exact union controls$ tests.js. Exact executable, command and streams are retained in original recordf7175ec3.",
+          "failure": "Actual preimplementation failure recorder2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753: spawnSync ETIMEDOUT at unchanged30000ms, then ERR_ASSERTION at tests.js:52302; one root fails with no inner26 completion claim. Production SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6 and test SHA2568289d5aba9f46f1d35d0a16d0dcd69cc47ffa23af8a73bb132fae8f15a736b69 match baseline3627/tree d14746c65cac926ab2d929397336f232921c0bba. Original purpose label remains green for the earlier1976 step; it is preimplementation failure evidence for this later1980 repair, without retroactive relabeling or repeat RED.",
+          "record": "2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753"
+        }
+      },
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      },
+      {
+        "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      }
+    ],
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/joined-diagnostics1982/merger",
+    "completionBoundary": "Source integration only; no original Linux causal repair, new runtime qualification, CI, push, main merge, Stable or Beta claim."
+  },
+  {
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+    "testChangesSha256": "0bd6f1844ac0e6aa35277b378533a08957ec5cc1ed396811443101a4622b7607",
+    "reason": "Atomic1982 source-preserving integration of ROOT-admitted cumulative1976/1980 and opening1978 diagnostics; bind exact combined comparison without rewriting historical literal evidence.",
+    "previousBehavior": "E retained eight unscoped partial process reads and scalar opening maxima, with the original process authority and responsiveness assertions. The original hosted Linux process and opening failures remain failed.",
+    "intendedBehavior": "Keep the admitted diagnostic selection, consolidated literal filesystem coverage and one maximum opening interval together. Application bytes, original assertions, timing bounds, signal authority, refusal and cleanup predicates retain their accepted identities.",
+    "replacementTests": [
+      "Linux partial read diagnostics retain literal ordered kernel observations",
+      "Linux partial read diagnostics keep invocation and raw payload bounds explicit",
+      "owned partial read diagnostics survive the receipt without granting unknown custody"
+    ],
+    "preservedCoverage": [
+      "All1555 E rationale object literals and all four admitted cumulative/opening worker literals remain exact and in original order within each input. No prior failure or chronology is relabeled.",
+      "All original E process tests, root names/counts, assertions, 30000ms/4MiB lifecycle wrapper, identity/signal/refusal/cleanup decisions and 1000ms opening guard remain protected. Only diagnostic metadata is added.",
+      "No app/UI/FAQ/assets/service worker/rules/workflow/dependency changes, extra native scenario, source fixture duplication, ordinary interval history or observer callback are introduced. Original Linux failures, final full/native qualification, CI and Stable acceptance remain separate."
+    ],
+    "redEvidence": {
+      "command": "The original commands and complete raw RED/GREEN records remain in the four literal worker rationale objects and sealed owner artifacts, indexed by sourceRationales. Atomic1982 joins source and runs focused GREEN/static checks only; it creates no retrospective RED.",
+      "failure": "1976 actual missing relevant-window assertions preceded implementation; its EACCES heuristic label remains unchanged. The failed original30000ms wrapper is1980 actual preimplementation evidence, followed by one unchanged wrapper26-case GREEN29560.04ms.1978 actual missing-interval RED preceded one-record implementation and identical four-case GREEN. Earlier prelaunch and static-audit failures remain separately classified."
+    },
+    "sourceRationales": [
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "9c278de8975f80419700dfb6bbc65bef8310327d4655cc1fd321aee753878add",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976",
+        "redEvidence": {
+          "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^(Linux partial read diagnostics|owned partial read diagnostics)' scripts/agent-tools/hosted-native-callers.test.mjs",
+          "failure": "Original recorder2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1 ran before implementation at E with only the test changed, dirty identity eb5b3c3b08fd9717e3189c31cb4fbb010e5823cf6065c2bad15e7f5f58ab952e. TAP has3 tests,1 pass,2 intended ERR_ASSERTION/AssertionError failures: the later direct-child window and exact actual unknown incident tableReadId+PID window are absent. The unchanged bounds case passes. The recorder labels this infrastructure-failure because its EACCES regex matches that literal word inside the assertion message; there is no launch/import/syntax failure. Its original JSON and complete TAP remain unchanged; no repeat was used to obtain a different label.",
+          "record": "2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1",
+          "outputSha256": "74b599730c194bc46d963b8089642bcf8021f37e4c4e3ef06203797ea807f396"
+        }
+      },
+      {
+        "baseCommit": "3627c4402651a7a0e4ab99a6af0e7dc81066063e",
+        "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+        "testChangesSha256": "5b807554323c9d2ad4d6ea734b91b44bb0acbf125a7221fcdf0172548de2b4ae",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-fixture-budget1980/sol-owner1980",
+        "redEvidence": {
+          "command": "Existing unchanged preimplementation caller: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose green --summary -- node --test --test-reporter=tap --test-name-pattern=^RISK repository process: owned native lifecycle retains stream and exact union controls$ tests.js. Exact executable, command and streams are retained in original recordf7175ec3.",
+          "failure": "Actual preimplementation failure recorder2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753: spawnSync ETIMEDOUT at unchanged30000ms, then ERR_ASSERTION at tests.js:52302; one root fails with no inner26 completion claim. Production SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6 and test SHA2568289d5aba9f46f1d35d0a16d0dcd69cc47ffa23af8a73bb132fae8f15a736b69 match baseline3627/tree d14746c65cac926ab2d929397336f232921c0bba. Original purpose label remains green for the earlier1976 step; it is preimplementation failure evidence for this later1980 repair, without retroactive relabeling or repeat RED.",
+          "record": "2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753"
+        }
+      },
+      {
+        "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      },
+      {
+        "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+        "protectedTestPath": "tests.js",
+        "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+        "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+        "redEvidence": {
+          "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+          "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+          "records": [
+            "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+          ],
+          "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+          "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+        }
+      }
+    ],
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/joined-diagnostics1982/merger",
+    "completionBoundary": "Source integration only; no original Linux causal repair, new runtime qualification, CI, push, main merge, Stable or Beta claim."
   }
 ]
