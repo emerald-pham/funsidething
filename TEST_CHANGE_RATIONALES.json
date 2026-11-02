@@ -54035,4 +54035,98 @@
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-fixture1999/owner",
     "completionBoundary": "Focused test-only fixture repair; no full suite, browser/native/emulator, push, CI, integration, release, tracker closure or Beta acceptance claim."
   }
+,
+{
+  "issue": 2019,
+  "baseCommit": "a29a268555025e154ba9674c8a9d9eda0f6fb1e3",
+  "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+  "testChangesSha256": "bec67c755325eab27b8ce1779dc795589d02296e058d5bc6e150084b536dc5bf",
+  "reason": "Atomic #2019 prevents table-derived custody after an unresolved unwitnessed-descendant incident, through the agreed existing actual-process consumer and OS read/signal boundary. Its same registered case now forces one partial projection before a later unchanged usable OS row, with independent root-spawn and child-ready/ordinary-exit gates instead of an assumed exit race. The case declaration is reflowed only to identify updated coverage; every original assertion, all26 registrations and existing bounds remain. All prior rationale object literals and inherited comparison evidence are preserved.",
+  "previousBehavior": "The original2017 and nested lifecycle failures admitted an initially unwitnessed partial PID on a later parsed (node) row and subsequently made a zero-signal absence probe, while the original ineligible incident stayed active and cleanup false. The old fixture returned only partial executable-path rows until exit, so that later admission was timing-dependent. Exact C2 with the deterministic same-core full-row transition failed the unchanged custody assertion before runtime edits.",
+  "intendedBehavior": "An active unwitnessed-descendant incident keeps that PID outside new table-derived owned membership for the entire job, including later nonempty executable rows. No probe or teardown signal may follow from that rejected identity. Preserve literal initial partial observation, null priorIdentity/priorProof/priorReadId, active ineligible incident, refusal and false cleanup. Keep known-first actual spawn/ancestry and executable-only terminal resolution, foreign/reuse/UID/namespace/root/browser/output/deadline contracts and all original budgets.",
+  "replacementTests": [
+    "owned native process retains an unknown partial descendant even after all witnessed processes exit"
+  ],
+  "preservedCoverage": [
+    "Every original assertion in the changed real-process test remains byte-for-byte present, including no ownership probe, active refusal, null prior proof and incomplete cleanup.",
+    "The other25 registered OS/process cases and all their bytes remain unchanged; complete26 direct outcomes and the unchanged30000ms/4194304-byte lifecycle caller retain known-first, foreign, reuse, terminal, root, browser, output and deadline coverage.",
+    "This exact comparison includes inherited pre-C2 changes and their literal rationale objects without claiming those histories as new #2019 RED evidence. No application asset, FAQ, version, reader predicate, production qualification or Linux-cause claim changes."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/unknown-custody-2019/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/unknown-child-repair2019/sol-owner2019/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^owned native process retains an unknown partial descendant even after all witnessed processes exit$' scripts/agent-tools/hosted-native-callers.test.mjs",
+    "failure": "Supported recorder79deb9dc observed ERR_ASSERTION Rejected provisional identity never becomes owned: expected false, actual true on unchanged C2 runtime SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6. The real child remained alive through controlled partial read4 then unchanged usable actual OS-reader row read5; original incident priorIdentity was null, firstOwnedRead was5 and later absenceProbe was ESRCH. One test failed without launch/import/deadline error before the minimal capture guard. Original2017 failures remain preserved, and any future sensitivity is separate.",
+    "record": "2026-11-02T12-49-12-876Z-79deb9dc-13c1-4b95-acea-8be724d777e4",
+    "metadataSha256": "95fbd3ec3850933c3f96c49896ce63e6d244d839d59f0869052f86e23093d0b0",
+    "outputSha256": "d9c0bbc9a49023d86dff6c3984e1720a0cf5e113be02e7c15d2cef7965ae41fb"
+  },
+  "inheritedCoverage": {
+    "checkpointCommit": "a29a268555025e154ba9674c8a9d9eda0f6fb1e3",
+    "originalRationaleCount": 1566,
+    "originalRationaleFileSha256": "8835c1de3acf75c81be9067a2044699123b43bc4df995b73ca48eb8290ec25f1"
+  },
+  "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/unknown-child-repair2019/sol-owner2019",
+  "completionBoundary": "Local source implementation and focused evidence only. ROOT owns independent source admission, separate fresh merger and later qualification/release. No tracker closure, unfiltered full suite, browser/emulator, PR/push/CI/deployment or Beta claim."
+},
+{
+  "issue": 2019,
+  "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+  "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+  "testChangesSha256": "2ef8660d5352ae1e85556811dbab0bb541546ed755be93f7398b0955aae29a24",
+  "reason": "Atomic #2019 prevents table-derived custody after an unresolved unwitnessed-descendant incident, through the agreed existing actual-process consumer and OS read/signal boundary. Its same registered case now forces one partial projection before a later unchanged usable OS row, with independent root-spawn and child-ready/ordinary-exit gates instead of an assumed exit race. The case declaration is reflowed only to identify updated coverage; every original assertion, all26 registrations and existing bounds remain. All prior rationale object literals and inherited comparison evidence are preserved.",
+  "previousBehavior": "The original2017 and nested lifecycle failures admitted an initially unwitnessed partial PID on a later parsed (node) row and subsequently made a zero-signal absence probe, while the original ineligible incident stayed active and cleanup false. The old fixture returned only partial executable-path rows until exit, so that later admission was timing-dependent. Exact C2 with the deterministic same-core full-row transition failed the unchanged custody assertion before runtime edits.",
+  "intendedBehavior": "An active unwitnessed-descendant incident keeps that PID outside new table-derived owned membership for the entire job, including later nonempty executable rows. No probe or teardown signal may follow from that rejected identity. Preserve literal initial partial observation, null priorIdentity/priorProof/priorReadId, active ineligible incident, refusal and false cleanup. Keep known-first actual spawn/ancestry and executable-only terminal resolution, foreign/reuse/UID/namespace/root/browser/output/deadline contracts and all original budgets.",
+  "replacementTests": [
+    "owned native process retains an unknown partial descendant even after all witnessed processes exit"
+  ],
+  "preservedCoverage": [
+    "Every original assertion in the changed real-process test remains byte-for-byte present, including no ownership probe, active refusal, null prior proof and incomplete cleanup.",
+    "The other25 registered OS/process cases and all their bytes remain unchanged; complete26 direct outcomes and the unchanged30000ms/4194304-byte lifecycle caller retain known-first, foreign, reuse, terminal, root, browser, output and deadline coverage.",
+    "This exact comparison includes inherited pre-C2 changes and their literal rationale objects without claiming those histories as new #2019 RED evidence. No application asset, FAQ, version, reader predicate, production qualification or Linux-cause claim changes."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/unknown-custody-2019/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/unknown-child-repair2019/sol-owner2019/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^owned native process retains an unknown partial descendant even after all witnessed processes exit$' scripts/agent-tools/hosted-native-callers.test.mjs",
+    "failure": "Supported recorder79deb9dc observed ERR_ASSERTION Rejected provisional identity never becomes owned: expected false, actual true on unchanged C2 runtime SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6. The real child remained alive through controlled partial read4 then unchanged usable actual OS-reader row read5; original incident priorIdentity was null, firstOwnedRead was5 and later absenceProbe was ESRCH. One test failed without launch/import/deadline error before the minimal capture guard. Original2017 failures remain preserved, and any future sensitivity is separate.",
+    "record": "2026-11-02T12-49-12-876Z-79deb9dc-13c1-4b95-acea-8be724d777e4",
+    "metadataSha256": "95fbd3ec3850933c3f96c49896ce63e6d244d839d59f0869052f86e23093d0b0",
+    "outputSha256": "d9c0bbc9a49023d86dff6c3984e1720a0cf5e113be02e7c15d2cef7965ae41fb"
+  },
+  "inheritedCoverage": {
+    "checkpointCommit": "a29a268555025e154ba9674c8a9d9eda0f6fb1e3",
+    "originalRationaleCount": 1566,
+    "originalRationaleFileSha256": "8835c1de3acf75c81be9067a2044699123b43bc4df995b73ca48eb8290ec25f1"
+  },
+  "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/unknown-child-repair2019/sol-owner2019",
+  "completionBoundary": "Local source implementation and focused evidence only. ROOT owns independent source admission, separate fresh merger and later qualification/release. No tracker closure, unfiltered full suite, browser/emulator, PR/push/CI/deployment or Beta claim."
+},
+{
+  "issue": 2019,
+  "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+  "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+  "testChangesSha256": "fe400cc20da80f5635200f80bb8d4148e6f7a3b49551a2a4905eba5172780910",
+  "reason": "Atomic #2019 prevents table-derived custody after an unresolved unwitnessed-descendant incident, through the agreed existing actual-process consumer and OS read/signal boundary. Its same registered case now forces one partial projection before a later unchanged usable OS row, with independent root-spawn and child-ready/ordinary-exit gates instead of an assumed exit race. The case declaration is reflowed only to identify updated coverage; every original assertion, all26 registrations and existing bounds remain. All prior rationale object literals and inherited comparison evidence are preserved.",
+  "previousBehavior": "The original2017 and nested lifecycle failures admitted an initially unwitnessed partial PID on a later parsed (node) row and subsequently made a zero-signal absence probe, while the original ineligible incident stayed active and cleanup false. The old fixture returned only partial executable-path rows until exit, so that later admission was timing-dependent. Exact C2 with the deterministic same-core full-row transition failed the unchanged custody assertion before runtime edits.",
+  "intendedBehavior": "An active unwitnessed-descendant incident keeps that PID outside new table-derived owned membership for the entire job, including later nonempty executable rows. No probe or teardown signal may follow from that rejected identity. Preserve literal initial partial observation, null priorIdentity/priorProof/priorReadId, active ineligible incident, refusal and false cleanup. Keep known-first actual spawn/ancestry and executable-only terminal resolution, foreign/reuse/UID/namespace/root/browser/output/deadline contracts and all original budgets.",
+  "replacementTests": [
+    "owned native process retains an unknown partial descendant even after all witnessed processes exit"
+  ],
+  "preservedCoverage": [
+    "Every original assertion in the changed real-process test remains byte-for-byte present, including no ownership probe, active refusal, null prior proof and incomplete cleanup.",
+    "The other25 registered OS/process cases and all their bytes remain unchanged; complete26 direct outcomes and the unchanged30000ms/4194304-byte lifecycle caller retain known-first, foreign, reuse, terminal, root, browser, output and deadline coverage.",
+    "This exact comparison includes inherited pre-C2 changes and their literal rationale objects without claiming those histories as new #2019 RED evidence. No application asset, FAQ, version, reader predicate, production qualification or Linux-cause claim changes."
+  ],
+  "redEvidence": {
+    "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/unknown-custody-2019/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/unknown-child-repair2019/sol-owner2019/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^owned native process retains an unknown partial descendant even after all witnessed processes exit$' scripts/agent-tools/hosted-native-callers.test.mjs",
+    "failure": "Supported recorder79deb9dc observed ERR_ASSERTION Rejected provisional identity never becomes owned: expected false, actual true on unchanged C2 runtime SHA256362a9b18c057be89cb5804620aa86d73c02efce2b934b07871ec18ad6adde9d6. The real child remained alive through controlled partial read4 then unchanged usable actual OS-reader row read5; original incident priorIdentity was null, firstOwnedRead was5 and later absenceProbe was ESRCH. One test failed without launch/import/deadline error before the minimal capture guard. Original2017 failures remain preserved, and any future sensitivity is separate.",
+    "record": "2026-11-02T12-49-12-876Z-79deb9dc-13c1-4b95-acea-8be724d777e4",
+    "metadataSha256": "95fbd3ec3850933c3f96c49896ce63e6d244d839d59f0869052f86e23093d0b0",
+    "outputSha256": "d9c0bbc9a49023d86dff6c3984e1720a0cf5e113be02e7c15d2cef7965ae41fb"
+  },
+  "inheritedCoverage": {
+    "checkpointCommit": "a29a268555025e154ba9674c8a9d9eda0f6fb1e3",
+    "originalRationaleCount": 1566,
+    "originalRationaleFileSha256": "8835c1de3acf75c81be9067a2044699123b43bc4df995b73ca48eb8290ec25f1"
+  },
+  "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/unknown-child-repair2019/sol-owner2019",
+  "completionBoundary": "Local source implementation and focused evidence only. ROOT owns independent source admission, separate fresh merger and later qualification/release. No tracker closure, unfiltered full suite, browser/emulator, PR/push/CI/deployment or Beta claim."
+}
 ]

@@ -302,23 +302,31 @@ test('owned native process refuses ambiguous enrichment of a still-live owned id
  assert.equal(receipt.cleanup.complete,false);assert.ok(receipt.refusals.some(row=>row.includes('enrichment unavailable')));assert.equal(receipt.processes.find(row=>row.identity.pid===rootIdentity.pid).last.status,'identity-unavailable');assert.deepEqual(signals,[]);assert.equal(alive(rootIdentity.pid),true,'Missing enrichment cannot be converted to OS non-liveness or authorize a signal');
 });
 
-test('owned native process retains an unknown partial descendant even after all witnessed processes exit',async t=>{
- const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-unknown-')),ready=path.join(outputDir,'ready'),exitRequest=path.join(outputDir,'exit');let actual,partial,rootPid;
- const signals=[];
+test('owned native process retains an unknown partial descendant even after all witnessed processes exit', async t=>{
+ const outputDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-owned-unknown-')),ready=path.join(outputDir,'ready'),spawnRequest=path.join(outputDir,'spawn'),exitRequest=path.join(outputDir,'exit');let actual,partial,full,rootPid;
+ const signals=[],views=[];
  const child=`const fs=require('node:fs');fs.writeFileSync(${JSON.stringify(ready)},String(process.pid));const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(exitRequest)}))clearInterval(timer);},5);`;
- const fixture=`import{spawn}from'node:child_process';const c=spawn(process.execPath,['-e',${JSON.stringify(child)}],{detached:true,stdio:'ignore'});c.once('close',()=>console.log('actual-descendant-close'));`;
- const readProcessTable=()=>{
-  const rows=readNativeProcessTable();rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath)?.pid;
-  for(const row of rows)if(row.ppid===rootPid&&row.executable===process.execPath){
-   actual??={...row};const rejected={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};partial??=rejected;rows[rows.indexOf(row)]=rejected;
-   if(fs.existsSync(ready))fs.writeFileSync(exitRequest,'exit');
+ const fixture=`import{spawn}from'node:child_process';import fs from'node:fs';const timer=setInterval(()=>{if(fs.existsSync(${JSON.stringify(spawnRequest)})){clearInterval(timer);const c=spawn(process.execPath,['-e',${JSON.stringify(child)}],{detached:true,stdio:'ignore'});c.once('close',()=>console.log('actual-descendant-close'));}},5);`;
+ const readProcessTable=options=>{
+  const rows=readNativeProcessTable(options);rootPid??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath)?.pid;
+  if(rootPid&&!fs.existsSync(spawnRequest))fs.writeFileSync(spawnRequest,'spawn');
+  if(!partial){for(const row of rows)if(row.ppid===rootPid&&row.executable===process.execPath){
+   actual={...row};const rejected={...row,executable:null,enrichment:{status:'unavailable',errors:[{field:'executable',code:'ENOENT'}]}};partial=rejected;rows[rows.indexOf(row)]=rejected;
+   views.push({kind:'controlled-executable-only-partial-projection',tableReadId:options.readContext.id,raw:structuredClone(row),returned:structuredClone(rejected)});break;
+  }}else{
+   const row=rows.find(row=>['pid','startIdentity','startPrecision','uid','pidNamespace'].every(key=>row[key]===actual[key]));
+   if(row&&row.ppid===rootPid&&typeof row.executable==='string'&&row.executable.length>0&&row.enrichment?.status!=='unavailable'&&fs.existsSync(ready)&&Number(fs.readFileSync(ready,'utf8'))===actual.pid){
+    if(!full){full={...row};views.push({kind:'parsed-OS-reader-usable-row-returned-unchanged',tableReadId:options.readContext.id,raw:structuredClone(row),returned:structuredClone(row)});}
+    fs.writeFileSync(exitRequest,'exit');
+   }
   }
   return rows;
  };
- t.after(async()=>{if(actual){const row=readNativeProcessTable().find(row=>row.pid===actual.pid);if(row&&['startIdentity','startPrecision','uid','pidNamespace'].every(key=>row[key]===actual[key])&&alive(actual.pid)){process.kill(actual.pid,'SIGKILL');await until(()=>!alive(actual.pid));}}});
+ t.after(async()=>{fs.writeFileSync(path.join(outputDir,'controlled-table-views.json'),JSON.stringify({meaning:'Controlled projections paired with parsed OS-reader rows, not raw kernel reads',views},null,2)+'\n');if(actual){const row=readNativeProcessTable().find(row=>row.pid===actual.pid);if(row&&['startIdentity','startPrecision','uid','pidNamespace'].every(key=>row[key]===actual[key])&&alive(actual.pid)){process.kill(actual.pid,'SIGKILL');await until(()=>!alive(actual.pid));}}});
 
  const receipt=await runOwnedNativeProcess({cwd,outputDir,args:['--input-type=module','-e',fixture],timeoutMs:2000,system:{readProcessTable,signalProcess:(pid,signal)=>{signals.push({pid,signal});process.kill(pid,signal);}}});
- t.diagnostic('Unknown descendant actual OS row and provisional receipt: '+outputDir);
+ t.diagnostic('Unknown descendant controlled partial then unchanged parsed OS row and provisional receipt: '+outputDir);
+ assert.ok(full,'A later usable actual descendant row is observed while the independent ready/exit gate holds it alive');assert.equal(Number(fs.readFileSync(ready,'utf8')),actual.pid);assert.equal(views.length,2);assert.ok(views[0].tableReadId<views[1].tableReadId);assert.deepEqual(views[1].returned,views[1].raw);assert.equal(full.ppid,rootPid);
  assert.ok(actual&&partial);assert.equal(receipt.status,0);assert.equal(alive(actual.pid),false);assert.ok(receipt.processes.every(row=>row.last.status==='nonlive'),'All independently witnessed identities really ended');
  assert.equal(receipt.cleanup.complete,false,'An unowned partial row cannot be waived by all known processes exiting');assert.equal(receipt.processes.some(row=>row.identity.pid===actual.pid),false,'Rejected provisional identity never becomes owned');assert.equal(signals.some(row=>row.pid===actual.pid),false,'Unknown descendant never receives even an ownership probe');
  const incident=receipt.incidents.find(row=>row.observation.pid===actual.pid);assert.ok(incident);assert.equal(incident.kind,'unwitnessed-descendant');assert.equal(incident.status,'active');assert.equal(incident.eligible,false);assert.equal(incident.priorIdentity,null);assert.equal(incident.priorProof,null);assert.deepEqual(incident.observation,partial);assert.equal(incident.parentWitness.identity.pid,actual.ppid);assert.equal(incident.parentWitness.proof.kind,'actual-spawn-child');assert.ok(receipt.refusals.includes(incident.message));assert.ok(incident.observed.utc);assert.ok(incident.observations.length<=8);
