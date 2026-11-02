@@ -53433,5 +53433,56 @@
     ],
     "inheritedEvidence": "All earlier D literal records are preserved before these appends, including the existing comparison against published main. This record binds the joined diff and does not replace their historical evidence.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/next-source1960/merger"
+  },
+  {
+    "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+    "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+    "reason": "Issue #1978 strengthens the existing original-opening process RISK at the ROOT-acknowledged seam. Preserve literal maximum-gap endpoints at original refusal instead of requiring an instrumented follow-up; declaration is reflowed without a new test, changed name or selection. Earlier integration coverage/evidence remains protected and unchanged.",
+    "previousBehavior": "The original deliberate opening refusal retained only scalar openingMaxFrameGapMs; no literal same-run predecessor/current endpoints or predecessor boundary survived in that sample. Both healthy controls already passed.",
+    "intendedBehavior": "The original refusal retains one finite literal maximum interval, matching page time origin, available document identities and observed predecessor boundary before input. Existing1000ms guard, arithmetic, arming, native click, complete64-source custody and cleanup remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status"
+    ],
+    "preservedCoverage": [
+      "Both real Chromium/WebKit healthy0 Settings clicks and deliberate1300 opening refusals retain the existing exact source custody, account authority and native first-input fence.",
+      "The selected Linux eight-interval observation keeps literal boundaries and its bounded history, without enabling history or additional callbacks on ordinary Darwin.",
+      "All inherited E and published-main regression evidence and assertion protections remain unchanged; this entry adds only the bounded #1978 diagnostic contract."
+    ],
+    "redEvidence": {
+      "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+      "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+      "records": [
+        "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+      ],
+      "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+      "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978"
+  },
+  {
+    "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "reason": "Issue #1978 strengthens the existing original-opening process RISK at the ROOT-acknowledged seam. Preserve literal maximum-gap endpoints at original refusal instead of requiring an instrumented follow-up; declaration is reflowed without a new test, changed name or selection. Earlier integration coverage/evidence remains protected and unchanged.",
+    "previousBehavior": "The original deliberate opening refusal retained only scalar openingMaxFrameGapMs; no literal same-run predecessor/current endpoints or predecessor boundary survived in that sample. Both healthy controls already passed.",
+    "intendedBehavior": "The original refusal retains one finite literal maximum interval, matching page time origin, available document identities and observed predecessor boundary before input. Existing1000ms guard, arithmetic, arming, native click, complete64-source custody and cleanup remain unchanged.",
+    "replacementTests": [
+      "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status"
+    ],
+    "preservedCoverage": [
+      "Both real Chromium/WebKit healthy0 Settings clicks and deliberate1300 opening refusals retain the existing exact source custody, account authority and native first-input fence.",
+      "The selected Linux eight-interval observation keeps literal boundaries and its bounded history, without enabling history or additional callbacks on ordinary Darwin.",
+      "All inherited E and published-main regression evidence and assertion protections remain unchanged; this entry adds only the bounded #1978 diagnostic contract."
+    ],
+    "redEvidence": {
+      "command": "{\"executable\": \"/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\", \"args\": [\"--test\", \"--test-reporter=tap\", \"--test-name-pattern=^RISK repository process: opening frame gaps refuse native input before reset and retain missing input status$\", \"tests.js\"]}",
+      "failure": "Recorded preimplementation attempt 2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6 on unchanged exactE implementation exited1. Both healthy engine controls passed; both deliberate1300 cases failed exactly: The original opening refusal retains its literal measured maximum interval. All4 native reports and complete source custody existed and context/browser/server cleanup were true. Prior lease/port0 failures are infrastructure only and are not RED.",
+      "records": [
+        "2026-11-02T02-14-43-048Z-d954ceef-e8e7-49f1-9377-593b58bb42b6"
+      ],
+      "metadataSha256": "e442a3d3569d6a83207af548f56c20e5d831328df59529787c699c37f5614c59",
+      "outputSha256": "430f548781896864e53bd97a9669f98e4d498896a2dcd1565868533c0e96e925"
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/opening-interval-source/sol-owner1978",
+    "inheritedEvidence": "Prior exact-E aggregate rationale and its comparison records above remain unchanged; the published-main fingerprint covers that inherited work plus only the new #1978 assertions."
   }
 ]
