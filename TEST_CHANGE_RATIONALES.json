@@ -53433,5 +53433,39 @@
     ],
     "inheritedEvidence": "All earlier D literal records are preserved before these appends, including the existing comparison against published main. This record binds the joined diff and does not replace their historical evidence.",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/next-source1960/merger"
+  },
+  {
+    "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+    "protectedTestPath": "scripts/agent-tools/hosted-native-callers.test.mjs",
+    "testChangesSha256": "9c278de8975f80419700dfb6bbc65bef8310327d4655cc1fd321aee753878add",
+    "reason": "Atomic #1976 extends the existing literal Linux filesystem and actual-owned-child diagnostic consumers to expose same-UID prefix starvation, then preserves exact incident evidence while every ownership and refusal contract stays strict. This fingerprint uses the existing protectedTestFingerprint function on the named .mjs test diff; tests.js and its inventory are unchanged.",
+    "previousBehavior": "At exact E, unrelated same-UID systemd/sudo/sd-pam-shaped EACCES rows spend all eight raw read windows before a later relevant direct-child row or the actual unknown incident's tableReadId can be retained. The existing simple literal read and unscoped cap assertions already pass.",
+    "intendedBehavior": "The existing read context selects diagnostic evidence for the actual root, previously witnessed PIDs and observed direct children, counts filtered and capacity-omitted windows separately, and leaves every process row and authority decision unchanged. The same three diagnostic cases additionally distinguish full prior identity then exact Z then Z with missing core fields from observed changed non-null namespace/UID/start then actual absence; all remain blocked cleanup=false. No new root, fixture reduction, timeout relaxation, application byte or browser/CI execution is introduced.",
+    "replacementTests": [
+      "Linux partial read diagnostics retain literal ordered kernel observations",
+      "owned partial read diagnostics survive the receipt without granting unknown custody"
+    ],
+    "preservedCoverage": [
+      "Every prior literal raw read/order/hash, first-eight unscoped retention, eight-window/2048-stat/1024-link/8192-window/65536-total bound and post-cap no-extra-read assertion remains intact; scoped filtering adds no after-stat syscall to unrelated noise and preserves every returned same-UID row.",
+      "First-seen partial descendants remain active, ineligible, unwitnessed, outside known custody and unsignaled even with a diagnostic Z and every known child nonlive. Prior exact Z cannot erase later missing UID/namespace/executable core ambiguity; actual changed non-null core observations cannot be erased by absence.",
+      "The complete prior26-case lifecycle cohort retains foreign UID exclusion and sentinel protection, PID reuse, incomplete enrichment, strict executable-only eligible resolution, actual descendant browser close, unknown refusal, streams/frontiers and exact execution/TERM/KILL ceilings. The UID-change consumer mutates only its controlled returned OS row; it does not claim the foreign UID Linux reader produced a protected-link window.",
+      "The existing tests.js diagnostic and complete-lifecycle wrappers, their three/26 expected outcomes, 10000ms/30000ms deadlines, all global test assignments and historical rationale objects remain unchanged. Independent review, Linux/native qualification, original failed CI and release remain ROOT responsibilities."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/process-read-retention-1976/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=tap '--test-name-pattern=^(Linux partial read diagnostics|owned partial read diagnostics)' scripts/agent-tools/hosted-native-callers.test.mjs",
+      "failure": "Original recorder2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1 ran before implementation at E with only the test changed, dirty identity eb5b3c3b08fd9717e3189c31cb4fbb010e5823cf6065c2bad15e7f5f58ab952e. TAP has3 tests,1 pass,2 intended ERR_ASSERTION/AssertionError failures: the later direct-child window and exact actual unknown incident tableReadId+PID window are absent. The unchanged bounds case passes. The recorder labels this infrastructure-failure because its EACCES regex matches that literal word inside the assertion message; there is no launch/import/syntax failure. Its original JSON and complete TAP remain unchanged; no repeat was used to obtain a different label.",
+      "record": "2026-11-02T01-49-32-713Z-2b9cd900-e50c-496e-b87d-52d9adc860f1",
+      "outputSha256": "74b599730c194bc46d963b8089642bcf8021f37e4c4e3ef06203797ea807f396"
+    },
+    "greenEvidence": {
+      "focusedRecord": "2026-11-02T01-50-35-563Z-330f3add-7d27-46d6-9673-50a758e7ad0b",
+      "focusedOutcome": "Identical selection:3 passed,0 failed/skipped/cancelled; output SHA256 c577a75c151f9daa9c9d172793f7339bb11a859063449d41ce59d9366ddc9ad9.",
+      "lifecycleRecord": "2026-11-02T01-50-57-863Z-e0c81481-caaf-4182-bb12-4f7ad71c18bd",
+      "lifecycleOutcome": "One complete direct lifecycle cohort:26 passed,0 failed/skipped/cancelled; output SHA256 6c2eff71ce9604290edacf403e2d4b9e1d1381f99c65afae6eeb764f1496369b. TAP duration30948.191125ms on this macOS host exceeds the unchanged tests.js outer30000ms wrapper margin. ROOT then authorized one distinct existing-caller acceptance, recorded separately below; the direct pass does not qualify that wrapper.",
+      "wrapperRecord": "2026-11-02T01-54-59-795Z-f7175ec3-338a-4336-82c1-17b528ef4753",
+      "wrapperOutcome": "FAILED: the existing exact RISK repository process: owned native lifecycle retains stream and exact union controls wrapper returned spawnSync ETIMEDOUT at its unchanged30000ms limit, then ERR_ASSERTION at tests.js:52302 because result.error was not undefined. One root failed,0 passed/skipped/cancelled; wrapper test duration30012.186834ms. Source work stopped; no repair, timeout relaxation or behavioral retry followed."
+    },
+    "checkpointStatus": "FAILING-GATE CHECKPOINT ONLY; NOT admitted for integration or release. Atomic #1976 remains OPEN because the existing lifecycle caller is unqualified. ROOT explicitly authorized preserving a clean failing-gate commit after the wrapper timeout; all original passes and failures remain separate.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/read-retention-source/sol-owner1976"
   }
 ]
