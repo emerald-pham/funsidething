@@ -10555,12 +10555,38 @@ test("chipHTML: no 'not started' chip when startsAt is unset", async () => {
   assert.doesNotMatch(ctx.chipHTML(task), /not started/i);
 });
 
-test("fmtWhen: today / yesterday / this-week / older labels", async () => {
-  const { ctx } = await loadApp();
-  const now = Date.now();
+test("fmtWhen: today / yesterday / this-week / older labels", async t => {
+  // New York's fall-back day is 25 hours long: elapsed 24h is still today.
+  const now = Date.parse("2026-11-02T04:45:30.000Z");
+  const { ctx } = await loadAppAtTime(now, { beforeStateReady(ctx) {
+    // todayISO reads new Date(), so pin its constructor in this fixture too.
+    vm.runInContext(`const CalendarDate=Date; Date=class extends CalendarDate {
+      constructor(...args){super(...(args.length?args:[CalendarDate.now()]));}
+    };`, ctx);
+  } });
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
   assert.equal(ctx.fmtWhen(now), "today");
-  assert.equal(ctx.fmtWhen(now - 24 * 3600 * 1000), "yesterday");
+  assert.equal(ctx.fmtWhen(+yesterday), "yesterday");
   assert.equal(ctx.fmtWhen(null), "");
+
+  const zone = process.env.CHAIN_FMTWHEN_CALENDAR_CHILD;
+  if (zone) {
+    assert.equal(ctx.fmtWhen(now - 24 * 3600 * 1000), { UTC: "yesterday", "America/New_York": "today" }[zone]);
+    return;
+  }
+  for (const zone of ["UTC", "America/New_York"]) await t.test(zone, () => {
+    const env = { ...process.env, TZ: zone, CHAIN_FMTWHEN_CALENDAR_CHILD: zone }; delete env.NODE_TEST_CONTEXT;
+    const child = spawnSync(process.execPath, ["--test", "--test-reporter=tap",
+      "--test-name-pattern=^fmtWhen: today / yesterday / this-week / older labels$", "tests.js"],
+      { cwd: __dirname, env, encoding: "utf8", timeout: 30000 });
+    const output = child.stdout + child.stderr;
+    assert.equal(child.error, undefined, zone + " calendar consumer must finish: " + output);
+    assert.equal(child.signal, null, zone + " calendar consumer must not be interrupted: " + output);
+    assert.equal(child.status, 0, zone + " calendar labels must pass: " + output);
+    assert.match(output, /# tests 1\b/); assert.match(output, /# pass 1\b/);
+    assert.match(output, /# fail 0\b/); assert.match(output, /# skipped 0\b/);
+  });
 });
 
 

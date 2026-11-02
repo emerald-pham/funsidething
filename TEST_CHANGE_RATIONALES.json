@@ -53885,5 +53885,154 @@
     ],
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/joined-diagnostics1982/merger",
     "completionBoundary": "Source integration only; no original Linux causal repair, new runtime qualification, CI, push, main merge, Stable or Beta claim."
+  },
+  {
+    "issue": 1999,
+    "baseCommit": "dcfeb882f2345ca3ac038864592c315031142014",
+    "protectedTestPath": "tests.js",
+    "testChangesSha256": "cd6984bab130ac2b2e3bb79f9329712d05d9f6d8cfccf3de081f04f95b234949",
+    "reason": "Atomic #1999 corrects the existing fmtWhen fixture after concrete #1998 diagnosis proved its elapsed24h yesterday assumption wrong on the 25-hour New York fall-back day. Only that existing test block changes. This exact comparison also preserves all inherited checkpoint coverage and every one of the1563 prior literal rationale objects; inherited histories are not reclassified as new preimplementation evidence.",
+    "previousBehavior": "The original test used a live process timestamp and assumed subtracting24 elapsed hours always names yesterday. At2026-11-02T04:45:30Z in New York the resulting timestamp is still November1, so the unchanged app correctly says today. A Date.now-only pin also leaves todayISO reading a live zero-argument Date.",
+    "intendedBehavior": "Retain exact today, previous-local-calendar-day yesterday, and null empty-string outcomes at the original pinned fall-back instant. Reuse loadAppAtTime/setFakeTime and the established per-VM CalendarDate constructor seam. Build yesterday with local setDate arithmetic. The same existing consumer must pass in UTC and New York and must label elapsed24h yesterday in UTC but today in New York.",
+    "replacementTests": [
+      "fmtWhen: today / yesterday / this-week / older labels"
+    ],
+    "preservedCoverage": [
+      "The original today and null assertions remain literal; the yesterday expectation stays yesterday and only its invalid timestamp assumption changes under concrete bug evidence.",
+      "Every tests.js byte outside the existing fmtWhen block is preserved from exactC, including other date formatting, cross-year, due, calendar, completion, persistence and native process contracts.",
+      "All1563 existing TEST_CHANGE_RATIONALES.json object literals remain byte-identical in original order. Inherited comparison rationales and their actual RED/GREEN chronology remain authoritative for earlier checkpoint changes.",
+      "Both timezone children run the exact existing registered consumer with all three protected assertions before the recursion guard. Each must finish with one test, one pass, zero failures and zero skips. No test skip, weakened assertion or new test framework is introduced.",
+      "The UTC parent plus UTC child pass while a later restored elapsed24h negative control fails in the New York child with expected yesterday and actual today; this is later sensitivity, not a fabricated preimplementation RED.",
+      "Application, FAQ, changelog, service worker, rules, workflow, dependency, native runner, budgets, test-group registration and RISK map remain unchanged relative exactC. Whole-checkpoint qualification, CI and release remain outside this test-only result."
+    ],
+    "redEvidence": {
+      "command": "TZ=America/New_York /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/date-fixture-1999/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-fixture1999/owner/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-failure-diagnosis/pin-full-start-clock.mjs --experimental-vm-modules --test --test-reporter=tap --test-name-pattern=^fmtWhen: today / yesterday / this-week / older labels$ tests.js",
+      "failure": "Actual supported recorder 2026-11-02T05-33-06-515Z-f7864082-a7a8-4aa9-9b93-b2aca796d90a ran clean exactC before any test edit: one unchanged existing consumer failed ERR_ASSERTION, expected yesterday, actual today, at tests.js10562. Its diagnostic import pins process and VM Date to2026-11-02T04:45:30Z and prints America/New_York. Source identity was complete with empty tracked/nonignored diff. Same-source/same-instant UTC control2b95d163 passed as predicted and receives no RED credit. First attempted GREEN recordsd52b489b/20fb0c12 exposed the incomplete constructor clock pin and remain retained; later negative-control2f959a8b is explicitly later-baseline-sensitivity.",
+      "record": "2026-11-02T05-33-06-515Z-f7864082-a7a8-4aa9-9b93-b2aca796d90a",
+      "metadataSha256": "710db15b373cb588dd507a23f56c0bcf0feffc87b8dfcabd17fafa690632cdad",
+      "outputSha256": "74a0918becf3a53f6527cc1f6d4d8eed29a2a27a73fa83900f781b9b4f9f3b47"
+    },
+    "inheritedCoverage": {
+      "checkpointCommit": "dcfeb882f2345ca3ac038864592c315031142014",
+      "originalRationaleCount": 1563,
+      "originalRationaleFileSha256": "286b9998a83b28c8eab016213c1371b432d62f250f399ff806ac02b67b9a2968",
+      "comparisonFingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sourceRationales": []
+    },
+    "laterSensitivity": {
+      "record": "2026-11-02T05-37-37-291Z-2f959a8b-edca-4d24-9ffb-fd0a41ab91e1",
+      "purpose": "later-baseline-sensitivity",
+      "expectedResult": "UTC direct assertions and UTC child pass; New York child fails expected yesterday/actual today when only yesterday argument reverts to elapsed24h. Fixed bytes restored exactly afterward."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-fixture1999/owner",
+    "completionBoundary": "Focused test-only fixture repair; no full suite, browser/native/emulator, push, CI, integration, release, tracker closure or Beta acceptance claim."
+  },
+  {
+    "issue": 1999,
+    "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+    "protectedTestPath": "tests.js",
+    "testChangesSha256": "14d0aba5f15cc4e2704aeaa19e1fb15b97fcd8db70093cfff408f1c8b726d079",
+    "reason": "Atomic #1999 corrects the existing fmtWhen fixture after concrete #1998 diagnosis proved its elapsed24h yesterday assumption wrong on the 25-hour New York fall-back day. Only that existing test block changes. This exact comparison also preserves all inherited checkpoint coverage and every one of the1563 prior literal rationale objects; inherited histories are not reclassified as new preimplementation evidence.",
+    "previousBehavior": "The original test used a live process timestamp and assumed subtracting24 elapsed hours always names yesterday. At2026-11-02T04:45:30Z in New York the resulting timestamp is still November1, so the unchanged app correctly says today. A Date.now-only pin also leaves todayISO reading a live zero-argument Date.",
+    "intendedBehavior": "Retain exact today, previous-local-calendar-day yesterday, and null empty-string outcomes at the original pinned fall-back instant. Reuse loadAppAtTime/setFakeTime and the established per-VM CalendarDate constructor seam. Build yesterday with local setDate arithmetic. The same existing consumer must pass in UTC and New York and must label elapsed24h yesterday in UTC but today in New York.",
+    "replacementTests": [
+      "fmtWhen: today / yesterday / this-week / older labels"
+    ],
+    "preservedCoverage": [
+      "The original today and null assertions remain literal; the yesterday expectation stays yesterday and only its invalid timestamp assumption changes under concrete bug evidence.",
+      "Every tests.js byte outside the existing fmtWhen block is preserved from exactC, including other date formatting, cross-year, due, calendar, completion, persistence and native process contracts.",
+      "All1563 existing TEST_CHANGE_RATIONALES.json object literals remain byte-identical in original order. Inherited comparison rationales and their actual RED/GREEN chronology remain authoritative for earlier checkpoint changes.",
+      "Both timezone children run the exact existing registered consumer with all three protected assertions before the recursion guard. Each must finish with one test, one pass, zero failures and zero skips. No test skip, weakened assertion or new test framework is introduced.",
+      "The UTC parent plus UTC child pass while a later restored elapsed24h negative control fails in the New York child with expected yesterday and actual today; this is later sensitivity, not a fabricated preimplementation RED.",
+      "Application, FAQ, changelog, service worker, rules, workflow, dependency, native runner, budgets, test-group registration and RISK map remain unchanged relative exactC. Whole-checkpoint qualification, CI and release remain outside this test-only result."
+    ],
+    "redEvidence": {
+      "command": "TZ=America/New_York /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/date-fixture-1999/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-fixture1999/owner/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-failure-diagnosis/pin-full-start-clock.mjs --experimental-vm-modules --test --test-reporter=tap --test-name-pattern=^fmtWhen: today / yesterday / this-week / older labels$ tests.js",
+      "failure": "Actual supported recorder 2026-11-02T05-33-06-515Z-f7864082-a7a8-4aa9-9b93-b2aca796d90a ran clean exactC before any test edit: one unchanged existing consumer failed ERR_ASSERTION, expected yesterday, actual today, at tests.js10562. Its diagnostic import pins process and VM Date to2026-11-02T04:45:30Z and prints America/New_York. Source identity was complete with empty tracked/nonignored diff. Same-source/same-instant UTC control2b95d163 passed as predicted and receives no RED credit. First attempted GREEN recordsd52b489b/20fb0c12 exposed the incomplete constructor clock pin and remain retained; later negative-control2f959a8b is explicitly later-baseline-sensitivity.",
+      "record": "2026-11-02T05-33-06-515Z-f7864082-a7a8-4aa9-9b93-b2aca796d90a",
+      "metadataSha256": "710db15b373cb588dd507a23f56c0bcf0feffc87b8dfcabd17fafa690632cdad",
+      "outputSha256": "74a0918becf3a53f6527cc1f6d4d8eed29a2a27a73fa83900f781b9b4f9f3b47"
+    },
+    "inheritedCoverage": {
+      "checkpointCommit": "dcfeb882f2345ca3ac038864592c315031142014",
+      "originalRationaleCount": 1563,
+      "originalRationaleFileSha256": "286b9998a83b28c8eab016213c1371b432d62f250f399ff806ac02b67b9a2968",
+      "comparisonFingerprint": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+      "sourceRationales": [
+        {
+          "index": 1558,
+          "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+          "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+          "originalObjectCanonicalSha256": "aac5998331fa7e69d1fb107d42f0b9348e66419a7d4f6a474dff01ed9d64ae63"
+        },
+        {
+          "index": 1561,
+          "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
+          "testChangesSha256": "3b827f257d144b0db7dd808e66b8e4f1f5e66ee16d1ea4997179457c58d214ca",
+          "originalObjectCanonicalSha256": "77bbad68e78fe8fc29837b3f780639cacaa3f88de1343fdfe84db7e0b0030e02"
+        }
+      ]
+    },
+    "laterSensitivity": {
+      "record": "2026-11-02T05-37-37-291Z-2f959a8b-edca-4d24-9ffb-fd0a41ab91e1",
+      "purpose": "later-baseline-sensitivity",
+      "expectedResult": "UTC direct assertions and UTC child pass; New York child fails expected yesterday/actual today when only yesterday argument reverts to elapsed24h. Fixed bytes restored exactly afterward."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-fixture1999/owner",
+    "completionBoundary": "Focused test-only fixture repair; no full suite, browser/native/emulator, push, CI, integration, release, tracker closure or Beta acceptance claim."
+  },
+  {
+    "issue": 1999,
+    "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+    "protectedTestPath": "tests.js",
+    "testChangesSha256": "ab3c807e1478abbf7b50352533fec601c5e63f16893bc1c421748e7661024b81",
+    "reason": "Atomic #1999 corrects the existing fmtWhen fixture after concrete #1998 diagnosis proved its elapsed24h yesterday assumption wrong on the 25-hour New York fall-back day. Only that existing test block changes. This exact comparison also preserves all inherited checkpoint coverage and every one of the1563 prior literal rationale objects; inherited histories are not reclassified as new preimplementation evidence.",
+    "previousBehavior": "The original test used a live process timestamp and assumed subtracting24 elapsed hours always names yesterday. At2026-11-02T04:45:30Z in New York the resulting timestamp is still November1, so the unchanged app correctly says today. A Date.now-only pin also leaves todayISO reading a live zero-argument Date.",
+    "intendedBehavior": "Retain exact today, previous-local-calendar-day yesterday, and null empty-string outcomes at the original pinned fall-back instant. Reuse loadAppAtTime/setFakeTime and the established per-VM CalendarDate constructor seam. Build yesterday with local setDate arithmetic. The same existing consumer must pass in UTC and New York and must label elapsed24h yesterday in UTC but today in New York.",
+    "replacementTests": [
+      "fmtWhen: today / yesterday / this-week / older labels"
+    ],
+    "preservedCoverage": [
+      "The original today and null assertions remain literal; the yesterday expectation stays yesterday and only its invalid timestamp assumption changes under concrete bug evidence.",
+      "Every tests.js byte outside the existing fmtWhen block is preserved from exactC, including other date formatting, cross-year, due, calendar, completion, persistence and native process contracts.",
+      "All1563 existing TEST_CHANGE_RATIONALES.json object literals remain byte-identical in original order. Inherited comparison rationales and their actual RED/GREEN chronology remain authoritative for earlier checkpoint changes.",
+      "Both timezone children run the exact existing registered consumer with all three protected assertions before the recursion guard. Each must finish with one test, one pass, zero failures and zero skips. No test skip, weakened assertion or new test framework is introduced.",
+      "The UTC parent plus UTC child pass while a later restored elapsed24h negative control fails in the New York child with expected yesterday and actual today; this is later sensitivity, not a fabricated preimplementation RED.",
+      "Application, FAQ, changelog, service worker, rules, workflow, dependency, native runner, budgets, test-group registration and RISK map remain unchanged relative exactC. Whole-checkpoint qualification, CI and release remain outside this test-only result."
+    ],
+    "redEvidence": {
+      "command": "TZ=America/New_York /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/date-fixture-1999/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-fixture1999/owner/recorded --purpose preimplementation-red --summary -- /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import /Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-failure-diagnosis/pin-full-start-clock.mjs --experimental-vm-modules --test --test-reporter=tap --test-name-pattern=^fmtWhen: today / yesterday / this-week / older labels$ tests.js",
+      "failure": "Actual supported recorder 2026-11-02T05-33-06-515Z-f7864082-a7a8-4aa9-9b93-b2aca796d90a ran clean exactC before any test edit: one unchanged existing consumer failed ERR_ASSERTION, expected yesterday, actual today, at tests.js10562. Its diagnostic import pins process and VM Date to2026-11-02T04:45:30Z and prints America/New_York. Source identity was complete with empty tracked/nonignored diff. Same-source/same-instant UTC control2b95d163 passed as predicted and receives no RED credit. First attempted GREEN recordsd52b489b/20fb0c12 exposed the incomplete constructor clock pin and remain retained; later negative-control2f959a8b is explicitly later-baseline-sensitivity.",
+      "record": "2026-11-02T05-33-06-515Z-f7864082-a7a8-4aa9-9b93-b2aca796d90a",
+      "metadataSha256": "710db15b373cb588dd507a23f56c0bcf0feffc87b8dfcabd17fafa690632cdad",
+      "outputSha256": "74a0918becf3a53f6527cc1f6d4d8eed29a2a27a73fa83900f781b9b4f9f3b47"
+    },
+    "inheritedCoverage": {
+      "checkpointCommit": "dcfeb882f2345ca3ac038864592c315031142014",
+      "originalRationaleCount": 1563,
+      "originalRationaleFileSha256": "286b9998a83b28c8eab016213c1371b432d62f250f399ff806ac02b67b9a2968",
+      "comparisonFingerprint": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+      "sourceRationales": [
+        {
+          "index": 1557,
+          "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+          "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+          "originalObjectCanonicalSha256": "8d9368c38da24e353692e86b013eee86831cdb7d3df6527755f0786820fe8e44"
+        },
+        {
+          "index": 1559,
+          "baseCommit": "39f79b055da63410c99f56fed94cd347bf1605b9",
+          "testChangesSha256": "018005962b671b86d354a11e6e4c6081bee2592b4a44fe65d3d74293a7555096",
+          "originalObjectCanonicalSha256": "d639ef29decf06fcc195bb862938e207c74919750cc6d1651314e094196556ab"
+        }
+      ]
+    },
+    "laterSensitivity": {
+      "record": "2026-11-02T05-37-37-291Z-2f959a8b-edca-4d24-9ffb-fd0a41ab91e1",
+      "purpose": "later-baseline-sensitivity",
+      "expectedResult": "UTC direct assertions and UTC child pass; New York child fails expected yesterday/actual today when only yesterday argument reverts to elapsed24h. Fixed bytes restored exactly afterward."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/implement-1299-20261029/autonomous-completion-20261029/finish-20261031/resume-20261102/date-fixture1999/owner",
+    "completionBoundary": "Focused test-only fixture repair; no full suite, browser/native/emulator, push, CI, integration, release, tracker closure or Beta acceptance claim."
   }
 ]
