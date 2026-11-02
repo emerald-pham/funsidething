@@ -186,6 +186,51 @@ test('Linux partial read diagnostics retain literal ordered kernel observations'
  assert.equal(scopedDiagnostics.windows.length,1);assert.equal(scopedDiagnostics.filteredWindows,12);assert.equal(scopedDiagnostics.omittedWindows,0);assert.equal(noisy.noiseStatReads(),12,'Filtered rows receive no additional diagnostic after-stat syscall');
  assert.equal(Buffer.from(scopedWindow.statBefore.rawBase64,'base64').toString(),before);assert.equal(Buffer.from(scopedWindow.statAfter.rawBase64,'base64').toString(),after);assert.equal(scopedWindow.uid.value,uid);assert.equal(scopedWindow.executable.error.code,'ENOENT');assert.equal(scopedWindow.pidNamespace.value,'pid:[41001]');
  const scopedReads=[scopedWindow.statBefore,scopedWindow.uid,scopedWindow.executable,scopedWindow.pidNamespace,scopedWindow.statAfter];for(let index=0;index<scopedReads.length;index++){assert.ok(scopedReads[index].started.monotonicMs<=scopedReads[index].finished.monotonicMs);if(index)assert.ok(scopedReads[index-1].finished.monotonicMs<=scopedReads[index].started.monotonicMs);}
+ // These are literal filesystem traces, not kernel terminal-state or custody
+ // proof. The unchanged actual-owned-process cases below own those verdicts.
+ const coreTraces=[];
+ for(const change of ['missing-core','pidNamespace','uid','startIdentity']){
+  const phases=change==='missing-core'?['full','exact-z','missing-core','absent']:['full','changed','absent'],traceDiagnostics={},trace=[];
+  for(const [index,phase]of phases.entries()){
+   const lostCore=phase==='missing-core',changed=phase==='changed',present=phase!=='absent',calls=[];
+   const traceFields=Array.from({length:30},()=> '0');Object.assign(traceFields,{0:phase==='exact-z'||lostCore?'Z':'S',1:'123',2:'41001',3:'41001',19:change==='startIdentity'&&changed?'987655':'987654'});
+   const raw='41001 (literal-owned-core) '+traceFields.join(' '),uidRaw='Uid:\t'+(change==='uid'&&changed?uid+1:uid)+'\n';
+   const missing=file=>{calls.push({file,error:'ENOENT'});throw Object.assign(Error('controlled enrichment vanished'),{code:'ENOENT'});};
+   const traceFilesystem={readdirSync:()=>present?['41001']:[],readFileSync:file=>{
+    if(lostCore&&!file.endsWith('/stat'))return missing(file);
+    const value=file.endsWith('/stat')?raw:uidRaw;calls.push({file,value});return value;
+   },readlinkSync:file=>{
+    if(lostCore||changed&&file.endsWith('/exe'))return missing(file);
+    const value=file.endsWith('/exe')?'/owned/runtime/node':change==='pidNamespace'&&changed?'pid:[changed]':'pid:[41001]';calls.push({file,value});return value;
+   }};
+   const traceRows=readLinuxNativeProcessTable({procRoot:'/controlled/proc',filesystem:withSameUidNoise(traceFilesystem).filesystem,diagnostics:traceDiagnostics,readContext:{id:index+1,started:{utc:new Date().toISOString(),monotonicMs:performance.now()},diagnosticPids:[123,41001]}});
+   trace.push({tableReadId:index+1,phase,literalStat:present?raw:null,uidRaw:present?uidRaw:null,calls,observation:traceRows.find(row=>row.pid===41001)??null});
+  }
+  const prior=trace[0].observation;assert.equal(prior.state,'S');assert.equal(prior.startIdentity,'987654');assert.equal(prior.uid,uid);assert.equal(prior.pidNamespace,'pid:[41001]');assert.equal(prior.executable,'/owned/runtime/node');
+  assert.equal(trace.at(-1).observation,null,'A literal later directory absence does not claim actual kernel absence');assert.deepEqual(trace.at(-1).calls,[]);
+  assert.equal(traceDiagnostics.filteredWindows,phases.length*3);assert.equal(traceDiagnostics.omittedWindows,0);
+  if(change==='uid'){
+   // A non-null foreign raw UID is filtered before protected links. Never
+   // mutate the returned row to pretend the Linux reader observed that UID.
+   assert.equal(trace[1].observation,null);assert.equal(trace[1].uidRaw,'Uid:\t'+(uid+1)+'\n');
+   assert.deepEqual(trace[1].calls.map(row=>row.file),['/controlled/proc/41001/stat','/controlled/proc/41001/status']);assert.equal(trace[1].calls[1].value,'Uid:\t'+(uid+1)+'\n');assert.deepEqual(traceDiagnostics.windows,[]);
+  }else{
+   const observed=trace[change==='missing-core'?2:1],rawWindow=traceDiagnostics.windows.find(row=>row.tableReadId===observed.tableReadId&&row.pid===41001);
+   assert.ok(rawWindow,'The relevant known PID literal raw window survives unrelated prefix rows');assert.equal(traceDiagnostics.windows.length,1);assert.equal(rawWindow.rowOrdinal,3);
+   assert.equal(Buffer.from(rawWindow.statBefore.rawBase64,'base64').toString(),observed.literalStat);assert.equal(Buffer.from(rawWindow.statAfter.rawBase64,'base64').toString(),observed.literalStat);
+   if(change==='missing-core'){
+    const exactZ=trace[1].observation;assert.equal(exactZ.state,'Z');for(const key of ['pid','ppid','startIdentity','startPrecision','uid','pidNamespace','executable'])assert.equal(exactZ[key],prior[key],key+' remains exact before core loss');
+    assert.equal(rawWindow.statBefore.identity.state,'Z');assert.equal(rawWindow.statAfter.identity.state,'Z');assert.equal(rawWindow.statBefore.identity.startIdentity,'987654');assert.equal(rawWindow.statAfter.identity.startIdentity,'987654');
+    for(const key of ['uid','executable','pidNamespace']){assert.equal(observed.observation[key],null);assert.equal(rawWindow[key].error.code,'ENOENT');}
+   }else{
+    assert.notEqual(observed.observation[change],prior[change]);assert.notEqual(observed.observation[change],null);assert.equal(observed.observation.executable,null);assert.equal(rawWindow.executable.error.code,'ENOENT');
+    if(change==='pidNamespace'){assert.equal(observed.observation.pidNamespace,'pid:[changed]');assert.equal(rawWindow.pidNamespace.value,'pid:[changed]');}
+    else{assert.equal(observed.observation.startIdentity,'987655');assert.equal(rawWindow.statBefore.identity.startIdentity,'987655');assert.equal(rawWindow.statAfter.identity.startIdentity,'987655');}
+   }
+  }
+  coreTraces.push({change,seam:'controlled-Linux-filesystem-only',trace,diagnostics:traceDiagnostics});
+ }
+ fs.writeFileSync(path.join(evidenceDir,'core-traces.json'),JSON.stringify(coreTraces,null,2)+'\n');
 });
 
 test('Linux partial read diagnostics keep invocation and raw payload bounds explicit',()=>{
@@ -217,33 +262,8 @@ test('owned partial read diagnostics survive the receipt without granting unknow
  assert.ok(receipt.processReadDiagnostics?.windows.length>0,'The existing owned-process receipt retains its bounded literal first-observation read evidence');
  const saved=JSON.parse(fs.readFileSync(path.join(outputDir,'process.json')));assert.deepEqual(saved.processReadDiagnostics,receipt.processReadDiagnostics);assert.ok(receipt.processReadDiagnostics.windows.length<=8);assert.ok(receipt.processReadDiagnostics.retainedBytes<=65536);
  const incident=receipt.incidents.find(row=>row.observation.pid===unknownPid);assert.ok(incident);assert.equal(incident.status,'active');assert.equal(incident.priorIdentity,null);assert.equal(incident.priorProof,null);assert.equal(incident.priorReadId,null);assert.equal(incident.eligible,false);assert.equal(incident.observation.state,'R');assert.equal(receipt.cleanup.complete,false);assert.equal(receipt.status,0);assert.equal(receipt.close.code,0);assert.equal(signals.some(row=>row.pid===unknownPid),false,'A diagnostic terminal after-read grants an unknown no signal or zero-probe authority');assert.equal(receipt.processes.some(row=>row.identity.pid===unknownPid),false);
- const window=receipt.processReadDiagnostics.windows.find(row=>row.tableReadId===incident.observationReadId&&row.pid===unknownPid);assert.ok(window,'The actual unknown incident retains its tableReadId + PID window despite the unrelated same-UID prefix');assert.equal(window.statBefore.identity.state,'R');assert.equal(window.statAfter.identity.state,'Z');assert.equal(receipt.processReadDiagnostics.spawn.pid,actualRoot.pid);assert.ok(receipt.processReadDiagnostics.spawn.initialReadId>0);
+ const window=receipt.processReadDiagnostics.windows.find(row=>row.tableReadId===incident.observationReadId&&row.pid===unknownPid);assert.ok(window);assert.ok(window,'The actual unknown incident retains its tableReadId + PID window despite the unrelated same-UID prefix');assert.equal(window.statBefore.identity.state,'R');assert.equal(window.statAfter.identity.state,'Z');assert.equal(receipt.processReadDiagnostics.spawn.pid,actualRoot.pid);assert.ok(receipt.processReadDiagnostics.spawn.initialReadId>0);
  assert.equal(receipt.processReadDiagnostics.filteredWindows,receipt.processReadDiagnostics.tableReads*3);assert.ok(receipt.processes.every(row=>row.last.status==='nonlive'),'Known children really exit while unknown custody stays refused');
- for(const change of ['missing-core','pidNamespace','uid','startIdentity']){
-  const traceDir=fs.mkdtempSync(path.join(retainedRoot,'chain-owned-read-core-')),initialPids=new Set(readNativeProcessTable().map(row=>row.pid)),trace=[],traceSignals=[];let actual,phase=0;
-  const readTrace=options=>{
-   const rows=readNativeProcessTable();actual??=rows.find(row=>row.ppid===process.pid&&row.executable===process.execPath&&!initialPids.has(row.pid));const present=actual&&rows.some(row=>row.pid===actual.pid),currentPhase=phase;
-   const fields=Array.from({length:30},()=> '0');Object.assign(fields,{0:change==='missing-core'&&currentPhase>0?'Z':'S',1:String(process.pid),2:String(actual?.pid||0),3:String(actual?.pid||0),19:change==='startIdentity'&&currentPhase>0?'987655':'987654'});
-   const raw=(actual?.pid||0)+' (literal-owned-core) '+fields.join(' '),lostCore=change==='missing-core'&&currentPhase>=2,partial=lostCore||change!=='missing-core'&&currentPhase>0;
-   const missing=()=>{throw Object.assign(Error('controlled enrichment vanished'),{code:'ENOENT'});};
-   const filesystem={readdirSync:()=>present?[String(actual.pid)]:[],readFileSync:file=>file.endsWith('/stat')?raw:lostCore?missing():'Uid:\t'+process.getuid()+'\n',readlinkSync:file=>partial&&file.endsWith('/exe')||lostCore?missing():file.endsWith('/exe')?process.execPath:change==='pidNamespace'&&currentPhase>0?'pid:[changed]':'pid:[41001]'};
-   const literal=readLinuxNativeProcessTable({procRoot:'/controlled/proc',filesystem:withSameUidNoise(filesystem).filesystem,...options}),projected=literal.find(row=>row.pid===actual?.pid);
-   // Linux's foreign-UID exclusion remains intact. This OS-seam control changes
-   // only the returned observed UID; the literal raw UID remains separately saved.
-   if(projected&&change==='uid'&&currentPhase>0)projected.uid=process.getuid()+1;
-   trace.push({tableReadId:options.readContext.id,phase:currentPhase,actualIdentity:present?{...actual}:null,literalStat:present?raw:null,observation:projected?structuredClone(projected):null});if(present)phase++;
-   return rows.filter(row=>row.pid!==actual?.pid).concat(literal);
-  };
-  const result=await runOwnedNativeProcess({cwd,outputDir:traceDir,args:['-e','setTimeout(()=>{},140)'],timeoutMs:2000,system:{readProcessTable:readTrace,signalProcess:(pid,signal)=>{traceSignals.push({pid,signal});process.kill(pid,signal);}}});
-  fs.writeFileSync(path.join(traceDir,'fixture-reads.json'),JSON.stringify({change,trace,traceSignals},null,2)+'\n');t.diagnostic('Diagnostic-only '+change+' trace and actual child close: '+traceDir);
-  const witnessed=result.processes.find(row=>row.identity.pid===actual.pid),changed=trace.find(row=>row.phase===(change==='missing-core'?2:1)&&row.observation),rawWindow=result.processReadDiagnostics.windows.find(row=>row.tableReadId===changed.tableReadId&&row.pid===actual.pid);
-  assert.ok(rawWindow,'The relevant known PID raw window survives unrelated prefix rows');assert.ok(witnessed.terminalResolutionBlocked);assert.equal(result.cleanup.complete,false);assert.ok(result.refusals.some(row=>row.includes('identity changed')));assert.equal(result.status,0);assert.equal(result.close.code,0);assert.equal(alive(actual.pid),false);assert.equal(traceSignals.some(row=>row.signal!==0),false,'Diagnostics never restore teardown signal authority');assert.ok(result.processes.every(row=>row.last.status==='nonlive'));
-  if(change==='missing-core'){
-   assert.equal(witnessed.nonliveProof.kind,'kernel-terminal-state');assert.equal(witnessed.nonliveProof.identity.state,'Z');assert.equal(witnessed.nonliveProof.identity.uid,process.getuid());assert.equal(witnessed.nonliveProof.identity.pidNamespace,'pid:[41001]');assert.equal(rawWindow.statBefore.identity.state,'Z');assert.equal(rawWindow.statAfter.identity.state,'Z');assert.equal(rawWindow.statBefore.identity.startIdentity,'987654');for(const key of ['uid','executable','pidNamespace'])assert.equal(rawWindow[key].error.code,'ENOENT');
-  }else{
-   assert.notEqual(changed.observation[change],witnessed.identity[change]);assert.notEqual(changed.observation[change],null);assert.equal(result.incidents[0].status,'active');assert.equal(result.incidents[0].eligible,false);assert.ok(result.incidents[0].blocked);assert.ok(trace.some(row=>row.phase>1&&row.observation===null),'A later real absence does not erase an observed changed core');
-  }
- }
 });
 
 test('owned native process stops on the combined stream cap and retains the accepted prefix',async()=>{
