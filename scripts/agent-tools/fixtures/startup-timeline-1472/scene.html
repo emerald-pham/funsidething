@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>1472 controlled Timeline semantics</title>
+<style>html,body{margin:0;width:100%;height:100%;background:rgb(255,0,0)}button{position:absolute;left:10px;top:10px;width:100px;height:40px}</style>
+<button id="work">Work once</button><script>
+'use strict';
+window.controlledLog=[];
+function controlledMark(kind,extra={}){const row={kind,pageMs:performance.now(),documentId:window.__nativeTimelineDocument?.id,...extra};controlledLog.push(row);performance.mark('controlled1472:'+JSON.stringify(row),{startTime:row.pageMs});return row;}
+function controlledScene(name,color){document.documentElement.style.backgroundColor=color;document.body.style.backgroundColor=color;controlledMark('scene:'+name);}
+function controlledSynchronousWork(){controlledMark('sync:start');const until=performance.now()+25;while(performance.now()<until){}controlledMark('sync:end');}
+function controlledAsyncFinished(){controlledMark('async:end');controlledScene('yellow','rgb(255,255,0)');window.controlledDone=true;}
+function controlledPress(event){controlledMark('trusted-input',{trusted:event.isTrusted,eventTimeStamp:event.timeStamp});controlledSynchronousWork();controlledScene('blue','rgb(0,0,255)');controlledMark('async:start');setTimeout(controlledAsyncFinished,80);}
+document.getElementById('work').addEventListener('click',controlledPress,{once:true});controlledScene('red','rgb(255,0,0)');window.controlledReady=true;
+</script>

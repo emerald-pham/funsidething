@@ -1,0 +1,41 @@
+{
+  "fixtureSha256": "b70ef166ce8f4c470d73c03de3e5aaab3f3d201890d0fa60080719f51496a670",
+  "fixtureBytes": 1069165,
+  "taskCount": 64,
+  "activeTasks": 64,
+  "doneTasks": 0,
+  "orderedIDsSha256": "30bfbdba0c1b5f3c84da9a516726ec244c8c1e894e0a883e3f6db9e0a5235ba2",
+  "taskCoreAndUnknownProjectionSha256": "2d11527a8465995433d11d78181302484cd591a66b5ab0823332b1d781c0c8c1",
+  "futureBoardSha256": "1569db75a158eb4cc99a7893a23482431899308cc427d8231333bd775358f9a3",
+  "futurePopulatedVersion": 7,
+  "opaqueCharacter": "p",
+  "opaqueCodeUnits": 1048576,
+  "opaqueUTF8Sha256": "bdcb28a9deb6343e0134eb10449314c675ec8a384e8c556af3c551266966969b",
+  "task0FutureOpaque": [
+    "retain",
+    7
+  ],
+  "task63FutureOpaque": [
+    "retain",
+    63
+  ],
+  "contexts": [],
+  "chain": [],
+  "mode": "scan",
+  "scanMode": "descending",
+  "candidateId": null,
+  "listOpen": false,
+  "historyOpen": false,
+  "addOpenAfterHydrate": true,
+  "addOpenAfterOneToggle": false,
+  "initialContextCounts": [
+    0,
+    0,
+    0
+  ],
+  "passLabel": "0/64",
+  "collapsedListLabel": "All tasks (64)",
+  "historyLabel": "History (0 entries)",
+  "initialScannerCopy": "Nothing dotted yet \u2014 Descending mode starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before.",
+  "sourceReadback": "Complete state + readonly raw meta/snapshots/backups/opaque, original legacy and per-record typed values/hashes; no count-only preservation claim. Actual normal hydration/view bookkeeping differences listed explicitly, never silently normalized."
+}

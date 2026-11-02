@@ -24,7 +24,7 @@
   LandscapeMood.configureHistory(storage);
   LandscapeMood.setPersonalHourlyQuotes(window.getScannerHourlyQuotes?.()||{});
   window.addEventListener('scanner-hourly-quotes-change',event=>{
-    LandscapeMood.setPersonalHourlyQuotes(event.detail||{});refreshSky();
+    LandscapeMood.setPersonalHourlyQuotes(event.detail||{});refreshSky(true);
   });
   let currentEntry=null,visibleBanners=[];
   function sceneTextVisible(element){
@@ -519,6 +519,8 @@
       for(const t of planted.filter(t=>geometry.depthBand(t.x,t.y)===band).sort((a,b)=>a.y-b.y))tree(b,t.x,t.y,t.size,S.mixHex(p.front,'#183d32',.25),t.variant);
     }
     const vignette=b.createLinearGradient(0,hy,0,H);vignette.addColorStop(0,'rgba(5,25,27,0)');vignette.addColorStop(1,'rgba(5,25,27,.035)');b.fillStyle=vignette;b.fillRect(0,hy,W,H-hy);
+    // Cache the slot only after its complete backdrop is painted.
+    lastCitySlot=sceneSnapshot.windowsSlot;
   }
   function cloud(x,y,size,opacity,weather){
     if(weather?.status==='rain'||weather?.status==='thunderstorm'){
@@ -1438,7 +1440,10 @@
   }
   new MutationObserver(updateChrome).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
   themeQuery.addEventListener('change',updateChrome);
-  function refreshSky(){
+  function refreshSky(reuseBackground=false){
+    // Copy loading and a same-size restart still reconcile the current sky and
+    // visitors. Reuse static pixels only when every painted input is unchanged.
+    const previousBackground=reuseBackground?JSON.stringify([sky,p,sceneSeason,sceneSnapshot?.gardens,lastCitySlot,W,H,dpr]):null;
     const location=globalThis.LivingLocation?.current();
     sky=S.skyAt(S.sceneDate(new Date(Math.floor(Date.now()/60000)*60000),sceneStorage,location),location);p=S.palette(sky.sun.altitude);
     if(globalThis.LandscapeMood){sceneSeason=LandscapeMood.season(sky.date,location).name;p=LandscapeMood.palette(p,sky.date,location);}
@@ -1448,7 +1453,8 @@
     const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},T.random(sceneSeed,'hourly-text',Math.floor(+sky.date/3600000)));
     currentEntry=entry;
     status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');
-    paintBackground();syncScene(Date.now());paintLife(world.elapsed);
+    if(!reuseBackground||previousBackground!==JSON.stringify([sky,p,sceneSeason,sceneSnapshot.gardens,sceneSnapshot.windowsSlot,W,H,dpr]))paintBackground();
+    syncScene(Date.now());paintLife(world.elapsed);
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
@@ -1470,7 +1476,7 @@
     nextPaint+=1000/30;
     if(nextPaint<=now)nextPaint=now+1000/30;
     last=now;syncScene(Date.now());
-    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
+    if(lastCitySlot!==sceneSnapshot.windowsSlot)paintBackground();
     paintLife(world.elapsed);
   }
   function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
@@ -1518,7 +1524,7 @@
     // barge crossing, without turning reduced motion into continuous animation.
     const before=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     syncScene(Date.now());
-    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
+    if(lastCitySlot!==sceneSnapshot.windowsSlot)paintBackground();
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
@@ -1533,7 +1539,7 @@
   }
   function start(){
     stop();if(document.hidden)return;
-    if(W!==window.innerWidth||H!==window.innerHeight)resize();else refreshSky();
+    if(W!==window.innerWidth||H!==window.innerHeight)resize();else refreshSky(true);
     scheduleSky();if(!reduced)frame=requestAnimationFrame(tick);else partyTimer=setInterval(()=>advanceRooftopParty(1),1000);
   }
   function updateMotion(){
@@ -1591,10 +1597,14 @@
     // A board adoption mirrors the shared choice into the offline sky keys.
     // Memory also holds it when browser storage rejects writes. Repaint
     // without emitting a user edit back into cloud sync.
+    const beforeTime=S.readSceneTime(sceneStorage),beforeSeason=S.readSceneSeason(sceneStorage);
     sceneStorage.applySynced(time,season);
     renderSceneTimeChoice();
     if(timeDialog.open){seasonInput.value=season||'';refreshSolarTimes();}
-    refreshSky();
+    // Device mirrors and controls still refresh on every adoption. The minute
+    // clock already keeps an unchanged scene current; ordinary task Undo does
+    // not need another complete scenery paint.
+    if(beforeTime!==S.readSceneTime(sceneStorage)||beforeSeason!==S.readSceneSeason(sceneStorage))refreshSky();
   };
   seasonInput.addEventListener('change',refreshSolarTimes);
   document.addEventListener('click',event=>{
@@ -1655,7 +1665,8 @@
   document.addEventListener('landscape-location-change',()=>{refreshSky();});
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
-  resize();updateMotion();if(preference===null)openMotion();
+  // Hidden startup still needs a scene before saved choices can be adopted.
+  if(document.hidden)resize();updateMotion();if(preference===null)openMotion();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
   document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));
@@ -1664,5 +1675,5 @@
   fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{
     if(!response.ok)throw new Error('Human text unavailable');
     return response.text();
-  }).then(markdown=>{LandscapeMood.setHumanText(markdown);refreshSky();}).catch(()=>{});
+  }).then(markdown=>{LandscapeMood.setHumanText(markdown);refreshSky(true);}).catch(()=>{});
 })();

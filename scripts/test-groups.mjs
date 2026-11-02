@@ -4,10 +4,34 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateInputPass } from './agent-tools/ci-pass-reuse.mjs';
+import { currentServiceDeclarations, validateInputPass } from './agent-tools/ci-pass-reuse.mjs';
 
 export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-process'];
+const NATIVE_BUTTON_PROFILE_ADMISSION={required:{profile:'ordinary',engines:['chromium','webkit']},optional:{selector:'optional_mobile_diagnostics',defaultSelected:false,profile:'workload-diagnostic',kind:'optional-workload-diagnostics'}};
+const OPTIONAL_WORKLOAD_ROOTS=[
+  "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
+  "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+  "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+  "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+  "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
+  "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+  "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release"
+];
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
+function optionalWorkloadPartition(inventory,index){
+  const roots=OPTIONAL_WORKLOAD_ROOTS.filter(root=>index.optionalRoots.has(root)).map(root=>{
+    const row=index.assignmentsByRoot.get(root);return{root,file:row.file,group:row.group,reason:row.admissionReason};
+  });
+  const baselineCaseIds=inventory.requiredCases.filter(item=>index.optionalRoots.has(index.replacementByBaseline.get(item.root)?.currentRoot||item.root)).map(item=>item.id).sort();
+  return{roots,baselineCaseIds};
+}
+function validateOptionalRegistrations(index){
+  for(const root of index.optionalRoots){
+    const row=index.assignmentsByRoot.get(root),source=fs.readFileSync(path.join(ROOT,row.file),'utf8'),count=countTestRegistrations(source,root);
+    if(count!==1)fail(`Optional workload root ${JSON.stringify(root)} is registered ${count} times; expected exactly one executable registration.`);
+  }
+}
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INVENTORY_PATH = path.join(ROOT, 'scripts/test-group-inventory.json');
 const ASSIGNMENTS_PATH = path.join(ROOT, 'scripts/test-group-assignments.json');
@@ -35,9 +59,10 @@ function parseArgs(argv) {
   const keyMap = new Map([
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
-    ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
+    ['--source-sha', 'sourceSha'], ['--optional-workload-result','optionalWorkloadResult'], ['--mobile-stress-report','mobileStressReport'], ['--mobile-report','mobileReport'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
   ]);
   for (let index = 0; index < argv.length; index++) {
+    if(argv[index]==='--optional-workload-diagnostics'){if(values.optionalWorkloadDiagnostics)fail('Optional workload diagnostics flag was provided more than once.');values.optionalWorkloadDiagnostics=true;continue;}
     if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
     const key = keyMap.get(argv[index]);
     if (!key) fail(`Unknown argument: ${argv[index]}`);
@@ -89,6 +114,7 @@ function requiredIdentity(options) {
     if (typeof options[key] !== 'string' || !options[key].trim()) fail(`Missing required group identity field: ${key}.`);
   }
   if (!GROUP_IDS.includes(options.group)) fail(`Unknown group ${JSON.stringify(options.group)}; expected ${GROUP_IDS.join(', ')}.`);
+  if(options.optionalWorkloadDiagnostics&&(options.group!=='native-process'||options.aggregate||options.covered))fail('Optional workload diagnostics requires --group native-process and cannot aggregate or cover required evidence.');
   if (!/^[^/\s]+\/[^/\s]+$/.test(options.repository)) fail('Repository identity must use owner/name form.');
   if (!/^[A-Za-z0-9_.-]+$/.test(options.eventPolicy)) fail('Event policy must be a compact policy/event identifier.');
   if (!/^[A-Za-z0-9_.:-]+$/.test(options.runId)) fail('Run id contains unsupported characters.');
@@ -106,7 +132,7 @@ function readJson(file, label) {
 
 function testFiles() {
   const packageJson = readJson(path.join(ROOT, 'package.json'), 'package.json');
-  if (packageJson.scripts?.test !== 'node --test tests.js scripts/agent-tools/*.test.mjs') {
+  if (packageJson.scripts?.test !== 'node --experimental-vm-modules --test tests.js scripts/agent-tools/*.test.mjs') {
     fail('The full npm test entry point changed; update the group runner contract explicitly before grouping this suite.');
   }
   const scriptFiles = fs.readdirSync(path.join(ROOT, 'scripts/agent-tools'))
@@ -220,9 +246,21 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
   }
   const allReplacedSources = new Set(replacementByBaseline.keys());
   for (const root of assignedRootIds) {
-    if (baselineRoots.has(root) || replacementTargets.has(root)) continue;
     if (allReplacedSources.has(root)) fail(`Historical root ${JSON.stringify(root)} must be represented through its replacement target only.`);
   }
+
+  const optionalRoots=new Set();
+  for(const row of assignmentsByRoot.values()){
+    if(row.admission!==undefined&&row.admission!=='optional-workload-diagnostic')fail('Unknown optional admission classification.');
+    if(row.admission==='optional-workload-diagnostic'){
+      if(!OPTIONAL_WORKLOAD_ROOTS.includes(row.root)||row.file!=='tests.js'||row.group!=='native-process')fail('Optional admission must use exactly the approved seven workload identities in tests.js/native-process; unknown or mandatory roots are forbidden.');
+      if(typeof row.admissionReason!=='string'||!row.admissionReason.startsWith('Accepted #1193:')||row.admissionReason.length<40)fail('Optional workload admission needs its source-bound #1193 reason.');
+      optionalRoots.add(row.root);
+    }
+  }
+  const optionalSource=fs.readFileSync(path.join(ROOT,'tests.js'),'utf8');
+  const optionalSourcePresent=OPTIONAL_WORKLOAD_ROOTS.some(root=>countTestRegistrations(optionalSource,root)>0);
+  if((optionalSourcePresent||OPTIONAL_WORKLOAD_ROOTS.some(root=>assignmentsByRoot.has(root)))&&(optionalRoots.size!==7||OPTIONAL_WORKLOAD_ROOTS.some(root=>!optionalRoots.has(root))))fail('Optional workload partition is missing one of the exact seven classifications.');
 
   const durationByRoot = new Map(inventory.rootTests.map(item => [item.id, item.durationMs]));
   const currentRootToBaseline = new Map();
@@ -251,7 +289,7 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
   }
 
   const rootsPerGroup = new Map(GROUP_IDS.map(id => [id, []]));
-  for (const [root, assignment] of assignmentsByRoot) rootsPerGroup.get(assignment.group).push(root);
+  for (const [root, assignment] of assignmentsByRoot) if(!optionalRoots.has(root))rootsPerGroup.get(assignment.group).push(root);
   for (const [group, roots] of rootsPerGroup) if (!roots.length) fail(`Required group ${group} is empty.`);
 
   const processControls = assignments.processControls;
@@ -260,12 +298,14 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     const owner = assignmentsByRoot.get(control?.ownerRoot);
     if (!control || typeof control.id !== 'string' || controlIds.has(control.id) || !owner ||
         !groupSet.has(control.group) || !fileSet.has(control.file) || control.expectedExecutions !== 1 ||
-        owner.group !== control.group || owner.file !== control.file) {
+        owner.group !== control.group || owner.file !== control.file || optionalRoots.has(control.ownerRoot)) {
       fail('Controlled process children need one source declaration, one assigned owner root, and exactly one execution.');
     }
     controlIds.add(control.id);
   }
-  return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup };
+  const currentServiceCases = currentServiceDeclarations(ROOT, assignments);
+  if (currentServiceCases.some(item => inventoryIndex.cases.has(item.id))) fail('Current service declarations must remain separate from the immutable historical case inventory.');
+  return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup, optionalRoots, currentServiceCases };
 }
 
 function cohortDigest(inventory, assignments, assignmentIndex) {
@@ -274,7 +314,7 @@ function cohortDigest(inventory, assignments, assignmentIndex) {
     return replacement ? replacementCaseId(item.id, replacement) : item.id;
   }).sort();
   const rootAssignments = [...assignmentIndex.assignmentsByRoot.values()]
-    .map(({ root, group, file }) => ({ root, group, file }))
+    .map(({ root, group, file, admission, admissionReason }) => ({ root, group, file, admission:admission||'required',admissionReason:admissionReason||null }))
     .sort((left, right) => left.root.localeCompare(right.root));
   const rootReplacements = [...assignmentIndex.replacementByBaseline.values()]
     .map(({ baselineRoot, currentRoot, baselineGroup, group, file }) => ({ baselineRoot, currentRoot, baselineGroup, group, file }))
@@ -282,7 +322,7 @@ function cohortDigest(inventory, assignments, assignmentIndex) {
   const processControls = assignments.processControls
     .map(({ id, group, file, ownerRoot, expectedExecutions }) => ({ id, group, file, ownerRoot, expectedExecutions }))
     .sort((left, right) => left.id.localeCompare(right.id));
-  return sha256(JSON.stringify({ expectedGroups: GROUP_IDS, requiredCaseIds, rootAssignments, rootReplacements, processControls }));
+  return sha256(JSON.stringify({ expectedGroups: GROUP_IDS, requiredCaseIds, rootAssignments, rootReplacements, processControls, currentServiceCases:assignmentIndex.currentServiceCases, optionalWorkloadDiagnostics:optionalWorkloadPartition(inventory,assignmentIndex) }));
 }
 
 function addedRootRegistrations(comparisonBase, files) {
@@ -581,25 +621,26 @@ function parseTap(text) {
   return cases;
 }
 
-function expectedCasesForGroup(inventory, assignments, group) {
+function expectedCasesForGroup(inventory, assignments, group, optional=false) {
   const roots = new Map(assignments.assignmentsByRoot);
   const expected = new Map();
   for (const item of inventory.requiredCases) {
     const replacement = assignments.replacementByBaseline.get(item.root);
     const currentRoot = replacement?.currentRoot || item.root;
     const assignment = roots.get(currentRoot);
-    if (assignment?.group === group) {
+    if (assignment?.group === group && (assignments.optionalRoots?.has(currentRoot)||false)===optional) {
       const currentId = replacement ? replacementCaseId(item.id, replacement) : item.id;
       expected.set(normalizeTapIdentity(currentId), item.id);
     }
   }
+  if (!optional) for (const item of assignments.currentServiceCases || []) if (item.group === group) expected.set(item.id, item.id);
   return expected;
 }
 
-function verifyResults({ cases, group, inventory, assignments, files, source }) {
+function verifyResults({ cases, group, inventory, assignments, files, source, environmentPresence, optionalWorkloadDiagnostics=false }) {
   const errors = [];
   const selectedRoots = [...assignments.assignmentsByRoot.values()]
-    .filter(entry => entry.group === group)
+    .filter(entry => entry.group === group && (assignments.optionalRoots?.has(entry.root)||false)===optionalWorkloadDiagnostics)
     .map(entry => normalizeTapIdentity(entry.root))
     .sort();
   const selectedRootSet = new Set(selectedRoots);
@@ -612,7 +653,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
   for (const root of selectedRoots) if (!seenRoots.has(root)) errors.push(`Assigned root ${JSON.stringify(root)} did not execute.`);
   for (const root of seenRoots) if (!selectedRootSet.has(root)) errors.push(`Unassigned or wrong-group root ${JSON.stringify(root)} executed.`);
 
-  const expected = expectedCasesForGroup(inventory, assignments, group);
+  const expected = expectedCasesForGroup(inventory, assignments, group, optionalWorkloadDiagnostics);
   const actualById = new Map();
   for (const item of cases) {
     if (actualById.has(item.id)) errors.push(`Case ${JSON.stringify(item.id)} executed more than once.`);
@@ -625,17 +666,20 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
     const replacement = assignments.replacementByBaseline.get(root);
     return normalizeTapIdentity(replacement ? replacementCaseId(id, replacement) : id);
   }));
+  const currentServiceCases = new Set((assignments.currentServiceCases || []).filter(item => item.group === group).map(item => item.id));
+  if (currentServiceCases.size && typeof environmentPresence?.FIRESTORE_EMULATOR_HOST !== 'boolean') errors.push('Current service outcomes require actual child emulator environment-presence metadata.');
   for (const item of cases) {
     if (item.status === 'failed') errors.push(`Test case failed: ${item.id}`);
     else if (item.status === 'todo') errors.push(`Test case was unexpectedly marked TODO: ${item.id}`);
-    else if (item.status === 'skipped' && !acceptedSkips.has(item.id)) errors.push(`Test case was unexpectedly skipped: ${item.id}`);
+    else if (item.status === 'skipped' && !acceptedSkips.has(item.id) &&
+      !(currentServiceCases.has(item.id) && environmentPresence?.FIRESTORE_EMULATOR_HOST === false)) errors.push(`Test case was unexpectedly skipped: ${item.id}`);
   }
   const requiredSkipResults = [...acceptedSkips].filter(id => expected.has(id));
   for (const id of requiredSkipResults) if (actualById.get(id)?.status !== 'skipped' && actualById.get(id)?.status !== 'passed') {
     errors.push(`Accepted environment-dependent baseline case ${JSON.stringify(id)} is missing or invalid.`);
   }
 
-  for (const control of assignments.processControls.filter(item => item.group === group)) {
+  for (const control of assignments.processControls.filter(item => item.group === group&&selectedRootSet.has(normalizeTapIdentity(item.ownerRoot)))) {
     const sourceText = fs.readFileSync(path.join(ROOT, control.file), 'utf8');
     const registrations = countTestRegistrations(sourceText, control.id);
     if (registrations !== control.expectedExecutions) errors.push(`Controlled child ${JSON.stringify(control.id)} is registered ${registrations} times; expected exactly ${control.expectedExecutions}.`);
@@ -685,10 +729,145 @@ function coverageReference(proof, identity, execution=true) {
   return {contextSha256:proof.contextSha256,cohortContext:context,coveredBy:producer};
 }
 
-function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
+async function optionalMobileOutcome({needs,options,descriptor,mobileInventory,mobilePolicy,mobilePolicyError}) {
+  const outputs=needs['validation-context']?.outputs||{},policy=outputs.policy,selectedValue=outputs['mobile-diagnostics'];
+  const selectedKnown=['true','false'].includes(selectedValue),selected=selectedKnown?selectedValue==='true':null;
+  const jobResult=needs['mobile-memory']?.result??null,requiredPath=options.mobileReport,stressPath=options.mobileStressReport;
+  const paths={required:requiredPath,stress:stressPath},present=Object.fromEntries(Object.entries(paths).map(([name,file])=>[name,Boolean(file&&fs.existsSync(file))]));
+  const storyInRun=fs.existsSync(mobileInventory)||descriptor.groups.some(group=>group.roots.includes('RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch'));
+  if(!storyInRun&&selected!==true)return null;
+  const outcome={selected,required:false,selectedBy:selected===true?'workflow_dispatch':null,policy:policy??null,jobResult,status:'invalid'};
+  const policies=new Set(['canonical-pr-merge-v1','outgoing-branch-push-v1','exact-main-push-v1','workflow-dispatch-unselected-v1','optional-mobile-dispatch-v1']);
+  if(!selectedKnown||!policies.has(policy)||(selected===(policy!=='optional-mobile-dispatch-v1'))){
+    outcome.errors=['Optional mobile selection output and routed workflow policy are missing, unknown or inconsistent.'];
+    return outcome;
+  }
+  const reportsPresent=present.required||present.stress;
+  if(!selected){
+    outcome.status=jobResult==='skipped'&&!reportsPresent?'not-run':'invalid';
+    if(outcome.status==='invalid')outcome.errors=['An unselected optional mobile diagnostic has an unexpected job result or report.'];
+    return outcome;
+  }
+  if(mobilePolicyError){outcome.errors=[mobilePolicyError];return outcome;}
+  if(!fs.existsSync(mobileInventory)||!storyInRun){outcome.errors=['Selected optional mobile diagnostic has no authoritative capped-story inventory.'];return outcome;}
+  try{
+    const {MOBILE_STORY}=await import('./button-safety-mobile-contract.mjs');
+    if(!mobilePolicy||Object.keys(MOBILE_STORY).some(key=>JSON.stringify(mobilePolicy[key])!==JSON.stringify(MOBILE_STORY[key])))throw Error('Mobile memory policy cannot waive required1GB/reported512MB/motion/Yes workload.');
+  }catch(error){outcome.errors=['Mobile memory policy unavailable or invalid: '+error.message];return outcome;}
+  const missingReports=Object.keys(paths).filter(name=>!present[name]);
+  if(missingReports.length){outcome.status='unavailable';outcome.missingReports=missingReports;return outcome;}
+  const observedReports={},errors=[],reports={};
+  for(const [name,file]of Object.entries(paths)){
+    try{
+      const bytes=fs.readFileSync(file),report=JSON.parse(bytes.toString('utf8'));
+      reports[name]=report;
+      observedReports[name]={reportSha256:sha256(bytes),candidateCommit:report.candidateCommit??null,candidateTree:report.candidateTree??null,sourceSha:report.sourceSha??null,repository:report.repository??null,runId:report.runId??null,runAttempt:report.runAttempt??null,eventPolicy:report.eventPolicy??null,budgetProfile:report.budgetProfile??null,status:report.status??null,cases:Array.isArray(report.cases)?report.cases.length:null,artifactCount:Array.isArray(report.artifacts)?report.artifacts.length:null};
+    }catch(error){errors.push(`${name} mobile report: ${error.message}`);}
+  }
+  if(reports.required&&reports.stress){
+    const {verifyMobileMemoryReport,verifyMobileStressReport}=await import('./button-safety-mobile-contract.mjs');
+    for(const [name,report,verify]of [['required',reports.required,verifyMobileMemoryReport],['stress',reports.stress,verifyMobileStressReport]])try{
+      verify(report,{artifactRoot:path.dirname(path.resolve(paths[name])),candidateCommit:descriptor.resultIdentity.checkoutSha,candidateTree:descriptor.resultIdentity.checkoutTree,sourceSha:options.sourceSha,repository:options.repository,runId:options.runId,runAttempt:options.runAttempt,eventPolicy:options.eventPolicy});
+    }catch(error){errors.push(`${name} mobile report: ${error.message}`);}
+  }
+  outcome.observedReports=observedReports;
+  if(errors.length){outcome.status='invalid';outcome.errors=errors;return outcome;}
+  const required=reports.required,stress=reports.stress;
+  outcome.reportSha256=observedReports.required.reportSha256;
+  outcome.candidateCommit=required.candidateCommit;
+  outcome.candidateTree=required.candidateTree;
+  outcome.image=required.image;
+  outcome.cases=required.cases.length;
+  outcome.artifactCount=required.artifacts.length;
+  outcome.stress={reportSha256:observedReports.stress.reportSha256,status:stress.status,cases:stress.cases.map(row=>({motion:row.motion,outcome:row.appOutcome})),artifactCount:stress.artifacts.length};
+  const outcomes=outcome.stress.cases.map(row=>row.outcome),applicationFailure=outcomes.some(value=>typeof value==='string'&&value.startsWith('app-'));
+  if(applicationFailure)outcome.status='app-failed';
+  else if(stress.status==='failed')outcome.status='failed';
+  else if(jobResult==='success')outcome.status='pass';
+  else{outcome.status='unavailable';outcome.reason='The selected diagnostic producer did not complete successfully.';}
+  return outcome;
+}
+
+function optionalWorkloadOutcome({needs,options,descriptor,inventory,assignmentIndex,assignments,files,source,verifiedFile}) {
+  const outputs=needs['validation-context']?.outputs||{},policy=outputs.policy,selectedValue=outputs['mobile-diagnostics'];
+  const selectedKnown=['true','false'].includes(selectedValue),selected=selectedKnown?selectedValue==='true':null,jobResult=needs['mobile-memory']?.result??null;
+  const file=options.optionalWorkloadResult,present=Boolean(file&&fs.existsSync(file));
+  if(!descriptor.optionalWorkloadDiagnostics.roots.length&&selected!==true&&!present)return null;
+  const outcome={selected,required:false,selectedBy:selected===true?'workflow_dispatch':null,policy:policy??null,jobResult,status:'invalid'};
+  const errors=[];
+  // Retain the complete original value and its actual byte identity even when
+  // selection, source or execution integrity is invalid. It never supplies an
+  // ordinary report or changes the mandatory verdict.
+  let record,root;
+  if(present)try{
+    root=path.dirname(path.resolve(file));
+    if(fs.lstatSync(root).isSymbolicLink()||!fs.lstatSync(root).isDirectory()||fs.lstatSync(file).isSymbolicLink()||!fs.lstatSync(file).isFile())fail('Optional workload result must be a regular owned artifact.');
+    const bytes=fs.readFileSync(file);record=JSON.parse(bytes.toString('utf8'));
+    outcome.observedResult={sha256:sha256(bytes),bytes:bytes.length,raw:record};
+  }catch(error){errors.push(error.message);}
+  const policies=new Set(['canonical-pr-merge-v1','outgoing-branch-push-v1','exact-main-push-v1','workflow-dispatch-unselected-v1','optional-mobile-dispatch-v1']);
+  if(!selectedKnown||!policies.has(policy)||(selected===(policy!=='optional-mobile-dispatch-v1')))errors.push('Optional workload selection and routed policy are missing, unknown or inconsistent.');
+  if(errors.length){outcome.errors=errors;return outcome;}
+  if(!selected){
+    outcome.status=jobResult==='skipped'&&!present?'not-run':'invalid';
+    if(outcome.status==='invalid')outcome.errors=['An unselected optional workload has an unexpected producer result or artifact.'];
+    return outcome;
+  }
+  if(!present){outcome.status='unavailable';outcome.reason='The selected producer did not retain an optional workload result.';return outcome;}
+  try{
+    if(record.schemaVersion!==1||record.kind!=='optional-workload-diagnostics')fail('Optional workload result kind or schema is invalid.');
+    if(record.resultIdentity?.selectedGroup!=='optional-workload-diagnostics')fail('Optional workload result cannot impersonate a required group.');
+    for(const[key,value]of Object.entries(descriptor.resultIdentity)){
+      if(key==='selectedGroup')continue;
+      if(JSON.stringify(record.resultIdentity?.[key])!==JSON.stringify(value))fail('Optional workload source identity mismatch: '+key+'.');
+    }
+    if(record.resultIdentity.checkoutDirty)fail('Hosted optional workload source is dirty.');
+    if(descriptor.optionalWorkloadDiagnostics.roots.length!==7||JSON.stringify(record.optionalWorkloadDiagnostics)!==JSON.stringify(descriptor.optionalWorkloadDiagnostics))fail('Optional workload partition must retain exactly the seven independently classified roots.');
+    if(!['passed','failed'].includes(record.status)||!Array.isArray(record.cases)||!Array.isArray(record.artifacts)||!Array.isArray(record.issues))fail('Optional workload execution is missing or malformed.');
+    if(record.process?.signal||record.process?.spawnError||![0,1].includes(record.process?.exitCode))fail('Optional workload process did not complete normally.');
+    const tap=verifiedFile(root,record.process.stdout.path,record.process.stdout.sha256).toString('utf8');
+    verifiedFile(root,record.process.stderr.path,record.process.stderr.sha256);
+    const cases=parseTap(tap).map(({id,root,status,skipReason})=>({id,root,status,skipReason}));
+    if(JSON.stringify(cases)!==JSON.stringify(record.cases))fail('Optional workload cases differ from the actual retained TAP.');
+    const validationIssues=verifyResults({cases,group:'native-process',inventory,assignments:{...assignmentIndex,processControls:assignments.processControls},files,source,environmentPresence:record.process?.environmentPresence,optionalWorkloadDiagnostics:true});
+    outcome.validationIssues=validationIssues;
+    // An honestly observed failed assertion stays failed. All other verifier
+    // errors remain invalid. Neither path rewrites the raw cases or issues.
+    const assertionFailures=cases.filter(row=>row.status==='failed').map(row=>'Test case failed: '+row.id);
+    if(validationIssues.some(issue=>!assertionFailures.includes(issue)))fail('Optional workload integrity: '+validationIssues.join(' '));
+    const expectedIssues=record.process.exitCode===0?validationIssues:['Test process exited with '+record.process.exitCode+'.',...validationIssues];
+    if(JSON.stringify(record.issues)!==JSON.stringify(expectedIssues))fail('Optional workload raw issues do not reconcile with its actual process and cases.');
+    if(fs.existsSync(path.join(root,'runtime-tmp')))fail('Optional workload owned process-temp cleanup is incomplete.');
+    const artifactPaths=new Set();
+    for(const artifact of record.artifacts){
+      if(artifactPaths.has(artifact.path))fail('Duplicate optional workload artifact.');artifactPaths.add(artifact.path);
+      verifiedFile(root,artifact.path,artifact.sha256,artifact.bytes);
+    }
+    const actualArtifacts=['native','recovery-ui'].flatMap(name=>fs.existsSync(path.join(root,name))?artifactInventory(path.join(root,name)):[]);
+    if(JSON.stringify(actualArtifacts.sort((a,b)=>a.path.localeCompare(b.path)))!==JSON.stringify([...record.artifacts].sort((a,b)=>a.path.localeCompare(b.path))))fail('Optional workload artifact inventory is incomplete or inconsistent.');
+    outcome.artifactCount=record.artifacts.length;
+    if(record.status==='passed'){
+      if(record.process.exitCode!==0||validationIssues.length)fail('Optional workload claimed a false pass.');
+      outcome.status=jobResult==='success'?'pass':'unavailable';
+      if(outcome.status==='unavailable')outcome.reason='The selected diagnostic producer did not complete successfully.';
+    }else{
+      if(record.process.exitCode!==1||assertionFailures.length===0)fail('Optional workload failed status has no actual failed assertion.');
+      outcome.status='failed';
+    }
+  }catch(error){outcome.errors=[error.message];outcome.status='invalid';}
+  return outcome;
+}
+
+async function aggregateResults({options, outputDir, descriptor, inventory, assignmentIndex, assignments, files, source}) {
   if (!options.resultsDir || !options.needsJson) fail('Aggregate requires --results-dir and --needs-json.');
   const needs = readJson(options.needsJson, 'actual workflow predecessor results');
   const issues = [], records = [], allCases = new Set();
+
+  let mobileMemory=null;
+  const mobileInventory=path.join(ROOT,'scripts/button-safety-inventory.json');
+  let mobilePolicy=null,mobilePolicyError=null;
+  if(fs.existsSync(mobileInventory))try{mobilePolicy=readJson(mobileInventory,'mobile story policy').requiredMobileStory;}catch(error){mobilePolicyError='Mobile memory policy unavailable: '+error.message;}
+  mobileMemory=await optionalMobileOutcome({needs,options,descriptor,mobileInventory,mobilePolicy,mobilePolicyError});
   const covered=needs['cohort-routing']?.outputs?.decision==='reuse';
   const reused=JSON.parse(needs['cohort-routing']?.outputs?.reused||'[]');
   if(!Array.isArray(reused)||new Set(reused).size!==reused.length||reused.some(id=>!GROUP_IDS.includes(id)&&!['rules','compatibility'].includes(id)))fail('Invalid reused-gate inventory.');
@@ -719,11 +898,13 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
     if (sha256(content) !== expected) fail(`Artifact hash mismatch: ${relative}.`);
     return content;
   };
+  const optionalWorkload=optionalWorkloadOutcome({needs,options,descriptor,inventory,assignmentIndex,assignments,files,source,verifiedFile});
   for (const id of GROUP_IDS) {
     try {
       const root = path.resolve(options.resultsDir,id);
       if (fs.lstatSync(root).isSymbolicLink()) fail('Group evidence must be a real directory.');
       const record = readJson(path.join(root,'result.json'),`required result for ${id}`);
+      if(record.kind!=='required-test-group')fail(`Required group ${id} has an optional or unknown result kind.`);
       const inputCovered=!covered&&reused.includes(id)&&record.status==='covered';
       if (record.status !== (covered||inputCovered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
       const identity = record.resultIdentity;
@@ -732,6 +913,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
         if (JSON.stringify(identity?.[key]) !== JSON.stringify(value)) fail(`Required group ${id} identity mismatch: ${key}.`);
       }
       if (identity?.selectedGroup !== id || identity.checkoutDirty) fail(`Wrong or dirty group identity: ${id}.`);
+      if (JSON.stringify(record.currentServiceCases) !== JSON.stringify(descriptor.currentServiceCases)) fail(`Required group ${id} current service declaration differs from the source-bound descriptor.`);
       if(covered||inputCovered){
         const expectedCoverage=inputCovered?coverageReference(freshProof,{...descriptor.resultIdentity,selectedGroup:id},false):freshCoverage;
         if(record.cases?.length!==0||record.artifacts?.length!==0||record.process!==null||JSON.stringify(record.coverage)!==JSON.stringify(expectedCoverage))fail('Covered records are mixed, incomplete or claim current execution.');
@@ -742,7 +924,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       verifiedFile(root,record.process.stderr.path,record.process.stderr.sha256);
       const cases = parseTap(tap).map(({id,root,status,skipReason}) => ({id,root,status,skipReason}));
       if (JSON.stringify(cases) !== JSON.stringify(record.cases)) fail(`Required group ${id} case report differs from actual TAP.`);
-      const errors = verifyResults({cases,group:id,inventory,assignments:{...assignmentIndex,processControls:assignments.processControls},files,source});
+      const errors = verifyResults({cases,group:id,inventory,assignments:{...assignmentIndex,processControls:assignments.processControls},files,source,environmentPresence:record.process?.environmentPresence});
       if (errors.length) fail(errors.join(' '));
       for (const item of cases) { if (allCases.has(item.id)) fail(`Duplicate case across groups: ${item.id}.`); allCases.add(item.id); }
       const artifactPaths = new Set();
@@ -782,12 +964,24 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
           if (report.status !== 'passed' || report.oldCommit !== '779defa4e8c3465fdf535fe17dbe2227d2b76ea1' || report.candidateCommit !== identity.checkoutSha || report.candidateTree !== identity.checkoutTree || !['contextClosed','browserClosed','serverClosed'].every(key=>report.cleanup?.[key]===true)) fail('Native report outcome, actual checkout or cleanup mismatch.');
         }
       }
+      if (descriptor.groups.find(group=>group.id===id).roots.includes('RISK repository process: required native button actions execute in Chromium and WebKit')) {
+        const reports=[];
+        for(const artifact of record.artifacts||[]){
+          if(!artifact.path.startsWith('native/')||!artifact.path.endsWith('.json'))continue;
+          const report=JSON.parse(verifiedFile(root,artifact.path,artifact.sha256,artifact.bytes));
+          if(report.kind==='button-safety')reports.push(report);
+        }
+        if(reports.length!==2||new Set(reports.map(report=>report.engine)).size!==2||!['chromium','webkit'].every(engine=>reports.some(report=>report.engine===engine)))fail('Both required distinct native button reports must be present.');
+        const bytes=fs.readFileSync(path.join(ROOT,'scripts/button-safety-inventory.json'));
+        const {verifyButtonSafetyReport}=await import('./button-safety-contract.mjs');
+        for(const report of reports)verifyButtonSafetyReport(report,{inventory:JSON.parse(bytes),inventorySha256:sha256(bytes),candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,engine:report.engine,expectedProfile:descriptor.nativeButtonProfileAdmission.required.profile});
+      }
       records.push({group:id,resultSha256:sha256(fs.readFileSync(path.join(root,'result.json'))),cases:cases.length,passed:cases.filter(item=>item.status==='passed').length,skipped:cases.filter(item=>item.status==='skipped').length,artifacts:record.artifacts,identity});
     } catch (error) { issues.push(`${id}: ${error.message}`); }
   }
   const coveredCount=records.filter(record=>record.mode==='covered').length;
   const original=coveredCount===0&&reusedEmulators.length===0;
-  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:coveredCount===GROUP_IDS.length?'covered':coveredCount?'mixed':'full',resultIdentity:descriptor.resultIdentity,groups:records,emulatorCoverage,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
+  const report = {schemaVersion:1,status:issues.length?'failed':'passed',mode:coveredCount===GROUP_IDS.length?'covered':coveredCount?'mixed':'full',resultIdentity:descriptor.resultIdentity,currentServiceCases:descriptor.currentServiceCases,nativeButtonProfileAdmission:descriptor.nativeButtonProfileAdmission,mobileMemory,optionalWorkload,groups:records,emulatorCoverage,caseCount:allCases.size,issues,finishedAt:new Date().toISOString()};
   atomicWrite(path.join(outputDir,'aggregate.json'),report);
   if (issues.length) fail(issues.join('\n'));
   process.stdout.write(`Complete required cohort verified: ${allCases.size} cases.\n`);
@@ -821,14 +1015,14 @@ async function unclassifiedRootGuard(files, assignments, outputDir) {
   // suppress a future root here.
   const reporterPath=path.join(outputDir,'unclassified-reporter.mjs');
   fs.writeFileSync(reporterPath,`export default async function* (events) { for await (const event of events) if(event.type==='test:summary') yield JSON.stringify(event.data)+'\\n'; }\n`,{flag:'wx'});
-  const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
+  const env = {...process.env,CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS:'0'}; delete env.NODE_TEST_CONTEXT;
   const reports=[],errors=[];
   for (const [index,file] of files.entries()) {
     const roots=[...assignments.assignmentsByRoot.values()].filter(entry=>entry.file===file).map(entry=>normalizeTapIdentity(entry.root));
     const patterns=testNamePatternArguments(roots).map(argument=>argument.replace('--test-name-pattern=','--test-skip-pattern='));
     const prefix=`unclassified-${index}`;
     const stdoutPath=path.join(outputDir,prefix+'.tap'),stderrPath=path.join(outputDir,prefix+'.stderr.log'),summaryPath=path.join(outputDir,prefix+'.summary.jsonl');
-    const child=spawn(process.execPath,['--test','--test-reporter=tap','--test-reporter-destination=stdout','--test-reporter='+reporterPath,'--test-reporter-destination='+summaryPath,...patterns,file],{cwd:ROOT,env,detached:true,stdio:['ignore','pipe','pipe']});
+    const child=spawn(process.execPath,['--experimental-vm-modules','--test','--test-reporter=tap','--test-reporter-destination=stdout','--test-reporter='+reporterPath,'--test-reporter-destination='+summaryPath,...patterns,file],{cwd:ROOT,env,detached:true,stdio:['ignore','pipe','pipe']});
     const stdout=fs.createWriteStream(stdoutPath,{flags:'wx'}),stderr=fs.createWriteStream(stderrPath,{flags:'wx'});
     child.stdout.pipe(stdout);child.stderr.pipe(stderr);
     let timedOut=false,overLimit=false,bytes=0;
@@ -870,7 +1064,8 @@ async function runChild(files, roots, outputDir, options, source) {
     TMPDIR: runtimeTmp,
     TMP: runtimeTmp,
     TEMP: runtimeTmp,
-    CHAIN_TEST_GROUP: options.group,
+    CHAIN_TEST_GROUP: options.optionalWorkloadDiagnostics?'optional-workload-diagnostics':options.group,
+    CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS: options.optionalWorkloadDiagnostics?'1':'0',
     CHAIN_TEST_RUN_ID: options.runId,
     CHAIN_GROUP_OUTPUT_DIR: outputDir,
     CHAIN_NATIVE_OUTPUT: nativeDir,
@@ -878,7 +1073,7 @@ async function runChild(files, roots, outputDir, options, source) {
     CHAIN_NATIVE_CANDIDATE_TREE: source.tree,
     CHAIN_RECOVERY_UI_OUTPUT: recoveryDir,
   };
-  const child = spawn(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
+  const child = spawn(process.execPath, ['--experimental-vm-modules', '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.pipe(tap);
@@ -895,6 +1090,7 @@ async function runChild(files, roots, outputDir, options, source) {
   finally { fs.rmSync(runtimeTmp, { recursive: true, force: true }); }
   return {
     exit, cases, tapPath, stderrPath, tapSha256: sha256(tapText), stderrSha256: sha256(stderrText), nativeDir, recoveryDir,
+    environmentPresence: { FIRESTORE_EMULATOR_HOST: Boolean(env.FIRESTORE_EMULATOR_HOST) },
     selection: { requiredRootCount: roots.length, namePatternArgumentBytes: patternArguments.map(argument => Buffer.byteLength(argument)) },
   };
 }
@@ -924,6 +1120,7 @@ async function main() {
 
   const result = {
     schemaVersion: 1,
+    kind:options.optionalWorkloadDiagnostics?'optional-workload-diagnostics':'required-test-group',
     status: 'preflight_failed',
     startedAt,
     resultIdentity: null,
@@ -958,7 +1155,7 @@ async function main() {
       workingTreeSha256: source.workingTreeSha256,
       comparisonBase: options.comparisonBase,
       expectedGroups: GROUP_IDS,
-      selectedGroup: options.group,
+      selectedGroup: options.optionalWorkloadDiagnostics?'optional-workload-diagnostics':options.group,
       inventorySha256: sha256(inventoryBytes),
       assignmentsSha256: sha256(assignmentsBytes),
       addedRootTitles: [],
@@ -968,6 +1165,7 @@ async function main() {
     };
     const inventoryIndex = validateInventory(inventory);
     const assignmentIndex = validateAssignments(assignments, inventory, inventoryIndex, files);
+    validateOptionalRegistrations(assignmentIndex);
     const registrationInfo = validateAddedRegistrations(assignments, inventoryIndex, assignmentIndex, files, inventory.baseline.sourceSha);
     result.resultIdentity.addedRootTitles = registrationInfo.addedRootTitles;
     result.resultIdentity.mappedBaselineRoots = registrationInfo.mappedBaselineRoots;
@@ -977,9 +1175,11 @@ async function main() {
       return runtimeRoot === id ? null : { baselineRoot: id, runtimeRoot };
     }).filter(Boolean);
     result.resultIdentity.cohortDigestSha256 = cohortDigest(inventory, assignments, assignmentIndex);
+    result.optionalWorkloadDiagnostics=optionalWorkloadPartition(inventory,assignmentIndex);
+    result.currentServiceCases=assignmentIndex.currentServiceCases;
     {
       const accepted = new Set(inventory.acceptedSkipCaseIds);
-      const descriptor = { schemaVersion: 1, resultIdentity: { ...result.resultIdentity, selectedGroup: null },
+      const descriptor = { schemaVersion: 1, nativeButtonProfileAdmission:NATIVE_BUTTON_PROFILE_ADMISSION, resultIdentity: { ...result.resultIdentity, selectedGroup: null }, currentServiceCases:result.currentServiceCases, optionalWorkloadDiagnostics:result.optionalWorkloadDiagnostics,
         groups: GROUP_IDS.map(id => ({ id,
           roots: assignmentIndex.rootsPerGroup.get(id).map(normalizeTapIdentity).sort(),
           requiredCaseIds: [...expectedCasesForGroup(inventory, assignmentIndex, id).keys()],
@@ -1002,10 +1202,9 @@ async function main() {
       }
     }
 
-    const selectedFiles = [...new Set([
-      ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
-    ])].sort();
-    const selectedRoots = assignmentIndex.rootsPerGroup.get(options.group).sort();
+    const selectedRoots = options.optionalWorkloadDiagnostics?[...assignmentIndex.optionalRoots].sort():assignmentIndex.rootsPerGroup.get(options.group).sort();
+    const selectedRootSet=new Set(selectedRoots);
+    const selectedFiles = [...new Set(selectedRoots.map(root=>assignmentIndex.assignmentsByRoot.get(root).file))].sort();
     if (!selectedFiles.length || !selectedRoots.length) fail(`Required group ${options.group} is empty.`);
 
     result.inventory = {
@@ -1016,12 +1215,12 @@ async function main() {
       baselineCaseCount: inventory.baseline.caseCount,
       baselinePassed: inventory.baseline.passed,
       baselineAcceptedSkips: inventory.baseline.skipped,
-      requiredCasesForGroup: expectedCasesForGroup(inventory, assignmentIndex, options.group).size,
+      requiredCasesForGroup: expectedCasesForGroup(inventory, assignmentIndex, options.group,Boolean(options.optionalWorkloadDiagnostics)).size,
       requiredRootsForGroup: selectedRoots.length,
       baselineEstimatedDurationMs: assignments.groups.find(group => group.id === options.group).baselineEstimatedDurationMs,
       groupAssignmentMethod: assignments.assignmentMethod,
     };
-    result.processControls = assignments.processControls.filter(control => control.group === options.group).map(control => ({
+    result.processControls = assignments.processControls.filter(control => control.group === options.group&&selectedRootSet.has(control.ownerRoot)).map(control => ({
       id: control.id,
       group: control.group,
       file: control.file,
@@ -1030,7 +1229,7 @@ async function main() {
       registrationCount: countTestRegistrations(fs.readFileSync(path.join(ROOT, control.file), 'utf8'), control.id),
     }));
 
-    if (options.group === 'core') result.unclassifiedRootGuard = await unclassifiedRootGuard(files,assignmentIndex,outputDir);
+    if (options.group === 'core'&&!options.optionalWorkloadDiagnostics) result.unclassifiedRootGuard = await unclassifiedRootGuard(files,assignmentIndex,outputDir);
     const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source);
     nativeDir = childResult.nativeDir;
     result.process = {
@@ -1040,6 +1239,7 @@ async function main() {
       stdout: { path: path.basename(childResult.tapPath), sha256: childResult.tapSha256 },
       stderr: { path: path.basename(childResult.stderrPath), sha256: childResult.stderrSha256 },
       selection: childResult.selection,
+      environmentPresence: childResult.environmentPresence,
     };
     result.cases = childResult.cases.map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
     result.artifacts = [...artifactInventory(nativeDir), ...artifactInventory(childResult.recoveryDir)];
@@ -1050,6 +1250,8 @@ async function main() {
       assignments: { ...assignmentIndex, processControls: assignments.processControls },
       files: selectedFiles,
       source,
+      environmentPresence: childResult.environmentPresence,
+      optionalWorkloadDiagnostics:Boolean(options.optionalWorkloadDiagnostics),
     });
     if (childResult.exit.code !== 0) result.issues.unshift(`Test process exited with ${childResult.exit.code ?? childResult.exit.signal ?? childResult.exit.error}.`);
     if (gitStatus.trim() && !source.dirty) result.issues.push('Checkout dirty state could not be reconciled with its identity.');

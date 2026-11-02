@@ -1,0 +1,1 @@
+{"record":{"startTime":0.9111577916773967,"stackTrace":{"callFrames":[{"functionName":"requestAnimationFrame","url":"[native code]","scriptId":"0","lineNumber":0,"columnNumber":0},{"functionName":"pulse","url":"web-inspector://bootstrap.js","scriptId":"17","lineNumber":781,"columnNumber":576}]},"data":{"id":44},"type":"RequestAnimationFrame"}}

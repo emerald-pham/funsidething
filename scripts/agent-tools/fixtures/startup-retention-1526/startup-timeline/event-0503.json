@@ -1,0 +1,1 @@
+{"record":{"startTime":1.2182787499623373,"data":{"id":85},"children":[{"startTime":1.2182814999832772,"data":{"scriptName":"","scriptLine":25,"scriptColumn":26},"children":[],"endTime":1.218301374989096,"type":"FunctionCall"}],"endTime":1.218301791639533,"type":"FireAnimationFrame"}}

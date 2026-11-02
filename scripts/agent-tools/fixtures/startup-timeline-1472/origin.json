@@ -1,0 +1,7 @@
+{
+  "sourcePacketSha256": "f69ce8245ae4603cbf4e0abcd373388ce792f49cf369921a55640258e0a7fdf5",
+  "recorderId": "f10a3672-5021-46cf-ac16-e0681bb74c99",
+  "captureSha256": "06ee85c2cbbe1ae5480688ad2e703d6807fcd1c881a3099005327fa63f6f5efe",
+  "rawInventorySha256": "5f3c4ce91cf79a29b4d0ac36868af0820df8b7e138ddbe7c4d3db5a2bc5fcc9a",
+  "runtimeProvenance": "Exact closed1468 tuple from original capture, not later consumer host"
+}

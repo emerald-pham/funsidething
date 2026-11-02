@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+    inputs:
+      optional_mobile_diagnostics:
+        description: Run the capped mobile WebKit diagnostic story for this branch.
+        required: false
+        default: false
+        type: boolean
 
 env:
   CHAIN_CI_TOPOLOGY: four-groups-v1
@@ -16,6 +23,7 @@ jobs:
       base: ${{ steps.diff-base.outputs.sha }}
       context: ${{ steps.plan.outputs.context }}
       policy: ${{ steps.plan.outputs.policy }}
+      mobile-diagnostics: ${{ steps.plan.outputs.mobile-diagnostics }}
       tree: ${{ steps.plan.outputs.tree }}
       workflow-blob: ${{ steps.plan.outputs.workflow-blob }}
       input-keys: ${{ steps.plan.outputs.input-keys }}
@@ -202,6 +210,9 @@ jobs:
       - name: Install matching native Chromium
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         run: npx --no-install playwright install --with-deps chromium
+      - name: Install matching required native WebKit
+        if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group) && (matrix.group == 'native-process' || matrix.group == 'persistence-recovery')
+        run: npx --no-install playwright install --with-deps webkit
       - name: Execute CI gate ${{ matrix.group }} input ${{ fromJSON(steps.selected.outputs.input-keys)[matrix.group] }}
         if: steps.selected.outputs.decision == 'full' && !contains(fromJSON(steps.selected.outputs.reused), matrix.group)
         run: echo "Executing previously uncovered group inputs"
@@ -219,8 +230,43 @@ jobs:
         if: success() && steps.group.outputs.mode == 'executed' && steps.group.outputs.key != ''
         run: echo "Original group execution and retained result verified"
 
+  mobile-memory:
+    name: mobile-WebKit-1GB-and-512MB-stress
+    if: ${{ github.event_name == 'workflow_dispatch' && needs.validation-context.outputs.mobile-diagnostics == 'true' }}
+    needs: validation-context
+    runs-on: ubuntu-latest
+    env:
+      CHAIN_TEST_EVENT_POLICY: ${{ needs.validation-context.outputs.policy }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Required 1GB browser family with external driver and live-WebKit OOM control
+        run: node scripts/button-safety-mobile-memory.mjs --run --profile required-1gb --output-dir "$RUNNER_TEMP/mobile-memory/required"
+      - name: Report 512MB stress outcomes with full execution integrity
+        if: always()
+        run: node scripts/button-safety-mobile-memory.mjs --run --profile stress-512mb --output-dir "$RUNNER_TEMP/mobile-memory/stress"
+      - name: Install matching selected workload browsers
+        if: always()
+        run: npx --no-install playwright install --with-deps chromium webkit
+      - name: Execute selected optional workload diagnostics
+        if: always()
+        run: npm run test:group -- --optional-workload-diagnostics --group native-process --output-dir "$RUNNER_TEMP/mobile-memory/optional-workload" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "${{ needs.validation-context.outputs.base }}"
+      - name: Preserve capped runtime configuration control and native results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mobile-memory
+          if-no-files-found: error
+
   scanner-tests:
-    needs: [validation-context, event-gates, cohort-routing, regression]
+    needs: [validation-context, event-gates, cohort-routing, regression, mobile-memory]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -266,6 +312,12 @@ jobs:
           name: regression-${{ github.run_id }}-${{ github.run_attempt }}-native-process
           path: ${{ runner.temp }}/groups/native-process
       - uses: actions/download-artifact@v4
+        if: always() && needs.validation-context.outputs.mobile-diagnostics == 'true'
+        continue-on-error: true
+        with:
+          name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/mobile-memory
+      - uses: actions/download-artifact@v4
         with:
           name: ci-routing-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/ci-routing
@@ -278,7 +330,7 @@ jobs:
         id: aggregate
         if: always()
         run: |
-          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
+          npm run test:group -- --aggregate --group core --output-dir "$RUNNER_TEMP/aggregate" --results-dir "$RUNNER_TEMP/groups" --needs-json "$RUNNER_TEMP/needs.json" --mobile-report "$RUNNER_TEMP/mobile-memory/required/report.json" --mobile-stress-report "$RUNNER_TEMP/mobile-memory/stress/report.json" --optional-workload-result "$RUNNER_TEMP/mobile-memory/optional-workload/result.json" --proof "$RUNNER_TEMP/final-routing/routing.json" --repository "$GITHUB_REPOSITORY" --event-policy "$CHAIN_TEST_EVENT_POLICY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$CHAIN_TEST_SOURCE_SHA" --comparison-base "$CHAIN_TEST_COMPARISON_BASE"
       - name: Preserve verified aggregate and final observations
         if: always()
         uses: actions/upload-artifact@v4

@@ -445,7 +445,7 @@
       return {ok:true,verified:head?.payload===legacy.headPayload&&head?.hash===headHash&&exactBackups&&exactOpaque,hash:headHash};
     }
 
-    async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[]}={}){
+    async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[],isCurrent=null}={}){
       ensureOpen();
       if(typeof payload!=="string") return {error:true,code:"invalid-payload"};
       const nextHash=await sha(payload);
@@ -476,6 +476,11 @@
           return {error:true,code:"backup-id-collision"};
         }
       }
+      // Hashing and transaction reads can outlive a bounded replay. Recheck its
+      // synchronous authority in this transaction immediately before any write.
+      let currentAttempt=isCurrent===null;
+      if(isCurrent!==null)try{currentAttempt=typeof isCurrent==="function"&&isCurrent()===true;}catch{}
+      if(!currentAttempt){tx.abort();try{await transactionDone(tx);}catch{}return {error:true,code:"stale-attempt"};}
       const removeIds=new Set(Array.isArray(removeBackupIds)?removeBackupIds.filter(id=>typeof id==="string"&&id):[]);
       for(const id of removeIds) backupStore.delete(id);
       for(const prepared of preparedBackups){

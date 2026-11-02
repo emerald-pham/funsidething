@@ -1,0 +1,1 @@
+{"record":{"startTime":0.447677833319176,"data":{"type":"DOMContentLoaded","defaultPrevented":false},"children":[{"startTime":0.44768320833100006,"data":{"scriptName":"web-inspector://bootstrap.js","scriptLine":761,"scriptColumn":50},"children":[],"endTime":0.447696499992162,"type":"FunctionCall"}],"endTime":0.44769699999596924,"type":"EventDispatch"}}

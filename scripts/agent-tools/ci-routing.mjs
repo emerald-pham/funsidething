@@ -47,14 +47,23 @@ async function main() {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository ?? '')) throw new Error('GITHUB_REPOSITORY must identify the current repository.');
   if (!decimal(process.env.GITHUB_RUN_ID) || !decimal(process.env.GITHUB_RUN_ATTEMPT)) throw new Error('Current run and attempt identities are required.');
   const eventName = process.env.GITHUB_EVENT_NAME;
-  if (!['push', 'pull_request'].includes(eventName)) throw new Error('Unknown workflow event policy.');
+  if (!['push', 'pull_request', 'workflow_dispatch'].includes(eventName)) throw new Error('Unknown workflow event policy.');
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-  const sourceSha = eventName === 'pull_request' ? event.pull_request?.head?.sha : event.after;
   const checkoutSha = git('rev-parse', 'HEAD');
-  if (!sha(sourceSha) || checkoutSha !== process.env.GITHUB_SHA || (eventName === 'push' && sourceSha !== checkoutSha)) throw new Error('Source or actual checkout identity is unavailable or inconsistent.');
+  if (eventName === 'workflow_dispatch' && (event.ref !== process.env.GITHUB_REF || !/^refs\/heads\/.+/.test(event.ref ?? '')
+    || !['true', 'false'].includes(event.inputs?.optional_mobile_diagnostics))) {
+    throw new Error('Workflow dispatch requires an exact branch ref and explicit optional mobile boolean.');
+  }
+  const sourceSha = eventName === 'pull_request' ? event.pull_request?.head?.sha : eventName === 'workflow_dispatch' ? checkoutSha : event.after;
+  if (!sha(sourceSha) || checkoutSha !== process.env.GITHUB_SHA || (eventName !== 'pull_request' && sourceSha !== checkoutSha)) throw new Error('Source or actual checkout identity is unavailable or inconsistent.');
   const sourceTree = git('rev-parse', `${sourceSha}^{tree}`), checkoutTree = git('rev-parse', 'HEAD^{tree}');
   if (!sha(sourceTree) || !sha(checkoutTree) || git('status', '--porcelain', '--untracked-files=no')) throw new Error('Routing requires a clean exact committed checkout.');
   const isMain = eventName === 'push' && process.env.GITHUB_REF === 'refs/heads/main';
+  const mobileDiagnosticSelected = eventName === 'workflow_dispatch' && event.inputs.optional_mobile_diagnostics === 'true';
+  const optionalDiagnostics = { mobileMemory: { selected: mobileDiagnosticSelected, required: false, selectedBy: mobileDiagnosticSelected ? 'workflow_dispatch' : null } };
+  const eventPolicy = eventName === 'workflow_dispatch'
+    ? mobileDiagnosticSelected ? 'optional-mobile-dispatch-v1' : 'workflow-dispatch-unselected-v1'
+    : eventName === 'pull_request' ? 'canonical-pr-merge-v1' : isMain ? 'exact-main-push-v1' : 'outgoing-branch-push-v1';
   let cohort = null;
   if (args.descriptor) {
     const descriptor = JSON.parse(readFileSync(args.descriptor,'utf8')), identity=descriptor.resultIdentity;
@@ -62,13 +71,21 @@ async function main() {
       if (identity?.[key] !== value) throw new Error(`Descriptor identity mismatch: ${key}.`);
     }
     if (String(identity.runAttempt)!==process.env.GITHUB_RUN_ATTEMPT || identity.checkoutDirty || !/^[a-f0-9]{64}$/.test(identity.cohortDigestSha256) || JSON.stringify(identity.expectedGroups)!==JSON.stringify(['core','scenery','persistence-recovery','native-process'])) throw new Error('Invalid complete cohort descriptor.');
+    const workflow=git('show',`${checkoutSha}:${workflowPath}`),jobsSource=workflow.split(/^jobs:\s*$/m)[1]||'';
+    const jobs=[...jobsSource.matchAll(/^  ([a-z][a-z0-9-]*):\s*$/gm)].map(match=>match[1]);
+    const job=id=>jobsSource.split(new RegExp('^  '+id+':\\s*$','m'))[1]?.split(/^  [a-z][a-z0-9-]*:\s*$/m)[0]||'';
+    if(JSON.stringify(jobs)!==JSON.stringify(['validation-context','event-gates','cohort-routing','regression','mobile-memory','scanner-tests','release-evidence','deploy-pages'])
+      ||!/^  workflow_dispatch:\n    inputs:\n      optional_mobile_diagnostics:\n        description: [^\n]+\n        required: false\n        default: false\n        type: boolean$/m.test(workflow)
+      ||!/^      mobile-diagnostics: \$\{\{ steps\.plan\.outputs\.mobile-diagnostics \}\}$/m.test(job('validation-context'))
+      ||!/^    name: mobile-WebKit-1GB-and-512MB-stress$/m.test(job('mobile-memory'))
+      ||!/^    if: \$\{\{ github\.event_name == 'workflow_dispatch' && needs\.validation-context\.outputs\.mobile-diagnostics == 'true' \}\}$/m.test(job('mobile-memory'))
+      ||!/^    needs: \[validation-context, event-gates, cohort-routing, regression, mobile-memory\]$/m.test(job('scanner-tests')))throw new Error('Unknown optional mobile diagnostic topology.');
     cohort={requiredCohort:'four-groups-v1',cohortDigestSha256:identity.cohortDigestSha256,inventorySha256:identity.inventorySha256,assignmentsSha256:identity.assignmentsSha256,expectedGroups:identity.expectedGroups,workflowBlob:git('rev-parse',`${checkoutSha}:${workflowPath}`)};
   }
-  const boundContext = (...values) => ({...context(...values),...(cohort||{})});
-  const validationContext = boundContext(repository, sourceSha, sourceTree, checkoutSha, checkoutTree, args['comparison-base'],
-    eventName === 'pull_request' ? 'canonical-pr-merge-v1' : isMain ? 'exact-main-push-v1' : 'outgoing-branch-push-v1');
+  const boundContext = (...values) => ({...context(...values),...(cohort||{}),optionalDiagnostics});
+  const validationContext = boundContext(repository, sourceSha, sourceTree, checkoutSha, checkoutTree, args['comparison-base'], eventPolicy);
   const record = { schemaVersion: 1, eventName, runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
-    validationContext, cohortContext: validationContext, contextSha256: hash(validationContext), decision: 'full',
+    validationContext, cohortContext: validationContext, optionalDiagnostics, contextSha256: hash(validationContext), decision: 'full',
     reason: isMain ? 'Exact main requires execution or verified original passes for complete inputs.' : 'No verified equivalent producer.', coveredBy: null, observations: [] };
   record.inputContext = ciInputContext(validationContext);
   record.inputKeys = Object.fromEntries(CI_GATES.map(gate => [gate, ciInputKey(record.inputContext, gate)]));
@@ -162,8 +179,13 @@ async function main() {
         }
         if(cohort){
           const required=['validation-context','event-gates','cohort-routing',...cohort.expectedGroups.map(id=>'regression-'+id),'scanner-tests'];
-          if(required.some(name=>result.jobs.filter(job=>job.name===name&&job.status==='completed'&&job.conclusion==='success'&&String(job.run_id)===String(run.id)&&String(job.run_attempt)===String(run.run_attempt)&&job.head_sha===sourceSha).length!==1))throw new Error('Producer required topology is incomplete.');
-          if(result.jobs.some(job=>!required.includes(job.name)&&!['release-evidence','deploy-pages'].includes(job.name)))throw new Error('Producer topology is unknown.');
+          for(const name of required){
+            const matches=result.jobs.filter(job=>job.name===name);
+            if(matches.length!==1)throw new Error('Producer required topology is incomplete or ambiguous.');
+            const job=matches[0];
+            if(job.status!=='completed'||job.conclusion!=='success'||String(job.run_id)!==String(run.id)||String(job.run_attempt)!==String(run.run_attempt)||job.head_sha!==sourceSha)throw new Error('Producer required topology is incomplete.');
+          }
+          if(result.jobs.some(job=>!required.includes(job.name)&&!['mobile-WebKit-1GB-and-512MB-stress','release-evidence','deploy-pages'].includes(job.name)))throw new Error('Producer topology is unknown.');
         }
         const completed = steps.filter(step => (cohort ? new RegExp(`^Complete regression context ${expected} report [a-f0-9]{64}$`).test(step.name) : step.name === `Complete regression context ${expected}`) && step.conclusion === 'success');
         // Metadata-only edited runs can themselves be covered. They are never
@@ -195,8 +217,8 @@ async function main() {
     catch (error) { record.inputReuseReason = `${error.message} Unverified gates require execution.`; }
   }
   writeFileSync(path.join(directory, 'routing.json'), JSON.stringify(record, null, 2) + '\n', { mode: 0o600 });
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `decision=${record.decision}\ncontext=${record.contextSha256}\nevent-policy=${validationContext.eventPolicy}\npolicy=${validationContext.eventPolicy}\ntree=${checkoutTree}\nworkflow-blob=${cohort?.workflowBlob||''}\ncohort=${cohort?.cohortDigestSha256||''}\ninput-keys=${JSON.stringify(record.inputKeys)}\nreused=${JSON.stringify(Object.keys(record.inputPasses))}\n`);
-  console.log(`CI routing decision=${record.decision} reused-gates=${Object.keys(record.inputPasses).join(',')||'none'} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `decision=${record.decision}\ncontext=${record.contextSha256}\nevent-policy=${validationContext.eventPolicy}\npolicy=${validationContext.eventPolicy}\nmobile-diagnostics=${mobileDiagnosticSelected}\ntree=${checkoutTree}\nworkflow-blob=${cohort?.workflowBlob||''}\ncohort=${cohort?.cohortDigestSha256||''}\ninput-keys=${JSON.stringify(record.inputKeys)}\nreused=${JSON.stringify(Object.keys(record.inputPasses))}\n`);
+  console.log(`CI routing decision=${record.decision} mobile-diagnostics=${mobileDiagnosticSelected} reused-gates=${Object.keys(record.inputPasses).join(',')||'none'} context=${record.contextSha256} source=${sourceSha} actual-checkout=${checkoutSha} producer=${record.coveredBy ? `${record.coveredBy.runId}/${record.coveredBy.runAttempt}` : 'none'} reason=${record.reason}`);
   if (record.decision === 'fail') process.exitCode = 1;
 }
 

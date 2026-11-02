@@ -1,0 +1,411 @@
+/* Offline sky and bounded event scheduling. No scanner state, DOM or network.
+   Florida is an explicit observer, not an inference from the device timezone. */
+(function(root){
+  'use strict';
+  const A=root.Astronomy, CONFIG=root.LandscapeConfig, RAD=Math.PI/180;
+  if(!CONFIG)throw new Error('LandscapeConfig must load before landscape-core.js');
+  const DEFAULT_LOCATION={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York'};
+  const observer=new A.Observer(DEFAULT_LOCATION.latitude,DEFAULT_LOCATION.longitude,20);
+  const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
+  const START_SPEED_MIN=.82,START_SPEED_MAX=1.18;
+  const startingSpeed=sample=>lerp(START_SPEED_MIN,START_SPEED_MAX,clamp(Number(sample)||0));
+  function validDate(date){if(!(date instanceof Date)||!Number.isFinite(+date))throw new TypeError('Valid date required');}
+  // Zone validity is independent of observer coordinates. Retain only eight
+  // validated strings; mutable locations still pass every coordinate check.
+  const validatedZones=new Set();
+  function locationObserver(location){
+    if(location===undefined||location===null)return {observer,timeZone:DEFAULT_LOCATION.timezone};
+    if(typeof location!=='object')throw new TypeError('Location object required');
+    const latitude=location.latitude,longitude=location.longitude;
+    if(typeof latitude!=='number'||!Number.isFinite(latitude)||latitude<-90||latitude>90)throw new RangeError('Invalid latitude');
+    if(typeof longitude!=='number'||!Number.isFinite(longitude)||longitude<-180||longitude>180)throw new RangeError('Invalid longitude');
+    const timeZone=location.timezone===undefined?DEFAULT_LOCATION.timezone:location.timezone;
+    if(typeof timeZone!=='string'||!timeZone.trim())throw new RangeError('Invalid timezone');
+    if(!validatedZones.has(timeZone)){
+      try{new Intl.DateTimeFormat('en-US',{timeZone}).format();}catch{throw new RangeError('Invalid timezone');}
+      validatedZones.add(timeZone);
+      if(validatedZones.size>8)validatedZones.delete(validatedZones.values().next().value);
+    }
+    return {observer:new A.Observer(latitude,longitude,Number.isFinite(location.elevation)?location.elevation:20),timeZone};
+  }
+  function partsInZone(date,timeZone){
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date);
+    return Object.fromEntries(parts.map(p=>[p.type,p.value]));
+  }
+  function dateInZone(year,month,day,timeZone,hour=0){
+    let guess=Date.UTC(year,month-1,day,hour);
+    // Resolve the zone offset at the candidate midnight in three passes,
+    // without depending on a host-specific date parser.
+    for(let i=0;i<3;i++){
+      const at=partsInZone(new Date(guess),timeZone);
+      const asUTC=Date.UTC(+at.year,+at.month-1,+at.day,+at.hour,+at.minute,+at.second);
+      guess=Date.UTC(year,month-1,day,hour)-(asUTC-guess);
+    }
+    return new Date(guess);
+  }
+  function localMidnight(date,timeZone){
+    const values=partsInZone(date,timeZone);
+    return dateInZone(+values.year,+values.month,+values.day,timeZone);
+  }
+  function sameLocalDay(date,reference,timeZone){
+    const a=partsInZone(date,timeZone),b=partsInZone(reference,timeZone);
+    return a.year===b.year&&a.month===b.month&&a.day===b.day;
+  }
+  function bodyAt(body,date,obs){
+    const eq=A.Equator(body,date,obs,true,true);
+    const h=A.Horizon(date,obs,eq.ra,eq.dec,'normal');
+    return {altitude:h.altitude,azimuth:h.azimuth,visible:h.altitude>-.3};
+  }
+  function sunAt(date,location){validDate(date);const sun=bodyAt('Sun',date,locationObserver(location).observer);return {...sun,polarDay:polarDayAt(date,location,sun)};}
+  function sunTimes(date,location){
+    validDate(date);
+    const config=locationObserver(location),start=localMidnight(date,config.timeZone);
+    const search=(direction,twilight=false)=>{try{
+      // Twilight uses the geometric solar center at -6 degrees; rise/set
+      // instead includes the upper limb and atmospheric refraction.
+      const found=twilight?A.SearchAltitude('Sun',config.observer,direction,start,2,-6):A.SearchRiseSet('Sun',config.observer,direction,start,2);
+      return found&&found.date&&sameLocalDay(found.date,date,config.timeZone)?found.date:null;
+    }catch{return null;}};
+    return {firstLight:search(1,true),rise:search(1),set:search(-1),lastLight:search(-1,true)};
+  }
+  const solarPresets=Object.freeze({'first-light':'firstLight',sunrise:'rise',sunset:'set','last-light':'lastLight'});
+  function solarSchedule(date,location){
+    const timeZone=locationObserver(location).timeZone,times=sunTimes(date,location);
+    const labels=['First light','Sunrise','Sunset','Last light'];
+    const clock=new Intl.DateTimeFormat('en-US',{timeZone,hour:'numeric',minute:'2-digit'});
+    return {timeZone,dateLabel:new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'short',day:'numeric'}).format(date),
+      events:Object.entries(solarPresets).map(([preset,key],i)=>({preset,label:labels[i],at:times[key],time:times[key]?clock.format(times[key]):'Does not occur'}))};
+  }
+  function projectStar(date,row,rotation,obs){
+    const ra=row[0]*15*RAD,dec=row[1]*RAD;
+    const v=new A.Vector(Math.cos(dec)*Math.cos(ra),Math.cos(dec)*Math.sin(ra),Math.sin(dec),date);
+    const eq=A.EquatorFromVector(A.RotateVector(rotation||A.Rotation_EQJ_EQD(date),v));
+    const h=A.Horizon(date,obs,eq.ra,eq.dec,'normal');
+    return {azimuth:h.azimuth,altitude:h.altitude,magnitude:row[2],colorIndex:row[3]||0};
+  }
+  function starAt(date,row,rotation,location){
+    // Keep the original (date, row, rotation) call shape while accepting a
+    // location as the convenient third argument for direct callers.
+    if(location===undefined&&rotation&&typeof rotation==='object'&&!Array.isArray(rotation)&&!Array.isArray(rotation.rot)){location=rotation;rotation=undefined;}
+    validDate(date); return projectStar(date,row,rotation,locationObserver(location).observer);
+  }
+  const polarDayCache=new Map();
+  function polarDayAt(date,location,sun){
+    const config=locationObserver(location);let polarDay=false;
+    if(sun.visible){
+      const parts=partsInZone(date,config.timeZone),key=[config.observer.latitude,config.observer.longitude,config.timeZone,parts.year,parts.month,parts.day].join(':');
+      if(!polarDayCache.has(key)){const times=sunTimes(date,location);polarDayCache.set(key,!times.rise&&!times.set);if(polarDayCache.size>8)polarDayCache.delete(polarDayCache.keys().next().value);}
+      polarDay=polarDayCache.get(key);
+    }
+    return polarDay;
+  }
+  function fireworksAllowed(sky){const sun=sky.sun||sky;return !sky.polarDay&&!sun.polarDay&&sky.period!=='day'&&sun.altitude<8;}
+  function skyAt(date,location){
+    validDate(date);
+    const config=locationObserver(location),sun=bodyAt('Sun',date,config.observer),moon=bodyAt('Moon',date,config.observer),phase=A.MoonPhase(date);
+    const polarDay=polarDayAt(date,location,sun);
+    const rotation=A.Rotation_EQJ_EQD(date);
+    const delta=(sun.azimuth-moon.azimuth)*RAD,sa=sun.altitude*RAD,ma=moon.altitude*RAD;
+    // Project sunlight onto the Moon's local sky tangent plane. This follows
+    // horizon tilt and hemisphere rather than always lighting a vertical side.
+    moon.brightLimbAngle=Math.atan2(-(Math.sin(sa)*Math.cos(ma)-Math.cos(sa)*Math.sin(ma)*Math.cos(delta)),Math.cos(sa)*Math.sin(delta));
+    return {date,sun,moon,phase,polarDay,illumination:A.Illumination('Moon',date).phase_fraction,
+      period:polarDay?'day':sun.altitude < -12?'night':sun.altitude<8?(sun.azimuth<180?'dawn':'dusk'):'day',
+      stars:root.SKY_STARS.map(row=>projectStar(date,row,rotation,config.observer)).filter(s=>s.altitude>0)};
+  }
+  // Shared anchor stops keep every sky and terrain layer continuous across twilight.
+  const STOPS=[
+    [-18,['#152b4a','#365779','#6b8ba5','#526b87','#5b8990','#497d7c','#39666b','#a7c7da']],
+    [-9, ['#4e6287','#b2a4c3','#f3bdd0','#91a0b4','#88aaa5','#68998e','#527f79','#e6bfd5']],
+    [-1, ['#91bedc','#f8c8bb','#fff0cd','#bfc3d1','#bcd5b1','#a3c98d','#7bb28a','#f3c59e']],
+    [7,  ['#9bd4ef','#dbf4ee','#fff5d7','#bdd8dc','#c4e2b3','#aad88f','#8bc89a','#c5e7c5']],
+    [35, ['#8ed4f3','#d4f5f2','#f6fbe2','#bbdce1','#c5e8b7','#ace097','#8dcca1','#ade1c6']]
+  ];
+  function mixHex(a,b,t){
+    const rgb=h=>h.slice(1).match(/../g).map(n=>parseInt(n,16));
+    return '#'+rgb(a).map((n,i)=>Math.round(lerp(n,rgb(b)[i],t)).toString(16).padStart(2,'0')).join('');
+  }
+  function palette(altitude){
+    let lo=STOPS[0],hi=STOPS[STOPS.length-1];
+    for(let i=0;i<STOPS.length-1;i++)if(altitude<=STOPS[i+1][0]){lo=STOPS[i];hi=STOPS[i+1];break;}
+    const t=smooth(lo[0],hi[0],altitude),c=lo[1].map((v,i)=>mixHex(v,hi[1][i],t));
+    return {sky:c.slice(0,3),city:c[3],far:c[4],hill:c[5],front:c[6],tint:c[7],night:1-smooth(-12,0,altitude)};
+  }
+  const SKIN_TONES=['#4a2f28','#654132','#82563f','#9c6b4b','#b27d58','#c68f68','#d9a27e','#e6b795','#efc9ac','#f6dbc2'];
+  function skinTone(seed,night=0,ambient='#526c80'){
+    const value=Number.isFinite(seed)?clamp(seed,0,.999999):0;
+    return mixHex(SKIN_TONES[Math.floor(value*SKIN_TONES.length)],ambient,clamp(night)*.18);
+  }
+  function advanceLights(state,elapsed,night,random=Math.random){
+    if(elapsed<state.next)return false;
+    state.next=elapsed+7.5;
+    const visible=state.visible;
+    if(!night||!state.windows.length||(visible&&!visible.length))return false;
+    // A window behind another building is real state, but not visible motion.
+    const slot=Math.floor(clamp(random(),0,.999999)*(visible?visible.length:state.windows.length));
+    const index=visible?visible[slot]:slot;
+    state.windows[index]=!state.windows[index];return true;
+  }
+  const GARDEN_LIGHT_INTERVAL=60,GARDEN_LIGHT_CHANCE=1/6;
+  const sampleGardenLight=random=>clamp(Number(random())||0,0,.999999)<GARDEN_LIGHT_CHANCE;
+  function createGardenLights(roofIndices=[],random=Math.random){
+    const state={elapsed:0,next:GARDEN_LIGHT_INTERVAL,roofs:[],lit:{}};
+    return syncGardenLights(state,roofIndices,random);
+  }
+  function syncGardenLights(state,roofIndices=[],random=Math.random){
+    if(!state||typeof state!=='object')return state;
+    const lit={...(state.lit||{})},roofs=[];
+    for(const index of new Set(roofIndices.filter(Number.isInteger))){
+      roofs.push(index);
+      if(!Object.hasOwn(lit,index))lit[index]=sampleGardenLight(random);
+    }
+    state.roofs=roofs;state.lit=lit;return state;
+  }
+  function advanceGardenLights(state,dt,night,random=Math.random){
+    if(!state||!Number.isFinite(dt)||dt<=0)return false;
+    state.elapsed+=dt;
+    if(state.elapsed<state.next)return false;
+    state.next=state.elapsed+GARDEN_LIGHT_INTERVAL;
+    if(!night||!state.roofs.length)return false;
+    const slot=Math.floor(clamp(Number(random())||0,0,.999999)*state.roofs.length),index=state.roofs[slot],wasLit=state.lit[index];
+    state.lit[index]=sampleGardenLight(random);return state.lit[index]!==wasLit;
+  }
+  function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
+  const MAX_EVENTS=14,RARE_COOLDOWN=420;
+  const EVENT_TYPES=CONFIG.eventTypes;
+  const WINTER_VISITORS=CONFIG.winterEvents.filter(type=>!EVENT_TYPES.includes(type));
+  const WINTER_EVENTS=CONFIG.seasons.winter.events;
+  const eventsForSeason=season=>CONFIG.eventsForSeason(season);
+  function setSeason(world,season){
+    if(world.season===season)return;
+    world.season=season;
+    const allowed=new Set([...eventsForSeason(season),'meteor','abduction','fireworks','festival']);
+    // A season selection should not leave a summer picnic or watersport on snow.
+    // Preserve the ordinary schedule rather than forcing a burst of replacements.
+    world.events=world.events.filter(event=>allowed.has(event.type));
+  }
+  const RARE_TYPES=['abduction','fireworks','festival'];
+  const NIGHT_TYPES=CONFIG.nightEvents;
+  const NIGHT_REGULARS=CONFIG.nightRegulars;
+  const WATER_TYPES=CONFIG.waterEvents;
+  const EVENT_DURATIONS=CONFIG.eventDurations||CONFIG.durations;
+  const INITIAL_TYPES=EVENT_TYPES.filter(type=>type!=='dolphin');
+  const groupSize=(type,seed)=>{
+    const index=Math.floor(clamp(Number(seed)||0,0,.999999)*5);
+    return type==='flock'?3+index*2:type==='cyclist'?1+index:1;
+  };
+  function createWorld(random=Math.random,season='summer'){
+    const world={random,season,railNext:{train:0,metro:12},nextFireworks:20*CONFIG.nightShows.fireworks.occurrenceScale,nextFestival:60,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,lastFestival:-CONFIG.nightShows.festival.cooldown,rareCount:0,wind:.6+random()*1.2};
+    // Start mid-journey so returning never waits for a first event. Pick three
+    // distinct ordinary visitors; the rare abduction is never in the opening cast.
+    const pool=(season==='winter'?WINTER_EVENTS:INITIAL_TYPES).filter(type=>CONFIG.spawnRate(type)>0);
+    while(world.events.length<3&&pool.length){
+      let cursor=clamp(random(),0,1-.0000001)*pool.reduce((sum,type)=>sum+CONFIG.spawnRate(type),0),index=0;
+      while(index<pool.length-1&&cursor>=CONFIG.spawnRate(pool[index]))cursor-=CONFIG.spawnRate(pool[index++]);
+      spawn(world,pool.splice(index,1)[0],true);
+    }
+    return world;
+  }
+  // Retain one admission slot after visible fireworks expire. This ephemeral
+  // reservation preserves the old opportunity/RNG stream without painting tails.
+  const reservedEventCount=w=>w.events.length+(w.elapsed<w.fireworksReservedUntil&&!w.events.some(e=>e.type==='fireworks')?1:0);
+  function spawn(w,type,initial=false){
+    if(!type||!CONFIG.spawnRate(type))return;
+    if(CONFIG.rail[type]&&w.events.some(e=>e.type===type))return;
+    if(['banner','skywriter','meteor','bird','dolphin'].includes(type)&&w.events.some(e=>e.type===type))return;
+    if(WATER_TYPES.includes(type)&&w.events.filter(e=>WATER_TYPES.includes(e.type)).length>=2)return;
+    const r=w.random;
+    const skywriterWord=type==='skywriter'?root.LandscapeMood?.skywriterMessage(r):undefined;
+    if(type==='skywriter'&&!skywriterWord)return;
+    if(type==='dolphin'&&r()>.35)return; // A short, occasional surprise, never an opening attraction.
+    // Choose one duration for the whole stationary show. Reusing the old
+    // nine-second default expired it after just three bursts.
+    const showRange=CONFIG.nightShows.fireworks.duration;
+    const base=type==='fireworks'?showRange[0]+clamp(r(),0,1)*(showRange[1]-showRange[0]):
+      CONFIG.rail[type]?.duration||EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
+    // Pick travel speed once at arrival. Duration is its inverse so every
+    // visitor still completes the full route, while later fast traffic can
+    // visibly catch and pass a slower visitor without frame-time randomness.
+    const travels=type!=='abduction'&&type!=='fireworks';
+    // Keep the old sampled spacing independently of the shorter visible show.
+    const speed=travels?startingSpeed(r()):1,duration=type==='fireworks'?Math.min(60,base):base/speed;
+    const age=initial?duration*(.15+r()*.45):0,lane=r(),seed=r(),reverse=r()>.5;
+    if(type==='fireworks')w.fireworksReservedUntil=w.elapsed+base-age;
+    w.events.push({type,...(type==='fireworks'?{scheduleDuration:base}:{}),...(skywriterWord?{skywriterWord}:{}),age,duration,speed,lane,seed,reverse,
+      ...(['flock','cyclist'].includes(type)?{count:groupSize(type,seed)}:{})});
+  }
+  function advance(w,dt,sky){
+    if(!Number.isFinite(dt)||dt<=0)return w;
+    w.elapsed+=dt;
+    w.events=w.events.filter(e=>{e.age+=dt;return e.age<e.duration;});
+    // Reserve two of the existing slots for rail service. Each track has one
+    // vehicle at most; after it clears, a short gap replaces random long waits.
+    for(const type of ['train','metro']){
+      const rate=CONFIG.spawnRate(type),active=w.events.find(e=>e.type===type);
+      if(active){w.railNext[type]=w.elapsed+Math.max(0,active.duration-active.age)+CONFIG.rail[type].gap/(rate||1);continue;}
+      if(rate&&w.elapsed>=w.railNext[type]&&reservedEventCount(w)<MAX_EVENTS){
+        spawn(w,type);w.railNext[type]=w.elapsed+CONFIG.rail[type].gap/rate;
+      }
+    }
+    // These deadlines use active scene time, so hidden/reduced-motion time
+    // never queues missed shows. A festival owns its own shells and does not
+    // overlap a standalone display. Two slots remain reserved for rail.
+    for(const type of ['festival','fireworks']){
+      const key=type==='festival'?'nextFestival':'nextFireworks',show=CONFIG.nightShows[type];
+      if(w.elapsed<w[key])continue;
+      const occurrenceScale=show.occurrenceScale||1;
+      w[key]=w.elapsed+show.interval*occurrenceScale;
+      if(!fireworksAllowed(sky)||!CONFIG.spawnRate(type)||reservedEventCount(w)>=MAX_EVENTS-2||(w.elapsed<w.fireworksReservedUntil||w.events.some(e=>e.type==='festival'||e.type==='fireworks')))continue;
+      if(type==='festival'&&(w.elapsed-w.lastRare<RARE_COOLDOWN||w.elapsed-w.lastFestival<show.cooldown))continue;
+      if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
+      spawn(w,type);
+      if(type==='festival'){w.lastRare=w.elapsed;w.lastFestival=w.elapsed;w.rareCount++;}
+      // Scale the entire sampled start interval, including the quiet portion
+      // occupied by the preceding show. Scaling only failed-roll odds would
+      // not preserve show frequency when the visible duration is shortened.
+      else w[key]=w.elapsed+(w.events.find(e=>e.type==='fireworks').scheduleDuration+show.rest)*occurrenceScale;
+    }
+    if(w.elapsed>=w.next){
+      const r=w.random,a=activity(sky);
+      // Daylight is the scene's busiest window. Keep its gaps at half the
+      // former seven-to-twenty-five second range, while preserving the quieter
+      // nighttime rhythm for the same seeded visitors.
+      const interval=sky.sun.altitude < -6 ? 7+r()*18 : 3.5+r()*9;
+      w.next=w.elapsed+interval/a;
+      if(reservedEventCount(w)<MAX_EVENTS-2){
+        const rareRate=CONFIG.spawnRate('abduction')*(sky.sun.altitude < -6?.5:1);
+        if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025*rareRate){
+          spawn(w,'abduction');w.lastRare=w.elapsed;w.rareCount++;
+        }else{
+          let type;
+          if(sky.sun.altitude < -6){
+            // Night visitors share the editable weights; rail service is independent.
+            type=CONFIG.pickEvent(w.season,'night',r);
+          }else type=CONFIG.pickEvent(w.season,'day',r);
+          if(!CONFIG.rail[type])spawn(w,type);
+        }
+      }
+    }
+    return w;
+  }
+  function weatherAt(now,season='summer'){
+    validDate(now);
+    // One immutable UTC episode schedule is shared by offline and online devices.
+    // A selected winter scene changes the precipitation, never its timing.
+    const weather=CONFIG.weather,slot=Math.floor(+now/weather.slot);
+    const random=salt=>{let hash=(slot^0x51a7c3d9^Math.imul(salt,0x9e3779b9))|0;hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);return ((hash^(hash>>>16))>>>0)/4294967296;};
+    const storm=random(1)<weather.stormChance;
+    const weatherType=season==='winter'?(storm?'snowstorm':'snow'):(storm?'thunderstorm':'rain');
+    const enabled=random(0)<Math.min(1,weather.chance*CONFIG.spawnRate(weatherType));
+    // NWS ordinary thunderstorm cells last about 30–60 minutes. Quieter
+    // showers are shorter; three-hour slots leave room for a natural clearing.
+    const start=Math.round(slot*weather.slot+(weather.startMinutes[0]+random(3)*(weather.startMinutes[1]-weather.startMinutes[0]))*60000);
+    const durationRange=storm?weather.stormMinutes:weather.showerMinutes;
+    const end=Math.round(start+(durationRange[0]+random(2)*(durationRange[1]-durationRange[0]))*60000);
+    const active=enabled&&+now>=start&&+now<end;
+    const status=!active?'clear':season==='winter'?(storm?'snowstorm':'snow'):(storm?'thunderstorm':'rain');
+    return {status,intensity:active?smooth(start,start+120000,+now)*(1-smooth(end-120000,end,+now)):0,storm:active&&storm,slot,start,end};
+  }
+  const woodlandConfig=CONFIG.woodland,woodlandTypes=woodlandConfig.types;
+  function createWoodland(random=Math.random){return {random,elapsed:0,next:woodlandConfig.interval,events:[]};}
+  function advanceWoodland(w,dt){
+    if(!Number.isFinite(dt)||dt<=0)return w;
+    w.elapsed+=dt;
+    w.events=w.events.filter(e=>{e.age+=dt;return e.age<e.duration;});
+    if(w.elapsed>=w.next){
+      // Its own RNG, budget and deadline leave every other visitor's odds alone.
+      // Never replay missed rolls after a pause or a delayed frame.
+      w.next=w.elapsed+woodlandConfig.interval;
+      const weights=woodlandTypes.map(type=>CONFIG.spawnRate('woodland-'+type)),total=weights.reduce((a,b)=>a+b,0);
+      if(total&&w.events.length<woodlandConfig.maxActive&&w.random()<woodlandConfig.chance*total/woodlandTypes.length){
+        const r=w.random;let cursor=r()*total,index=0;while(index<weights.length-1&&cursor>=weights[index])cursor-=weights[index++];
+        const speed=startingSpeed(r());
+        w.events.push({type:woodlandTypes[index],age:0,duration:woodlandConfig.duration/speed,speed,seed:r(),lane:r(),reverse:r()>.5});
+      }
+    }
+    return w;
+  }
+  const SCENE_TIME_KEY='fvp:chain-scanner:scene-time';
+  const validSceneTime=value=>Object.hasOwn(solarPresets,value)||typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  function readSceneTime(storage){try{const value=storage.getItem(SCENE_TIME_KEY);return validSceneTime(value)?value:null;}catch{return null;}}
+  function saveSceneTime(storage,value){
+    if(value!==null&&!validSceneTime(value))return false;
+    try{if(value===null)storage.removeItem(SCENE_TIME_KEY);else storage.setItem(SCENE_TIME_KEY,value);return true;}catch{return false;}
+  }
+  const SCENE_SEASON_KEY='fvp:chain-scanner:scene-season';
+  const seasons=['spring','summer','autumn','winter'];
+  function readSceneSeason(storage){try{const value=storage.getItem(SCENE_SEASON_KEY);return seasons.includes(value)?value:null;}catch{return null;}}
+  function saveSceneSeason(storage,value){
+    if(value!==null&&!seasons.includes(value))return false;
+    try{if(value===null)storage.removeItem(SCENE_SEASON_KEY);else storage.setItem(SCENE_SEASON_KEY,value);return true;}catch{return false;}
+  }
+  function createSceneMirror(storage){
+    // The board can remain readable when browser preference writes fail. Keep
+    // adopted scene choices in memory so a failed offline mirror cannot make
+    // the displayed sky disagree with the board that was just accepted.
+    let timeOverride,seasonOverride;
+    function recordDeviceChoice(time,season){
+      if(time!==null&&!validSceneTime(time)||season!==null&&!seasons.includes(season))return false;
+      timeOverride=time;seasonOverride=season;return true;
+    }
+    return {
+      getItem(key){
+        if(key===SCENE_TIME_KEY&&timeOverride!==undefined)return timeOverride;
+        if(key===SCENE_SEASON_KEY&&seasonOverride!==undefined)return seasonOverride;
+        try{return storage?.getItem(key)??null;}catch{return null;}
+      },
+      applySynced(time,season){
+        if(!recordDeviceChoice(time,season))return false;
+        saveSceneSeason(storage,season);saveSceneTime(storage,time);return true;
+      },
+      recordDeviceChoice,
+      release(key){
+        if(key===null||key===SCENE_TIME_KEY)timeOverride=undefined;
+        if(key===null||key===SCENE_SEASON_KEY)seasonOverride=undefined;
+      },
+    };
+  }
+  function sceneSolarDate(now,storage,location){
+    const season=readSceneSeason(storage);
+    if(!season)return new Date(now);
+    const zone=locationObserver(location).timeZone,month=([3,6,9,0][seasons.indexOf(season)]+(location?.latitude<0?6:0))%12;
+    return dateInZone(+partsInZone(now,zone).year,month+1,15,zone,12);
+  }
+  function sceneDate(now,storage,location){
+    const date=new Date(now),time=readSceneTime(storage);
+    const season=readSceneSeason(storage);
+    if(Object.hasOwn(solarPresets,time)){
+      return sunTimes(sceneSolarDate(now,storage,location),location)[solarPresets[time]]||new Date(now);
+    }
+    if(!time&&!season)return date;
+    // A synced numeric lock must mean the same instant on a phone in Tokyo
+    // and a laptop in Orlando. Resolve both calendar and clock in the shared
+    // sky zone; device time zones remain available for real task dates.
+    const zone=locationObserver(location).timeZone,parts=partsInZone(now,zone);
+    const month=season?(([3,6,9,0][seasons.indexOf(season)]+(location?.latitude<0?6:0))%12)+1:+parts.month;
+    const [hour,minute]=time?time.split(':').map(Number):[+parts.hour,+parts.minute];
+    return new Date(+dateInZone(+parts.year,month,season?15:+parts.day,zone,hour)+minute*60000+(time?0:+parts.second*1000+date.getUTCMilliseconds()));
+  }
+  const MOTION_KEY='fvp:chain-scanner:landscape-motion';
+  const normalizeMotion=v=>v==='normal'||v==='reduced'?v:null;
+  const MOTION_REMEMBER_MS=7*24*60*60*1000;
+  // Safety consent belongs to this browser, never the synced board. Legacy
+  // untimed choices ask again; clock rollback cannot extend consent into future.
+  function readMotion(storage,now=Date.now()){
+    try{
+      const record=JSON.parse(storage.getItem(MOTION_KEY));
+      if(!record||!normalizeMotion(record.choice)||!Number.isFinite(record.savedAt)||record.savedAt<0||!Number.isFinite(now))return null;
+      const age=now-record.savedAt;
+      return age>=0&&age<MOTION_REMEMBER_MS?record.choice:null;
+    }catch{return null;}
+  }
+  function saveMotion(storage,value,now=Date.now()){
+    if(!normalizeMotion(value)||!Number.isFinite(now)||now<0)return false;
+    try{storage.setItem(MOTION_KEY,JSON.stringify({choice:value,savedAt:now}));return true;}catch{return false;}
+  }
+  function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,createGardenLights,syncGardenLights,advanceGardenLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunAt,sunTimes,fireworksAllowed,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+    nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
+})(globalThis);

@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import {createMobileBundle,refreshMobileBundle} from './mobile-memory-fixture.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runner = path.join(repository, 'scripts/test-groups.mjs');
@@ -131,11 +132,13 @@ function createFixture(t, options = {}) {
   fs.mkdirSync(path.join(root, 'scripts/agent-tools'), { recursive: true });
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.copyFileSync(runner, path.join(root, 'scripts/test-groups.mjs'));
+  if(options.mobileStory)for(const name of ['button-safety-mobile-contract.mjs','button-safety-ci-policy.mjs'])fs.copyFileSync(path.join(repository,'scripts',name),path.join(root,'scripts',name));
+  if(options.mobileStory)writeJson(path.join(root,'scripts/button-safety-inventory.json'),{requiredRuntimeAssets:JSON.parse(fs.readFileSync(path.join(repository,'scripts/button-safety-inventory.json'),'utf8')).requiredRuntimeAssets,requiredMobileStory:{savedTasks:400,yesCount:10,distinctTasks:true,windowMs:2000,memoryBudgetBytes:1000000000,motions:['normal','reduced']}});
   fs.copyFileSync(path.join(repository,'scripts/agent-tools/ci-pass-reuse.mjs'),path.join(root,'scripts/agent-tools/ci-pass-reuse.mjs'));
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {
     type: 'module',
-    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
+    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: JSON.parse(fs.readFileSync(path.join(repository, 'package.json'), 'utf8')).scripts.test },
   });
   fs.writeFileSync(path.join(root, 'tests.js'), suiteSource({ ...options, coreTitle, runtimeCoreTitle: options.runtimeCoreTitle || coreTitle }));
   fs.writeFileSync(path.join(root, 'scripts/agent-tools/fixture.test.mjs'),
@@ -151,6 +154,15 @@ function createFixture(t, options = {}) {
     group.baselineEstimatedDurationMs = group.baselineRootCount * 100;
   }
   writeJson(path.join(root, 'scripts/test-group-assignments.json'), groupAssignments);
+
+  if(options.nrOptional){
+    const {roots,reason,guard}=options.nrOptional;
+    const declarations=roots.map((title,index)=>`if(optionalWorkloadDiagnosticsSelected){\n test(${JSON.stringify(title)},()=>{fs.appendFileSync(process.env.CHAIN_NR_JOURNAL,JSON.stringify({root:${JSON.stringify(title)},group:process.env.CHAIN_TEST_GROUP,selected:process.env.CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS})+'\\n');fs.writeFileSync(path.join(process.env.CHAIN_NATIVE_OUTPUT,'optional-${index}.json'),JSON.stringify({root:${JSON.stringify(title)},sha:process.env.CHAIN_NATIVE_CANDIDATE_SHA,tree:process.env.CHAIN_NATIVE_CANDIDATE_TREE}));if(process.env.CHAIN_NR_FAIL===${JSON.stringify(title)})assert.fail('retained optional fixture failure');});\n}\n`).join('');
+    fs.appendFileSync(path.join(root,'tests.js'),'\nconst optionalWorkloadDiagnosticsSelected='+guard+';\n'+declarations);
+    const suiteFile=path.join(root,'tests.js');fs.writeFileSync(suiteFile,fs.readFileSync(suiteFile,'utf8').replace('    tree: process.env.CHAIN_NATIVE_CANDIDATE_TREE,','    tree: process.env.CHAIN_NATIVE_CANDIDATE_TREE,optionalSelected:process.env.CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS,group:process.env.CHAIN_TEST_GROUP,'));
+    const inv=JSON.parse(fs.readFileSync(path.join(root,'scripts/test-group-inventory.json')));inv.rootTests.push(...roots.map(id=>({id,durationMs:100})));inv.requiredCases.push(...roots.map(id=>({id,root:id})));inv.baseline.caseCount+=roots.length;inv.baseline.passed+=roots.length;writeJson(path.join(root,'scripts/test-group-inventory.json'),inv);
+    groupAssignments.rootAssignments.push(...roots.map(root=>({root,file:'tests.js',group:'native-process',admission:'optional-workload-diagnostic',admissionReason:reason})));const native=groupAssignments.groups.find(row=>row.id==='native-process');native.baselineRootCount+=roots.length;native.baselineEstimatedDurationMs+=roots.length*100;writeJson(path.join(root,'scripts/test-group-assignments.json'),groupAssignments);
+  }
 
   git(root, 'init', '-q');
   git(root, 'config', 'user.email', 'fixture@example.test');
@@ -320,7 +332,7 @@ function parseTapIds(output) {
   return ids;
 }
 
-test('test group runner reconciles complete full and grouped fixture cohorts', t => {
+test('test group runner reconciles complete full and grouped fixture cohorts', t => { // Each real test child must support its same-context module imports.
   const fixture = createFixture(t);
   const outerNativeOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-outer-native-'));
   fs.rmSync(outerNativeOutput, { recursive: true });
@@ -362,6 +374,51 @@ test('test group runner reconciles complete full and grouped fixture cohorts', t
   assert.equal(new Set(groupedIds).size, groupedIds.length, 'group partitions must not overlap');
   assert.deepEqual(groupedIds.sort(), fullIds, 'grouped and default full-suite fixture identities must match exactly');
   assert.deepEqual(fullIds.sort(), inventory().requiredCases.map(item => item.id).sort());
+
+  // Use the actual supported commands: the recorder's explicit flag must not
+  // conceal an unsupported npm or grouped child process.
+  const vmFixture=createFixture(t),journalRoot=fs.mkdtempSync(path.join(os.tmpdir(),'chain-vm-entrypoint-journal-'));
+  vmFixture.outputs.push(journalRoot);
+  const vmPrelude=[
+    "import vm from 'node:vm';",
+    "const moduleContext=vm.createContext({});",
+    "const moduleDependency=new vm.SyntheticModule(['value'],function(){this.setExport('value',1299);},{context:moduleContext});",
+    "const sourceModule=new vm.SourceTextModule(`import {value} from 'chain:fixture-value'; export const ready=value;`,{context:moduleContext});",
+    "await sourceModule.link(specifier=>{assert.equal(specifier,'chain:fixture-value');return moduleDependency;});",
+    "await sourceModule.evaluate();assert.equal(sourceModule.namespace.ready,1299);",
+    "fs.appendFileSync(process.env.CHAIN_VM_ENTRYPOINT_JOURNAL,JSON.stringify({moduleValue:sourceModule.namespace.ready,ambientOptions:process.env.NODE_OPTIONS??null,pid:process.pid})+'\\n');",
+  ].join('\n')+'\n';
+  fs.writeFileSync(path.join(vmFixture.root,'tests.js'),vmPrelude+fs.readFileSync(path.join(vmFixture.root,'tests.js'),'utf8'));
+  git(vmFixture.root,'add','tests.js');git(vmFixture.root,'commit','-qm','require actual same-context VM modules in the existing fixture');vmFixture.sourceSha=git(vmFixture.root,'rev-parse','HEAD');
+  let retained=null;
+  if(process.env.CHAIN_VM_ENTRYPOINT_EVIDENCE){
+    assert.ok(path.isAbsolute(process.env.CHAIN_VM_ENTRYPOINT_EVIDENCE));fs.mkdirSync(process.env.CHAIN_VM_ENTRYPOINT_EVIDENCE,{recursive:true});
+    retained=fs.mkdtempSync(path.join(process.env.CHAIN_VM_ENTRYPOINT_EVIDENCE,'whole-consumer-'));fs.cpSync(vmFixture.root,path.join(retained,'source'),{recursive:true});
+  }
+  const failures=[],witnesses=[];
+  for(const [index,entrypoint,group,expectedExecutions] of [[0,'npm test',null,1],[1,'group core and unclassified guard','core',2],[2,'group native-process','native-process',1]]){
+    const journal=path.join(journalRoot,'mode-'+index+'.jsonl'),native=isolatedFixtureNativeOutput(vmFixture),environment={...native.env,CHAIN_VM_ENTRYPOINT_JOURNAL:journal};
+    for(const key of ['NODE_OPTIONS','NODE_TEST_CONTEXT','CHAIN_TEST_GROUP','CHAIN_GROUP_OUTPUT_DIR'])delete environment[key];
+    const child=group?invoke(vmFixture,{group,env:{...environment,NODE_OPTIONS:undefined,NODE_TEST_CONTEXT:undefined,CHAIN_TEST_GROUP:undefined,CHAIN_GROUP_OUTPUT_DIR:undefined}}):run('npm',['test'],vmFixture.root,environment);
+    const rows=fs.existsSync(journal)?fs.readFileSync(journal,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line)):[];
+    if(retained){
+      const target=path.join(retained,'mode-'+index);fs.mkdirSync(target);writeJson(path.join(target,'process.json'),{entrypoint,status:child.status,signal:child.signal,error:child.error?.message??null,stdout:child.stdout,stderr:child.stderr,rows});
+      if(child.outputDir&&fs.existsSync(child.outputDir))fs.cpSync(child.outputDir,path.join(target,'complete-group-output'),{recursive:true});
+      if(fs.existsSync(journal))fs.copyFileSync(journal,path.join(target,'actual-child-journal.jsonl'));
+      fs.cpSync(native.output,path.join(target,'caller-native-output'),{recursive:true});
+    }
+    try{
+      assert.equal(child.status,0,entrypoint+' must evaluate actual same-context modules: '+child.stdout+'\n'+child.stderr);
+      assert.equal(child.signal,null);assert.equal(rows.length,expectedExecutions,entrypoint+' includes each actual VM consumer and guard import exactly once');
+      for(const row of rows){assert.equal(row.moduleValue,1299);assert.equal(row.ambientOptions,null);assert.ok(Number.isSafeInteger(row.pid)&&row.pid>0);}
+      assert.equal(new Set(rows.map(row=>row.pid)).size,expectedExecutions,'Each import comes from its real isolated test process');
+      if(group){assert.equal(child.evidence.status,'passed');assert.equal(child.evidence.process.exitCode,0);if(group==='core'){assert.equal(child.evidence.unclassifiedRootGuard.status,'passed');assert.ok(child.evidence.unclassifiedRootGuard.files.every(row=>row.process.code===0));}}
+      else assert.deepEqual(JSON.parse(fs.readFileSync(path.join(native.output,'candidate-identity.json'))),{sha:vmFixture.sourceSha,tree:git(vmFixture.root,'rev-parse','HEAD^{tree}')});
+    }catch(error){failures.push({entrypoint,message:error.message});}
+    witnesses.push({entrypoint,moduleValues:rows.map(row=>row.moduleValue)});
+  }
+  t.diagnostic('VM-module supported entrypoint witnesses: '+JSON.stringify(witnesses));
+  assert.deepEqual(failures,[],'All supported process entrypoints must execute actual VM modules; retained subprocess failures stay explicit');
 });
 
 test('test group runner reconciles a renamed root and preserves baseline case identities', t => {
@@ -381,6 +438,18 @@ test('test group runner reconciles a renamed root and preserves baseline case id
     file: 'tests.js',
     reason: 'The renamed fixture title preserves its historical child assertions and case identities.',
   }];
+  const sentinel = path.join(fixture.root, 'contradictory-catalog-body-executed');
+  const contradictoryAssignments = {
+    ...groupAssignments,
+    rootAssignments: [...groupAssignments.rootAssignments, { root: oldRoot, group: 'core', file: 'tests.js' }],
+  };
+  writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), contradictoryAssignments);
+  const contradictory = invoke(fixture, { args: ['--describe'], env: { CHAIN_DESCRIPTOR_SENTINEL: sentinel } });
+  assert.notEqual(contradictory.status, 0, 'A replaced historical source cannot remain live alongside its explicit current target');
+  assert.equal(contradictory.evidence?.status, 'preflight_failed');
+  assert.match(contradictory.evidence?.issues?.join('\n') || contradictory.stderr, /Historical root .* must be represented through its replacement target only/);
+  assert.equal(fs.existsSync(sentinel), false, 'Contradictory catalogs must fail before any test body executes');
+  assert.equal(fs.existsSync(path.join(contradictory.outputDir, 'descriptor.json')), false, 'A contradictory catalog cannot publish a valid descriptor');
   writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), groupAssignments);
   git(fixture.root, 'add', 'tests.js', 'scripts/test-group-assignments.json');
   git(fixture.root, 'commit', '-qm', 'classify a preserved renamed root');
@@ -548,8 +617,8 @@ test('test group preflight rejects a passing dynamic row added at an unchanged r
 });
 
 
-function aggregateFixture(t) {
-  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true});
+function aggregateFixture(t, options={}) {
+  const fixture=createFixture(t,{nativeTitle:'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',nativeReports:true,...options});
   fixture.originals=new Map();
   for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
   return fixture;
@@ -561,6 +630,54 @@ function aggregateCopy(t,fixture,mutate=()=>{},args=[],env={}) {
   mutate(collected,needs);
   return invoke(fixture,{args:['--aggregate','--results-dir',collected,'--needs-json',needs,...args],env});
 }
+test('test group aggregate preserves optional outcomes separately from the required verdict',async t=>{
+ const fixture=aggregateFixture(t,{mobileStory:true}),tree=git(fixture.root,'rev-parse','HEAD^{tree}'),source={candidateCommit:fixture.sourceSha,candidateTree:tree,sourceSha:fixture.sourceSha};
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-optional-mobile-aggregate-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+ const required=createMobileBundle(path.join(directory,'required'),source),stress=createMobileBundle(path.join(directory,'stress'),source,'stress-512mb');
+ const invalid=createMobileBundle(path.join(directory,'invalid'),source);invalid.report.candidateTree='0'.repeat(40);refreshMobileBundle(invalid);
+ const failedStress=createMobileBundle(path.join(directory,'failed-stress'),source,'stress-512mb');failedStress.report.status='failed';failedStress.report.cases[0].appOutcome='app-runtime-failure';failedStress.native.normal.status='failed';failedStress.native.normal.errors=['page-crash'];failedStress.native.normal.failure='Page crashed';refreshMobileBundle(failedStress);
+ const kernelFailedStress=createMobileBundle(path.join(directory,'kernel-failed-stress'),source,'stress-512mb');kernelFailedStress.report.status='failed';kernelFailedStress.report.cases[0].appOutcome='kernel-oom';kernelFailedStress.report.cases[0].after.events={max:1,oom:1,oom_kill:1};kernelFailedStress.report.cases[0].containerOOMKilled=true;kernelFailedStress.report.cases[0].server.status='failed';kernelFailedStress.report.cases[0].server.errors=['Browser budget OOM: oom','Browser budget OOM: oom_kill'];kernelFailedStress.report.cases[0].server.engineExit={exitCode:137,signal:null};kernelFailedStress.native.normal.status='failed';kernelFailedStress.native.normal.errors=['page-crash'];kernelFailedStress.native.normal.failure='page.goto: Page crashed';refreshMobileBundle(kernelFailedStress);
+ const reportArgs=(one,two)=>['--mobile-report',path.join(one,'report.json'),'--mobile-stress-report',path.join(two,'report.json')];
+ const missingArgs=reportArgs(path.join(directory,'missing-required'),path.join(directory,'missing-stress'));
+ const scenarios=[
+  {name:'not-run',selected:false,jobResult:'skipped',args:missingArgs,status:'not-run'},
+  {name:'unavailable',selected:true,jobResult:'failure',args:missingArgs,status:'unavailable'},
+  {name:'invalid',selected:true,jobResult:'success',args:reportArgs(invalid.directory,stress.directory),status:'invalid'},
+  {name:'pass',selected:true,jobResult:'success',args:reportArgs(required.directory,stress.directory),status:'pass'},
+  {name:'app-failed',selected:true,jobResult:'success',args:reportArgs(required.directory,failedStress.directory),status:'app-failed'},
+  {name:'failed',selected:true,jobResult:'success',args:reportArgs(required.directory,kernelFailedStress.directory),status:'failed'},
+ ];
+ for(const scenario of scenarios)await t.test(scenario.name,sub=>{
+  const result=aggregateCopy(sub,fixture,(_,needsFile)=>{const needs=JSON.parse(fs.readFileSync(needsFile,'utf8'));needs['validation-context'].outputs={policy:scenario.selected?'optional-mobile-dispatch-v1':'outgoing-branch-push-v1','mobile-diagnostics':String(scenario.selected)};needs['mobile-memory']={result:scenario.jobResult};writeJson(needsFile,needs);},scenario.args);
+  assert.equal(result.status,0,'Optional '+scenario.name+' diagnostics must not fail the required aggregate: '+result.stdout+result.stderr);
+  const aggregate=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'),'utf8'));
+  assert.equal(aggregate.status,'passed');assert.equal(aggregate.mobileMemory.status,scenario.status);assert.equal(aggregate.mobileMemory.selected,scenario.selected);assert.equal(aggregate.mobileMemory.jobResult,scenario.jobResult);assert.equal(aggregate.mobileMemory.required,false);
+  if(scenario.status==='app-failed'){assert.equal(aggregate.mobileMemory.stress.status,'failed');assert.ok(aggregate.mobileMemory.stress.cases.some(row=>row.outcome==='app-runtime-failure'));}
+  if(scenario.status==='failed'){assert.equal(aggregate.mobileMemory.stress.status,'failed');assert.ok(aggregate.mobileMemory.stress.cases.some(row=>row.outcome==='kernel-oom'));}
+ });
+ const integrityRoot=fs.mkdtempSync(path.join(os.tmpdir(),'chain-selected-mobile-integrity-'));t.after(()=>fs.rmSync(integrityRoot,{recursive:true,force:true}));
+ const stressIntegrity=createMobileBundle(path.join(integrityRoot,'stress'),source,'stress-512mb');
+ const variants=['failed-job','wrong-source','no-oom','unbounded','duplicate-tasks','missing-normal','legacy-scope','external-driver-network','remote-disconnect-only','control-outside-browser'];
+ for(const variant of variants)await t.test('selected report '+variant,sub=>{
+  const directory=path.join(integrityRoot,variant),required=createMobileBundle(directory,source);
+  if(variant==='wrong-source')required.report.candidateTree='0'.repeat(40);
+  if(variant==='no-oom')required.report.negativeControl.after.events.oom_kill=0;
+  if(variant==='unbounded')required.report.cases[0].after.memoryMaxBytes=1024000000;
+  if(variant==='duplicate-tasks')required.native.normal.presses[1].offeredTaskId=required.native.normal.presses[0].offeredTaskId;
+  if(variant==='missing-normal')required.report.cases.shift();
+  if(variant==='legacy-scope')required.report.schemaVersion=1;
+  if(variant==='external-driver-network')required.report.cases[0].driver.networkMode='bridge';
+  if(variant==='remote-disconnect-only')required.report.cases[0].server.cleanup.engineExited=false;
+  if(variant==='control-outside-browser')required.report.negativeControl.server.control.membership='0::/outside';
+  refreshMobileBundle(required);
+  const result=aggregateCopy(sub,fixture,(_,needsFile)=>{const needs=JSON.parse(fs.readFileSync(needsFile,'utf8'));needs['validation-context'].outputs={policy:'optional-mobile-dispatch-v1','mobile-diagnostics':'true'};needs['mobile-memory']={result:variant==='failed-job'?'failure':'success'};writeJson(needsFile,needs);},['--mobile-report',path.join(required.directory,'report.json'),'--mobile-stress-report',path.join(stressIntegrity.directory,'report.json')]);
+  assert.equal(result.status,0,'Invalid or failed selected diagnostic data cannot fail the mandatory aggregate: '+variant+' '+result.stderr);
+  const aggregate=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'),'utf8'));
+  assert.equal(aggregate.status,'passed');assert.equal(aggregate.mobileMemory.status,variant==='failed-job'?'unavailable':'invalid');
+  assert.ok(aggregate.mobileMemory.observedReports.required.reportSha256,'The actual optional report bytes remain identified.');
+  if(variant!=='failed-job')assert.ok(aggregate.mobileMemory.errors.length>0,'The selected report integrity failure must remain visible: '+variant);
+ });
+});
 test('test group aggregate verifies the complete actual cohort and native artifacts', t => {
   const fixture=aggregateFixture(t),result=aggregateCopy(t,fixture);
   assert.equal(result.status,0,result.stdout+result.stderr);
@@ -593,13 +710,42 @@ test('test group aggregate rejects corrupt outcomes identities jobs and native e
   for(const [name,mutate]of scenarios)await parent.test(name,t=>{const result=aggregateCopy(t,fixture,mutate);assert.notEqual(result.status,0,'aggregate must reject '+name);});
 });
 
-test('test group workflow scanner command rejects missing parallel group evidence', t => {
+test('test group workflow scanner command rejects missing parallel group evidence', async t => {
+  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8'),lines=workflow.split('\n');
+  const jobLines=name=>{const start=lines.findIndex(line=>line===`  ${name}:`),end=lines.findIndex((line,index)=>index>start&&/^  [A-Za-z0-9_-]+:\s*$/.test(line));assert.notEqual(start,-1,'workflow job exists: '+name);return lines.slice(start,end<0?undefined:end);};
+  const jobHeader=job=>{const steps=job.indexOf('    steps:');return job.slice(0,steps<0?job.length:steps).join('\n');};
+  const jobSteps=job=>{const result=[];let step=null;for(const line of job){if(line.startsWith('      - ')){if(step)result.push(step.join('\n'));step=[line];}else if(step)step.push(line);}if(step)result.push(step.join('\n'));return result;};
+  const scanner=jobLines('scanner-tests'),mobile=jobLines('mobile-memory'),scannerHeader=jobHeader(scanner),mobileHeader=jobHeader(mobile),steps=jobSteps(scanner);
+  const optionalDownload=steps.find(step=>step.includes('uses: actions/download-artifact@v4')&&step.includes('name: mobile-memory-${{ github.run_id }}-${{ github.run_attempt }}'));
+  await t.test('mobile download follows the default-off explicit branch selector',()=>{
+    assert.match(workflow,/^  workflow_dispatch:\n    inputs:\n      optional_mobile_diagnostics:\n        description: Run the capped mobile WebKit diagnostic story for this branch\.\n        required: false\n        default: false\n        type: boolean$/m,'The diagnostic selector must stay default-off.');
+    assert.match(mobileHeader,/^    if: \$\{\{ github\.event_name == 'workflow_dispatch' && needs\.validation-context\.outputs\.mobile-diagnostics == 'true' \}\}$/m,'Only explicit branch dispatch may run the optional producer.');
+    assert.ok(optionalDownload,'scanner-tests must retain the exact run/attempt-bound optional artifact input.');
+    assert.match(optionalDownload,/^        if: always\(\) && needs\.validation-context\.outputs\.mobile-diagnostics == 'true'$/m,'The optional download must be skipped when unselected but remain inspectable after selected producer failure.');
+    assert.match(optionalDownload,/^          name: mobile-memory-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}$/m);
+    assert.match(optionalDownload,/^          path: \$\{\{ runner\.temp \}\}\/mobile-memory$/m);
+  });
+  await t.test('only optional mobile download failure is contained; mandatory failures still block',()=>{
+    assert.ok(optionalDownload,'The exact optional download step must be present.');
+    assert.match(optionalDownload,/^        continue-on-error: true$/m,'Only this optional download failure may be nonfatal to scanner-tests.');
+    assert.match(scannerHeader,/^    if: always\(\)$/m,'The aggregate consumer must still collect predecessor results.');
+    assert.doesNotMatch(scannerHeader,/continue-on-error\s*:/,'Do not make the entire scanner job nonfatal.');
+    assert.doesNotMatch(mobileHeader,/continue-on-error\s*:/,'Do not make the optional producer job nonfatal.');
+    const tolerated=steps.filter(step=>/^        continue-on-error:\s*true\s*$/m.test(step));
+    assert.deepEqual(tolerated,[optionalDownload],'Failure containment must be scoped to the optional download step only.');
+    const requiredDownloads=steps.filter(step=>step.includes('uses: actions/download-artifact@v4')&&step!==optionalDownload);
+    assert.ok(requiredDownloads.some(step=>step.includes('regression-${{ github.run_id }}-${{ github.run_attempt }}-core')),'A mandatory group artifact control remains present.');
+    assert.ok(requiredDownloads.some(step=>step.includes('ci-routing-${{ github.run_id }}-${{ github.run_attempt }}')),'The required routing proof remains present.');
+    for(const step of requiredDownloads)assert.doesNotMatch(step,/continue-on-error\s*:/,'Required artifact download must remain fatal.');
+    const aggregate=steps.find(step=>step.includes('name: Verify complete required cohort'));
+    assert.ok(aggregate,'The existing required aggregate consumer must remain present.');
+    assert.doesNotMatch(aggregate,/continue-on-error\s*:/,'The mandatory aggregate result must remain fatal.');
+  });
   const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
   t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));
   for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fs.cpSync(result.outputDir,path.join(temporary,'groups',group),{recursive:true});}
   fs.rmSync(path.join(temporary,'groups/scenery/result.json'));
   writeJson(path.join(temporary,'needs.json'),Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:'success'}])));
-  const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8');
   const step=workflow.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);
   const command=step?step[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n'):'npm test';
   const env={...process.env,RUNNER_TEMP:temporary,GITHUB_REPOSITORY:'example/fixture',GITHUB_RUN_ID:'fixture-run-1',GITHUB_RUN_ATTEMPT:'1',CHAIN_TEST_SOURCE_SHA:fixture.sourceSha,CHAIN_TEST_COMPARISON_BASE:fixture.comparisonBase,CHAIN_TEST_EVENT_POLICY:'local'};delete env.NODE_TEST_CONTEXT;
@@ -839,4 +985,262 @@ test('test group catalog routes real declarations despite matching quoted fixtur
     assert.equal(executed.filter(item => item === title).length, 1, 'execute each actual declaration exactly once');
     assert.equal(native.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1);
   }
+});
+
+test('test group aggregate requires both exact native button safety reports',async t=>{ // Copy the complete real contract module closure before binding fixture identity.
+ const fixture=createFixture(t,{mobileStory:true,nativeTitle:'RISK repository process: required native button actions execute in Chromium and WebKit'});fixture.originals=new Map();
+ for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+ const absent=aggregateCopy(t,fixture);assert.notEqual(absent.status,0,'scanner-tests must reject a passing native root that omitted both required button engine artifacts');assert.match(absent.stderr,/Both required distinct native button reports must be present/);
+ const manifest={schemaVersion:1,requiredRuntimeAssets:JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/button-safety-inventory.json'),'utf8')).requiredRuntimeAssets,requiredMobileStory:JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/button-safety-inventory.json'),'utf8')).requiredMobileStory,requiredActions:['act:add'],requiredScenarios:['populated','oversized retained-source'],requiredWorkload:{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000},requiredRapidActions:['act:add']},bytes=Buffer.from(JSON.stringify(manifest));
+ for(const name of ['button-safety-contract.mjs','button-safety-startup.mjs','button-safety-timeline-core.mjs'])fs.copyFileSync(path.join(repository,'scripts',name),path.join(fixture.root,'scripts',name));fs.writeFileSync(path.join(fixture.root,'scripts/button-safety-inventory.json'),bytes);
+ // Fixture source identity includes the authoritative inventory before producing results.
+ git(fixture.root,'add','.');git(fixture.root,'commit','-qm','fixture button inventory');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+ fixture.originals.clear();for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+ const inject=(root,variant)=>{
+  const group=path.join(root,'native-process'),file=path.join(group,'result.json'),result=JSON.parse(fs.readFileSync(file));
+  for(const engine of ['chromium','webkit']){
+   const report={schemaVersion:1,kind:'button-safety',engine,status:'passed',candidateCommit:result.resultIdentity.checkoutSha,candidateTree:result.resultIdentity.checkoutTree,inventorySha256:createHash('sha256').update(bytes).digest('hex'),assets:{...manifest.requiredRuntimeAssets},requiredActions:['act:add'],requiredScenarios:manifest.requiredScenarios,scenarios:manifest.requiredScenarios.map(name=>({name,status:'passed',setup:{currentTasks:400,durableTasks:400,activeTasks:400,durableHash:'e'.repeat(64),fixtureRole:'active'}})),requiredWorkload:manifest.requiredWorkload,requiredRapidActions:manifest.requiredRapidActions,rapidOutcomes:[{action:'act:add',status:'passed',assertions:1,responsive:true,bursts:[{attempts:10,trustedPresses:10,unrelatedClicks:0,windowMs:1500,acceptedClicks:10,refused:0,disappeared:0,semantics:'Ten trusted native Add presses preserve one accepted task and exact source'}]}],observedActions:['act:add'],outcomes:[{action:'act:add',status:'passed',events:['click'],assertions:1,responsive:true}],errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+   if(engine==='webkit'){
+    if(variant==='wrong engine')report.engine='chromium';if(variant==='wrong candidate')report.candidateCommit='f'.repeat(40);if(variant==='skip')report.outcomes[0].status='skipped';if(variant==='new uncovered action')report.observedActions.push('act:new-untested');if(variant==='missing action')report.outcomes=[];if(variant==='lifecycle')report.errors.push('page-crash');if(variant==='missing stress scenario')report.scenarios.pop();if(variant==='skipped stress scenario')report.scenarios[1].status='skipped';if(variant==='missing saved400')delete report.scenarios[0].setup;if(variant==='missing rapid family')report.rapidOutcomes=[];if(variant==='skipped rapid family')report.rapidOutcomes[0].status='skipped';if(variant==='slow rapid presses')report.rapidOutcomes[0].bursts[0].windowMs=2001;if(variant==='unrelated rapid action')report.rapidOutcomes[0].bursts[0].unrelatedClicks=1;
+   }
+   const relative='native/button-'+engine+'.json',encoded=Buffer.from(JSON.stringify(report));fs.writeFileSync(path.join(group,relative),encoded);result.artifacts.push({path:relative,bytes:encoded.length,sha256:createHash('sha256').update(encoded).digest('hex')});
+  }
+  writeJson(file,result);
+ };
+ const identity=JSON.parse(fs.readFileSync(path.join(fixture.originals.get('native-process'),'result.json'),'utf8')).resultIdentity;
+ const mobileDir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-desktop-mobile-proof-'));t.after(()=>fs.rmSync(mobileDir,{recursive:true,force:true}));
+ createMobileBundle(mobileDir,{candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,sourceSha:identity.sourceSha,repository:identity.repository,runId:identity.runId,runAttempt:identity.runAttempt,eventPolicy:identity.eventPolicy});
+ const stressDir=mobileDir+'-stress';t.after(()=>fs.rmSync(stressDir,{recursive:true,force:true}));createMobileBundle(stressDir,{candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,sourceSha:identity.sourceSha,repository:identity.repository,runId:identity.runId,runAttempt:identity.runAttempt,eventPolicy:identity.eventPolicy},'stress-512mb');
+ const aggregate=(owner,variant)=>aggregateCopy(owner,fixture,(root,needs)=>{inject(root,variant);const value=JSON.parse(fs.readFileSync(needs,'utf8'));value['mobile-memory']={result:'success'};writeJson(needs,value);},['--mobile-report',path.join(mobileDir,'report.json'),'--mobile-stress-report',path.join(stressDir,'report.json')]);
+ const good=aggregate(t,null);assert.equal(good.status,0,'complete two-engine button evidence accepted with independently valid mobile proof: '+good.stderr);
+ for(const variant of ['wrong engine','wrong candidate','skip','new uncovered action','missing action','lifecycle','missing stress scenario','skipped stress scenario','missing saved400','missing rapid family','skipped rapid family','slow rapid presses','unrelated rapid action'])await t.test(variant,sub=>{const result=aggregate(sub,variant);assert.notEqual(result.status,0,'aggregate must reject '+variant+' even with recomputed valid artifact hashes and valid independent mobile proof');});
+});
+
+
+test('test group aggregate requires independently bound required and reported stress profiles',t=>{
+ const fixture=aggregateFixture(t,{mobileStory:true}),source={candidateCommit:fixture.sourceSha,candidateTree:git(fixture.root,'rev-parse','HEAD^{tree}'),sourceSha:fixture.sourceSha};
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'chain-budget-pair-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const required=createMobileBundle(path.join(dir,'required'),source),stress=createMobileBundle(path.join(dir,'stress'),source,'stress-512mb');
+ const passJob=(_,needs)=>{const j=JSON.parse(fs.readFileSync(needs));j['validation-context'].outputs={policy:'optional-mobile-dispatch-v1','mobile-diagnostics':'true'};j['mobile-memory']={result:'success'};writeJson(needs,j);};
+ const args=['--mobile-report',path.join(required.directory,'report.json')];
+ const missing=aggregateCopy(t,fixture,passJob,args);assert.equal(missing.status,0,'A missing optional stress input cannot fail the mandatory aggregate: '+missing.stderr);let missingAggregate=JSON.parse(fs.readFileSync(path.join(missing.outputDir,'aggregate.json'),'utf8'));assert.equal(missingAggregate.status,'passed');assert.equal(missingAggregate.mobileMemory.status,'unavailable');assert.deepEqual(missingAggregate.mobileMemory.missingReports,['stress']);
+ const pair=[...args,'--mobile-stress-report',path.join(stress.directory,'report.json')];const good=aggregateCopy(t,fixture,passJob,pair);assert.equal(good.status,0,good.stdout+good.stderr);let goodAggregate=JSON.parse(fs.readFileSync(path.join(good.outputDir,'aggregate.json'),'utf8'));assert.equal(goodAggregate.status,'passed');assert.equal(goodAggregate.mobileMemory.status,'pass');
+ stress.report.status='failed';stress.report.cases[0].appOutcome='app-runtime-failure';stress.native.normal.status='failed';stress.native.normal.errors=['page-crash'];stress.native.normal.failure='Page crashed';refreshMobileBundle(stress);const failedApp=aggregateCopy(t,fixture,passJob,pair);assert.equal(failedApp.status,0,'An honestly failed stress app remains nonblocking: '+failedApp.stderr);const failedAggregate=JSON.parse(fs.readFileSync(path.join(failedApp.outputDir,'aggregate.json'),'utf8'));assert.equal(failedAggregate.status,'passed');assert.equal(failedAggregate.mobileMemory.status,'app-failed');assert.equal(failedAggregate.mobileMemory.stress.status,'failed');assert.ok(failedAggregate.mobileMemory.stress.cases.some(row=>row.outcome==='app-runtime-failure'),'The optional application failure must remain visible in the aggregate evidence.');
+ stress.report.candidateTree='0'.repeat(40);refreshMobileBundle(stress);const wrongSource=aggregateCopy(t,fixture,passJob,pair);assert.equal(wrongSource.status,0,'An invalid optional source cannot fail the mandatory aggregate: '+wrongSource.stderr);const wrongSourceAggregate=JSON.parse(fs.readFileSync(path.join(wrongSource.outputDir,'aggregate.json'),'utf8'));assert.equal(wrongSourceAggregate.status,'passed');assert.equal(wrongSourceAggregate.mobileMemory.status,'invalid');assert.equal(wrongSourceAggregate.mobileMemory.observedReports.stress.candidateTree,'0'.repeat(40));assert.ok(wrongSourceAggregate.mobileMemory.errors.some(error=>/candidateTree/.test(error)),'The exact source-identity defect must remain recorded.');
+ const substitute=aggregateCopy(t,fixture,passJob,['--mobile-report',path.join(stress.directory,'report.json'),'--mobile-stress-report',path.join(required.directory,'report.json')]);assert.equal(substitute.status,0,'An invalid profile substitution cannot fail the mandatory aggregate: '+substitute.stderr);const substituteAggregate=JSON.parse(fs.readFileSync(path.join(substitute.outputDir,'aggregate.json'),'utf8'));assert.equal(substituteAggregate.status,'passed');assert.equal(substituteAggregate.mobileMemory.status,'invalid');assert.ok(substituteAggregate.mobileMemory.errors.length>0,'A profile substitution must remain invalid rather than pass.');
+});
+
+test('test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution',async parent=>{
+ const optionalRoots=[
+ "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
+ "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+ "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+ "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+ "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
+ "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+ "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release"
+],guard="process.env.CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS==='1'&&process.env.CHAIN_TEST_GROUP==='optional-workload-diagnostics'&&process.execArgv.some(value=>value.startsWith('--test-name-pattern='))",reason="Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls.";
+ const options={nrOptional:{roots:optionalRoots,reason,guard}},fixture=createFixture(parent,options),invFile=path.join(fixture.root,'scripts/test-group-inventory.json'),inventoryBytes=fs.readFileSync(invFile);
+ const evidenceRoot=process.env.CHAIN_NR_FIXTURE_EVIDENCE;let evidenceSerial=0;
+ const retain=(label,result)=>{if(evidenceRoot){const destination=path.join(evidenceRoot,String(++evidenceSerial).padStart(2,'0')+'-'+label);fs.mkdirSync(destination,{recursive:true});if(result.outputDir)fs.cpSync(result.outputDir,path.join(destination,'runner'),{recursive:true});writeJson(path.join(destination,'command.json'),{status:result.status,signal:result.signal,stdout:result.stdout,stderr:result.stderr,outputDir:result.outputDir||null});}return result;};
+ const description=retain('required-descriptor',invoke(fixture,{args:['--describe']}));assert.equal(description.status,0,description.stdout+description.stderr);const descriptor=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json')));
+ assert.deepEqual(descriptor.groups.find(row=>row.id==='native-process').roots,[fixtureRoots['native-process'],fixtureScriptRoot].sort(),'Default required native partition must exclude exactly the seven explicitly classified workload roots');
+ assert.deepEqual(descriptor.groups.map(row=>row.id),groups);assert.deepEqual(descriptor.optionalWorkloadDiagnostics,{roots:optionalRoots.map(root=>({root,file:'tests.js',group:'native-process',reason})),baselineCaseIds:optionalRoots.slice().sort()},'The intentional optional baseline partition retains every historical identity and source-bound reason');assert.equal(descriptor.baseline.caseCount,13);assert.equal(description.evidence.kind,'required-test-group');
+ const actualSource=fs.readFileSync(path.join(repository,'tests.js'),'utf8');assert.equal(actualSource.split('const optionalWorkloadDiagnosticsSelected='+guard+';').length,2,'Actual default npm registrations share the independently required explicit-selection guard');for(const root of optionalRoots)assert.ok(actualSource.includes("if(optionalWorkloadDiagnosticsSelected){\n test('"+root+"',"),'Each actual literal workload callback has its individual registration guard: '+root);
+ const journalDirectory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-nr-journals-'));fixture.outputs.push(journalDirectory);let journalSerial=0;
+ const environment=()=>({CHAIN_NR_JOURNAL:path.join(journalDirectory,String(++journalSerial)+'.jsonl'),CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS:'1',CHAIN_TEST_GROUP:'optional-workload-diagnostics'});
+ const journal=env=>fs.existsSync(env.CHAIN_NR_JOURNAL)?fs.readFileSync(env.CHAIN_NR_JOURNAL,'utf8').trim().split('\n').map(line=>JSON.parse(line)):[];
+ await parent.test('required native mode rejects inherited selection without losing mandatory roots',()=>{
+  const env=environment(),result=retain('required-polluted',invoke(fixture,{group:'native-process',env}));assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.evidence.kind,'required-test-group');assert.equal(result.evidence.resultIdentity.selectedGroup,'native-process');assert.deepEqual(result.evidence.cases.map(row=>row.id).sort(),[fixtureRoots['native-process'],fixtureScriptRoot].sort());assert.deepEqual(journal(env),[]);const mandatory=JSON.parse(fs.readFileSync(path.join(result.outputDir,'native/candidate-identity.json')));assert.equal(mandatory.optionalSelected,'0','Required child forcibly clears an inherited opt-in flag');assert.equal(mandatory.group,'native-process');assert.equal(result.evidence.inventory.baselineCaseCount,13);assert.equal(fs.existsSync(path.join(result.outputDir,'runtime-tmp')),false);
+ });
+ await parent.test('plain npm test does not register optional callbacks even with polluted opt-in environment',()=>{
+  const env=environment(),isolated=isolatedFixtureNativeOutput(fixture,{...process.env,...env});delete isolated.env.NODE_TEST_CONTEXT;const result=retain('plain-npm-test',run('npm',['test'],fixture.root,isolated.env));assert.equal(result.status,0,result.stdout+result.stderr);for(const root of optionalRoots)assert.ok(!result.stdout.includes(root),'No passing placeholder, skipped registration or workload callback in default npm test');for(const root of[...Object.values(fixtureRoots),fixtureScriptRoot])assert.ok(result.stdout.includes(root));assert.deepEqual(journal(env),[]);
+ });
+ let optionalResult;
+ await parent.test('explicit optional CLI executes seven distinct actual callbacks and retains source TAP artifacts and cleanup',()=>{
+  const env=environment(),result=retain('optional-execution',invoke(fixture,{group:'native-process',args:['--optional-workload-diagnostics'],env}));optionalResult=result;assert.equal(result.status,0,result.stdout+result.stderr);assert.equal(result.evidence.kind,'optional-workload-diagnostics');assert.equal(result.evidence.resultIdentity.selectedGroup,'optional-workload-diagnostics');assert.deepEqual(result.evidence.resultIdentity.expectedGroups,groups);assert.equal(result.evidence.cases.length,7);assert.deepEqual(result.evidence.cases.map(row=>row.id).sort(),optionalRoots.slice().sort());assert.ok(result.evidence.cases.every(row=>row.status==='passed'&&row.id===row.root));const rows=journal(env);assert.equal(rows.length,7);assert.deepEqual(rows.map(row=>row.root).sort(),optionalRoots.slice().sort());assert.ok(rows.every(row=>row.group==='optional-workload-diagnostics'&&row.selected==='1'));assert.equal(result.evidence.artifacts.length,7);for(const artifact of result.evidence.artifacts){const bytes=fs.readFileSync(path.join(result.outputDir,artifact.path));assert.equal(bytes.length,artifact.bytes);assert.equal(createHash('sha256').update(bytes).digest('hex'),artifact.sha256);const value=JSON.parse(bytes);assert.ok(optionalRoots.includes(value.root));assert.equal(value.sha,fixture.sourceSha);assert.equal(value.tree,result.evidence.resultIdentity.checkoutTree);}assert.equal(fs.existsSync(path.join(result.outputDir,'runtime-tmp')),false);assert.ok(fs.readFileSync(path.join(result.outputDir,'test.tap'),'utf8').startsWith('TAP version 13'));assert.deepEqual(fs.readFileSync(invFile),inventoryBytes);
+ });
+ await parent.test('optional application failure remains an actual failed optional result with all seven attempts',()=>{
+  const env={...environment(),CHAIN_NR_FAIL:optionalRoots[0]},result=retain('optional-failure',invoke(fixture,{group:'native-process',args:['--optional-workload-diagnostics'],env}));assert.notEqual(result.status,0);assert.equal(result.evidence.kind,'optional-workload-diagnostics');assert.equal(result.evidence.status,'failed');assert.equal(result.evidence.process.exitCode,1);assert.equal(result.evidence.cases.length,7);assert.equal(result.evidence.cases.filter(row=>row.status==='failed').length,1);assert.equal(journal(env).length,7);assert.equal(fs.existsSync(path.join(result.outputDir,'runtime-tmp')),false);
+ });
+ await parent.test('optional CLI cannot select another required group',()=>{const env=environment(),result=retain('wrong-group',invoke(fixture,{group:'core',args:['--optional-workload-diagnostics'],env}));assert.notEqual(result.status,0);assert.match(result.stderr,/optional.*native-process/i);assert.deepEqual(journal(env),[]);});
+ const variants=[
+  ['unknown optional identity',f=>{const p=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(p));a.rootAssignments.push({root:'unapproved optional workload',file:'tests.js',group:'native-process',admission:'optional-workload-diagnostic',admissionReason:reason});writeJson(p,a);},/optional.*(unknown|approved|exact)/i],
+  ['pure mandatory root marked optional',f=>{const p=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(p));Object.assign(a.rootAssignments[0],{admission:'optional-workload-diagnostic',admissionReason:reason});writeJson(p,a);},/optional.*(unknown|approved|exact)/i],
+  ['one optional classification omitted',f=>{const p=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(p));delete a.rootAssignments.find(row=>row.root===optionalRoots[0]).admission;writeJson(p,a);},/optional.*(missing|exact|seven)/i],
+  ['duplicate assignment',f=>{const p=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(p));a.rootAssignments.push({...a.rootAssignments.find(row=>row.root===optionalRoots[0])});writeJson(p,a);},/overlapping/],
+  ['missing source-bound reason',f=>{const p=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(p));delete a.rootAssignments.find(row=>row.root===optionalRoots[0]).admissionReason;writeJson(p,a);},/optional.*reason/i],
+  ['changed baseline partition',f=>{const p=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(p)),row=a.groups.find(row=>row.id==='native-process');row.baselineRootCount--;row.baselineEstimatedDurationMs-=100;writeJson(p,a);},/measured-root.*independent baseline/],
+  ['missing executable optional registration',f=>{const p=path.join(f.root,'tests.js');fs.writeFileSync(p,fs.readFileSync(p,'utf8').replace('test('+JSON.stringify(optionalRoots[0])+',','void('+JSON.stringify(optionalRoots[0])+','));},/optional.*registered 0/i],
+  ['duplicate executable optional registration',f=>{fs.appendFileSync(path.join(f.root,'tests.js'),'\ntest('+JSON.stringify(optionalRoots[0])+',()=>{});\n');},/optional.*registered 2/i],
+ ];
+ for(const[label,mutate,pattern]of variants)await parent.test(label,sub=>{const f=createFixture(sub,options);mutate(f);const result=retain('reject-'+label.replaceAll(' ','-'),invoke(f,{args:['--describe']}));assert.notEqual(result.status,0);assert.match(result.stderr,pattern);});
+ for(const duplicate of[false,true])await parent.test(duplicate?'duplicate actual optional execution is refused':'missing actual optional execution is refused',sub=>{const f=createFixture(sub,options),p=path.join(f.root,'tests.js'),before=fs.readFileSync(p,'utf8'),prefix='if(optionalWorkloadDiagnosticsSelected){\n test('+JSON.stringify(optionalRoots[0])+',';assert.ok(before.includes(prefix));const replacement=(duplicate?'if(optionalWorkloadDiagnosticsSelected){\n for(let repeat=0;repeat<2;repeat++)test(':'if(false&&optionalWorkloadDiagnosticsSelected){\n test(')+JSON.stringify(optionalRoots[0])+',';fs.writeFileSync(p,before.replace(prefix,replacement));const env=environment(),result=retain(duplicate?'duplicate-actual':'missing-actual',invoke(f,{group:'native-process',args:['--optional-workload-diagnostics'],env}));assert.notEqual(result.status,0);assert.equal(result.evidence.kind,'optional-workload-diagnostics');assert.equal(result.evidence.status,'failed');assert.match(result.stderr,duplicate?/more than once/:/did not execute|is missing/);assert.equal(journal(env).length,duplicate?8:6);});
+ await parent.test('cohort digest binds the optional source-bound reason and leaves inventory bytes exact',()=>{const p=path.join(fixture.root,'scripts/test-group-assignments.json'),before=fs.readFileSync(p),a=JSON.parse(before);a.rootAssignments.find(row=>row.root===optionalRoots[0]).admissionReason+=' Additional source-bound fixture provenance.';writeJson(p,a);const result=retain('digest-reason',invoke(fixture,{args:['--describe']}));assert.equal(result.status,0,result.stderr);assert.notEqual(result.evidence.resultIdentity.cohortDigestSha256,description.evidence.resultIdentity.cohortDigestSha256);assert.deepEqual(fs.readFileSync(invFile),inventoryBytes);fs.writeFileSync(p,before);});
+ await parent.test('optional results cannot replace required native evidence even after forged group identity',sub=>{
+  const f=aggregateFixture(sub,options),env=environment(),optional=retain('aggregate-optional',invoke(f,{group:'native-process',args:['--optional-workload-diagnostics'],env}));assert.equal(optional.status,0,optional.stderr);const result=retain('aggregate-refusal',aggregateCopy(sub,f,collected=>{const destination=path.join(collected,'native-process');fs.rmSync(destination,{recursive:true});fs.cpSync(optional.outputDir,destination,{recursive:true});const p=path.join(destination,'result.json'),record=JSON.parse(fs.readFileSync(p));record.resultIdentity.selectedGroup='native-process';writeJson(p,record);}));assert.notEqual(result.status,0);assert.match(result.stderr,/optional|required group native-process/i);
+ });
+ assert.deepEqual(fs.readFileSync(invFile),inventoryBytes,'Independent historical inventory bytes remain immutable throughout partition/selection');
+});
+
+test('test group public workflow retains selected workload evidence without admitting it as ordinary proof',async parent=>{ // Copy the complete real contract module closure before binding fixture identity.
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex'),copy=value=>JSON.parse(JSON.stringify(value));
+ const optionalRoots=["RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes", "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch", "RISK repository process: native rapid cloud selection preserves the two-second input burst", "RISK repository process: unavailable native attempts reuse one prepared isolated release document", "RISK repository process: native burst preparation survives remounts without waiving missing or late input", "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts", "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release"],guard="process.env.CHAIN_OPTIONAL_WORKLOAD_DIAGNOSTICS==='1'&&process.env.CHAIN_TEST_GROUP==='optional-workload-diagnostics'&&process.execArgv.some(value=>value.startsWith('--test-name-pattern='))",reason='Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls.';
+ const workflow=fs.readFileSync(path.join(repository,'.github/workflows/data-safety.yml'),'utf8'),scanner=workflow.split(/^  scanner-tests:\s*$/m)[1].split(/^  [a-z][a-z0-9-]*:\s*$/m)[0],mobile=workflow.split(/^  mobile-memory:\s*$/m)[1].split(/^  [a-z][a-z0-9-]*:\s*$/m)[0];
+ const block=scanner.match(/      - name: Verify complete required cohort\n[\s\S]*?        run: \|\n((?:          [^\n]*\n|\n)*)/);assert.ok(block,'Existing whole workflow aggregate command is required');const command=block[1].split('\n').map(line=>line.startsWith('          ')?line.slice(10):line).join('\n');
+ const fixture=createFixture(parent,{mobileStory:true,nativeTitle:'RISK repository process: required native button actions execute in Chromium and WebKit',nrOptional:{roots:optionalRoots,reason,guard}}),manifest=JSON.parse(fs.readFileSync(path.join(repository,'scripts/button-safety-inventory.json'),'utf8'));
+ const ordinaryNames=["populated Add contexts settings and list", "editor done-task", "editor worked-task", "editor dot-task", "editor delete-task", "scanner yes", "scanner no", "scanner cant", "scanner postpone", "scanner cand-done", "scanner cand-worked", "scanner bench-done", "scanner bench-cant", "scanner bench-postpone", "scanner dislodge", "scanner worked", "scanner start-working", "intervention continue and skipped fresh pass", "exhausted scanner rescan and new pass", "fresh pass", "overdue WOOP native walkthrough", "recorded history and final WOOP", "manual backup restore delete and reset", "debug log refresh selection and return", "Help original apology and native backdrop dismissal", "native install accepted", "native install dismissed", "both-mode scan and resume descending", "both-mode scan and resume chance", "both-mode scan and resume squared", "theme preference changes through its button", "motion settings open and both choices respond", "scene time presets, lock, live time, and close", "location request, save name, reset, and close", "denied location request leaves the default sky", "scene view enters and returns to the task view", "Help FAQ and changelog disclosures toggle and close", "first-run Quick Start can be acknowledged", "cloud sync signs out and rejects signed-out authentication safely", "cloud retry, reload, and sign out preserve the device board during read failures", "cloud recovery reviews, protects, and applies a source with read and write failures", "Settings decision review offers Light and saves it while protecting failures", "populated comprehensive export", "oversized retained-source export", "accepted unsaved current board export", "clipboard refusal never renders payload or downloads", "download refusal keeps the prepared export usable", "unavailable saved-source export is visibly partial", "guarded file import preview cancel and confirm", "guarded paste import rejects malformed data and retains cancelled draft", "ordinary repeated selected eligibility", "ordinary Undo consumes two saved edit frames", "ordinary overdue WOOP repeated Next retains answers", "ordinary final WOOP repeated Next retains answers", "ordinary repeated cloud source choice", "ordinary repeated saved decision choice", "ordinary two distinct scanner decisions", "ordinary scene choice survives reopen and task Undo", "ordinary pending Copy refuses reentry", "ordinary obsolete Copy cannot alter replacement transfer"],repeatDefinitions=[{"name": "ordinary repeated selected eligibility", "file": "scripts/button-safety-rapid-core.mjs", "actionFamilies": ["act:list-eligibility"], "expected": "Select Eligible, then deliver two repeated native clicks and native Enter; retain mounted rows, selected control, focus and scroll. A genuinely changed filter still refreshes the view.", "minimumAttempts": 2, "assertionId": "selected-row-keeps-focus-and-scroll"}, {"name": "ordinary Undo consumes two saved edit frames", "file": "scripts/button-safety-rapid-core.mjs", "actionFamilies": ["act:undo"], "expected": "Create two real independently saved title edits, deliver two native Undo inputs, and restore the exact current and durable baseline without consuming prior history.", "minimumAttempts": 2, "assertionId": "undo-restores-two-independent-saves"}, {"name": "ordinary overdue WOOP repeated Next retains answers", "file": "scripts/button-safety-rapid-core.mjs", "actionFamilies": ["act:woop-next"], "expected": "Open overdue WOOP through the scanner; two Next attempts with one answer advance exactly one step, retain later answers and save the exact complete plan through durable reopen.", "minimumAttempts": 2, "assertionId": "overdue-woop-advances-one-step-and-reopens"}, {"name": "ordinary final WOOP repeated Next retains answers", "file": "scripts/button-safety-rapid-core.mjs", "actionFamilies": ["act:woop-next"], "expected": "Use the sole-active-task role; repeat Next twice at each answered step, never skip a required answer, then save/delete through actual controls and verify durable state.", "minimumAttempts": 2, "assertionId": "sole-task-woop-retains-required-answers"}, {"name": "ordinary repeated cloud source choice", "file": "scripts/button-safety-cloud.mjs", "actionFamilies": ["act:choose-cloud-recovery-source"], "expected": "Repeat the same eligible source twice and Enter without replacing mounted facts, focus or scroll; alternate source choice still changes selection. Preserve exact protected originals and no adoption before explicit Apply, including read/write refusal.", "minimumAttempts": 2, "assertionId": "same-cloud-source-keeps-review-and-protected-originals"}, {"name": "ordinary repeated saved decision choice", "file": "scripts/button-safety-cloud.mjs", "actionFamilies": ["act:choose-decision-recovery"], "expected": "Repeat the same Light choice twice without losing selection or gaining authority; explicit Apply saves Light, failed acknowledgement remains pending and exact device/cloud source boundaries remain protected.", "minimumAttempts": 2, "assertionId": "same-decision-choice-does-not-gain-authority"}, {"name": "ordinary two distinct scanner decisions", "file": "scripts/button-safety-rapid-core.mjs", "actionFamilies": ["act:yes"], "expected": "Deliver two distinct intentional Yes inputs tied to independently captured offered task IDs, account both accepted decisions, and preserve both in ordered current/durable scanner state without dropping or retargeting input.", "minimumAttempts": 2, "assertionId": "two-yes-inputs-bind-to-two-offered-task-ids"}, {"name": "ordinary scene choice survives reopen and task Undo", "file": "scripts/button-safety-scenes.mjs", "actionFamilies": ["scene-time:lock", "act:undo"], "expected": "Accept a scene lock, reopen and verify its durable identity, perform two distinct task edits and two native Undo inputs, retain the independently chosen scene and exact protected sources. Keep readiness, Normal/Reduced and unchanged-scene repaint checks in existing regression consumers.", "minimumAttempts": 2, "assertionId": "scene-lock-survives-reopen-and-task-undo"}, {"name": "ordinary pending Copy refuses reentry", "file": "scripts/button-safety-rapid.mjs", "actionFamilies": ["act:copy-export"], "expected": "Defer actual clipboard boundary completion, deliver two attempted Copy presses, classify first accepted/second refused, perform a trusted Download with exact prepared bytes before Copy settles, then preserve both truthful outcomes and all saved sources.", "minimumAttempts": 2, "assertionId": "pending-copy-refuses-reentry-and-keeps-download"}, {"name": "ordinary obsolete Copy cannot alter replacement transfer", "file": "scripts/button-safety-rapid.mjs", "actionFamilies": ["act:copy-export"], "expected": "Start Copy, replace/close the prepared transfer and start a newer Copy; settle the old completion while the new operation is busy, proving unchanged new status, busy state, archive identity and protected sources.", "minimumAttempts": 2, "assertionId": "obsolete-copy-cannot-change-new-transfer"}];
+ assert.deepEqual(manifest.profiles.ordinary.requiredScenarios,ordinaryNames,'The fixture uses all independently accepted fifty ordinary flows plus ten named semantic cases');assert.deepEqual(manifest.profiles.ordinary.requiredRepeatCases,repeatDefinitions,'The complete six-field normative repeat inventory is frozen independently');assert.equal(manifest.requiredActions.length,114);assert.deepEqual(manifest.profiles.ordinary.fixture,{savedTasks:64,source:'signed-out-installed',authMode:'signed-out'});assert.equal(manifest.profiles['workload-diagnostic'].requiredScenarios.length,90);assert.deepEqual(manifest.profiles['workload-diagnostic'].requiredWorkload,{savedTasks:400,rapidAttempts:10,rapidWindowMs:2000});
+ for(const name of ['button-safety-contract.mjs','button-safety-startup.mjs','button-safety-timeline-core.mjs'])fs.copyFileSync(path.join(repository,'scripts',name),path.join(fixture.root,'scripts',name));writeJson(path.join(fixture.root,'scripts/button-safety-inventory.json'),manifest);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','bind complete independent ordinary and workload report inventories');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');fixture.originals=new Map();for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+ const identity=readEvidence(fixture.originals.get('native-process')).resultIdentity,inventoryHash=hash(fs.readFileSync(path.join(fixture.root,'scripts/button-safety-inventory.json'))),journal=fs.mkdtempSync(path.join(os.tmpdir(),'chain-pa-optional-journal-'));fixture.outputs.push(journal);
+ const optionalGood=invoke(fixture,{group:'native-process',args:['--optional-workload-diagnostics'],env:{CHAIN_NR_JOURNAL:path.join(journal,'passed.jsonl')}});assert.equal(optionalGood.status,0,optionalGood.stdout+optionalGood.stderr);assert.equal(optionalGood.evidence.kind,'optional-workload-diagnostics');assert.equal(optionalGood.evidence.cases.length,7);
+ const optionalFailed=invoke(fixture,{group:'native-process',args:['--optional-workload-diagnostics'],env:{CHAIN_NR_JOURNAL:path.join(journal,'failed.jsonl'),CHAIN_NR_FAIL:optionalRoots[0]}});assert.equal(optionalFailed.status,1);assert.equal(optionalFailed.evidence.status,'failed');assert.equal(optionalFailed.evidence.cases.length,7);assert.equal(optionalFailed.evidence.cases.filter(row=>row.status==='failed').length,1);
+ // Synthetic aggregate-parser observations only; this fixture executes no browser.
+ const syntheticAuthority=stage=>({stage,mode:'scan',authUser:'observed@example.invalid',account:'board@example.invalid',identity:'observed-owner',revision:17,dirty:false,cloudStatus:'ok'});
+ const cloudStages={
+  'cloud sync signs out and rejects signed-out authentication safely':['before-sign-out','signed-out','authentication-refused'],
+  'Settings decision review offers Light and saves it while protecting failures':['before-settings','baseline-saved','read-refused','reviewed','selected','write-refused','reviewed-retry','selected-retry','applied']
+ };
+ const nativeReport=(engine,profile='ordinary')=>{
+  const definition=manifest.profiles[profile],count=profile==='ordinary'?64:400;
+  const report={schemaVersion:1,kind:'button-safety',engine,profile,status:'passed',candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,inventorySha256:inventoryHash,assets:copy(manifest.requiredRuntimeAssets),requiredActions:copy(manifest.requiredActions),requiredScenarios:copy(definition.requiredScenarios),scenarios:definition.requiredScenarios.map(name=>{const fixture=profile==='ordinary'?manifest.profiles.ordinary.scenarioFixtures[name]:null,role=fixture?.fixtureRole||definition.scenarioRoles?.[name]||'active';return{name,status:'passed',setup:{currentTasks:count,durableTasks:count,activeTasks:role==='active'?count:1,durableHash:'e'.repeat(64),fixtureRole:role,...(fixture?{source:fixture.source,authMode:fixture.authMode,observedAuthority:syntheticAuthority('post-bootstrap')}:{})},...(profile==='ordinary'&&cloudStages[name]?{authorityObservations:cloudStages[name].map(stage=>({stage,authority:syntheticAuthority(stage),currentTasks:64,durableTasks:64,currentHash:'d'.repeat(64),durableHash:'e'.repeat(64)}))}:{})};}),observedActions:copy(manifest.requiredActions),outcomes:manifest.requiredActions.map(action=>({action,status:'passed',events:['click'],assertions:1,responsive:true})),errors:[],cleanup:{contextClosed:true,browserClosed:true,serverClosed:true}};
+  if(profile==='ordinary')report.repeatOutcomes=repeatDefinitions.map(row=>{const attempts=[0,1].map(index=>({receiptId:engine+':'+row.name+':'+index,actionFamily:row.actionFamilies[index%row.actionFamilies.length],trusted:true,result:'accepted',receiptAtMs:10+index}));return{name:row.name,status:'passed',attempts,accounting:{attempted:2,accepted:2,refused:0,disappeared:0},assertions:[{id:row.assertionId,status:'passed',expected:row.expected,evidence:'Independent public aggregate fixture complete semantic witness'}],sourceIdentity:{candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,inventorySha256:inventoryHash,durableHash:'e'.repeat(64)}};});
+  else{report.requiredWorkload=copy(definition.requiredWorkload);report.requiredRapidActions=copy(definition.requiredRapidActions);report.rapidOutcomes=definition.requiredRapidActions.map(action=>({action,status:'passed',assertions:1,responsive:true,bursts:[{attempts:10,trustedPresses:10,unrelatedClicks:0,windowMs:1500,acceptedClicks:1,refused:9,disappeared:0,semantics:'Original diagnostic trusted-attempt accounting remains strict'}]}));}return report;
+ };
+ let serial=0;const evidenceRoot=process.env.CHAIN_PA_FIXTURE_EVIDENCE;
+ const execute=(owner,label,{selected=false,jobResult=selected?'success':'skipped',workload=selected?'passed':'absent',mutateRequired=()=>{},mutateOptional=()=>{},selector=String(selected),policy=selected?'optional-mobile-dispatch-v1':'outgoing-branch-push-v1',mobileAppFailure=false}={})=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-pa-public-workflow-'));owner.after(()=>fs.rmSync(directory,{recursive:true,force:true}));fs.mkdirSync(path.join(directory,'groups'));
+  for(const[id,output]of fixture.originals)fs.cpSync(output,path.join(directory,'groups',id),{recursive:true});
+  const native=path.join(directory,'groups/native-process'),resultFile=path.join(native,'result.json'),record=JSON.parse(fs.readFileSync(resultFile)),reports=['chromium','webkit'].map(engine=>nativeReport(engine));mutateRequired(reports);
+  reports.forEach((report,index)=>{const relative='native/ordinary-button-'+index+'.json',bytes=Buffer.from(JSON.stringify(report));fs.writeFileSync(path.join(native,relative),bytes);record.artifacts.push({path:relative,bytes:bytes.length,sha256:hash(bytes)});});writeJson(resultFile,record);
+  if(workload!=='absent'){
+   const target=path.join(directory,'mobile-memory/optional-workload');fs.mkdirSync(path.dirname(target),{recursive:true});fs.cpSync((workload==='failed'?optionalFailed:optionalGood).outputDir,target,{recursive:true});const file=path.join(target,'result.json'),raw=JSON.parse(fs.readFileSync(file));mutateOptional(raw,target);writeJson(file,raw);
+  }
+  if(selected){const required=createMobileBundle(path.join(directory,'mobile-memory/required'),{candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,sourceSha:identity.sourceSha,repository:identity.repository,runId:identity.runId,runAttempt:identity.runAttempt,eventPolicy:identity.eventPolicy}),stress=createMobileBundle(path.join(directory,'mobile-memory/stress'),{candidateCommit:identity.checkoutSha,candidateTree:identity.checkoutTree,sourceSha:identity.sourceSha,repository:identity.repository,runId:identity.runId,runAttempt:identity.runAttempt,eventPolicy:identity.eventPolicy},'stress-512mb');if(mobileAppFailure){stress.report.status='failed';stress.report.cases[0].appOutcome='app-runtime-failure';stress.native.normal.status='failed';stress.native.normal.errors=['page-crash'];stress.native.normal.failure='Page crashed';refreshMobileBundle(stress);}}
+  const needs=Object.fromEntries(['validation-context','event-gates','cohort-routing','regression'].map(id=>[id,{result:'success'}]));needs['validation-context'].outputs={policy,'mobile-diagnostics':selector};needs['mobile-memory']={result:jobResult};writeJson(path.join(directory,'needs.json'),needs);
+  const env={...process.env,RUNNER_TEMP:directory,GITHUB_REPOSITORY:identity.repository,GITHUB_RUN_ID:String(identity.runId),GITHUB_RUN_ATTEMPT:String(identity.runAttempt),CHAIN_TEST_SOURCE_SHA:identity.sourceSha,CHAIN_TEST_COMPARISON_BASE:identity.comparisonBase,CHAIN_TEST_EVENT_POLICY:identity.eventPolicy};delete env.NODE_TEST_CONTEXT;const child=spawnSync('bash',['-euo','pipefail','-c',command],{cwd:fixture.root,env,encoding:'utf8',timeout:15000,maxBuffer:32*1024*1024});
+  if(evidenceRoot){const target=path.join(evidenceRoot,String(++serial).padStart(2,'0')+'-'+label.replaceAll(' ','-'));fs.mkdirSync(target,{recursive:true});fs.cpSync(directory,path.join(target,'complete-workflow-artifacts'),{recursive:true});writeJson(path.join(target,'command.json'),{executable:'bash',argv:['-euo','pipefail','-c',command],cwd:fixture.root,status:child.status,signal:child.signal,error:child.error?.message,stdout:child.stdout,stderr:child.stderr});}
+  assert.equal(child.error,undefined,'Actual workflow aggregate must execute: '+label);assert.equal(child.signal,null);const reportFile=path.join(directory,'aggregate/aggregate.json');assert.ok(fs.existsSync(reportFile),'Actual aggregate output retained before assertions: '+child.stdout+child.stderr);return{child,report:JSON.parse(fs.readFileSync(reportFile)),directory};
+ };
+ await parent.test('existing selected job executes and retains all seven diagnostics without making their producer fatal to ordinary admission',()=>{
+  assert.match(workflow,/optional_mobile_diagnostics:[\s\S]*?default: false/);assert.match(mobile,/github\.event_name == 'workflow_dispatch' && needs\.validation-context\.outputs\.mobile-diagnostics == 'true'/);assert.ok(mobile.includes('--optional-workload-diagnostics'),'The selected existing job must execute the exact accepted optional public mode');assert.ok(mobile.includes('--group native-process'));assert.ok(mobile.includes('$RUNNER_TEMP/mobile-memory/optional-workload'));assert.ok(mobile.includes('playwright install --with-deps chromium webkit'));assert.match(mobile,/name: Execute selected optional workload diagnostics\n        if: always\(\)/,'A failed capped diagnostic cannot skip the separately selected workload attempt');assert.ok(command.includes('--optional-workload-result "$RUNNER_TEMP/mobile-memory/optional-workload/result.json"'),'Actual existing aggregate command carries the separately identified optional result');assert.doesNotMatch(mobile,/continue-on-error\s*:/,'Producer failure remains raw failure; only existing optional download is contained');assert.ok(mobile.includes('--profile required-1gb'));assert.ok(mobile.includes('--profile stress-512mb'));
+ });
+ const optionalCases=[
+  ['unselected not-run',{},'not-run'],
+  ['selected unavailable',{selected:true,jobResult:'failure',workload:'absent'},'unavailable'],
+  ['selected pass',{selected:true},'pass'],
+  ['selected failed',{selected:true,jobResult:'failure',workload:'failed'},'failed'],
+  ['selected invalid kind',{selected:true,mutateOptional:r=>{r.kind='required-test-group';}},'invalid'],
+  ['selected wrong source',{selected:true,mutateOptional:r=>{r.resultIdentity.checkoutTree='0'.repeat(40);}},'invalid'],
+  ['selected wrong attempt',{selected:true,mutateOptional:r=>{r.resultIdentity.runAttempt=2;}},'invalid'],
+  ['selected missing case',{selected:true,mutateOptional:r=>{r.cases.pop();}},'invalid'],
+  ['selected duplicate case',{selected:true,mutateOptional:r=>{r.cases.push(copy(r.cases[0]));}},'invalid'],
+  ['selected unknown case',{selected:true,mutateOptional:r=>{r.cases[0].id=r.cases[0].root='unknown optional callback';}},'invalid'],
+  ['selected corrupt TAP',{selected:true,mutateOptional:(r,p)=>{fs.appendFileSync(path.join(p,r.process.stdout.path),'corruption');}},'invalid'],
+  ['selected corrupt artifact',{selected:true,mutateOptional:(r,p)=>{fs.appendFileSync(path.join(p,r.artifacts[0].path),'corruption');}},'invalid'],
+  ['selected missing artifact inventory',{selected:true,mutateOptional:r=>{r.artifacts.pop();}},'invalid'],
+  ['selected incomplete cleanup',{selected:true,mutateOptional:(r,p)=>{fs.mkdirSync(path.join(p,'runtime-tmp'));}},'invalid'],
+  ['unselected unexpected result',{workload:'passed'},'invalid'],
+  ['unknown selector',{selected:true,selector:'1'},'invalid'],
+  ['inconsistent selected policy',{selected:true,policy:'outgoing-branch-push-v1'},'invalid'],
+  ['selected mobile app-failed remains raw',{selected:true,mobileAppFailure:true},'pass'],
+ ];
+ for(const[label,options,status]of optionalCases)await parent.test(label,sub=>{
+  const{child,report}=execute(sub,label,options);assert.equal(child.status,0,'Optional '+label+' cannot fail complete required ordinary proof: '+child.stderr);assert.equal(report.status,'passed');assert.equal(report.groups.length,4);assert.equal(report.optionalWorkload?.status,status,'Actual aggregate retains the separately selected raw optional outcome: '+label);assert.equal(report.optionalWorkload.required,false);assert.equal(report.optionalWorkload.selected,['unknown selector'].includes(label)?null:Boolean(options.selected));
+  if(options.workload!=='absent'&&(options.selected||options.workload==='passed')){assert.match(report.optionalWorkload.observedResult.sha256,/^[a-f0-9]{64}$/);assert.ok(report.optionalWorkload.observedResult.bytes>0);assert.equal(report.optionalWorkload.observedResult.raw.kind,label==='selected invalid kind'?'required-test-group':'optional-workload-diagnostics');}
+  if(status==='pass'||status==='failed'){const raw=report.optionalWorkload.observedResult.raw;assert.equal(raw.cases.length,7);assert.deepEqual(raw.cases.map(row=>row.root).sort(),optionalRoots.slice().sort());assert.equal(raw.status,status==='pass'?'passed':'failed');assert.equal(raw.process.exitCode,status==='pass'?0:1);assert.equal(raw.artifacts.length,7);assert.equal(report.optionalWorkload.artifactCount,7);}
+  if(status==='invalid')assert.ok(report.optionalWorkload.errors.length>0,'Integrity error stays visible without granting ordinary credit');if(options.mobileAppFailure){assert.equal(report.mobileMemory.status,'app-failed');assert.equal(report.mobileMemory.stress.status,'failed');}
+ });
+ const mandatoryCases=[
+  ['missing Chromium',rows=>rows.splice(0,1)],['missing WebKit',rows=>rows.pop()],['missing both',rows=>rows.splice(0)],['duplicate engine',rows=>{rows[1].engine='chromium';}],
+  ['diagnostic substitutes ordinary',rows=>{rows[1]=nativeReport('webkit','workload-diagnostic');}],['forged diagnostic profile',rows=>{rows[1].profile='workload-diagnostic';}],
+  ['failed ordinary',rows=>{rows[1].status='failed';}],['wrong ordinary source',rows=>{rows[1].candidateTree='f'.repeat(40);}],['missing action',rows=>{rows[1].outcomes.pop();}],
+  ['missing repeat',rows=>{rows[1].repeatOutcomes.pop();}],['untrusted input',rows=>{rows[1].repeatOutcomes[0].attempts[0].trusted=false;}],['wrong accounting',rows=>{rows[1].repeatOutcomes[0].accounting.accepted=1;}],['incomplete ordinary cleanup',rows=>{rows[1].cleanup.contextClosed=false;}],
+ ];
+ for(const[label,mutateRequired]of mandatoryCases)await parent.test(label,sub=>{const{child,report}=execute(sub,label,{selected:true,mutateRequired});assert.notEqual(child.status,0,'Selected complete optional diagnostics cannot replace '+label);assert.equal(report.status,'failed');assert.ok(report.issues.length>0);});
+});
+
+
+function currentServiceFixture(t) {
+  const fixture=createFixture(t),file=path.join(fixture.root,'scripts/test-group-assignments.json');
+  const declared=JSON.parse(fs.readFileSync(path.join(repository,'scripts/test-group-assignments.json'),'utf8')).currentServiceCases;
+  assert.equal(declared.length,6,'The diagnosed current service cohort contains exactly six cases');
+  const assignments=JSON.parse(fs.readFileSync(file));
+  assignments.currentServiceCases=declared;
+  assignments.rootAssignments.push(...declared.map(({id,file,group})=>({root:id,file,group})));
+  writeJson(file,assignments);
+  fs.appendFileSync(path.join(fixture.root,'tests.js'),'\n'+declared.map(({id})=>`if(process.env.CHAIN_SERVICE_FIXTURE_OMIT!==${JSON.stringify(id)}){\n test(${JSON.stringify(id)},{skip:!process.env.FIRESTORE_EMULATOR_HOST},t=>{if(process.env.CHAIN_SERVICE_FIXTURE_SKIP===${JSON.stringify(id)})t.skip('intentional emulator-present service skip');});\n}\n`).join(''));
+  git(fixture.root,'add','.');git(fixture.root,'commit','-qm','add current service fixture consumers');
+  fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');fixture.currentServiceCases=declared;
+  return fixture;
+}
+
+test('test group runner accounts for current service skips only without an emulator',async t=>{
+  const fixture=currentServiceFixture(t),result=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:''}});
+  assert.equal(result.status,0,'Declared current service roots must stay required and retain real no-emulator skip outcomes: '+result.stdout+'\n'+result.stderr);
+  assert.deepEqual(result.evidence.currentServiceCases,fixture.currentServiceCases);
+  assert.deepEqual(result.evidence.process.environmentPresence,{FIRESTORE_EMULATOR_HOST:false});
+  assert.equal(result.evidence.inventory.requiredCasesForGroup,8,'The six current cases augment rather than replace the two historical required core cases');
+  assert.equal(result.evidence.inventory.baselineAcceptedSkips,1,'Historical skip inventory stays immutable');
+  for(const {id} of fixture.currentServiceCases)assert.equal(result.evidence.cases.find(item=>item.id===id)?.status,'skipped');
+  const described=invoke(fixture,{args:['--describe'],env:{FIRESTORE_EMULATOR_HOST:''}});assert.equal(described.status,0,described.stdout+described.stderr);
+  const descriptor=JSON.parse(fs.readFileSync(path.join(described.outputDir,'descriptor.json')));
+  assert.deepEqual(descriptor.currentServiceCases,fixture.currentServiceCases);
+  for(const {id} of fixture.currentServiceCases)assert.ok(descriptor.groups.find(item=>item.id==='core').requiredCaseIds.includes(id));
+  const present=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:'127.0.0.1:1'}});assert.equal(present.status,0,present.stdout+present.stderr);
+  assert.deepEqual(present.evidence.process.environmentPresence,{FIRESTORE_EMULATOR_HOST:true});
+  for(const {id} of fixture.currentServiceCases)assert.equal(present.evidence.cases.find(item=>item.id===id)?.status,'passed');
+  const skipped=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:'127.0.0.1:1',CHAIN_SERVICE_FIXTURE_SKIP:fixture.currentServiceCases[0].id}});
+  assert.notEqual(skipped.status,0,'An emulator-present child cannot use the no-emulator service classification');
+  assert.equal(skipped.evidence.process.environmentPresence.FIRESTORE_EMULATOR_HOST,true);
+  assert.match(skipped.evidence.issues.join('\n'),/unexpectedly skipped/);
+  const missing=invoke(fixture,{env:{FIRESTORE_EMULATOR_HOST:'',CHAIN_SERVICE_FIXTURE_OMIT:fixture.currentServiceCases[0].id}});
+  assert.notEqual(missing.status,0,'No emulator cannot excuse an omitted required service outcome');assert.match(missing.evidence.issues.join('\n'),/did not execute|missing/);
+  await t.test('duplicate actual service outcome is refused',sub=>{
+    const f=currentServiceFixture(sub),id=f.currentServiceCases[0].id;
+    fs.appendFileSync(path.join(f.root,'tests.js'),`\nconst duplicateServiceTitle=${JSON.stringify(id)};test(duplicateServiceTitle,{skip:true},()=>{});\n`);
+    const result=invoke(f,{env:{FIRESTORE_EMULATOR_HOST:''}});assert.notEqual(result.status,0);assert.match(result.evidence.issues.join('\n'),/executed more than once/);
+  });
+  await t.test('unknown assigned skip stays forbidden',sub=>{
+    const f=currentServiceFixture(sub),file=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(file));
+    a.rootAssignments.push({root:'unknown current environment skip',file:'tests.js',group:'core'});writeJson(file,a);
+    fs.appendFileSync(path.join(f.root,'tests.js'),"\ntest('unknown current environment skip',{skip:true},()=>{});\n");
+    const result=invoke(f,{env:{FIRESTORE_EMULATOR_HOST:''}});assert.notEqual(result.status,0);assert.match(result.evidence.issues.join('\n'),/unexpectedly skipped: unknown current environment skip/);
+  });
+  for(const [label,mutate] of [
+    ['missing declaration',a=>{delete a.currentServiceCases;}],
+    ['missing classified ID',a=>a.currentServiceCases.pop()],
+    ['duplicate classified ID',a=>{a.currentServiceCases[0]={...a.currentServiceCases[1]};}],
+    ['unknown classified ID',a=>{a.currentServiceCases[0].id='unknown current service';}],
+    ['broadened classified cohort',a=>a.currentServiceCases.push({...a.currentServiceCases[0],id:'another current service'})],
+    ['wrong group',a=>{a.currentServiceCases[0].group='native-process';}],
+    ['wrong source file',a=>{a.currentServiceCases[0].file='scripts/agent-tools/fixture.test.mjs';}],
+    ['wrong environment',a=>{a.currentServiceCases[0].environment='LANDSCAPE_BROWSER_URL';}],
+    ['wrong mandatory gate',a=>{a.currentServiceCases[0].mandatoryGate='compatibility';}],
+    ['unknown policy field',a=>{a.currentServiceCases[0].allowOtherSkips=true;}],
+  ])await t.test(label,sub=>{
+    const f=currentServiceFixture(sub),file=path.join(f.root,'scripts/test-group-assignments.json'),a=JSON.parse(fs.readFileSync(file));mutate(a);writeJson(file,a);
+    const result=invoke(f,{args:['--describe']});assert.notEqual(result.status,0,label+' must fail before a child starts');assert.match(result.stderr,/Current service/);assert.equal(result.evidence.process,null);
+  });
+  await t.test('source guard mismatch is refused',sub=>{
+    const f=currentServiceFixture(sub),file=path.join(f.root,'tests.js');fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('skip:!process.env.FIRESTORE_EMULATOR_HOST','skip:false'));
+    const result=invoke(f,{args:['--describe']});assert.notEqual(result.status,0);assert.match(result.stderr,/Current service declaration/);
+  });
+  const assignmentFile=path.join(fixture.root,'scripts/test-group-assignments.json'),before=fs.readFileSync(assignmentFile),a=JSON.parse(before),inventoryFile=path.join(fixture.root,'scripts/test-group-inventory.json'),inventoryBytes=fs.readFileSync(inventoryFile);
+  a.currentServiceCases.reverse();writeJson(assignmentFile,a);const reordered=invoke(fixture,{args:['--describe']});assert.equal(reordered.status,0,reordered.stderr);
+  assert.notEqual(reordered.evidence.resultIdentity.cohortDigestSha256,described.evidence.resultIdentity.cohortDigestSha256,'Complete cohort digest binds the current classification itself');
+  assert.deepEqual(fs.readFileSync(inventoryFile),inventoryBytes);fs.writeFileSync(assignmentFile,before);
+  fixture.originals=new Map();for(const group of groups){const observed=invoke(fixture,{group,env:{FIRESTORE_EMULATOR_HOST:''}});assert.equal(observed.status,0,observed.stdout+observed.stderr);fixture.originals.set(group,observed.outputDir);}
+  const aggregate=aggregateCopy(t,fixture);assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);
+  const report=JSON.parse(fs.readFileSync(path.join(aggregate.outputDir,'aggregate.json')));assert.deepEqual(report.currentServiceCases,fixture.currentServiceCases);assert.equal(report.caseCount,12);
+  for(const [label,mutate] of [
+    ['missing environment metadata',record=>{delete record.process.environmentPresence;}],
+    ['emulator-present actual skips',record=>{record.process.environmentPresence.FIRESTORE_EMULATOR_HOST=true;}],
+    ['string environment metadata',record=>{record.process.environmentPresence.FIRESTORE_EMULATOR_HOST='false';}],
+    ['mismatched current declaration',record=>record.currentServiceCases.pop()],
+    ['missing current declaration',record=>{delete record.currentServiceCases;}],
+  ])await t.test('aggregate refuses '+label,sub=>{
+    const observed=aggregateCopy(sub,fixture,collected=>{const file=path.join(collected,'core/result.json'),record=JSON.parse(fs.readFileSync(file));mutate(record);writeJson(file,record);});
+    assert.notEqual(observed.status,0,label+' must fail aggregate reconciliation');assert.match(observed.stderr,/environment-presence|unexpectedly skipped|source-bound descriptor/);
+  });
 });

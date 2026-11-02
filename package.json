@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests.js scripts/agent-tools/*.test.mjs",
+    "test": "node --experimental-vm-modules --test tests.js scripts/agent-tools/*.test.mjs",
     "test:agent-tools": "node --test scripts/agent-tools/*.test.mjs",
     "agent:rendered-evidence": "node scripts/agent-tools/rendered-evidence.mjs",
     "agent:record-test-run": "node scripts/agent-tools/record-run.mjs",
@@ -19,7 +19,8 @@
     "release:record": "node scripts/release-evidence.mjs record",
     "release:verify": "node scripts/release-evidence.mjs verify",
     "release:publish": "node scripts/release-evidence.mjs publish",
-    "test:group": "node scripts/test-groups.mjs"
+    "test:group": "node scripts/test-groups.mjs",
+    "test:buttons": "node --test --test-name-pattern=\"^RISK repository process: required native button actions execute in Chromium and WebKit$\" tests.js"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

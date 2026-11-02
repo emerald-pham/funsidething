@@ -15,6 +15,19 @@ const git = (cwd, ...args) => {
   return result.stdout.trim();
 };
 
+const requiredServiceTitles = [
+  "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+  "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+  "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+  "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+  "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+  "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)"
+];
+function rulesTap(titles = requiredServiceTitles) {
+  const names = [...titles, ...Array.from({length:30-titles.length}, (_value,index) => 'ordinary rules fixture '+index)];
+  return 'TAP version 13\n'+names.map((name,index)=>`ok ${index+1} - ${name}\n`).join('')+'1..30\n# tests 30\n# pass 30\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
+}
+
 function fixture(t, grouped=false) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'chain-ci-routing-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -28,6 +41,9 @@ function fixture(t, grouped=false) {
   writeFileSync(path.join(source, 'package.json'), JSON.stringify({ private: true, scripts: { test: 'node --test tests.js' } }));
   writeFileSync(path.join(source, 'tests.js'), "import { test } from 'node:test';test('isolated routing fixture',()=>{});\n");
   if(grouped){for(const file of ['.github/workflows/data-safety.yml','scripts/test-group-inventory.json','scripts/test-group-assignments.json','scripts/test-groups.mjs','scripts/agent-tools/ci-routing.mjs']){mkdirSync(path.dirname(path.join(source,file)),{recursive:true});writeFileSync(path.join(source,file),'fixture '+file+'\n');}}
+  writeFileSync(path.join(source,'scripts/test-group-assignments.json'),JSON.stringify({rootAssignments:requiredServiceTitles.map(root=>({root,file:'tests.js',group:'core'})),currentServiceCases:requiredServiceTitles.map(id=>({id,file:'tests.js',group:'core',environment:'FIRESTORE_EMULATOR_HOST',mandatoryGate:'rules'}))}));
+  writeFileSync(path.join(source,'tests.js'),readFileSync(path.join(source,'tests.js'),'utf8')+requiredServiceTitles.map(title=>`test(${JSON.stringify(title)},{skip:!process.env.FIRESTORE_EMULATOR_HOST},()=>{});\n`).join(''));
+  if(grouped==='mobile')writeFileSync(path.join(source,'.github/workflows/data-safety.yml'),readFileSync(path.join(repo,'.github/workflows/data-safety.yml')));
   git(source, 'add', '.'); git(source, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture base');
   const base = git(source, 'rev-parse', 'HEAD');
   writeFileSync(path.join(source, 'candidate.txt'), 'isolated candidate\n');
@@ -38,7 +54,7 @@ function fixture(t, grouped=false) {
   const journal = path.join(root, 'executions.jsonl');
   const external = path.join(root, 'github.json');
   writeFileSync(external, JSON.stringify({ runs: [], jobs: [] }));
-  writeFileSync(path.join(bin, 'npm'), `#!/usr/bin/env node\nrequire('node:fs').appendFileSync(process.env.ROUTING_EXECUTIONS, JSON.stringify({argv:process.argv.slice(2),sha:process.env.GITHUB_SHA})+'\\n');\nif(process.argv.some(arg=>arg==='test:rules'||arg==='test:compatibility'))console.log('TAP version 13\\n# tests 24\\n# pass 24\\n# fail 0\\n# cancelled 0\\n# skipped 0');\n`);
+  writeFileSync(path.join(bin, 'npm'), '#!/usr/bin/env node\n'+"const fs=require('node:fs');fs.appendFileSync(process.env.ROUTING_EXECUTIONS,JSON.stringify({argv:process.argv.slice(2),sha:process.env.GITHUB_SHA})+'\\n');if(process.argv.some(arg=>arg==='test:rules'||arg==='test:compatibility'))console.log(process.env.ROUTING_GATE_TAP_FILE?fs.readFileSync(process.env.ROUTING_GATE_TAP_FILE,'utf8'):"+JSON.stringify(rulesTap())+');\n');
   writeFileSync(path.join(bin, 'curl'), `#!/usr/bin/env node
 const fs=require('node:fs'),x=JSON.parse(fs.readFileSync(process.env.ROUTING_GITHUB));
 const url=process.argv.at(-1);
@@ -68,14 +84,15 @@ decision="$(node -p "require('$ROUTING_OUTPUT/ci-routing/routing.json').decision
 if [[ "$decision" == "full" ]]; then npm test; elif [[ "$decision" != "reuse" ]]; then exit 1; fi`;
 }
 
-function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', changes = undefined, planOnly = false, environment = {} } = {}) {
+function invoke(f, { event = 'push', ref = 'refs/heads/topic', source = f.head, checkout = f.head, base = f.base, action = 'synchronize', changes = undefined, workflowInputs = undefined, planOnly = false, environment = {} } = {}) {
   git(f.source, 'checkout', '--detach', checkout);
   const output = path.join(f.root, `attempt-${++f.attempt}`);
   mkdirSync(output);
   const eventPath = path.join(output, 'event.json');
   writeFileSync(eventPath, JSON.stringify(event === 'pull_request' ? {
     action, changes, number: 17, pull_request: { number: 17, head: { sha: source, ref: 'topic', repo: { full_name: 'fixture/repo' } }, base: { sha: base, ref: 'main' } },
-  } : { after: source, before: base, repository: { full_name: 'fixture/repo' } }));
+  } : event === 'workflow_dispatch' ? { ref, inputs: workflowInputs, repository: { full_name: 'fixture/repo' } }
+    : { after: source, before: base, repository: { full_name: 'fixture/repo' } }));
   const result = spawnSync('bash', ['-euo', 'pipefail', '-c', planOnly ? 'node "$ROUTING_COMMAND" --comparison-base "$ROUTING_BASE" --evidence-dir "$ROUTING_OUTPUT/ci-routing" --plan-only 1' : cohortShell()], {
     cwd: f.source, encoding: 'utf8', timeout: 15000,
     env: { ...process.env, PATH: f.bin + path.delimiter + process.env.PATH,
@@ -134,11 +151,11 @@ function attachInputArtifacts(f,github,jobs){
     const gate=marker.name.split(' ')[3],emulator=['rules','compatibility'].includes(gate);
     const name=emulator?`event-gates-${job.run_id}-${job.run_attempt}`:`regression-${job.run_id}-${job.run_attempt}-${gate}`;
     const directory=path.join(f.root,name),prefix=emulator?gate+'/':'';mkdirSync(path.join(directory,prefix,'native'),{recursive:true});
-    const stdout='TAP version 13\n# tests 24\n# pass 24\n# fail 0\n# cancelled 0\n# skipped 0\n';
+    const stdout=gate==='rules'?rulesTap():'TAP version 13\n# tests 24\n# pass 24\n# fail 0\n# cancelled 0\n# skipped 0\n';
     writeFileSync(path.join(directory,prefix,'stdout.tap'),stdout);writeFileSync(path.join(directory,prefix,'stderr.log'),'');
     const native=gate==='native-process'&&f.largeNativeEvidence?f.largeNativeEvidence:'{"status":"passed","mode":"original"}\n';writeFileSync(path.join(directory,prefix,'native/original.json'),native);
     const report={status:'passed',resultIdentity:{repository:'fixture/repo',runId:String(job.run_id),runAttempt:emulator?String(job.run_attempt):Number(job.run_attempt),sourceSha:job.head_sha,checkoutSha:f.merge,checkoutTree:f.tree,comparisonBase:f.base,selectedGroup:gate,checkoutDirty:false},
-      issues:[],cases:[{id:'original fixture case',status:'passed'}],artifacts:[{path:'native/original.json',bytes:Buffer.byteLength(native),sha256:hash(native)}],process:{exitCode:0,signal:null,spawnError:null,stdout:{path:'stdout.tap',sha256:hash(stdout)},stderr:{path:'stderr.log',sha256:hash('')},stdoutSha256:hash(stdout),stderrSha256:hash('')},tests:24,passed:24};
+      issues:[],cases:[{id:'original fixture case',status:'passed'}],artifacts:[{path:'native/original.json',bytes:Buffer.byteLength(native),sha256:hash(native)}],process:{exitCode:0,signal:null,spawnError:null,stdout:{path:'stdout.tap',sha256:hash(stdout)},stderr:{path:'stderr.log',sha256:hash('')},stdoutSha256:hash(stdout),stderrSha256:hash('')},tests:gate==='rules'?30:24,passed:gate==='rules'?30:24};
     const bytes=JSON.stringify(report);writeFileSync(path.join(directory,prefix,'result.json'),bytes);
     marker.name=marker.name.replace(/result [a-f0-9]{64}$/,`result ${hash(bytes)}`);
     const archive=directory+'.zip';const result=spawnSync('zip',['-qr',archive,'.'],{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);
@@ -207,6 +224,37 @@ test('workflow emulator gate reuses a verified pass and executes an uncovered ga
   const changedImage=spawnSync('bash',['-euo','pipefail','-c',selected.replaceAll('${{ needs.validation-context.outputs.base }}',f.base)],{cwd:f.source,env:{...env,ImageVersion:'20261023.2.0'},encoding:'utf8',timeout:15000});
   assert.equal(changedImage.status,0,changedImage.stdout+changedImage.stderr);
   assert.equal(JSON.parse(readFileSync(path.join(temporary,'emulator-gates/rules/result.json'))).status,'passed','different consuming image must execute the emulator gate');
+  rmSync(path.join(temporary,'emulator-gates/rules'),{recursive:true,force:true});
+  const missingTap=path.join(f.root,'missing-service.tap');writeFileSync(missingTap,rulesTap(requiredServiceTitles.slice(1)));
+  const missing=spawnSync('bash',['-euo','pipefail','-c',selected.replaceAll('${{ needs.validation-context.outputs.base }}',f.base)],{cwd:f.source,env:{...env,ImageVersion:'20261023.2.0',ROUTING_GATE_TAP_FILE:missingTap},encoding:'utf8',timeout:15000});
+  assert.notEqual(missing.status,0,'coherent 30-pass rules totals must refuse a missing exact current service consumer');
+  assert.equal(JSON.parse(readFileSync(path.join(temporary,'emulator-gates/rules/result.json'))).status,'failed');
+  for(const [label,tap] of [
+    ['duplicate exact consumer',rulesTap([...requiredServiceTitles,requiredServiceTitles[0]])],
+    ['skipped exact consumer',rulesTap().replace('ok 1 - '+requiredServiceTitles[0],'ok 1 - '+requiredServiceTitles[0]+' # SKIP fixture')],
+    ['TODO exact consumer',rulesTap().replace('ok 1 - '+requiredServiceTitles[0],'ok 1 - '+requiredServiceTitles[0]+' # TODO fixture')],
+    ['failed exact consumer',rulesTap().replace('ok 1 - '+requiredServiceTitles[0],'not ok 1 - '+requiredServiceTitles[0])],
+  ]){
+    rmSync(path.join(temporary,'emulator-gates/rules'),{recursive:true,force:true});writeFileSync(missingTap,tap);
+    const result=spawnSync('bash',['-euo','pipefail','-c',selected.replaceAll('${{ needs.validation-context.outputs.base }}',f.base)],{cwd:f.source,env:{...env,ImageVersion:'20261023.2.0',ROUTING_GATE_TAP_FILE:missingTap},encoding:'utf8',timeout:15000});
+    assert.notEqual(result.status,0,label+' must be refused despite coherent passing totals');
+    assert.match(JSON.parse(readFileSync(path.join(temporary,'emulator-gates/rules/result.json'))).issues.join('\n'),/Required rules service consumer/);
+  }
+  for(const [label,tap] of [
+    ['missing exact consumer',rulesTap(requiredServiceTitles.slice(1))],
+    ['duplicate exact consumer',rulesTap([...requiredServiceTitles,requiredServiceTitles[0]])],
+    ['skipped exact consumer',rulesTap().replace('ok 1 - '+requiredServiceTitles[0],'ok 1 - '+requiredServiceTitles[0]+' # SKIP fixture')],
+  ]){
+    const github=publishedInputPass(f,plan.record,['rules']),artifact=github.artifacts.find(item=>item.name.startsWith('event-gates-'));
+    const directory=artifact.fixturePath.slice(0,-4),file=path.join(directory,'rules/result.json'),report=JSON.parse(readFileSync(file));
+    report.process.stdoutSha256=createHash('sha256').update(tap).digest('hex');writeFileSync(path.join(directory,'rules/stdout.tap'),tap);
+    const bytes=JSON.stringify(report);writeFileSync(file,bytes);
+    for(const job of github.jobs)for(const step of job.steps)if(step.name.startsWith('Completed CI gate rules '))step.name=step.name.replace(/result [a-f0-9]{64}$/,`result ${createHash('sha256').update(bytes).digest('hex')}`);
+    const zipped=spawnSync('zip',['-qr',artifact.fixturePath,'.'],{cwd:directory,encoding:'utf8'});assert.equal(zipped.status,0,zipped.stderr);
+    artifact.digest='sha256:'+createHash('sha256').update(readFileSync(artifact.fixturePath)).digest('hex');writeFileSync(f.external,JSON.stringify(github));
+    const observed=invoke(f,{ref:'refs/heads/main',checkout:f.merge,source:f.merge});assert.equal(observed.status,0,observed.stdout+observed.stderr);
+    assert.equal(observed.record.inputPasses.rules,undefined,'retained original TAP must refuse '+label+' after all result and archive hashes are recomputed');
+  }
 });
 
 test('workflow rerun reuses an original successful gate from its own earlier attempt', t => {
@@ -405,6 +453,27 @@ const fallbackCases = [
   ['missing producer inventory count', x => { x.omitRunTotal = true; }],
 ];
 
+test('workflow dispatch explicitly selects optional mobile diagnostics', t => {
+  const f = fixture(t, 'mobile');
+  const workflow = readFileSync(path.join(f.source, '.github/workflows/data-safety.yml'), 'utf8');
+  assert.match(workflow, /^  workflow_dispatch:\n    inputs:\n      optional_mobile_diagnostics:\n        description: [^\n]+\n        required: false\n        default: false\n        type: boolean$/m, 'The diagnostic selector must be an explicit default-off workflow input');
+  const mobileJob = workflow.split(/^  mobile-memory:\s*$/m)[1]?.split(/^  [a-z][a-z0-9-]*:\s*$/m)[0] || '';
+  assert.match(mobileJob, /^\s+if: \$\{\{ github\.event_name == 'workflow_dispatch' && needs\.validation-context\.outputs\.mobile-diagnostics == 'true' \}\}$/m, 'Only the planner-approved dispatch selection may launch the diagnostic producer');
+  const ordinary = invoke(f, { event: 'push', ref: 'refs/heads/topic', planOnly: true });
+  assert.equal(ordinary.error, undefined);
+  assert.equal(ordinary.status, 0, ordinary.stderr || ordinary.stdout);
+  assert.deepEqual(ordinary.record?.optionalDiagnostics?.mobileMemory, { selected: false, required: false, selectedBy: null });
+  assert.match(ordinary.stdout, /mobile-diagnostics=false/);
+  const selected = invoke(f, { event: 'workflow_dispatch', ref: 'refs/heads/topic', workflowInputs: { optional_mobile_diagnostics: 'true' }, planOnly: true });
+  assert.equal(selected.error, undefined);
+  assert.equal(selected.status, 0, selected.stderr || selected.stdout);
+  assert.equal(selected.record?.optionalDiagnostics?.mobileMemory?.selected, true);
+  assert.equal(selected.record?.optionalDiagnostics?.mobileMemory?.required, false);
+  assert.equal(selected.record?.optionalDiagnostics?.mobileMemory?.selectedBy, 'workflow_dispatch');
+  assert.equal(selected.record?.validationContext?.eventPolicy, 'optional-mobile-dispatch-v1');
+  assert.match(selected.stdout, /mobile-diagnostics=true/);
+});
+
 test('workflow routing rejects uncertain producer contexts', async parent => {
 for (const [name, change] of fallbackCases) {
   await parent.test(`workflow runs the actual branch cohort for ${name}`, t => {
@@ -585,7 +654,7 @@ test('grouped routing reuses only an exact completed reconciled producer and pre
     ['known failed producer without aggregate',x=>{x.runs[0].conclusion='failure';x.jobs=x.jobs.filter(job=>job.name!=='scanner-tests');},'fail',1],
   ];
   for(const [name,mutate,decision,code]of scenarios)await parent.test(name,t=>{
-    const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
+    const f=fixture(t,'mobile'),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});
     assert.equal(first.status,0,first.stdout+first.stderr);const github=publishedGroups(f,first.record);mutate(github);writeFileSync(f.external,JSON.stringify(github));
     const second=invoke(f,{environment:descriptorFor(f,f.head)});assert.equal(second.status,code,second.stdout+second.stderr);assert.equal(second.record?.decision,decision,second.stdout);
     if(decision==='reuse'){assert.equal(second.record.coveredBy.runId,'71');assert.equal(second.record.coveredBy.runAttempt,'2');assert.equal(second.record.coveredBy.reportSha256,'8'.repeat(64));assert.equal(executions(f).length,1);}
@@ -593,7 +662,7 @@ test('grouped routing reuses only an exact completed reconciled producer and pre
 });
 
 test('grouped metadata-only edited PR reuses only its completed exact merge context', t => {
-  const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);publishedGroups(f,first.record);
+  const f=fixture(t,'mobile'),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);publishedGroups(f,first.record);
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'previous evidence'}},environment:descriptorFor(f,f.merge)});
   assert.equal(edited.status,0,edited.stdout+edited.stderr);assert.equal(edited.record.decision,'reuse');assert.equal(executions(f).length,1);
   const baseEdit=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{base:{ref:{from:'previous-base'}}},environment:descriptorFor(f,f.merge)});
@@ -602,9 +671,36 @@ test('grouped metadata-only edited PR reuses only its completed exact merge cont
 
 
 test('metadata edits continue past verified covered runs to the original full producer', t => {
-  const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
+  const f=fixture(t,'mobile'),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
   const github=publishedGroups(f,first.record),covered=github.jobs.map(job=>({...job,run_id:72,run_attempt:1,steps:job.name==='scanner-tests'?[{name:`Verified complete cohort ${first.record.contextSha256} report ${'9'.repeat(64)} mode reuse`,conclusion:'success'}]:job.steps}));
   github.jobsByRun={'71':github.jobs,'72':covered};github.runs.unshift({...github.runs[0],id:72,run_attempt:1});writeFileSync(f.external,JSON.stringify(github));
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
   assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
+});
+
+
+test('current grouped routing ignores optional mobile diagnostic rows for reuse',async parent=>{
+ const scenarios=[
+  ['complete current producer',()=>{},'reuse'],
+  ['missing mobile',x=>{x.jobs=x.jobs.filter(job=>job.name!=='mobile-WebKit-1GB-and-512MB-stress');},'reuse'],
+  ['failed mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='failure';},'reuse'],
+  ['skipped mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='skipped';},'reuse'],
+  ['canceled mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').conclusion='cancelled';},'reuse'],
+  ['running mobile',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').status='in_progress';},'reuse'],
+  ['wrong mobile attempt',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').run_attempt=1;},'reuse'],
+  ['wrong mobile source',x=>{x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress').head_sha='0'.repeat(40);},'reuse'],
+  ['duplicate mobile',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress')});},'reuse'],
+  ['valid mobile plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),conclusion:'failure'});},'reuse'],
+  ['valid mobile plus running duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),status:'in_progress'});},'reuse'],
+  ['valid mobile plus wrong-run duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_id:72});},'reuse'],
+  ['valid mobile plus wrong-attempt duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),run_attempt:1});},'reuse'],
+  ['valid mobile plus wrong-source duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='mobile-WebKit-1GB-and-512MB-stress'),head_sha:'0'.repeat(40)});},'reuse'],
+  ['valid core plus failed duplicate',x=>{x.jobs.push({...x.jobs.find(job=>job.name==='regression-core'),conclusion:'failure'});},'full'],
+ ];
+ for(const [name,mutate,decision]of scenarios)await parent.test(name,t=>{
+  const f=fixture(t,'mobile'),first=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
+  const github=publishedGroups(f,first.record);github.jobs.push({...github.jobs.find(job=>job.name==='regression-core'),name:'mobile-WebKit-1GB-and-512MB-stress'});mutate(github);writeFileSync(f.external,JSON.stringify(github));
+  const second=invoke(f,{environment:descriptorFor(f,f.head)});assert.equal(second.status,0,second.stderr);assert.equal(second.record?.decision,decision,'Actual current workflow producer policy: '+second.stdout+second.stderr);
+  if(decision==='reuse'){assert.equal(second.record.coveredBy.runId,'71');assert.equal(second.record.coveredBy.runAttempt,'2');assert.equal(second.record.coveredBy.checkoutSha,f.merge);assert.equal(second.record.validationContext.sourceSha,f.head);assert.equal(second.record.validationContext.checkoutSha,f.head);assert.equal(second.record.cohortContext.checkoutSha,f.merge);assert.equal(executions(f).length,1);}
+ });
 });

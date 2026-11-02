@@ -488,29 +488,60 @@ test('binds required parallel topology to actual candidate workflow even when ne
 
 test('parallel workflow observation preserves complete missing skipped canceled and unknown distinctions', async parent => {
   const workflow=await readFile(new URL('../../.github/workflows/data-safety.yml',import.meta.url),'utf8');
+  const mobile='mobile-WebKit-1GB-and-512MB-stress';
   const required=['validation-context','event-gates','cohort-routing','regression-core','regression-scenery','regression-persistence-recovery','regression-native-process','scanner-tests'];
   const scenarios=[
-    ['complete full cohort',()=>{},0,'success'],
-    ['complete covered cohort',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode reuse')}));},0,'success'],
-    ['absent verified aggregate marker',run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=[];},1,'failure'],
-    ['absent core group',run=>{run.jobs=run.jobs.filter(job=>job.name!=='regression-core');},1,'failure'],
-    ['skipped group',run=>{run.jobs[3].conclusion='skipped';},1,'failure'],
-    ['canceled group',run=>{run.jobs[4].conclusion='cancelled';},1,'canceled'],
-    ['duplicate group',run=>{run.jobs.push({...run.jobs[3]});},2,'unresolved'],
-    ['unknown group',run=>{run.jobs.push({name:'regression-other',conclusion:'success'});},2,'unresolved'],
-    ['unknown candidate topology',()=>{},2,'unresolved',workflow.replace('four-groups-v1','unrecognized-v2')],
-    ['unavailable candidate bytes',()=>{},2,'unresolved',workflow,'controlled public API failure'],
+    {name:'complete required ordinary cohort with mobile not selected',expectedCode:0,expectedResult:'success',mobileOutcome:'not-run'},
+    {name:'successful optional mobile remains separately reported',expectedCode:0,expectedResult:'success',mobileConclusion:'success',mobileOutcome:'passed'},
+    {name:'unavailable optional mobile result remains separate from required success',mutate:run=>{run.jobs=run.jobs.filter(job=>job.name!==mobile);},expectedCode:0,expectedResult:'success',mobileOutcome:'unavailable'},
+    {name:'failed optional mobile remains separate from required success',mutate:run=>{run.jobs.find(job=>job.name===mobile).conclusion='failure';},expectedCode:0,expectedResult:'success',mobileOutcome:'failed'},
+    {name:'skipped optional mobile is reported as not run',mutate:run=>{run.jobs.find(job=>job.name===mobile).conclusion='skipped';},expectedCode:0,expectedResult:'success',mobileOutcome:'not-run'},
+    {name:'canceled optional mobile remains separately observable',mutate:run=>{run.jobs.find(job=>job.name===mobile).conclusion='cancelled';},expectedCode:0,expectedResult:'success',mobileOutcome:'canceled'},
+    {name:'timed out optional mobile remains separately failed',mutate:run=>{run.jobs.find(job=>job.name===mobile).conclusion='timed_out';},expectedCode:0,expectedResult:'success',mobileOutcome:'failed'},
+    {name:'failed required group stays failed when optional mobile also fails',mutate:run=>{run.jobs.find(job=>job.name==='regression-core').conclusion='failure';run.jobs.find(job=>job.name===mobile).conclusion='failure';},expectedCode:1,expectedResult:'failure',mobileOutcome:'failed'},
+    {name:'invalid optional mobile conclusion stays visible without blocking required success',mutate:run=>{run.jobs.find(job=>job.name===mobile).conclusion='unknown';},expectedCode:0,expectedResult:'success',mobileOutcome:'invalid',optionalConclusion:'unknown'},
+    {name:'older parallel workflow remains supported',mutate:run=>{run.jobs=run.jobs.filter(job=>job.name!==mobile);},expectedCode:0,expectedResult:'success',workflowBytes:workflow.replace(/^  mobile-memory:\n[\s\S]*?(?=^  scanner-tests:)/m,'').replace(', regression, mobile-memory]',', regression]')},
+    {name:'renamed unknown mobile job policy',expectedCode:2,expectedResult:'unresolved',workflowBytes:workflow.replace('name: mobile-WebKit-1GB-and-512MB-stress','name: unknown-mobile-job')},
+    {name:'mobile job absent from scanner dependencies',expectedCode:2,expectedResult:'unresolved',workflowBytes:workflow.replace(', regression, mobile-memory]',', regression]')},
+    {name:'complete covered cohort',mutate:run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=run.jobs.find(job=>job.name==='scanner-tests').steps.filter(step=>!step.name.startsWith('Complete regression')).map(step=>({...step,name:step.name.replace('mode full','mode reuse')}));},expectedCode:0,expectedResult:'success',mobileConclusion:'success'},
+    {name:'absent verified aggregate marker',mutate:run=>{run.jobs.find(job=>job.name==='scanner-tests').steps=[];},expectedCode:1,expectedResult:'failure',mobileConclusion:'success'},
+    {name:'absent core group',mutate:run=>{run.jobs=run.jobs.filter(job=>job.name!=='regression-core');},expectedCode:1,expectedResult:'failure',mobileConclusion:'success'},
+    {name:'skipped group',mutate:run=>{run.jobs[3].conclusion='skipped';},expectedCode:1,expectedResult:'failure',mobileConclusion:'success'},
+    {name:'canceled group',mutate:run=>{run.jobs[4].conclusion='cancelled';},expectedCode:1,expectedResult:'canceled',mobileConclusion:'success'},
+    {name:'duplicate group',mutate:run=>{run.jobs.push({...run.jobs[3]});},expectedCode:2,expectedResult:'unresolved',mobileConclusion:'success'},
+    {name:'unknown group',mutate:run=>{run.jobs.push({name:'regression-other',conclusion:'success'});},expectedCode:2,expectedResult:'unresolved',mobileConclusion:'success'},
+    {name:'unknown candidate topology',expectedCode:2,expectedResult:'unresolved',workflowBytes:workflow.replace('four-groups-v1','unrecognized-v2')},
+    {name:'unavailable candidate bytes',expectedCode:2,expectedResult:'unresolved',workflowBytes:workflow,apiError:'controlled public API failure'},
   ];
-  for(const [name,mutate,code,outcome,bytes=workflow,apiError=null]of scenarios)await parent.test(name,async t=>{
+  for(const scenario of scenarios)await parent.test(scenario.name,async t=>{
+    const {mutate,expectedCode,expectedResult,workflowBytes=workflow,apiError}=scenario;
     const root=await mkdtemp(path.join(os.tmpdir(),'ci-monitor-parallel-'));t.after(()=>rm(root,{recursive:true,force:true}));
-    const run={attempt:2,databaseId:Number(requestedRunId),headSha:requestedCommit,event:'pull_request',headBranch:'feature',workflowName:'Data safety',status:'completed',conclusion:'success',jobs:required.map(name=>({name,status:'completed',conclusion:'success'})).concat([{name:'release-evidence',conclusion:'skipped'},{name:'deploy-pages',conclusion:'skipped'}])};
-    const context='1'.repeat(64),report='8'.repeat(64),bytesForBlob=Buffer.from(bytes),blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytesForBlob.length+'\0'),bytesForBlob])).digest('hex');
+    const run={attempt:2,databaseId:Number(requestedRunId),headSha:requestedCommit,event:'pull_request',headBranch:'feature',workflowName:'Data safety',status:'completed',conclusion:'success',jobs:required.map(name=>({name,status:'completed',conclusion:'success'})).concat([{name:mobile,status:'completed',conclusion:scenario.mobileConclusion??'skipped'},{name:'release-evidence',conclusion:'skipped'},{name:'deploy-pages',conclusion:'skipped'}])};
+    const context='1'.repeat(64),report='8'.repeat(64),bytesForBlob=Buffer.from(workflowBytes),blob=createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytesForBlob.length+'\0'),bytesForBlob])).digest('hex');
     run.jobs[0].steps=[{name:'Actual checkout '+ 'd'.repeat(40)+' tree '+'e'.repeat(40),conclusion:'success'},{name:'Validation source '+requestedCommit+' base '+'b'.repeat(40),conclusion:'success'},{name:'Workflow blob '+blob+' policy four-groups-v1',conclusion:'success'},{name:'Announce regression context '+context,conclusion:'success'}];
     run.jobs.find(job=>job.name==='scanner-tests').steps=[{name:'Verify complete required cohort',conclusion:'success'},{name:'Verified complete cohort '+context+' report '+report+' mode full',conclusion:'success'},{name:'Complete regression context '+context+' report '+report,conclusion:'success'}];
-    mutate(run);
-    const {bin,fixturePath}=await createGhFixture(root,{metadata:[{stdout:JSON.stringify(run)}],workflow:bytes,apiError});
+    mutate?.(run);
+    const {bin,fixturePath}=await createGhFixture(root,{metadata:[{stdout:JSON.stringify(run)}],workflow:workflowBytes,apiError});
     const result=invokeMonitor({bin,fixturePath,evidence:path.join(root,'evidence'),args:['--max-retries','0']});
-    assert.equal(result.status,code,result.stdout+result.stderr);assert.match(result.stdout,new RegExp('result='+outcome+' '));
+    assert.equal(result.status,expectedCode,result.stdout+result.stderr);assert.match(result.stdout,new RegExp('result='+expectedResult+' '));
+    if(scenario.mobileOutcome){
+      const resultLine=result.stdout.split('\n').find(line=>line.startsWith('CI monitor result='));
+      const evidenceDirectory=resultLine?.match(/(?:^|\s)evidence=(\/\S+)$/)?.[1];
+      assert.ok(evidenceDirectory,'public CLI result must identify its durable attempt directory');
+      const summary=JSON.parse(await readFile(path.join(evidenceDirectory,'summary.json'),'utf8'));
+      assert.equal(summary.optionalMobileOutcome,scenario.mobileOutcome,`${scenario.name}: ${JSON.stringify(summary)}`);
+      assert.match(result.stdout,new RegExp(`optional-mobile=${scenario.mobileOutcome}(?:\\s|$)`));
+      if(scenario.optionalConclusion){
+        const mobileOutcome=summary.optionalOutcomes.find(item=>item.name===mobile);
+        assert.equal(mobileOutcome.outcome,'invalid','an unrecognized optional conclusion must remain explicitly invalid');
+        assert.equal(mobileOutcome.conclusion,scenario.optionalConclusion,'retain the raw GitHub conclusion for diagnosis');
+      }
+      if(scenario.workflowBytes===undefined){
+        const policy=JSON.parse(await readFile(path.join(evidenceDirectory,'workflow-policy.json'),'utf8'));
+        assert.equal(policy.required.includes(mobile),false,'mobile diagnostics must stay outside the required ordinary cohort');
+        assert.equal(policy.optional.includes(mobile),true,'the exact workflow must retain mobile diagnostics as optional');
+      }
+    }
     const fixture=JSON.parse(await readFile(fixturePath,'utf8'));
     assert.ok(fixture.calls.filter(call=>call.args.includes('--log')).every(call=>call.args[call.args.indexOf('--attempt')+1]==='2'),'raw logs must be pinned to the observed attempt');
   });

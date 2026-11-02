@@ -37,29 +37,6 @@
     }
   ],
   "rootAssignments": [
-    {"root": "workflow input reuse retains large original native evidence and rejects changed bytes", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "RISK repository process: large original CI artifacts retain verified coverage without buffering native reports", "group": "native-process", "file": "tests.js"},
-    {"root": "test group aggregate preserves observer protocol across emulator coverage and fresh fallback", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes", "group": "native-process", "file": "tests.js"},
-    {"root": "migration accepts a live token lock released during ownership inspection", "group": "native-process", "file": "scripts/agent-tools/coordination.test.mjs"},
-    {"root": "RISK repository process: released host locks cannot cause spurious CI migration failures", "group": "native-process", "file": "tests.js"},
-    {"root": "workflow partial retries preserve successful gates and invalidate a later failed execution", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse orders actual gate executions across rerun IDs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse requires readable retained original result and native artifacts", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow mandatory input policy rejects legacy coverage without original gate artifacts", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "test group aggregate admits a fresh execution after consumer runtime changes", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "RISK repository process: unchanged CI inputs reuse an original successful gate across events", "group": "core", "file": "tests.js"},
-    {"root": "RISK repository process: CI admission enforces reuse before repeating a passed test child", "group": "core", "file": "tests.js"},
-    {"root": "workflow reuses an independently passed gate on main for the same complete inputs", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse keeps a newer failed gate from inheriting an older pass", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow emulator gate reuses a verified pass and executes an uncovered gate", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow rerun reuses an original successful gate from its own earlier attempt", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "workflow input reuse rejects changed inputs and uncertain original evidence", "group": "native-process", "file": "scripts/agent-tools/ci-routing.test.mjs"},
-    {"root": "test group input coverage reuses a passed group without claiming new execution", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group aggregate reconciles reused and executed groups with fresh original proof", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group workflow consumer forbids duplicate execution for a verified input pass", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group workflow publication attests actual execution and never promotes a reused result", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
-    {"root": "test group input aggregation rejects stale missing and fabricated coverage", "group": "native-process", "file": "scripts/agent-tools/test-groups.test.mjs"},
     {
       "root": "18 hours elapsed before the next 02:00 does not recycle scanned tasks",
       "group": "core",
@@ -2166,7 +2143,7 @@
       "file": "tests.js"
     },
     {
-      "root": "Landscape browser: scene time presets persist and return to live without changing tasks",
+      "root": "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
       "group": "core",
       "file": "tests.js"
     },
@@ -4161,7 +4138,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "root": "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
       "group": "core",
       "file": "tests.js"
     },
@@ -4276,7 +4253,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "root": "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
       "group": "core",
       "file": "tests.js"
     },
@@ -7786,7 +7763,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
+      "root": "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
       "group": "core",
       "file": "tests.js"
     },
@@ -7836,12 +7813,27 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "root": "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
       "group": "core",
       "file": "tests.js"
     },
@@ -8237,6 +8229,11 @@
     },
     {
       "root": "RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening",
       "group": "core",
       "file": "tests.js"
     },
@@ -9096,7 +9093,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "root": "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
       "group": "core",
       "file": "tests.js"
     },
@@ -10426,7 +10423,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "root": "RISK support diagnostics: Settings points to the single archive Export",
       "group": "core",
       "file": "tests.js"
     },
@@ -10926,7 +10923,12 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "root": "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits",
       "group": "core",
       "file": "tests.js"
     },
@@ -12406,7 +12408,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK repository process: nested native fixture output stays isolated at the command boundary",
+      "root": "RISK repository process: supported VM module entrypoints retain isolated native fixture output",
       "group": "native-process",
       "file": "tests.js"
     },
@@ -12711,7 +12713,22 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
+      "root": "RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources",
       "group": "core",
       "file": "tests.js"
     },
@@ -12721,17 +12738,17 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
+      "root": "RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
+      "root": "RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database",
       "group": "core",
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
+      "root": "RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls",
       "group": "core",
       "file": "tests.js"
     },
@@ -12746,7 +12763,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
+      "root": "RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded",
       "group": "core",
       "file": "tests.js"
     },
@@ -12756,7 +12773,7 @@
       "file": "tests.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
+      "root": "RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status",
       "group": "core",
       "file": "tests.js"
     },
@@ -12766,6 +12783,610 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: button safety rejects incomplete native action evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety rejects false passes and newly untested actions",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate detects errors raised by a real click",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: completed after callbacks release ordinary fixture captures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: completed nested bodies release ordinary fixture captures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary native cloud recovery preserves sources through failures and retry",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes",
+      "group": "native-process",
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
+    },
+    {
+      "root": "RISK repository process: native rapid cloud selection preserves the two-second input burst",
+      "group": "native-process",
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
+    },
+    {
+      "root": "RISK repository process: native button gate refuses unallocated local launch before browser startup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: new and duplicate source buttons require native coverage inventory",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: merged tracked app sources match the reviewed button templates",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate requires both exact native button safety reports",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: native button gate awaits an asynchronous false outcome",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button gate cannot omit a required stress scenario",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK Settings transfer sections: cleanup controls stay outside the focused backup section",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native button safety requires 400-task and rapid-press evidence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: pending Copy repeat catalog preserves precompletion Download and ordinary admission",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required button enforcement changes need process coverage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK button safety guidance: mounted Help describes actions and keeps testing evidence internal",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: every button safety module fails the actual CLI without process coverage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch",
+      "group": "native-process",
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
+    },
+    {
+      "root": "RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory parser rejects waived limits synthetic touch and mismatched durable evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory boundary refuses unsupported or unbounded runtimes before native launch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile memory command cannot run a pretend local cap and pins the owned container boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: intentional Docker OOM control cannot waive capped client failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory intentional OOM control binds the Docker flag while clients reject it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK Settings guidance: mounted cleanup and sync FAQs name their current locations",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: CI monitor requires capped mobile job while preserving prior topology",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: routed hosted policies reach native consumers without waiving invalid launches",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "hosted button consumers admit routed event policies before their runtime boundary",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted button consumers reject invalid missing mismatched and local launches",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted child and memory artifacts preserve raw policy and distinct source checkout identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: unavailable native attempts reuse one prepared isolated release document",
+      "group": "native-process",
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
+    },
+    {
+      "root": "RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native report cannot omit or change reviewed runtime asset bytes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile artifact consumers require reviewed runtime asset hashes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: retained native sources seed once without a persistent board bootstrap",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: remote mobile consumer waits for browser owner exit after disconnect",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile memory parser rejects changed final browser or driver container isolation",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget CLI preserves uncertain create ownership and cleans confirmed objects",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-lifecycle.test.mjs"
+    },
+    {
+      "root": "RISK repository process: expected native reload retries only its navigation context loss",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: hosted direct native callers retain ephemeral listener defaults",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery FAQ: mounted help names scene time without implementation details",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles require one decimal GB without accepting the reported stress limit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile budget profiles report authentic stress application failures without waiving execution integrity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI preserves a failed normal app attempt and executes reduced before complete cleanup",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "test group aggregate requires independently bound required and reported stress profiles",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: native burst preparation survives remounts without waiving missing or late input",
+      "group": "native-process",
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
+    },
+    {
+      "root": "RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles reject failed stress setup substitutions and mixed nonapp errors",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile budget profiles require attributable primary failures for reported stress",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile kernel page floor uses actual auxv readback without changing requested budgets",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile kernel page floor actual CLI preserves exact requests and rejects substituted observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "root": "RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts",
+      "group": "native-process",
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
+    },
+    {
+      "root": "RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: interrupted replay and two tab originals never lose pending facts",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: stress engine loss requires the actual kernel and owned exit evidence",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "mobile stress owned engine loss reports the observed waitForFunction Browser closed without hiding driver faults",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory.test.mjs"
+    },
+    {
+      "root": "mobile stress CLI retains the observed reduced owned-engine OOM after a failed normal attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/mobile-memory-stress-lifecycle.test.mjs"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene",
+      "group": "core"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either",
+      "group": "native-process"
+    },
+    {
+      "file": "tests.js",
+      "root": "RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices",
+      "group": "core"
+    },
+    {
+      "root": "RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release",
+      "group": "native-process",
+      "file": "tests.js",
+      "admission": "optional-workload-diagnostic",
+      "admissionReason": "Accepted #1193: strict optional workload diagnostic; preserve its original assertions and all required ordinary, detector and source controls."
+    },
+    {
+      "root": "workflow input reuse retains large original native evidence and rejects changed bytes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK repository process: large original CI artifacts retain verified coverage without buffering native reports",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate preserves observer protocol across emulator coverage and fresh fallback",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "migration accepts a live token lock released during ownership inspection",
+      "group": "native-process",
+      "file": "scripts/agent-tools/coordination.test.mjs"
+    },
+    {
+      "root": "RISK repository process: released host locks cannot cause spurious CI migration failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "workflow partial retries preserve successful gates and invalidate a later failed execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse orders actual gate executions across rerun IDs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse requires readable retained original result and native artifacts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow mandatory input policy rejects legacy coverage without original gate artifacts",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "test group aggregate admits a fresh execution after consumer runtime changes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: unchanged CI inputs reuse an original successful gate across events",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: CI admission enforces reuse before repeating a passed test child",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: persistence recovery CI installs required matching WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "workflow reuses an independently passed gate on main for the same complete inputs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse keeps a newer failed gate from inheriting an older pass",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow emulator gate reuses a verified pass and executes an uncovered gate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow rerun reuses an original successful gate from its own earlier attempt",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow input reuse rejects changed inputs and uncertain original evidence",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "test group input coverage reuses a passed group without claiming new execution",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate reconciles reused and executed groups with fresh original proof",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group workflow consumer forbids duplicate execution for a verified input pass",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group workflow publication attests actual execution and never promotes a reused result",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group input aggregation rejects stale missing and fabricated coverage",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
       "root": "RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible",
       "group": "persistence-recovery",
       "file": "tests.js"
@@ -12773,6 +13394,11 @@
     {
       "root": "RISK opening board presentation: shared markup retains released cards contexts task rows and history",
       "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view legacy opening: complete raw legacy boards remain visible before durable startup",
+      "group": "persistence-recovery",
       "file": "tests.js"
     },
     {
@@ -12816,12 +13442,787 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK saved view held Export: terminal Settings preserves an exact partial source-only archive",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
       "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group aggregate preserves optional outcomes separately from the required verdict",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: optional mobile diagnostics do not block ordinary reuse",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "hosted mobile reports require explicit raw policy for optional dispatch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "hosted memory policy admits only explicitly selected mobile workflow dispatch on a branch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "current grouped routing ignores optional mobile diagnostic rows for reuse",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow dispatch explicitly selects optional mobile diagnostics",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: fractional native Undo click receipts preserve high-resolution time",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: refused saved decision capture waits for its refreshed unselected review",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved decision review guidance: mounted FAQ retains place and explicit save authority",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK saved decision review guidance: mounted changelog records selected review continuity",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution",
+      "file": "scripts/agent-tools/test-groups.test.mjs",
+      "group": "native-process"
+    },
+    {
+      "root": "RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources",
+      "file": "tests.js",
+      "group": "native-process"
+    },
+    {
+      "root": "RISK repository process: trusted planner declares ordinary engines separately from optional workloads",
+      "file": "tests.js",
+      "group": "native-process"
+    },
+    {
+      "root": "test group public workflow retains selected workload evidence without admitting it as ordinary proof",
+      "file": "scripts/agent-tools/test-groups.test.mjs",
+      "group": "native-process"
+    },
+    {
+      "root": "RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: failed Timeline controller finalizes available custody before browser close",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: initial-only native Timeline evidence refuses unvalidated branches",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup observations bind exact app sources and complete saved data",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile retains full logical occurrences within finite physical storage",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile consumer derives exact bytes and reaches every finite guard",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile controller retains the complete sequence before truthful terminal cleanup",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile CLI requires reader consent and an exact raw namespace",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: explicit Timeline profile cannot activate unrelated native routes",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary startup settings distinguish legacy raw8 from independently versioned live and durable16",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary deliberate Reload preserves complete saved sources and account authority",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: external browser termination retains lifecycle classification without app crash credit",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: external disconnect classification rejects an omitted lifecycle listener",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: opening frame gaps refuse native input before reset and retain missing input status",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline profile requires exact explicit selection at existing consumers",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline retains the same45-data late-close finalization sequence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline preserves every finite producer guard",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline consumer derives all independent data and retains exact guards",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline ordinary custody preserves every original field and typed setting guard",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline actual controller finalizes late-close data and typed custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline public CLI preserves explicit custody and finite stdout",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: additional56 Timeline rejects non-string selectors before coercion or activation",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup reference view completes bounded lossless parent transport",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup reference view preserves full values custody bounds and owned leases",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup fixture directories provide isolated portable custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline retains the same53-data late-close finalization sequence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline independently consumes every53-data canonical byte",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline preserves every finite producer guard",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline consumer derives all independent data and retains exact guards",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline ordinary custody preserves every original field and typed setting guard",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline rejects non-string selectors before coercion or activation",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline requires exact selection and reference-only public verification",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline reference transport preserves every53-data value and typed store",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline consumer preserves source size and typed stack bounds",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline reference loading preserves the owned namespace and orphan guards",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: startup fixture temp aliases preserve canonical owned custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: full-domain Timeline preserves PNG metadata and native command deadlines",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: default manual ordinary admission retains capped refusal",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary cloud sign out keeps the complete64 source at action boundaries",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "hosted ordinary native admits default-off manual dispatch while capped consumers refuse it",
+      "group": "native-process",
+      "file": "scripts/agent-tools/button-ci-policy.test.mjs"
+    },
+    {
+      "root": "RISK repository process: replaced historical roots reject contradictory live assignments before execution",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: mandatory rules evidence requires each current service consumer",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group runner accounts for current service skips only without an emulator",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: current service skips retain required source-bound grouped accounting",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "owned native process streams before its deadline and reaps a detached TERM-ignoring descendant",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process retains real normal output and closes without teardown signals",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process binds live TAP stdout browser logs to actual detached child identities",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process charges slow identity setup to the original child deadline",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "Linux proc reader ignores inaccessible foreign enrichment without losing owned scans",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "Linux proc reader preserves valid owned stat identity when enrichment disappears",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process stops on the combined stream cap and retains the accepted prefix",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process refuses forged browser PID ownership and preserves a real foreign sentinel",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process refuses a changed start identity before signaling",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process refuses ambiguous enrichment of a still-live owned identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process reaps its witnessed detached child after the root exits first",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "hosted native receipt verification rejects missing duplicate unknown skipped and incomplete outcomes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "RISK repository process: Linux native observer retains literal CPU deliveries and bounded clock custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: owned native lifecycle retains stream and exact union controls",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: proven terminal executable incidents retain actual exit custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: partial OS read diagnostics retain literal bounded evidence without custody",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "Linux partial read diagnostics retain literal ordered kernel observations",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "Linux partial read diagnostics keep invocation and raw payload bounds explicit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned partial read diagnostics survive the receipt without granting unknown custody",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process reconciles a witnessed executable-only terminal read after actual exit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process retains an unknown partial descendant even after all witnessed processes exit",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process keeps terminal incidents unresolved after an intervening core ambiguity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process requires independent nonliveness proof after an absent terminal identity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process reconciles a witnessed descendant while retaining its actual browser close",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process never signals a live row whose executable field is absent",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "owned native process never resumes signal authority after an intervening identity ambiguity",
+      "group": "native-process",
+      "file": "scripts/agent-tools/hosted-native-callers.test.mjs"
+    },
+    {
+      "root": "RISK repository process: Linux failure follow-up preserves the exact successful scene history",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Linux scene observation retains bounded observer phase brackets",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scene source observation brackets stay inactive in ordinary runs",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Linux observer phases refuse inconsistent retained page clocks",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Linux failure observation retains bounded literal heartbeat intervals",
+      "group": "native-process",
       "file": "tests.js"
     }
   ],
   "processControls": [
+    {
+      "id": "RISK app fixture cleanup: API success producer",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: API success observer",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: synchronous cleanup error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: asynchronous cleanup error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: callback cleanup error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: synchronous nested body error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: asynchronous nested body error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: callback nested body error",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: callback and Promise misuse",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested timeout",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested skip and todo",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: fixture callback ownership preserves actual cleanup and child contracts",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested producer retires eight ordinary fixtures",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed nested bodies release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: nested observer collects retired fixtures while a neighbor stays usable",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed nested bodies release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: after producer retires eight ordinary fixtures",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed after callbacks release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
+    {
+      "id": "RISK app fixture cleanup: after observer collects retired fixtures while a neighbor stays usable",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: completed after callbacks release ordinary fixture captures",
+      "expectedExecutions": 1
+    },
     {
       "id": "RISK native installed-client delivery: signed-out",
       "group": "native-process",
@@ -12885,6 +14286,114 @@
       "group": "core",
       "file": "tests.js",
       "reason": "The user authorized automatic useful offline recovery. Preserve pre-hydration no-read/no-adoption, exact current-head repair, full raw originals, manual/protected copies and remote authority; replace obsolete unusable-placeholder expectations with the proven supported local workspace. Fresh cloud reads may follow verified local recovery; source-bound tests measure the actual ordering."
+    },
+    {
+      "baselineRoot": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "currentRoot": "RISK Settings transfer consolidation: one Import, one Export and direct Copy",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "currentRoot": "RISK backup export safety: unreadable originals stay byte-exact without a raw-data view",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
+      "currentRoot": "RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "currentRoot": "RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "currentRoot": "RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "currentRoot": "RISK support diagnostics: Settings points to the single archive Export",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Issue webkit-button-safety renames this contract around the final unified Import and recovery-archive Export behavior; exact-source, preview, cancellation, partial-state and diagnostics assertions remain."
+    },
+    {
+      "baselineRoot": "Landscape browser: scene time presets persist and return to live without changing tasks",
+      "currentRoot": "RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Preserve the complete native scene-time preset/save/reload/live consumer while adding the observed renderer-loading readiness transition before its trusted click."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery",
+      "currentRoot": "RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests.js",
+      "reason": "Ticket #1393 binds the unchanged recovery-copy expectations to their retained October28 dated entry while allowing a newer WOOP note above it. Every original content assertion remains protected and the historical baseline duration/group are retained."
+    }
+  ],
+  "currentServiceCases": [
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
+    },
+    {
+      "id": "RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)",
+      "file": "tests.js",
+      "group": "core",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "mandatoryGate": "rules"
     }
   ]
 }

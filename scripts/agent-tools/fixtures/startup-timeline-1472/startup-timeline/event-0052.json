@@ -1,0 +1,1 @@
+{"record":{"startTime":0.44897345831850544,"data":{"type":"click","defaultPrevented":false},"children":[{"startTime":0.44897629163460806,"data":{"scriptName":"http://127.0.0.1:53619/controlled1472.html","scriptLine":10,"scriptColumn":25},"children":[],"endTime":0.47326079168124124,"type":"FunctionCall"}],"endTime":0.47326158330542967,"type":"EventDispatch"}}

@@ -1,0 +1,1 @@
+{"record":{"startTime":1.3437847499735653,"data":{"type":"ResizeObserver"},"children":[{"startTime":1.343795583350584,"data":{"scriptName":"http://127.0.0.1:53623/button-61f95aa9-0b54-4b2e-a366-5cb2a5f0365b/","scriptLine":9718,"scriptColumn":30},"children":[],"endTime":1.343812833307311,"type":"FunctionCall"}],"endTime":1.343813166662585,"type":"ObserverCallback"}}

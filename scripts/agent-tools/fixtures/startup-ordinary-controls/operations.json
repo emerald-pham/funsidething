@@ -1,0 +1,131 @@
+{
+  "operations": [
+    {
+      "id": "saved-source-preview",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 1177455,
+      "endByte": 1178674,
+      "startLine": 14936,
+      "endLineExclusive": 14951,
+      "regionSha256": "016058a8d8859789da4f87fd9270deae264a60a672295875d914cbddfbead932",
+      "semanticRole": "optional",
+      "justification": "Safe read-only full agreeing source projection; no source acceptance or decision authority.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    },
+    {
+      "id": "load-accepted-device-board",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 288198,
+      "endByte": 289794,
+      "startLine": 3621,
+      "endLineExclusive": 3655,
+      "regionSha256": "9bfeac1833cf09aa4c04243a49e409614e3113de3d48d357d05e5794683fd6fd",
+      "semanticRole": "required-board",
+      "justification": "Establish local device source authority and parse saved board before init acceptance.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    },
+    {
+      "id": "recompute-board-ranks",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 507467,
+      "endByte": 507624,
+      "startLine": 6928,
+      "endLineExclusive": 6932,
+      "regionSha256": "365e0b82f5cd702196c4055550d9109bee20a136bd03b6a01892bc5a0e42f78f",
+      "semanticRole": "required-board",
+      "justification": "Current released boot calls this for full open-task rank statistics; observed cost is not proof every suboperation is essential.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    },
+    {
+      "id": "render-board",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 690815,
+      "endByte": 691591,
+      "startLine": 9703,
+      "endLineExclusive": 9710,
+      "regionSha256": "4fee4e18e98a4177c3d0c1a01efbbac46ee4f72c86abbf3360b9395b955e50ea",
+      "semanticRole": "required-board",
+      "justification": "Released renderer updates board/control surfaces; includes optional scheduling tail, so no claim every child is required.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    },
+    {
+      "id": "render-add-panel",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 693385,
+      "endByte": 694629,
+      "startLine": 9746,
+      "endLineExclusive": 9766,
+      "regionSha256": "f21f7ed361ac019983ae8f7cd79d88842ccc326d3b1f2e198804680631e9ac30",
+      "semanticRole": "required-board",
+      "justification": "Builds Add inputs and truthful expanded/collapsed state; required for this ordinary action response.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    },
+    {
+      "id": "toggle-add-action",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 1144485,
+      "endByte": 1144571,
+      "startLine": 14375,
+      "endLineExclusive": 14376,
+      "regionSha256": "362d694eaa88c28d854349d9916969520210833a12155dd1dcd5988276f73b35",
+      "semanticRole": "required-board",
+      "justification": "One action flips addOpen then renderAddPanel and save; no task/decision edit.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    },
+    {
+      "id": "save-view-debounce",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 313376,
+      "endByte": 314495,
+      "startLine": 3992,
+      "endLineExclusive": 4017,
+      "regionSha256": "fa813f2a9583ed7619eb61fdec6ef28e53f5c4ec513d0b8a459781c229706f47",
+      "semanticRole": "required-board",
+      "justification": "Existing view action records a save request and350ms persistence timer; wait is async elapsed, not synchronous CPU.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    },
+    {
+      "id": "boot-initialization",
+      "source": "index.html",
+      "sourceSha256": "719f9731b7649319366bd21192d56c9f5b1fda4d9d12b7b42fc6e2620a1eea85",
+      "startByte": 1178674,
+      "endByte": 1184369,
+      "startLine": 14951,
+      "endLineExclusive": 15051,
+      "regionSha256": "cf01a00c3a983b68037744b173aefb03e33cbb0aaa2b2918f9e51873ec092ba0",
+      "semanticRole": "required-board",
+      "justification": "Read/validate/accept/hydrate/rank/render, then optional boot notices; mixed subwork remains explicit.",
+      "runtimeAssociation": "Static semantic catalog only. Not a native span name/role assignment from opaque coordinates or receipt adjacency."
+    }
+  ],
+  "wholeURLRules": [
+    {
+      "path": "index.html",
+      "role": "unclassified",
+      "reason": "Mixed inline boot/board/action/recovery/cloud/appearance scripts; no blanket whole-document role."
+    },
+    {
+      "path": "landscape.js",
+      "role": "optional",
+      "reason": "Frozen two-canvas scenery renderer and scene controls (file header, canvas/data-scenery/data-life setup), separate from saved-board task/decision store; optional for this ordinary saved-board control contract."
+    },
+    {
+      "path": "device-store-v2.js",
+      "role": "unclassified",
+      "reason": "Mixed required source reads and other persistence/recovery operations; classify only separately proved operation."
+    },
+    {
+      "pathPattern": "owned generated diagnostic and synthetic SDK URLs",
+      "role": "instrumentation",
+      "reason": "Exact retained producer-owned source/fixture boundary, not shipped app computation."
+    }
+  ],
+  "coordinatePolicy": "Verbatim native numeric fields stay opaque. Catalog byte/physical-line ranges are source citations, never an asserted native coordinate conversion. Unknown/mixed/unlocated native scopes remain unclassified."
+}

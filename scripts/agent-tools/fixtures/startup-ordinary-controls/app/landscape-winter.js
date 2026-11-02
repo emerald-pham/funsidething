@@ -1,0 +1,360 @@
+/* Finite winter visitors for the living landscape. The module owns only
+   visitor geometry and paint calls; seasonal scheduling and the snow-covered
+   hills remain with the scene renderer. */
+(function (root) {
+  'use strict';
+
+  const TYPES = Object.freeze(['snowman', 'skier', 'snowangel']);
+  const clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value));
+  const smooth = (start, end, value) => {
+    const amount = clamp((value - start) / (end - start));
+    return amount * amount * (3 - 2 * amount);
+  };
+  const mix = (a, b, amount) => {
+    const t = clamp(amount);
+    const parse = value => {
+      const hex = String(value || '').replace('#', '');
+      return /^[0-9a-f]{6}$/i.test(hex) ? [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)] : null;
+    };
+    const left = parse(a), right = parse(b);
+    if (!left || !right) return a;
+    return `#${left.map((value, index) => Math.round(value + (right[index] - value) * t).toString(16).padStart(2, '0')).join('')}`;
+  };
+  const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+  function eventValues(event, geometry, W) {
+    const duration = Math.max(.001, finite(event && (event.activityDuration || event.duration), 1));
+    const natural=!!event?.activityDuration,clock=natural?geometry.walkingClock(event):geometry.motionAge(event,'x');
+    const arrivalSeconds=event?.type==='snowangel'?(natural?geometry.walkingPlan(event).arrivalSeconds:Math.abs((event.reverse?W+32:-32)-W*(.18+finite(event.lane,.5)*.64))/geometry.walkingSpeed(event)):0;
+    const builderArrivalSeconds=natural&&['snowman','skier'].includes(event.type)?geometry.walkingPlan(event).arrivalSeconds:0;
+    const progress = natural?clamp((clock-(event.type==='snowangel'?arrivalSeconds-duration*.12:builderArrivalSeconds))/duration,0,1):geometry.motionProgress(event, 'x');
+    const verticalProgress = geometry.motionProgress(event, 'y');
+    const lane = clamp(finite(event && event.lane, .5));
+    const seed = clamp(finite(event && event.seed, .5));
+    const direction = event && event.reverse ? -1 : 1;
+    // Winter visitors share the trail visitor's visual weight. Preserve a
+    // readable minimum on phones while keeping desktop people close to 1x.
+    const scale = Math.min(1, Math.max(.85, W / 720));
+    return { duration, progress, verticalProgress, clock, lane, seed, direction, scale, natural, arrivalSeconds, builderArrivalSeconds };
+  }
+
+  function requireGeometry(geometry, W, H) {
+    if (!geometry || typeof geometry.middle !== 'function' || typeof geometry.near !== 'function' ||
+      typeof geometry.tangent !== 'function') throw new TypeError('Winter geometry required');
+    if (!Number.isFinite(W) || !Number.isFinite(H) || W <= 0 || H <= 0) {
+      throw new RangeError('Winter viewport required');
+    }
+  }
+
+  function lerp(a, b, amount) { return a + (b - a) * amount; }
+
+  function skierX(progress, direction, lane, W) {
+    // The middle hill is a sine wave. These two short ranges are selected from
+    // its descending slopes; reversing chooses the mirrored downhill run.
+    const low = direction > 0 ? W * (.08 + lane * .05) : W * (.60 + lane * .03);
+    const high = direction > 0 ? W * (.30 + lane * .05) : W * (.82 + lane * .02);
+    // Complete the visit on this one downhill slope. Fade into the trees at
+    // its end instead of racing across the next (uphill) section to the edge.
+    const run = smooth(0, 1, progress);
+    return direction > 0 ? lerp(low, high, run) : lerp(high, low, run);
+  }
+
+  function activityAnchor(lane, W) { return W * (.18 + lane * .64); }
+
+  function anchoredActivity(progress, direction, lane, W, departureStart = null) {
+    const anchor = activityAnchor(lane, W);
+    const arrival = smooth(0, .12, progress);
+    const approach = direction > 0 ? -W * .22 : W * 1.22;
+    const settled = lerp(approach, anchor, arrival);
+    const exit = direction > 0 ? W * 1.22 : -W * .22;
+    const departure = departureStart === null ? 0 : smooth(departureStart, 1, progress);
+    return { anchor, x: lerp(settled, exit, departure), arrival, departure };
+  }
+
+  function pose(type, event, geometry, W, H) {
+    if (!TYPES.includes(type)) throw new RangeError('Unknown winter visitor');
+    requireGeometry(geometry, W, H);
+    const values = eventValues(event || {}, geometry, W);
+    const { duration, progress, verticalProgress, clock, lane, seed, direction, scale, natural, arrivalSeconds, builderArrivalSeconds } = values;
+    const alpha = natural ? 1 : smooth(0, .06, progress) * (1 - smooth(.94, 1, progress));
+
+    if (type === 'skier') {
+      const arriving=natural&&clock<builderArrivalSeconds,plan=natural?geometry.walkingPlan(event):null;
+      const x=arriving?(direction>0?-32:W+32)+direction*plan.arrival.distanceAt(clock):skierX(progress,direction,lane,W);
+      const snowOffset = 8 + lane * 2;
+      return {
+        type, x, y: geometry.middle(x) + snowOffset, groundY: geometry.middle(x) + snowOffset,
+        snowOffset, angle: geometry.tangent(geometry.middle, x),
+        // The skis use angle alone; lean is reserved for the torso.
+        lean: direction * (.08 + seed * .1),
+        scale: Math.max(.85, scale * (.98 + lane * .02)), alpha:natural?1-smooth(.94,1,progress):alpha, progress, verticalProgress, clock, lane, seed, direction,
+        natural,arriving,skiBlend:arriving?0:smooth(0,.12,progress),walkDistance:natural?plan.arrival.distanceAt(Math.min(clock,builderArrivalSeconds)):0,travel:plan?.travel,
+        skiing: !arriving&&progress >= .12 && progress <= .88, walking: arriving,
+      };
+    }
+
+    const activity = anchoredActivity(progress, direction, lane, W, type === 'snowangel' ? .84 : null);
+    const anchor = activity.anchor;
+
+    if (type === 'snowman') {
+      const snowOffset = 5 + lane;
+      const groundY = geometry.middle(anchor) + snowOffset;
+      const build = smooth(.14, .72, progress);
+      const finalFadeAlpha = smooth(.94, 1, progress);
+      const structureAlpha = 1 - finalFadeAlpha;
+      const builderWalk = smooth(.68, .98, progress);
+      const plan=natural?geometry.walkingPlan(event):null,arriving=natural&&clock<builderArrivalSeconds;
+      const approachDistance=natural?plan.arrival.distanceAt(Math.min(clock,builderArrivalSeconds)):0;
+      const departureDistance=natural?plan.journey.distanceAt(Math.max(0,clock-plan.begin)):W*.24*builderWalk;
+      const walkDistance=approachDistance+departureDistance;
+      const builderX = arriving?(direction>0?-32:W+32)+direction*approachDistance:anchor-direction*13*scale+direction*departureDistance;
+      const builderGroundY = geometry.middle(builderX) + snowOffset;
+      const builderAlpha = natural?1:smooth(.05,.14,progress)*(1-smooth(.90,.99,progress));
+      return {
+        type, x: anchor, y: groundY, groundY, snowOffset,
+        builderX, builderGroundY, builderScale: scale, travel:natural?geometry.walkingPlan(event).travel:{startDistance:0,length:W*.24,duration:duration*.30}, walkDistance, structureAlpha, patchAlpha: structureAlpha,
+        finalFadeAlpha, angle: geometry.tangent(geometry.middle, anchor), scale, alpha,
+        progress, verticalProgress, clock, lane, seed, direction, build,
+        building: progress >= .08 && progress < .78,
+        builderLeaving: progress >= .68 && (natural || progress < .99),
+        builderVisible: builderAlpha > 0, builderAlpha, natural, arriving, walking: arriving || progress >= .68,
+      };
+    }
+
+    if(natural){
+      // The imprint keeps its original presentation clock; its person walks
+      // independently until the entire silhouette has crossed the viewport.
+      const start=direction>0?-32:W+32,speed=geometry.walkingSpeed(event);
+      const plan=geometry.walkingPlan(event);
+      activity.x=clock<arrivalSeconds?start+direction*plan.arrival.distanceAt(clock):anchor+direction*plan.journey.distanceAt(Math.max(0,clock-plan.begin));
+    }
+    const arriving=natural&&clock<arrivalSeconds;
+    const imprintGroundY = geometry.near(anchor) + 9 + lane * 2;
+    const bodyGroundY = geometry.near(activity.x) + 9 + lane * 2;
+    const bodyMode = arriving?1-smooth(Math.max(0,arrivalSeconds-6),arrivalSeconds,clock):smooth(.68, .84, progress);
+    const finalFadeAlpha = smooth(.94, 1, progress);
+    const imprintAlpha = 1 - finalFadeAlpha;
+    const armSweep = smooth(.12, .72, progress);
+    const legSweep = clamp(.5 + .5 * Math.sin(armSweep * Math.PI * 2 + seed * 4));
+    const walking = arriving || progress >= .84;
+    return {
+      type, x: activity.x, y: bodyGroundY, groundY: bodyGroundY,
+      walkDistance: natural?(arriving?geometry.walkingPlan(event).arrival.distanceAt(clock):Math.abs(anchor-(direction>0?-32:W+32))+Math.abs(activity.x-anchor)):Math.abs(activity.x - anchor),
+      travel:natural?geometry.walkingPlan(event).travel:{startDistance:0,length:Math.abs((direction>0?W*1.22:-W*.22)-anchor),duration:duration*.16},
+      imprintX: anchor, imprintGroundY, imprintAlpha, patchAlpha: imprintAlpha,
+      snowOffset: 9 + lane * 2, angle: geometry.tangent(geometry.near, activity.x),
+      scale: scale * .96, alpha, progress, verticalProgress, clock, lane, seed, direction,
+      imprint: armSweep, standing: bodyMode, bodyMode,
+      lyingAlpha: 1 - bodyMode, standingAlpha: bodyMode,
+      armSweep, legSweep, walking, walkAmount: walking ? smooth(.84, .94, progress) : 0,
+    };
+  }
+
+  function paint(g, geometry, W, H, event, t, palette, helpers) {
+    if (!g || !helpers) return false;
+    const type = event && event.type;
+    if (!TYPES.includes(type)) return false;
+    const poseValue = pose(type, event, geometry, W, H);
+    const personX=type==='snowman'?poseValue.builderX:poseValue.x;
+    if(event.activityDuration&&poseValue.progress>=1&&(personX<-80||personX>W+80))return true;
+    const ellipse = helpers.ellipse;
+    const line = helpers.line;
+    const color = helpers.color || (() => palette && palette.front || '#8b9f9a');
+    const skinColor = helpers.skinColor || (() => '#b27d58');
+    const personHead = typeof helpers.personHead === 'function' ? helpers.personHead : null;
+    const S = helpers.S || {};
+    if (typeof ellipse !== 'function' || typeof line !== 'function') return false;
+    const smoothValue = typeof S.smooth === 'function' ? S.smooth : smooth;
+    const mixHex = typeof S.mixHex === 'function' ? S.mixHex : mix;
+    const front = palette && palette.front || '#8dcca1';
+    const hill = palette && palette.hill || '#ace097';
+    const sky = palette && palette.sky || ['#8ed4f3', '#d4f5f2', '#f6fbe2'];
+    const snow = mixHex(sky[1] || '#d4f5f2', '#ffffff', .7);
+    const snowShadow = mixHex(sky[2] || '#f6fbe2', '#9bbcc5', .35);
+    const ink = mixHex(palette && palette.city || '#bbdce1', '#4c6870', .3);
+    const drawEllipse = (x, y, rx, ry, fill) => ellipse(g, x, y, Math.max(0, rx), Math.max(0, ry), fill);
+    const drawLine = (x, y, x2, y2, stroke, width = 1) => line(g, x, y, x2, y2, stroke, width);
+    const drawHead = (x, y, rx, ry, seed, skin, hat = false) => {
+      if (personHead) return personHead(g, x, y, rx, ry, seed, skin, hat);
+      return drawEllipse(x, y, rx, ry, skin);
+    };
+
+    const drawWalker = (x,y,scaleValue,ground,headY=-12,working=0,skiBlend=0,skiAngle=0) => {
+      const motion=geometry.humanWalkPose(x,y,poseValue.walkDistance,poseValue.direction,ground,0,scaleValue,poseValue.travel);
+      const skin=skinColor(poseValue.seed),dir=poseValue.direction;
+      const skiPoint=(x,y)=>({x:Math.cos(skiAngle)*x-dir*Math.sin(skiAngle)*y,y:dir*Math.sin(skiAngle)*x+Math.cos(skiAngle)*y});
+      const blend=(x,y,target)=>({x:x+(target.x-x)*skiBlend,y:y+(target.y-y)*skiBlend});
+      const hip=blend(motion.hipX,motion.hipY,skiPoint(0,-7));
+      g.save();g.translate(x,y);g.scale(dir*scaleValue,scaleValue);
+      const arm=(hand,side)=>{
+        const workX=motion.hipX+(side===0?5*smoothValue(.14,.72,poseValue.progress):-3.2);
+        const workY=side===0?-7.9:-6.1;
+        const grip=blend(hand.x+(workX-hand.x)*working,hand.y+(workY-hand.y)*working,skiPoint(side===0?7:-6,-7));
+        const shoulder=blend(motion.hipX,-8+motion.bob,skiPoint(side===0?1:0,-11));
+        drawLine(shoulder.x,shoulder.y,(shoulder.x+grip.x)*.5,(shoulder.y+grip.y)*.5,skin,1.1);
+        drawLine((shoulder.x+grip.x)*.5,(shoulder.y+grip.y)*.5,grip.x,grip.y,skin,1.1);
+        return grip;
+      };
+      const backGrip=arm(motion.arms[1],1);
+      const head=blend(motion.hipX,headY+motion.bob,skiPoint(2,-16));
+      drawHead(head.x,head.y,2,2,poseValue.seed,skin,false);
+      const shoulder=blend(motion.hipX,-9+motion.bob,skiPoint(1,-14));
+      drawLine(shoulder.x,shoulder.y,hip.x,hip.y,color(poseValue.seed),2.7+.1*skiBlend);
+      motion.legs.forEach((leg,i)=>{
+        const knee=blend(leg.kneeX,leg.kneeY,skiPoint(i?-4:4,-7)),foot=blend(leg.footX,leg.footY,skiPoint(i?-1:1,-1));
+        drawLine(hip.x,hip.y,knee.x,knee.y,ink,1.3+.2*skiBlend);
+        drawLine(knee.x,knee.y,foot.x,foot.y,ink,1.3+.2*skiBlend);
+      });
+      const frontGrip=arm(motion.hand,0);g.restore();return {...motion.hand,head,grips:[backGrip,frontGrip]};
+    };
+
+    g.save();
+    const sceneAlpha = clamp(poseValue.alpha);
+    const depthScale = poseValue.scale;
+    const shadowX = type === 'snowangel' ? poseValue.imprintX : poseValue.x;
+    const shadowY = type === 'snowangel' ? poseValue.imprintGroundY : poseValue.groundY;
+    g.globalAlpha = sceneAlpha * (event.activityDuration ? type==='snowman'?clamp(poseValue.structureAlpha):type==='snowangel'?clamp(poseValue.imprintAlpha):1 : 1);
+    if (typeof helpers.groundShadow === 'function') {
+      g.globalAlpha *= type === 'snowman' ? clamp(poseValue.build) : 1;
+      helpers.groundShadow(g, shadowX, shadowY, type === 'snowman' ? 24 * depthScale :
+        type === 'skier' ? 18 * depthScale : 5 * depthScale, 14 * depthScale, snowShadow);
+      g.globalAlpha = sceneAlpha;
+    } else drawEllipse(shadowX, shadowY + depthScale * .7, 14 * depthScale, 2.2 * depthScale, snowShadow);
+
+    if(type==='skier'&&poseValue.natural){
+      // Keep one opaque figure while putting on the skis; swapping unrelated
+      // rigs at the launch point moved the head and hands in a single frame.
+      const amount=poseValue.skiBlend,dir=poseValue.direction;
+      const hand=drawWalker(poseValue.x,poseValue.groundY,depthScale,geometry.humanGround('middle',poseValue.snowOffset),-12,0,amount,poseValue.angle+poseValue.lean);
+      const onSlope=(x,y)=>({x:Math.cos(poseValue.angle)*x-dir*Math.sin(poseValue.angle)*y,y:dir*Math.sin(poseValue.angle)*x+Math.cos(poseValue.angle)*y});
+      const blend=(x,y,target)=>({x:x+(target.x-x)*amount,y:y+(target.y-y)*amount});
+      g.save();g.translate(poseValue.x,poseValue.groundY);g.scale(dir*depthScale,depthScale);
+      for(const offset of [0,1.2]){
+        const a=blend(hand.x+offset,hand.y-8,onSlope(-7,1+offset)),b=blend(hand.x+offset,hand.y+8,onSlope(7,1+offset));
+        drawLine(a.x,a.y,b.x,b.y,mixHex(color(poseValue.seed),offset?ink:snowShadow,amount),1.1-(offset?.3*amount:0));
+      }
+      g.save();g.globalAlpha*=amount;
+      const hatAngle=(poseValue.angle+poseValue.lean)*amount,hat={x:hand.head.x+dir*Math.sin(hatAngle),y:hand.head.y-Math.cos(hatAngle)};
+      drawEllipse(hat.x,hat.y,2.2,1.2,color(poseValue.seed));
+      for(const [index,offset] of [[0,-4],[1,4]]){
+        const angle=poseValue.angle+poseValue.lean,delta={x:Math.cos(angle)*offset-dir*Math.sin(angle)*8,y:dir*Math.sin(angle)*offset+Math.cos(angle)*8};
+        const a=hand.grips[index];drawLine(a.x,a.y,a.x+delta.x,a.y+delta.y,ink,.7);
+      }
+      g.restore();g.restore();
+      g.save();g.globalAlpha*=amount;
+      if(amount>0)for(let i=0;i<2;i++){
+        const from=poseValue.x-dir*(5+i*5)*depthScale,to=poseValue.x-dir*(17+i*5)*depthScale;
+        drawLine(from,geometry.middle(from)+poseValue.snowOffset+1,to,geometry.middle(to)+poseValue.snowOffset+1,snowShadow,.65*depthScale);
+      }
+      g.restore();return true;
+    }
+    if (type === 'snowman') {
+      g.globalAlpha = sceneAlpha * clamp(poseValue.structureAlpha);
+      const built = poseValue.build;
+      const base = 7.4 * depthScale * built;
+      const middle = 5.3 * depthScale * smooth(.18, 1, built);
+      const head = 3.7 * depthScale * smooth(.52, 1, built);
+      if (base > 0) drawEllipse(poseValue.x, poseValue.groundY - base * .55, base, base * .78, snow);
+      if (middle > 0) drawEllipse(poseValue.x, poseValue.groundY - base - middle * .45, middle, middle * .82, snow);
+      if (head > 0) {
+        const headY = poseValue.groundY - base - middle * 1.35 - head * .45;
+        drawEllipse(poseValue.x, headY, head, head, snow);
+        if (built > .75) {
+          drawEllipse(poseValue.x - head * .33, headY - head * .05, .45 * depthScale, .45 * depthScale, ink);
+          drawEllipse(poseValue.x + head * .33, headY - head * .05, .45 * depthScale, .45 * depthScale, ink);
+          drawEllipse(poseValue.x + poseValue.direction * head * .92, headY + head * .1, .7 * depthScale, .45 * depthScale, '#d89b68');
+        }
+      }
+      if (poseValue.builderVisible) {
+        g.save();
+        g.globalAlpha = sceneAlpha * clamp(poseValue.builderAlpha);
+        if (typeof helpers.groundShadow === 'function')
+          helpers.groundShadow(g, poseValue.builderX, poseValue.builderGroundY, 14 * depthScale, 7 * depthScale, snowShadow);
+        const builderX = poseValue.builderX;
+        const builderY = poseValue.builderGroundY;
+        const s = poseValue.builderScale;
+        drawEllipse(builderX, builderY + .5 * s, 3.4 * s, .9 * s, mixHex(front, '#315d55', .35));
+        // Building arms blend into the shared walking pose as the builder
+        // leaves; scaled feet follow the snowy ground rather than scene time.
+        drawWalker(builderX,builderY,s,geometry.humanGround('middle',poseValue.snowOffset),-11,
+          (poseValue.natural?smoothValue(0,.08,poseValue.progress):1)*(1-smoothValue(.68,.78,poseValue.progress)));
+        g.restore();
+      }
+    } else if (type === 'skier') {
+      const dir = poseValue.direction;
+      const sx = poseValue.x, sy = poseValue.groundY;
+      // Tracks are placed in world coordinates so they remain on the hill even
+      // while the skier rotates with the rendered hillside tangent.
+      for (let i = 0; i < 2; i++) {
+        const from = sx - dir * (5 + i * 5) * depthScale;
+        const to = sx - dir * (17 + i * 5) * depthScale;
+        drawLine(from, geometry.middle(from) + poseValue.snowOffset + 1, to, geometry.middle(to) + poseValue.snowOffset + 1, snowShadow, .65 * depthScale);
+      }
+      // The skis follow the terrain exactly. A small lean is applied only to
+      // the skier's body so the boards stay level against the snow.
+      g.save();
+      g.translate(sx, sy);
+      g.rotate(poseValue.angle);
+      g.scale(dir * depthScale, depthScale);
+      drawLine(-7, 1, 7, 1, snowShadow, 1.1);
+      drawLine(-7, 2.2, 7, 2.2, ink, .8);
+      g.restore();
+      g.save();
+      g.translate(sx, sy);
+      g.rotate(poseValue.angle + poseValue.lean);
+      g.scale(dir * depthScale, depthScale);
+      drawLine(-1, -1, -4, -7, ink, 1.5);
+      drawLine(1, -1, 4, -7, ink, 1.5);
+      drawLine(0, -7, -4, -7, ink, 1.5);
+      drawLine(0, -7, 4, -7, ink, 1.5);
+      drawLine(0, -7, 1, -14, color(poseValue.seed), 2.8);
+      drawHead(2, -16, 2, 2, poseValue.seed, skinColor(poseValue.seed), true);
+      drawEllipse(2, -17, 2.2, 1.2, color(poseValue.seed));
+      drawLine(0, -11, -6, -7, skinColor(poseValue.seed), 1.1);
+      drawLine(1, -11, 7, -7, skinColor(poseValue.seed), 1.1);
+      drawLine(-6, -7, -10, 1, ink, .7);
+      drawLine(7, -7, 11, 1, ink, .7);
+      g.restore();
+    } else {
+      const dir = poseValue.direction, s = depthScale;
+      // Leave the imprint behind at its activity anchor while the person
+      // transitions from lying to standing and then walks away.
+      g.globalAlpha = sceneAlpha * clamp(poseValue.imprintAlpha);
+      const imprintWidth = (13 + 8 * poseValue.imprint) * s;
+      const imprintHeight = (1.6 + 1.2 * poseValue.imprint) * s;
+      drawEllipse(poseValue.imprintX, poseValue.imprintGroundY + .4 * s, imprintWidth, imprintHeight, mixHex(snow, '#9cbac2', .25));
+
+      if (poseValue.lyingAlpha > 0) {
+        g.save();
+        g.globalAlpha = sceneAlpha * clamp(poseValue.lyingAlpha);
+        const bodyY = poseValue.groundY - 2 * s;
+        const arm = poseValue.armSweep * 8 * s;
+        const leg = (poseValue.legSweep * 5 - 2.5) * s;
+        drawEllipse(poseValue.x, bodyY, 7 * s, 2 * s, color(poseValue.seed));
+        drawHead(poseValue.x + dir * 8 * s, bodyY - 1 * s, 2 * s, 2 * s, poseValue.seed, skinColor(poseValue.seed), false);
+        drawLine(poseValue.x - dir * 3 * s, bodyY, poseValue.x - dir * 8 * s, bodyY - arm, snowShadow, 1.4 * s);
+        drawLine(poseValue.x + dir * 3 * s, bodyY, poseValue.x + dir * 8 * s, bodyY - arm * .7, snowShadow, 1.4 * s);
+        drawLine(poseValue.x - dir * 3 * s, bodyY + 1 * s, poseValue.x - dir * (7 + leg) * s, bodyY + 3 * s, snowShadow, 1.4 * s);
+        drawLine(poseValue.x + dir * 3 * s, bodyY + 1 * s, poseValue.x + dir * (7 - leg) * s, bodyY + 3 * s, snowShadow, 1.4 * s);
+        g.restore();
+      }
+      if (poseValue.standingAlpha > 0) {
+        g.save();
+        g.globalAlpha = sceneAlpha * clamp(poseValue.standingAlpha);
+        // The imprint stays behind; its shadow cannot ground the person who
+        // stands and leaves. Follow the same terrain contact and body fade.
+        if (typeof helpers.groundShadow === 'function')
+          helpers.groundShadow(g, poseValue.x, poseValue.groundY, 14 * s, 7 * s, snowShadow);
+        else drawEllipse(poseValue.x, poseValue.groundY + .5 * s, 3.4 * s, .9 * s, snowShadow);
+        // Do not rotate planted feet with the body: sample their actual hill
+        // contacts in world space, then render the connected local joints.
+        drawWalker(poseValue.x,poseValue.groundY,s,geometry.humanGround('near',poseValue.snowOffset));
+        g.restore();
+      }
+    }
+    g.restore();
+    return true;
+  }
+
+  root.LandscapeWinter = Object.freeze({ types: TYPES, pose, paint });
+})(globalThis);

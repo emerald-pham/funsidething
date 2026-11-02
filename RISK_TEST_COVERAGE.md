@@ -15,17 +15,18 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: large original CI artifacts retain verified coverage without buffering native reports
 - RISK repository process: released host locks cannot cause spurious CI migration failures
 - RISK repository process: CI admission enforces reuse before repeating a passed test child
+- RISK repository process: persistence recovery CI installs required matching WebKit
 - RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
-- RISK repository process: nested native fixture output stays isolated at the command boundary
+- RISK repository process: supported VM module entrypoints retain isolated native fixture output
 
 - RISK cloud recovery device connection: a failed handle is reopened within the same protected review
 - RISK cloud recovery reconnect guidance: mounted help explains reconnecting without replacing saved data
 
 ## Task state, eligibility, and scanner controls
 
-- RISK backup format safety: raw-source qualification remains outside the native selector
+- RISK backup export safety: unreadable originals stay byte-exact without a raw-data view
 - RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable
 
 - RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account
@@ -59,7 +60,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud source recovery pending capture: a cached device store without conditional staging keeps the choice held
 - RISK DEVICE STORAGE V2: conditional pending writes refuse JSON-lossy unknown evidence
 - RISK cloud source recovery pending capture: native recovery cannot discard a named array extension
-- RISK unreadable device recovery: Quick start and current Changelog explain preserved sources and local pending recovery
+- RISK unreadable device recovery: Quick start and dated Changelog explain preserved sources and local pending recovery
 - RISK cloud source recovery: readable device work stays visible read-only during pending and timed-out cloud checks
 - RISK cloud source recovery: complete-source details stay responsive bounded and exact
 - RISK cloud source recovery: read-only inspection does not expose unreadable placeholders or foreign identity work
@@ -198,19 +199,29 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
-- RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving
+- RISK JSON COPY PASTE: large native paste retains full draft without rendering the archive
+- RISK JSON COPY PASTE: closing a large paste during encoding stops before backup writes
+- RISK JSON COPY PASTE: stale clipboard completion cannot release a newer export transfer
+- RISK JSON COPY PASTE: Copy and Download round-trip seeded pending archives without replaying sources
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
-- RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes
-- RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics
-- RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export
+- RISK transfer guidance: mounted FAQ and changelog explain one prepared archive and guarded recovery limits
+- RISK button safety guidance: mounted Help describes actions and keeps testing evidence internal
+- RISK DATABASE REPAIR EXPORT: unified Copy and Download retain exact sources and metadata without writes
+- RISK DATABASE REPAIR EXPORT: unreadable sources are labeled partial and never shown as an empty database
+- RISK DATABASE REPAIR EXPORT: held capture preserves exact before and after sources and rejects partial restore
+- RISK DATABASE REPAIR EXPORT: asynchronous snapshot rejection stays partial and unavailable
+- RISK DATABASE REPAIR EXPORT: Debug log points to the combined archive without duplicate export controls
 - RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire
 - RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes
-- RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft
+- RISK DATABASE REPAIR EXPORT: canceled capture keeps the pasted draft and concurrent capture is bounded
 - RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board
-- RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits
+- RISK DATABASE REPAIR EXPORT: Help describes direct Copy and partial archive status
 - RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
-- RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
+- RISK MANUAL JSON EXPORT: pending Copy keeps its independent Download usable
+- RISK MANUAL JSON EXPORT: a refused download leaves the same prepared archive available to Copy
+- RISK MANUAL JSON EXPORT: refused Download releases its temporary anchor and object URL
+- RISK MANUAL JSON EXPORT: unavailable and unsupported sources are explicit partial exports
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview
@@ -272,7 +283,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK SCALABLE QUOTA: optional IndexedDB history cannot block a primary board that fits
 - RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read
 - RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser
-- RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage
+- RISK RECOVERY EXPORT: accepted unsaved board stays in direct Copy when device storage fails
 - RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device save gate
 - RISK CLOUD BACKUP: an exact stable recovery copy satisfies adoption when duplicate writes hit quota
 - RISK CLOUD BACKUP: an unreadable backup row is never discarded to make room
@@ -283,7 +294,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD ADOPTION: a board-store quota failure restores both browser keys and holds the cloud
 - RISK CLOUD ADOPTION: failed write rollback preserves another tab newer browser bytes
 - RISK LOCAL BACKUPS: deleting one visible copy preserves hidden unreadable recovery bytes
-- RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal
+- RISK LOCAL BACKUPS: unreadable old copy stays visible and byte-exact in unified Export
 - RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguous deletion
 - RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab
 - RISK LOCAL BACKUPS: quota retires the oldest automatic copy while keeping recent, manual, and account recovery
@@ -485,9 +496,10 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK backup and Restore consolidation: Settings keeps one guarded action with all formats
+- RISK Settings transfer consolidation: one Import, one Export and direct Copy
+- RISK Settings transfer sections: cleanup controls stay outside the focused backup section
 
-The Settings board-data area exposes one Download backup action with current-board JSON, complete recovery archive, and source-only raw export formats as applicable, plus one Restore action that routes File or Paste into the existing protected preview. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. Current-board view/copy and Support diagnostics remain separate; lower local/app backup controls are outside this consolidation.
+Settings keeps one Import and one Export in Data and backups alongside the existing backup status, manual backup, local backup list, Restore, and Delete controls. Import accepts supported board JSON, recovery archives, and raw backup lists through the existing protected file-or-paste preview. Export prepares a single read-only recovery archive; separate Download and direct Copy use the exact same bytes. It includes accepted unsaved edits, supported unknown fields, readable saved sources, and bounded diagnostics. Unavailable or changing sources are marked partial, and the original bytes remain protected. The archive is not rendered in a large textarea. Review saved decisions, Clear history, Reset everything, the local debug log, and recent sync errors remain available in the collapsed Recovery and cleanup section.
 
 ## Returning-user first upload
 
@@ -549,7 +561,7 @@ The Settings board-data area exposes one Download backup action with current-boa
 - RISK support diagnostics: source operations report the effective bounded SDK deadline
 - RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work
 - RISK support diagnostics: real device retries count attempts while unexplained churn remains refused
-- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: Settings points to the single archive Export
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
 
@@ -1280,10 +1292,18 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view broken-board status: configured cloud changes remain visible in the saved appearance and after recovery
 - RISK saved view broken-board guidance: opening status does not imply cloud confirmation or erase recovery warnings
 - RISK opening board presentation: shared markup retains released cards contexts task rows and history
+- RISK saved view legacy opening: complete raw legacy boards remain visible before durable startup
 - RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits
 - RISK saved view full-board safety: supported copies and identity masks never grant authority
 - RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts
 - RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens
+- RISK saved view held Export: terminal Settings preserves an exact partial source-only archive
+  - Current297 terminal-held Settings extension verifies protected Import/Export/File/Paste/Debug routes and natural disabled edit/save/recovery controls with full original source-only Export assertions retained.
+- RISK saved view held Copy: trusted terminal Copy preserves prepared bytes and original sources
+- RISK saved view held Download: trusted terminal Download preserves the same Copy archive and original sources
+- RISK complete accepted-unsaved Download: native files match the prepared Copy archive and preserve complete sources
+  - Current297/339 native extension retains the positive whole-file control, then independently rejected and absent clipboard outcomes each retain the same archive and yield a full actual Download with complete independent decoded archive/source/draft equality.
+  - Current1533 correction awaits the complete normal save before capturing a separate full live source baseline; each refused Copy and later Download retains the original archive, exact sources and status, enabled controls, narrow Export width/scroll bounds and constant markup without a giant editor.
 - RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
@@ -1308,6 +1328,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK always binary context interactions: last-green and all-red clicks stay binary and Undo preserves assignments and AND eligibility
 
 ## Explicit overdue scanner WOOP
+
+- RISK overdue WOOP: a newly started scan keeps Next usable and the saved plan through reopening
 
 - RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off
 - RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot
@@ -1863,7 +1885,7 @@ The full-app control pauses the real startup raw-store capture, then lets authen
 
 ## Incident support diagnostics
 
-- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: Settings points to the single archive Export
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending
 - RISK support diagnostics: a held snapshot does not claim durability for a later accepted action
@@ -2038,6 +2060,7 @@ The held-demotion native boundary requires one Current and one Previous heading 
 ## Populated-board responsiveness and damaged-source work
 
 - RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery
+- RISK corrupt cloud work budget fixture: incompatible complete prior ratings keep the actual source held: real cloudPull retains corrupt-generation and exact current/cloud bytes when the complete prior source has incompatible legacy ratings (saved a.mu 26 versus accepted 25); helper default and production recovery remain unchanged.
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
 - RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
 - RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls
@@ -2258,3 +2281,308 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
 
 The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.
+
+## Native button safety process
+
+The command/report consumer rejects missing, duplicate, skipped, cancelled, unresponsive or unasserted button outcomes; named Chromium and WebKit must execute. Source button template counts and native observed actions fail closed on new uncovered controls. The independent scenario inventory requires populated, oversized, retained-draft, route and external-failure variants; async predicates must resolve to true, rather than merely return a Promise. Local allocation, exact source/tree and aggregate artifact identities remain required. Desktop synthetic fixtures do not establish physical-device or private-board recovery. The ordinary report-admission RISK cohort independently binds all sixty scenario IDs to fifty-four signed-out and six existing reconcile-held source/auth fixtures; reports cannot choose their own expected profile or fixture. The separately selected workload diagnostic keeps its original strict numeric controls; legacy rapid single-scenario tests opt into it explicitly, while ordinary oversized-transfer evidence uses the trusted64-task fixture. The exact public workflow consumer also freezes the accepted pending-Copy repeat description and retains complete ordinary, optional and refusal-control outcomes.
+
+- RISK repository process: button safety rejects incomplete native action evidence
+- RISK repository process: button safety rejects false passes and newly untested actions
+- RISK repository process: button safety report admission binds ordinary and workload diagnostic profiles
+- RISK repository process: button safety CLI and runner select ordinary and diagnostic profiles
+- RISK repository process: ordinary native Playwright resolution is pinned and cleanup owned
+- RISK repository process: ordinary repeated selected eligibility preserves rows receipts and sources
+- RISK repository process: ordinary Undo restores two saved edit frames and preserves prior history and sources
+- RISK repository process: fractional native Undo click receipts preserve high-resolution time
+- RISK repository process: pending Copy repeat catalog preserves precompletion Download and ordinary admission
+- RISK repository process: native button gate detects errors raised by a real click
+- RISK repository process: ordinary native cloud recovery preserves sources through failures and retry
+- RISK repository process: required native button actions execute in Chromium and WebKit
+- RISK repository process: rapid native attempts preserve Add and asynchronous dialog outcomes
+- RISK repository process: native rapid cloud selection preserves the two-second input burst
+- RISK repository process: native button gate refuses unallocated local launch before browser startup
+- RISK repository process: native allocation admits its healthy owner past missing foreign paths and protects their claims
+- RISK repository process: new and duplicate source buttons require native coverage inventory
+- RISK repository process: merged tracked app sources match the reviewed button templates
+
+- RISK repository process: native button gate awaits an asynchronous false outcome
+- RISK repository process: native button gate cannot omit a required stress scenario
+- RISK repository process: every button safety module fails the actual CLI without process coverage
+
+- RISK repository process: native button safety requires 400-task and rapid-press evidence
+
+- RISK repository process: required button enforcement changes need process coverage
+
+- RISK cloud source recovery choice: repeating the selected source preserves the mounted review and alternate choices
+
+- RISK repository process: required mobile memory evidence cannot be replaced by passing desktop groups
+
+- RISK repository process: mobile WebKit accepts ten distinct offered tasks using real touch
+
+- RISK repository process: capped mobile reports bind kernel memory distinct touch and durable outcomes
+
+- RISK repository process: intentional Docker OOM control cannot waive capped client failures
+
+- RISK Settings guidance: mounted cleanup and sync FAQs name their current locations
+
+- RISK repository process: CI monitor requires capped mobile job while preserving prior topology
+
+- RISK repository process: routed hosted policies reach native consumers without waiving invalid launches
+
+- RISK repository process: current producer reuse requires successful capped mobile evidence
+
+- RISK saved view continuity: repeated selected eligibility retains mounted rows and still refreshes changed views
+- RISK repository process: native paste prepares complete fixture bytes before its consumer frame budget
+- RISK repository process: unavailable native attempts reuse one prepared isolated release document
+
+- RISK repository process: native HTTP serves exact committed runtime Markdown without exposing other files
+- RISK repository process: native report cannot omit or change reviewed runtime asset bytes
+
+- RISK repository process: mobile artifact consumers require reviewed runtime asset hashes
+
+- RISK scenery startup: native mobile paints once while hidden return saved choices resize and rain preserve the scene
+
+- RISK repository process: retained native sources seed once without a persistent board bootstrap
+
+- RISK scenery scene time readiness: loading controls look unavailable before native presets save reload and return to live
+
+- RISK synced scene durability: native retained boards keep immediate scene locks through reload without changing tasks or sources
+
+## Browser budget scope and remote ownership
+
+- RISK repository process: mobile budget planner caps browsers before launch and isolates the external driver
+- RISK repository process: mobile budget scope cannot relabel whole-container evidence or disconnected browsers
+- RISK repository process: remote mobile consumer waits for browser owner exit after disconnect
+
+- RISK repository process: pending mobile creates retain ownership until daemon completion and owned removal
+
+## Exact candidate qualification repairs
+
+- RISK repository process: expected native reload retries only its navigation context loss
+- RISK repository process: hosted direct native callers retain ephemeral listener defaults
+- RISK scenery FAQ: mounted help names scene time without implementation details
+
+- RISK repository process: required one GB and reported 512MB stress profiles cannot substitute for each other
+
+- RISK repository process: native burst preparation survives remounts without waiving missing or late input
+
+- RISK repository process: failed mobile stress attempts retain actual setup and reject mixed transport faults
+
+Failed stress reports require the independently observed mobile context and durable pre-navigation fixture, even before app-ready. Synthetic parser controls reject absent or substituted setup, reduced workload and mixed transport/navigation errors while a measured startup kernel OOM remains a failed reportable app outcome. Successful stories additionally bind their task and unknown-source hashes back to that prepared fixture. Mounted button, Copy and reload answers retain useful routes and limitations; separate paste and export answers retain preview, Cancel, protected-original and partial-source guidance.
+
+- RISK repository process: failed mobile stress primary errors cannot hide unrelated driver failures
+
+The existing immutable stress verifier binds the thrown primary error independently of the page-event inventory. Exact native app-event assertions, attributable crash/closed-target consequences and measured frame/ten-touch assertions remain reportable; a separate driver/transport primary error remains invalid even beside a recorded app error or kernel OOM.
+
+- RISK repository process: mobile kernel page floor requires actual observations and exact requested budgets
+
+The pinned Linux x64 reader preserves the raw AT_PAGESZ witness and binds it to browser, external driver, host membership and image architecture. Only the exact observed downward page floor can satisfy the kernel limit; Docker/requested budgets remain exact. Missing, substituted, unsupported or inflated observations and peaks above the effective cap fail closed. The existing unreadable-source help test preserves approved Copy/Download, accepted unsaved work, originals and partial-archive semantics without obsolete literal wording.
+
+- RISK repository process: refused native releases avoid drag round trips while preserving ten real attempts
+
+- RISK synced scene intent: rapid choices survive interrupted device hashing without changing protected sources
+
+- RISK task action history: Undo refreshes ranks once after projecting its immutable cancellation
+
+- RISK synced scene intent: exact own-prefix commits replay only the missing rapid choice suffix
+
+- RISK synced scene intent: storage refusal bounds and foreign heads preserve originals and existing Export
+
+- RISK synced scene intent: interrupted replay and two tab originals never lose pending facts
+
+- RISK synced scene intent: bounded replay exposes the saved board and rejects a late hash completion
+
+- RISK synced scene intent: foreign retirement cannot erase a newer live tab choice generation
+
+## Scene replay transaction and held-source independence
+
+- RISK synced scene replay transaction: expiry during the actual store hash cannot replace the saved head
+- RISK synced scene ordinary saves: held receipt sources never block unrelated durable task edits
+- RISK scene receipt Export: a source appended during the real snapshot is preserved as a partial observation
+- RISK synced scene ordinary saves: a fresh current-account scene choice ignores a foreign receipt tip
+- RISK DEVICE STORAGE V2: current attempt refusal fences all mutations and the real capacity retry
+
+- RISK repository process: stress engine loss requires the actual kernel and owned exit evidence
+
+## Scene repaint and native input attribution
+
+- RISK synced scene repaint: unchanged mirrored locations retain storage without announcing another scene
+- RISK repository process: ordinary task Undo keeps unchanged scenery while separate scene choices repaint and save
+- RISK repository process: native frame accounting separates pre-input and post-input stalls without waiving either
+- RISK Undo scene guidance: FAQ and Changelog explain task Undo keeps scene choices
+
+- RISK scenery backdrop cache: first unchanged lighting timer reuses actual pixels while changed slots and loaded copy still paint
+
+- RISK scenery text loading: delayed bank reuses identical backdrop while current copy visitors and changed scenes refresh
+  - Actual held-bank mobile WebKit consumer in Normal/Reduced preserves initial/full pixels, changed pending time/location, current copy and visitor reconciliation, 400 durable tasks, both retained source hashes and cleanup. Local uncapped deterministic rendering only; no hosted 1GB or physical-device claim.
+
+- RISK repository process: scenery consumers use allocated fallback ports and preserve early native failures
+  - Actual child scenery consumers run without CHAIN_NATIVE_PORT using the allocated smoke fallback (CI with neither uses ephemeral0); controlled early launch preserves its primary failure before bootstrap exists. Original pixel/copy/source/data assertions remain.
+- RISK repository process: native scene-time bursts cannot activate controls behind a refused top-layer release
+  - The real scene dialog preset occupies the refused opener coordinate: nine actual trusted first-light downs must receive isolated neutral ups, zero wrong clicks, one accepted opener, ten attempts within2s, and complete cleanup. Existing two-engine neutral release preservation remains required.
+
+- RISK repository process: startup report marks a missing complete-board paint incomplete without failing the app
+
+- RISK repository process: supplemental startup capture rejects malformed artifacts and unsupported paint completeness
+
+- RISK repository process: selected startup capture produces real bounded JPEG artifacts through the public native command
+
+- RISK repository process: startup capture selection refuses unknown and foreign modes before output or launch
+
+- RISK BACKUP FILE RESTORE real service: exact acknowledgement precedes durable adoption (Firestore rules: import ACK)
+
+- RISK BACKUP FILE RESTORE real service: unavailable fresh read preserves the accepted board (Firestore rules: import fresh read)
+
+- RISK BACKUP FILE RESTORE real service: failed publication cannot acknowledge an import (Firestore rules: import publication)
+
+- RISK BACKUP FILE RESTORE real service: committed publication remains unacknowledged without readback (Firestore rules: import uncertain ACK)
+
+- RISK BACKUP FILE RESTORE real service: a changed peer revision refuses stale consent (Firestore rules: import peer)
+
+- RISK BACKUP FILE RESTORE real service control: bypassed acknowledgement fails the complete consumer (Firestore rules: import ACK sensitivity)
+
+- RISK transfer Import proof: exact board, incoming bytes, and authority survive prepared-source boundaries
+  - Actual existing Settings File/Paste handlers retain complete incoming bytes and all protected sources through Cancel/Close, deliberate replacement, stale confirmation, late resolve/reject and archive/raw normal cold reopen. Typed manual fields, opaque originals and a later isolated broken-guard assertion remain explicit; VM evidence does not claim native or actual service proof.
+- RISK repository process: ordinary overdue WOOP repeated Next preserves answers plans and sources
+
+- RISK repository process: ordinary final WOOP repeated Next preserves sole-task answers plans deletion and sources
+  - Sole-active ordinary64 final WOOP, four trusted repeated Next receipts, actual answer/Save/Delete controls, complete lossless source and real-time/lifecycle preservation through two browser reopens. Runner-enforcement RED pending under1050; no app-regression claim.
+
+- RISK repository process: ordinary repeated cloud source choice preserves mounted facts receipts and complete sources
+  - Current1631/1663 definition and actual1664 whole coverage RED retain both engines, the original10 full phases plus exact separate selected/closed/reopened3, real trusted footer Cancel/Sync/review and unselected reset, complete held authority/typed/source/account/current/durable protection and all original focus/Enter/alternate/refused Apply tails.Actual1634 whole both-engine GREEN8103f4a6 passed6/6 with58 full raw phases and complete source/receipt/refusal/ACK/cleanup verification; historical definition labels above remain original chronology.
+  - Ordinary held64 source choices retain mounted full facts/focus/scroll through two trusted repeats and Enter; alternate selection/read refusal/explicit refused publication preserve complete current/durable/remote/typed/pending/protected sources and declared added-copy lifecycle. Definition-only RED pending1054.
+  - CF02 #1284 independently requires full trusted focus-event/node/receipt boundaries in all10 lossless phases, application received-focus continuity and actual Enter; read-only observation RED pending1285. Existing whole source/lifecycle/exit/cleanup assertions retained.
+
+- RISK repository process: ordinary repeated saved decision choice retains selection authority and complete sources
+  - Current1631/1663 definition and actual1664 whole coverage RED retain both engines, strict raw bootstrap/canonical setup, original13 full phases plus exact separate selected/closed/reopened3, actual footer Close/Settings/disclosure/review reset with no decision authority, whole typed/current/durable/remote/pending/account/revision protection and every original Light-only repeat/refusal/retry/ACK tail.Actual1634 whole both-engine GREEN8103f4a6 passed6/6 with58 full raw phases and complete source/receipt/refusal/ACK/cleanup verification; historical definition labels above remain original chronology.
+  - Ordinary held64 Light selections retain the mounted review and exact complete current/durable/cloud/manual/protected/typed/pending sources. Explicit refused Apply retains prepared consent; explicit retry confirms only its new decision. Definition-only1057; actual runner RED1058 still unrun.
+
+- RISK saved decision review guidance: mounted FAQ retains place and explicit save authority
+  - Existing public mounted Help/Settings copy seam: saved-decision repeat/place and explicit save authority, with prior app/data assertions retained.
+
+- RISK saved decision review guidance: mounted changelog records selected review continuity
+  - Existing public mounted Help/Settings copy seam: saved-decision repeat/place and explicit save authority, with prior app/data assertions retained.
+
+- `RISK repository process: ordinary two distinct scanner decisions retain both offered IDs and complete sources` — OR07: two separate trusted Yes inputs bind independently captured offered task IDs; retain both accepted decisions in ordered complete current/durable sources, exact prior history and unknown fields, typed opaque/pending/manual originals and automatic backup lifecycle, receipts/accounting and owned native cleanup.
+
+- `RISK repository process: ordinary scene repeat accounts the original trusted Lock and both Undos with complete sources` — OR08: Chromium and WebKit retain the original trusted23:15/winter Lock and both original Undo receipts as three accepted attempts bound to their actual source/timestamps, while preserving exactly11 native actions and8 complete phases. The lock survives genuine reopen; two distinct task edits/two trusted Undo inputs preserve independently literal full current/durable boards, scene/event authority, history, unknown/typed/pending/manual originals and exact automatic backup lifecycle, all native receipts/accounting and cleanup. Existing readiness/Normal/Reduced/repaint coverage remains.
+
+- `RISK repository process: ordinary pending Copy refuses reentry with complete archive and sources` — OR09: two real attempted Copy presses while the existing external clipboard promise is deferred; first accepted/second explicitly refused through trusted native down and neutral release; a trusted Download saves identical full archive bytes before clipboard settlement; complete independently literal64task raw/canonical/current/durable/backup/pending/typed/local/IDB source map, all receipts/accounting/report/exit/cleanup. OS clipboard/physical device not claimed.
+
+- `RISK repository process: ordinary obsolete Copy cannot alter replacement transfer with complete archive and sources` — OR10: actual old Copy, real close/replacement, newer Copy busy, old clipboard completion leaves every new status/busy/archive field and saved source byte intact, then truthfully settle newer Copy; both independently complete raw/canonical64task/current/durable/history/typed/local/IDB/manual/pending/source/archive maps, exact9native clicks/downs and old/new actualreceipt accounting/cleanup. No OSclipboard/physicaldevice claim.
+
+- `test group optional workload admission partitions exactly seven diagnostic roots without bypassing required execution` — NR: exact seven source-bound optional identities, preserved four required groups/historical baseline, default and inherited-opt-in registration refusal, explicit CLI actual journal/TAP/source/artifact/cleanup and distinctive optional kind; unknown/missing/duplicate/pure-mandatory/reason/baseline/registration/digest/required-substitution controls use existing isolated fixtures only.
+
+- `RISK repository process: ordinary top-layer release refuses a covered intended opener and preserves complete sources` — Required ordinary existing public --probe/--control top-layer-release: explicit Settings setup plus two intended opener attempts in Chromium+WebKit, one accepted/one real covered-target neutral refusal, exact full input/geometry/receipt accounting, independent64-task raw/canonical seed and five full typed protected-source phases, no save/preset/other action and complete cleanup. Definition/static only under1212;1213 runtime remains held for root queue handoff.
+
+- `RISK repository process: trusted planner declares ordinary engines separately from optional workloads` — Pure public current-source planner declares independently fixed ordinary Chromium+WebKit context and default-off separate workload admission; descriptor is zero-execution context only.
+- `test group public workflow retains selected workload evidence without admitting it as ordinary proof` — Actual existing workflow aggregate command with complete ordinary profiles, exact seven selected optional public CLI fixture callbacks, complete statuses/artifacts, mandatory source/action/repeat/trust/accounting/cleanup negatives and no runtime/native execution.
+
+## Integrated optional-policy consumer index
+
+- `RISK repository process: optional mobile outcomes remain distinct from the required aggregate verdict` — The existing aggregate preserves all optional mobile outcomes separately from the required ordinary verdict, without converting failed/unavailable diagnostics into passes.
+- `RISK repository process: optional mobile diagnostics do not block ordinary reuse` — The existing current-source reuse planner disregards optional mobile failures while still refusing missing, failed or ambiguous mandatory producers.
+- `RISK repository process: explicit mobile diagnostics require dispatch selection and hosted admission` — The existing hosted optional mobile route requires explicit branch workflow-dispatch selection and retains raw event/ref/source admission; unselected or forged policy refuses before runtime.
+
+- RISK repository process: native Timeline raw evidence stays incomplete and rejects false provenance
+
+- RISK repository process: native Timeline provider preserves raw delivery and restores owned session hooks
+
+- RISK repository process: retained native Timeline bytes preserve source-located callers and typed point stacks
+
+- RISK repository process: native Timeline SDK doubles require a portable explicit runtime boundary
+
+- RISK repository process: initial-only native Timeline evidence refuses unvalidated branches
+
+- RISK repository process: ordinary startup observations bind exact app sources and complete saved data
+
+- RISK repository process: ordinary startup snapshots preserve bounded first observed states and reject false pixels
+
+- RISK repository process: ordinary startup roles preserve unknown callers and separate trusted input from synchronous work
+
+- RISK repository process: ordinary startup source serialization preserves native marker and owned lifecycle contracts
+
+| Canonical Timeline raw storage, exact derived PNG/logical bounds and truthful failed controller custody | `RISK repository process: canonical Timeline retains exact raw deliveries and derives every PNG without eager writes`; `RISK repository process: canonical Timeline consumer rejects loss and preserves schema1 strictness`; `RISK repository process: failed Timeline controller finalizes available custody before browser close`; `RISK repository process: canonical Timeline bounds preserve logical occurrence charges and failed cleanup` |
+
+- RISK synced scene durability: native accepted scene choices reopen while the actual save hash is pending
+
+| Explicit opt-in finite Timeline capacity, same raw bytes, controller finalization and consent-bound CLI | `RISK repository process: explicit Timeline profile retains full logical occurrences within finite physical storage`; `RISK repository process: explicit Timeline profile consumer derives exact bytes and reaches every finite guard`; `RISK repository process: explicit Timeline profile controller retains the complete sequence before truthful terminal cleanup`; `RISK repository process: explicit Timeline profile CLI requires reader consent and an exact raw namespace`; `RISK repository process: explicit Timeline profile cannot activate unrelated native routes` |
+
+| Original legacy Worked-hours8 and independent live/durable v2 numeric16, strict full ordinary/raw/typed boundaries | `RISK repository process: ordinary startup settings distinguish legacy raw8 from independently versioned live and durable16` |
+
+| Complete bounded public Git diff collection and specific rationale, coverage, ref and child-error refusals | `RISK test-first gate: public CLI validates complete large UTF8 Git diffs and preserves specific refusals` |
+
+- RISK repository process: ordinary deliberate Reload preserves complete saved sources and account authority
+
+- RISK repository process: external browser termination retains lifecycle classification without app crash credit
+
+- RISK repository process: external disconnect classification rejects an omitted lifecycle listener
+
+- `RISK repository process: opening frame gaps refuse native input before reset and retain missing input status` — #1978: the original Chromium/WebKit healthy0 and deliberate1300ms opening consumer retains the literal same-run maximum predecessor/current page endpoints, exact difference, observed predecessor boundary, time origin and available document identities before trusted input. Existing full64-source custody, healthy Settings click,1000ms guard and cleanup remain required; one maximum record adds no callbacks, evaluations, timers or ordinary interval history. This diagnostic does not establish original Linux gap cause or repair.
+
+| Additional explicit56 Timeline envelope, late close, exact selection and unchanged complete custody guards | `RISK repository process: additional56 Timeline profile requires exact explicit selection at existing consumers`; `RISK repository process: additional56 Timeline retains the same45-data late-close finalization sequence`; `RISK repository process: additional56 Timeline preserves every finite producer guard`; `RISK repository process: additional56 Timeline consumer derives all independent data and retains exact guards`; `RISK repository process: additional56 Timeline ordinary custody preserves every original field and typed setting guard`; `RISK repository process: additional56 Timeline actual controller finalizes late-close data and typed custody`; `RISK repository process: additional56 Timeline public CLI preserves explicit custody and finite stdout`; `RISK repository process: additional56 Timeline rejects non-string selectors before coercion or activation` |
+
+- RISK repository process: startup reference view completes bounded lossless parent transport
+- RISK repository process: startup reference view preserves full values custody bounds and owned leases
+
+- RISK repository process: startup fixture directories provide isolated portable custody
+
+| Conditional full-domain Timeline capacity, literal53-data late close and complete reference-only custody | `RISK repository process: full-domain Timeline retains the same53-data late-close finalization sequence`; `RISK repository process: full-domain Timeline independently consumes every53-data canonical byte`; `RISK repository process: full-domain Timeline preserves every finite producer guard`; `RISK repository process: full-domain Timeline consumer derives all independent data and retains exact guards`; `RISK repository process: full-domain Timeline ordinary custody preserves every original field and typed setting guard`; `RISK repository process: full-domain Timeline rejects non-string selectors before coercion or activation`; `RISK repository process: full-domain Timeline requires exact selection and reference-only public verification`; `RISK repository process: full-domain Timeline reference transport preserves every53-data value and typed store`; `RISK repository process: full-domain Timeline consumer preserves source size and typed stack bounds`; `RISK repository process: full-domain Timeline reference loading preserves the owned namespace and orphan guards` |
+
+- RISK repository process: startup fixture temp aliases preserve canonical owned custody
+
+- RISK repository process: full-domain Timeline preserves PNG metadata and native command deadlines
+
+- RISK repository process: completed after callbacks release ordinary fixture captures
+- RISK app fixture cleanup: after producer retires eight ordinary fixtures
+- RISK app fixture cleanup: after observer collects retired fixtures while a neighbor stays usable
+
+- RISK repository process: completed nested bodies release ordinary fixture captures
+- RISK app fixture cleanup: nested producer retires eight ordinary fixtures
+- RISK app fixture cleanup: nested observer collects retired fixtures while a neighbor stays usable
+
+- RISK repository process: fixture callback ownership preserves actual cleanup and child contracts
+- RISK app fixture cleanup: API success producer
+- RISK app fixture cleanup: API success observer
+- RISK app fixture cleanup: synchronous cleanup error
+- RISK app fixture cleanup: asynchronous cleanup error
+- RISK app fixture cleanup: callback cleanup error
+- RISK app fixture cleanup: synchronous nested body error
+- RISK app fixture cleanup: asynchronous nested body error
+- RISK app fixture cleanup: callback nested body error
+- RISK app fixture cleanup: callback and Promise misuse
+- RISK app fixture cleanup: nested timeout
+- RISK app fixture cleanup: nested skip and todo
+
+- RISK repository process: ordinary guarded paste preserves malformed cancel and durable import contracts
+
+- RISK repository process: final WOOP verification preserves both canonical UUID orders through the native consumer
+
+## Final review repair contracts1827–1833
+
+- RISK repository process: default manual ordinary admission retains capped refusal
+- RISK repository process: ordinary cloud sign out keeps the complete64 source at action boundaries
+- RISK repository process: ordinary Settings Light keeps the complete64 source through acknowledgement failures
+
+- `RISK repository process: replaced historical roots reject contradictory live assignments before execution` — #1869: existing renamed-root public CLI rejects obsolete source plus explicit target before body/descriptor publication; valid renamed parent and baseline child identities remain required.
+
+- `RISK repository process: mandatory rules evidence requires each current service consumer`: the existing workflow run-gate consumer rejects coherent passing totals when an exact current Firestore service consumer is absent; the same named process fixture retains ordinary execution, reuse and runtime invalidation.
+
+- `RISK repository process: current service skips retain required source-bound grouped accounting`: the real group CLI retains the six current Firestore roots as required cases, reports their actual skips only without the emulator, and binds their separate current declaration into cohort/result accounting.
+
+- `RISK repository process: refused saved decision capture waits for its refreshed unselected review` — #1877: the existing two-engine ordinary saved-decision consumer holds the actual post-refusal external SDK root reply, requires the consumer to wait while its preview is absent, then releases that reply within the original deadline. The real fresh unselected preview must precede capture, and the unchanged complete source verifier, trusted inputs and continuous1000ms heartbeat remain required. The existing hosted-direct-caller fixture also selects this root: its caller allows CI port0, while the native runner still validates the canonical hosted policy/event/ref and enforces positive allocated local ports. This focused synthetic SDK evidence does not establish full-cohort, actual hosted or physical-device acceptance.
+
+- `RISK repository process: Linux native observer retains literal CPU deliveries and bounded clock custody` — #1904: distinct diagnostic-only Linux protocol receiver retains literal CPU/Timeline bytes, same-document clocks, source-bound elapsed scopes and explicit unavailable attribution; caps, unsupported commands, foreign sessions/contexts, runtime/profile admission, tampering and owned stop remain fail closed. Protocol doubles provide no Linux execution credit; the original Mac provider/verifier remains byte-exact.
+- `RISK repository process: owned native lifecycle retains stream and exact union controls` — #1902: real streamed child readiness, TAP stdout browser PID/close binding, an absolute deadline that includes identity setup, detached TERM-ignoring and parent-exited descendant cleanup, a foreign sentinel, PID/start-identity and ambiguous-enrichment refusal, combined output cap and strict independent literal24-case union plus terminal-count controls. Linux filesystem doubles cover protected foreign processes and lost enrichment after valid stat observation; these controls claim no actual Linux run. The existing hosted consumer runs the saved-decision3 and remaining21 selections serially with180s each,360s aggregate and separate bounded6s teardown; it retains each original TAP and zero-skip requirement. #2019 holds a real previously unowned descendant through an independently gated partial-first then unchanged usable OS-reader row, preserving its active ineligible incident, null prior witness, no ownership/probe/signal and false cleanup; controlled projections are labelled separately from parsed OS rows and make no raw-kernel or Linux-cause claim. #1954/#1955 select strict real ESRCH separately from a literal same-core Z/X held until actual parent reaping/browser close, with collected receipts and raw fixture/table views. #1959 adds three bounded read-diagnostic cases, so the exact complete OS cohort is26 cases and preserves every prior23 case.
+
+- `RISK repository process: proven terminal executable incidents retain actual exit custody` — #1935: actual fully witnessed process/parent identity precedes an executable-only ENOENT observation; real normal child exit and independent kernel ESRCH permit cleanup while the timestamped rejected row, prior ancestry and resolution proof remain inspectable. The existing complete lifecycle consumer also retains unresolved unknown descendant/provisional rows, missing independent nonliveness proof and intervening start/precision/UID/namespace ambiguity as failures, alongside all original live, foreign, reuse, browser, detached-child, stream-cap, deadline and literal24-union controls. These OS-boundary controls do not establish actual Linux acceptance.
+
+- `RISK repository process: partial OS read diagnostics retain literal bounded evidence without custody` — #1959/#1976/#1980: ordered literal Linux stat-before/stat-after, UID, executable and namespace evidence survives the existing OS reader and owned receipt within eight windows and64KiB per invocation. Owned callers reserve that capacity for the actual root, previously witnessed PIDs and their observed direct children; repeated unrelated same-UID EACCES prefixes are explicitly filtered without dropping returned rows or adding after-stat reads. Unscoped callers retain the original first-eight policy and all byte/read bounds. Exact tableReadId+PID joins and unknown R→diagnostic-Z refusal remain in the actual owned-child receipt. Literal full→exact-Z→missing-core and changed non-null namespace/start→directory-absence traces share the existing filesystem case; a raw foreign UID is explicitly filtered before protected links, without projecting a changed returned UID. The unchanged actual core/unknown/reuse/terminal consumers independently preserve unresolved incidents, cleanup=false and no teardown authority; every removed redundant experimental assertion has an explicit coverage migration. All26 outcomes and the unchanged30000ms/4MiB complete-lifecycle caller remain required. Controlled filesystem Z observations are separate from actual test-owned macOS terminal rows and child closes; neither establishes a hosted Linux cause, native qualification or release acceptance.
+
+- `RISK repository process: Linux failure follow-up preserves the exact successful scene history` — #1937: existing failure-command planning retains exactly the original successful30-scenario prefix, independent committed inventory/source/cleanup/frontier admission, separate fresh pageerror route, once-only windows and actual scenario enumeration; no environment shortcut or gate credit.
+- `RISK repository process: Linux scene observation retains bounded observer phase brackets` — #1937: the existing Linux protocol receiver retains bounded same-document page/host observer scopes, source generation and exact raw custody. Unknown/foreign phases, interruption, caps and stop remain incomplete; refused phase ends and clock anchors cannot manufacture derived evidence, and owned page hooks close on normal/capped stop.
+- `RISK repository process: scene source observation brackets stay inactive in ordinary runs` — #1937: the actual scene sourceSnapshot consumer preserves complete serialized observation bytes, emits no optional observation calls in ordinary runs, and closes guarded page/transport brackets on read failure. Controlled page/protocol evidence establishes no native acceptance or application cause.
+
+- `RISK repository process: Linux observer phases refuse inconsistent retained page clocks` — #1937: literal page phase timestamps must agree with the independently retained native/page offset within the unchanged1.001ms uncertainty. Contradictory phases retain raw evidence but stay incomplete/unavailable; valid anchor calibration, CPU-clock limits, source/generation custody and capture/process caps remain unchanged.
+
+- `RISK repository process: Linux failure observation retains bounded literal heartbeat intervals` — #1958: the actual callback supplied by the existing public `runButtonSafety` consumer retains at most8 largest finite RAF intervals only in its selected Linux failure observation, with literal page endpoints, measured gap, initialization/step-reset/RAF boundary, the existing Timeline document ID or explicit null, and the page-clock trusted-input time or null. A deterministic external Playwright/time boundary exercises the callback without launching a browser or bypassing Linux verification; original frame verdicts, calculations, sampling, source/history custody and budgets remain unchanged, and no cause or Linux acceptance is claimed.

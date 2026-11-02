@@ -414,7 +414,7 @@ test('graceful interruption persists completed work, bounds owned cleanup and pr
     `if (process.env.BROWSER_AUDIT_FIXTURE_MODE === 'hang-wide' && width === 1280) {
   const { spawn } = await import('node:child_process');
   const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
-  child.unref();
+  // Keep the renderer alive until the audit runner signals its owned group.
   await writeFile(path.join(output, 'descendant.pid'), String(child.pid) + '\\n');
   await new Promise(() => {});
 }
@@ -469,7 +469,14 @@ const report = {`,
     await delay(25);
   }
 
-  assert.ok(descendantPid, 'second case should be running with an owned renderer descendant');
+  assert.ok(descendantPid, 'second case should be running with an owned renderer descendant: '+JSON.stringify(currentManifest?.cases[1]));
+  // Let the observing parent pause after readiness: the interruption fixture must
+  // remain running until signaled, rather than relying on a lucky polling turn.
+  await delay(100);
+  currentManifest = JSON.parse(await readFile(path.join(output, 'manifest.json'), 'utf8'));
+  assert.equal(currentManifest.cases[1].status, 'attempted', 'the renderer must stay live until interruption: '+JSON.stringify(currentManifest.cases[1].attempts.map(({exitCode,signal,status})=>({exitCode,signal,status}))));
+  assert.equal(await processIsAlive(currentManifest.cases[1].attempts[0].rendererProcess.pid), true);
+  assert.equal(await processIsAlive(descendantPid), true);
   auditProcess.kill('SIGINT');
   const exit = await waitBounded(closed, 5000);
   assert.ok(exit, 'the audit runner should finish bounded cleanup after SIGINT');

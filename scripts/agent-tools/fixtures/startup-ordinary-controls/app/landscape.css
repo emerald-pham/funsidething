@@ -1,0 +1,182 @@
+/* The real sky is independent of color-scheme. Only a small amount of its
+   ambient color enters opaque, readable foreground surfaces. */
+:root{
+  --scene-tint:#ade1c6;
+  --secondary-surface:color-mix(in srgb,var(--panel) 90%,transparent);
+  --bg:light-dark(#f7fcf8,#243d54);
+  --panel:light-dark(#ffffff,#344b5f);
+  --surface:light-dark(#ffffff,#3d566b);
+  --subtle:light-dark(#f5fbf6,#30465c);
+  --ink:light-dark(#284d4e,#f1fafb);
+  --mut:light-dark(#527075,#c1d8e4);
+  --line:light-dark(#d8eadf,#688194);
+  --accent:light-dark(#316b59,#b7ecda);
+  --chain:light-dark(#b9e6c6,#abd9c3);
+  --chain-deep:light-dark(#96d6b2,#8dcbb0);
+  --chain-ink:light-dark(#193f35,#193f35);
+  --action-ink:light-dark(#243b40,#243b40);
+  --yes:light-dark(#b5e9b9,#a6dcae); --no:light-dark(#ffe0a0,#f2d094);
+  --cant:light-dark(#c6e5ec,#afcedc); --danger:light-dark(#ffc4cc,#ebb1c0);
+  --good:light-dark(#2c7346,#b5ebc5);
+  --chip:light-dark(#edf9ed,#456077);
+  --rowline:light-dark(#e4f3e8,#486177);
+  --track:light-dark(#deefe4,#5e7890);
+}
+/* Light fills carry dark labels instead of darkening the whole palette just
+   to support white text. Subtle buttons keep their theme-aware ink rule. */
+.btn{color:var(--action-ink)}
+html{background:var(--bg)}
+body{background:transparent;isolation:isolate}
+#modalRoot{position:relative;z-index:3}
+#landscape{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#8ed4f3;contain:strict}
+#landscape canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.wrap{max-width:760px;padding-top:max(22px,env(safe-area-inset-top));position:relative;z-index:1;opacity:1;transition:opacity .65s ease,visibility 0s}
+.top{padding:14px 17px;border-radius:17px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));border:1px solid var(--line);box-shadow:0 4px 24px #1539310a}
+.titles h1{letter-spacing:-.035em;font-size:19px;font-weight:600}
+.passbar{margin-top:12px}
+.ptrack{height:4px}
+.scene-intro{height:clamp(165px,25vh,265px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:12px 12px 17px;position:relative;isolation:isolate}
+
+.scene-eyebrow{font-size:10px;font-weight:600;letter-spacing:.19em;text-transform:uppercase;margin:0 0 8px;color:var(--ink)}
+.scene-intro h2{font-family:var(--font-q);font-size:clamp(30px,4vw,43px);font-weight:400;line-height:1.08;letter-spacing:-.035em;margin:0 0 12px;color:var(--ink)}
+.scene-details{display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;font-size:11px;color:var(--ink)}
+.scene-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:5px;vertical-align:2px}
+.scene-look{font-size:11px;color:var(--ink);border:1px solid color-mix(in srgb,var(--mut) 40%,transparent);background:color-mix(in srgb,var(--panel) 88%,transparent);padding:5px 10px;border-radius:99px;min-height:30px}
+.panel{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));box-shadow:0 5px 22px #123c2a0a}
+#scan,[data-preview-id="scan"]{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:18px;border:1px solid var(--line);box-shadow:0 8px 28px #123c2a0b}
+#scan:empty,[data-preview-id="scan"]:empty{display:none}
+.bench{box-shadow:0 4px 12px #254c3d25}
+.foot{background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:16px;border:1px solid var(--line);border-radius:16px;font-size:13px}
+.foot .themebtn,.foot .inspiration-note{font-size:inherit}
+.themebtn{min-height:36px}
+.landscape-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:10px}
+.motion-dialog{max-width:440px;width:calc(100% - 32px);max-height:calc(100dvh - 40px);overflow:auto;padding:28px;border:1px solid var(--line);border-radius:22px;color:var(--ink);background:var(--panel);box-shadow:0 24px 100px #081c2855}
+/* The native prompt must fit its containing viewport when text is enlarged.
+   Intrinsic cards stack before either explicit safety choice gets clipped. */
+#motionDialog{max-height:min(calc(100dvh - 40px),calc(100% - 40px))}
+#motionDialog .motion-choices{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
+#motionDialog .motion-choices button{min-width:0;overflow-wrap:anywhere}
+.motion-dialog::backdrop{background:#102b3955;backdrop-filter:blur(3px)}
+.motion-dialog h2{font-family:var(--font-q);font-size:32px;font-weight:400;letter-spacing:-.03em;line-height:1.1;margin:7px 0 13px}
+.motion-dialog p{font-size:14px;line-height:1.6;color:var(--mut)}
+.motion-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+.motion-choices button{border:1px solid var(--line);border-radius:13px;text-align:left;background:var(--surface);padding:14px;min-height:92px}
+.motion-choices button[aria-pressed="true"]{border-color:var(--good);background:var(--yes);color:var(--action-ink);box-shadow:inset 0 0 0 1px var(--good)}
+#sceneTimeDialog .motion-choices button[aria-pressed="true"]:not([data-scene-time="live"]){border-color:var(--danger);background:var(--danger);color:var(--action-ink);box-shadow:inset 0 0 0 1px var(--danger)}
+.motion-choices strong,.motion-choices span{display:block}
+.motion-choices span{font-size:12px;font-weight:400;color:var(--mut);margin-top:6px}
+#deviceMotionNote{font-size:12px}
+[data-landscape-motion="reduced"] *,[data-landscape-motion="reduced"] *::before,[data-landscape-motion="reduced"] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+.viewing-scene .wrap{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .65s ease,visibility 0s .65s}
+html.viewing-scene{overflow:hidden;overscroll-behavior:none}
+#exitScene{position:fixed;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:5;border:1px solid var(--line);border-radius:99px;background:var(--panel);color:var(--ink);box-shadow:0 4px 30px #102b3940;padding:12px 20px;white-space:nowrap;font-size:13px}
+@media(max-width:600px){
+  .wrap{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .top{padding:11px 12px}.titles h1{font-size:17px}.topbtns{gap:0}.topbtns .ghost{padding:7px}
+  .scene-intro{height:clamp(155px,24vh,210px);padding-left:10px}
+  .scene-intro h2{font-size:33px}.scene-details{font-size:10px;gap:6px}
+  #scan,[data-preview-id="scan"]{padding:14px}
+}
+@media(max-width:360px){.titles h1{font-size:15px}.scene-intro h2{font-size:30px}.topbtns .ghost{padding:6px}.syncbtn{width:70px}}
+@media(max-height:500px) and (min-width:601px){.scene-intro{height:110px}.scene-intro h2{font-size:30px}.scene-eyebrow{margin-bottom:5px}.top{padding:9px 14px}.passbar{margin-top:5px}.wrap{padding-top:10px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+
+/* A compact reading surface keeps opposite sky/theme combinations legible. */
+.scene-intro{height:auto;min-height:clamp(165px,25vh,265px)}
+
+.scene-reading{width:fit-content;max-width:min(100%,360px);padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:var(--secondary-surface);box-shadow:0 5px 24px #17382e0a}
+@media(max-width:600px){.scene-intro{min-height:190px;padding:12px 0 18px}.scene-reading{padding:14px 12px}.scene-eyebrow{font-size:9px;letter-spacing:.12em}.scene-intro h2{font-size:30px}}
+@media(max-height:500px) and (min-width:601px){.scene-intro{min-height:140px}.scene-reading{padding:10px 14px}.scene-intro h2{margin-bottom:8px}}
+@media(max-width:360px){
+  .titles h1{white-space:nowrap}
+  .topbtns .ghost{padding:5px;white-space:nowrap}
+  .topbtns .keyhint{display:none}
+  .syncbtn{width:60px;font-size:11px}
+}
+
+/* Preserve the scanner's phase emphasis. A blanket opacity reset here once
+   overrode the earlier scanning rules; keyboard focus should reveal actions
+   just as hover does, without taking those actions out of the tab order. */
+.actionrow.disabled:focus-within,.siderail.disabled:focus-within,.btnwrap.disabled:focus-within{opacity:1}
+.chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on{color:var(--action-ink)}
+.syncbtn.err,#importMsg.warn{color:var(--ink)}
+
+/* Let scenery through supporting surfaces without fading text or controls. */
+.foot,#ctxPanel,#histPanel,[data-preview-id="ctxPanel"],[data-preview-id="histPanel"]{background:var(--secondary-surface)}
+@media(max-width:600px){
+  .scene-reading{width:300px;max-width:calc(100% - 20px)}
+  .scene-intro h2{font-size:clamp(25px,7.5vw,30px)}
+}
+/* Keep the clock and season as separate labeled fields on narrow screens. */
+#sceneTimeDialog label { display:block; margin:12px 0 6px; }
+#sceneTimeDialog input, #sceneTimeDialog select { display:block; width:100%; box-sizing:border-box; min-height:40px; }
+#sceneTimeDialog .motion-choices button { min-height:48px; padding:12px; }
+/* Four separate solar moments remain visible alongside the lock controls on phones. */
+#sceneTimeDialog{padding:20px}
+#sceneTimeDialog h2{font-size:28px;margin:4px 0 10px}
+#sceneTimeDialog p{font-size:13px;line-height:1.4;margin:8px 0}
+#sceneTimeDialog .motion-choices{gap:8px;margin-top:10px}
+#sceneTimeDialog .motion-choices button{min-height:44px;padding:9px}
+#sceneTimeDialog .motion-choices span{margin-top:2px}
+#sceneSolarTimes strong{font-size:13px}
+#sceneSolarDate{overflow-wrap:anywhere}
+
+/* Optional patterned indicators keep the resolved semantic fill and dark label
+   ink. Dashed white diagonals cover active fills; opposite slopes mark exclusions.
+   Light-label fields and ink-only sync status use an edge cue to leave their
+   glyphs clear. No animation, new layout box, or interaction is introduced. */
+:root[data-patterned-indicators="true"]{
+  --indicator-selected:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-8 8L8-8M0 16L16 0M8 24L24 8' fill='none' stroke='%23fff' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E");
+  --indicator-excluded:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-8 8L8 24M0 0L16 16M8-8L24 8' fill='none' stroke='%23fff' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E");
+}
+:root[data-patterned-indicators="true"] :is(.ltag.on,#addButton.yes,.setting-set,.bulk-rank-selected,.motion-choices button[aria-pressed="true"],.chip.due-today,.chip.due-overdue){
+  background-image:var(--indicator-selected);
+  background-size:16px 16px;background-repeat:repeat;
+}
+:root[data-patterned-indicators="true"] :is(.setting-unset,#sceneTimeDialog .motion-choices button[aria-pressed="true"]:not([data-scene-time="live"])){
+  background-image:var(--indicator-excluded);
+  background-size:16px 16px;background-repeat:repeat;
+}
+/* Clip full-size diagonal tiles at light-label field edges; scaling flattens them. */
+:root[data-patterned-indicators="true"] :is(.cand,.chip.due-tomorrow){position:relative}
+:root[data-patterned-indicators="true"] :is(.cand,.chip.due-tomorrow)::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:4px;pointer-events:none;
+  background-image:var(--indicator-selected);background-size:16px 16px;background-repeat:repeat;
+  border-bottom-left-radius:inherit;border-bottom-right-radius:inherit;
+}
+:root[data-patterned-indicators="true"] :is(.syncbtn.ok,.syncbtn.busy,.syncbtn.err){
+  background-image:repeating-linear-gradient(135deg,transparent 0 4px,currentColor 4px 6px,transparent 6px 10px);
+  background-size:100% 4px;background-position:left bottom;background-repeat:no-repeat;
+}
+:root[data-patterned-indicators="true"] .bench{
+  background-image:var(--indicator-selected),linear-gradient(180deg,var(--chain) 0%,var(--chain-deep) 140%);
+  background-size:16px 16px,100% 100%;background-position:left top,left top;background-repeat:repeat,no-repeat;
+}
+
+/* Keep the native checkbox fallback independent of ordinary active chip paint. */
+@supports selector(:has(input:checked)){
+:root[data-patterned-indicators="true"] .ctxpick .ltag:has(input:checked){
+  background-image:var(--indicator-selected);
+  background-size:16px 16px;background-repeat:repeat;
+}
+}
+
+/* A transparent Selected slot cannot carry white stripes in day mode. Match
+   selected context fill; keep its existing label ink on an opaque panel backing. */
+:root[data-patterned-indicators="true"] .bulk-rank-selected{background-color:var(--chain-deep)}
+:root[data-patterned-indicators="true"] .bulk-rank-selected .tkl{background:var(--panel)}
+/* Secondary descriptions need the same contrast as the selected main label. */
+:root[data-patterned-indicators="true"] .motion-choices button[aria-pressed="true"] span{color:var(--action-ink)}
+
+/* The twenty-pixel marks cannot carry distinguishable stripes without merging
+   into their check/X feet. Use the whole control's bottom padding as a rail,
+   matching each mark's actual color and leaving its glyph completely untouched. */
+:root[data-patterned-indicators="true"] :is(.ctxitem.included,.ctxitem.excluded){position:relative}
+:root[data-patterned-indicators="true"] :is(.ctxitem.included,.ctxitem.excluded)::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:4px;pointer-events:none;
+  background-image:var(--indicator-selected);background-size:16px 16px;background-repeat:repeat;
+}
+:root[data-patterned-indicators="true"] .ctxitem.included::after{background-color:light-dark(#2c7346,#28643e)}
+:root[data-patterned-indicators="true"] .ctxitem.excluded::after{background-color:light-dark(#b7353c,#a82f36);background-image:var(--indicator-excluded)}
