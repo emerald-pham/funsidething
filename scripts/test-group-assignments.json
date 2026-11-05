@@ -5536,6 +5536,21 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an unchanged manifest revision is not fetched again",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: a revision, generation or account change and an explicit revalidation read the generation again",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remembered as unreadable and healthy reads stay complete",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data",
       "group": "core",
       "file": "tests.js"
@@ -5832,6 +5847,16 @@
     },
     {
       "root": "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again",
       "group": "persistence-recovery",
       "file": "tests.js"
     },

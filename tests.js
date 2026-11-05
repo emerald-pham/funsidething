@@ -4067,6 +4067,21 @@ test('RISK sync responsiveness guidance: mounted Help explains large boards and 
  assert.match(help,/Large saved boards respond faster/);assert.match(help,/Corrupted cloud sources stop repeated downloads/);
 });
 
+// #2201: these budget contracts must not depend on the recovery read expiring.
+// They hold a damaged source whose complete prior generation would otherwise
+// reconcile automatically (#2198). Give that prior a conflicting legacy rating
+// (the #2408 refusal shape) so the automatic default genuinely has to wait.
+async function conflictingPriorGeneration2201(backend,previousGeneration,codec){
+ const priorPath='users/owner/generations/'+previousGeneration,header=backend.docs.get(priorPath);
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(priorPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const board=JSON.parse(await codec.decodeSnapshot(header,chunks)),task=board.tasks.find(row=>row.id==='a');
+ assert.equal(board.decisionBaseline,undefined);assert.equal(task.mu,25,'the accepted board rates this task differently');task.mu=26;
+ const encoded=await codec.encodeSnapshot(JSON.stringify(board));
+ for(const key of [...backend.docs.keys()])if(key.startsWith(priorPath+'/chunks/'))backend.docs.delete(key);
+ backend.docs.set(priorPath,{...header,hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
+ for(const chunk of encoded.chunks)backend.docs.set(priorPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+}
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.
@@ -4077,6 +4092,7 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
  const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(different));
  backend.docs.set(headerPath,{...backend.docs.get(headerPath),hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
  assert.equal(encoded.chunkCount,8,'the supported damaged source represents a populated eight-chunk board');
+ await conflictingPriorGeneration2201(backend,originalRoot.previousGeneration,ctx.window.ChainStorageV2);
  let reads=0;app.faults.serverRead=async()=>{reads++;};t.after(()=>{delete app.faults.serverRead;});
  await ctx.cloudPull();assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);assert.ok(reads>0);
  const originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,attemptReads=reads,byAction=[];
@@ -4110,8 +4126,9 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
  assert.equal(backend.CS.knownDamagedSource,false);assert.equal(JSON.stringify(backend.docs.get(headerPath)),JSON.stringify(JSON.parse(originalCloud).find(([key])=>key===headerPath)[1]));
 });
 
-async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
+async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false,conflictingPrior=false}={}){
  const seed=await damagedAcknowledgedApp187(t,{sourcePadding:2000000});
+ if(conflictingPrior)await conflictingPriorGeneration2201(seed.backend,seed.originalRoot.previousGeneration,seed.ctx.window.ChainStorageV2);
  if(newerLocalWork){seed.shim.document.getElementById('addInput').value='Newer local task without an ACK export';await seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true);}
  const raw=seed.ctx.cloudPayload(),originalRoot={...seed.originalRoot},originalHeader={...seed.originalHeader},provider=[...seed.backend.docs];
  assert.equal(Object.hasOwn(JSON.parse(raw),'decisionBase'),false,'the supported export does not carry the private ACK payload');
@@ -4131,7 +4148,7 @@ async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
 }
 
 test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads',{timeout:20000},async t=>{
- const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true}),{ctx,shim,backend,counts,originalRoot}=app;
+ const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true,conflictingPrior:true}),{ctx,shim,backend,counts,originalRoot}=app;
  assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);
  const initialReads=counts.reads,originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,byAction=[];
  assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
@@ -31645,6 +31662,73 @@ test('RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation 
  assert.equal(result.code,undefined);assert.equal(result.payload,healthy.activePayload);assert.equal(result.rev,2346);
 });
 
+// #2201: the captured export re-fetched the same unreadable generation on every
+// opening. Bounds are counted store round trips, never elapsed milliseconds.
+test('RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an unchanged manifest revision is not fetched again',async()=>{
+ const fixture=await capturedUnreadableGenerationFixture();
+ const first=await fixture.pullOnce();
+ assert.deepEqual(first.calls,['readRoot','readGeneration','readChunks','readRoot'],'the first failing pull still proves the generation unreadable');
+ for(let repeat=0;repeat<3;repeat++){
+  const again=await fixture.pullOnce();
+  assert.deepEqual(again.calls,['readRoot'],'an unchanged manifest re-reads only its server root, never the proved-unreadable header or chunks');
+  assert.equal(again.roundTrips,1);
+  assert.deepEqual({error:again.result.error,code:again.result.code,generationId:again.result.generationId,rev:again.result.rev,payload:again.result.payload},
+   {error:true,code:'corrupt-generation',generationId:fixture.activeGenerationId,rev:2346,payload:undefined});
+ }
+ assert.equal(fixture.adapter.roots.get(fixture.uid).rev,2346,'bounded pulls never write');
+});
+
+test('RISK CLOUD V2 RECOVERY FIXTURE: a revision, generation or account change and an explicit revalidation read the generation again',async()=>{
+ const full=['readRoot','readGeneration','readChunks','readRoot'];
+ const fixture=await capturedUnreadableGenerationFixture(),{adapter,uid}=fixture,root=structuredClone(adapter.roots.get(uid));
+ assert.equal((await fixture.pullOnce()).result.code,'corrupt-generation');assert.deepEqual((await fixture.pullOnce()).calls,['readRoot']);
+ // A new manifest revision naming the same generation is a fresh question.
+ adapter.roots.set(uid,{...root,rev:root.rev+1});
+ const revised=await fixture.pullOnce();
+ assert.deepEqual(revised.calls,full,'a changed manifest revision reads the generation again');
+ assert.equal(revised.result.code,'corrupt-generation');assert.equal(revised.result.rev,root.rev+1);
+ // A changed active generation at the same revision reads the new generation.
+ adapter.roots.set(uid,{...root,activeGeneration:fixture.priorGenerationId,previousGeneration:fixture.activeGenerationId});
+ const switched=await fixture.pullOnce();
+ assert.deepEqual(switched.calls,full,'a changed active generation is read in full');
+ assert.equal(switched.result.payload,fixture.priorPayload);assert.equal(switched.result.code,undefined);
+ // Another account never inherits this account's conclusion, even for identical ids.
+ adapter.roots.set(uid,root);assert.deepEqual((await fixture.pullOnce()).calls,full);assert.deepEqual((await fixture.pullOnce()).calls,['readRoot']);
+ adapter.roots.set('other-owner',structuredClone(root));
+ const healthy=adapter.generations.get(uid+'/'+fixture.priorGenerationId);
+ adapter.generations.set('other-owner/'+fixture.activeGenerationId,structuredClone(healthy));
+ const calls=[],original=adapter.readChunks;adapter.readChunks=(...args)=>{calls.push(args[0]);return original(...args);};
+ const other=await fixture.store.pull('other-owner');adapter.readChunks=original;
+ assert.deepEqual(calls,['other-owner'],'another account reads its own generation');assert.equal(other.payload,fixture.priorPayload);
+ // An explicit revalidation (the Retry control) always proves the answer again.
+ const retried=await fixture.pullOnce({revalidate:true});
+ assert.deepEqual(retried.calls,full,'explicit revalidation reads the header and chunks again');
+ assert.equal(retried.result.code,'corrupt-generation');
+ assert.deepEqual((await fixture.pullOnce()).calls,['readRoot'],'the re-proved conclusion still bounds later ordinary pulls');
+});
+
+test('RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remembered as unreadable and healthy reads stay complete',async()=>{
+ const full=['readRoot','readGeneration','readChunks','readRoot'];
+ for(const [method,code] of [['readChunks','unavailable'],['readGeneration','permission-denied'],['readChunks','deadline-exceeded']]){
+  const fixture=await capturedUnreadableGenerationFixture(),{adapter}=fixture,original=adapter[method];
+  adapter[method]=async()=>{adapter[method]=original;throw Object.assign(Error('isolated '+code),{code:'firestore/'+code});};
+  const failed=await fixture.pullOnce();
+  assert.equal(failed.result.code,code,'a '+code+' read keeps its own code instead of becoming corruption');
+  const later=await fixture.pullOnce();
+  assert.deepEqual(later.calls,full,'after a transient '+code+' failure the next pull still downloads and checks the generation');
+  assert.equal(later.result.code,'corrupt-generation');
+  // Only a completed check that proved the generation unreadable bounds later pulls.
+  assert.deepEqual((await fixture.pullOnce()).calls,['readRoot']);
+ }
+ // A healthy board's read behavior is unchanged: every pull reads it in full.
+ const healthy=await capturedUnreadableGenerationFixture({defect:false});
+ for(let repeat=0;repeat<3;repeat++){
+  const read=await healthy.pullOnce();
+  assert.deepEqual(read.calls,full,'healthy pulls read the root, header and chunks, then recheck the root');
+  assert.equal(read.result.payload,healthy.activePayload);assert.equal(read.result.code,undefined);
+ }
+});
+
 // #2198: the same captured shape (#2195) reaching the real app consumer. The
 // device holds an accepted board whose acknowledged copy no longer matches the
 // damaged active header, and the immediately prior generation is complete.
@@ -31790,6 +31874,79 @@ test('RISK cloud generation recovery: a conflicting or different-account prior g
    assert.equal(ctx.state.tasks.length,JSON.parse(before).tasks.length,'another account contributes nothing to this board');
   }
  });
+});
+
+// #2201: the captured export re-downloaded the same unreadable generation and
+// its multi-megabyte prior on every opening. A completed refusal over an
+// unchanged server root is reused; the root itself is still read from the
+// server each time, and Retry or an account change proves everything again.
+test('RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again',{timeout:180000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating',recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ const generationReads=since=>reads.slice(since).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath));
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=async message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the first opening read settles');
+ assert.equal(backend.CS.errorCode,'corrupt-generation');
+ assert.equal(JSON.stringify(ctx.state),before,'the conflicting prior generation waits; the accepted board is unchanged');
+ assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null);
+ const firstOpen=reads.length,firstChunks=generationReads(0).filter(path=>path.endsWith('/chunks'));
+ assert.ok(firstChunks.includes(activePath+'/chunks')&&firstChunks.includes(priorPath+'/chunks'),'the first opening proves both sources from the server');
+ t.diagnostic('First opening: '+firstOpen+' server reads, '+firstChunks.length+' generation chunk reads');
+ // Returning to the app (hide, then show) and a later automatic pull.
+ shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;
+ vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);await settle('the resumed read settles');
+ const resumed=reads.slice(firstOpen);
+ t.diagnostic('Resume: '+resumed.length+' server reads '+JSON.stringify(resumed));
+ assert.deepEqual(generationReads(firstOpen),[],'resuming over the unchanged root downloads neither the unreadable generation nor its prior again');
+ assert.ok(resumed.includes('users/owner'),'the root is still read from the server, so a changed manifest is never missed');
+ const afterResume=reads.length;await ctx.cloudPull();await settle('a later automatic pull settles');
+ assert.deepEqual(reads.slice(afterResume),['users/owner'],'a later automatic pull costs one server root read');
+ // The held source still bounds ordinary work after the resume.
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;const afterPull=reads.length;
+ shim.document.getElementById('addInput').value='Local work after resuming a held source';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await settle('the ordinary edit settles');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the ordinary edit is durable');
+ assert.deepEqual(reads.slice(afterPull),[],'an ordinary edit after resuming triggers no cloud download');
+ assert.equal(ctx.state.syncDirty,true,'device durability is not a cloud acknowledgement');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');assert.equal(backend.writes.length,writes);
+ // Explicit Retry proves the answer again from the server.
+ const beforeRetry=reads.length;await ctx.onAction('sync-retry',{});await settle('Retry settles');
+ assert.ok(generationReads(beforeRetry).includes(activePath+'/chunks'),'explicit Retry downloads and checks the unreadable generation again');
+ // An account change never inherits the earlier account session's conclusion.
+ // The harness delivers the sign-in pull explicitly, as the cold-open fixtures do.
+ const beforeAccount=reads.length;backend.emitAuth(null);await flush();backend.emitAuth({uid:'owner',email:'owner@example.test'});await flush();
+ await ctx.cloudPull();await settle('the re-signed-in read settles');
+ assert.ok(generationReads(beforeAccount).includes(activePath+'/chunks'),'signing in again proves the source again');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Local work after resuming a held source'));
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected after Retry and sign-in');
+});
+
+test('RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again',{timeout:180000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating',recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const reads=[];let roots=0,interrupted=false;
+ // Root reads of the first opening: the bounded pull, the exact-copy check's
+ // start and end, then the automatic default's first capture. Its closing root
+ // read fails transiently, after the exact-copy check has already completed.
+ app.faults.serverRead=async path=>{reads.push(path);
+  if(path==='users/owner'&&!interrupted&&++roots===5){interrupted=true;throw Object.assign(Error('Synthetic transient recovery read'),{code:'unavailable'});}};
+ t.after(()=>{delete app.faults.serverRead;});
+ const chunkReads=since=>reads.slice(since).filter(path=>path===activePath+'/chunks'||path===priorPath+'/chunks');
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=async message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const resume=async message=>{shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;
+  vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);await settle(message);};
+ const before=JSON.stringify(ctx.state),cloudBefore=JSON.stringify([...backend.docs]);
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the interrupted opening settles');
+ assert.equal(interrupted,true,'the transient failure reached the automatic recovery read');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore);
+ const afterInterrupted=reads.length;await resume('the next opening settles');
+ assert.ok(chunkReads(afterInterrupted).includes(priorPath+'/chunks'),'an interrupted check is not a conclusion: the next opening reads the sources again');
+ const afterCompleted=reads.length;await resume('a later opening settles');
+ assert.deepEqual(reads.slice(afterCompleted),['users/owner'],'once the check completes, a later opening reads only the server root');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');
 });
 
 test('RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone',{timeout:90000},async t=>{

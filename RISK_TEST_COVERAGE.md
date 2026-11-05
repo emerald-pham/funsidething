@@ -237,6 +237,9 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
 - RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation
+- RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an unchanged manifest revision is not fetched again
+- RISK CLOUD V2 RECOVERY FIXTURE: a revision, generation or account change and an explicit revalidation read the generation again
+- RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remembered as unreadable and healthy reads stay complete
 - RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation
 - RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board
 - RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted
@@ -2045,6 +2048,8 @@ The held-demotion native boundary requires one Current and one Previous heading 
 
 - RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
+- RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again
+- RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again
 - RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
 - RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls
 - RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams
