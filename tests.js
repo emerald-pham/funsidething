@@ -37660,6 +37660,41 @@ test('RISK repository process: Pages FAQ policy reads exact head and base from a
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');const release=workflow.split('  release-evidence:')[1].split('  deploy-pages:')[0];assert.match(release,/actions\/checkout@v4\s+with:\s+fetch-depth: 0/,'Pages must not infer missing policy objects from a shallow checkout');
 });
 
+// Spec #2205 scaled review policy. The switch is the committed AGENTS.md
+// wording below, read from the exact candidate head and base like the FAQ policy.
+const SCALED_REVIEW_POLICY_TEXT='Release reviews scale to the exact diff. The release validator derives the\nplan, and the owner review records FAQ coverage for every product release.\n';
+function makeScaledReviewFixture(options={}){
+ const f=makeReleaseGateFixture();
+ const write=files=>{for(const [file,text] of Object.entries(files)){const target=path.join(f.repo,file);if(text===null){fs.rmSync(target,{force:true});continue;}fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,text);}};
+ const commit=message=>{releaseGateGit(f.repo,['add','--all']);releaseGateGit(f.repo,['commit','--allow-empty','-q','-m',message]);return releaseGateGit(f.repo,['rev-parse','HEAD']);};
+ write({'AGENTS.md':options.agentsBase===undefined?SCALED_REVIEW_POLICY_TEXT:options.agentsBase,...options.base});f.baseSha=commit('Scaled review policy base');
+ write({'AGENTS.md':options.agentsHead===undefined?SCALED_REVIEW_POLICY_TEXT:options.agentsHead,...options.candidate});f.candidateSha=commit('Scaled review policy candidate');
+ f.treeSha=releaseGateGit(f.repo,['rev-parse',f.candidateSha+'^{tree}']);f.changedPath=Object.keys(options.candidate||{})[0]||'AGENTS.md';
+ return f;
+}
+function scaledPlan(fields){
+ return {schemaVersion:2,mode:'independent-review',requiresCodeReview:true,requiresFaqReview:false,requiresOwnerFaqCoverage:true,
+  requiresSpecialistReview:false,requiresTypographyReview:false,specialistDomains:[],...fields};
+}
+
+test('RISK repository process: scaled review plan pins ordinary code to owner plus independent and docs to owner only',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ // A realistic ordinary fix also edits its test, the RISK map and the test
+ // rationale file; those process files must not summon a specialist.
+ const ordinary=makeScaledReviewFixture({base:{'src/landscape.mjs':'const hue = 30;\n','tests.js':'\n','RISK_TEST_COVERAGE.md':'# Map\n','TEST_CHANGE_RATIONALES.json':'[]\n'},
+  candidate:{'src/landscape.mjs':'const hue = 32;\n','tests.js':"test('RISK landscape colors: dawn hue stays warm',()=>{});\n",
+   'RISK_TEST_COVERAGE.md':'# Map\n- RISK landscape colors: dawn hue stays warm\n','TEST_CHANGE_RATIONALES.json':'[{"reason":"Dawn hue regression case"}]\n'}});
+ const docs=makeScaledReviewFixture({base:{'README.md':'Old setup note.\n'},candidate:{'README.md':'Clearer setup note.\n'}});
+ try{
+  assert.deepEqual(deriveReleaseReviewPlan(ordinary.repo,ordinary.candidateSha,ordinary.baseSha),
+   scaledPlan({changedFiles:['RISK_TEST_COVERAGE.md','TEST_CHANGE_RATIONALES.json','src/landscape.mjs','tests.js']}),
+   'an ordinary code fix needs exactly the owner review plus one combined independent review');
+  assert.deepEqual(deriveReleaseReviewPlan(docs.repo,docs.candidateSha,docs.baseSha),
+   scaledPlan({changedFiles:['README.md'],mode:'owner-self-review',requiresCodeReview:false,requiresOwnerFaqCoverage:false}),
+   'a documentation-only diff needs only the owner review');
+ }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);

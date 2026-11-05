@@ -239,10 +239,21 @@ function isDocumentationOnlyPath(file) {
   return !riskDocumentationPath.test(normalized);
 }
 
-function reviewDomainsForPath(file) {
+// Spec #2205: the scaled review policy is switched on only by this committed
+// AGENTS.md wording. Whitespace is normalized so rewrapping the paragraph does
+// not silently revert a candidate to the older policy.
+const scaledReviewPolicyMarker = 'Release reviews scale to the exact diff.';
+
+function hasScaledReviewPolicy(repoRoot, sha) {
+  return (gitShow(repoRoot, sha, 'AGENTS.md') || '').replace(/\s+/g, ' ').includes(scaledReviewPolicyMarker);
+}
+
+function reviewDomainsForPath(file, scaled = false) {
   const normalized = file.toLowerCase().replaceAll('\\', '/');
   const domains = new Set();
-  if (isReleaseProcessPath(file)) domains.add('release-process');
+  // Under the scaled policy, process files (test map, rationales, guidance)
+  // keep the independent code review but no longer summon a specialist.
+  if (isReleaseProcessPath(file) && !scaled) domains.add('release-process');
   if (/(?:cloud|firestore|sync|storage|persist|backup|recovery|migration|indexeddb|localstorage|local-storage|account)/.test(normalized)) {
     domains.add('memory-cloud-sync');
   }
@@ -254,7 +265,7 @@ function reviewDomainsForPath(file) {
   return [...domains].sort();
 }
 
-function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file) {
+function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled = false) {
   const normalized = file.toLowerCase().replaceAll('\\', '/');
   const domains = new Set();
   const patch = gitRaw(repoRoot, ['diff', '--unified=2', '--no-renames', baseSha, commitSha, '--', file]);
@@ -269,7 +280,7 @@ function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file) {
     domains.add('security-deployment');
   }
   if (/(?:migration|migrat|schemaVersion|schema version|upgradeDatabase|versionchange)/i.test(context)) domains.add('data-migration');
-  if (/(?:^|\/)\.github\/workflows\//.test(normalized)) domains.add('release-process');
+  if (/(?:^|\/)\.github\/workflows\//.test(normalized) && !scaled) domains.add('release-process');
   return [...domains].sort();
 }
 
@@ -284,6 +295,7 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     : [];
   const changedFiles = gitRaw(repoRoot, ['diff', '--name-only', '--no-renames', '-z', baseSha, commitSha, '--'])
     .split('\0').filter(Boolean).sort();
+  const scaled = hasScaledReviewPolicy(repoRoot, commitSha);
   let requiresCodeReview = false;
   const specialistDomains = new Set();
   for (const file of changedFiles) {
@@ -291,8 +303,8 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     const commentsOnly = commentOnlyDiff(repoRoot, baseSha, commitSha, file);
     if (!documentationOnly && !commentsOnly) requiresCodeReview = true;
     if (!commentsOnly) {
-      for (const domain of reviewDomainsForPath(file)) specialistDomains.add(domain);
-      for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file)) specialistDomains.add(domain);
+      for (const domain of reviewDomainsForPath(file, scaled)) specialistDomains.add(domain);
+      for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled)) specialistDomains.add(domain);
     }
   }
   for (const domain of additionalSpecialistDomains) specialistDomains.add(domain);
@@ -301,6 +313,21 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
   const mode = requiresCodeReview && requiresSpecialistReview ? 'dual-review' :
     requiresCodeReview ? 'independent-review' :
     requiresSpecialistReview ? 'specialist-review' : 'owner-self-review';
+  if (scaled) {
+    // Plan schema 2 marks the scaled policy. FAQ coverage moves into the owner
+    // review for product behavior instead of a separate FAQ reviewer.
+    return {
+      schemaVersion: 2,
+      changedFiles,
+      mode,
+      requiresCodeReview,
+      requiresFaqReview: false,
+      requiresOwnerFaqCoverage: requiresCodeReview,
+      requiresSpecialistReview,
+      requiresTypographyReview: false,
+      specialistDomains: domains,
+    };
+  }
   return {
     schemaVersion: 1,
     changedFiles,
