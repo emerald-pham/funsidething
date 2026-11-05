@@ -22,7 +22,8 @@ A branch that still edits the old single `tests.js` ports by moving each new or
 changed test into the area file of its group, adding any new helper to
 `tests/shared.js` with an export, prefixing relative dynamic imports and
 `new URL(..., import.meta.url)` paths with `../`, and pointing its catalog rows
-at the new file. Do not merge a recreated `tests.js`: `npm test` and the group
+at the new file. A recreated `tests.js` cannot merge: the test-first gate rejects
+a diff that adds or changes it, and `npm test` and the group
 runner no longer run it.
 
 The additional `test:group` entry point runs one explicitly classified group in

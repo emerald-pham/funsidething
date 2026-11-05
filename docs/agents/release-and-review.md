@@ -70,11 +70,24 @@ dispatch, so an engine-specific failure cannot block unrelated fixes.
 are nightly and which stay in the required cohort.
 
 Before a Stable release, dispatch `Nightly` on the release candidate ref
-(`gh workflow run nightly.yml --ref <candidate-branch>`) and require that run to
-pass on the exact candidate head. A failed, skipped or missing run blocks the
-release until it is fixed or the maintainer accepts the named failure. A
-failing scheduled run fails the workflow and GitHub notifies the maintainer;
-treat it as a release blocker for the next Stable release, not as noise.
+(`gh workflow run nightly.yml --ref <candidate-branch>`) and require its
+`cross-engine-native` job to pass on the exact candidate head. Only that job is
+a release gate. The workflow's `velocity-report` and `ruleset-drift` jobs are
+monitoring: handle their failures as their own sections say, without blocking
+the release on them. A failed, skipped or missing `cross-engine-native` job
+blocks the release until it is fixed or the maintainer accepts the named
+failure. A failing scheduled run fails the workflow and GitHub notifies the
+maintainer; treat a `cross-engine-native` failure as a release blocker for the
+next Stable release, not as noise.
+
+`cross-engine-native` is expected to be red until PR #285's WebKit product fix
+lands as its own change (maintainer decision, 2026-11-04). Until then, the
+release owner still dispatches the job on the exact candidate and checks that
+its only failures are the known #285 WebKit cases: no other failing case, no
+Chromium failure, and nothing skipped or missing. The owner records that run
+and the maintainer's acceptance of the named #285 failures in the release
+evidence. Any other failure blocks the release as above. Delete this paragraph
+when #285 merges.
 
 ## Ruleset drift
 

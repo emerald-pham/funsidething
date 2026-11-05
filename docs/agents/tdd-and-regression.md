@@ -43,6 +43,9 @@ offline, CI, and live results separately.
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
 to an app, PWA shell, or enforcement file is refused while no file under `tests/` has uncommitted changes.
 Treat the block as correct and go write the test — do not work around it.
+A root `tests.js` is not a test file: nothing runs it, the hook refuses writing
+it, and the CI gate rejects a diff that adds or changes one. Port such edits as
+[test groups](test-groups.md#test-files) describes.
 
 `RISK_TEST_COVERAGE.md` maps the current high-cost feature contracts to their
 named tests. Add or rename its entry whenever a `RISK` test is added, removed,
@@ -104,7 +107,9 @@ old expectation is wrong. Never weaken, delete, skip, or replace a regression
 test merely to make an implementation pass. Fix the implementation first.
 
 A rationale entry in `TEST_CHANGE_RATIONALES.json` is required only when the
-test diff (every file under `tests/`) removes or renames an existing test, or
+test diff (all changes under `tests/`, shared helpers included, plus the
+deletion of the old root `tests.js` when the base predates the split) removes
+or renames an existing test, or
 deletes, changes or weakens one of its lines. Adding a new test or extending an
 existing one with more assertions needs no entry. The entry carries the exact
 protected-test-change fingerprint of the whole test diff (each line bound to its
