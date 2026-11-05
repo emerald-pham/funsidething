@@ -5856,6 +5856,31 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: genuine device and cloud errors stay visible over the older complete source status",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit",
       "group": "persistence-recovery",
       "file": "tests.js"

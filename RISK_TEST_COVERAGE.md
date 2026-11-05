@@ -241,6 +241,11 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board
 - RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted
 - RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone
+- RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered
+- RISK cloud generation recovery status: genuine device and cloud errors stay visible over the older complete source status
+- RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore
+- RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status
+- RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status
 - RISK repository process: compatibility round trips preserve independently hashed production bytes
 - RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest
 - RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest
