@@ -576,7 +576,8 @@ else if (args[0] === 'api' && args.some(arg => arg.startsWith('search/issues')))
   if (!query.includes('repo:${velocityRepo}') || !query.includes('is:issue') || !query.includes('created:>=${velocityWindowStart}')) error = 'unexpected issue search ' + query;
   else out = { total_count: fixture.issuesOpened, incomplete_results: false, items: [] };
 }
-else if (has('issue', 'list')) out = fixture.alertIssues;
+// Like GitHub, a --label filter returns only issues carrying that label.
+else if (has('issue', 'list')) out = fixture.alertIssues.filter(issue => !args.includes('--label') || (issue.labels || []).includes(value('--label'))).map(({ labels, ...issue }) => issue);
 else if (has('issue', 'create')) out = 'https://github.com/${velocityRepo}/issues/901';
 else if (has('issue', 'comment')) out = 'https://github.com/${velocityRepo}/issues/' + args[2] + '#issuecomment-1';
 else error = 'unexpected gh call ' + JSON.stringify(args);
@@ -652,6 +653,23 @@ test('velocity report alerts when nothing merged to main in 7 days while PRs are
   assert.match(flagValue(create, '--body'), /#606/, 'the alert carries the weekly summary');
 });
 
+test('velocity report counts only ready PRs into main as waiting for a merge', async parent => {
+  const draftIntoMain = { number: 610, title: 'Sketch a new board layout', createdAt: '2026-11-01T12:00:00Z', isDraft: true, baseRefName: 'main' };
+  const readyIntoBranch = { number: 611, title: 'Ticket work for the integration branch', createdAt: '2026-11-02T12:00:00Z', isDraft: false, baseRefName: 'integration/spec-2205-release-scaling' };
+  const readyIntoMain = { number: 612, title: 'Ship the release scaling spec', createdAt: '2026-11-03T12:00:00Z', isDraft: false, baseRefName: 'main' };
+  await parent.test('drafts and PRs into other branches are not a stall', async t => {
+    const { result, issueWrites } = await invokeVelocity(t, velocityData({ merged: [], open: [draftIntoMain, readyIntoBranch] }));
+    assert.equal(result.status, 0, 'nothing is ready to merge to main, so nothing stalled: ' + result.stdout + result.stderr);
+    assert.doesNotMatch(result.stdout, /^::error/m);
+    assert.deepEqual(issueWrites, []);
+  });
+  await parent.test('the stall counts only the ready PR into main', async t => {
+    const { result } = await invokeVelocity(t, velocityData({ merged: [], open: [draftIntoMain, readyIntoBranch, readyIntoMain] }));
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /^::error title=[^:]*::[^\n]*no PR merged to main in 7 days while 1 open PR wait/im);
+  });
+});
+
 test('velocity report alerts when more than 100 issues are opened in a week', async t => {
   const { result, summary, issueWrites } = await invokeVelocity(t, velocityData({ issuesOpened: 101 }));
   assert.equal(result.status, 1, 'an issue spike must fail the nightly job visibly: ' + result.stdout + result.stderr);
@@ -670,7 +688,7 @@ test('velocity report reuses an existing open alert issue instead of filing a du
     // GitHub title search is fuzzy, so a near-miss title must not be mistaken for
     // the alert, even when it is the older issue.
     { number: 70, title: 'Weekly velocity alert wording follow-up' },
-    { number: 77, title: velocityAlertTitle },
+    { number: 77, title: velocityAlertTitle, labels: ['needs-triage'] },
   ];
   const { result, issueWrites, calls } = await invokeVelocity(t, velocityData({ merged: [], issuesOpened: 250, alertIssues }));
   assert.equal(result.status, 1, 'the alert still fails the nightly job: ' + result.stdout + result.stderr);
@@ -688,8 +706,19 @@ test('velocity report reuses an existing open alert issue instead of filing a du
   assert.equal(flagValue(lookup, '--state'), 'open', 'a closed alert is not reused');
 });
 
+test('velocity report reuses an open alert issue that has already been triaged', async t => {
+  // Triage replaces needs-triage with another label; the alert is still the
+  // one open alert, so the nightly run must comment on it, not file a second.
+  const alertIssues = [{ number: 81, title: velocityAlertTitle, labels: ['ready-for-human'] }];
+  const { result, issueWrites } = await invokeVelocity(t, velocityData({ merged: [], alertIssues }));
+  assert.equal(result.status, 1, 'the alert still fails the nightly job: ' + result.stdout + result.stderr);
+  assert.equal(issueWrites.filter(call => call[1] === 'create').length, 0, 'a triaged open alert issue must not be duplicated');
+  assert.equal(issueWrites.length, 1, 'exactly one alert issue write');
+  assert.deepEqual(issueWrites[0].slice(0, 3), ['issue', 'comment', '81'], 'the triaged alert issue is reused');
+});
+
 test('velocity report dry run reports the alert without writing to GitHub', async t => {
-  const { result, issueWrites, calls } = await invokeVelocity(t, velocityData({ merged: [], alertIssues: [{ number: 77, title: velocityAlertTitle }] }), ['--dry-run']);
+  const { result, issueWrites, calls } = await invokeVelocity(t, velocityData({ merged: [], alertIssues: [{ number: 77, title: velocityAlertTitle, labels: ['needs-triage'] }] }), ['--dry-run']);
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stdout, /^::error title=[^:]*::[^\n]*no PR merged to main in 7 days/im);
   assert.deepEqual(issueWrites, [], 'a dry run must never create or comment on an issue');

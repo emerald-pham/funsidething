@@ -534,8 +534,9 @@ async function velocityReport(args) {
   const body = [...alerts.map((alert) => `- **${alert.title}**: ${alert.message}`), '', summary].join('\n');
   // One open alert issue at a time: the nightly run comments on it while the
   // alert persists instead of adding to the issue pile it is meant to warn about.
-  // Title search is fuzzy, so only an exact title match counts.
-  const existing = ghJson(['issue', 'list', '--repo', options.repo, '--state', 'open', '--label', 'needs-triage', '--search', `"${VELOCITY_ALERT_TITLE}" in:title`, '--limit', '100', '--json', 'number,title'])
+  // Title search is fuzzy, so only an exact title match counts. Any label
+  // counts: triage replaces needs-triage, and a triaged alert is still open.
+  const existing = ghJson(['issue', 'list', '--repo', options.repo, '--state', 'open', '--search', `"${VELOCITY_ALERT_TITLE}" in:title`, '--limit', '100', '--json', 'number,title'])
     .filter((issue) => issue.title === VELOCITY_ALERT_TITLE).sort((a, b) => a.number - b.number)[0];
   // A dry run reads the real repository but never writes, for local checks.
   if (options.dryRun) process.stdout.write(`Velocity dry run: would ${existing ? `comment on #${existing.number}` : `create "${VELOCITY_ALERT_TITLE}" labelled needs-triage`}.\n`);
@@ -553,7 +554,10 @@ const VELOCITY_ISSUE_LIMIT = 100;
 
 function velocityAlerts({ merged, open, issuesOpened }) {
   const alerts = [];
-  if (!merged.length && open.length) alerts.push({ title: 'Velocity stall', message: `No PR merged to main in 7 days while ${plural(open.length, 'open PR')} wait.` });
+  // Only ready PRs into main can be waiting on a merge to main: drafts are not
+  // asking to merge, and ticket PRs into an integration branch merge elsewhere.
+  const waiting = open.filter((pr) => !pr.isDraft && pr.baseRefName === 'main');
+  if (!merged.length && waiting.length) alerts.push({ title: 'Velocity stall', message: `No PR merged to main in 7 days while ${plural(waiting.length, 'open PR')} wait.` });
   if (issuesOpened > VELOCITY_ISSUE_LIMIT) alerts.push({ title: 'Issue spike', message: `${issuesOpened} issues opened in 7 days (limit ${VELOCITY_ISSUE_LIMIT}).` });
   return alerts;
 }
