@@ -11878,10 +11878,6 @@ async function runAutomaticRecoveryDecline(){
   if(!deviceStore||!liveBoardAccepted||!deviceStorageAuthority)return refuse("Storage isn't ready. Try again shortly.");
   if(cloudPushInFlight||fileRestoreBusy||declineEditorActive()||scannerGestureActive)return refuse("A save or edit is running. Try again soon.");
   if(hold.account!==account||hold.identity!==identity)return refuse("Account switched. Nothing changed.");
-  // Stop the pending publication first: an aborted read cannot publish, and
-  // a cleared hold gives later pulls nothing to publish.
-  if(cloudSourceRecoveryRead)cancelCloudSourceRecoveryRead({record:false});
-  automaticCloudSourceResumeRequested=false;
   const board=JSON.stringify(state);
   let stored,archives,head;
   try{[stored,archives,head]=await Promise.all([deviceStore.getRecoveryCloudHold(),deviceStore.listOpaqueArchives(),deviceStore.readHead()]);}
@@ -11910,6 +11906,12 @@ async function runAutomaticRecoveryDecline(){
   if(!next||JSON.stringify(next)!==prior||(next.syncAccount??account)!==account)
     return refuse("Earlier board unreadable. Use Review cloud recovery.");
   const encodeHold=value=>JSON.stringify(encodeManualArchiveValue(value,"device recovery hold"));
+  // Only now, with every refusal behind it, stop the pending publication: an
+  // aborted read cannot publish, and a cleared hold gives later pulls nothing
+  // to publish. Stopping it before the checks meant a refused decline still
+  // paused automatic cloud confirmation (#2194 independent review N1).
+  if(cloudSourceRecoveryRead)cancelCloudSourceRecoveryRead({record:false});
+  automaticCloudSourceResumeRequested=false;
   // #2194 review L1: remember the choice before the device commit, and stop if
   // it cannot be remembered. Written afterwards, a failed write let the next
   // pull apply and publish the older copy over a decline reported as done.

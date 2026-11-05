@@ -32827,6 +32827,35 @@ test('RISK cloud generation recovery: an edit attempted while the decline commit
  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the device head matches the board on screen');
 });
 
+// #2194 independent review N1: a decline cancelled the in-flight automatic
+// recovery read and the requested background resume before its refusal
+// checks, so a refused decline still paused automatic cloud confirmation until
+// the next focus, pageshow or online event. A refused decline changes nothing.
+test('RISK cloud generation recovery: a refused decline leaves the automatic recovery read and its requested resume in place',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ t.after(faithfulModalQuery2194(shim));
+ // Keep working on the older copy, so the decline must refuse.
+ shim.document.getElementById('addInput').value='Work kept on the older copy';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(20);},'the edit settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const pending=await store.getRecoveryCloudHold();
+ // A returning tab requests the automatic resume (the app's own focus path),
+ // and an automatic recovery read is in flight (a local working recovery).
+ vm.runInContext('resumeCloudSync({type:"focus"})',ctx);
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(20);},'the focus pull settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(vm.runInContext('automaticCloudSourceResumeRequested',ctx),true,'positive control: the focus requested the automatic resume');
+ vm.runInContext('globalThis.__read2194={controller:new AbortController(),automaticFallback:true,serial:cloudSourceRecoverySerial};cloudSourceRecoveryRead=__read2194;cloudSourceRecoveryBusy=false;',ctx);
+ t.after(()=>{try{vm.runInContext('if(cloudSourceRecoveryRead===globalThis.__read2194)cloudSourceRecoveryRead=null;',ctx);}catch{}});
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),false,'positive control: the decline is refused after later edits');
+ const message=shim.document.getElementById('toast').textContent;
+ assert.match(message,/Board changed since recovery/,'the refusal is the board-changed case: '+message);
+ assert.equal(vm.runInContext('__read2194.controller.signal.aborted',ctx),false,'a refused decline does not abort the automatic recovery read');
+ assert.equal(vm.runInContext('cloudSourceRecoveryRead===__read2194',ctx),true,'a refused decline keeps the automatic recovery read current');
+ assert.equal(vm.runInContext('automaticCloudSourceResumeRequested',ctx),true,'a refused decline keeps the requested automatic resume');
+ assert.deepEqual(await store.getRecoveryCloudHold(),pending,'the refused decline keeps the pending automatic default exactly');
+});
+
 test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
  for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
   const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
