@@ -31502,6 +31502,73 @@ test('RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and
   'the previous generation stays available for explicit recovery but is never silently made current');
 });
 
+// #2195: the shape a real diagnostics export captured (spec #2194), rebuilt from
+// isolated synthetic data only. Recovery (#2198) and read-cost (#2201) tickets
+// reuse capturedUnreadableGenerationFixture() instead of inventing a failure.
+const CAPTURED_UNREADABLE_GENERATION=Object.freeze({rev:2346,
+ active:Object.freeze({chunkCount:8,byteLength:2057012}),prior:Object.freeze({chunkCount:8,byteLength:2014008})});
+function syntheticBoardOfBytes(label,byteLength){
+ const board={tasks:Array.from({length:3000},(_,index)=>({id:`${label}-${index}`,title:`Synthetic ${label} task ${index}`,done:false})),
+  settings:{fixture:'synthetic-2195',pad:''}};
+ const unpadded=Buffer.byteLength(JSON.stringify(board),'utf8');assert.ok(unpadded<byteLength,'synthetic board must fit the captured size');
+ board.settings.pad='x'.repeat(byteLength-unpadded);
+ const payload=JSON.stringify(board);assert.equal(Buffer.byteLength(payload,'utf8'),byteLength);
+ return payload;
+}
+async function capturedUnreadableGenerationFixture({defect=true,uid='fixture-owner'}={}){
+ const adapter=cloudV2Adapter(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto}),codec=loadStorageV2();
+ const {rev,active,prior}=CAPTURED_UNREADABLE_GENERATION;
+ const priorGenerationId='fixture-prior-generation',activeGenerationId='fixture-active-generation';
+ const priorPayload=syntheticBoardOfBytes('prior',prior.byteLength),activePayload=syntheticBoardOfBytes('active',active.byteLength);
+ // Earlier history is irrelevant to the capture; seed its revision so the two
+ // real publishes land on rev-1 (prior) and rev (active) through the store.
+ adapter.roots.set(uid,{schemaVersion:2,rev:rev-2,activeGeneration:null,previousGeneration:null,updatedAt:1});
+ assert.equal((await store.push(uid,priorPayload,2,rev-2,{generationId:priorGenerationId})).ok,true);
+ assert.equal((await store.push(uid,activePayload,3,rev-1,{generationId:activeGenerationId})).ok,true);
+ // The defect: the published active header still declares its chunks and
+ // bytes, but none of its chunks remain readable on the server.
+ if(defect)adapter.generations.get(uid+'/'+activeGenerationId).chunks.clear();
+ const reads=[];
+ for(const method of ['readRoot','readGeneration','readChunks']){
+  const original=adapter[method];adapter[method]=(...args)=>{reads.push(method);return original(...args);};
+ }
+ const generation=id=>{const stored=adapter.generations.get(uid+'/'+id);
+  return {header:structuredClone(stored.header),readableChunks:[...stored.chunks.values()].sort((a,b)=>a.index-b.index).map(chunk=>structuredClone(chunk))};};
+ return {adapter,store,uid,rev,priorGenerationId,activeGenerationId,priorPayload,activePayload,generation,
+  decodeGeneration:id=>{const {header,readableChunks}=generation(id);return codec.decodeSnapshot(header,readableChunks);},
+  async pullOnce(options){const start=reads.length,result=await store.pull(uid,options),calls=reads.slice(start);return {result,calls,roundTrips:calls.length};}};
+}
+
+test('RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation',async()=>{
+ for(let run=0;run<2;run++){
+  const fixture=await capturedUnreadableGenerationFixture();
+  const root=fixture.adapter.roots.get(fixture.uid);
+  assert.equal(root.rev,2346);assert.equal(root.activeGeneration,fixture.activeGenerationId);assert.equal(root.previousGeneration,fixture.priorGenerationId);
+  const active=fixture.generation(fixture.activeGenerationId),prior=fixture.generation(fixture.priorGenerationId);
+  assert.equal(active.header.state,'published');assert.equal(active.header.chunkCount,8);assert.equal(active.header.byteLength,2057012);
+  assert.equal(active.readableChunks.length,0,'the captured active generation declares 8 chunks but none are readable');
+  assert.equal(prior.header.chunkCount,8);assert.equal(prior.header.byteLength,2014008);assert.equal(prior.readableChunks.length,8);
+  assert.equal(await fixture.decodeGeneration(fixture.priorGenerationId),fixture.priorPayload,'the prior generation decodes losslessly to its original payload');
+  for(const payload of [fixture.priorPayload,fixture.activePayload]){
+   assert.equal(JSON.parse(payload).settings.fixture,'synthetic-2195');assert.doesNotMatch(payload,/@/,'no account identifier appears in fixture data');
+  }
+  const first=await fixture.pullOnce();
+  assert.deepEqual({error:first.result.error,code:first.result.code,generationId:first.result.generationId,payload:first.result.payload},
+   {error:true,code:'corrupt-generation',generationId:fixture.activeGenerationId,payload:undefined});
+  assert.deepEqual(first.calls,['readRoot','readGeneration','readChunks','readRoot'],'one failing pull reads the root, header and chunks, then re-reads the root');
+  assert.equal(first.roundTrips,4);
+  const again=await fixture.pullOnce();
+  assert.equal(again.result.code,'corrupt-generation','the condition is persistent rather than transient');
+  assert.equal(again.result.generationId,fixture.activeGenerationId);
+  assert.equal(fixture.adapter.roots.get(fixture.uid).rev,2346,'failing pulls never write');
+ }
+ // Non-vacuity: the same fixture without the missing chunks reads normally.
+ const healthy=await capturedUnreadableGenerationFixture({defect:false});
+ assert.equal(healthy.generation(healthy.activeGenerationId).readableChunks.length,8);
+ const {result}=await healthy.pullOnce();
+ assert.equal(result.code,undefined);assert.equal(result.payload,healthy.activePayload);assert.equal(result.rev,2346);
+});
+
 async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=null}={}){
  const pending=new Set(),auth={currentUser:{uid,email:'e@example.com'}},events=[];
  const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,host(v)])):value;
