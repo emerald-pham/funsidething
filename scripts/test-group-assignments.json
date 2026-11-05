@@ -9201,6 +9201,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK regression gate: a rationale is required only for removed or weakened tests",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK regression gate: changing existing tests requires a specific reason and replacement coverage",
       "group": "core",
       "file": "tests.js"
@@ -9307,6 +9312,46 @@
     },
     {
       "root": "RISK repository process: FAQ policy rejects legacy verified receipts and old deployment descriptions",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scaled review plan pins ordinary code to owner plus independent and docs to owner only",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scaled review plan sets typography only for markup or stylesheet content",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scaled review policy needs its committed AGENTS.md wording at both the exact head and base",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scaled receipts record FAQ coverage in the owner review instead of a separate reviewer",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scaled receipts publish the v=4 binding and cannot cross policy boundaries",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: Pages accepts the v=4 binding only for scaled-policy candidates",
+      "group": "native-process",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: the repository AGENTS.md wording switches on the scaled review policy",
       "group": "native-process",
       "file": "tests.js"
     },
@@ -10792,6 +10837,11 @@
     },
     {
       "root": "RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files",
       "group": "core",
       "file": "tests.js"
     },

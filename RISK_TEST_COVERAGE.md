@@ -1007,6 +1007,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Last task WOOP: rendered Delete binding rejects same-ID board replacement and restored head
 - RISK repository process: FAQ policy rejects legacy verified receipts and old deployment descriptions
 - RISK repository process: Pages FAQ policy reads exact head and base from a full release-evidence checkout
+- RISK repository process: scaled review plan pins ordinary code to owner plus independent and docs to owner only
+- RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence
+- RISK repository process: scaled review plan sets typography only for markup or stylesheet content
+- RISK repository process: scaled review policy needs its committed AGENTS.md wording at both the exact head and base
+- RISK repository process: scaled receipts record FAQ coverage in the owner review instead of a separate reviewer
+- RISK repository process: scaled receipts publish the v=4 binding and cannot cross policy boundaries
+- RISK repository process: Pages accepts the v=4 binding only for scaled-policy candidates
+- RISK repository process: the repository AGENTS.md wording switches on the scaled review policy
 - RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks
 - RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent
 - RISK Last task WOOP: imported long causal chains validate without recursive stack failure

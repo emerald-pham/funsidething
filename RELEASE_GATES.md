@@ -206,7 +206,8 @@ code, and specialist reports as evidence of those human actions.
 
 ## FAQ coverage evidence
 
-Product candidates also require `faqReview` with the same approved exact-SHA,
+This section covers candidates whose base predates the scaled review policy
+below. Such product candidates also require `faqReview` with the same approved exact-SHA,
 completedAt, summary, scope, external evidencePath and evidenceSha256 shape as
 `independentReview`. Use a reviewer task distinct from owner, code, and specialist
 reviewers. The immutable receipt copies `faq-review.md`; verification checks its
@@ -228,3 +229,37 @@ deletion. Deployment verification fetches the associated merged PR's retained
 `refs/pull/<number>/head` when that exact object is absent, then requires its SHA
 to match GitHub's reviewed head before deriving policy. A missing, invalid, or
 moved ref fails closed; fetching does not replace the deployed checkout.
+
+## Scaled review policy evidence
+
+When the committed AGENTS.md at both the exact head and the base contains
+"Release reviews scale to the exact diff.", the validator derives a plan with
+`schemaVersion: 2` inside the schema version 2 receipt. The plan adds
+`requiresTypographyReview` and `requiresOwnerFaqCoverage`, and sets
+`requiresFaqReview` to false; see
+[release and review](docs/agents/release-and-review.md#scaled-review-policy)
+for what each bit requires and the combined independent review checklist. A
+candidate whose base predates the wording keeps the earlier plan and evidence.
+
+Whenever `requiresOwnerFaqCoverage` is true, the owner review carries the FAQ
+coverage result; omit it otherwise. Do not include `faqReview`:
+
+```json
+"ownerReview": {
+  "...": "the owner fields shown above",
+  "faqCoverage": {
+    "result": "updated",
+    "summary": "<which extended FAQ entries changed, or why no user-facing behavior changed>"
+  }
+}
+```
+
+`result` is `updated` or `no-user-facing-change`. Schema version 1 receipts
+are rejected for scaled-policy candidates. The publisher sends all three
+contexts with the same compact description ending in `v=4`. Local verification
+rejects a scaled receipt for an old-policy candidate because its plan no longer
+matches the exact diff. Pages accepts `v=4` only when the exact reviewed head
+and base derive the scaled policy, and requires `v=4` for those candidates;
+`v=2`, `v=3` and schema-1 bindings keep verifying for their own candidates. An
+unreadable head cannot claim `v=4`. Deployment still binds the exact reviewed
+head, tree, base and receipt digest.

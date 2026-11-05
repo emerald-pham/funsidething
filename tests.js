@@ -37717,6 +37717,243 @@ test('RISK repository process: Pages FAQ policy reads exact head and base from a
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');const release=workflow.split('  release-evidence:')[1].split('  deploy-pages:')[0];assert.match(release,/actions\/checkout@v4\s+with:\s+fetch-depth: 0/,'Pages must not infer missing policy objects from a shallow checkout');
 });
 
+// Spec #2205 scaled review policy. The switch is the committed AGENTS.md
+// wording below, read from the exact candidate head and base like the FAQ policy.
+const SCALED_REVIEW_POLICY_TEXT='Release reviews scale to the exact diff. The release validator derives the\nplan, and the owner review records FAQ coverage for every product release.\n';
+function makeScaledReviewFixture(options={}){
+ const f=makeReleaseGateFixture();
+ const write=files=>{for(const [file,text] of Object.entries(files)){const target=path.join(f.repo,file);if(text===null){fs.rmSync(target,{force:true});continue;}fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,text);}};
+ const commit=message=>{releaseGateGit(f.repo,['add','--all']);releaseGateGit(f.repo,['commit','--allow-empty','-q','-m',message]);return releaseGateGit(f.repo,['rev-parse','HEAD']);};
+ write({'AGENTS.md':options.agentsBase===undefined?SCALED_REVIEW_POLICY_TEXT:options.agentsBase,...options.base});f.baseSha=commit('Scaled review policy base');
+ write({'AGENTS.md':options.agentsHead===undefined?SCALED_REVIEW_POLICY_TEXT:options.agentsHead,...options.candidate});f.candidateSha=commit('Scaled review policy candidate');
+ f.treeSha=releaseGateGit(f.repo,['rev-parse',f.candidateSha+'^{tree}']);f.changedPath=Object.keys(options.candidate||{})[0]||'AGENTS.md';
+ return f;
+}
+function scaledPlan(fields){
+ return {schemaVersion:2,mode:'independent-review',requiresCodeReview:true,requiresFaqReview:false,requiresOwnerFaqCoverage:true,
+  requiresSpecialistReview:false,requiresTypographyReview:false,specialistDomains:[],...fields};
+}
+
+test('RISK repository process: scaled review plan pins ordinary code to owner plus independent and docs to owner only',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ // A realistic ordinary fix also edits its test, the RISK map and the test
+ // rationale file; those process files must not summon a specialist.
+ const ordinary=makeScaledReviewFixture({base:{'src/landscape.mjs':'const hue = 30;\n','tests.js':'\n','RISK_TEST_COVERAGE.md':'# Map\n','TEST_CHANGE_RATIONALES.json':'[]\n'},
+  candidate:{'src/landscape.mjs':'const hue = 32;\n','tests.js':"test('RISK landscape colors: dawn hue stays warm',()=>{});\n",
+   'RISK_TEST_COVERAGE.md':'# Map\n- RISK landscape colors: dawn hue stays warm\n','TEST_CHANGE_RATIONALES.json':'[{"reason":"Dawn hue regression case"}]\n'}});
+ const docs=makeScaledReviewFixture({base:{'README.md':'Old setup note.\n'},candidate:{'README.md':'Clearer setup note.\n'}});
+ try{
+  assert.deepEqual(deriveReleaseReviewPlan(ordinary.repo,ordinary.candidateSha,ordinary.baseSha),
+   scaledPlan({changedFiles:['RISK_TEST_COVERAGE.md','TEST_CHANGE_RATIONALES.json','src/landscape.mjs','tests.js']}),
+   'an ordinary code fix needs exactly the owner review plus one combined independent review');
+  assert.deepEqual(deriveReleaseReviewPlan(docs.repo,docs.candidateSha,docs.baseSha),
+   scaledPlan({changedFiles:['README.md'],mode:'owner-self-review',requiresCodeReview:false,requiresOwnerFaqCoverage:false}),
+   'a documentation-only diff needs only the owner review');
+ }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
+});
+
+test('RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const neutral={base:'const value = 1;\n',head:'const value = 2;\n'};
+ const fixtures={
+  // The release receipt verifier and pre-push gate are deployment infrastructure
+  // even when the changed line itself looks neutral.
+  releaseVerifier:makeScaledReviewFixture({base:{'scripts/release-evidence.mjs':neutral.base},candidate:{'scripts/release-evidence.mjs':neutral.head}}),
+  pushGate:makeScaledReviewFixture({base:{'scripts/install-release-hook.mjs':neutral.base},candidate:{'scripts/install-release-hook.mjs':neutral.head}}),
+  workflow:makeScaledReviewFixture({base:{'.github/workflows/data-safety.yml':'on: push\n'},candidate:{'.github/workflows/data-safety.yml':'on: pull_request\n'}}),
+  cloud:makeScaledReviewFixture({base:{'src/cloud-sync.mjs':neutral.base},candidate:{'src/cloud-sync.mjs':neutral.head}}),
+  rules:makeScaledReviewFixture({base:{'firestore.rules':neutral.base},candidate:{'firestore.rules':neutral.head}}),
+  callable:makeScaledReviewFixture({base:{'src/handlers.mjs':'exports.limit = https.onCall((request) => checkOwner(request));\n'},
+   candidate:{'src/handlers.mjs':'exports.limit = https.onCall((request) => checkTeam(request));\n'}}),
+  migration:makeScaledReviewFixture({base:{'src/upgrade.mjs':'const schemaVersion = 3;\n'},candidate:{'src/upgrade.mjs':'const schemaVersion = 4;\n'}}),
+  ambiguous:makeScaledReviewFixture({base:{'src/current-context.mjs':'export function saveSession(session) { return adapter.write(session); }\n'},
+   candidate:{'src/current-context.mjs':'export function saveSession(session) { return adapter.remove(session); }\n'}}),
+  ordinary:makeScaledReviewFixture({base:{'src/landscape.mjs':neutral.base},candidate:{'src/landscape.mjs':neutral.head}}),
+ };
+ try{
+  const domains=(name,options)=>deriveReleaseReviewPlan(fixtures[name].repo,fixtures[name].candidateSha,fixtures[name].baseSha,options).specialistDomains;
+  assert.deepEqual(domains('releaseVerifier'),['security-deployment'],'the receipt verifier keeps its deployment specialist');
+  assert.deepEqual(domains('pushGate'),['security-deployment'],'the pre-push release gate keeps its deployment specialist');
+  assert.deepEqual(domains('workflow'),['security-deployment'],'CI and Pages workflow edits keep the deployment specialist');
+  assert.deepEqual(domains('cloud'),['memory-cloud-sync']);
+  assert.deepEqual(domains('rules'),['memory-cloud-sync','security-deployment']);
+  assert.deepEqual(domains('callable'),['security-deployment']);
+  assert.deepEqual(domains('migration'),['data-migration']);
+  assert.deepEqual(domains('ambiguous'),['memory-cloud-sync','shared-session-state'],'ambiguous session persistence still fails closed to the specialist');
+  const cloudPlan=deriveReleaseReviewPlan(fixtures.cloud.repo,fixtures.cloud.candidateSha,fixtures.cloud.baseSha);
+  assert.equal(cloudPlan.mode,'dual-review');assert.equal(cloudPlan.schemaVersion,2);
+  assert.deepEqual(domains('ordinary',{additionalSpecialistDomains:['release-process']}),['release-process'],'the owner can still add a known domain');
+  assert.deepEqual(domains('cloud',{additionalSpecialistDomains:[]}),['memory-cloud-sync'],'an empty declaration cannot remove a derived domain');
+  assert.deepEqual(domains('rules',{additionalSpecialistDomains:['data-migration']}),['data-migration','memory-cloud-sync','security-deployment'],'declarations only add');
+ }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: scaled review plan sets typography only for markup or stylesheet content',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const page=(style,script,body)=>'<!doctype html>\n<style>\n'+style+'\n</style>\n<script>\n'+script+'\n</script>\n<body>\n'+body+'\n</body>\n';
+ const basePage=page('.row { color: red; }','const limit = 3;\nrow.innerHTML = \'<span class="a">x</span>\';','<p>Old control</p>');
+ const fixtures={
+  stylesheet:makeScaledReviewFixture({base:{'styles.css':'#status { color: red; }\n'},candidate:{'styles.css':'#status { color: blue; }\n'}}),
+  stylesheetComment:makeScaledReviewFixture({base:{'styles.css':'/* old note */\n#status { color: red; }\n'},candidate:{'styles.css':'/* clearer note */\n#status { color: red; }\n'}}),
+  markup:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('<p>Old control</p>','<p>New control</p>')}}),
+  inlineStyle:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('color: red','color: blue')}}),
+  scriptTemplate:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('class="a"','class="b"')}}),
+  scriptLogic:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('const limit = 3;','const limit = 4;')}}),
+  moduleLogic:makeScaledReviewFixture({base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}}),
+  // Tests and tooling assert on markup strings but are never rendered to users.
+  testMarkup:makeScaledReviewFixture({base:{'tests.js':'\n','scripts/agent-tools/report.mjs':'\n'},
+   candidate:{'tests.js':"assert.match(html,/<p class=\"note\">/);\n",'scripts/agent-tools/report.mjs':"const row = '<td class=\"ok\">';\n"}}),
+ };
+ try{
+  const typography=name=>deriveReleaseReviewPlan(fixtures[name].repo,fixtures[name].candidateSha,fixtures[name].baseSha).requiresTypographyReview;
+  assert.equal(typography('stylesheet'),true,'stylesheet content needs typography review');
+  assert.equal(typography('markup'),true,'page markup needs typography review');
+  assert.equal(typography('inlineStyle'),true,'an inline style block is stylesheet content');
+  assert.equal(typography('scriptTemplate'),true,'markup rendered from a script template is markup content');
+  assert.equal(typography('scriptLogic'),false,'inline script logic is not markup');
+  assert.equal(typography('moduleLogic'),false,'module logic is not markup');
+  assert.equal(typography('stylesheetComment'),false,'a comment-only stylesheet edit changes no styling');
+  assert.equal(typography('testMarkup'),false,'markup strings in tests and tooling are not rendered app markup');
+ }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: scaled review policy needs its committed AGENTS.md wording at both the exact head and base',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const faqPolicy='Independent FAQ coverage review is required for every product release.\n';
+ const app={base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}};
+ const fixtures={
+  // The candidate that introduces the lighter policy is still reviewed under
+  // the policy its base carries, so a diff cannot lower its own review bar.
+  introducing:makeScaledReviewFixture({...app,agentsBase:faqPolicy,agentsHead:SCALED_REVIEW_POLICY_TEXT}),
+  removing:makeScaledReviewFixture({...app,agentsBase:SCALED_REVIEW_POLICY_TEXT,agentsHead:faqPolicy}),
+  rewrapped:makeScaledReviewFixture({...app,agentsBase:SCALED_REVIEW_POLICY_TEXT,agentsHead:SCALED_REVIEW_POLICY_TEXT.replace(/\s+/g,'\n  ')}),
+ };
+ try{
+  const plan=name=>deriveReleaseReviewPlan(fixtures[name].repo,fixtures[name].candidateSha,fixtures[name].baseSha);
+  const introducing=plan('introducing');
+  assert.equal(introducing.schemaVersion,1,'an old-policy base keeps the old plan');
+  assert.equal(introducing.requiresFaqReview,true,'an old-policy base keeps the separate FAQ review');
+  assert.equal(Object.hasOwn(introducing,'requiresTypographyReview'),false);
+  const removing=plan('removing');
+  assert.equal(removing.schemaVersion,1,'a head without the wording returns to the old policy');
+  assert.equal(removing.requiresFaqReview,true);
+  assert.equal(plan('rewrapped').schemaVersion,2,'rewrapping the committed wording keeps the scaled policy');
+ }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: scaled receipts record FAQ coverage in the owner review instead of a separate reviewer',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const ordinary=makeScaledReviewFixture({base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}});
+ const docs=makeScaledReviewFixture({base:{'README.md':'Old note.\n'},candidate:{'README.md':'New note.\n'}});
+ const coverage={result:'no-user-facing-change',summary:'The hue tweak changes no control, default or saved data the extended FAQ describes.'};
+ try{
+  const input=riskBasedReleaseInput(ordinary,{specialistReview:false});
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,input),/FAQ coverage/,'product behavior needs the owner FAQ coverage result');
+  const badResult=riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:{...coverage,result:'skipped'}}}});
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,badResult),/FAQ coverage/);
+  const vague=riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:{...coverage,summary:'fine'}}}});
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,vague),/FAQ coverage/);
+  const separate=riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:coverage}}});
+  const faqPath=path.join(ordinary.root,'faq-review.md');fs.writeFileSync(faqPath,'A separate FAQ reviewer is no longer part of the plan.\n');
+  separate.faqReview={...separate.independentReview,task:'/root/faq-review',evidencePath:faqPath,evidenceSha256:releaseGateHash(faqPath)};
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,separate),/FAQ review/,'the scaled plan has no separate FAQ reviewer');
+  const recorded=recordReleaseEvidence(ordinary.repo,riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:coverage}}}));
+  assert.deepEqual(recorded.receipt.ownerReview.faqCoverage,coverage);
+  assert.equal(verifyReleaseEvidence(ordinary.repo,ordinary.candidateSha).ok,true);
+  const stripped=JSON.parse(fs.readFileSync(recorded.receiptPath,'utf8'));delete stripped.ownerReview.faqCoverage;releaseGateReseal(stripped);
+  fs.writeFileSync(recorded.receiptPath,JSON.stringify(stripped));
+  const tampered=verifyReleaseEvidence(ordinary.repo,ordinary.candidateSha);
+  assert.equal(tampered.ok,false,'a resealed receipt cannot drop the owner FAQ coverage result');assert.match(tampered.errors.join(' '),/FAQ coverage/);
+  recordReleaseEvidence(docs.repo,riskBasedReleaseInput(docs,{codeReview:false,specialistReview:false}));
+  assert.equal(verifyReleaseEvidence(docs.repo,docs.candidateSha).ok,true,'documentation-only receipts need no FAQ coverage result');
+ }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
+});
+
+const SCALED_FAQ_COVERAGE={result:'no-user-facing-change',summary:'The change alters no control, default or saved data the extended FAQ describes.'};
+
+test('RISK repository process: scaled receipts publish the v=4 binding and cannot cross policy boundaries',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence,publishReleaseStatuses}=await import('./scripts/release-evidence.mjs');
+ const app={base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}};
+ const ordinary=makeScaledReviewFixture(app);
+ const docs=makeScaledReviewFixture({base:{'README.md':'Old note.\n'},candidate:{'README.md':'New note.\n'}});
+ const legacyInput=makeScaledReviewFixture(app);
+ const introducing=makeScaledReviewFixture({...app,agentsBase:'Independent FAQ coverage review is required for every product release.\n'});
+ try{
+  const recorded=recordReleaseEvidence(ordinary.repo,riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:SCALED_FAQ_COVERAGE}}}));
+  const statuses=[];await publishReleaseStatuses(ordinary.repo,ordinary.candidateSha,async status=>statuses.push(status));
+  assert.deepEqual(statuses.map(status=>status.context).sort(),['funsidething/independent-review','funsidething/memory-audit','funsidething/specialist-review'],
+   'all three required contexts are still published');
+  assert.ok(statuses.every(status=>/;c=1;s=0;v=4$/.test(status.description)&&status.description.length<=140),'scaled receipts publish the new v=4 binding');
+  recordReleaseEvidence(docs.repo,riskBasedReleaseInput(docs,{codeReview:false,specialistReview:false}));
+  const docsStatuses=[];await publishReleaseStatuses(docs.repo,docs.candidateSha,async status=>docsStatuses.push(status));
+  assert.ok(docsStatuses.every(status=>/;c=0;s=0;v=4$/.test(status.description)));
+  assert.throws(()=>recordReleaseEvidence(legacyInput.repo,releaseGateInput(legacyInput)),/schemaVersion 2/,
+   'the historical two-review receipt cannot stand in for a scaled-policy candidate');
+  // Rebind the scaled receipt onto a candidate whose base predates the policy.
+  const target=path.join(introducing.repo,'.git','funsidething-release-evidence',introducing.candidateSha);
+  fs.cpSync(path.dirname(recorded.receiptPath),target,{recursive:true});
+  const moved=JSON.parse(fs.readFileSync(recorded.receiptPath,'utf8'));
+  moved.candidate={commitSha:introducing.candidateSha,treeSha:introducing.treeSha,baseSha:introducing.baseSha};
+  for(const key of ['ownerReview','independentReview'])moved[key].reviewedSha=introducing.candidateSha;
+  releaseGateReseal(moved);fs.writeFileSync(path.join(target,'receipt.json'),JSON.stringify(moved));
+  assert.equal(verifyReleaseEvidence(introducing.repo,introducing.candidateSha).ok,false,'the scaled receipt is rejected for an old-policy candidate');
+ }finally{for(const fixture of [ordinary,docs,legacyInput,introducing])cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: Pages accepts the v=4 binding only for scaled-policy candidates',async()=>{
+ const {deriveReleaseReviewPlan,recordReleaseEvidence,publishReleaseStatuses,verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs');
+ const app={base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}};
+ const scaled=makeScaledReviewFixture(app);
+ const introducing=makeScaledReviewFixture({...app,agentsBase:'Independent FAQ coverage review is required for every product release.\n'});
+ const mainSha='d'.repeat(40);
+ const pages=(f,statuses,repoRoot=f.repo)=>verifyDeploymentEvidence({repoRoot,repository:'emerald-pham/funsidething',deployedSha:mainSha,beforeSha:f.baseSha,token:'fixture',
+  fetchImpl:async url=>{
+   const pathname=new URL(url).pathname;let body;
+   if(pathname.endsWith('/commits/'+mainSha+'/pulls'))body=[{number:41,merge_commit_sha:mainSha,merged_at:new Date().toISOString(),base:{ref:'main'},head:{sha:f.candidateSha}}];
+   else if(pathname.endsWith('/commits/'+mainSha))body={parents:[{sha:f.baseSha}],commit:{tree:{sha:f.treeSha}}};
+   else if(pathname.endsWith('/commits/'+f.candidateSha+'/statuses'))body=statuses.map((row,i)=>({...row,created_at:new Date(Date.now()+i).toISOString()}));
+   else if(pathname.endsWith('/commits/'+f.candidateSha))body={commit:{tree:{sha:f.treeSha}}};
+   else if(pathname.includes('/compare/'))body={status:'ahead'};else throw Error(pathname);
+   return {ok:true,status:200,json:async()=>body};
+  }});
+ const rebind=(statuses,from,to)=>statuses.map(row=>({...row,description:row.description.replace(from,to)}));
+ try{
+  const recorded=recordReleaseEvidence(scaled.repo,riskBasedReleaseInput(scaled,{specialistReview:false,input:{ownerReview:{faqCoverage:SCALED_FAQ_COVERAGE}}}));
+  const statuses=[];await publishReleaseStatuses(scaled.repo,scaled.candidateSha,async row=>statuses.push(row));
+  const accepted=await pages(scaled,statuses);
+  assert.equal(accepted.ok,true,accepted.errors.join('; '));
+  assert.deepEqual([accepted.reviewedSha,accepted.treeSha,accepted.baseSha,accepted.receiptSha256],
+   [scaled.candidateSha,scaled.treeSha,scaled.baseSha,recorded.receipt.receiptSha256],'Pages still binds the exact head, tree, base and receipt digest');
+  for(const older of [';v=2',';v=3'])assert.equal((await pages(scaled,rebind(statuses,';v=4',older))).ok,false,older+' cannot authorize a scaled-policy candidate');
+  const legacy=statuses.map(row=>({...row,description:'receipt-sha256='+recorded.receipt.receiptSha256+';base='+scaled.baseSha}));
+  assert.equal((await pages(scaled,legacy)).ok,false,'the schema-1 binding cannot authorize a scaled-policy candidate');
+  const unknownHead=path.join(scaled.root,'empty');fs.mkdirSync(unknownHead);releaseGateGit(unknownHead,['init','-q']);
+  assert.equal((await pages(scaled,statuses,unknownHead)).ok,false,'v=4 fails closed when the exact head policy cannot be read');
+
+  const plan=deriveReleaseReviewPlan(introducing.repo,introducing.candidateSha,introducing.baseSha);assert.equal(plan.requiresFaqReview,true);
+  const input=riskBasedReleaseInput(introducing,{specialistReview:plan.requiresSpecialistReview,domains:plan.specialistDomains});
+  const faqPath=path.join(introducing.root,'faq.md');fs.writeFileSync(faqPath,'Reviewed changed controls, saved data, defaults and complete FAQ coverage.\n');
+  input.faqReview={...input.independentReview,task:'/root/faq-distinct-reviewer',evidencePath:faqPath,evidenceSha256:releaseGateHash(faqPath)};
+  recordReleaseEvidence(introducing.repo,input);
+  const historical=[];await publishReleaseStatuses(introducing.repo,introducing.candidateSha,async row=>historical.push(row));
+  assert.ok(historical.every(row=>/;v=3$/.test(row.description)),'an old-policy candidate keeps its FAQ binding');
+  assert.equal((await pages(introducing,historical)).ok,true,'historical v=3 bindings still verify for their own candidates');
+  assert.equal((await pages(introducing,rebind(historical,';v=3',';v=4'))).ok,false,'v=4 is rejected for an old-policy candidate');
+ }finally{cleanupReleaseGateFixture(scaled);cleanupReleaseGateFixture(introducing);}
+});
+
+test('RISK repository process: the repository AGENTS.md wording switches on the scaled review policy',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ // Guidance cleanups must keep the exact sentence the release validator reads.
+ const agents=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
+ const f=makeScaledReviewFixture({agentsBase:agents,agentsHead:agents,base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}});
+ try{
+  const plan=deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);
+  assert.equal(plan.schemaVersion,2,'the committed AGENTS.md must carry the scaled review policy wording');
+  assert.equal(plan.requiresFaqReview,false);assert.equal(plan.requiresOwnerFaqCoverage,true);
+ }finally{cleanupReleaseGateFixture(f);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);

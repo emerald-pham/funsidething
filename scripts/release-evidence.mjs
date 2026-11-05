@@ -239,10 +239,24 @@ function isDocumentationOnlyPath(file) {
   return !riskDocumentationPath.test(normalized);
 }
 
-function reviewDomainsForPath(file) {
+// Spec #2205: the scaled review policy is switched on only by this committed
+// AGENTS.md wording. Whitespace is normalized so rewrapping the paragraph does
+// not silently revert a candidate to the older policy.
+const scaledReviewPolicyMarker = 'Release reviews scale to the exact diff.';
+
+function hasScaledReviewPolicy(repoRoot, sha) {
+  return (gitShow(repoRoot, sha, 'AGENTS.md') || '').replace(/\s+/g, ' ').includes(scaledReviewPolicyMarker);
+}
+
+function reviewDomainsForPath(file, scaled = false) {
   const normalized = file.toLowerCase().replaceAll('\\', '/');
   const domains = new Set();
-  if (isReleaseProcessPath(file)) domains.add('release-process');
+  // Under the scaled policy, process files (test map, rationales, guidance)
+  // keep the independent code review but no longer summon a specialist.
+  if (isReleaseProcessPath(file) && !scaled) domains.add('release-process');
+  // The receipt verifier, Pages deployment check and pre-push gate are
+  // deployment infrastructure, so they keep a specialist under the scaled policy.
+  if (scaled && /^scripts\/(?:release-evidence|install-release-hook)\.mjs$/.test(normalized)) domains.add('security-deployment');
   if (/(?:cloud|firestore|sync|storage|persist|backup|recovery|migration|indexeddb|localstorage|local-storage|account)/.test(normalized)) {
     domains.add('memory-cloud-sync');
   }
@@ -254,7 +268,7 @@ function reviewDomainsForPath(file) {
   return [...domains].sort();
 }
 
-function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file) {
+function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled = false) {
   const normalized = file.toLowerCase().replaceAll('\\', '/');
   const domains = new Set();
   const patch = gitRaw(repoRoot, ['diff', '--unified=2', '--no-renames', baseSha, commitSha, '--', file]);
@@ -269,8 +283,65 @@ function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file) {
     domains.add('security-deployment');
   }
   if (/(?:migration|migrat|schemaVersion|schema version|upgradeDatabase|versionchange)/i.test(context)) domains.add('data-migration');
-  if (/(?:^|\/)\.github\/workflows\//.test(normalized)) domains.add('release-process');
+  if (/(?:^|\/)\.github\/workflows\//.test(normalized) && !scaled) domains.add('release-process');
   return [...domains].sort();
+}
+
+// Typography review follows rendered markup and styling, not logic. Script
+// lines count when they build markup or classes/styles, because most of the
+// app's markup is rendered from template strings inside index.html scripts.
+const markupLinePattern = /<\/?[a-z][a-z0-9-]*(?:[\s>/]|$)|\b(?:class|style)\s*=|\.style\b|classList|className|(?:inner|outer)HTML|insertAdjacentHTML/i;
+
+function inlineScriptLines(text) {
+  const inside = new Set();
+  if (text === null) return inside;
+  let open = false;
+  text.split(/\r?\n/).forEach((line, index) => {
+    if (open) {
+      if (/<\/script\s*>/i.test(line)) open = false;
+      else inside.add(index + 1);
+      return;
+    }
+    const start = line.match(/<script\b([^>]*)>/i);
+    if (start && !/\bsrc\s*=/i.test(start[1]) && !/<\/script\s*>/i.test(line.slice(start.index + start[0].length))) open = true;
+  });
+  return inside;
+}
+
+const unrenderedSegments = new Set(['.git', '.github', '.claude', 'audits', 'docs', 'node_modules', 'scripts']);
+
+function changesTypography(repoRoot, baseSha, commitSha, file) {
+  const normalized = file.replaceAll('\\', '/');
+  // Tests and tooling assert on markup strings but are never shown to users.
+  if (normalized === 'tests.js' || /\.test\.[cm]?js$/i.test(normalized) ||
+      normalized.split('/').some(segment => unrenderedSegments.has(segment))) return false;
+  const extension = path.extname(file).toLowerCase();
+  if (['.css', '.scss'].includes(extension)) return true;
+  const html = ['.html', '.htm'].includes(extension);
+  if (!html && !['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx'].includes(extension)) return false;
+  const patch = gitRaw(repoRoot, ['diff', '--unified=0', '--no-renames', baseSha, commitSha, '--', file]);
+  const scripts = html
+    ? { '-': inlineScriptLines(gitShow(repoRoot, baseSha, file)), '+': inlineScriptLines(gitShow(repoRoot, commitSha, file)) }
+    : null;
+  let inHunk = false;
+  let oldLine = 0;
+  let newLine = 0;
+  for (const line of patch.split(/\r?\n/)) {
+    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      inHunk = true;
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      continue;
+    }
+    const side = line[0];
+    if (!inHunk || (side !== '+' && side !== '-')) continue;
+    const number = side === '+' ? newLine++ : oldLine++;
+    // Outside inline scripts, every HTML line is markup or inline stylesheet.
+    if (html && !scripts[side].has(number)) return true;
+    if (markupLinePattern.test(line.slice(1))) return true;
+  }
+  return false;
 }
 
 export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = {}) {
@@ -284,15 +355,23 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     : [];
   const changedFiles = gitRaw(repoRoot, ['diff', '--name-only', '--no-renames', '-z', baseSha, commitSha, '--'])
     .split('\0').filter(Boolean).sort();
+  // The policy is read at the exact head, but a candidate whose base predates
+  // it keeps the old policy: the diff that introduces the lighter plan cannot
+  // approve itself under that plan.
+  const scaled = hasScaledReviewPolicy(repoRoot, commitSha) && hasScaledReviewPolicy(repoRoot, baseSha);
   let requiresCodeReview = false;
+  let requiresTypographyReview = false;
   const specialistDomains = new Set();
   for (const file of changedFiles) {
     const documentationOnly = isDocumentationOnlyPath(file);
     const commentsOnly = commentOnlyDiff(repoRoot, baseSha, commitSha, file);
     if (!documentationOnly && !commentsOnly) requiresCodeReview = true;
+    if (scaled && !commentsOnly && !requiresTypographyReview) {
+      requiresTypographyReview = changesTypography(repoRoot, baseSha, commitSha, file);
+    }
     if (!commentsOnly) {
-      for (const domain of reviewDomainsForPath(file)) specialistDomains.add(domain);
-      for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file)) specialistDomains.add(domain);
+      for (const domain of reviewDomainsForPath(file, scaled)) specialistDomains.add(domain);
+      for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled)) specialistDomains.add(domain);
     }
   }
   for (const domain of additionalSpecialistDomains) specialistDomains.add(domain);
@@ -301,6 +380,21 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
   const mode = requiresCodeReview && requiresSpecialistReview ? 'dual-review' :
     requiresCodeReview ? 'independent-review' :
     requiresSpecialistReview ? 'specialist-review' : 'owner-self-review';
+  if (scaled) {
+    // Plan schema 2 marks the scaled policy. FAQ coverage moves into the owner
+    // review for product behavior instead of a separate FAQ reviewer.
+    return {
+      schemaVersion: 2,
+      changedFiles,
+      mode,
+      requiresCodeReview,
+      requiresFaqReview: false,
+      requiresOwnerFaqCoverage: requiresCodeReview,
+      requiresSpecialistReview,
+      requiresTypographyReview,
+      specialistDomains: domains,
+    };
+  }
   return {
     schemaVersion: 1,
     changedFiles,
@@ -322,6 +416,14 @@ function evidenceFile(repoRoot, sourcePath, expectedSha, label) {
   return fs.readFileSync(resolved);
 }
 
+// Schema-1 receipts remain valid only for candidates from before the FAQ and
+// scaled policies; both later policies require schema-2 review objects.
+function schemaVersionOneConflict(plan) {
+  if (plan.schemaVersion === 2) return 'Scaled review policy requires schemaVersion 2 evidence.';
+  if (plan.requiresFaqReview) return 'FAQ coverage policy requires schemaVersion 2 evidence.';
+  return null;
+}
+
 function validateInput(repoRoot, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Release evidence input must be a JSON object.');
   if (input.schemaVersion !== 1) throw new Error('Release evidence input must use schemaVersion 1.');
@@ -331,7 +433,8 @@ function validateInput(repoRoot, input) {
   const actualTree = candidateTree(repoRoot, commitSha);
   if (!SHA1.test(treeSha || '') || actualTree !== treeSha) throw new Error('Candidate tree SHA does not match the exact commit.');
   assertAncestor(repoRoot, baseSha, commitSha);
-  if(deriveReleaseReviewPlan(repoRoot,commitSha,baseSha).requiresFaqReview)throw new Error('FAQ coverage policy requires schemaVersion 2 evidence.');
+  const legacyPlanError = schemaVersionOneConflict(deriveReleaseReviewPlan(repoRoot, commitSha, baseSha));
+  if (legacyPlanError) throw new Error(legacyPlanError);
   const ownerTask = taskId(input.ownerTask, 'ownerTask');
   const auditorTask = taskId(input.memoryAudit?.task, 'memoryAudit.task');
   const reviewerTask = taskId(input.independentReview?.task, 'independentReview.task');
@@ -421,6 +524,20 @@ function validatedMemorySources(sources, field, verifyNow) {
   });
 }
 
+// Scaled policy: the owner records the extended-FAQ coverage result for product
+// behavior, replacing the separate FAQ reviewer of the October 2026 policy.
+const faqCoverageResults = new Set(['updated', 'no-user-facing-change']);
+
+function ownerFaqCoverage(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !faqCoverageResults.has(value.result)) {
+    throw new Error('Owner review FAQ coverage must record a result of updated or no-user-facing-change.');
+  }
+  if (typeof value.summary !== 'string' || value.summary.trim().length < 20) {
+    throw new Error('Owner review FAQ coverage must record a specific summary.');
+  }
+  return { result: value.result, summary: value.summary.trim() };
+}
+
 function validateRiskBasedInput(repoRoot, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || input.schemaVersion !== 2) {
     throw new Error('Risk-based release evidence input must use schemaVersion 2.');
@@ -446,6 +563,9 @@ function validateRiskBasedInput(repoRoot, input) {
   if (!owner.scope || owner.scope.fullDiff !== true || typeof owner.scope.rationale !== 'string' || owner.scope.rationale.trim().length < 20) {
     throw new Error('Owner review must attest to the full exact diff and record a specific risk rationale.');
   }
+  let faqCoverage;
+  if (reviewPlan.requiresOwnerFaqCoverage) faqCoverage = ownerFaqCoverage(owner.faqCoverage);
+  else if (owner.faqCoverage !== undefined) throw new Error('This exact diff has no product behavior; omit the owner review FAQ coverage.');
   const ownerBytes = evidenceFile(repoRoot, owner.evidencePath, owner.evidenceSha256, 'Owner exact-diff review');
   const identities = [ownerTask];
   let independentReview;
@@ -532,6 +652,7 @@ function validateRiskBasedInput(repoRoot, input) {
       completedAt: ownerTime,
       summary: owner.summary.trim(),
       scope: { fullDiff: true, rationale: owner.scope.rationale.trim() },
+      ...(faqCoverage ? { faqCoverage } : {}),
       evidence: { file: 'owner-review.md', sha256: sha256(ownerBytes) },
     },
     ...(independentReview ? { independentReview } : {}),
@@ -627,6 +748,15 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
   if (typeof owner?.summary !== 'string' || owner.summary.trim().length < 20 ||
       owner?.scope?.fullDiff !== true || typeof owner?.scope?.rationale !== 'string' || owner.scope.rationale.trim().length < 20) {
     errors.push('Owner exact-diff review summary or full-diff risk rationale is incomplete.');
+  }
+  if (plan?.requiresOwnerFaqCoverage) {
+    try {
+      ownerFaqCoverage(owner?.faqCoverage);
+    } catch (error) {
+      errors.push(error.message);
+    }
+  } else if (owner && Object.hasOwn(owner, 'faqCoverage')) {
+    errors.push('Owner review FAQ coverage is not part of this exact-diff plan.');
   }
   const identities = [];
   try {
@@ -746,7 +876,12 @@ export function verifyReleaseEvidence(repoRoot, commitSha) {
     return { ok: false, errors: ['Missing or malformed exact-SHA release receipt: ' + error.message], receiptPath };
   }
   if (receipt?.schemaVersion === 2) return verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath);
-  try{if(deriveReleaseReviewPlan(repoRoot,commitSha,receipt?.candidate?.baseSha).requiresFaqReview)errors.push('FAQ coverage policy requires schemaVersion 2 evidence.');}catch(error){errors.push(error.message);}
+  try {
+    const legacyPlanError = schemaVersionOneConflict(deriveReleaseReviewPlan(repoRoot, commitSha, receipt?.candidate?.baseSha));
+    if (legacyPlanError) errors.push(legacyPlanError);
+  } catch (error) {
+    errors.push(error.message);
+  }
   if (!receipt || typeof receipt !== 'object' || receipt.schemaVersion !== 1) errors.push('Release receipt schemaVersion must be 1.');
   if (receipt?.candidate?.commitSha !== commitSha) errors.push('Release receipt is stale or names a different candidate SHA.');
   if (receipt?.candidate?.commitSha && SHA1.test(receipt.candidate.commitSha)) {
@@ -843,6 +978,14 @@ export function validatePrePushUpdates(repoRoot, updates) {
   return errors;
 }
 
+// Status binding versions: v=2 is the original risk-based plan, v=3 the
+// October 2026 FAQ-reviewer policy, and v=4 the scaled policy (plan schema 2).
+// Each verifier accepts a binding only for candidates carrying its own policy.
+function statusBindingVersion(reviewPlan) {
+  if (reviewPlan.schemaVersion === 2) return ';v=4';
+  return reviewPlan.requiresFaqReview ? ';v=3' : ';v=2';
+}
+
 export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
   const result = verifyReleaseEvidence(repoRoot, commitSha);
   if (!result.ok) throw new Error('Cannot publish release statuses without a valid exact-SHA receipt: ' + result.errors.join(' '));
@@ -852,7 +995,7 @@ export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
     ? 'r=' + result.receipt.receiptSha256 + ';b=' + result.receipt.candidate.baseSha +
       ';p=' + sha256(Buffer.from(canonicalJson(result.receipt.reviewPlan))).slice(0, 12) +
       ';c=' + (result.receipt.reviewPlan.requiresCodeReview ? '1' : '0') +
-      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
+      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + statusBindingVersion(result.receipt.reviewPlan)
     : 'receipt-sha256=' + result.receipt.receiptSha256 + ';base=' + result.receipt.candidate.baseSha;
   const targetUrl = 'https://github.com/' + git(repoRoot, ['remote', 'get-url', 'origin']).replace(/^.*github\.com[:/]/, '').replace(/\.git$/, '') + '/commit/' + commitSha;
   const base = result.receipt.candidate.baseSha;
@@ -922,7 +1065,11 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
       localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
       if(!localHead)throw new Error('Exact review head remains unavailable after fetching its PR ref.');
     }
-    const faqPolicy=localHead ? !!deriveReleaseReviewPlan(repoRoot,headSha,baseSha).requiresFaqReview : false;
+    const headPlan=localHead ? deriveReleaseReviewPlan(repoRoot,headSha,baseSha) : null;
+    const faqPolicy=!!headPlan?.requiresFaqReview;
+    // The v=4 binding is honored only when the exact head and base carry the
+    // scaled policy; an unreadable head can never claim it (fails closed).
+    const scaledPolicy=headPlan?.schemaVersion===2;
     const reviewedCommit = await githubJson(fetchImpl, api + '/commits/' + headSha, token);
     if (!treeSha || reviewedCommit.commit?.tree?.sha !== treeSha) {
       throw new Error('The reviewed pull request head tree does not exactly match the deployed main tree.');
@@ -937,12 +1084,14 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
     const riskBasedDescription = latest.get('funsidething/specialist-review')?.status?.description ||
       latest.get('funsidething/independent-review')?.status?.description || '';
     if(faqPolicy&&!/;v=3$/.test(riskBasedDescription))throw new Error('FAQ coverage policy requires FAQ-approved exact-head deployment evidence.');
-    if (/;v=[23]$/.test(riskBasedDescription)) {
+    if (scaledPolicy && !/;v=4$/.test(riskBasedDescription)) throw new Error('Scaled review policy requires v=4 exact-head deployment evidence.');
+    if (!scaledPolicy && /;v=4$/.test(riskBasedDescription)) throw new Error('The v=4 review binding is accepted only for scaled-policy candidates.');
+    if (/;v=[234]$/.test(riskBasedDescription)) {
       const statusPlan = new Map();
       for (const context of RISK_BASED_RELEASE_STATUS_CONTEXTS) {
         const status = latest.get(context)?.status;
         if (!status || status.state !== 'success') throw new Error('Latest exact-head status is missing or unsuccessful: ' + context + '.');
-        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=([23])$/);
+        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=([234])$/);
         if (!match || match[2] !== baseSha) throw new Error('Risk-based exact-head status is not bound to the deployed base and receipt: ' + context + '.');
         statusPlan.set(context, match.slice(1));
       }

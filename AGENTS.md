@@ -20,7 +20,8 @@ Routine animation-frequency tuning stays out of public patch notes/changelog by
 user preference; keep internal evidence truthful and the extended FAQ accurate.
 This exception does not suppress bugs, safety/accessibility changes or limits.
 
-Independent FAQ coverage review is required for every product release.
+Release reviews scale to the exact diff. The release validator derives the
+plan, and the owner review records FAQ coverage for every product release.
 Read [release and review](docs/agents/release-and-review.md) before release for
 review identities, exact-candidate regression, compatibility, receipt, CI and
 live verification requirements. Documentation housekeeping uses owner review.
