@@ -16913,7 +16913,12 @@ test('RISK saved view accepted handover: normal actions and exact local work sur
 
 test('RISK opening board presentation: shared markup retains released cards contexts task rows and history',async()=>{
  const baseline=spawnSync('git',['show','6c67fb0c9988d3e578579c7bb23a8ed0731aac3f:index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(baseline.status,0,baseline.stderr);
- const tasks=['first','bench','candidate'].map((id,i)=>({...syncTask(id,'Saved <'+id+'> & title'),mu:25+i,ctx:['home'],evergreen:i===2,due:i===2?'2026-10-29':null}));
+ // #2194 CI (PR #2222): the candidate's due date was the literal 2026-10-29,
+ // written as a date a few days ahead. Once it passed, both apps offered the
+ // overdue Run WOOP control with its own random binding id, so the released
+ // and current markup could never match again. Keep it a few days ahead.
+ const dueSoon=(()=>{const day=new Date(Date.now()+3*86400000);return day.getFullYear()+'-'+String(day.getMonth()+1).padStart(2,'0')+'-'+String(day.getDate()).padStart(2,'0');})();
+ const tasks=['first','bench','candidate'].map((id,i)=>({...syncTask(id,'Saved <'+id+'> & title'),mu:25+i,ctx:['home'],evergreen:i===2,due:i===2?dueSoon:null}));
  tasks.push({...syncTask('done','Finished <saved> task'),done:true,completedAt:1});
  const board=syncState({tasks,contexts:[{id:'home',name:'Home & <garden>',active:true}],chain:['first','bench'],candidateId:'candidate',listOpen:true,ctxOpen:true,histOpen:true,
   workLog:[{id:'work-log',taskId:'first',title:'Earlier <work>',kind:'worked',at:2}],settings:{...syncState().settings,dateFormat:'mdy'}}),raw=JSON.stringify(board);
@@ -31363,6 +31368,33 @@ test('RISK repository process: release hooks reject marker-only or tampered disp
   assert.equal(fs.readFileSync(installed.preservedHookPath,'utf8'),prior,
    'the real hook remains recoverable byte-for-byte');
  }finally{cleanupReleaseGateFixture(tampered);}
+});
+
+// #2194 CI (PR #2222): the group runner accepts only the 61 environment skips
+// captured in the baseline inventory, so every browser root this branch added
+// under {skip:!process.env.LANDSCAPE_BROWSER_URL} failed CI as an unexpected
+// skip. An added root may skip only through an explicit environmentSkips
+// declaration naming the variable its registration is gated on.
+test('RISK test inventory: every added environment-gated root is declared with the variable its registration skips on',()=>{
+ const assignments=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-assignments.json'),'utf8'));
+ const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-inventory.json'),'utf8'));
+ const baselineSkips=new Set(inventory.acceptedSkipCaseIds);
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+ const gated=new Map();
+ for(const match of source.matchAll(/^test\(\s*(['"])(.*?)\1\s*,\s*\{\s*skip\s*:\s*!process\.env\.([A-Z][A-Z0-9_]*)\s*\}/gm))gated.set(match[2],match[3]);
+ const added=[...gated].filter(([root])=>!baselineSkips.has(root));
+ assert.ok(added.length>=10,'positive control: this branch adds environment-gated browser roots: '+added.length);
+ const declared=new Map((assignments.environmentSkips||[]).map(entry=>[entry.root,entry]));
+ for(const [root,environment] of added){
+  assert.ok(declared.has(root),'the added environment-gated root is declared: '+root);
+  assert.equal(declared.get(root).environment,environment,'the declaration names the variable the registration skips on: '+root);
+  assert.ok(String(declared.get(root).reason||'').trim().length>=20,'the declaration explains why the root cannot run in CI: '+root);
+ }
+ for(const root of declared.keys()){
+  assert.ok(gated.has(root),'every declaration names an environment-gated root in tests.js: '+root);
+  assert.equal(baselineSkips.has(root),false,'baseline skips stay in the independent inventory, not in declarations: '+root);
+  assert.ok(assignments.rootAssignments.some(entry=>entry.root===root),'every declared root keeps its group assignment: '+root);
+ }
 });
 
 test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{

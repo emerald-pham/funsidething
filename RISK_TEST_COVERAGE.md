@@ -459,6 +459,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: unrelated risk cases cannot approve enforcement edits
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
 - RISK test inventory: every named risk contract maps to a feature boundary
+- RISK test inventory: every added environment-gated root is declared with the variable its registration skips on
+- RISK test inventory: the group runner accepts an added environment-gated skip only when declared and its variable is absent
 
 ## Release memory/cloud/sync and independent code review
 
