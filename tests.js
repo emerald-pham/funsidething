@@ -31995,7 +31995,10 @@ test('RISK corrupt cloud work budget: resuming over an unchanged unreadable gene
  t.diagnostic('First opening: '+firstOpen+' server reads, '+firstChunks.length+' generation chunk reads');
  // Returning to the app (hide, then show) and a later automatic pull.
  shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;
- vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);await settle('the resumed read settles');
+ // resumeCloudSync starts its pull without returning it: wait for its first
+ // server read, then for the pull to finish, so an early check cannot pass empty.
+ const beforeResume=reads.length;vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);
+ await fixtureDeadline(async wait=>{while(reads.length===beforeResume||!settled())await wait(10);},'the resumed read settles',CAPTURED_RESULT_BUDGET_MS+20000);
  const resumed=reads.slice(firstOpen);
  t.diagnostic('Resume: '+resumed.length+' server reads '+JSON.stringify(resumed));
  assert.deepEqual(generationReads(firstOpen),[],'resuming over the unchanged root downloads neither the unreadable generation nor its prior again');
@@ -32035,7 +32038,9 @@ test('RISK corrupt cloud work budget: an interrupted recovery check is not remem
  const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
  const settle=async message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
  const resume=async message=>{shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;
-  vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);await settle(message);};
+  // The resumed pull is not returned: wait for its first server read, then idle.
+  const before=reads.length;vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);
+  await fixtureDeadline(async wait=>{while(reads.length===before||!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);};
  const before=JSON.stringify(ctx.state),cloudBefore=JSON.stringify([...backend.docs]);
  ctx.closeModal();await flush();await ctx.cloudPull();await settle('the interrupted opening settles');
  assert.equal(interrupted,true,'the transient failure reached the automatic recovery read');
