@@ -13026,6 +13026,11 @@
       "file": "scripts/agent-tools/test-groups.test.mjs"
     },
     {
+      "root": "test group runner refuses the retired single tests.js suite command",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
       "root": "preflight runs the focused checks from the per-area test directory",
       "group": "native-process",
       "file": "scripts/agent-tools/preflight.test.mjs"

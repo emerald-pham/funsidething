@@ -9,6 +9,10 @@ import { test } from 'node:test';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runner = path.join(repository, 'scripts/test-groups.mjs');
+// Fixtures use the per-area tests/ layout the runner groups (#2213). A legacy
+// single tests.js fixture exists only as a pre-split comparison base.
+const suiteFile = 'tests/core.test.js';
+const suiteCommand = 'node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs';
 const groups = ['core', 'scenery', 'persistence-recovery', 'native-process'];
 const fixtureRoots = {
   core: 'fixture core baseline root',
@@ -92,12 +96,13 @@ function inventory(coreTitle = fixtureRoots.core, additionalCoreRoots = [], nati
 }
 
 function assignments(coreTitle = fixtureRoots.core, options = {}) {
+  const file = options.legacyLayout ? 'tests.js' : suiteFile;
   const rootAssignments = [
-    { root: coreTitle, group: 'core', file: 'tests.js' },
-    ...(options.additionalCoreRoots || []).map(root => ({ root, group: 'core', file: 'tests.js' })),
-    { root: fixtureRoots.scenery, group: 'scenery', file: 'tests.js' },
-    { root: fixtureRoots['persistence-recovery'], group: 'persistence-recovery', file: 'tests.js' },
-    { root: options.nativeTitle || fixtureRoots['native-process'], group: 'native-process', file: 'tests.js' },
+    { root: coreTitle, group: 'core', file },
+    ...(options.additionalCoreRoots || []).map(root => ({ root, group: 'core', file })),
+    { root: fixtureRoots.scenery, group: 'scenery', file },
+    { root: fixtureRoots['persistence-recovery'], group: 'persistence-recovery', file },
+    { root: options.nativeTitle || fixtureRoots['native-process'], group: 'native-process', file },
     { root: fixtureScriptRoot, group: 'native-process', file: 'scripts/agent-tools/fixture.test.mjs' },
   ];
   return {
@@ -117,7 +122,7 @@ function assignments(coreTitle = fixtureRoots.core, options = {}) {
     processControls: options.processControl ? [{
       id: 'fixture native controlled child outcome',
       group: 'native-process',
-      file: 'tests.js',
+      file,
       ownerRoot: fixtureRoots['native-process'],
       expectedExecutions: 1,
     }] : [],
@@ -135,9 +140,10 @@ function createFixture(t, options = {}) {
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {
     type: 'module',
-    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
+    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: options.legacyLayout ? 'node --test tests.js scripts/agent-tools/*.test.mjs' : suiteCommand },
   });
-  fs.writeFileSync(path.join(root, 'tests.js'), suiteSource({ ...options, coreTitle, runtimeCoreTitle: options.runtimeCoreTitle || coreTitle }));
+  fs.mkdirSync(path.join(root, 'tests'), { recursive: true });
+  fs.writeFileSync(path.join(root, options.legacyLayout ? 'tests.js' : suiteFile), suiteSource({ ...options, coreTitle, runtimeCoreTitle: options.runtimeCoreTitle || coreTitle }));
   fs.writeFileSync(path.join(root, 'scripts/agent-tools/fixture.test.mjs'),
     `import { test } from 'node:test';\ntest(${JSON.stringify(fixtureScriptRoot)}, () => {});\n`);
   writeJson(path.join(root, 'scripts/test-group-inventory.json'), inventory(coreTitle, options.additionalCoreRoots || [], options.nativeTitle));
@@ -325,7 +331,7 @@ test('test group runner reconciles complete full and grouped fixture cohorts', t
   const outerNativeOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-outer-native-'));
   fs.rmSync(outerNativeOutput, { recursive: true });
   fixture.outputs.push(outerNativeOutput);
-  const fixtureArgs = ['--test', '--test-reporter=tap', 'tests.js', 'scripts/agent-tools/fixture.test.mjs'];
+  const fixtureArgs = ['--test', '--test-reporter=tap', suiteFile, 'scripts/agent-tools/fixture.test.mjs'];
   const callerEnv = {
     ...process.env,
     CHAIN_NATIVE_OUTPUT: outerNativeOutput,
@@ -368,21 +374,21 @@ test('test group runner reconciles a renamed root and preserves baseline case id
   const oldRoot = 'fixture core historical title';
   const newRoot = `${oldRoot} with isolated contexts`;
   const fixture = createFixture(t, { coreTitle: oldRoot });
-  fs.writeFileSync(path.join(fixture.root, 'tests.js'), suiteSource({ coreTitle: newRoot }));
+  fs.writeFileSync(path.join(fixture.root, suiteFile), suiteSource({ coreTitle: newRoot }));
   const groupAssignments = JSON.parse(fs.readFileSync(path.join(fixture.root, 'scripts/test-group-assignments.json'), 'utf8'));
   groupAssignments.rootAssignments = groupAssignments.rootAssignments.filter(item => item.root !== oldRoot);
-  groupAssignments.rootAssignments.push({ root: newRoot, group: 'core', file: 'tests.js' });
+  groupAssignments.rootAssignments.push({ root: newRoot, group: 'core', file: suiteFile });
   groupAssignments.rootAssignments.sort((a, b) => a.root.localeCompare(b.root));
   groupAssignments.rootReplacements = [{
     baselineRoot: oldRoot,
     currentRoot: newRoot,
     baselineGroup: 'core',
     group: 'core',
-    file: 'tests.js',
+    file: suiteFile,
     reason: 'The renamed fixture title preserves its historical child assertions and case identities.',
   }];
   writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), groupAssignments);
-  git(fixture.root, 'add', 'tests.js', 'scripts/test-group-assignments.json');
+  git(fixture.root, 'add', suiteFile, 'scripts/test-group-assignments.json');
   git(fixture.root, 'commit', '-qm', 'classify a preserved renamed root');
   fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
   fixture.comparisonBase = fixture.sourceSha;
@@ -403,7 +409,7 @@ test('test group runner rejects overlapping and unclassified registrations', t =
   assert.match(overlap.evidence?.issues?.join('\n') || '', /overlapping group assignments/);
 
   const unclassifiedFixture = createFixture(t);
-  fs.appendFileSync(path.join(unclassifiedFixture.root, 'tests.js'), "\ntest('new unclassified root', () => {});\n");
+  fs.appendFileSync(path.join(unclassifiedFixture.root, suiteFile), "\ntest('new unclassified root', () => {});\n");
   const unclassified = invoke(unclassifiedFixture);
   assert.notEqual(unclassified.status, 0);
   assert.match(unclassified.evidence?.issues?.join('\n') || '', /New top-level test.*no explicit group assignment/);
@@ -416,7 +422,7 @@ test('test group runner rejects unexpected skips and missing required cases', t 
   assert.match(skipped.evidence?.issues?.join('\n') || '', /unexpectedly skipped/);
 
   const missingFixture = createFixture(t);
-  fs.writeFileSync(path.join(missingFixture.root, 'tests.js'), suiteSource().replace(
+  fs.writeFileSync(path.join(missingFixture.root, suiteFile), suiteSource().replace(
     "  await t.test('fixture accepted environment skip', { skip: 'baseline skip' }, () => {});", ''));
   const missing = invoke(missingFixture);
   assert.notEqual(missing.status, 0);
@@ -464,7 +470,7 @@ test('RISK test group runner preserves hash identities and counts only executabl
     const nativeFixture = isolatedFixtureNativeOutput(fixture);
     const fullEnv = { ...nativeFixture.env };
     delete fullEnv.NODE_TEST_CONTEXT;
-    const full = run(process.execPath, ['--test', '--test-reporter=tap', 'tests.js'], fixture.root, fullEnv);
+    const full = run(process.execPath, ['--test', '--test-reporter=tap', suiteFile], fixture.root, fullEnv);
     assert.equal(full.status, 0, `${full.stdout}\n${full.stderr}`);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(nativeFixture.output, 'candidate-identity.json'), 'utf8')),
       { sha: fixture.sourceSha, tree: fullEnv.CHAIN_NATIVE_CANDIDATE_TREE }, 'the nested full fixture writes its own candidate identity');
@@ -536,12 +542,12 @@ test('test group selection executes every uncertain routing scenario under its a
 });
 
 test('test group preflight rejects a passing dynamic row added at an unchanged registration site', t => {
-  const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+  const fixture=createFixture(t),file=path.join(fixture.root,suiteFile);
   fs.appendFileSync(file,"\nconst futureDynamicRows=[];for(const title of futureDynamicRows)test(title,()=>{});\n");
-  git(fixture.root,'add','tests.js');git(fixture.root,'commit','-qm','existing dynamic registration site');
+  git(fixture.root,'add',suiteFile);git(fixture.root,'commit','-qm','existing dynamic registration site');
   fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
   fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('futureDynamicRows=[]','futureDynamicRows=["unclassified future dynamic row"]'));
-  git(fixture.root,'add','tests.js');git(fixture.root,'commit','-qm','add an unclassified data row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  git(fixture.root,'add',suiteFile);git(fixture.root,'commit','-qm','add an unclassified data row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
   const result=invoke(fixture);
   assert.notEqual(result.status,0,'a passing unknown runtime root must not disappear from the required grouped cohort');
   assert.match(result.stderr,/unclassified.*dynamic|dynamic.*unclassified/i);
@@ -600,9 +606,9 @@ test('test group aggregate rejects corrupt outcomes identities jobs and native e
 // never needed by the required aggregate.
 const installedClientRoot='RISK repository process: required installed-client native outcomes and artifacts execute exactly once';
 const nightlyFixtureRoot='fixture cross-engine native button root';
-function nightlyFixture(t,{body='()=>{if(process.env.CHAIN_NIGHTLY_SENTINEL)fs.writeFileSync(process.env.CHAIN_NIGHTLY_SENTINEL,"executed");}',nightlyRoots=[{root:nightlyFixtureRoot,file:'tests.js',reason:'Fixture cross-engine case runs in the nightly job only.'}]}={}){
+function nightlyFixture(t,{body='()=>{if(process.env.CHAIN_NIGHTLY_SENTINEL)fs.writeFileSync(process.env.CHAIN_NIGHTLY_SENTINEL,"executed");}',nightlyRoots=[{root:nightlyFixtureRoot,file:suiteFile,reason:'Fixture cross-engine case runs in the nightly job only.'}]}={}){
   const fixture=createFixture(t,{nativeTitle:installedClientRoot,nativeReports:true});
-  fs.appendFileSync(path.join(fixture.root,'tests.js'),`\ntest(${JSON.stringify(nightlyFixtureRoot)},${body});\n`);
+  fs.appendFileSync(path.join(fixture.root,suiteFile),`\ntest(${JSON.stringify(nightlyFixtureRoot)},${body});\n`);
   const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));catalog.nightlyRoots=nightlyRoots;writeJson(file,catalog);
   git(fixture.root,'add','.');git(fixture.root,'commit','-qm','nightly cross-engine root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
   return fixture;
@@ -623,7 +629,7 @@ test('test group required cohort passes without nightly cross-engine cases and n
   assert.equal(report.status,'passed');assert.equal(report.groups.length,4);assert.equal(report.caseCount,6);
 });
 test('test group nightly declarations cannot remove required or installed-client cases from the required cohort', async parent => {
-  const nightly=root=>({root,file:'tests.js',reason:'Attempted move of a required case to the nightly job.'});
+  const nightly=root=>({root,file:suiteFile,reason:'Attempted move of a required case to the nightly job.'});
   const scenarios=[
     ['installed-client owner root',installedClientRoot],
     ['installed-client signed-out case','RISK native installed-client delivery: signed-out'],
@@ -669,14 +675,14 @@ test('test group nightly cohort runs only the declared cross-engine cases and fa
   const failures=[
     ['failing engine case',{body:'()=>{throw new Error("webkit pageerror")}'},/failed/i],
     ['skipped engine case',{body:'{skip:"webkit unavailable"},()=>{}'},/skipped/i],
-    ['declared case that is not registered',{nightlyRoots:[{root:nightlyFixtureRoot,file:'tests.js',reason:'Fixture cross-engine case runs in the nightly job only.'},{root:'fixture absent cross-engine root',file:'tests.js',reason:'Declared but missing from the source.'}]},/fixture absent cross-engine root/],
+    ['declared case that is not registered',{nightlyRoots:[{root:nightlyFixtureRoot,file:suiteFile,reason:'Fixture cross-engine case runs in the nightly job only.'},{root:'fixture absent cross-engine root',file:suiteFile,reason:'Declared but missing from the source.'}]},/fixture absent cross-engine root/],
     ['no declared nightly cases',{nightlyRoots:[]},/no nightly cross-engine roots/i],
   ];
   for(const [name,options,message]of failures)await parent.test(name,t=>{
     const fixture=nightlyFixture(t,options);
     if(!options.nightlyRoots?.some(entry=>entry.root===nightlyFixtureRoot)&&options.nightlyRoots){
       // Without a declaration the appended root is unclassified; keep the fixture valid by assigning it to core.
-      const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:'tests.js'});writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','assign root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+      const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:suiteFile});writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','assign root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
     }
     const result=invoke(fixture,{group:'nightly-cross-engine'});
     assert.notEqual(result.status,0,'a nightly '+name+' must fail the nightly run');
@@ -716,9 +722,9 @@ test('test group covered references preserve producer provenance without executi
 });
 
 test('test group registration guard binds names to files and distinguishes empty wrappers', async parent => {
-  const scenarios=[['same name assigned in another file',JSON.stringify(fixtureScriptRoot)],['file wrapper title','"tests.js"'],['unknown skipped root','"unclassified skipped root"']];
+  const scenarios=[['same name assigned in another file',JSON.stringify(fixtureScriptRoot)],['file wrapper title',JSON.stringify(suiteFile)],['unknown skipped root','"unclassified skipped root"']];
   for(const [name,title]of scenarios)await parent.test(name,t=>{
-    const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+    const fixture=createFixture(t),file=path.join(fixture.root,suiteFile);
     fs.appendFileSync(file,`\nfor(const title of [])test(title,${name==='unknown skipped root'?"{skip:'unexpected'},":''}()=>{});\n`);
     git(fixture.root,'add','.');git(fixture.root,'commit','-qm','existing dynamic site');fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
     fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('of []','of ['+title+']'));
@@ -737,11 +743,11 @@ test('test group covered mode rejects a different producer source even with a va
 });
 
 test('test group explicitly assigned dynamic roots execute in their declared file and group', t => {
-  const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+  const fixture=createFixture(t),file=path.join(fixture.root,suiteFile);
   fs.appendFileSync(file,'\nfor(const title of [])test(title,()=>{});\n');git(fixture.root,'add','.');git(fixture.root,'commit','-qm','existing dynamic site');
   fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
   fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('of []','of ["explicit future dynamic root"]'));
-  const catalog=JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/test-group-assignments.json')));catalog.rootAssignments.push({root:'explicit future dynamic root',file:'tests.js',group:'scenery',registration:'dynamic'});writeJson(path.join(fixture.root,'scripts/test-group-assignments.json'),catalog);
+  const catalog=JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/test-group-assignments.json')));catalog.rootAssignments.push({root:'explicit future dynamic root',file:suiteFile,group:'scenery',registration:'dynamic'});writeJson(path.join(fixture.root,'scripts/test-group-assignments.json'),catalog);
   git(fixture.root,'add','.');git(fixture.root,'commit','-qm','explicit dynamic assignment');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
   const result=invoke(fixture,{group:'scenery'});assert.equal(result.status,0,result.stdout+result.stderr);assert.ok(result.evidence.cases.some(item=>item.id==='explicit future dynamic root'&&item.status==='passed'));
 });
@@ -907,14 +913,14 @@ test('test group catalog routes real declarations despite matching quoted fixtur
     const rows = candidateCatalog.rootAssignments.filter(row => row.root === title);
     assert.equal(rows.length, 1, 'each known real case needs exactly one catalog row');
     assert.equal(rows[0].group, 'native-process', 'retain the historical group membership');
-    // The real rows name their split area file (#2213); this fixture keeps the
-    // single tests.js layout, where it appends the declarations below.
-    return { ...rows[0], file: 'tests.js' };
+    // The real rows name their own area file (#2213); this fixture appends the
+    // declarations below to its one suite file.
+    return { ...rows[0], file: suiteFile };
   });
   const journal = path.join(fixture.root, 'real-case-executions.jsonl');
   const declarations = titles.map(title => `test(${JSON.stringify(title)}, () => { fs.appendFileSync(process.env.CHAIN_REAL_CASE_JOURNAL, ${JSON.stringify(title + '\n')}); });`).join('\n');
   const quoted = `const quotedFixtureSource = ${JSON.stringify(declarations)};\n`;
-  fs.appendFileSync(path.join(fixture.root, 'tests.js'), '\n' + quoted + declarations + '\n');
+  fs.appendFileSync(path.join(fixture.root, suiteFile), '\n' + quoted + declarations + '\n');
   fs.writeFileSync(path.join(fixture.root, 'scripts/agent-tools/preflight.test.mjs'), "import { test } from 'node:test';\n" + quoted + "test('fixture preflight real owner root', () => {});\n");
   const catalog = JSON.parse(fs.readFileSync(path.join(fixture.root, 'scripts/test-group-assignments.json'), 'utf8'));
   catalog.rootAssignments.push(...selected, { root: 'fixture preflight real owner root', group: 'native-process', file: 'scripts/agent-tools/preflight.test.mjs' });
@@ -944,7 +950,7 @@ function convertToSplitLayout(fixture, { duplicateCoreRoot = false } = {}) {
   const header = "import assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport path from 'node:path';\nimport { test } from 'node:test';\nimport { sharedMarker } from './shared.js';\n";
   const body = source.slice(source.indexOf('test('));
   const sceneryAt = body.indexOf(`test(${JSON.stringify(fixtureRoots.scenery)}`);
-  fs.mkdirSync(path.join(fixture.root, 'tests'));
+  fs.mkdirSync(path.join(fixture.root, 'tests'), { recursive: true });
   fs.writeFileSync(path.join(fixture.root, 'tests/shared.js'), "export const sharedMarker = 'shared';\n");
   fs.writeFileSync(path.join(fixture.root, 'tests/core.test.js'), header + "assert.equal(sharedMarker, 'shared');\n" + body.slice(0, sceneryAt));
   fs.writeFileSync(path.join(fixture.root, 'tests/other.test.js'), header + body.slice(sceneryAt) +
@@ -952,7 +958,7 @@ function convertToSplitLayout(fixture, { duplicateCoreRoot = false } = {}) {
   fs.rmSync(path.join(fixture.root, 'tests.js'));
   const packagePath = path.join(fixture.root, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-  packageJson.scripts.test = 'node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs';
+  packageJson.scripts.test = suiteCommand;
   writeJson(packagePath, packageJson);
   const catalogPath = path.join(fixture.root, 'scripts/test-group-assignments.json');
   const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
@@ -969,11 +975,11 @@ function convertToSplitLayout(fixture, { duplicateCoreRoot = false } = {}) {
 test('test group runner matches added root titles written with string escapes', t => {
   const fixture = createFixture(t);
   const titles = ['fixture Settings → Import root', "fixture today's escaped root", 'fixture #hash root'];
-  fs.appendFileSync(path.join(fixture.root, 'tests.js'),
+  fs.appendFileSync(path.join(fixture.root, suiteFile),
     "\ntest(\"fixture Settings \\u2192 Import root\", () => {});\ntest('fixture today\\'s escaped root', () => {});\ntest('fixture #hash root', () => {});\n");
   const catalogPath = path.join(fixture.root, 'scripts/test-group-assignments.json');
   const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
-  catalog.rootAssignments.push(...titles.map(root => ({ root: root.replace('#', '\\#'), group: 'core', file: 'tests.js' })));
+  catalog.rootAssignments.push(...titles.map(root => ({ root: root.replace('#', '\\#'), group: 'core', file: suiteFile })));
   writeJson(catalogPath, catalog);
   git(fixture.root, 'add', '--all');
   git(fixture.root, 'commit', '-qm', 'add roots with escaped titles');
@@ -989,7 +995,7 @@ test('test group runner matches added root titles written with string escapes', 
 // the installed-client sensitivity controls) have no group because they never
 // register in ordinary runs, and moving them into a split file keeps that.
 test('test group runner treats registrations moved into split files as existing', t => {
-  const fixture = createFixture(t);
+  const fixture = createFixture(t, { legacyLayout: true });
   fs.appendFileSync(path.join(fixture.root, 'tests.js'), "\nif (process.env.CHAIN_FIXTURE_GATED === '1') {\n  test('fixture env-gated sensitivity root', () => {});\n}\n");
   git(fixture.root, 'add', 'tests.js');
   git(fixture.root, 'commit', '-qm', 'baseline env-gated registration');
@@ -1014,7 +1020,7 @@ test('test group runner treats registrations moved into split files as existing'
 });
 
 test('test group runner resolves every root across split per-area test files', t => {
-  const fixture = createFixture(t);
+  const fixture = createFixture(t, { legacyLayout: true });
   convertToSplitLayout(fixture);
   const described = invoke(fixture, { args: ['--describe'] });
   assert.equal(described.status, 0, described.stdout + described.stderr);
@@ -1032,9 +1038,18 @@ test('test group runner resolves every root across split per-area test files', t
     ['scripts/agent-tools/fixture.test.mjs', 'tests/core.test.js', 'tests/other.test.js'],
     'the guard covers every split test file and not the shared helper module');
 
-  const duplicate = createFixture(t);
+  const duplicate = createFixture(t, { legacyLayout: true });
   convertToSplitLayout(duplicate, { duplicateCoreRoot: true });
   const rejected = invoke(duplicate);
   assert.notEqual(rejected.status, 0, 'a root registered again in another split file must fail closed');
   assert.match(rejected.evidence.issues.join('\n'), /tests\/other\.test\.js/);
+});
+
+// Nothing runs a root tests.js since #2213, so a checkout whose npm test still
+// names it is not the suite this runner groups.
+test('test group runner refuses the retired single tests.js suite command', t => {
+  const fixture = createFixture(t, { legacyLayout: true });
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.notEqual(described.status, 0, 'the single-file layout must not group: ' + described.stdout + described.stderr);
+  assert.match(described.stderr, /full npm test entry point changed/);
 });

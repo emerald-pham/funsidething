@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -26,11 +26,10 @@ function childEnvironment() {
 async function createAppFixture(t, suffix) {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), `chain-preflight-${suffix}-`));
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
-  // Copy the real test surface: the per-area tests/ directory after #2213, or
-  // the single tests.js in older checkouts.
-  const testSurface = existsSync(path.join(repositoryRoot, 'tests.js')) ? ['tests.js']
-    : readdirSync(path.join(repositoryRoot, 'tests')).filter(file => file.endsWith('.js')).sort().map(file => `tests/${file}`);
-  const sentinelFile = testSurface.includes('tests.js') ? 'tests.js' : 'tests/core.test.js';
+  // Copy the real test surface: the per-area tests/ directory (#2213),
+  // including the shared helpers the area files import.
+  const testSurface = readdirSync(path.join(repositoryRoot, 'tests')).filter(file => file.endsWith('.js')).sort().map(file => `tests/${file}`);
+  const sentinelFile = 'tests/core.test.js';
   const fixtureFiles = [
     ...testSurface, 'index.html', 'app-release.js', 'location.js', 'vendor/lz-string-1.5.0.min.js',
     'scripts/test-first-gate.mjs',
@@ -98,7 +97,8 @@ async function runPreflight(fixture, evidenceName) {
 test('preflight stops after a failed focused check instead of launching the full test suite', async t => {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'chain-preflight-fail-fast-'));
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
-  await writeFile(path.join(fixtureRoot, 'tests.js'), `
+  await mkdir(path.join(fixtureRoot, 'tests'), { recursive: true });
+  await writeFile(path.join(fixtureRoot, 'tests/core.test.js'), `
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 test('Landscape location: visible default-sky copy does not name Orlando', () => {
@@ -135,18 +135,19 @@ test('Landscape location: visible default-sky copy does not name Orlando', () =>
 test('RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections', () => {});
 test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });
 `;
-  const testsPath = path.join(fixtureRoot, 'tests.js');
+  await mkdir(path.join(fixtureRoot, 'tests'), { recursive: true });
+  const testsPath = path.join(fixtureRoot, 'tests/core.test.js');
   // A rationale is required only when an existing test is removed or weakened
   // (#2208), so the fixture removes a committed test rather than adding one.
   await writeFile(testsPath, `${selectedTests}\ntest('existing fixture test removed without rationale', () => {});\n`);
   runGit(fixtureRoot, ['init', '-b', 'main']);
   runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
   runGit(fixtureRoot, ['config', 'user.name', 'Preflight fixture']);
-  runGit(fixtureRoot, ['add', 'scripts/test-first-gate.mjs', 'TEST_CHANGE_RATIONALES.json', 'tests.js']);
+  runGit(fixtureRoot, ['add', 'scripts/test-first-gate.mjs', 'TEST_CHANGE_RATIONALES.json', 'tests/core.test.js']);
   runGit(fixtureRoot, ['commit', '-m', 'fixture base']);
   const base = runGit(fixtureRoot, ['rev-parse', 'HEAD']);
   await writeFile(testsPath, selectedTests);
-  runGit(fixtureRoot, ['add', 'tests.js']);
+  runGit(fixtureRoot, ['add', 'tests/core.test.js']);
   runGit(fixtureRoot, ['commit', '-m', 'fixture removes a protected test']);
 
   const result = spawnSync(process.execPath, [preflight, '--base', base], {
@@ -166,14 +167,15 @@ test('preflight fails closed when a selected existing contract is missing', asyn
   await mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
   await copyFile(path.join(repositoryRoot, 'scripts/test-first-gate.mjs'), path.join(fixtureRoot, 'scripts/test-first-gate.mjs'));
   await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
-  await writeFile(path.join(fixtureRoot, 'tests.js'), `
+  await mkdir(path.join(fixtureRoot, 'tests'), { recursive: true });
+  await writeFile(path.join(fixtureRoot, 'tests/core.test.js'), `
 import { test } from 'node:test';
 test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });
 `);
   runGit(fixtureRoot, ['init', '-b', 'main']);
   runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
   runGit(fixtureRoot, ['config', 'user.name', 'Preflight fixture']);
-  runGit(fixtureRoot, ['add', 'scripts/test-first-gate.mjs', 'TEST_CHANGE_RATIONALES.json', 'tests.js']);
+  runGit(fixtureRoot, ['add', 'scripts/test-first-gate.mjs', 'TEST_CHANGE_RATIONALES.json', 'tests/core.test.js']);
   runGit(fixtureRoot, ['commit', '-m', 'fixture without focused checks']);
   const base = runGit(fixtureRoot, ['rev-parse', 'HEAD']);
 

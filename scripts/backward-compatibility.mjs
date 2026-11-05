@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { listTestFiles } from './test-groups.mjs';
 
 // Keep an immutable support floor as well as the rolling release base. Testing
 // only HEAD against itself would let a breaking change redefine compatibility.
@@ -174,11 +175,10 @@ export async function runCompatibilityMatrix(root,{base}={}){
 export const COMPATIBILITY_FAMILIES=['RISK BACKWARD COMPATIBILITY:','RISK FIRST SIGN IN:','RISK CLOUD LOOP:',
   'RISK CLOUD RECOVERY UI:','RISK PWA recovery:'];
 
-// The families live in the per-area tests/ directory (#2213); older checkouts
-// keep the single tests.js. Only files that register a family are run.
+// The families live in the per-area tests/ directory (#2213). Only files that
+// register a family are run.
 export function compatibilityTestFiles(root){
-  const candidates=fs.existsSync(path.join(root,'tests'))
-    ?fs.readdirSync(path.join(root,'tests')).filter(file=>file.endsWith('.test.js')).sort().map(file=>`tests/${file}`):['tests.js'];
+  const candidates=listTestFiles(root);
   const sources=candidates.map(file=>[file,fs.readFileSync(path.join(root,file),'utf8')]);
   const registers=(source,name)=>source.includes(`test('${name}`);
   for(const name of COMPATIBILITY_FAMILIES)assert.ok(sources.some(([,source])=>registers(source,name)),`Missing required compatibility family ${name}`);

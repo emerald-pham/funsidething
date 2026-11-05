@@ -2709,12 +2709,12 @@ function riskBasedReleaseInput(fixture,options={}){
   ...(input.specialistReview?{specialistReview:{...input.specialistReview,...options.input?.specialistReview}}:{})};
 }
 
-// Checks over every test read the whole test surface, not one file: the
-// per-area tests/ directory (#2213) and, while a branch still has it, tests.js.
+// Checks over every test read the whole test surface, not one file: every file
+// in the per-area tests/ directory (#2213), shared helpers included. A root
+// tests.js is rejected by the test-first gate, so it is not read.
 function testSurfaceSource(root=__dirname){
  const directory=path.join(root,'tests');
- const files=[...(fs.existsSync(path.join(root,'tests.js'))?[path.join(root,'tests.js')]:[]),
-  ...(fs.existsSync(directory)?fs.readdirSync(directory).filter(file=>file.endsWith('.js')).sort().map(file=>path.join(directory,file)):[])];
+ const files=fs.readdirSync(directory).filter(file=>file.endsWith('.js')).sort().map(file=>path.join(directory,file));
  return files.map(file=>fs.readFileSync(file,'utf8')).join('\n');
 }
 

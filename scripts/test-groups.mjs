@@ -11,6 +11,16 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// The one definition of a registered test file (#2213): a *.test.js file in the
+// top-level tests/ directory; tests/shared.js holds helpers, not tests. The
+// runner, preflight and the compatibility gate all list tests this way. The
+// test-first gate and edit hook deliberately use the wider test surface
+// (anything under tests/), since a helper edit is still a test edit.
+export const isTestFile = file => /^tests\/[^/]+\.test\.js$/.test(file);
+export function listTestFiles(root = ROOT) {
+  return fs.readdirSync(path.join(root, 'tests')).map(file => `tests/${file}`).filter(isTestFile).sort();
+}
 const INVENTORY_PATH = path.join(ROOT, 'scripts/test-group-inventory.json');
 const ASSIGNMENTS_PATH = path.join(ROOT, 'scripts/test-group-assignments.json');
 const sha1Pattern = /^[0-9a-f]{40}$/;
@@ -108,16 +118,14 @@ function readJson(file, label) {
   catch (error) { fail(`Could not read ${label}: ${error.message}`); }
 }
 
-// The full suite is the per-area test directory (#2213). The single tests.js
-// layout stays accepted so older checkouts and runner fixtures still group.
+// The full suite is the per-area test directory (#2213); nothing runs a root
+// tests.js any more, so its old command is not accepted.
 // tests/shared.js holds helpers, not tests, so only *.test.js files count.
 // npm test runs two files at a time: with every area file in parallel, timer
 // deadlines in the long core file expired under load (5 s fixture deadlines),
 // which never happened while tests.js ran as one serial process.
 const FULL_SUITE_COMMANDS = new Map([
-  ['node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs', () => fs.readdirSync(path.join(ROOT, 'tests'))
-    .filter(file => file.endsWith('.test.js')).sort().map(file => `tests/${file}`)],
-  ['node --test tests.js scripts/agent-tools/*.test.mjs', () => ['tests.js']],
+  ['node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs', () => listTestFiles()],
 ]);
 
 function testFiles() {
@@ -360,8 +368,10 @@ function registeredTitleCounts(sources) {
 
 function addedRootRegistrations(comparisonBase, files) {
   const current = registeredTitleCounts(files.map(file => fs.readFileSync(path.join(ROOT, file), 'utf8')));
+  // A comparison base from before the split (main until #2205 lands) still
+  // registers its tests in the root tests.js, so the baseline reads it too.
   const baselineFiles = git(['ls-tree', '-r', '--name-only', comparisonBase, '--', 'tests.js', 'tests', 'scripts/agent-tools'])
-    .split('\n').filter(file => file === 'tests.js' || /^tests\/[^/]+\.test\.js$/.test(file) || /^scripts\/agent-tools\/[^/]+\.test\.mjs$/.test(file));
+    .split('\n').filter(file => file === 'tests.js' || isTestFile(file) || /^scripts\/agent-tools\/[^/]+\.test\.mjs$/.test(file));
   const baseline = registeredTitleCounts(baselineFiles.map(file => git(['show', `${comparisonBase}:${file}`])));
   return new Set([...current].filter(([title, count]) => count > (baseline.get(title) || 0)).map(([title]) => title));
 }
