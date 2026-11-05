@@ -907,7 +907,9 @@ test('test group catalog routes real declarations despite matching quoted fixtur
     const rows = candidateCatalog.rootAssignments.filter(row => row.root === title);
     assert.equal(rows.length, 1, 'each known real case needs exactly one catalog row');
     assert.equal(rows[0].group, 'native-process', 'retain the historical group membership');
-    return rows[0];
+    // The real rows name their split area file (#2213); this fixture keeps the
+    // single tests.js layout, where it appends the declarations below.
+    return { ...rows[0], file: 'tests.js' };
   });
   const journal = path.join(fixture.root, 'real-case-executions.jsonl');
   const declarations = titles.map(title => `test(${JSON.stringify(title)}, () => { fs.appendFileSync(process.env.CHAIN_REAL_CASE_JOURNAL, ${JSON.stringify(title + '\n')}); });`).join('\n');
