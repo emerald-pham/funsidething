@@ -18,22 +18,10 @@ caret, text and adjacent controls; containment alone does not establish usable
 editing. Inspect captures before closing the allocated session so transient
 overlays or hidden controls can be corrected within that window.
 
-Every release candidate receives an owner review of its exact diff. The release
-validator derives the minimum review plan from the candidate's exact
-base-to-commit diff; the input cannot choose a lower-risk plan. An optional
-`additionalSpecialistDomains` input may add known domains to raise the review
-plan, but it cannot replace or remove any domain derived from the diff, and its
-value is bound into the receipt. Ambiguous auth, state-persistence, and
-session-persistence changes fail closed to their relevant specialists. Pure
-documentation, comments, copy, and repository housekeeping with no executable,
-configuration, test, release-gate, data, or product-behavior change need only the
-owner's exact-diff review. Ordinary code or behavior needs one independent
-code/behavior review. Shared session state, callable or authorization behavior,
-Firestore rules, deployment or authentication infrastructure, data migration,
-memory, cloud persistence, and synchronization need the relevant specialist
-review. When both code behavior and a specialist domain are materially affected,
-record both independent reviews. When only one domain is affected, only its
-reviewer is required.
+The release validator derives the review plan from the candidate's exact
+base-to-commit diff. Which reviews each plan requires is defined in
+[release and review](docs/agents/release-and-review.md#risk-based-exact-commit-release-gates);
+this file defines the evidence those reviews record.
 
 Schema version 1 receipts retain their original review policy: both a
 memory/cloud/sync audit and a distinct code/behavior review are required. They
