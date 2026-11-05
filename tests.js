@@ -7247,7 +7247,7 @@ test('RISK shared scenery reduced motion: the ambient timer repaints isolated wo
  for(const [previous,next] of [[[],[{id:'private-woodland-arrival'}]],[[{id:'private-woodland-expiry'}],[]]]){
   for(const reduced of [true,false]){
    let paints=0,backgrounds=0,syncs=0;
-   const woodland={events:previous},context={visits,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{events:[{id:'unchanged-train',type:'train',age:1,duration:100}],elapsed:1},woodland,
+   const woodland={events:previous},context={visits,openingPaint:null,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{events:[{id:'unchanged-train',type:'train',age:1,duration:100}],elapsed:1},woodland,
     rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:42,sceneSnapshot:{windowsSlot:42},reduced,
     syncScene(){syncs++;woodland.events=next;},paintBackground(){backgrounds++;},paintLife(){paints++;},Date};
    vm.runInNewContext(functionSource+';advanceRooftopParty(1)',context);
@@ -38229,7 +38229,7 @@ test('RISK fireworks reduced motion: static blooms stay on the stationary barge 
 
 test('RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),c=sceneTimeline(),visits=c.LandscapeVisits.create(),code=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty('))),paints=[];
- const context={visits,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[{id:'festival:unchanged',type:'festival',age:59,duration:150}]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},Date:{now:()=>60000},syncScene(){context.world.events[0].age=60;context.world.elapsed=60;},paintBackground(){throw Error('unrelated background must stay unchanged');},paintLife(age){paints.push(age);}};
+ const context={visits,openingPaint:null,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[{id:'festival:unchanged',type:'festival',age:59,duration:150}]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},Date:{now:()=>60000},syncScene(){context.world.events[0].age=60;context.world.elapsed=60;},paintBackground(){throw Error('unrelated background must stay unchanged');},paintLife(age){paints.push(age);}};
  vm.runInNewContext(code+';advanceRooftopParty(1)',context);
  assert.deepEqual(paints,[],'sixty seconds no longer expires barge fireworks');
  context.advanceRooftopParty(1);assert.deepEqual(paints,[],'unchanged static membership cannot start continuous animation');
@@ -41914,7 +41914,7 @@ test('RISK pedestrian slot guidance: extended FAQ separates arrival budget from 
 
 test('RISK pedestrian reduced retirement consumer: shared slot expiry repaints a still scene even when retained IDs do not change',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),advance=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop(',source.indexOf('  function advanceRooftopParty('))),c=sceneTimeline(),visits=c.LandscapeVisits.create();
- let painted=0;const event={id:'retained',type:'walker',age:59,duration:2373,activityDuration:60},context={visits,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[event]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},syncScene(){event.age=61;context.world.elapsed=61;},paintBackground(){throw Error('unrelated background should remain cached');},paintLife(){painted++;}};
+ let painted=0;const event={id:'retained',type:'walker',age:59,duration:2373,activityDuration:60},context={visits,openingPaint:null,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[event]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},syncScene(){event.age=61;context.world.elapsed=61;},paintBackground(){throw Error('unrelated background should remain cached');},paintLife(){painted++;}};
  vm.runInNewContext(advance+';advanceRooftopParty(1);',context);
  assert.equal(painted,1,'expiry of a shared admission slot must remove its old reduced representative');
  assert.equal(context.world.events[0].age,61,'retained shared walking recipe remains available to normal motion');

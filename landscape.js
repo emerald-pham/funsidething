@@ -1559,11 +1559,12 @@
     clocktowerVisit.active=sceneSnapshot.clocktower;
   }
   function advanceRooftopParty(dt){
+    if(document.hidden||!geometry||!p)return;
     // While the opening paint still waits for the board (or its bounded
     // fallback), the reduced-motion timer paints nothing: its first run, a
     // second after opening, drew the scenery over a late board (#2194 R1).
     // The opening paint then draws the latest scene once.
-    if(document.hidden||!geometry||!p||openingPaint)return;
+    if(openingPaint)return;
     // Static scenery repaints on membership changes, including the complete
     // barge crossing, without turning reduced motion into continuous animation.
     const before=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
