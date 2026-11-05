@@ -5906,6 +5906,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
       "group": "persistence-recovery",
       "file": "tests.js"

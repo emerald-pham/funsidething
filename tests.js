@@ -32792,6 +32792,41 @@ test('RISK cloud generation recovery: Use my board from before recovery succeeds
  assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published');
 });
 
+// #2194 independent review N2: nothing re-checked the board after the
+// decline's device commit, so closing Settings (Escape) and adding a task
+// while that commit was in flight let the decline replace the new edit.
+// Board input stays held until the decline finishes; no edit is replaced.
+test('RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state);
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ t.after(faithfulModalQuery2194(shim));
+ // Hold only the decline's own device commit so input can be attempted during it.
+ const commitHead=store.commitHead;let release,entered=false;const gate=new Promise(resolve=>{release=resolve;});
+ store.commitHead=async function(options){if(options?.releaseRecoveryHold){entered=true;await gate;}return commitHead.call(this,options);};
+ t.after(()=>{store.commitHead=commitHead;release();});
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ shim.document.dispatchEvent({type:'click',detail:1,target:declineButton2194()});
+ await fixtureDeadline(async wait=>{while(!entered&&!shim.document.getElementById('toast').textContent)await wait(10);},'the decline reaches its device commit',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(entered,true,'positive control: the decline reaches its device commit: '+shim.document.getElementById('toast').textContent);
+ // Escape closes Settings, then Enter in Add submits a new task.
+ const closed=ctx.closeModal();
+ const title='Task added while the decline commits';
+ shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});
+ const accepted=ctx.state.tasks.some(task=>task.title===title);
+ shim.document.getElementById('toast').textContent='';release();
+ // The decline ends with its own toast, success or refusal.
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||!shim.document.getElementById('toast').textContent)await wait(20);},'the decline finishes',CAPTURED_RESULT_BUDGET_MS+20000);
+ const outcome=shim.document.getElementById('toast').textContent;
+ await ctx.persist();
+ const kept=ctx.state.tasks.some(task=>task.title===title)||shim.document.getElementById('addInput').value===title;
+ assert.ok(kept,'the edit attempted during the decline is never replaced: it is either on the board or still in the Add field ('+JSON.stringify({closed,accepted,outcome})+')');
+ assert.equal(accepted,false,'board input is held while the decline commits ('+outcome+')');
+ assert.equal(closed,false,'Settings stays open while the decline commits');
+ assert.equal(JSON.stringify(ctx.state),before,'the decline still restores the exact board from before recovery');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the device head matches the board on screen');
+});
+
 test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
  for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
   const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;

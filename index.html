@@ -10840,6 +10840,7 @@ function renderHistory(){
    MODALS
    ================================================================ */
 function closeModal(){
+  if(automaticRecoveryDeclineBusy){toast("Restoring your earlier board. Wait a moment.",6000);return false;}
   if(cloudSourceRecoveryPreview?.publishing){toast("A protected cloud save is in progress. Keep this preview open until confirmation finishes.",6000);return false;}
   if(fileRestorePreview?.irreversible){toast("A protected save is in progress. Keep this preview open until it finishes.",6000);return false;}
   if(fileRestorePreview)return cancelFileRestore();
@@ -11858,7 +11859,17 @@ function declineEditorActive(){
   return !!(document.querySelector("dialog[open]")||
     active?.matches?.('input, textarea, select, [contenteditable="true"]')&&!root?.contains?.(active));
 }
+// Board input and closing Settings stay held for the whole decline: nothing
+// re-checked the board after its device commit, so an edit made during that
+// await could be replaced by the earlier board (#2194 independent review N2).
+let automaticRecoveryDeclineBusy=false;
 async function declineAutomaticCloudRecovery(){
+  if(automaticRecoveryDeclineBusy)return false;
+  automaticRecoveryDeclineBusy=true;
+  try{return await runAutomaticRecoveryDecline();}
+  finally{automaticRecoveryDeclineBusy=false;}
+}
+async function runAutomaticRecoveryDecline(){
   const hold=deviceRecoveryCloudHold,backend=window.CloudSync,account=backend?.user??null,identity=cloudAccountIdentity();
   // Each refusal is one short sentence (four lines or fewer at an enlarged
   // 260 px phone width); Help explains the cases (#2194 rendered recapture).
@@ -11915,6 +11926,7 @@ async function declineAutomaticCloudRecovery(){
   state=next;deviceHeadHash=committed.head?.hash||committed.hash;lastPersistedRaw=prior;persistedChanceSeed=next.chance?.seed??null;
   deviceRecoveryCloudHold=null;automaticCloudRecovery=null;forgetUnreadableCloudSourceHold();
   cloudAdoptionHeld=true;pendingPush=false;
+  automaticRecoveryDeclineBusy=false;
   applyTheme();recomputeRanks();closeModal();render();renderSync();
   toast("Your board from before recovery is back. The older and damaged cloud copies stay protected, and cloud saving is still not confirmed.",9000);
   return true;
@@ -14595,6 +14607,8 @@ async function confirmResetEverything(){
    ================================================================ */
 function onAction(act, el){
   if(openingRecoveryHeld&&!OPENING_RECOVERY_ACTIONS.has(act))return false;
+  // The recovery decline holds every action until it finishes (#2194 N2).
+  if(automaticRecoveryDeclineBusy)return false;
   if(RESTART_DIAGNOSTICS_ACTIONS.has(act))restartDiagnosticsRecord("action",act);
   // A detached/stale control stays bound to what the user saw, never to its replacement.
   if(el?.dataset?.candidate!==undefined && el.dataset.candidate!==(state.candidateId || '')) return;
