@@ -45,10 +45,10 @@ test('Repository test-first guard covers every app module and documents risk cas
 test('Repository CI gate requires changed tests and risk cases with app source diffs',async()=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  assert.deepEqual(validateTestFirst(['README.md'],[]),[]);
- assert.match(validateTestFirst(['landscape.css'],[])[0],/tests\.js/);
- assert.deepEqual(validateTestFirst(['landscape.css','tests.js'],['+test("visual regression",()=>{})']),[]);
- assert.match(validateTestFirst(['index.html','tests.js'],['+test("ordinary",()=>{})'])[0],/RISK/);
- assert.deepEqual(validateTestFirst(['index.html','tests.js'],['+test("RISK eligibility: boundary",()=>{})']),[]);
+ assert.match(validateTestFirst(['landscape.css'],[])[0],/tests\//);
+ assert.deepEqual(validateTestFirst(['landscape.css','tests/core.test.js'],['+test("visual regression",()=>{})']),[]);
+ assert.match(validateTestFirst(['index.html','tests/core.test.js'],['+test("ordinary",()=>{})'])[0],/RISK/);
+ assert.deepEqual(validateTestFirst(['index.html','tests/core.test.js'],['+test("RISK eligibility: boundary",()=>{})']),[]);
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
  assert.match(workflow,/test-first-gate\.mjs/);
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
@@ -117,13 +117,13 @@ test('RISK regression gate: a rationale is required only for removed or weakened
 test('RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files',async()=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const ordinary=['+test("scan: ordinary direct test",()=>{})'],processRisk=['+test("RISK test-first gate: process coverage",()=>{})'];
- assert.match(validateTestFirst(['location.js'],[]).join(' '),/without tests\.js/,'an app change without tests is rejected');
- assert.deepEqual(validateTestFirst(['landscape.css','tests.js'],ordinary),[],'a CSS-only change passes with a direct non-RISK test');
- assert.deepEqual(validateTestFirst(['icon-192.png','tests.js'],ordinary),[],'a static-asset change passes with a direct non-RISK test');
- assert.match(validateTestFirst(['landscape.js','tests.js'],ordinary).join(' '),/RISK/,'a high-risk JS change without a new RISK test is rejected');
- assert.match(validateTestFirst(['scripts/test-first-gate.mjs','tests.js'],['+test("RISK landscape colors: dawn",()=>{})']).join(' '),/process/,
+ assert.match(validateTestFirst(['location.js'],[]).join(' '),/without a tests\/ file/,'an app change without tests is rejected');
+ assert.deepEqual(validateTestFirst(['landscape.css','tests/core.test.js'],ordinary),[],'a CSS-only change passes with a direct non-RISK test');
+ assert.deepEqual(validateTestFirst(['icon-192.png','tests/core.test.js'],ordinary),[],'a static-asset change passes with a direct non-RISK test');
+ assert.match(validateTestFirst(['landscape.js','tests/core.test.js'],ordinary).join(' '),/RISK/,'a high-risk JS change without a new RISK test is rejected');
+ assert.match(validateTestFirst(['scripts/test-first-gate.mjs','tests/core.test.js'],['+test("RISK landscape colors: dawn",()=>{})']).join(' '),/process/,
   'an enforcement change without process RISK coverage is rejected');
- assert.deepEqual(validateTestFirst(['scripts/test-first-gate.mjs','tests.js'],processRisk),[],'process RISK coverage satisfies an enforcement change');
+ assert.deepEqual(validateTestFirst(['scripts/test-first-gate.mjs','tests/core.test.js'],processRisk),[],'process RISK coverage satisfies an enforcement change');
 });
 
 test('RISK test-first gate: an app change paired with an edit to any split test file is accepted',async t=>{
@@ -132,7 +132,7 @@ test('RISK test-first gate: an app change paired with an edit to any split test 
  for(const file of ['tests/core.test.js','tests/scenery.test.js','tests/repository-process.test.js','tests/shared.js'])
   assert.deepEqual(validateTestFirst(['index.html',file],risk),[],`${file} is part of the test surface`);
  assert.deepEqual(validateTestFirst(['tests/core.test.js'],[]),[],'a test-only change is not an app change');
- assert.match(validateTestFirst(['index.html','docs/tests/notes.js'],risk).join(' '),/without tests\.js/,'only the top-level test directory counts');
+ assert.match(validateTestFirst(['index.html','docs/tests/notes.js'],risk).join(' '),/without a tests\/ file/,'only the top-level test directory counts');
  const edit=file=>[`--- a/${file}`,`+++ b/${file}`,'@@ -10 +10 @@','- assert.equal(value,1);','+ assert.equal(value,2);'];
  assert.notEqual(protectedTestFingerprint(edit('tests/core.test.js')),protectedTestFingerprint(edit('tests/scenery.test.js')),
   'a rationale for one split file cannot approve the same change in another file');
@@ -155,6 +155,41 @@ test('RISK test-first gate: an app change paired with an edit to any split test 
  assert.match(weakened.stderr,/without an exact-diff rationale/);
 });
 
+test('RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected',async t=>{
+ const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
+ const risk=['+test("RISK eligibility: boundary",()=>{})'];
+ // npm test and the group runner no longer run tests.js (#2213), so a test
+ // written there would protect nothing; the gate points at the port instead.
+ for(const changed of [['index.html','tests.js'],['tests.js']]){
+  const errors=validateTestFirst(changed,risk).join(' ');
+  assert.match(errors,/tests\.js/,`${changed.join(', ')}: the root tests.js edit is named`);
+  assert.match(errors,/tests\//,'the message points at the tests/ directory');
+  assert.match(errors,/docs\/agents\/test-groups\.md/,'the message points at the porting note');
+ }
+ assert.match(validateTestFirst(['index.html','tests.js'],risk).join(' '),/without a tests\/ file/,'a root tests.js does not count as the test for an app change');
+ // Comparing against a base from before the split, deleting tests.js is the move itself.
+ assert.deepEqual(validateTestFirst(['index.html','tests.js','tests/core.test.js'],risk,['tests.js']),[],'deleting the old root tests.js is not an edit to it');
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-root-tests-gate-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ const write=(file,text)=>{fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.writeFileSync(path.join(root,file),text);};
+ write('scripts/test-first-gate.mjs',fs.readFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),'utf8'));
+ write('index.html','<p>old</p>\n');write('tests.js',"test('scan: sky',()=>{\n assert.ok(true);\n});\n");write('TEST_CHANGE_RATIONALES.json','[]\n');
+ git('init','-q');git('config','user.email','gate@example.invalid');git('config','user.name','Gate fixture');git('add','.');git('commit','-qm','old layout');
+ const oldBase=git('rev-parse','HEAD');
+ const gate=base=>spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:root,encoding:'utf8'});
+ // This move drops the assertion, so it must still need a record.
+ git('rm','-q','tests.js');write('tests/core.test.js',"test('scan: sky',()=>{\n});\n");git('add','.');git('commit','-qm','split');
+ const split=gate(oldBase);
+ assert.doesNotMatch(split.stderr,/test-groups\.md/,'deleting the root tests.js in the split is not rejected as an edit to it: '+split.stderr);
+ assert.match(split.stderr,/without an exact-diff rationale/,'the deleted tests.js lines stay protected, so a weakened move still needs its record');
+ const splitBase=git('rev-parse','HEAD');
+ write('index.html','<p>new</p>\n');write('tests.js',"test('RISK eligibility: recreated root file',()=>{});\n");git('add','.');git('commit','-qm','recreate tests.js');
+ const recreated=gate(splitBase);
+ assert.equal(recreated.status,1,'a recreated root tests.js fails the CLI: '+recreated.stdout+recreated.stderr);
+ assert.match(recreated.stderr,/docs\/agents\/test-groups\.md/);
+});
+
 test('RISK test-first gate: the edit hook treats the test directory as the test surface',async t=>{
  const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-split-hook-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
@@ -175,17 +210,38 @@ test('RISK test-first gate: the edit hook treats the test directory as the test 
  assert.equal(hook('index.html'),false,'a staged split test change also counts');
 });
 
+test('RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-root-tests-hook-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ fs.mkdirSync(path.join(root,'tests'));fs.writeFileSync(path.join(root,'index.html'),'<p>old</p>\n');
+ fs.writeFileSync(path.join(root,'tests/core.test.js'),"test('core: one',()=>{});\n");fs.writeFileSync(path.join(root,'tests.js'),"test('legacy: one',()=>{});\n");
+ git('init','-q');git('config','user.email','hook@example.invalid');git('config','user.name','Hook fixture');git('add','.');git('commit','-qm','base');
+ const hook=file=>{
+  const r=spawnSync('bash',[path.join(__dirname,'.claude/hooks/test-first-guard.sh')],{input:JSON.stringify({tool_input:{file_path:path.join(root,file)}}),encoding:'utf8'});
+  assert.equal(r.status,0,r.stderr);return r.stdout;
+ };
+ const refusal=hook('tests.js');
+ assert.match(refusal,/"permissionDecision": "deny"/,'writing a root tests.js is refused: nothing runs it');
+ assert.match(refusal,/tests\//,'the refusal points at the tests/ directory');
+ assert.match(refusal,/docs\/agents\/test-groups\.md/,'the refusal points at the porting note');
+ fs.appendFileSync(path.join(root,'tests.js'),"test('legacy: two',()=>{});\n");
+ assert.match(hook('index.html'),/"permissionDecision": "deny"/,'an uncommitted root tests.js change does not let an app edit through');
+ git('add','tests.js');
+ assert.match(hook('index.html'),/"permissionDecision": "deny"/,'nor does a staged one');
+});
+
 test('RISK test-first gate: future runtime modules are detected without a filename allowlist',async()=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const errors=validateTestFirst(['features/new-scan-rule.js'],[]).join(' ');
- assert.match(errors,/tests\.js/,'a new application module must not bypass the test-first diff gate');
+ assert.match(errors,/tests\//,'a new application module must not bypass the test-first diff gate');
 });
 
 test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case',async()=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const riskFiles=['index.html','location.js','stars.js','landscape.js','landscape-appearance.js','landscape-riders.js','landscape-seasonal.js','landscape-skywriter.js','landscape-winter.js','sw.js','manifest.webmanifest','firestore.rules','features/new-module.js'];
  for(const file of riskFiles){
-  const errors=validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' ');
+  const errors=validateTestFirst([file,'tests/core.test.js'],['+test("ordinary behavior test",()=>{})']).join(' ');
   assert.match(errors,/RISK/,`${file} must require a new high-risk contract`);
  }
 });
@@ -193,8 +249,8 @@ test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell e
 test('RISK test-first gate: changing enforcement code requires process tests and a new risk case',async()=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','scripts/test-groups.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
-  assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,`${file} must be covered by a process test`);
-  assert.match(validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
+  assert.match(validateTestFirst([file],[]).join(' '),/tests\//,`${file} must be covered by a process test`);
+  assert.match(validateTestFirst([file,'tests/core.test.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
  }
 });
 
@@ -202,7 +258,7 @@ test('RISK test-first gate: release evidence scripts receive edit-time process p
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const hook=fs.readFileSync(path.join(__dirname,'.claude/hooks/test-first-guard.sh'),'utf8');
  for(const file of ['scripts/release-evidence.mjs','scripts/install-release-hook.mjs']){
-  assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,'release enforcement edits need process tests');
+  assert.match(validateTestFirst([file],[]).join(' '),/tests\//,'release enforcement edits need process tests');
   assert.ok(hook.includes(file),'release enforcement scripts need edit-time test-first protection');
  }
 });
@@ -211,7 +267,7 @@ test('RISK test-first gate: unrelated risk cases cannot approve enforcement edit
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const unrelated=['+test("RISK landscape colors: dawn hue stays warm",()=>{})'];
  for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
-  assert.match(validateTestFirst([file,'tests.js'],unrelated).join(' '),/process/i,
+  assert.match(validateTestFirst([file,'tests/core.test.js'],unrelated).join(' '),/process/i,
    `${file} needs a risk-labeled process test rather than an unrelated risk case`);
  }
 });

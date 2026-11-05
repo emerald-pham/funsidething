@@ -427,6 +427,8 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
 - RISK test-first gate: an app change paired with an edit to any split test file is accepted
 - RISK test-first gate: the edit hook treats the test directory as the test surface
+- RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected
+- RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test
 - RISK test inventory: every named risk contract maps to a feature boundary
 - RISK test inventory: risk map and source checks read every file in the test directory
 

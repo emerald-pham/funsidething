@@ -12966,6 +12966,16 @@
       "file": "scripts/agent-tools/ci-monitor.test.mjs"
     },
     {
+      "root": "velocity report reuses an open alert issue that has already been triaged",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "velocity report counts only ready PRs into main as waiting for a merge",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
       "root": "workflow runs the weekly velocity report nightly with only the permissions its alert needs",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
@@ -12977,6 +12987,16 @@
     },
     {
       "root": "RISK test-first gate: the edit hook treats the test directory as the test surface",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test",
       "group": "core",
       "file": "tests/repository-process.test.js"
     },

@@ -16,9 +16,12 @@ const processFiles=new Set([
   '.claude/hooks/test-first-guard.sh',
 ]);
 const isProcessFile=file=>processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
-// The test surface is the per-area tests/ directory (#2213) plus the legacy
-// single tests.js, so a branch still editing tests.js is gated the same way.
-const isTestFile=file=>file==='tests.js'||file.startsWith('tests/');
+// The test surface is the per-area tests/ directory (#2213). The edit hook's
+// tests/* case mirrors this predicate (a shell hook cannot import it), so keep
+// the two in sync. A root tests.js is not a test file any more: npm test and
+// the group runner stopped running it, so a test written there protects nothing.
+const isTestFile=file=>file.startsWith('tests/');
+const LEGACY_TEST_FILE='tests.js';
 const isAppFile=file=>{
   if(isTestFile(file))return false;
   if(file==='firestore.rules')return true;
@@ -32,14 +35,19 @@ const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&/\.(?:h
 const hasAddedRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK\b/.test(line));
 const hasAddedProcessRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK (?:test-first gate|regression gate|test inventory|repository process)\b/.test(line));
 
-export function validateTestFirst(changedFiles,addedTestLines){
+// deletedFiles lets the split itself through: against a base from before
+// #2213, the diff deletes tests.js, and those deleted lines stay protected by
+// the rationale check below. Adding or editing a root tests.js is rejected.
+export function validateTestFirst(changedFiles,addedTestLines,deletedFiles=[]){
+  const errors=[];
+  if(changedFiles.includes(LEGACY_TEST_FILE)&&!deletedFiles.includes(LEGACY_TEST_FILE))
+    errors.push('A root tests.js was added or changed, but tests now live in the per-area files under tests/ and nothing runs tests.js. Move the change into the area file of its group as the porting note in docs/agents/test-groups.md describes.');
   const edited=changedFiles.filter(isAppFile);
   const enforcementEdits=changedFiles.filter(isProcessFile);
-  if(!edited.length&&!enforcementEdits.length)return [];
-  const errors=[];
+  if(!edited.length&&!enforcementEdits.length)return errors;
   if(!changedFiles.some(isTestFile)){
-    if(edited.length)errors.push(`App files changed (${edited.join(', ')}) without tests.js or a tests/ file in the diff.`);
-    if(enforcementEdits.length)errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without tests.js or tests/ process coverage in the diff.`);
+    if(edited.length)errors.push(`App files changed (${edited.join(', ')}) without a tests/ file in the diff.`);
+    if(enforcementEdits.length)errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without tests/ process coverage in the diff.`);
   }
   const highRisk=[...edited.filter(isHighRiskAppFile),...enforcementEdits];
   if(highRisk.length&&!hasAddedRiskTest(addedTestLines))
@@ -53,7 +61,8 @@ export function validateTestFirst(changedFiles,addedTestLines){
 // reused for a different diff. Blank lines and single-line comments cannot
 // change what runs, so they are left out. With several test files each line
 // also carries its file path, so a record cannot move to another file (#2213);
-// tests.js lines keep their earlier form so existing records stay valid.
+// tests.js lines keep their earlier form so records written for diffs against
+// pre-split bases (which delete or edit tests.js) still verify.
 const protectedTestLines=lines=>{
   const protectedLines=[];let cursor=null,file='';
   for(const line of lines){
@@ -116,9 +125,12 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
     try{
       const diff=(...args)=>execFileSync('git',['diff',...args,`${base}...HEAD`],{encoding:'utf8'});
       const changed=diff('--name-only','--diff-filter=ACMRTD').trim().split('\n').filter(Boolean);
-      const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--','tests.js','tests'],{encoding:'utf8',maxBuffer:256*1024*1024}).split('\n');
+      const deleted=diff('--name-only','--diff-filter=D').trim().split('\n').filter(Boolean);
+      // tests.js stays in the protected diff because a base from before the
+      // split still has it: deleting its tests must need a record like any other.
+      const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--',LEGACY_TEST_FILE,'tests'],{encoding:'utf8',maxBuffer:256*1024*1024}).split('\n');
       const records=fs.existsSync('TEST_CHANGE_RATIONALES.json')?JSON.parse(fs.readFileSync('TEST_CHANGE_RATIONALES.json','utf8')):[];
-      const errors=[...validateTestFirst(changed,testDiff),...validateRegressionChanges(testDiff,records)];
+      const errors=[...validateTestFirst(changed,testDiff,deleted),...validateRegressionChanges(testDiff,records)];
       if(errors.length){process.stderr.write(errors.join('\n')+'\n');process.exitCode=1;}
       else process.stdout.write('Test-first diff gate passed.\n');
     }catch(error){process.stderr.write(`Could not compare ${base} to HEAD: ${error.message}\n`);process.exitCode=2;}
