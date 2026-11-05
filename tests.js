@@ -37760,6 +37760,30 @@ test('RISK repository process: scaled review plan sets typography only for marku
  }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: scaled review policy needs its committed AGENTS.md wording at both the exact head and base',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const faqPolicy='Independent FAQ coverage review is required for every product release.\n';
+ const app={base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}};
+ const fixtures={
+  // The candidate that introduces the lighter policy is still reviewed under
+  // the policy its base carries, so a diff cannot lower its own review bar.
+  introducing:makeScaledReviewFixture({...app,agentsBase:faqPolicy,agentsHead:SCALED_REVIEW_POLICY_TEXT}),
+  removing:makeScaledReviewFixture({...app,agentsBase:SCALED_REVIEW_POLICY_TEXT,agentsHead:faqPolicy}),
+  rewrapped:makeScaledReviewFixture({...app,agentsBase:SCALED_REVIEW_POLICY_TEXT,agentsHead:SCALED_REVIEW_POLICY_TEXT.replace(/\s+/g,'\n  ')}),
+ };
+ try{
+  const plan=name=>deriveReleaseReviewPlan(fixtures[name].repo,fixtures[name].candidateSha,fixtures[name].baseSha);
+  const introducing=plan('introducing');
+  assert.equal(introducing.schemaVersion,1,'an old-policy base keeps the old plan');
+  assert.equal(introducing.requiresFaqReview,true,'an old-policy base keeps the separate FAQ review');
+  assert.equal(Object.hasOwn(introducing,'requiresTypographyReview'),false);
+  const removing=plan('removing');
+  assert.equal(removing.schemaVersion,1,'a head without the wording returns to the old policy');
+  assert.equal(removing.requiresFaqReview,true);
+  assert.equal(plan('rewrapped').schemaVersion,2,'rewrapping the committed wording keeps the scaled policy');
+ }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);

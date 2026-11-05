@@ -355,7 +355,10 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     : [];
   const changedFiles = gitRaw(repoRoot, ['diff', '--name-only', '--no-renames', '-z', baseSha, commitSha, '--'])
     .split('\0').filter(Boolean).sort();
-  const scaled = hasScaledReviewPolicy(repoRoot, commitSha);
+  // The policy is read at the exact head, but a candidate whose base predates
+  // it keeps the old policy: the diff that introduces the lighter plan cannot
+  // approve itself under that plan.
+  const scaled = hasScaledReviewPolicy(repoRoot, commitSha) && hasScaledReviewPolicy(repoRoot, baseSha);
   let requiresCodeReview = false;
   let requiresTypographyReview = false;
   const specialistDomains = new Set();
