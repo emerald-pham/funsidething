@@ -10,9 +10,10 @@ Preserve accepted user actions, drafts, data and exact recovery sources. Repeat
 only permitted, safe operations: verify an uncertain mutation's outcome before
 retrying, and retain existing idempotency, revision and account guards. Honor
 operation-specific consent, quota, paid-attempt and retry restrictions. Automatic
-recovery cannot choose an older source, overwrite protected data or reset user
-storage as a repair shortcut, change permissions or bypass validation, consent
-or security. Required security invalidation of revoked or unauthorized session
+recovery may open a validated older source only as a reversible automatic
+recovery default (see GLOSSARY) that keeps newer work and every alternative
+protected. It cannot overwrite protected data or reset user storage as a repair
+shortcut, change permissions or bypass validation, consent or security. Required security invalidation of revoked or unauthorized session
 data still applies.
 
 Keep useful progress visible without blocking unrelated work. Cancel pending

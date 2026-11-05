@@ -32948,7 +32948,9 @@ test('RISK review fixes guidance: mounted Help and the November 4 changelog desc
  assert.match(older,/Use my board from before recovery/,'Help names the Settings decline');
  assert.match(older,/without saving the older copy to the cloud/);
  const scenery=answer('Why does the scenery fill in after the board opens?');
- assert.match(scenery,/drawn only after the board appears/,'Help says the scenery waits for the board');
+ // #2194 FAQ review B3: the opening paint has a bounded fallback, so "only"
+ // was inaccurate; the bounded wait is asserted in the B1-B3 guidance test.
+ assert.match(scenery,/drawn after the board appears/,'Help says the scenery waits for the board');
  assert.match(scenery,/the background shows the scene’s sky colour/);
  assert.match(scenery,/change the sky, its colours and the hourly message together/);
  for(const [name,text] of [['damaged',damaged],['older',older],['scenery',scenery]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
@@ -32957,6 +32959,58 @@ test('RISK review fixes guidance: mounted Help and the November 4 changelog desc
  assert.match(release,/Settings can return to your board from before recovery/,'the release note covers declining the older copy');
  assert.match(release,/drawn just after the board appears/,'the release note says the scenery waits for the board');
  assert.match(release,/together with the sky/,'the release note says minute updates change text and sky together');
+});
+
+// #2194 FAQ review B1-B3, S1-S4: Help says when the decline is offered and
+// refused, what follows it (including that signing out forgets it), that the
+// scenery draws anyway after a bounded wait, that the cloud recovery review
+// itself chooses nothing, which checks are remembered, and what each cloud
+// button label means.
+test('RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>help.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ // B1 and B2: availability of the decline and the state after it.
+ const back=answer('Can I go back to my board from before recovery?');
+ assert.ok(back,'Help has an entry for returning to the board from before recovery');
+ assert.match(back,/you are signed in/,'the decline is offered only while signed in');
+ assert.match(back,/unavailable once you change the board, during a save or edit, or when this device had no earlier board/,'Help names when the decline is refused');
+ assert.match(back,/use Review cloud recovery instead/,'Help points to the route that works when the decline is refused');
+ assert.match(back,/Once the cloud confirms the board, the choice is gone/);
+ assert.match(back,/cloud saving stays paused/,'Help says cloud saving stays paused after declining');
+ assert.match(back,/Retry sync checks the copy again and keeps your choice/);
+ assert.match(back,/Signing out forgets it, so signing in again can reopen the older copy/,'Help says signing out forgets the decline');
+ assert.match(back,/A newer cloud save or a healthy cloud read also ends it/);
+ const older=answer('What does “older copy in use” mean?');
+ assert.match(older,/if you have not changed the board since/,'the older-copy answer qualifies the decline');
+ const release=help.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/Until the cloud confirms it, and if you have not changed the board since, Settings can return to your board from before recovery/,'the release note qualifies the decline');
+ // B3: the bounded wait; reduced motion waits in the same way.
+ const scenery=answer('Why does the scenery fill in after the board opens?');
+ assert.doesNotMatch(scenery,/drawn only after the board appears/,'Help no longer says the scenery waits without limit');
+ assert.match(scenery,/If the board takes longer than a few seconds, the scenery draws anyway/,'Help names the bounded scenery wait');
+ assert.match(scenery,/Reduced motion still keeps the scenery still and waits for the board in the same way/);
+ assert.match(release,/If a large board takes more than a few seconds, the scenery draws without waiting/,'the release note names the bounded scenery wait');
+ assert.doesNotMatch(release,/even when a large board opens late/,'the release note no longer promises an unbounded wait');
+ // S1: the recovery review itself chooses nothing; the automatic default does.
+ const damagedSave=answer('What if a cloud save is damaged?');
+ assert.match(damagedSave,/use Review cloud recovery sources from the cloud warning or restored-device hold; original sources stay protected\. There, choices await verification; none is selected by default/,'the no-default sentence is scoped to the review');
+ // Its neighbouring answer keeps its protected wording; it is already scoped
+ // to the review by the sentence before it.
+ assert.match(answer('What can I inspect while cloud checks wait?'),/The whole source review has a one-minute limit\. When safe, changed sources get one fresh check within that minute; nothing is chosen automatically\./);
+ // S2 and S3: which checks are remembered, and the separate incomplete-copy recheck.
+ const working=answer('Can I keep working with a damaged cloud save?');
+ assert.match(working,/Once a finished check finds a cloud copy unreadable/,'only a completed check is remembered');
+ assert.match(working,/even after a restart or a failed connection/,'a failed connection keeps the remembered check');
+ assert.match(working,/so do an interrupted check, a changed board base or device storage that cannot open/);
+ assert.match(working,/Incomplete earlier copies kept after an older copy opens are separate: reconnecting checks them/);
+ // S4: every cloud button label.
+ const labels=answer('What do the cloud button labels mean?');
+ for(const label of ['syncing','synced','older copy in use','recovery pending','save error','error','sign in'])
+  assert.match(labels,new RegExp('<b>'+label+'</b>'),'Help explains the '+label+' label');
+ for(const [name,text] of [['back',back],['older',older],['scenery',scenery],['working',working],['labels',labels]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
 });
 
 test('RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status',{timeout:240000},async t=>{

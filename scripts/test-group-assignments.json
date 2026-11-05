@@ -5936,6 +5936,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status",
       "group": "persistence-recovery",
       "file": "tests.js"
