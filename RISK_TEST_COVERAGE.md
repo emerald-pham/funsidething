@@ -407,6 +407,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK landscape water: lake clip overlaps the horizon contact at fractional pixel densities
 - RISK landscape water browser: GPU distortion preserves contact and sharp pixels while patches move independently
 - RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order
+- RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices
 
 ## Offline shell and updates
 

@@ -1090,7 +1090,9 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
- const latest=current.match(/<li>(.*?)<\/li>/)?.[1]||'';
+ // Keyed by its release date: a later dated entry (#2202) is now listed above it.
+ assert.ok(current.includes('<h3>October 28, 2026</h3>'),'the October 28 recovery note stays in the current changelog');
+ const latest=current.split('<h3>October 28, 2026</h3>')[1]?.match(/<li>(.*?)<\/li>/)?.[1]||'';
  assert.match(latest,/saved board needs recovery.*preserved local copies/);
  assert.match(latest,/syncing label.*board is still opening.*not that cloud saving is confirmed/);
  assert.match(latest,/genuine errors and recovery warnings remain visible/);
@@ -7443,6 +7445,103 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
    }
   }finally{await browser.close();}
  }
+});
+
+// #2202: opening must leave the board usable before the scenery paints. The
+// scenery boot is held at its spawn-rate fetch until the seeded board is ready,
+// then released while trusted keys are typed into Add. The first scenery canvas
+// sizing busy-holds the main thread briefly so a typed key is certainly pending
+// during the scenery's opening task, as on a slow phone. Only ordering is
+// asserted, never elapsed time. The in-process app harness never runs the
+// scenery runtime, so this seam is the real browser.
+test('RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('opening-'+i,'Opening board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     let releaseRates;const ratesHeld=new Promise(resolve=>{releaseRates=resolve;});
+     await context.route('**/*',async route=>{
+      const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();
+      if(url.pathname.endsWith('/SPAWN_RATES.md'))await ratesHeld;
+      return route.continue();
+     });
+     let paintedSeen=false;await context.exposeBinding('__openingPainted',()=>{paintedSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const opening=window.__opening={log:[],booted:false,painted:false,framesAfterPaint:0,appFramePaints:0};
+      opening.ready=()=>{
+       const panel=document.getElementById('addPanel'),body=document.getElementById('addBody'),input=document.getElementById('addInput'),button=document.getElementById('addButton'),scan=document.getElementById('scan');
+       return !!(panel&&body&&input&&button&&scan)&&document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!panel.closest('[hidden],[inert]')&&!body.hidden&&!input.disabled&&!button.disabled
+        &&input.getClientRects().length>0&&getComputedStyle(input).visibility==='visible'&&scan.children.length>0&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      };
+      const raf=window.requestAnimationFrame.bind(window);let inAppFrame=false;
+      window.requestAnimationFrame=callback=>raf(time=>{const previous=inAppFrame;inAppFrame=true;try{return callback(time);}finally{inAppFrame=previous;}});
+      const observe=()=>{if(opening.painted)opening.framesAfterPaint++;else if(opening.booted)opening.log.push({kind:'frame'});if(opening.framesAfterPaint<60)raf(observe);};raf(observe);
+      for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.isTrusted)opening.log.push({kind:'input',type,afterBoot:opening.booted,afterPaint:opening.painted,target:event.target?.id||''});},true);
+      const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+      Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+       if(!opening.booted&&this.closest?.('#landscape')){
+        opening.booted=true;opening.log.push({kind:'boot',ready:opening.ready()});
+        const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+       }
+       width.set.call(this,value);
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        if(this.canvas?.closest?.('#landscape')){
+         if(!opening.painted){opening.painted=true;opening.log.push({kind:'paint',method,ready:opening.ready(),motionPrompt:!!document.getElementById('motionDialog')?.open});window.__openingPainted();}
+         else if(inAppFrame&&opening.framesAfterPaint>0)opening.appFramePaints++;
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__opening.ready(),null,{timeout:15000});
+     const held=await page.evaluate(()=>({booted:__opening.booted,painted:__opening.painted,sky:typeof LivingSky,controller:!!navigator.serviceWorker?.controller}));
+     assert.deepEqual(held,{booted:false,painted:false,sky:'object',controller:false},`${label}: the scenery runtime is loaded but still held, with no service worker in the way`);
+     await page.locator('#addInput').focus();
+     releaseRates();
+     let typed=0;const deadline=Date.now()+20000;
+     while(!paintedSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');typed++;}
+     assert.ok(paintedSeen,`${label}: the released scenery actually paints`);
+     await page.waitForFunction(()=>__opening.framesAfterPaint>=60,null,{timeout:15000});
+     const result=await page.evaluate(()=>({log:__opening.log,appFramePaints:__opening.appFramePaints,value:document.getElementById('addInput').value,motion:document.documentElement.dataset.landscapeMotion}));
+     const {log}=result,boot=log.findIndex(entry=>entry.kind==='boot'),paint=log.findIndex(entry=>entry.kind==='paint');
+     const firstInput=log.findIndex((entry,index)=>index>boot&&entry.kind==='input'),frames=log.slice(boot+1,paint).filter(entry=>entry.kind==='frame').length;
+     const summary={label,boot,paint,firstInputAfterBoot:firstInput,framesBetweenBootAndPaint:frames,inputsAfterBootBeforePaint:log.slice(boot+1,paint).filter(entry=>entry.kind==='input').length,typed,appFramePaints:result.appFramePaints,motion:result.motion};observed.push(summary);
+     // Fixture preconditions: the board was usable when the scenery began, the scenery landed, and a typed key followed its start.
+     assert.ok(boot>=0&&log[boot].ready,`${label}: the seeded board is usable before the scenery begins`);
+     assert.ok(paint>boot,`${label}: the scenery paints after it begins`);
+     assert.ok(firstInput>boot,`${label}: a trusted key was typed after the scenery began ${JSON.stringify(summary)}`);
+     assert.equal(result.motion,motion,`${label}: the saved motion choice applies`);
+     assert.equal(result.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test: ordering only.
+     if(!(firstInput<paint))failures.push(`${label}: the first trusted key after the scenery began was handled only after the scenery's first paint`);
+     if(frames<1)failures.push(`${label}: no frame was presented between the scenery starting and its first paint`);
+     if(!log[paint].ready||log[paint].motionPrompt)failures.push(`${label}: the board was not usable at the scenery's first paint`);
+     // Reduced motion keeps no animation loop; normal motion resumes it after opening.
+     if(motion==='reduced'&&result.appFramePaints!==0)failures.push(`${label}: reduced motion painted scenery from animation frames`);
+     if(motion==='normal'&&result.appFramePaints===0)failures.push(`${label}: normal motion did not resume its animation`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
 test('RISK list presentation browser: Top x default percent toggle dotted filters and reload work on actual phone tablet and desktop controls',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
