@@ -608,3 +608,114 @@ test('metadata edits continue past verified covered runs to the original full pr
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
   assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
 });
+
+// GitHub decides triggers, concurrency and job conditions before any repository
+// code runs, so these helpers interpret the workflow the way GitHub does instead
+// of matching its exact spelling. Only the expression subset the workflow uses is
+// supported; anything else fails loudly rather than silently evaluating to false.
+function workflowBlock(text, key, indent = '') {
+  const lines = text.split('\n'), start = lines.findIndex(line => line === `${indent}${key}:` || line.startsWith(`${indent}${key}: `));
+  if (start < 0) return null;
+  const inline = lines[start].slice(indent.length + key.length + 1).trim(), body = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() && !line.startsWith(indent + ' ')) break;
+    body.push(line);
+  }
+  return { inline, body: body.join('\n') };
+}
+function workflowList(value) {
+  const match = value.match(/^\[(.*)\]$/);
+  if (!match) throw new Error(`Unsupported workflow list ${JSON.stringify(value)}.`);
+  return match[1].split(',').map(item => item.trim().replace(/^'(.*)'$/, '$1')).filter(Boolean);
+}
+function evaluateWorkflowExpression(expression, context) {
+  const lookup = name => name.split('.').slice(1).reduce((value, key) => value?.[key], context.github) ?? null;
+  const tokens = expression.match(/'(?:[^']|'')*'|github(?:\.[A-Za-z_][\w-]*)+|format\(|==|!=|&&|\|\||[!(),]|[^\s!(),=&|]+/g) || [];
+  const js = tokens.map(token => {
+    if (token.startsWith("'")) return JSON.stringify(token.slice(1, -1).replaceAll("''", "'"));
+    if (token.startsWith('github.')) return JSON.stringify(lookup(token));
+    if (token === 'format(') return 'format(';
+    if (['==', '!=', '&&', '||', '!', '(', ')', ',', 'true', 'false', 'null'].includes(token)) return token;
+    throw new Error(`Unsupported workflow expression token ${JSON.stringify(token)} in ${JSON.stringify(expression)}.`);
+  }).join(' ');
+  const format = (pattern, ...values) => pattern.replace(/\{(\d+)\}/g, (_, index) => String(values[Number(index)] ?? ''));
+  return Function('format', `return (${js});`)(format);
+}
+function interpolateWorkflowValue(value, context) {
+  // A value that is exactly one expression keeps its type (booleans for
+  // cancel-in-progress); mixed text interpolates each expression as a string.
+  const whole = value.match(/^\$\{\{((?:(?!\}\}).)*)\}\}$/s);
+  if (whole) return evaluateWorkflowExpression(whole[1].trim(), context);
+  return value.replace(/\$\{\{(.*?)\}\}/g, (_, expression) => String(evaluateWorkflowExpression(expression.trim(), context) ?? ''));
+}
+function workflowTriggers(workflow, context) {
+  const on = workflowBlock(workflow, 'on');
+  assert.ok(on, 'the workflow must declare its triggers');
+  const event = workflowBlock(on.body, context.github.event_name, '  ');
+  if (!event) return false;
+  if (context.github.event_name === 'push') {
+    const branches = workflowBlock(event.body, 'branches', '    ');
+    if (!branches) return true;
+    return workflowList(branches.inline).some(branch => {
+      if (/[*?[\]!]/.test(branch)) throw new Error(`Unsupported branch filter ${branch}.`);
+      return context.github.ref === `refs/heads/${branch}`;
+    });
+  }
+  const types = workflowBlock(event.body, 'types', '    ');
+  return types ? workflowList(types.inline).includes(context.github.event.action) : true;
+}
+function workflowJobRuns(workflow, job, context) {
+  const jobs = workflowBlock(workflow, 'jobs'), block = workflowBlock(jobs.body, job, '  ');
+  assert.ok(block, `the workflow must keep its ${job} job`);
+  const condition = workflowBlock(block.body, 'if', '    ');
+  return condition ? Boolean(interpolateWorkflowValue(condition.inline.startsWith('${{') ? condition.inline : `\${{ ${condition.inline} }}`, context)) : true;
+}
+// GitHub concurrency: runs sharing a group are serialized; a new run with
+// cancel-in-progress cancels the group's in-progress and pending runs, and even
+// without it a newer pending run replaces an older pending one. A run alone in
+// its group can therefore never be cancelled by concurrency.
+function workflowConcurrency(workflow, context) {
+  const block = workflowBlock(workflow, 'concurrency');
+  if (!block) return { group: null, cancelInProgress: false };
+  if (block.inline) return { group: String(interpolateWorkflowValue(block.inline, context)), cancelInProgress: false };
+  const group = workflowBlock(block.body, 'group', '  '), cancel = workflowBlock(block.body, 'cancel-in-progress', '  ');
+  assert.ok(group?.inline, 'a concurrency block must name its group');
+  return { group: String(interpolateWorkflowValue(group.inline, context)), cancelInProgress: cancel ? Boolean(interpolateWorkflowValue(cancel.inline, context)) : false };
+}
+function laterRunCancelsEarlier(workflow, earlier, later) {
+  const first = workflowConcurrency(workflow, earlier), second = workflowConcurrency(workflow, later);
+  const shared = first.group !== null && first.group === second.group;
+  return { shared, inProgress: shared && second.cancelInProgress, pending: shared };
+}
+const workflowContext = (event_name, ref, extra = {}) => ({ github: { workflow: 'Data safety', event_name, ref, run_id: '9001', sha: 'a'.repeat(40), ...extra, event: { action: undefined, ...extra.event } } });
+
+test('workflow runs once per pull request commit and keeps push validation on main', () => {
+  const workflow = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  const branchPush = workflowContext('push', 'refs/heads/topic'), mainPush = workflowContext('push', 'refs/heads/main');
+  assert.equal(workflowTriggers(workflow, branchPush), false, 'a PR branch push must not start a second run beside its pull_request run');
+  assert.equal(workflowTriggers(workflow, workflowContext('push', 'refs/heads/main-backup')), false, 'only the exact main branch keeps push validation');
+  assert.equal(workflowTriggers(workflow, mainPush), true, 'deployment must still follow a verified main push build');
+  for (const action of ['opened', 'synchronize', 'reopened', 'edited'])
+    assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action } })), true, `pull_request ${action} must keep its run`);
+  assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'labeled' } })), false, 'unrelated PR activity stays outside CI');
+  for (const job of ['release-evidence', 'deploy-pages']) {
+    assert.equal(workflowJobRuns(workflow, job, mainPush), true, `${job} must still run for a push to main`);
+    assert.equal(workflowJobRuns(workflow, job, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })), false, `${job} must never run for a pull request`);
+  }
+});
+
+test('workflow cancels superseded non-main runs and never cancels main', () => {
+  const workflow = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  const pr = (action, run_id, sha, number = 17, workflowName = 'Data safety') => workflowContext('pull_request', `refs/pull/${number}/merge`, { workflow: workflowName, run_id, sha, event: { action } });
+  const older = pr('synchronize', '101', 'b'.repeat(40)), newer = pr('synchronize', '102', 'c'.repeat(40));
+  assert.deepEqual(laterRunCancelsEarlier(workflow, older, newer), { shared: true, inProgress: true, pending: true }, 'a newer commit on the same PR must cancel the superseded run');
+  assert.deepEqual(laterRunCancelsEarlier(workflow, older, pr('reopened', '102', 'c'.repeat(40))), { shared: true, inProgress: true, pending: true }, 'a reopened PR candidate supersedes the earlier run too');
+  assert.equal(laterRunCancelsEarlier(workflow, older, pr('synchronize', '103', 'd'.repeat(40), 18)).shared, false, 'another PR must never cancel this one');
+  assert.equal(laterRunCancelsEarlier(workflow, older, pr('synchronize', '104', 'd'.repeat(40), 17, 'Other workflow')).shared, false, 'the group is keyed by workflow as well as ref');
+  const edited = pr('edited', '105', 'b'.repeat(40));
+  assert.equal(laterRunCancelsEarlier(workflow, older, edited).inProgress, false, 'a PR metadata edit must not cancel the full producer it reuses');
+  assert.deepEqual(laterRunCancelsEarlier(workflow, edited, newer), { shared: true, inProgress: true, pending: true }, 'a newer commit supersedes a metadata-edit run waiting on the old commit');
+  const mainRun = (run_id, sha) => workflowContext('push', 'refs/heads/main', { run_id, sha });
+  assert.deepEqual(laterRunCancelsEarlier(workflow, mainRun('201', 'e'.repeat(40)), mainRun('202', 'f'.repeat(40))), { shared: false, inProgress: false, pending: false }, 'a later main push must never cancel or replace an earlier main run or its deploy');
+  assert.equal(workflowConcurrency(workflow, mainRun('201', 'e'.repeat(40))).cancelInProgress, false, 'main runs never cancel in-progress work');
+});
