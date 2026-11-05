@@ -148,7 +148,8 @@ version 2) requires:
   markup, classes or styles. Tests and tooling never set it.
 - `requiresFaqReview` is false. Whenever the plan includes product behavior
   (`requiresOwnerFaqCoverage`), the owner review records the extended-FAQ
-  coverage result instead.
+  coverage result instead. Product behavior means an app runtime file or the
+  Firestore rules; test, tooling and workflow changes never set it.
 
 Receipts stay schema version 2 and publish the `v=4` status binding on all
 three required contexts. See [RELEASE_GATES.md](../../RELEASE_GATES.md#scaled-review-policy-evidence).

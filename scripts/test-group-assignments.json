@@ -9321,6 +9321,11 @@
       "file": "tests/repository-process.test.js"
     },
     {
+      "root": "RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
       "root": "RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence",
       "group": "native-process",
       "file": "tests/repository-process.test.js"

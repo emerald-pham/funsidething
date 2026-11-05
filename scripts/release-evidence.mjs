@@ -220,8 +220,10 @@ function stripSourceComments(source, extension) {
   return output.trimEnd();
 }
 
-// The test surface is the per-area tests/ directory (#2213) plus the legacy
-// single tests.js; both follow the same review rules.
+// The test surface is the per-area tests/ directory (#2213). The root tests.js
+// stays here because receipts are re-derived for their own base and candidate:
+// a pre-split candidate that edited tests.js must keep the plan it was recorded
+// with.
 const isTestSurfacePath = file => file === 'tests.js' || file.startsWith('tests/');
 
 function commentOnlyDiff(repoRoot, baseSha, commitSha, file) {
@@ -314,6 +316,18 @@ function inlineScriptLines(text) {
 
 const unrenderedSegments = new Set(['.git', '.github', '.claude', 'audits', 'docs', 'node_modules', 'scripts']);
 
+// Product behavior is what users run: the app's runtime files and the Firestore
+// rules. Tests, tooling and workflows change no control, default or saved data
+// the extended FAQ describes, so only product files call for owner FAQ coverage.
+const productFilePattern = /\.(?:html?|js|mjs|cjs|jsx|ts|tsx|css|scss|webmanifest|svg|png|jpe?g|webp|avif)$/i;
+function isProductPath(file) {
+  const normalized = file.replaceAll('\\', '/');
+  if (normalized === 'firestore.rules') return true;
+  if (isTestSurfacePath(normalized) || /\.test\.[cm]?js$/i.test(normalized) ||
+      normalized.split('/').some(segment => unrenderedSegments.has(segment))) return false;
+  return productFilePattern.test(normalized);
+}
+
 function changesTypography(repoRoot, baseSha, commitSha, file) {
   const normalized = file.replaceAll('\\', '/');
   // Tests and tooling assert on markup strings but are never shown to users.
@@ -364,12 +378,14 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
   // approve itself under that plan.
   const scaled = hasScaledReviewPolicy(repoRoot, commitSha) && hasScaledReviewPolicy(repoRoot, baseSha);
   let requiresCodeReview = false;
+  let changesProduct = false;
   let requiresTypographyReview = false;
   const specialistDomains = new Set();
   for (const file of changedFiles) {
     const documentationOnly = isDocumentationOnlyPath(file);
     const commentsOnly = commentOnlyDiff(repoRoot, baseSha, commitSha, file);
     if (!documentationOnly && !commentsOnly) requiresCodeReview = true;
+    if (!documentationOnly && !commentsOnly && isProductPath(file)) changesProduct = true;
     if (scaled && !commentsOnly && !requiresTypographyReview) {
       requiresTypographyReview = changesTypography(repoRoot, baseSha, commitSha, file);
     }
@@ -386,14 +402,15 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     requiresSpecialistReview ? 'specialist-review' : 'owner-self-review';
   if (scaled) {
     // Plan schema 2 marks the scaled policy. FAQ coverage moves into the owner
-    // review for product behavior instead of a separate FAQ reviewer.
+    // review for product behavior instead of a separate FAQ reviewer. Schema 1
+    // (every pre-policy receipt) is untouched.
     return {
       schemaVersion: 2,
       changedFiles,
       mode,
       requiresCodeReview,
       requiresFaqReview: false,
-      requiresOwnerFaqCoverage: requiresCodeReview,
+      requiresOwnerFaqCoverage: changesProduct,
       requiresSpecialistReview,
       requiresTypographyReview,
       specialistDomains: domains,

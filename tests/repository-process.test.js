@@ -1249,6 +1249,31 @@ test('RISK repository process: scaled review plan pins ordinary code to owner pl
  }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
 });
 
+test('RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const neutral={base:'const value = 1;\n',head:'const value = 2;\n'};
+ // Tests, tooling and workflows change no control, default or saved data the
+ // FAQ describes; the app's runtime files and rules do.
+ const cases={
+  'test-only':[{'tests/core.test.js':neutral.base},{'tests/core.test.js':neutral.head},false],
+  'shared test helper':[{'tests/shared.js':neutral.base},{'tests/shared.js':neutral.head},false],
+  'agent tooling':[{'scripts/agent-tools/report.mjs':neutral.base},{'scripts/agent-tools/report.mjs':neutral.head},false],
+  'workflow':[{'.github/workflows/nightly.yml':'on: schedule\n'},{'.github/workflows/nightly.yml':'on: workflow_dispatch\n'},false],
+  'app module':[{'landscape-mood.js':neutral.base},{'landscape-mood.js':neutral.head},true],
+  'stylesheet':[{'landscape.css':'a{color:red}\n'},{'landscape.css':'a{color:blue}\n'},true],
+  'firestore rules':[{'firestore.rules':'rules_version = "1";\n'},{'firestore.rules':'rules_version = "2";\n'},true],
+  'app change with its test':[{'landscape-mood.js':neutral.base,'tests/core.test.js':neutral.base},{'landscape-mood.js':neutral.head,'tests/core.test.js':neutral.head},true],
+ };
+ for(const [name,[base,candidate,expected]] of Object.entries(cases)){
+  const f=makeScaledReviewFixture({base,candidate});
+  try{
+   const plan=deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);
+   assert.equal(plan.requiresCodeReview,true,`${name}: code changed, so code review stays required`);
+   assert.equal(plan.requiresOwnerFaqCoverage,expected,`${name}: owner FAQ coverage ${expected?'is':'is not'} required`);
+  }finally{cleanupReleaseGateFixture(f);}
+ }
+});
+
 test('RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence',async()=>{
  const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
  const neutral={base:'const value = 1;\n',head:'const value = 2;\n'};
