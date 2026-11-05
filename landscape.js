@@ -1455,8 +1455,16 @@
   function paintScene(){
     paintBackground();syncScene(Date.now());paintLife(world.elapsed);
   }
+  // During the opening task a refresh computes the scene but owes its paint.
+  // Opening used to paint the whole landscape two or three times in the same
+  // task as the board's first input, so a visible board could not be used
+  // until the scenery finished drawing (#2202). A later refresh paints at
+  // once and settles the owed paint.
+  let openingPaint=null;
   function refreshSky(){
-    computeScene();paintScene();
+    computeScene();
+    if(openingPaint?.opening)openingPaint.due=true;
+    else{if(openingPaint)openingPaint.due=false;paintScene();}
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
@@ -1663,14 +1671,29 @@
   document.addEventListener('landscape-location-change',()=>{refreshSky();});
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
+  openingPaint={opening:true,due:false};
   resize();updateMotion();if(preference===null)openMotion();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
   document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));
+  // Paint the opening scene once, after the board's next frame and any input
+  // queued behind this task, using the latest computed scene. Until then the
+  // normal-motion loop keeps running but its next paint is held; the
+  // reduced-motion timer first runs a second after opening.
+  openingPaint.opening=false;nextPaint=Infinity;
+  requestAnimationFrame(()=>setTimeout(()=>{
+    const owed=openingPaint?.due;openingPaint=null;
+    if(nextPaint===Infinity)nextPaint=0;
+    if(owed&&!document.hidden){syncScene(Date.now());paintScene();}
+  }));
   // The editable local file is precached for offline use. A failed first load
   // leaves hourly text blank and cannot interrupt animation startup.
   fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{
     if(!response.ok)throw new Error('Human text unavailable');
     return response.text();
-  }).then(markdown=>{LandscapeMood.setHumanText(markdown);refreshSky();}).catch(()=>{});
+  }).then(markdown=>{
+    LandscapeMood.setHumanText(markdown);
+    // Text that arrives before the opening paint joins it instead of painting first.
+    if(openingPaint){computeScene();openingPaint.due=true;}else refreshSky();
+  }).catch(()=>{});
 })();
