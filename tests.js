@@ -7925,6 +7925,84 @@ test('RISK opening scenery hydration browser: with reduced motion a board that o
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2194 FAQ re-review B4: while the opening paint waits for a late board, a
+// resize, a return to the app (hide then show) or a pageshow ran refreshSky or
+// start(), which painted the scenery at once and released the normal-motion
+// loop's hold. During the wait they must only compute and join the single
+// opening paint; once it has happened they repaint as before.
+test('RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,NIGHT=Date.UTC(2026,10,5,4,0,0),DELAY_MS=2500;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('wait-'+i,'Waiting board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ const fire=async(page,event)=>{
+  if(event==='resize'){const size=page.viewportSize();await page.setViewportSize({width:size.width-30,height:size.height-60});await page.waitForTimeout(400);await page.setViewportSize(size);await page.waitForTimeout(400);}
+  else await page.evaluate(async event=>{
+   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+   if(event==='hide-show'){
+    // Headless pages stay visible, so the page's own visibility is overridden.
+    window.__fakeHidden=true;document.dispatchEvent(new Event('visibilitychange'));await pause(150);
+    window.__fakeHidden=false;document.dispatchEvent(new Event('visibilitychange'));await pause(300);
+   }else{window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));await pause(300);}
+  },event);
+ };
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const motion of ['normal','reduced'])for(const event of ['resize','hide-show','pageshow']){
+   const label=`${engineName}/${motion}/${event}`;
+   const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({board,ROWS,NIGHT,DELAY_MS,motion})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     const RealDate=Date,offset=NIGHT-RealDate.now(),now=()=>RealDate.now()+offset;
+     window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+      apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+     window.__fakeHidden=false;
+     Object.defineProperty(Document.prototype,'hidden',{configurable:true,get(){return window.__fakeHidden;}});
+     Object.defineProperty(Document.prototype,'visibilityState',{configurable:true,get(){return window.__fakeHidden?'hidden':'visible';}});
+     const o=window.__wait={booted:false,painted:false,paintReady:null,paintRows:null,draws:0};
+     window.storage={async get(){await new Promise(resolve=>setTimeout(resolve,DELAY_MS));return {value:board};},async set(){}};
+     const rows=()=>document.querySelectorAll('#listBody [data-row]').length;
+     o.ready=()=>document.documentElement.dataset.appReady==='true'&&rows()===ROWS;
+     const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+     Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+      width.set.call(this,value);if(this.matches?.('#landscape [data-scenery]'))o.booted=true;}});
+     const context2d=CanvasRenderingContext2D.prototype;
+     for(const method of ['clearRect','fillRect','fill','stroke','drawImage','putImageData','fillText']){
+      const original=context2d[method];
+      context2d[method]=function(...args){
+       if(this.canvas?.matches?.('#landscape [data-scenery]')){o.draws++;if(!o.painted){o.painted=true;o.paintRows=rows();o.paintReady=o.ready();}}
+       return original.apply(this,args);
+      };
+     }
+    },{board,ROWS,NIGHT,DELAY_MS,motion});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.__wait.booted&&document.documentElement.dataset.landscapeMotion!==undefined,null,{timeout:20000});
+    await fire(page,event);
+    const during=await page.evaluate(()=>({ready:window.__wait.ready(),painted:window.__wait.painted}));
+    await page.waitForFunction(()=>window.__wait.painted&&window.__wait.ready(),null,{timeout:30000});
+    const r=await page.evaluate(()=>({paintReady:window.__wait.paintReady,paintRows:window.__wait.paintRows,motion:document.documentElement.dataset.landscapeMotion}));
+    // After the opening paint the same event still repaints the scenery.
+    await page.waitForTimeout(300);
+    const before=await page.evaluate(()=>window.__wait.draws);
+    await fire(page,event);
+    const after=await page.evaluate(()=>window.__wait.draws);
+    observed.push({label,during,...r,repaintDraws:after-before});
+    assert.equal(r.motion,motion,`${label}: the motion choice applies`);
+    assert.equal(during.ready,false,`${label}: the event happened while the board was still opening`);
+    assert.deepEqual(errors,[],`${label}: no page errors`);
+    if(!(r.paintReady&&r.paintRows===ROWS))failures.push(`${label}: the scenery painted before the board was rendered (${r.paintRows} rows)`);
+    if(!(after>before))failures.push(`${label}: after the opening paint the ${event} no longer repaints the scenery`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2194 rendered acceptance R2: on a returning night reload Chromium shows the
 // board for a few frames before landscape.js runs, over the stylesheet's fixed
 // day-blue. Until the scenery boots, the background must show the sky last

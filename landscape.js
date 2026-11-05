@@ -1481,11 +1481,13 @@
   function paintScene(){
     paintBackground();syncScene(Date.now());paintLife(world.elapsed);
   }
-  // During the opening task a refresh computes the scene but owes its paint.
+  // Until the opening paint a refresh computes the scene but owes its paint.
   // Opening used to paint the whole landscape two or three times in the same
   // task as the board's first input, so a visible board could not be used
-  // until the scenery finished drawing (#2202). A later refresh paints at
-  // once and settles the owed paint.
+  // until the scenery finished drawing (#2202). A resize, a return to the app
+  // or a pageshow while the board is still opening reaches this refresh too;
+  // it used to paint before the board (#2194 FAQ re-review B4), so it now
+  // joins the single opening paint. After that paint a refresh paints at once.
   // Opening states: {opening:true} during the boot task (refreshes only compute);
   // {opening:false} while the opening paint is owed, waiting for the board;
   // null once it has painted. `due` says a computed scene still needs painting.
@@ -1493,8 +1495,8 @@
   let openingPaint=null;
   function refreshSky(){
     computeScene();
-    if(openingPaint?.opening)openingPaint.due=true;
-    else{if(openingPaint)openingPaint.due=false;paintScene();}
+    if(openingPaint)openingPaint.due=true;
+    else paintScene();
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
@@ -1573,7 +1575,7 @@
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
-  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;refreshPaint=null;partyTimer=0;}
+  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=openingPaint?Infinity:0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;refreshPaint=null;partyTimer=0;}
   function scheduleSky(){
     clearTimeout(skyTimer);if(document.hidden)return;
     const now=Date.now(),weather=S.weatherAt(new Date(now),sceneSeason);
@@ -1762,8 +1764,9 @@
   // board may hydrate after this task (a large or slow device read): its
   // hydration reapplies the saved scene choice, and every refresh owed to the
   // opening paint only computes, so no scenery paint runs in the task that
-  // first shows the board (#2194 review F6, F9). Direct refreshes after this
-  // task still paint at once. If the board never signals, the scenery still
+  // first shows the board (#2194 review F6, F9). A resize, a return to the
+  // app or a pageshow meanwhile only computes and keeps the loop's hold
+  // (#2194 FAQ re-review B4). If the board never signals, the scenery still
   // paints after a bounded wait. Until then the normal-motion loop keeps
   // running but its next paint is held, and the reduced-motion timer skips
   // its runs until then.

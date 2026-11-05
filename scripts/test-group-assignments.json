@@ -12974,6 +12974,11 @@
       "root": "RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [
