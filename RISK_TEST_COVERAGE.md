@@ -251,6 +251,7 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes
 - RISK cloud generation recovery: a refused decline leaves the automatic recovery read and its requested resume in place
 - RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit
+- RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit
 - RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted
 - RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone
 - RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered

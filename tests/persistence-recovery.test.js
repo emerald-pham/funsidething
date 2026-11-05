@@ -1096,6 +1096,119 @@ test('RISK large board opening browser: a large saved board opens from device st
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2226 (spec #2224): the accepted device board appears and takes input before
+// any automatic recovery default work starts, extending #2194's board before
+// scenery ordering to cloud recovery. The cloud is faked in the page, as in the
+// #2194 browser test above: signed in, the current generation reads as
+// unreadable (corrupt-generation) and known damaged, and its root names an
+// intact earlier generation. The fake answers the opening pull only when the
+// test releases it, then busy-holds the main thread briefly so a trusted tap on
+// Add and keys are certainly pending when the answer lands, as on a slow phone.
+// The recovery-source read is held open, so recovery is still running when
+// Settings, the debug log, Review cloud recovery and Restore are checked. Only
+// ordering is asserted, never elapsed time.
+test('RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=600,KEYS=3;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('recovery-opening-'+i,'Recovery opening task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    let answerHeld=false;await context.exposeBinding('__cloudAnswerHeld',()=>{answerHeld=true;});
+    await context.addInitScript(({board,ROWS,HOLD_MS})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     const opening=window.__recoveryOpening={log:[],pulls:0};
+     opening.boardShown=()=>{
+      const panel=document.getElementById('addPanel'),body=document.getElementById('addBody'),input=document.getElementById('addInput');
+      return !!(panel&&body&&input)&&document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!panel.closest('[hidden],[inert]')&&
+       !body.hidden&&!input.disabled&&input.getClientRects().length>0&&getComputedStyle(input).visibility==='visible'&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+     };
+     for(const type of ['pointerdown','keydown'])document.addEventListener(type,event=>{if(event.isTrusted)opening.log.push({kind:'input',type,board:opening.boardShown(),target:event.target?.id||''});},true);
+     let release;const answer=new Promise(resolve=>{release=resolve;});opening.releasePull=()=>{setTimeout(release,0);};
+     const root={rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier'};
+     const cloud={configured:true,ready:true,user:'owner@example.test',status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+      signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+      async pull(){
+       const first=++opening.pulls===1;opening.log.push({kind:'pull',board:opening.boardShown()});
+       if(first){await answer;window.__cloudAnswerHeld();const until=performance.now()+HOLD_MS;while(performance.now()<until){}}
+       Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+       window.dispatchEvent(new CustomEvent('cloudsync'));
+       return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+      },
+      async push(){opening.log.push({kind:'push'});return {error:true};},
+      async recoveryEvidence(){opening.log.push({kind:'source-read',read:'evidence',board:opening.boardShown()});return {identity:'fixture-identity',epoch:1,pending:null};},
+      // Held open: automatic recovery is still running for the rest of the test.
+      readRecoverySource(){opening.log.push({kind:'source-read',read:'source',board:opening.boardShown()});return new Promise(()=>{});},
+     };
+     // The page's own backend module stays unconfigured; this signed-in fake is the cloud.
+     Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+     // Auth restoration finishing early, as a signed-in phone does on a cold open.
+     document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+    },{board,ROWS,HOLD_MS});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>__recoveryOpening.boardShown()&&__recoveryOpening.log.some(entry=>entry.kind==='pull'),null,{timeout:20000});
+    const add=await page.locator('#addInput').boundingBox();
+    await page.evaluate(()=>__recoveryOpening.releasePull());
+    const deadline=Date.now()+10000;while(!answerHeld&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,1));
+    assert.ok(answerHeld,`${engineName}: the unreadable cloud answer arrives`);
+    // Dispatched while the answer holds the main thread, so both are pending.
+    await page.mouse.click(add.x+add.width/2,add.y+add.height/2);
+    for(let i=0;i<KEYS;i++)await page.keyboard.press('KeyQ');
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0))));
+    const first=await page.evaluate(()=>({log:__recoveryOpening.log.slice(),value:document.getElementById('addInput').value,focused:document.activeElement?.id||''}));
+    const log=first.log,firstInput=log.findIndex(entry=>entry.kind==='input'),firstKey=log.findIndex(entry=>entry.kind==='input'&&entry.type==='keydown'),
+     firstRead=log.findIndex(entry=>entry.kind==='source-read');
+    const summary={engine:engineName,firstInput,firstKey,firstRead,value:first.value,focused:first.focused,log:log.map(entry=>entry.kind+(entry.type?':'+entry.type:'')+(entry.read?':'+entry.read:''))};
+    // Fixture preconditions: the board was showing, a tap and keys were dispatched, and the keys reached Add.
+    assert.ok(firstInput>=0&&firstKey>=0,`${engineName}: trusted input was observed ${JSON.stringify(summary)}`);
+    assert.equal(first.value,'q'.repeat(KEYS),`${engineName}: every trusted key reached Add ${JSON.stringify(summary)}`);
+    // Behavior under test: ordering only.
+    if(log.some((entry,index)=>entry.kind==='source-read'&&!entry.board))failures.push(`${engineName}: a recovery-source read started before the board was showing ${JSON.stringify(summary)}`);
+    if(!log[firstInput].board)failures.push(`${engineName}: the board was not showing when the first trusted input was handled ${JSON.stringify(summary)}`);
+    if(firstRead>=0&&firstRead<firstKey)failures.push(`${engineName}: a recovery-source read started before a trusted key reached Add ${JSON.stringify(summary)}`);
+    // Recovery still runs once the person leaves Add; it is never skipped.
+    await page.locator('#addInput').blur();
+    await page.waitForFunction(()=>__recoveryOpening.log.some(entry=>entry.kind==='source-read'),null,{timeout:15000});
+    // Reachable while the recovery-source read is still held open.
+    await page.locator('#appHeader [data-act="settings"]').click();
+    for(const act of ['view-support-diagnostics','restore-backup']){
+     const section=page.locator('#modalRoot details.settings-section:has([data-act="'+act+'"])');
+     if(await section.count()&&!await section.evaluate(el=>el.open))await section.locator(':scope > summary').click();
+    }
+    const settings=await page.evaluate(()=>{const read=act=>{const el=document.querySelector('#modalRoot [data-act="'+act+'"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;};
+     return {debugLog:read('view-support-diagnostics'),restore:read('restore-backup')};});
+    summary.settings=settings;
+    if(!settings.debugLog?.visible||settings.debugLog.disabled)failures.push(`${engineName}: Settings does not offer the debug log while recovery runs ${JSON.stringify(settings)}`);
+    if(!settings.restore?.visible||settings.restore.disabled)failures.push(`${engineName}: Settings does not offer Restore while recovery runs ${JSON.stringify(settings)}`);
+    if(settings.debugLog?.visible&&!settings.debugLog.disabled){
+     await page.locator('#modalRoot [data-act="view-support-diagnostics"]').click();
+     summary.debugLogOpened=await page.waitForFunction(()=>/debug log/i.test(document.querySelector('#modalRoot')?.textContent||'')&&!!document.querySelector('#modalRoot pre,#modalRoot textarea'),null,{timeout:5000}).then(()=>true,()=>false);
+     if(!summary.debugLogOpened)failures.push(`${engineName}: the debug log did not open while recovery runs`);
+    }
+    await page.keyboard.press('Escape');await page.evaluate(()=>closeModal());
+    await page.locator('#syncBtn').click();
+    const review=await page.evaluate(()=>{const el=document.querySelector('#modalRoot [data-act="review-cloud-source-recovery"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;});
+    summary.review=review;
+    if(!review?.visible||review.disabled)failures.push(`${engineName}: the cloud button does not offer Review cloud recovery while recovery runs ${JSON.stringify(review)}`);
+    summary.stillHeld=await page.evaluate(()=>__recoveryOpening.log.filter(entry=>entry.kind==='source-read'&&entry.read==='source').length);
+    assert.ok(summary.stillHeld>=1,`${engineName}: the recovery-source read is held open, so recovery is still running`);
+    observed.push(summary);
+    assert.deepEqual(errors,[],`${engineName}: no page errors`);
+   }finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 test('RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='broken-board-hydration-'+Date.now()+'-'+Math.random(),broken='{broken saved device board',
   board=syncState({tasks:[syncTask('recovered-phone-board','Saved iPhone board')],futureSaved:{keep:['exact',31]}}),raw=JSON.stringify(board),
