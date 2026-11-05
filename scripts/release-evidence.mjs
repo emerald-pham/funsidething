@@ -287,6 +287,63 @@ function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled = fals
   return [...domains].sort();
 }
 
+// Typography review follows rendered markup and styling, not logic. Script
+// lines count when they build markup or classes/styles, because most of the
+// app's markup is rendered from template strings inside index.html scripts.
+const markupLinePattern = /<\/?[a-z][a-z0-9-]*(?:[\s>/]|$)|\b(?:class|style)\s*=|\.style\b|classList|className|(?:inner|outer)HTML|insertAdjacentHTML/i;
+
+function inlineScriptLines(text) {
+  const inside = new Set();
+  if (text === null) return inside;
+  let open = false;
+  text.split(/\r?\n/).forEach((line, index) => {
+    if (open) {
+      if (/<\/script\s*>/i.test(line)) open = false;
+      else inside.add(index + 1);
+      return;
+    }
+    const start = line.match(/<script\b([^>]*)>/i);
+    if (start && !/\bsrc\s*=/i.test(start[1]) && !/<\/script\s*>/i.test(line.slice(start.index + start[0].length))) open = true;
+  });
+  return inside;
+}
+
+const unrenderedSegments = new Set(['.git', '.github', '.claude', 'audits', 'docs', 'node_modules', 'scripts']);
+
+function changesTypography(repoRoot, baseSha, commitSha, file) {
+  const normalized = file.replaceAll('\\', '/');
+  // Tests and tooling assert on markup strings but are never shown to users.
+  if (normalized === 'tests.js' || /\.test\.[cm]?js$/i.test(normalized) ||
+      normalized.split('/').some(segment => unrenderedSegments.has(segment))) return false;
+  const extension = path.extname(file).toLowerCase();
+  if (['.css', '.scss'].includes(extension)) return true;
+  const html = ['.html', '.htm'].includes(extension);
+  if (!html && !['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx'].includes(extension)) return false;
+  const patch = gitRaw(repoRoot, ['diff', '--unified=0', '--no-renames', baseSha, commitSha, '--', file]);
+  const scripts = html
+    ? { '-': inlineScriptLines(gitShow(repoRoot, baseSha, file)), '+': inlineScriptLines(gitShow(repoRoot, commitSha, file)) }
+    : null;
+  let inHunk = false;
+  let oldLine = 0;
+  let newLine = 0;
+  for (const line of patch.split(/\r?\n/)) {
+    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      inHunk = true;
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      continue;
+    }
+    const side = line[0];
+    if (!inHunk || (side !== '+' && side !== '-')) continue;
+    const number = side === '+' ? newLine++ : oldLine++;
+    // Outside inline scripts, every HTML line is markup or inline stylesheet.
+    if (html && !scripts[side].has(number)) return true;
+    if (markupLinePattern.test(line.slice(1))) return true;
+  }
+  return false;
+}
+
 export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = {}) {
   candidateTree(repoRoot, commitSha);
   assertAncestor(repoRoot, baseSha, commitSha);
@@ -300,11 +357,15 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     .split('\0').filter(Boolean).sort();
   const scaled = hasScaledReviewPolicy(repoRoot, commitSha);
   let requiresCodeReview = false;
+  let requiresTypographyReview = false;
   const specialistDomains = new Set();
   for (const file of changedFiles) {
     const documentationOnly = isDocumentationOnlyPath(file);
     const commentsOnly = commentOnlyDiff(repoRoot, baseSha, commitSha, file);
     if (!documentationOnly && !commentsOnly) requiresCodeReview = true;
+    if (scaled && !commentsOnly && !requiresTypographyReview) {
+      requiresTypographyReview = changesTypography(repoRoot, baseSha, commitSha, file);
+    }
     if (!commentsOnly) {
       for (const domain of reviewDomainsForPath(file, scaled)) specialistDomains.add(domain);
       for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled)) specialistDomains.add(domain);
@@ -327,7 +388,7 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
       requiresFaqReview: false,
       requiresOwnerFaqCoverage: requiresCodeReview,
       requiresSpecialistReview,
-      requiresTypographyReview: false,
+      requiresTypographyReview,
       specialistDomains: domains,
     };
   }

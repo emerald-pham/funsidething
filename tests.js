@@ -37731,6 +37731,35 @@ test('RISK repository process: scaled review plan keeps the specialist for sync,
  }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: scaled review plan sets typography only for markup or stylesheet content',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const page=(style,script,body)=>'<!doctype html>\n<style>\n'+style+'\n</style>\n<script>\n'+script+'\n</script>\n<body>\n'+body+'\n</body>\n';
+ const basePage=page('.row { color: red; }','const limit = 3;\nrow.innerHTML = \'<span class="a">x</span>\';','<p>Old control</p>');
+ const fixtures={
+  stylesheet:makeScaledReviewFixture({base:{'styles.css':'#status { color: red; }\n'},candidate:{'styles.css':'#status { color: blue; }\n'}}),
+  stylesheetComment:makeScaledReviewFixture({base:{'styles.css':'/* old note */\n#status { color: red; }\n'},candidate:{'styles.css':'/* clearer note */\n#status { color: red; }\n'}}),
+  markup:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('<p>Old control</p>','<p>New control</p>')}}),
+  inlineStyle:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('color: red','color: blue')}}),
+  scriptTemplate:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('class="a"','class="b"')}}),
+  scriptLogic:makeScaledReviewFixture({base:{'index.html':basePage},candidate:{'index.html':basePage.replace('const limit = 3;','const limit = 4;')}}),
+  moduleLogic:makeScaledReviewFixture({base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}}),
+  // Tests and tooling assert on markup strings but are never rendered to users.
+  testMarkup:makeScaledReviewFixture({base:{'tests.js':'\n','scripts/agent-tools/report.mjs':'\n'},
+   candidate:{'tests.js':"assert.match(html,/<p class=\"note\">/);\n",'scripts/agent-tools/report.mjs':"const row = '<td class=\"ok\">';\n"}}),
+ };
+ try{
+  const typography=name=>deriveReleaseReviewPlan(fixtures[name].repo,fixtures[name].candidateSha,fixtures[name].baseSha).requiresTypographyReview;
+  assert.equal(typography('stylesheet'),true,'stylesheet content needs typography review');
+  assert.equal(typography('markup'),true,'page markup needs typography review');
+  assert.equal(typography('inlineStyle'),true,'an inline style block is stylesheet content');
+  assert.equal(typography('scriptTemplate'),true,'markup rendered from a script template is markup content');
+  assert.equal(typography('scriptLogic'),false,'inline script logic is not markup');
+  assert.equal(typography('moduleLogic'),false,'module logic is not markup');
+  assert.equal(typography('stylesheetComment'),false,'a comment-only stylesheet edit changes no styling');
+  assert.equal(typography('testMarkup'),false,'markup strings in tests and tooling are not rendered app markup');
+ }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);
