@@ -1486,6 +1486,10 @@
   // task as the board's first input, so a visible board could not be used
   // until the scenery finished drawing (#2202). A later refresh paints at
   // once and settles the owed paint.
+  // Opening states: {opening:true} during the boot task (refreshes only compute);
+  // {opening:false} while the opening paint is owed, waiting for the board;
+  // null once it has painted. `due` says a computed scene still needs painting.
+  // nextPaint=Infinity holds the animation loop's paint for that same wait.
   let openingPaint=null;
   function refreshSky(){
     computeScene();
@@ -1585,9 +1589,10 @@
         const writes=[],shown=sky;computeScene(writes);
         yieldStep(()=>{
           if(sky!==shown)return;
+          // The writes already synced the scene clock in this same step.
           for(const write of writes)write();
           if(timeDialog.open)refreshSolarTimes();
-          if(!document.hidden){syncScene(Date.now());paintScene();}
+          if(!document.hidden)paintScene();
         });
       }
       scheduleSky();
@@ -1764,6 +1769,9 @@
     requestAnimationFrame(()=>setTimeout(()=>{
       const owed=openingPaint?.due;openingPaint=null;
       if(nextPaint===Infinity)nextPaint=0;
+      // Not redundant: the scene was computed at boot, and the background reads
+      // light states that must match this later instant (paintScene syncs only
+      // after painting the background).
       if(owed&&!document.hidden){syncScene(Date.now());paintScene();}
     }));
   };

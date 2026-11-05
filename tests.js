@@ -4073,15 +4073,23 @@ test('RISK sync responsiveness guidance: mounted Help explains large boards and 
 // They hold a damaged source whose complete prior generation would otherwise
 // reconcile automatically (#2198). Give that prior a conflicting legacy rating
 // (the #2408 refusal shape) so the automatic default genuinely has to wait.
+// Decodes one stored cloud generation, lets `edit` return its new payload,
+// and stores that payload re-encoded in place of the old header and chunks.
+async function rewriteGenerationFixture(backend,generationPath,codec,edit){
+ const header=backend.docs.get(generationPath);
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(generationPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const payload=await edit(JSON.parse(await codec.decodeSnapshot(header,chunks))),encoded=await codec.encodeSnapshot(payload);
+ for(const key of [...backend.docs.keys()])if(key.startsWith(generationPath+'/chunks/'))backend.docs.delete(key);
+ backend.docs.set(generationPath,{...header,hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
+ for(const chunk of encoded.chunks)backend.docs.set(generationPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ return {payload,encoded};
+}
 async function conflictingPriorGeneration2201(backend,previousGeneration,codec){
- const priorPath='users/owner/generations/'+previousGeneration,header=backend.docs.get(priorPath);
- const chunks=[...backend.docs].filter(([key])=>key.startsWith(priorPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
- const board=JSON.parse(await codec.decodeSnapshot(header,chunks)),task=board.tasks.find(row=>row.id==='a');
- assert.equal(board.decisionBaseline,undefined);assert.equal(task.mu,25,'the accepted board rates this task differently');task.mu=26;
- const encoded=await codec.encodeSnapshot(JSON.stringify(board));
- for(const key of [...backend.docs.keys()])if(key.startsWith(priorPath+'/chunks/'))backend.docs.delete(key);
- backend.docs.set(priorPath,{...header,hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
- for(const chunk of encoded.chunks)backend.docs.set(priorPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ await rewriteGenerationFixture(backend,'users/owner/generations/'+previousGeneration,codec,board=>{
+  const task=board.tasks.find(row=>row.id==='a');
+  assert.equal(board.decisionBaseline,undefined);assert.equal(task.mu,25,'the accepted board rates this task differently');task.mu=26;
+  return JSON.stringify(board);
+ });
 }
 
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
@@ -32182,20 +32190,16 @@ async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_R
  const activePath='users/owner/generations/'+originalRoot.activeGeneration,priorPath='users/owner/generations/'+originalRoot.previousGeneration;
  // Prior generation: complete and verifiable, carrying one change this device
  // never saw, so its use is observable in the working board.
- const priorHeader=backend.docs.get(priorPath);
- const priorChunks=[...backend.docs].filter(([key])=>key.startsWith(priorPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
- const priorBoard=JSON.parse(await codec.decodeSnapshot(priorHeader,priorChunks));
- priorBoard.tasks.push(syncTask('captured-prior-only','Saved only in the intact prior generation'));
- // Unsafe variants must keep waiting: an ambiguous legacy rating (the #2408
- // refusal shape) or a board saved under another account.
- if(priorVariant==='ambiguous legacy rating'){assert.equal(priorBoard.decisionBaseline,undefined);priorBoard.tasks.find(row=>row.id==='a').mu=26;}
- else if(priorVariant==='different account')priorBoard.syncAccount='other-account@example.com';
- else assert.equal(priorVariant,null);
- const priorPayload=exactPaddedBoard(priorBoard,'futurePriorGenerationFixture',prior.byteLength),priorEncoded=await codec.encodeSnapshot(priorPayload);
+ const {payload:priorPayload,encoded:priorEncoded}=await rewriteGenerationFixture(backend,priorPath,codec,priorBoard=>{
+  priorBoard.tasks.push(syncTask('captured-prior-only','Saved only in the intact prior generation'));
+  // Unsafe variants must keep waiting: an ambiguous legacy rating (the #2408
+  // refusal shape) or a board saved under another account.
+  if(priorVariant==='ambiguous legacy rating'){assert.equal(priorBoard.decisionBaseline,undefined);priorBoard.tasks.find(row=>row.id==='a').mu=26;}
+  else if(priorVariant==='different account')priorBoard.syncAccount='other-account@example.com';
+  else assert.equal(priorVariant,null);
+  return exactPaddedBoard(priorBoard,'futurePriorGenerationFixture',prior.byteLength);
+ });
  assert.equal(priorEncoded.chunkCount,prior.chunkCount);
- for(const key of [...backend.docs.keys()])if(key.startsWith(priorPath+'/chunks/'))backend.docs.delete(key);
- backend.docs.set(priorPath,{...priorHeader,hash:priorEncoded.hash,byteLength:priorEncoded.byteLength,chunkCount:priorEncoded.chunkCount});
- for(const chunk of priorEncoded.chunks)backend.docs.set(priorPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
  // Active generation: a different source whose header declares the captured
  // chunks and bytes while none of its chunks remain readable.
  const different=JSON.parse(ctx.state.decisionBase.payload);

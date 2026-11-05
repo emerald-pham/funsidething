@@ -4828,7 +4828,11 @@ let unrepairableCloudSource = null; // one completed unsafe-repair check, bound 
 // app relaunched over the same root does not download them either.
 let provedUnreadableCloudSource = null;
 const PROVED_UNREADABLE_CLOUD_SOURCE_KEY="fvp:chain-scanner:proved-unreadable-cloud-source";
-let cloudPullRevalidate = false; // explicit Retry proves every source again
+// Explicit Retry proves every source again. This is a flag rather than a
+// cloudPull() argument on purpose: a Retry pull that has to wait (an open
+// editor, boot classification, file restore) is replayed later by callers that
+// pass nothing, and the request must survive until a pull actually reads.
+let cloudPullRevalidate = false;
 let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
 let cloudAdoptionHeld = false; // a newer read could not be safely adopted; prior read cannot authorize writes
 let adoptedSafety = null; // one exact locally saved union and the stable snapshot it was built from
@@ -4979,7 +4983,7 @@ function observeCloudIdentity(){
     reconciledAs=null;lastPushed="";
     confirmedCloudDeviceOwner=null;
     automaticCloudRecovery=null;
-    unrepairableCloudSource=null;provedUnreadableCloudSource=null;
+    forgetUnreadableCloudSourceHold({keepDeviceRecord:true});
     cloudWriteFailure=null;
     cloudAdoptionHeld=false;adoptedSafety=null;deferredCloudPull=false;
     if(cloudSourceRecoveryRead?.automaticHistoryResume||automaticCloudSourceResumeStatus.state!=="idle"){
@@ -5492,7 +5496,7 @@ function bindDecisionBase(account,revision,payload){
   const identity=cloudAccountIdentity(),identityChanged=identity!==null&&state.syncIdentity!==identity;
   if(identity!==null)state.syncIdentity=identity;
   if(JSON.stringify(state.decisionBase)===JSON.stringify(next))return identityChanged;
-  unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();
+  forgetUnreadableCloudSourceHold();
   state.decisionBase=next;
   return true;
 }
@@ -5998,6 +6002,14 @@ async function exactAcknowledgedCloudSource(failed,account){
       automaticRecovery:{backend,revision:manifest.rev,context:{recoveryIdentity:source.identity,recoveryEpoch:source.epoch,
         recoveryPending:evidence.pending,validateBeforePublish}}};
   }catch{return null;}
+}
+// The held unreadable-source conclusion no longer applies to this board: drop
+// the write hold and the completed refusal (here and on the device). An
+// account-change observation keeps the device record, which only a resolved
+// sign-out or another account clears (observeCloudIdentity).
+function forgetUnreadableCloudSourceHold({keepDeviceRecord=false}={}){
+  unrepairableCloudSource=null;
+  if(keepDeviceRecord)provedUnreadableCloudSource=null;else forgetProvedUnreadableCloudSource();
 }
 // The completed refusal no longer applies: forget it here and on the device.
 function forgetProvedUnreadableCloudSource(){
@@ -11861,7 +11873,7 @@ async function declineAutomaticCloudRecovery(){
   if(!committed?.ok||committed.superseded)return refuse("The earlier board could not be saved on this device. Nothing was lost; try again.");
   sealUndoFrame();
   state=next;deviceHeadHash=committed.head?.hash||committed.hash;lastPersistedRaw=prior;persistedChanceSeed=next.chance?.seed??null;
-  deviceRecoveryCloudHold=null;automaticCloudRecovery=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();
+  deviceRecoveryCloudHold=null;automaticCloudRecovery=null;forgetUnreadableCloudSourceHold();
   cloudAdoptionHeld=true;pendingPush=false;
   try{localStorage.setItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY,JSON.stringify({v:1,account,identity,rev:manifest.rev,generationId:manifest.activeGeneration}));}catch{}
   applyTheme();recomputeRanks();closeModal();render();renderSync();
@@ -12104,7 +12116,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         deviceRecoveryCloudHold=savedHold;deviceHeadHash=saved.hash;lastPersistedRaw=saved.payload;
         persistedChanceSeed=next.chance?.seed??null;freshClient=false;verifiedEmptyDeviceStore=false;
         deviceStorageRequired=true;liveBoardAccepted=false;unacceptedDeviceSource={reason:"missing-authoritative-head"};
-        state=next;automaticCloudFallbackBootBaseline=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();cloudAdoptionHeld=true;pendingPush=false;
+        state=next;automaticCloudFallbackBootBaseline=null;forgetUnreadableCloudSourceHold();cloudAdoptionHeld=true;pendingPush=false;
         render();renderSync();toast("The complete older cloud copy is saved on this device, but browser storage could not finish activating it. Keep this tab open and retry when storage is available.",9000);
         return false;
       }
@@ -12115,7 +12127,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       deviceRecoveryCloudHold=savedHold;deviceHeadHash=saved.hash;lastPersistedRaw=saved.payload;
       persistedChanceSeed=next.chance?.seed??null;freshClient=false;liveBoardAccepted=true;
       unacceptedDeviceSource=null;
-      state=next;automaticCloudFallbackBootBaseline=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();cloudAdoptionHeld=true;pendingPush=false;
+      state=next;automaticCloudFallbackBootBaseline=null;forgetUnreadableCloudSourceHold();cloudAdoptionHeld=true;pendingPush=false;
       if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}
       if(cloudRetryTimer&&cloudRetryOwner!=="automatic-source"){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
       render();renderSync();
@@ -12436,7 +12448,7 @@ async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null
       const finalIdentity=await backend.recoveryEvidence();
       if(!current()||finalIdentity.identity!==identity||finalIdentity.epoch!==evidence.epoch||finalIdentity.pending)return false;
       state=next;deviceHeadHash=saved.hash;lastPersistedRaw=applied;persistedChanceSeed=next.chance?.seed??null;
-      deviceRecoveryCloudHold=null;automaticCloudRecovery=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();
+      deviceRecoveryCloudHold=null;automaticCloudRecovery=null;forgetUnreadableCloudSourceHold();
       lastKnownCloudPayload=payload;lastKnownCloudAccount=account;lastKnownCloudRevision=result.rev;lastPushed=payload;
       reconciledAs=account;pendingPush=false;cloudAdoptionHeld=false;cloudResumePending=false;deferredCloudPull=false;
       cloudWriteFailure=null;clearCloudRetry();bindConfirmedDeviceCloudOwner();
