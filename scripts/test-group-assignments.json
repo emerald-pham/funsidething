@@ -5531,6 +5531,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data",
       "group": "core",
       "file": "tests.js"
@@ -12838,6 +12843,11 @@
     {
       "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
       "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order",
+      "group": "core",
       "file": "tests.js"
     }
   ],

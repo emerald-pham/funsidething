@@ -1438,7 +1438,10 @@
   }
   new MutationObserver(updateChrome).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
   themeQuery.addEventListener('change',updateChrome);
-  function refreshSky(){
+  // Computing the scene (astronomy, palette, season, mood and hourly text) is
+  // kept apart from painting it, so opening can decide when the costly
+  // background and life passes run. refreshSky still does both, in order.
+  function computeScene(){
     const location=globalThis.LivingLocation?.current();
     sky=S.skyAt(S.sceneDate(new Date(Math.floor(Date.now()/60000)*60000),sceneStorage,location),location);p=S.palette(sky.sun.altitude);
     if(globalThis.LandscapeMood){sceneSeason=LandscapeMood.season(sky.date,location).name;p=LandscapeMood.palette(p,sky.date,location);}
@@ -1448,7 +1451,12 @@
     const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},T.random(sceneSeed,'hourly-text',Math.floor(+sky.date/3600000)));
     currentEntry=entry;
     status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');
+  }
+  function paintScene(){
     paintBackground();syncScene(Date.now());paintLife(world.elapsed);
+  }
+  function refreshSky(){
+    computeScene();paintScene();
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){

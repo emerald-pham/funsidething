@@ -27279,6 +27279,82 @@ test('Weather synchronization: reduced-motion refreshes align with UTC and exact
  }
 });
 
+// Characterization for #2199. It runs the real refresh, resize and start
+// source with recording stand-ins so the scene is computed (astronomy,
+// palette, season, mood, hourly text) before it is painted, in the existing
+// order, whichever functions the refresh is split into.
+test('RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const chromeStart=source.indexOf('  function updateChrome(){'),chromeEnd=source.indexOf('  new MutationObserver(updateChrome)',chromeStart);
+ const listener="  themeQuery.addEventListener('change',updateChrome);\n",refreshStart=source.indexOf(listener)+listener.length,refreshEnd=source.indexOf('  function tick(now){',refreshStart);
+ const startStart=source.indexOf('  function start(){'),startEnd=source.indexOf('  function updateMotion(){',startStart);
+ assert.ok(chromeStart>0&&chromeEnd>chromeStart&&refreshStart>listener.length&&refreshEnd>refreshStart&&startStart>refreshEnd&&startEnd>startStart,'the refresh, resize and start source stays sliceable');
+ const code=source.slice(chromeStart,chromeEnd)+source.slice(refreshStart,refreshEnd)+source.slice(startStart,startEnd);
+ const NOW=Date.UTC(2026,10,4,23,37,12,345),MINUTE='2026-11-04T23:37:00.000Z',LOC={lat:28.4,lon:-81.6,timezone:'America/New_York'};
+ const run=({theme='light',dark=false,dialogOpen=false,reduced=false,hidden=false,size=[390,844],viewport=size,ratio=3,previous=null}={})=>{
+  const log=[],sceneStorage={mirror:true},entry={text:'Evening light',author:'Human',seenKey:'k'};let syncs=0;
+  const dataset=new Proxy({},{set(target,key,value){log.push(`dataset.${String(key)}=${value}`);target[key]=value;return true;}});
+  const meta={set content(value){log.push(`theme-color ${value}`);}};
+  const status={set textContent(value){log.push(`status ${value}`);this.value=value;},get textContent(){return this.value;}};
+  const canvas=name=>({set width(value){log.push(`${name}.width=${value}`);},set height(value){log.push(`${name}.height=${value}`);},getContext:()=>({setTransform:(...args)=>log.push(`${name}.setTransform ${args.join(',')}`)})});
+  class FixedDate extends Date{static now(){return NOW;}}
+  const ctx=vm.createContext({Math,JSON,Date:FixedDate,LivingLocation:{current:()=>LOC},sceneStorage,sceneSeed:'seed',sky:undefined,p:undefined,sceneSeason:previous?.sceneSeason,currentEntry:null,status,world:{elapsed:0},timeDialog:{open:dialogOpen},
+   reduced,frame:0,partyTimer:0,W:previous?.W,H:previous?.H,hy:undefined,dpr:undefined,geometry:undefined,cityLights:{windows:['old']},rooftopParty:null,clocktowerVisit:null,
+   host:{clientWidth:size[0],clientHeight:size[1]},window:{devicePixelRatio:ratio,innerWidth:viewport[0],innerHeight:viewport[1]},back:canvas('back'),front:canvas('front'),partyLayer:canvas('party'),
+   themeQuery:{get matches(){return dark;}},
+   document:{hidden,documentElement:{dataset,getAttribute:name=>name==='data-theme'?theme:null,style:{setProperty:(name,value)=>log.push(`style ${name}=${value}`)}},querySelector:selector=>selector==='meta[name="theme-color"]'?meta:null},
+   S:{sceneDate(date,storage,location){log.push(`sceneDate ${date.toISOString()} ${storage===sceneStorage} ${location===LOC}`);return date;},
+    skyAt(date,location){log.push(`skyAt ${date.toISOString()} ${location===LOC}`);return {date,sun:{altitude:-4.5},period:'dusk'};},
+    palette(altitude){log.push(`palette ${altitude}`);return {tint:'#102030',night:.4};},
+    mixHex(a,b,amount){return `mix(${a},${b},${amount})`;}},
+   LandscapeMood:{season(date,location){log.push(`season ${date.toISOString()} ${location===LOC}`);return {name:'autumn'};},
+    palette(base,date,location){log.push(`moodPalette ${base.tint} ${date.toISOString()} ${location===LOC}`);return {...base,tint:'#405060',mood:'calm'};},
+    messageEntry(date,context,random){log.push(`messageEntry ${date.toISOString()} ${JSON.stringify(context)} ${random}`);return entry;}},
+   T:{random(seed,label,hour){log.push(`random ${seed} ${label} ${hour}`);return .25;}},
+   LandscapeGeometry:{create(width,height){log.push(`geometry ${width}x${height}`);return {horizon:height*.6};}},
+   syncScene(now){syncs++;ctx.world.elapsed=syncs*10;log.push(`syncScene ${now}`);},
+   paintBackground(){log.push(`paintBackground ${ctx.sky.period} ${ctx.p.tint} ${ctx.status.textContent} ${dataset.sceneSeason} ${dataset.scenePeriod}`);},
+   paintLife(t){log.push(`paintLife ${t} ${ctx.p.tint}`);},refreshSolarTimes(){log.push('refreshSolarTimes');},
+   stop(){log.push('stop');},scheduleSky(){log.push('scheduleSky');},tick(){},advanceRooftopParty(){},
+   requestAnimationFrame(callback){log.push(`requestAnimationFrame ${callback===ctx.tick}`);return 7;},setInterval(callback,ms){log.push(`setInterval ${ms}`);return 9;}});
+  vm.runInContext(code,ctx);
+  return {ctx,log,entry};
+ };
+ // Expected values are written out from the stand-ins above, not read back from landscape.js.
+ const refresh=({theme='light',dark=false,dialogOpen=false}={})=>{
+  const chrome=theme==='dark'||(theme!=='light'&&dark)?'#344b5f':'#ffffff';
+  return [`sceneDate ${MINUTE} true true`,`skyAt ${MINUTE} true`,'palette -4.5',`season ${MINUTE} true`,`moodPalette #102030 ${MINUTE} true`,
+   'dataset.sceneSeason=autumn',`syncScene ${NOW}`,`theme-color mix(${chrome},#405060,0.03)`,'style --scene-tint=#405060','dataset.scenePeriod=dusk',
+   'random seed hourly-text 498287',`messageEntry ${MINUTE} {"lat":28.4,"lon":-81.6,"timezone":"America/New_York","sunAltitude":-4.5} 0.25`,'status Evening light · Human written',
+   'paintBackground dusk #405060 Evening light · Human written autumn dusk',`syncScene ${NOW}`,'paintLife 20 #405060',...(dialogOpen?['refreshSolarTimes']:[])];
+ };
+ const sized=([width,height],[pixelWidth,pixelHeight],ratio)=>[`geometry ${width}x${height}`,
+  ...['back','front','party'].flatMap(name=>[`${name}.width=${pixelWidth}`,`${name}.height=${pixelHeight}`,`${name}.setTransform ${ratio},0,0,${ratio},0,0`])];
+ for(const [theme,dark] of [['light',false],['dark',false],['system',true],['system',false]])for(const dialogOpen of [false,true]){
+  const first=run({theme,dark,dialogOpen});first.ctx.refreshSky();
+  assert.deepEqual(first.log,refresh({theme,dark,dialogOpen}),`refreshSky computes then paints in the existing order (${theme}/${dark}/${dialogOpen})`);
+  assert.deepEqual(JSON.parse(JSON.stringify({sky:first.ctx.sky,p:first.ctx.p,season:first.ctx.sceneSeason})),{sky:{date:MINUTE,sun:{altitude:-4.5},period:'dusk'},p:{tint:'#405060',night:.4,mood:'calm'},season:'autumn'});
+  assert.equal(first.ctx.currentEntry,first.entry,'the hourly message entry is the one observed for reading');
+  const again=run({theme,dark,dialogOpen});again.ctx.refreshSky();
+  assert.deepEqual(again.log,first.log,'identical inputs resolve to identical scene values and paint order');
+ }
+ for(const [size,ratio,pixels,dpr] of [[[390,844],3,[585,1266],1.5],[[2560,1440],2,[2309,1299],0.9021097956087902]]){
+  const resized=run({size,ratio});resized.ctx.resize();
+  assert.deepEqual(resized.log,[...sized(size,pixels,dpr),...refresh()],`resize builds geometry and sizes canvases before one compute-then-paint refresh (${size})`);
+  assert.equal(resized.ctx.W,size[0]);assert.equal(resized.ctx.H,size[1]);assert.equal(resized.ctx.hy,size[1]*.6);assert.equal(resized.ctx.dpr,dpr);
+  assert.equal(resized.ctx.cityLights.windows.length,0,'resize clears lit windows before repainting');
+ }
+ for(const reduced of [false,true]){
+  const loop=reduced?['setInterval 1000']:['requestAnimationFrame true'];
+  const same=run({reduced,previous:{W:390,H:844}});same.ctx.start();
+  assert.deepEqual(same.log,['stop',...refresh(),'scheduleSky',...loop],`unchanged start refreshes once before scheduling (${reduced})`);
+  const changed=run({reduced,previous:{W:320,H:640}});changed.ctx.start();
+  assert.deepEqual(changed.log,['stop',...sized([390,844],[585,1266],1.5),...refresh(),'scheduleSky',...loop],`resized start sizes then refreshes once before scheduling (${reduced})`);
+  const hidden=run({reduced,hidden:true,previous:{W:390,H:844}});hidden.ctx.start();
+  assert.deepEqual(hidden.log,['stop'],'a hidden page computes and paints nothing');
+ }
+});
+
 test('Landscape browser: live Sun, Moon, and stars repaint on minute ticks while a chosen hour stays fixed',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
  try{
