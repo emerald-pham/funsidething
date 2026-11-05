@@ -20745,31 +20745,15 @@
   },
   {
     "baseCommit": "8cd524a7f0ab7a25b6689244722ae3c5baf861c8",
-    "testChangesSha256": "4f5ebc131cd5eca5905b16955fce42bea1e67de6681cb14b281d60664844de10",
-    "reason": "Spec #2205 / ticket #2208: the maintainer decided a rationale record is required only when an existing test is removed, renamed, or has an assertion deleted or weakened. Three assertions pinned the retired rule that every executable addition, including new tests and helper lines inside existing tests, needs a record.",
-    "previousBehavior": "validateRegressionChanges rejected any executable tests.js change without an exact-fingerprint record, so appending a new test or adding a helper or assertion inside an existing test failed the gate until TEST_CHANGE_RATIONALES.json was edited.",
-    "intendedBehavior": "Pure additions and extensions pass without a record. Any removed or changed line still needs one, and pure insertions that can stop existing assertions from running (bare return, if(false)/if(0), block-comment delimiters, process.exit/exitCode, .skip(/.todo() still count as weakening and need one. validateTestFirst is unchanged and now pinned.",
+    "testChangesSha256": "d5fcde159b8469fca0a9ff7cdb81684cef9984be9ce4d610365a8b51ca650353",
+    "reason": "Spec #2205 combined test diff against main (one record, because the gate matches one fingerprint for the whole diff). It covers three things: (1) #2213 moves tests.js into per-area files under tests/ as a pure move; (2) #2208 removes three assertions that pinned the retired rule that every executable test addition needs a record; (3) the #2205 review makes a root tests.js stop counting as a test file, so the existing test-first gate fixtures that used tests.js as \"the test file\" now name tests/core.test.js and expect the new tests/ wording, and one preflight fixture moves its suite into tests/core.test.js. It supersedes the per-ticket #2208 and #2213 records, whose fingerprints matched only their own partial diffs.",
+    "previousBehavior": "On main every test, helper and fixture lived in the single tests.js, which npm test, the group runner, the gate, the edit hook, preflight and the compatibility gate all read. validateRegressionChanges required a record for any executable tests.js change, including a new test. validateTestFirst accepted tests.js as the test file for an app change, and its no-tests error said \"without tests.js\".",
+    "intendedBehavior": "The same tests, with identical names, bodies and assertions apart from enumerated path edits, live in tests/*.test.js with helpers in tests/shared.js. A record is needed only when an existing test is removed, renamed or weakened. Only files under tests/ count as test files: the gate rejects a diff that adds or changes a root tests.js and points at tests/ and the porting note in docs/agents/test-groups.md, the edit hook refuses writing one, and the no-tests error says \"without a tests/ file\". Deleting tests.js against a pre-split base stays in the protected diff. The changed gate fixtures keep every assertion: each still checks the same accept or reject decision, now with tests/core.test.js as the test file and /tests\\// or /without a tests\\/ file/ as the message.",
     "replacementTests": [
+      "RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected",
+      "RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test",
       "RISK regression gate: a rationale is required only for removed or weakened tests",
-      "RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files"
-    ],
-    "preservedCoverage": [
-      "Deleted, changed, renamed and removed tests still require an exact-fingerprint record with reason, behavior, replacement tests, preserved coverage and red evidence (existing RISK regression gate tests keep those assertions).",
-      "Inserted return, if(false), block comment and appended process.exit(0) still require a record; fingerprints still differ by line position.",
-      "App changes still require tests.js; high-risk JS/HTML/manifest/rules and enforcement files still require a new RISK test, enforcement files a process RISK test; CSS and static assets pass with a direct test."
-    ],
-    "redEvidence": {
-      "command": "node --test --test-name-pattern='a rationale is required only for removed or weakened tests' tests.js",
-      "failure": "Before the gate change the new test failed: AssertionError 'an added test needs no rationale record' (actual ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'], expected [])."
-    }
-  },
-  {
-    "baseCommit": "01696695d5e9ad2f7709f9e47f6303da34faa82d",
-    "testChangesSha256": "508acfac95cc4dd2fa7c3bc1b81d6e225dcd33d6baa06dc07e37c4879380e24b",
-    "reason": "Spec #2205 / ticket #2213: tests.js (4.2 MB) is split into per-area files under tests/ (core, scenery, persistence-recovery, native-process, repository-process) with helpers and fixtures in tests/shared.js. The split is a pure move: no test is removed, renamed or weakened. The diff shows tests.js removed only because its tests now live in the new files.",
-    "previousBehavior": "Every test, helper and fixture lived in the single tests.js; npm test, the group runner, the test-first gate, the edit hook, preflight, the compatibility gate and the RISK map check all read that one file.",
-    "intendedBehavior": "The same tests, with byte-identical names, bodies and assertions, live in the tests/ area files in their original order. Only imports and an enumerated set of self-location paths changed: 93 dynamic import specifiers and 9 repository file URLs now resolve from tests/, and 23 lines in tests that read, copy or spawn their own test file name the file they now live in. The tooling treats tests/ (and a legacy tests.js) as the test surface.",
-    "replacementTests": [
+      "RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files",
       "RISK test-first gate: an app change paired with an edit to any split test file is accepted",
       "RISK test-first gate: the edit hook treats the test directory as the test surface",
       "RISK test inventory: risk map and source checks read every file in the test directory",
@@ -20778,14 +20762,17 @@
       "RISK repository process: scaled review plan treats the test directory like the single test file"
     ],
     "preservedCoverage": [
-      "Name-and-count equivalence: the pre-split tests.js and the post-split tests/*.test.js register identical top-level test-name sets and counts (2372 by default, 1547 RISK) under the default environment and under each installed-client env flag that registers gated tests.",
-      "Source equivalence: all 2604 non-import top-level chunks of the pre-split tests.js appear exactly once across tests/*.js, byte for byte after the enumerated edits, in their original relative order within each file.",
-      "The full suite before and after the split has the same failing set: only the environment-dependent native cases that need CHAIN_NATIVE_CANDIDATE_* / CHAIN_NATIVE_PORT locally.",
-      "The RISK coverage-map check, the waitForFunction source check, the compatibility gate and the Firestore rules command read every file in tests/, so no RISK test or required family drops out of their scope."
+      "Split, name equivalence (#2213): the pre-split tests.js and the post-split tests/*.test.js register the same 2372 top-level tests with identical names, 1547 of them RISK, and stay identical under each installed-client env flag that registers gated tests.",
+      "Split, source equivalence (#2213): all 2604 non-import top-level statements of the pre-split tests.js appear exactly once across tests/*.js, in their original order within each file. The only edits are 93 dynamic import specifiers and 9 file URLs now resolved from tests/, plus 23 lines in tests that read, copy or spawn their own file.",
+      "Split, negative control (#2213): a throwaway commit that removed one moved test and flipped one assertion made the equivalence check fail, naming the missing test and the edited statement.",
+      "Against main, no top-level test title is missing. The only removed meaningful lines are those path edits, the three #2208 assertions, and the review fixture lines named in the reason.",
+      "Removed, renamed and changed tests still need an exact-fingerprint record. Fingerprints bind each line to its file and position. Suppressing insertions (return, if(false)/if(0), block comments, process.exit/exitCode, .skip/.todo) still need one.",
+      "App changes still need a changed tests/ file. High-risk JS, HTML, manifest and rules changes need a new RISK test, and enforcement files a process RISK test. CSS and static assets pass with a direct test. All the existing gate fixtures still assert these decisions.",
+      "The preflight outgoing-upstream fixture keeps every assertion: the selected base passes, the outgoing upstream delta is rejected for its missing rationale, the focused checks run once each, and refs and HEAD are preserved."
     ],
     "redEvidence": {
-      "command": "node equivalence.mjs <repo> <pre-split commit> <negative-control commit> (scratchpad check from ticket #2213), run against a throwaway commit that removed one moved test and inverted one assertion in tests/scenery.test.js",
-      "failure": "RESULT: FAIL (7): '[default] registered top-level tests: pre 2372, post 2371: DIFFERENT; missing after split: RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip', and the source check reported the edited chunk as matching no pre-split chunk. The split itself is a move, so no behavioral RED applies; the tooling slices each have their own observed RED."
+      "command": "node --test '--test-name-pattern=^RISK test-first gate: a root tests.js' tests/repository-process.test.js (review, 2026-11-05T03:41:08Z, ec32263 plus the new test); node --test '--test-name-pattern=^RISK test-first gate: the edit hook refuses a root tests.js' tests/repository-process.test.js (2026-11-05T03:43:10Z); #2208: node --test --test-name-pattern='a rationale is required only for removed or weakened tests' tests.js",
+      "failure": "Review gate RED, before the gate change: AssertionError 'index.html, tests.js: the root tests.js edit is named' (actual '', expected /tests\\.js/). Review hook RED, before the hook change: AssertionError 'writing a root tests.js is refused: nothing runs it' (actual '', expected deny). #2208 RED: AssertionError 'an added test needs no rationale record' (actual ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'], expected []). The #2213 split is a move, so it has no behavioral RED; its negative control failed as expected, and each tooling slice had its own observed RED."
     }
   }
 ]
