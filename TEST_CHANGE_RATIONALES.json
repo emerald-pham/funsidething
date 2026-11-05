@@ -20985,7 +20985,7 @@
   },
   {
     "baseCommit": "057bbac32544e4578075f952001598583090c529",
-    "testChangesSha256": "c01fe7d6e2a9b3ac63ab7a28224e8a6f6260dcdbc7992b4b624f86ee0259805e",
+    "testChangesSha256": "7dd05a9232a9da3d18cd81c90eefb8e17364a4a2bde9836179a3402ef1248df6",
     "reviewFixes2194Pass2": "true",
     "reason": "Spec #2194 second review-fix pass on integration 057bbac: specialist review M1 (a transient pull failure erased the persisted unreadable-source refusal), L1 (the Settings decline remembered its choice after the device commit and ignored a failed write), L2 (no direct test of the commitHead hold-mismatch path), FAQ review B1-B3 and S1-S4, FAQ B2 refusal guidance, and rendered acceptance R1 (reduced-motion timer painted the scenery before a late board) and R2 (Chromium showed the board over the stylesheet day-blue before landscape.js booted).",
     "previousBehavior": "After a completed refusal, one offline/timeout/permission pull deleted the device record, so the next pull made 22 server reads including 7 chunk reads. A decline whose localStorage marker write failed still reported success, and the next pull reapplied and published the older copy. Refused declines pointed to a Restore that is held while signed in. With reduced motion a board opening 1.5 s or later got the full scenery background at about 1.1 s. Chromium night reloads showed 1-4 frames of a dark board over rgb(142,212,243). Help said the scenery is drawn only after the board appears and gave the decline as always available until confirmation.",
@@ -21005,7 +21005,8 @@
       "The F1 cold-launch, resume and interrupted-check tests, the F2 Settings decline test and the #2198 Paste Restore decline test are unchanged and pass; Retry and sign-out still prove the source again.",
       "The F6/F8/F9/O1 opening hydration browser test keeps every assertion and its 800 ms delayed arm; the new browser tests add 2000 ms and 6500 ms reduced-motion arms and returning night reloads.",
       "The protected \"nothing is chosen automatically.\" sentence in What can I inspect while cloud checks wait? and its two assertions are unchanged; S1 is applied only to What if a cloud save is damaged?, within its existing 130-word limit.",
-      "The new browser tests are env-gated (LANDSCAPE_BROWSER_URL) and skip in CI; their evidence is local Chromium and macOS WebKit only."
+      "The new browser tests are env-gated (LANDSCAPE_BROWSER_URL) and skip in CI; their evidence is local Chromium and macOS WebKit only.",
+    "Three pre-existing reduced-motion tests that evaluate a slice of advanceRooftopParty (shared scenery reduced motion woodland, fireworks reduced deadline, pedestrian reduced retirement consumer) only gain openingPaint:null in their vm context, binding the new closure variable to its post-opening value; every assertion is unchanged. The established guard line if(document.hidden||!geometry||!p)return; stays verbatim, so the two source-literal assertions (rooftop parties, clocktower scheduler) are unchanged."
     ],
     "redEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --repo . --evidence-dir <scratchpad>/rf2/evidence --purpose preimplementation-red -- node --test --test-name-pattern='<new test>' tests.js, per slice; browser slices with LANDSCAPE_BROWSER_URL=http://127.0.0.1:18951/index.html and LANDSCAPE_PLAYWRIGHT set.",
