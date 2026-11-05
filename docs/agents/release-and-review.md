@@ -76,6 +76,15 @@ release until it is fixed or the maintainer accepts the named failure. A
 failing scheduled run fails the workflow and GitHub notifies the maintainer;
 treat it as a release blocker for the next Stable release, not as noise.
 
+## Ruleset drift
+
+The `Nightly` workflow's `ruleset-drift` job compares the required status
+checks that GitHub applies to `main` with
+[`.github/required-status-checks.json`](../../.github/required-status-checks.json)
+and fails naming each missing or extra check. Change the ruleset and that file
+together in one reviewed change. If the job reports it could not read the
+rules, run the `gh api` comparison it prints before the next Stable release.
+
 ## Risk-based exact-commit release gates
 
 Every candidate needs an owner review of its exact diff. The release validator

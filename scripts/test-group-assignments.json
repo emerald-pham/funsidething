@@ -12914,6 +12914,26 @@
       "root": "workflow runs the cross-engine native checks nightly and on dispatch outside the required cohort",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK repository process: nightly run fails when the live main ruleset drifts from the committed required checks",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "workflow checks the live main ruleset against the committed required checks every night",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "ruleset drift passes for the committed set and names missing and extra checks on a mismatch",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ruleset-drift.test.mjs"
+    },
+    {
+      "root": "ruleset drift fails visibly and names the manual comparison when the rules cannot be read",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ruleset-drift.test.mjs"
     }
   ],
   "nightlyRoots": [

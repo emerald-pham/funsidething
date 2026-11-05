@@ -769,3 +769,44 @@ test('workflow runs the cross-engine native checks nightly and on dispatch outsi
   }
   assert.equal(catalog.rootAssignments.find(entry => entry.root === 'RISK repository process: required installed-client native outcomes and artifacts execute exactly once')?.group, 'native-process', 'the Chromium installed-client cases stay in the required native group');
 });
+
+// #2216: the live main ruleset is GitHub-side state the repository cannot pin by
+// itself, so a nightly job compares its required checks with the set committed
+// here. Today's set was read from the live ruleset on 2026-11-04: the CI
+// aggregate bound to the GitHub Actions app plus the three receipt contexts.
+function workflowsRunningRulesetDrift(context) {
+  const directory = path.join(repo, '.github/workflows'), running = [];
+  for (const name of readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort()) {
+    const workflow = readFileSync(path.join(directory, name), 'utf8');
+    const scoped = { github: { ...context.github, workflow: workflow.match(/^name: (.+)$/m)?.[1]?.trim() } };
+    if (!workflowTriggers(workflow, scoped)) continue;
+    for (const job of workflowJobIds(workflow)) {
+      const text = workflowJobText(workflow, job);
+      if (/scripts\/agent-tools\/ruleset-drift\.mjs\b/.test(text) && workflowJobRuns(workflow, job, scoped)) running.push({ name, job, text });
+    }
+  }
+  return running;
+}
+
+test('workflow checks the live main ruleset against the committed required checks every night', () => {
+  const scheduled = workflowsRunningRulesetDrift(workflowContext('schedule', 'refs/heads/main'));
+  assert.equal(scheduled.length, 1, 'a scheduled run on main must run the ruleset drift check exactly once');
+  assert.equal(workflowsRunningRulesetDrift(workflowContext('workflow_dispatch', 'refs/heads/main')).length, 1, 'a manual dispatch must run the ruleset drift check too');
+  for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
+    assert.deepEqual(workflowsRunningRulesetDrift(context), [], `${context.github.event_name} runs must not depend on GitHub-side ruleset state`);
+
+  const { name, job, text } = scheduled[0];
+  assert.doesNotMatch(text, /--group nightly-cross-engine\b/, 'the drift check must be its own job so a cross-engine failure never hides drift');
+  assert.doesNotMatch(text, /continue-on-error/, 'a ruleset mismatch must fail the nightly run visibly');
+  assert.match(text, /--branch main\b/, 'the check must read the rules that apply to main');
+  assert.match(text, /GITHUB_TOKEN: \$\{\{ (?:github\.token|secrets\.GITHUB_TOKEN) \}\}/, 'the check must authenticate with the workflow token');
+  const permissions = workflowBlock(text, 'permissions', '    ');
+  assert.ok(permissions, `${name} ${job} must declare its own job-level permissions`);
+  assert.doesNotMatch(permissions.body + permissions.inline, /write/, 'reading the ruleset never needs write access');
+
+  const expectedPath = text.match(/--expected (\S+)/)?.[1];
+  assert.ok(expectedPath && existsSync(path.join(repo, expectedPath)), 'the expected required-check set must be committed in the repository');
+  const expected = JSON.parse(readFileSync(path.join(repo, expectedPath), 'utf8'));
+  assert.deepEqual(expected.requiredStatusChecks.map(check => check.context).sort(), ['funsidething/independent-review', 'funsidething/memory-audit', 'funsidething/specialist-review', 'scanner-tests'], 'the committed set matches the live main ruleset as read on 2026-11-04');
+  assert.equal(expected.requiredStatusChecks.find(check => check.context === 'scanner-tests').integrationId, 15368, 'scanner-tests stays bound to the GitHub Actions app');
+});

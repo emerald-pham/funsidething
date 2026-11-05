@@ -49,3 +49,23 @@ jobs:
           name: nightly-cross-engine-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nightly-cross-engine
           if-no-files-found: error
+
+  # Branch protection lives in GitHub, not in the repository, so a ruleset edit
+  # could silently drop a required check (#2216). This compares the rules that
+  # apply to main with the committed set and fails the run naming any missing or
+  # extra check. The branch-rules endpoint needs only repository read access, so
+  # the default token with contents: read is enough.
+  ruleset-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compare live main ruleset with committed required checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/agent-tools/ruleset-drift.mjs --repository "$GITHUB_REPOSITORY" --branch main --expected .github/required-status-checks.json
