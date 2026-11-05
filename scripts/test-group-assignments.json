@@ -5921,6 +5921,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK review fixes guidance: mounted Help and the November 4 changelog describe bounded rereads, declining the older copy and the scenery waiting for the board",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status",
       "group": "persistence-recovery",
       "file": "tests.js"

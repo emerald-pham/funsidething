@@ -251,6 +251,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud generation recovery status: opening, the older complete source in use and a genuine error each keep their own sync style
 - RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore
 - RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status
+- RISK review fixes guidance: mounted Help and the November 4 changelog describe bounded rereads, declining the older copy and the scenery waiting for the board
 - RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status
 - RISK repository process: compatibility round trips preserve independently hashed production bytes
 - RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest

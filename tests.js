@@ -32676,6 +32676,36 @@ test('RISK cloud generation recovery status: mounted Help and the current change
  assert.match(release,/was not recovered/);
 });
 
+// #2194 review H1: Help and the current changelog describe what the review
+// fixes changed: a known unreadable cloud copy is not downloaded again on
+// opening, restart, resume or reconnect; the pending older copy can be
+// declined from Settings; the opening paint waits for the board and shows the
+// scene's sky colour meanwhile; and minute updates change sky, colours and
+// hourly message together.
+test('RISK review fixes guidance: mounted Help and the November 4 changelog describe bounded rereads, declining the older copy and the scenery waiting for the board',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>help.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ const damaged=answer('Can I keep working with a damaged cloud save?');
+ assert.match(damaged,/opening or returning to the app checks only whether the cloud has changed, even after a restart/,'Help says a known unreadable copy is not downloaded again on opening, resume or restart');
+ assert.match(damaged,/Retry sync, signing in again or a newer cloud update checks everything again/);
+ const older=answer('What does “older copy in use” mean?');
+ assert.match(older,/Use my board from before recovery/,'Help names the Settings decline');
+ assert.match(older,/without saving the older copy to the cloud/);
+ const scenery=answer('Why does the scenery fill in after the board opens?');
+ assert.match(scenery,/drawn only after the board appears/,'Help says the scenery waits for the board');
+ assert.match(scenery,/the background shows the scene’s sky colour/);
+ assert.match(scenery,/change the sky, its colours and the hourly message together/);
+ for(const [name,text] of [['damaged',damaged],['older',older],['scenery',scenery]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
+ const release=help.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/not downloaded again when the app opens, restarts, returns from the background or comes back online/,'the release note covers #2201');
+ assert.match(release,/Settings can return to your board from before recovery/,'the release note covers declining the older copy');
+ assert.match(release,/drawn just after the board appears/,'the release note says the scenery waits for the board');
+ assert.match(release,/together with the sky/,'the release note says minute updates change text and sky together');
+});
+
 test('RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status',{timeout:240000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  const seen=[];
