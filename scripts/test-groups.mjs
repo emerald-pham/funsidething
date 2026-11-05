@@ -108,16 +108,26 @@ function readJson(file, label) {
   catch (error) { fail(`Could not read ${label}: ${error.message}`); }
 }
 
+// The full suite is the per-area test directory (#2213). The single tests.js
+// layout stays accepted so older checkouts and runner fixtures still group.
+// tests/shared.js holds helpers, not tests, so only *.test.js files count.
+const FULL_SUITE_COMMANDS = new Map([
+  ['node --test tests/*.test.js scripts/agent-tools/*.test.mjs', () => fs.readdirSync(path.join(ROOT, 'tests'))
+    .filter(file => file.endsWith('.test.js')).sort().map(file => `tests/${file}`)],
+  ['node --test tests.js scripts/agent-tools/*.test.mjs', () => ['tests.js']],
+]);
+
 function testFiles() {
   const packageJson = readJson(path.join(ROOT, 'package.json'), 'package.json');
-  if (packageJson.scripts?.test !== 'node --test tests.js scripts/agent-tools/*.test.mjs') {
+  const suiteFiles = FULL_SUITE_COMMANDS.get(packageJson.scripts?.test);
+  if (!suiteFiles) {
     fail('The full npm test entry point changed; update the group runner contract explicitly before grouping this suite.');
   }
   const scriptFiles = fs.readdirSync(path.join(ROOT, 'scripts/agent-tools'))
     .filter(file => file.endsWith('.test.mjs'))
     .sort()
     .map(file => `scripts/agent-tools/${file}`);
-  const files = ['tests.js', ...scriptFiles];
+  const files = [...suiteFiles(), ...scriptFiles];
   for (const file of files) if (!fs.statSync(path.join(ROOT, file)).isFile()) fail(`Missing full-suite file ${file}.`);
   return files;
 }

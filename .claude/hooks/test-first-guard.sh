@@ -30,8 +30,16 @@ esac
 
 repo=$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2>/dev/null) || exit 0
 
-# Unstaged or staged changes to tests.js both count as "a test was written".
-if ! git -C "$repo" diff --quiet -- tests.js || ! git -C "$repo" diff --cached --quiet -- tests.js; then
+# The test surface is the repository's per-area tests/ directory (#2213) plus
+# the legacy single tests.js; writing tests is always allowed.
+# Git reports the resolved top level, so compare against the resolved path.
+resolved="$(cd "$(dirname "$file")" && pwd -P)/$(basename "$file")"
+case "${resolved#"$repo"/}" in tests/*) exit 0 ;; esac
+
+# Unstaged or staged changes to the test files both count as "a test was
+# written"; a brand-new untracked test file counts too.
+if ! git -C "$repo" diff --quiet -- tests.js tests || ! git -C "$repo" diff --cached --quiet -- tests.js tests ||
+   [ -n "$(git -C "$repo" ls-files --others --exclude-standard -- tests 2>/dev/null)" ]; then
   exit 0
 fi
 
@@ -40,7 +48,7 @@ cat <<'JSON'
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "deny",
-    "permissionDecisionReason": "Test-first guard: tests.js has no uncommitted changes, so this app edit is implementation arriving before its test. Write the failing test in tests.js first, run it, and watch it fail for the right reason — then this edit goes through. Pure documentation is exempt."
+    "permissionDecisionReason": "Test-first guard: the test files (tests/ or tests.js) have no uncommitted changes, so this app edit is implementation arriving before its test. Write the failing test in the matching tests/ file first, run it, and watch it fail for the right reason — then this edit goes through. Pure documentation is exempt."
   }
 }
 JSON

@@ -169,17 +169,29 @@ export async function runCompatibilityMatrix(root,{base}={}){
   return report;
 }
 
+// These existing discriminating tests are part of compatibility, not merely
+// optional targeted checks. Missing/renamed families require a gate update.
+export const COMPATIBILITY_FAMILIES=['RISK BACKWARD COMPATIBILITY:','RISK FIRST SIGN IN:','RISK CLOUD LOOP:',
+  'RISK CLOUD RECOVERY UI:','RISK PWA recovery:'];
+
+// The families live in the per-area tests/ directory (#2213); older checkouts
+// keep the single tests.js. Only files that register a family are run.
+export function compatibilityTestFiles(root){
+  const candidates=fs.existsSync(path.join(root,'tests'))
+    ?fs.readdirSync(path.join(root,'tests')).filter(file=>file.endsWith('.test.js')).sort().map(file=>`tests/${file}`):['tests.js'];
+  const sources=candidates.map(file=>[file,fs.readFileSync(path.join(root,file),'utf8')]);
+  const registers=(source,name)=>source.includes(`test('${name}`);
+  for(const name of COMPATIBILITY_FAMILIES)assert.ok(sources.some(([,source])=>registers(source,name)),`Missing required compatibility family ${name}`);
+  return sources.filter(([,source])=>COMPATIBILITY_FAMILIES.some(name=>registers(source,name))).map(([file])=>file);
+}
+
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   try{
     assert.ok(process.env.FIRESTORE_EMULATOR_HOST,'Firestore emulator is required; run npm run test:compatibility');
     const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-    // These existing discriminating tests are part of compatibility, not merely
-    // optional targeted checks. Missing/renamed families require a gate update.
-    const families=['RISK BACKWARD COMPATIBILITY:','RISK FIRST SIGN IN:','RISK CLOUD LOOP:',
-      'RISK CLOUD RECOVERY UI:','RISK PWA recovery:'];
-    const tests=fs.readFileSync(path.join(root,'tests.js'),'utf8');
-    for(const name of families)assert.ok(tests.includes(`test('${name}`),`Missing required compatibility family ${name}`);
-    const result=spawnSync(process.execPath,['--test','--test-reporter=tap',`--test-name-pattern=^(${families.join('|')})`,'tests.js'],
+    const families=COMPATIBILITY_FAMILIES;
+    const files=compatibilityTestFiles(root);
+    const result=spawnSync(process.execPath,['--test','--test-reporter=tap',`--test-name-pattern=^(${families.join('|')})`,...files],
       {cwd:root,encoding:'utf8',maxBuffer:4*1024*1024,env:process.env});
     process.stdout.write(result.stdout||'');process.stderr.write(result.stderr||'');
     assert.equal(result.status,0,'Backward compatibility gate failed');

@@ -425,7 +425,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: changing enforcement code requires process tests and a new risk case
 - RISK test-first gate: unrelated risk cases cannot approve enforcement edits
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
+- RISK test-first gate: an app change paired with an edit to any split test file is accepted
+- RISK test-first gate: the edit hook treats the test directory as the test surface
 - RISK test inventory: every named risk contract maps to a feature boundary
+- RISK test inventory: risk map and source checks read every file in the test directory
 
 ## Release memory/cloud/sync and independent code review
 
@@ -509,6 +512,8 @@ The Settings board-data area exposes one Download backup action with current-boa
 ## Cross-release compatibility gate
 
 - RISK repository process: backward compatibility is a mandatory fail-closed release gate
+- RISK repository process: backward compatibility finds its required families across the test directory
+- RISK repository process: the Firestore rules command loads every registered Firestore rules test
 - RISK repository process: backward compatibility pins released code and rejects broken roundtrips
 - RISK repository process: backward compatibility rejects skipped or empty gate runs
 - RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions
@@ -1012,6 +1017,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK repository process: scaled review plan pins ordinary code to owner plus independent and docs to owner only
 - RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence
 - RISK repository process: scaled review plan sets typography only for markup or stylesheet content
+- RISK repository process: scaled review plan treats the test directory like the single test file
 - RISK repository process: scaled review policy needs its committed AGENTS.md wording at both the exact head and base
 - RISK repository process: scaled receipts record FAQ coverage in the owner review instead of a separate reviewer
 - RISK repository process: scaled receipts publish the v=4 binding and cannot cross policy boundaries

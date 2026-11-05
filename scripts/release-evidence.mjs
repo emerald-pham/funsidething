@@ -220,8 +220,12 @@ function stripSourceComments(source, extension) {
   return output.trimEnd();
 }
 
+// The test surface is the per-area tests/ directory (#2213) plus the legacy
+// single tests.js; both follow the same review rules.
+const isTestSurfacePath = file => file === 'tests.js' || file.startsWith('tests/');
+
 function commentOnlyDiff(repoRoot, baseSha, commitSha, file) {
-  if (!commentReviewExtensions.test(file) || file === 'tests.js' || isReleaseProcessPath(file)) return false;
+  if (!commentReviewExtensions.test(file) || isTestSurfacePath(file) || isReleaseProcessPath(file)) return false;
   const extension = path.extname(file).toLowerCase();
   const before = gitShow(repoRoot, baseSha, file);
   const after = gitShow(repoRoot, commitSha, file);
@@ -313,7 +317,7 @@ const unrenderedSegments = new Set(['.git', '.github', '.claude', 'audits', 'doc
 function changesTypography(repoRoot, baseSha, commitSha, file) {
   const normalized = file.replaceAll('\\', '/');
   // Tests and tooling assert on markup strings but are never shown to users.
-  if (normalized === 'tests.js' || /\.test\.[cm]?js$/i.test(normalized) ||
+  if (isTestSurfacePath(normalized) || /\.test\.[cm]?js$/i.test(normalized) ||
       normalized.split('/').some(segment => unrenderedSegments.has(segment))) return false;
   const extension = path.extname(file).toLowerCase();
   if (['.css', '.scss'].includes(extension)) return true;

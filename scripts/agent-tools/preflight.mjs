@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const focusedChecks = [
   'Landscape location: visible default-sky copy does not name Orlando',
@@ -7,6 +9,14 @@ const focusedChecks = [
 ];
 const testNamePattern = `^(?:${focusedChecks.map(escapeRegExp).join('|')})$`;
 const repositoryRoot = process.cwd();
+
+// The focused checks live in the per-area tests/ directory (#2213); older
+// checkouts keep the single tests.js file.
+function testFiles() {
+  const directory = path.join(repositoryRoot, 'tests');
+  if (!fs.existsSync(directory)) return ['tests.js'];
+  return fs.readdirSync(directory).filter(file => file.endsWith('.test.js')).sort().map(file => `tests/${file}`);
+}
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -145,7 +155,7 @@ async function main() {
     '--test',
     `--test-name-pattern=${testNamePattern}`,
     '--test-reporter=spec',
-    'tests.js',
+    ...testFiles(),
   ]);
   const testOutput = `${tests.stdout ?? ''}\n${tests.stderr ?? ''}`;
   const missingChecks = focusedChecks.filter(check =>

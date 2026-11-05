@@ -804,7 +804,7 @@ test('RISK device connection cancellation: closing before first upgrade leaves n
 });
 
 test('RISK repository process: Playwright waitForFunction predicates are synchronous',()=>{
- const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
+ const source=testSurfaceSource();
  const asyncWaitCalls=[...source.matchAll(/\.waitForFunction\s*\(\s*async\b/g)].map(match=>source.slice(0,match.index).split('\n').length);
  assert.deepEqual(asyncWaitCalls,[],'waitForFunction predicates must be synchronous; await storage reads through a bounded Node probe. Found lines: '+asyncWaitCalls.join(', '));
 });
@@ -29643,6 +29643,55 @@ test('RISK test-first gate: tests stay required for app changes and new RISK tes
  assert.deepEqual(validateTestFirst(['scripts/test-first-gate.mjs','tests.js'],processRisk),[],'process RISK coverage satisfies an enforcement change');
 });
 
+test('RISK test-first gate: an app change paired with an edit to any split test file is accepted',async t=>{
+ const {validateTestFirst,protectedTestFingerprint}=await import('./scripts/test-first-gate.mjs');
+ const risk=['+test("RISK eligibility: boundary",()=>{})'];
+ for(const file of ['tests/core.test.js','tests/scenery.test.js','tests/repository-process.test.js','tests/shared.js'])
+  assert.deepEqual(validateTestFirst(['index.html',file],risk),[],`${file} is part of the test surface`);
+ assert.deepEqual(validateTestFirst(['tests/core.test.js'],[]),[],'a test-only change is not an app change');
+ assert.match(validateTestFirst(['index.html','docs/tests/notes.js'],risk).join(' '),/without tests\.js/,'only the top-level test directory counts');
+ const edit=file=>[`--- a/${file}`,`+++ b/${file}`,'@@ -10 +10 @@','- assert.equal(value,1);','+ assert.equal(value,2);'];
+ assert.notEqual(protectedTestFingerprint(edit('tests/core.test.js')),protectedTestFingerprint(edit('tests/scenery.test.js')),
+  'a rationale for one split file cannot approve the same change in another file');
+ // The CLI reads the whole test directory for RISK cases and weakened tests.
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-split-gate-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ const write=(file,text)=>{fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.writeFileSync(path.join(root,file),text);};
+ write('scripts/test-first-gate.mjs',fs.readFileSync(path.join(__dirname,'scripts/test-first-gate.mjs'),'utf8'));
+ write('index.html','<p>old</p>\n');write('tests/scenery.test.js',"test('scenery: sky',()=>{\n assert.ok(true);\n});\n");write('TEST_CHANGE_RATIONALES.json','[]\n');
+ git('init','-q');git('config','user.email','gate@example.invalid');git('config','user.name','Gate fixture');git('add','.');git('commit','-qm','base');
+ const base=git('rev-parse','HEAD');
+ write('index.html','<p>new</p>\n');write('tests/core.test.js',"test('RISK eligibility: new boundary',()=>{});\n");git('add','.');git('commit','-qm','app change with a split test');
+ const gate=()=>spawnSync(process.execPath,['scripts/test-first-gate.mjs',base],{cwd:root,encoding:'utf8'});
+ const accepted=gate();
+ assert.equal(accepted.status,0,'an app change with a new RISK test in a split file passes the CLI: '+accepted.stdout+accepted.stderr);
+ write('tests/scenery.test.js',"test('scenery: sky',()=>{\n});\n");git('add','.');git('commit','-qm','weaken a split test');
+ const weakened=gate();
+ assert.equal(weakened.status,1,'a removed assertion in a split file still needs a rationale: '+weakened.stdout+weakened.stderr);
+ assert.match(weakened.stderr,/without an exact-diff rationale/);
+});
+
+test('RISK test-first gate: the edit hook treats the test directory as the test surface',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-split-hook-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ fs.mkdirSync(path.join(root,'tests'));fs.writeFileSync(path.join(root,'index.html'),'<p>old</p>\n');
+ fs.writeFileSync(path.join(root,'tests/core.test.js'),"test('core: one',()=>{});\n");fs.writeFileSync(path.join(root,'tests/shared.js'),'export const one=1;\n');
+ git('init','-q');git('config','user.email','hook@example.invalid');git('config','user.name','Hook fixture');git('add','.');git('commit','-qm','base');
+ const hook=file=>{
+  const r=spawnSync('bash',[path.join(__dirname,'.claude/hooks/test-first-guard.sh')],{input:JSON.stringify({tool_input:{file_path:path.join(root,file)}}),encoding:'utf8'});
+  assert.equal(r.status,0,r.stderr);return /"permissionDecision": "deny"/.test(r.stdout);
+ };
+ assert.equal(hook('index.html'),true,'an app edit with no test written is refused');
+ assert.equal(hook('tests/core.test.js'),false,'writing a split test file is never refused');
+ assert.equal(hook('tests/shared.js'),false,'writing the shared test helpers is never refused');
+ fs.appendFileSync(path.join(root,'tests/core.test.js'),"test('core: two',()=>{});\n");
+ assert.equal(hook('index.html'),false,'an uncommitted split test change lets the app edit through');
+ git('add','tests/core.test.js');
+ assert.equal(hook('index.html'),false,'a staged split test change also counts');
+});
+
 test('RISK test-first gate: future runtime modules are detected without a filename allowlist',async()=>{
  const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
  const errors=validateTestFirst(['features/new-scan-rule.js'],[]).join(' ');
@@ -30610,11 +30659,32 @@ test('RISK repository process: release hooks reject marker-only or tampered disp
  }finally{cleanupReleaseGateFixture(tampered);}
 });
 
+// Checks over every test read the whole test surface, not one file: the
+// per-area tests/ directory (#2213) and, while a branch still has it, tests.js.
+function testSurfaceSource(root=__dirname){
+ const directory=path.join(root,'tests');
+ const files=[...(fs.existsSync(path.join(root,'tests.js'))?[path.join(root,'tests.js')]:[]),
+  ...(fs.existsSync(directory)?fs.readdirSync(directory).filter(file=>file.endsWith('.js')).sort().map(file=>path.join(directory,file)):[])];
+ return files.map(file=>fs.readFileSync(file,'utf8')).join('\n');
+}
+
+test('RISK test inventory: risk map and source checks read every file in the test directory',async t=>{
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-test-surface-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'tests'));
+ fs.writeFileSync(path.join(root,'tests/core.test.js'),"test('RISK alpha boundary: core case',()=>{});\n");
+ fs.writeFileSync(path.join(root,'tests/scenery.test.js'),"test('RISK beta boundary: scenery case',async()=>{await page.waitForFunction(()=>true);});\n");
+ fs.writeFileSync(path.join(root,'tests/shared.js'),"export async function sharedProbe(page){return page.waitForFunction(()=>true);}\n");
+ const source=testSurfaceSource(root);
+ for(const marker of ['RISK alpha boundary: core case','RISK beta boundary: scenery case','export async function sharedProbe'])
+  assert.ok(source.includes(marker),`the test surface includes ${marker}`);
+});
+
 test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{
  const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');
  assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');
  const inventory=fs.readFileSync(inventoryPath,'utf8');
- const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+ const source=testSurfaceSource();
  const riskNames=[...source.matchAll(/^\s*test\(\s*(['"])(RISK\b[^'"]*)\1/gm)].map(match=>match[2]);
  for(const name of riskNames)assert.ok(inventory.includes(name),`risk contract is missing from the feature inventory: ${name}`);
  assert.match(inventory,/future|new feature/i,'the inventory must explain how future work adds risk contracts');
@@ -32374,6 +32444,32 @@ test('RISK repository process: backward compatibility is a mandatory fail-closed
  const result=spawnSync(process.execPath,['scripts/backward-compatibility.mjs'],{cwd:__dirname,encoding:'utf8',env:{...process.env,FIRESTORE_EMULATOR_HOST:''}});
  assert.notEqual(result.status,0,'missing emulator cannot silently skip compatibility');
  assert.match(result.stderr,/Firestore emulator is required/);
+});
+
+test('RISK repository process: backward compatibility finds its required families across the test directory',async t=>{
+ const {COMPATIBILITY_FAMILIES,compatibilityTestFiles}=await import('./scripts/backward-compatibility.mjs');
+ const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-split-compatibility-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(root,'tests'));
+ const register=names=>names.map(name=>`test('${name} fixture case',()=>{});`).join('\n')+'\n';
+ fs.writeFileSync(path.join(root,'tests/core.test.js'),register(COMPATIBILITY_FAMILIES.slice(0,2)));
+ fs.writeFileSync(path.join(root,'tests/persistence-recovery.test.js'),register(COMPATIBILITY_FAMILIES.slice(2)));
+ fs.writeFileSync(path.join(root,'tests/scenery.test.js'),"test('scenery: unrelated',()=>{});\n");
+ assert.deepEqual(compatibilityTestFiles(root),['tests/core.test.js','tests/persistence-recovery.test.js'],
+  'the gate runs every split file that registers a compatibility family');
+ fs.writeFileSync(path.join(root,'tests/persistence-recovery.test.js'),register(COMPATIBILITY_FAMILIES.slice(2,4)));
+ assert.throws(()=>compatibilityTestFiles(root),new RegExp('Missing required compatibility family '+COMPATIBILITY_FAMILIES[4]),
+  'a family missing from every split file still fails the gate');
+});
+
+test('RISK repository process: the Firestore rules command loads every registered Firestore rules test',()=>{
+ const command=JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8')).scripts['test:rules'];
+ const files=[...command.matchAll(/(?:^|\s)((?:tests\/[\w.-]+|tests)\.js)\b/g)].map(match=>match[1]);
+ assert.ok(files.length,'the rules command names its test files');
+ const registered=source=>(source.match(/^\s*test\(\s*['"]Firestore rules:/gm)||[]).length;
+ const loaded=files.reduce((total,file)=>total+registered(fs.readFileSync(path.join(__dirname,file),'utf8')),0);
+ assert.ok(loaded>0,'the rules command loads Firestore rules tests');
+ assert.equal(loaded,registered(testSurfaceSource()),'every Firestore rules test is in a file the rules command loads');
 });
 
 test('RISK repository process: backward compatibility pins released code and rejects broken roundtrips',async()=>{
@@ -37853,6 +37949,26 @@ test('RISK repository process: scaled review plan sets typography only for marku
   assert.equal(typography('moduleLogic'),false,'module logic is not markup');
   assert.equal(typography('stylesheetComment'),false,'a comment-only stylesheet edit changes no styling');
   assert.equal(typography('testMarkup'),false,'markup strings in tests and tooling are not rendered app markup');
+ }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: scaled review plan treats the test directory like the single test file',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const markupBase={'tests.js':'\n','tests/shared.js':'\n','tests/core.test.js':'\n'},markup="assert.match(html,/<p class=\"note\">/);\n";
+ const commentBase="test('core: one',()=>{\n // old note\n assert.ok(true);\n});\n",commented=commentBase.replace('old note','clearer note');
+ const fixtures={
+  legacyMarkup:makeScaledReviewFixture({base:markupBase,candidate:{'tests.js':markup}}),
+  sharedMarkup:makeScaledReviewFixture({base:markupBase,candidate:{'tests/shared.js':markup}}),
+  areaMarkup:makeScaledReviewFixture({base:markupBase,candidate:{'tests/core.test.js':markup}}),
+  legacyComment:makeScaledReviewFixture({base:{'tests.js':commentBase},candidate:{'tests.js':commented}}),
+  sharedComment:makeScaledReviewFixture({base:{'tests/shared.js':commentBase},candidate:{'tests/shared.js':commented}}),
+  areaComment:makeScaledReviewFixture({base:{'tests/core.test.js':commentBase},candidate:{'tests/core.test.js':commented}}),
+ };
+ try{
+  const plan=name=>{const {changedFiles,...rest}=deriveReleaseReviewPlan(fixtures[name].repo,fixtures[name].candidateSha,fixtures[name].baseSha);return rest;};
+  for(const kind of ['Markup','Comment'])for(const area of ['shared','area'])
+   assert.deepEqual(plan(area+kind),plan('legacy'+kind),`${area} test file ${kind.toLowerCase()} edits derive the same review plan as tests.js`);
+  assert.equal(plan('sharedMarkup').requiresTypographyReview,false,'markup strings in the shared test helpers are not rendered app markup');
  }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
 });
 

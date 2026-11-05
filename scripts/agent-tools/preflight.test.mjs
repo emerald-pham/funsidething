@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -25,8 +26,13 @@ function childEnvironment() {
 async function createAppFixture(t, suffix) {
   const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), `chain-preflight-${suffix}-`));
   t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  // Copy the real test surface: the per-area tests/ directory after #2213, or
+  // the single tests.js in older checkouts.
+  const testSurface = existsSync(path.join(repositoryRoot, 'tests.js')) ? ['tests.js']
+    : readdirSync(path.join(repositoryRoot, 'tests')).filter(file => file.endsWith('.js')).sort().map(file => `tests/${file}`);
+  const sentinelFile = testSurface.includes('tests.js') ? 'tests.js' : 'tests/core.test.js';
   const fixtureFiles = [
-    'tests.js', 'index.html', 'app-release.js', 'location.js', 'vendor/lz-string-1.5.0.min.js',
+    ...testSurface, 'index.html', 'app-release.js', 'location.js', 'vendor/lz-string-1.5.0.min.js',
     'scripts/test-first-gate.mjs',
   ];
   for (const relative of fixtureFiles) {
@@ -35,7 +41,7 @@ async function createAppFixture(t, suffix) {
     await copyFile(path.join(repositoryRoot, relative), target);
   }
   await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
-  const testsPath = path.join(fixtureRoot, 'tests.js');
+  const testsPath = path.join(fixtureRoot, sentinelFile);
   await writeFile(testsPath, `${await readFile(testsPath, 'utf8')}\ntest('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });\n`);
   runGit(fixtureRoot, ['init', '-b', 'main']);
   runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
@@ -180,6 +186,38 @@ test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_F
   assert.equal(result.status, 1, result.stderr || result.stdout);
   assert.match(result.stdout + result.stderr, /expected 2 named help\/copy checks to run/i);
   assert.doesNotMatch(result.stdout + result.stderr, /PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
+});
+
+// #2213 split tests.js into per-area files under tests/ that import a shared
+// helper module; the focused checks must still be found and run once there.
+test('preflight runs the focused checks from the per-area test directory', async t => {
+  const fixtureRoot = await mkdtemp(path.join(os.tmpdir(), 'chain-preflight-split-'));
+  t.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  await mkdir(path.join(fixtureRoot, 'scripts'), { recursive: true });
+  await mkdir(path.join(fixtureRoot, 'tests'), { recursive: true });
+  await copyFile(path.join(repositoryRoot, 'scripts/test-first-gate.mjs'), path.join(fixtureRoot, 'scripts/test-first-gate.mjs'));
+  await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
+  await writeFile(path.join(fixtureRoot, 'tests/shared.js'), "export { test } from 'node:test';\n");
+  await writeFile(path.join(fixtureRoot, 'tests/core.test.js'), `import { test } from './shared.js';
+test('Landscape location: visible default-sky copy does not name Orlando', () => {});
+test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });
+`);
+  await writeFile(path.join(fixtureRoot, 'tests/repository-process.test.js'), `import { test } from './shared.js';
+test('RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections', () => {});
+`);
+  runGit(fixtureRoot, ['init', '-b', 'main']);
+  runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
+  runGit(fixtureRoot, ['config', 'user.name', 'Preflight fixture']);
+  runGit(fixtureRoot, ['add', '.']);
+  runGit(fixtureRoot, ['commit', '-m', 'split fixture']);
+  const base = runGit(fixtureRoot, ['rev-parse', 'HEAD']);
+  const result = spawnSync(process.execPath, [preflight, '--base', base], { cwd: fixtureRoot, encoding: 'utf8', env: childEnvironment() });
+  const output = result.stdout + result.stderr;
+  assert.equal(result.status, 0, output);
+  assert.equal((output.match(/^✔ Landscape location:/gm) ?? []).length, 1, 'the copy check runs once from its split file');
+  assert.equal((output.match(/^✔ RISK Quick start content:/gm) ?? []).length, 1, 'the FAQ check runs once from its split file');
+  assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
+  assert.match(output, /Test-first diff gate passed\./);
 });
 
 test('preflight passes the existing wording, FAQ, and rationale contracts on a valid isolated repository', async t => {

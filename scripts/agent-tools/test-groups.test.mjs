@@ -932,3 +932,57 @@ test('test group catalog routes real declarations despite matching quoted fixtur
     assert.equal(native.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1);
   }
 });
+
+// #2213 moved tests.js into per-area files under tests/ with one shared helper
+// module. The runner must treat that directory as the full suite: every root
+// resolves to its split file, groups run across files, and a root registered
+// in a second file is still caught.
+function convertToSplitLayout(fixture, { duplicateCoreRoot = false } = {}) {
+  const source = fs.readFileSync(path.join(fixture.root, 'tests.js'), 'utf8');
+  const header = "import assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport path from 'node:path';\nimport { test } from 'node:test';\nimport { sharedMarker } from './shared.js';\n";
+  const body = source.slice(source.indexOf('test('));
+  const sceneryAt = body.indexOf(`test(${JSON.stringify(fixtureRoots.scenery)}`);
+  fs.mkdirSync(path.join(fixture.root, 'tests'));
+  fs.writeFileSync(path.join(fixture.root, 'tests/shared.js'), "export const sharedMarker = 'shared';\n");
+  fs.writeFileSync(path.join(fixture.root, 'tests/core.test.js'), header + "assert.equal(sharedMarker, 'shared');\n" + body.slice(0, sceneryAt));
+  fs.writeFileSync(path.join(fixture.root, 'tests/other.test.js'), header + body.slice(sceneryAt) +
+    (duplicateCoreRoot ? `\ntest(${JSON.stringify(fixtureRoots.core)}, () => {});\n` : ''));
+  fs.rmSync(path.join(fixture.root, 'tests.js'));
+  const packagePath = path.join(fixture.root, 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  packageJson.scripts.test = 'node --test tests/*.test.js scripts/agent-tools/*.test.mjs';
+  writeJson(packagePath, packageJson);
+  const catalogPath = path.join(fixture.root, 'scripts/test-group-assignments.json');
+  const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+  for (const row of catalog.rootAssignments) if (row.file === 'tests.js') row.file = row.root === fixtureRoots.core ? 'tests/core.test.js' : 'tests/other.test.js';
+  writeJson(catalogPath, catalog);
+  git(fixture.root, 'add', '--all');
+  git(fixture.root, 'commit', '-qm', 'split tests.js into per-area files');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+}
+
+test('test group runner resolves every root across split per-area test files', t => {
+  const fixture = createFixture(t);
+  convertToSplitLayout(fixture);
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.equal(described.status, 0, described.stdout + described.stderr);
+  const descriptor = JSON.parse(fs.readFileSync(path.join(described.outputDir, 'descriptor.json'), 'utf8'));
+  const describedRoots = descriptor.groups.flatMap(group => group.roots);
+  assert.equal(new Set(describedRoots).size, describedRoots.length, 'every root is described once');
+  for (const root of [...Object.values(fixtureRoots), fixtureScriptRoot]) assert.ok(describedRoots.includes(root), `${root} resolves after the split`);
+  for (const group of groups) {
+    const result = invoke(fixture, { group });
+    assert.equal(result.status, 0, `${group}: ${result.stdout}\n${result.stderr}`);
+    assert.equal(result.evidence.status, 'passed');
+  }
+  const core = invoke(fixture);
+  assert.deepEqual(core.evidence.unclassifiedRootGuard.files.map(item => item.file).sort(),
+    ['scripts/agent-tools/fixture.test.mjs', 'tests/core.test.js', 'tests/other.test.js'],
+    'the guard covers every split test file and not the shared helper module');
+
+  const duplicate = createFixture(t);
+  convertToSplitLayout(duplicate, { duplicateCoreRoot: true });
+  const rejected = invoke(duplicate);
+  assert.notEqual(rejected.status, 0, 'a root registered again in another split file must fail closed');
+  assert.match(rejected.evidence.issues.join('\n'), /tests\/other\.test\.js/);
+});
