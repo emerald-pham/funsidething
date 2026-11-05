@@ -46,9 +46,9 @@ export function validateTestFirst(changedFiles,addedTestLines){
   return errors;
 }
 
-// Every executable test change needs a purpose and red evidence. Exempting
-// appended code allowed process.exit(0) to bypass the suite; a uniform rule
-// avoids pretending to distinguish safe additions without a JavaScript parser.
+// The fingerprint covers every executable test change so a record cannot be
+// reused for a different diff. Blank lines and single-line comments cannot
+// change what runs, so they are left out.
 const protectedTestLines=lines=>{
   const protectedLines=[];let cursor=null;
   for(const line of lines){
@@ -66,8 +66,22 @@ const protectedTestLines=lines=>{
 export function protectedTestFingerprint(lines){
   return createHash('sha256').update(protectedTestLines(lines).join('\n')).digest('hex');
 }
+// A rationale is required only when existing coverage can shrink: a removed or
+// changed line (deleted, renamed or weakened assertion), or a pure insertion
+// that stops later assertions from running. Appended process.exit(0) once
+// bypassed the whole suite and inserted returns or block comments can hide
+// assertions, so those insertions still count as weakening. Ordinary added or
+// extended tests cannot hide an existing contract and need no record (#2208).
+const suppressesExistingTests=content=>
+  /\bprocess\.exit(?:Code)?\b/.test(content)||/^return\s*;?$/.test(content)||
+  /^if\s*\(\s*(?:false|0)\s*\)/.test(content)||/^\/\*|\/\*$|^\*\//.test(content)||
+  /\.(?:skip|todo)\s*\(/.test(content);
+const weakensExistingTests=lines=>protectedTestLines(lines).some(line=>{
+  const change=line.slice(line.indexOf(':')+1);
+  return change.startsWith('-')||suppressesExistingTests(change.slice(1));
+});
 export function validateRegressionChanges(lines,records){
-  if(!protectedTestLines(lines).length)return [];
+  if(!weakensExistingTests(lines))return [];
   const record=Array.isArray(records)&&records.find(entry=>entry?.testChangesSha256===protectedTestFingerprint(lines));
   if(!record)return ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'];
   const errors=[],substantive=value=>typeof value==='string'&&value.trim().length>=20;
