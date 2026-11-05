@@ -32450,6 +32450,42 @@ test('RISK cloud generation recovery: a decline whose choice cannot be remembere
  assert.deepEqual(afterDecline.hold,pending,'the refused decline keeps the pending automatic default exactly');
 });
 
+// #2194 FAQ review B2: while the automatic default is pending, cloud saving is
+// held, so a signed-in Restore is refused. A refused decline must point to a
+// route that works then, Review cloud recovery, rather than to Restore.
+test('RISK cloud generation recovery: a refused decline after later edits points to Review cloud recovery, which works while a signed-in Restore is held',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const refusal=Object.assign(Error('Controlled automatic publication refusal'),{code:'permission-denied'});
+ Object.defineProperty(app.faults,'push',{configurable:true,get(){return refusal;}});t.after(()=>{delete app.faults.push;});
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const unreconciled=JSON.stringify(ctx.state);
+ ctx.closeModal();await flush();const opening=ctx.cloudPull();let opened=false;opening.then(()=>{opened=true;},()=>{opened=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!opened||!idle())await wait(20);},'the automatic default settles unpublished',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery===true,'positive control: the automatic default is pending');
+ // The person keeps working on the older copy, as the label invites.
+ shim.document.getElementById('addInput').value='Work added after recovery';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await settle('the edit settles');
+ const edited=JSON.stringify(ctx.state);
+ assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),false,'positive control: the decline is refused after later edits');
+ const message=shim.document.getElementById('toast').textContent;
+ assert.equal(JSON.stringify(ctx.state),edited,'the refused decline changes nothing');
+ // The premise: a signed-in deliberate Restore is held while the default is pending.
+ ctx.closeModal();await flush();ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=unreconciled;
+ shim.document.dispatchEvent({type:'input',target:box});await ctx.onAction('preview-pasted-recovery',{});
+ const restoreRefusal=vm.runInContext('fileRestorePreview?fileRestoreReadinessReason(fileRestorePreview):"no preview"',ctx);
+ await ctx.onAction('cancel-file-restore',{});ctx.closeModal();await flush();
+ assert.match(String(restoreRefusal),/Cloud sync is held/,'a signed-in Restore is held while the automatic default is pending');
+ assert.doesNotMatch(message,/\bRestore\b/,'the refusal does not send the person to a Restore that is held: '+message);
+ assert.match(message,/Review cloud recovery/,'the refusal names Review cloud recovery: '+message);
+ ctx.openSettings();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"[^>]*>Review cloud recovery</,'Settings offers Review cloud recovery beside the decline');
+ const review=ctx.onAction('review-cloud-source-recovery',{});let reviewed=false;Promise.resolve(review).then(()=>{reviewed=true;},()=>{reviewed=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!reviewed||!idle())await wait(20);},'Review cloud recovery reads the sources',CAPTURED_RESULT_BUDGET_MS+20000);
+ const dialog=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(dialog,/Complete board open on this device/,'Review cloud recovery opens with the sources to choose from');
+ assert.match(dialog,/data-act="apply-cloud-source-recovery"/,'Review cloud recovery offers a deliberate choice');
+});
+
 test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
  for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
   const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;

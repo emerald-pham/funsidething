@@ -246,6 +246,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board
 - RISK cloud generation recovery: declining the pending automatic recovery default in Settings restores the unreconciled board before any publication
 - RISK cloud generation recovery: a decline whose choice cannot be remembered fails closed and a reported decline is never reapplied or published
+- RISK cloud generation recovery: a refused decline after later edits points to Review cloud recovery, which works while a signed-in Restore is held
 - RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted
 - RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone
 - RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered

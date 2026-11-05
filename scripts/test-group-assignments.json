@@ -5896,6 +5896,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery: a refused decline after later edits points to Review cloud recovery, which works while a signed-in Restore is held",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
       "group": "persistence-recovery",
       "file": "tests.js"

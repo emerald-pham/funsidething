@@ -11853,9 +11853,10 @@ async function declineAutomaticCloudRecovery(){
     cloudAccountIdentity()===identity&&!cloudPushInFlight&&!fileRestoreBusy;
   if(!current()||!recoverySourceValueEqual(stored,hold))return refuse("Recovery changed while it was being read. Nothing was changed; open Settings again.");
   // Only the board this recovery itself wrote may be replaced: later edits
-  // would otherwise be lost, so they keep the deliberate Restore route.
+  // would otherwise be lost. A signed-in Restore is held while cloud saving
+  // is (#2194 FAQ B2), so the refusals name Review cloud recovery instead.
   if(head?.hash!==deviceHeadHash||head.payload!==board||head.hash!==stored.headHash)
-    return refuse("This board has changed since recovery. Use Restore below to choose a board deliberately; every source stays protected.");
+    return refuse("This board has changed since recovery, so it was kept. Use Review cloud recovery below to choose a source deliberately; every source stays protected.");
   let source=null;
   try{
     const original=archives.find(row=>row.key===hold.originalKey);
@@ -11866,11 +11867,11 @@ async function declineAutomaticCloudRecovery(){
   }catch{source=null;}
   const prior=source?.acceptedDeviceBoard,manifest=source?.manifest;
   if(typeof prior!=="string"||!Number.isSafeInteger(manifest?.rev)||typeof manifest.activeGeneration!=="string")
-    return refuse("This recovery kept no earlier board on this device to return to. Use Restore below; every source stays protected.");
+    return refuse("This recovery kept no earlier board on this device to return to. Use Review cloud recovery below; every source stays protected.");
   let next;
   try{next=JSON.parse(prior);hydrateState(next);}catch{next=null;}
   if(!next||JSON.stringify(next)!==prior||(next.syncAccount??account)!==account)
-    return refuse("The earlier board could not be reopened exactly. Use Restore below; every source stays protected.");
+    return refuse("The earlier board could not be reopened exactly. Use Review cloud recovery below; every source stays protected.");
   const encodeHold=value=>JSON.stringify(encodeManualArchiveValue(value,"device recovery hold"));
   // #2194 review L1: remember the choice before the device commit, and stop if
   // it cannot be remembered. Written afterwards, a failed write let the next
