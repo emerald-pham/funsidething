@@ -12969,6 +12969,46 @@
       "root": "workflow runs the weekly velocity report nightly with only the permissions its alert needs",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK test-first gate: an app change paired with an edit to any split test file is accepted",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK test-first gate: the edit hook treats the test directory as the test surface",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK test inventory: risk map and source checks read every file in the test directory",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: backward compatibility finds its required families across the test directory",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: the Firestore rules command loads every registered Firestore rules test",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: scaled review plan treats the test directory like the single test file",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group runner resolves every root across split per-area test files",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "preflight runs the focused checks from the per-area test directory",
+      "group": "native-process",
+      "file": "scripts/agent-tools/preflight.test.mjs"
     }
   ],
   "nightlyRoots": [

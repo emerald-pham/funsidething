@@ -198,13 +198,13 @@ test('preflight runs the focused checks from the per-area test directory', async
   await copyFile(path.join(repositoryRoot, 'scripts/test-first-gate.mjs'), path.join(fixtureRoot, 'scripts/test-first-gate.mjs'));
   await writeFile(path.join(fixtureRoot, 'TEST_CHANGE_RATIONALES.json'), '[]\n');
   await writeFile(path.join(fixtureRoot, 'tests/shared.js'), "export { test } from 'node:test';\n");
-  await writeFile(path.join(fixtureRoot, 'tests/core.test.js'), `import { test } from './shared.js';
-test('Landscape location: visible default-sky copy does not name Orlando', () => {});
-test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });
-`);
-  await writeFile(path.join(fixtureRoot, 'tests/repository-process.test.js'), `import { test } from './shared.js';
-test('RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections', () => {});
-`);
+  // Registrations share the import line so the group catalog's added-root scan
+  // does not read these fixture strings as new repository roots.
+  await writeFile(path.join(fixtureRoot, 'tests/core.test.js'), "import { test } from './shared.js'; " +
+    "test('Landscape location: visible default-sky copy does not name Orlando', () => {}); " +
+    "test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });\n");
+  await writeFile(path.join(fixtureRoot, 'tests/repository-process.test.js'), "import { test } from './shared.js'; " +
+    "test('RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections', () => {});\n");
   runGit(fixtureRoot, ['init', '-b', 'main']);
   runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
   runGit(fixtureRoot, ['config', 'user.name', 'Preflight fixture']);
