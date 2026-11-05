@@ -1854,6 +1854,15 @@ function protectedBackupIdSet(){
   }
   return ids;
 }
+// #2225: opening keeps one daily copy and writes nothing once today's exists.
+// Checking for it first avoids serializing the board and re-reading every
+// retained full-board copy on each later open of the day.
+function hasTodaysDailyBackup(){
+  try{
+    const rows=parseBackupIndex(localStorage.getItem(LOCAL_BACKUPS_KEY)),day=backupDay(Date.now());
+    return Array.isArray(rows)&&rows.some(row=>row&&typeof row.id==="string"&&row.day===day&&row.kind==="daily"&&typeof row.payload==="string");
+  }catch(e){ return false; }
+}
 function readLegacyBackups(){
   try{
     const rows = parseBackupIndex(localStorage.getItem(LOCAL_BACKUPS_KEY));
@@ -2837,8 +2846,7 @@ function legacyBoardCopies(){
       .filter(([,raw])=>validSavedPayload(raw)).map(([key,raw])=>({key,raw}));
   }catch(e){return [];}
 }
-function legacyBoardBytes(){
-  const copies=legacyBoardCopies();
+function legacyBoardBytes(copies=legacyBoardCopies()){
   return copies.find(copy=>copy.key===LOCAL_HEAD_KEY)?.raw || copies[0]?.raw || null;
 }
 function legacyBoardSignature(copies=legacyBoardCopies()){return JSON.stringify(copies);}
@@ -3194,7 +3202,8 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     try{head=await deviceStore.readHead();}
     catch{head=await repairExactLocalDeviceHead(bootAttempt);if(!head)head=await recoverLocalWorkingDeviceSource({bootAttempt});if(!head)head=await deviceStore.readHead();}
     if(!localDeviceStartupCurrent(bootAttempt))return null;
-    const legacyCopies=legacyBoardCopies(),legacy=legacyBoardBytes(),legacySignature=legacyBoardSignature(legacyCopies);
+    // #2225: one validated read of the older browser copies serves all three.
+    const legacyCopies=legacyBoardCopies(),legacy=legacyBoardBytes(legacyCopies),legacySignature=legacyBoardSignature(legacyCopies);
     if(!head){
       const raw=await deviceStore.readRawExportSnapshot();
       if(!localDeviceStartupCurrent(bootAttempt))return null;
@@ -3219,6 +3228,9 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     let checked;
     try{checked=JSON.parse(head.payload);assertCompleteSavedCollections(checked);dropRemovedFields(checked);hydrateState(checked);}
     catch{head=await recoverLocalWorkingDeviceSource({bootAttempt});if(!head)throw Error("No supported local working source");}
+    // #2225: the check's copy is not the board; do not keep it alive across
+    // the reads below, while the board itself is parsed for opening.
+    checked=null;
     deviceRecoveryCloudHold=await deviceStore.getRecoveryCloudHold();
     if(deviceRecoveryCloudHold?.reason==="device-source-recovery"&&deviceRecoveryCloudHold.automaticRecovery===true){
       const raw=await deviceStore.readRawExportSnapshot();
@@ -5564,8 +5576,12 @@ function inheritedDecisionFacts(baseline){
   return (Array.isArray(baseline?.inheritance)?baseline.inheritance:[]).flatMap(receipt=>receipt.facts||[]);
 }
 function attestedDecisionEvent(baseline,event){
+  // #2225: canonicalize the event only when an inherited fact names it; most
+  // boards inherit none, and a scan-mode event carries a weight per task.
+  const facts=inheritedDecisionFacts(baseline).filter(fact=>fact.id===event.id);
+  if(!facts.length)return false;
   const canonical=canonicalDecisionFact(event);
-  return inheritedDecisionFacts(baseline).some(fact=>fact.id===event.id && readDecisionWitness(fact.witness)===canonical);
+  return facts.some(fact=>readDecisionWitness(fact.witness)===canonical);
 }
 function conflictingDecisionEvidence(...boards){
   const identities=new Map();
@@ -5763,36 +5779,64 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     }
   }
   if(checkCoherence){
-    const sourceComparable=JSON.parse(JSON.stringify(board));
-    const projected=JSON.parse(JSON.stringify(board));
+    // #2225: a large board's two detached comparison copies are never alive
+    // together. The projected copy is reduced to the ratings and current-choice
+    // facts compared below and released before the source copy is made. The
+    // verdicts and their order are unchanged.
+    const compared=rows.filter(event=>event.kind==="current-choice" && event.account===baseline.account && !attestedDecisionEvent(baseline,event));
+    const comparedFacts=(source,event)=>{
+      const {type,id,property}=event.target;
+      if(type==="task" && property==="disposition"){
+        const field=key=>[Object.hasOwn(source[key]||{},id),source[key]?.[id]??null];
+        return ["considered","cantAt","workedAt"].map(key=>canonicalDecisionFact(field(key)));
+      }
+      if(type==="pass"){
+        const field=key=>[Object.hasOwn(source,key),source[key]??null];
+        return (property==="chain"?["chain","passId","passStartedAt"]:property==="mode"?["mode"]:["scanMode","chance"]).map(key=>canonicalDecisionFact(field(key)));
+      }
+      const value=currentChoiceTargetRead(source,event.target);
+      return value?[canonicalDecisionFact(value)]:null;
+    };
+    // Neither copy needs History, and the source copy needs neither the
+    // decision log nor rating history: none of the reads above or the replay
+    // uses them. The replay reads a task's rating history only to find the row
+    // a No decision cites, so the projected copy keeps just those rows. An
+    // event naming any other task property keeps exact full copies.
+    const taskRows=new Set(Array.isArray(board.tasks)?board.tasks:[]);
+    const reducible=compared.every(event=>event.target?.type!=="task"||event.target.property==="disposition"||CURRENT_CHOICE_TASK_PROPERTIES.includes(event.target.property));
+    const cited=new Set([...rows.map(event=>event?.id),...inheritedDecisionFacts(baseline).map(fact=>fact?.id)]);
+    const comparisonCopy=forProjection=>JSON.parse(JSON.stringify(board,reducible?function(key,value){
+      if(this===board&&(key==="workLog"||!forProjection&&key==="decisionEvents"))return undefined;
+      if(key==="ratingHistory"&&taskRows.has(this)&&Array.isArray(value))return forProjection?value.filter(row=>cited.has(row?.id)):undefined;
+      return value;
+    }:undefined));
+    let projected=comparisonCopy(true);
     if(!Object.hasOwn(projected,"syncAccount"))projected.syncAccount=baseline.account;
     projectDecisionEvents(projected);
-    normalizeExpiredTimedHoldsForComparison(sourceComparable,effectiveNow);
     normalizeExpiredTimedHoldsForComparison(projected,effectiveNow);
-    const byId=new Map(projected.tasks.map(task=>[task.id,task]));
+    const byId=new Map(projected.tasks.map(task=>[task.id,[task.mu,task.sigma]]));
+    // A read that throws still throws where the comparison reaches it.
+    const expectedFacts=compared.map(event=>{try{return {facts:comparedFacts(projected,event)};}catch(error){return {error};}});
+    projected=null;
+    let sourceComparable=comparisonCopy(false);
+    normalizeExpiredTimedHoldsForComparison(sourceComparable,effectiveNow);
     if((sourceComparable.tasks||[]).some(task=>{
       const expected=byId.get(task.id);
-      return expected && (task.mu!==expected.mu || task.sigma!==expected.sigma);
+      return expected && (task.mu!==expected[0] || task.sigma!==expected[1]);
     }))return "unrepresented-legacy-learning";
-    for(const event of rows){
-      if(event.kind!=="current-choice" || event.account!==baseline.account || attestedDecisionEvent(baseline,event))continue;
-      const {type,id,property}=event.target;
-      let values;
-      if(type==="task" && property==="disposition"){
-        const field=(source,key)=>[Object.hasOwn(source[key]||{},id),source[key]?.[id]??null];
-        values=["considered","cantAt","workedAt"].map(key=>[field(sourceComparable,key),field(projected,key)]);
-      }else if(type==="pass"){
-        if(id!==currentChoicePassId(sourceComparable))continue;
-        const field=(source,key)=>[Object.hasOwn(source,key),source[key]??null];
-        values=(property==="chain"?["chain","passId","passStartedAt"]:property==="mode"?["mode"]:["scanMode","chance"]).map(key=>[field(sourceComparable,key),field(projected,key)]);
-      }else{
-        const actual=currentChoiceTargetRead(sourceComparable,event.target),expected=currentChoiceTargetRead(projected,event.target);
+    for(const [index,event] of compared.entries()){
+      const {type,id}=event.target;
+      if(type==="pass" && id!==currentChoicePassId(sourceComparable))continue;
+      const actual=comparedFacts(sourceComparable,event);
+      if(expectedFacts[index].error)throw expectedFacts[index].error;
+      const expected=expectedFacts[index].facts;
+      if(type!=="task"||event.target.property!=="disposition"){
         if(type==="task"&&!actual&&!expected)continue;
         if(!actual||!expected)return "unprojectable-decision-evidence";
-        values=[[actual,expected]];
       }
-      if(values.some(([left,right])=>canonicalDecisionFact(left)!==canonicalDecisionFact(right)))return "unprojectable-decision-evidence";
+      if(actual.some((fact,i)=>fact!==expected[i]))return "unprojectable-decision-evidence";
     }
+    sourceComparable=null;
   }
   return null;
 }
@@ -8806,20 +8850,35 @@ function decisionEventOrder(board,baseline,lifecycle=false){
   }
   const pending=new Map([...byId].filter(([id,row])=>!included.has(id)&&!ambiguous.has(id)));
   const ordered=[],done=new Set(included),blocked=new Set(ambiguous);
-  while(pending.size){
-    let changed=false;
-    for(const [id,row] of pending){
-      if(row.observedActionIds.some(parent=>!done.has(parent)&&(!allIds.has(parent)||!byId.has(parent)||ambiguous.has(parent)))){
-        blocked.add(id);pending.delete(id);changed=true;
-      }
+  // A parent that is unknown, unsupported or ambiguous can never become done,
+  // so a row citing one is blocked outright.
+  for(const [id,row] of pending){
+    if(row.observedActionIds.some(parent=>!done.has(parent)&&(!allIds.has(parent)||!byId.has(parent)||ambiguous.has(parent)))){
+      blocked.add(id);pending.delete(id);
     }
-    const ready=[...pending.values()].filter(row=>row.observedActionIds.every(parent=>done.has(parent)))
-      .sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0));
-    if(ready.length){
-      for(const row of ready){pending.delete(row.id);ordered.push(row);done.add(row.id);}
-      changed=true;
+  }
+  // #2225: release rows round by round, as before: each round takes every
+  // pending row whose parents are all done, in time then ID order. Counting
+  // each row's unfinished parents finds a round's rows without rescanning
+  // every pending row, which made a long decision log cost quadratic memory.
+  // A cycle or a missing causal ancestor stays pending (conserved, not guessed).
+  const position=new Map([...pending.keys()].map((id,index)=>[id,index])),waiting=new Map(),children=new Map();
+  for(const [id,row] of pending){
+    const parents=new Set(row.observedActionIds.filter(parent=>!done.has(parent)));
+    waiting.set(id,parents.size);
+    for(const parent of parents){if(!children.has(parent))children.set(parent,[]);children.get(parent).push(id);}
+  }
+  let ready=[...pending.values()].filter(row=>waiting.get(row.id)===0);
+  while(ready.length){
+    ready.sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0));
+    for(const row of ready){pending.delete(row.id);ordered.push(row);done.add(row.id);}
+    const next=[];
+    for(const row of ready)for(const child of children.get(row.id)||[]){
+      if(!pending.has(child))continue;
+      const left=waiting.get(child)-1;waiting.set(child,left);
+      if(left===0)next.push(pending.get(child));
     }
-    if(!changed)break; // a cycle or a missing causal ancestor stays conserved, not guessed
+    ready=next.sort((a,b)=>position.get(a.id)-position.get(b.id));
   }
   return {events:ordered,blockedIds:new Set([...blocked,...pending.keys()]),byId};
 }
@@ -12520,10 +12579,13 @@ async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null
     cloudPushInFlight=false;
   }
 }
-function cloudSourceRecoveryBoard(raw,account){
+// sourceOwned: validate against the source's own account and require complete
+// saved collections, from this one parse (#2225, the opening display source).
+function cloudSourceRecoveryBoard(raw,account,{sourceOwned=false}={}){
   try{
-    const original=JSON.parse(raw);
+    let original=JSON.parse(raw);
     if(!original||typeof original!=="object"||Array.isArray(original)||!Array.isArray(original.tasks))throw Error();
+    if(sourceOwned){assertCompleteSavedCollections(original);account=original.syncAccount??original.decisionBaseline?.account??null;}
     const board=JSON.parse(raw);hydrateState(board);
     // Hydration may supply absent defaults, but cannot erase a partial record
     // and call the remainder a complete recovery source.
@@ -12535,6 +12597,8 @@ function cloudSourceRecoveryBoard(raw,account){
     if(!retains(original,board))return {issue:"Some saved fields or records cannot be read without changing them. The complete original remains protected."};
     const owner=original.syncAccount??original.decisionBaseline?.account??account;
     if(owner!==account)return {issue:"This source belongs to another account."};
+    // #2225: release the unhydrated copy before the decision checks make theirs.
+    original=null;
     board.syncAccount=account;
     const issue=currentChoiceSourceIssue(board)||decisionEvidenceIssue(board,account);
     return issue?{issue:"Saved decisions need a compatible review ("+issue+"). Use Review saved decisions when available; originals remain protected."}:{board};
@@ -15238,9 +15302,8 @@ function showOpeningSavedBoard(){
   const candidates=[],seen=new Set();
   for(const key of [LOCAL_HEAD_KEY,STORE_KEY])try{
     const raw=localStorage.getItem(key);if(!raw||seen.has(raw))continue;seen.add(raw);
-    const original=JSON.parse(raw);assertCompleteSavedCollections(original);
-    const account=original.syncAccount??original.decisionBaseline?.account??null;
-    const checked=cloudSourceRecoveryBoard(raw,account);if(checked.board)candidates.push({raw,board:checked.board});
+    // #2225: one parse checks completeness, finds the owner and validates.
+    const checked=cloudSourceRecoveryBoard(raw,null,{sourceOwned:true});if(checked.board)candidates.push({raw,board:checked.board});
   }catch{ /* An unreadable copy cannot hide a separate complete display source. */ }
   // Rendering is not source consent. Divergent complete copies wait for the
   // existing guarded recovery instead of presenting an arbitrary choice.
@@ -15293,7 +15356,9 @@ function showOpeningSavedBoard(){
     deviceRecoveryCloudHold||={v:1,reason:"device-memory-workspace",workspace:"memory-only"};
     setDeviceSaveIssue("storage","unavailable");
   }
-  if(!rejectedSavedState&&loaded){
+  // #2225: both legacy-completion checks below return false, changing
+  // nothing, unless an open task carries a Done date; only then copy the board.
+  if(!rejectedSavedState&&loaded&&(state.tasks||[]).some(task=>!task.done&&(task.lastDoneAt||task.completedAt))){
     const upgraded=JSON.parse(JSON.stringify(state));
     if(ambiguousLegacyCompletion(upgraded))pendingLegacyCompletionSource=lastPersistedRaw??JSON.stringify(loaded);
     else if(checkpointLegacyCompletions(upgraded)){
@@ -15309,7 +15374,7 @@ function showOpeningSavedBoard(){
   // Keep the loaded edit time to explain an adoption that overtakes local
   // edits made while the first cloud read is in flight.
   baseUpdatedAt = rejectedSavedState ? 0 : (state.updatedAt || 0);
-  if(!rejectedSavedState && loaded) saveLocalBackup("daily", JSON.stringify(state), true);
+  if(!rejectedSavedState && loaded && !hasTodaysDailyBackup()) saveLocalBackup("daily", JSON.stringify(state), true);
   applyTheme();
   applyScenePreferences();
   if(migratedScene) save();
