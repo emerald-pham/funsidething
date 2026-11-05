@@ -37784,6 +37784,34 @@ test('RISK repository process: scaled review policy needs its committed AGENTS.m
  }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: scaled receipts record FAQ coverage in the owner review instead of a separate reviewer',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const ordinary=makeScaledReviewFixture({base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}});
+ const docs=makeScaledReviewFixture({base:{'README.md':'Old note.\n'},candidate:{'README.md':'New note.\n'}});
+ const coverage={result:'no-user-facing-change',summary:'The hue tweak changes no control, default or saved data the extended FAQ describes.'};
+ try{
+  const input=riskBasedReleaseInput(ordinary,{specialistReview:false});
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,input),/FAQ coverage/,'product behavior needs the owner FAQ coverage result');
+  const badResult=riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:{...coverage,result:'skipped'}}}});
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,badResult),/FAQ coverage/);
+  const vague=riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:{...coverage,summary:'fine'}}}});
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,vague),/FAQ coverage/);
+  const separate=riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:coverage}}});
+  const faqPath=path.join(ordinary.root,'faq-review.md');fs.writeFileSync(faqPath,'A separate FAQ reviewer is no longer part of the plan.\n');
+  separate.faqReview={...separate.independentReview,task:'/root/faq-review',evidencePath:faqPath,evidenceSha256:releaseGateHash(faqPath)};
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,separate),/FAQ review/,'the scaled plan has no separate FAQ reviewer');
+  const recorded=recordReleaseEvidence(ordinary.repo,riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:coverage}}}));
+  assert.deepEqual(recorded.receipt.ownerReview.faqCoverage,coverage);
+  assert.equal(verifyReleaseEvidence(ordinary.repo,ordinary.candidateSha).ok,true);
+  const stripped=JSON.parse(fs.readFileSync(recorded.receiptPath,'utf8'));delete stripped.ownerReview.faqCoverage;releaseGateReseal(stripped);
+  fs.writeFileSync(recorded.receiptPath,JSON.stringify(stripped));
+  const tampered=verifyReleaseEvidence(ordinary.repo,ordinary.candidateSha);
+  assert.equal(tampered.ok,false,'a resealed receipt cannot drop the owner FAQ coverage result');assert.match(tampered.errors.join(' '),/FAQ coverage/);
+  recordReleaseEvidence(docs.repo,riskBasedReleaseInput(docs,{codeReview:false,specialistReview:false}));
+  assert.equal(verifyReleaseEvidence(docs.repo,docs.candidateSha).ok,true,'documentation-only receipts need no FAQ coverage result');
+ }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);

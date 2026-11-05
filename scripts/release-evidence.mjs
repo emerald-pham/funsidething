@@ -515,6 +515,20 @@ function validatedMemorySources(sources, field, verifyNow) {
   });
 }
 
+// Scaled policy: the owner records the extended-FAQ coverage result for product
+// behavior, replacing the separate FAQ reviewer of the October 2026 policy.
+const faqCoverageResults = new Set(['updated', 'no-user-facing-change']);
+
+function ownerFaqCoverage(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !faqCoverageResults.has(value.result)) {
+    throw new Error('Owner review FAQ coverage must record a result of updated or no-user-facing-change.');
+  }
+  if (typeof value.summary !== 'string' || value.summary.trim().length < 20) {
+    throw new Error('Owner review FAQ coverage must record a specific summary.');
+  }
+  return { result: value.result, summary: value.summary.trim() };
+}
+
 function validateRiskBasedInput(repoRoot, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || input.schemaVersion !== 2) {
     throw new Error('Risk-based release evidence input must use schemaVersion 2.');
@@ -540,6 +554,9 @@ function validateRiskBasedInput(repoRoot, input) {
   if (!owner.scope || owner.scope.fullDiff !== true || typeof owner.scope.rationale !== 'string' || owner.scope.rationale.trim().length < 20) {
     throw new Error('Owner review must attest to the full exact diff and record a specific risk rationale.');
   }
+  let faqCoverage;
+  if (reviewPlan.requiresOwnerFaqCoverage) faqCoverage = ownerFaqCoverage(owner.faqCoverage);
+  else if (owner.faqCoverage !== undefined) throw new Error('This exact diff has no product behavior; omit the owner review FAQ coverage.');
   const ownerBytes = evidenceFile(repoRoot, owner.evidencePath, owner.evidenceSha256, 'Owner exact-diff review');
   const identities = [ownerTask];
   let independentReview;
@@ -626,6 +643,7 @@ function validateRiskBasedInput(repoRoot, input) {
       completedAt: ownerTime,
       summary: owner.summary.trim(),
       scope: { fullDiff: true, rationale: owner.scope.rationale.trim() },
+      ...(faqCoverage ? { faqCoverage } : {}),
       evidence: { file: 'owner-review.md', sha256: sha256(ownerBytes) },
     },
     ...(independentReview ? { independentReview } : {}),
@@ -721,6 +739,15 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
   if (typeof owner?.summary !== 'string' || owner.summary.trim().length < 20 ||
       owner?.scope?.fullDiff !== true || typeof owner?.scope?.rationale !== 'string' || owner.scope.rationale.trim().length < 20) {
     errors.push('Owner exact-diff review summary or full-diff risk rationale is incomplete.');
+  }
+  if (plan?.requiresOwnerFaqCoverage) {
+    try {
+      ownerFaqCoverage(owner?.faqCoverage);
+    } catch (error) {
+      errors.push(error.message);
+    }
+  } else if (owner && Object.hasOwn(owner, 'faqCoverage')) {
+    errors.push('Owner review FAQ coverage is not part of this exact-diff plan.');
   }
   const identities = [];
   try {
