@@ -2062,6 +2062,7 @@ The held-demotion native boundary requires one Current and one Previous heading 
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
 - RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again
 - RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again
+- RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing
 - RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again
 - RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
 - RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls

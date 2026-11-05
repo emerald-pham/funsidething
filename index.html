@@ -6208,7 +6208,12 @@ async function cloudPull(){
       if(priorUnreadable&&await provedUnreadableStillDecides(priorUnreadable,remote,pullStillCurrent)){
         unrepairableCloudSource=priorUnreadable.hold;
       }else{
-        forgetProvedUnreadableCloudSource();
+        // #2194 review M1: only an answer that read the server root can show
+        // the refusal no longer applies. A thrown read (offline, timeout,
+        // network, permission, interrupted) carries no code and says nothing
+        // about the source, so the device record stays; the next pull still
+        // re-checks it against a freshly read root and the held board.
+        if(remote.code)forgetProvedUnreadableCloudSource();
         const exact=await exactAcknowledgedCloudSource(remote,acct);
         if(exact){remote=exact;rebuildingCloudSource=true;rebuildContext=exact.automaticRecovery;}
         else{

@@ -32510,6 +32510,39 @@ test('RISK corrupt cloud work budget: a cold launch over an unchanged unreadable
  assert.ok(again.ctx.state.tasks.some(task=>task.title==='Local work after a cold launch'));
 });
 
+// #2194 review M1: a pull that fails before any server root is read (offline,
+// timeout, network, permission, interrupted) is no evidence about the source,
+// so it must not cost the completed refusal kept in device storage.
+test('RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating'}),{ctx,shim,backend,activePath,priorPath}=app;
+ const reads=[];let failRoot=null;
+ app.faults.serverRead=async path=>{reads.push(path);if(failRoot&&path==='users/owner'){const code=failRoot;failRoot=null;throw Object.assign(Error('Synthetic transient root failure'),{code});}};
+ t.after(()=>{delete app.faults.serverRead;});
+ const key='fvp:chain-scanner:proved-unreadable-cloud-source';
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const generationReads=since=>reads.slice(since).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath));
+ const cloudBefore=JSON.stringify([...backend.docs]);
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the first opening settles');
+ const recorded=shim.localStorage.getItem(key);
+ assert.ok(recorded,'positive control: the completed refusal is recorded on the device');
+ assert.ok(generationReads(0).includes(activePath+'/chunks'),'positive control: the first opening proves the source');
+ for(const code of ['unavailable','permission-denied','deadline-exceeded']){
+  failRoot=code;let at=reads.length;await ctx.cloudPull();await settle('the '+code+' pull settles');
+  assert.equal(failRoot,null,'the '+code+' failure was injected on the root read');
+  const kept=shim.localStorage.getItem(key);
+  at=reads.length;await ctx.cloudPull();await settle('the pull after '+code+' settles');
+  assert.equal(backend.CS.errorCode,'corrupt-generation','the next pull still reports the unreadable generation');
+  assert.deepEqual(generationReads(at).filter(path=>path.endsWith('/chunks')),[],'after a '+code+' failure the next pull over the unchanged root makes no chunk read');
+  assert.deepEqual(generationReads(at),[],'after a '+code+' failure the next pull over the unchanged root makes no header read');
+  assert.equal(kept,recorded,'a '+code+' pull failure keeps the completed refusal on the device');
+ }
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');
+ // Retry still proves the source again: the kept refusal is not permanent.
+ const beforeRetry=reads.length;await ctx.onAction('sync-retry',{});await settle('Retry settles');
+ assert.ok(generationReads(beforeRetry).includes(activePath+'/chunks'),'explicit Retry downloads and checks the unreadable generation again');
+});
+
 test('RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again',{timeout:180000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating',recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
  const reads=[];let roots=0,interrupted=false;

@@ -5861,6 +5861,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again",
       "group": "persistence-recovery",
       "file": "tests.js"
