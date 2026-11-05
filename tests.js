@@ -7925,6 +7925,65 @@ test('RISK opening scenery hydration browser: with reduced motion a board that o
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2194 rendered acceptance R2: on a returning night reload Chromium shows the
+// board for a few frames before landscape.js runs, over the stylesheet's fixed
+// day-blue. Until the scenery boots, the background must show the sky last
+// computed on this device instead.
+test('RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,NIGHT=Date.UTC(2026,10,5,4,0,0),RELOADS=3,DAY_BLUE='rgb(142, 212, 243)';
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('preboot-'+i,'Pre-boot board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true,settings:{...syncState().settings,theme:'dark'}}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const motion of ['normal','reduced']){
+   const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',colorScheme:'light',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({board,motion,NIGHT})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     const RealDate=Date,offset=NIGHT-RealDate.now(),now=()=>RealDate.now()+offset;
+     window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+      apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null){
+      localStorage.setItem('fvp:chain-scanner:v1',board);localStorage.setItem('fvp:chain-scanner:theme','dark');
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+     }
+     const o=window.__preboot={booted:false,frames:[]};
+     const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+     Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+      width.set.call(this,value);if(this.matches?.('#landscape [data-scenery]'))o.booted=true;}});
+     const raf=window.requestAnimationFrame.bind(window);
+     const observe=()=>{
+      const host=document.getElementById('landscape'),rows=document.querySelectorAll('#listBody [data-row]').length;
+      if(!o.booted&&host)o.frames.push({rows,background:getComputedStyle(host).backgroundColor,theme:document.documentElement.dataset.theme||null});
+      if(!o.booted)raf(observe);
+     };
+     raf(observe);
+    },{board,motion,NIGHT});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&document.documentElement.dataset.scenePeriod==='night',null,{timeout:20000});
+    // Let the first visit's opening paint settle before the returning reloads.
+    await page.waitForTimeout(1500);
+    for(let reload=1;reload<=RELOADS;reload++){
+     const label=`${engineName}/${motion}/reload ${reload}`;
+     await page.reload({waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__preboot.booted&&document.documentElement.dataset.appReady==='true',null,{timeout:20000});
+     const frames=await page.evaluate(()=>window.__preboot.frames);
+     const dayBlueWithBoard=frames.filter(frame=>frame.rows>0&&frame.background===DAY_BLUE).length;
+     observed.push({label,preBootFrames:frames.length,withBoard:frames.filter(frame=>frame.rows>0).length,dayBlueWithBoard,backgrounds:[...new Set(frames.map(frame=>frame.background))]});
+     assert.ok(frames.every(frame=>frame.theme==='dark'),`${label}: the dark theme applies before the scenery boots`);
+     if(dayBlueWithBoard)failures.push(`${label}: ${dayBlueWithBoard} frame(s) showed the board over the day-blue placeholder before the scenery booted`);
+    }
+    assert.deepEqual(errors,[],`${engineName}/${motion}: no page errors`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 test('RISK list presentation browser: Top x default percent toggle dotted filters and reload work on actual phone tablet and desktop controls',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
  for(const engine of [chromium,webkit]){

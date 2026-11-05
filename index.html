@@ -465,6 +465,21 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 </head>
 <body>
 <div id="landscape" aria-hidden="true"><canvas data-scenery></canvas><canvas data-life></canvas></div>
+<script>
+/* Before landscape.js runs, show the sky this device computed on its last
+   opening instead of the stylesheet's fixed day-blue (#2194 rendered R2).
+   Chromium can paint the board a few frames before the deferred scenery
+   boots; a night board over a day sky flashed on every reload. Only a recent
+   record of three colours is used; anything else keeps the stylesheet. */
+(function(){
+  try{
+    var r=JSON.parse(localStorage.getItem("fvp:chain-scanner:scene-placeholder")),host=document.getElementById("landscape"),hex=/^#[0-9a-f]{6}$/i;
+    if(host&&r&&r.v===1&&typeof r.at==="number"&&Math.abs(Date.now()-r.at)<1800000&&Array.isArray(r.sky)&&r.sky.length===3&&r.sky.every(function(c){return typeof c==="string"&&hex.test(c);})){
+      host.style.backgroundColor=r.sky[1];host.style.backgroundImage="linear-gradient("+r.sky.join(",")+")";
+    }
+  }catch(e){}
+})();
+</script>
 <div class="wrap">
   <div class="header-slot" id="headerSlot"><header class="top" id="appHeader">
     <div class="brand">

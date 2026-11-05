@@ -426,6 +426,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK recurring scenery refresh browser: the published scene text and colour never disagree with the painted sky in any frame in Chromium and WebKit under both motion choices
 - RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit
 - RISK opening scenery hydration browser: with reduced motion a board that opens seconds late still renders before any scenery paint, and a board that never appears still gets scenery after the bounded wait in Chromium and WebKit
+- RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit
 
 ## Offline shell and updates
 

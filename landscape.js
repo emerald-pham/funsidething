@@ -1739,10 +1739,13 @@
   function owedOpeningRefresh(){computeScene();openingPaint.due=true;if(timeDialog.open)refreshSolarTimes();}
   // Until the first paint the page shows the computed sky colour, not the
   // stylesheet's fixed day placeholder, behind the board (#2194 review O1).
+  // The colours are also kept for the inline step in index.html that shows
+  // them on the next opening before this script runs (#2194 rendered R2).
   function showScenePlaceholder(){
     if(!p?.sky?.length)return;
     host.style.backgroundColor=p.sky[Math.min(1,p.sky.length-1)];
     host.style.backgroundImage='linear-gradient('+p.sky.join(',')+')';
+    try{localStorage.setItem('fvp:chain-scanner:scene-placeholder',JSON.stringify({v:1,at:Date.now(),sky:p.sky.slice(0,3)}));}catch{}
   }
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});

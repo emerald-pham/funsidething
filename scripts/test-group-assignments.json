@@ -12964,6 +12964,11 @@
       "root": "RISK opening scenery hydration browser: with reduced motion a board that opens seconds late still renders before any scenery paint, and a board that never appears still gets scenery after the bounded wait in Chromium and WebKit",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [
