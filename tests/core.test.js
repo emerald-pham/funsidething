@@ -12697,7 +12697,12 @@ test('RISK opening board presentation: shared markup retains released cards cont
  const board=syncState({tasks,contexts:[{id:'home',name:'Home & <garden>',active:true}],chain:['first','bench'],candidateId:'candidate',listOpen:true,ctxOpen:true,histOpen:true,
   workLog:[{id:'work-log',taskId:'first',title:'Earlier <work>',kind:'worked',at:2}],settings:{...syncState().settings,dateFormat:'mdy'}}),raw=JSON.stringify(board);
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
- const old=await loadApp({...options,appSource:extractAppScript(baseline.stdout)}),current=await loadApp(options);
+ // Pin the calendar before the fixture's 2026-10-29 due date: once it is overdue both builds offer Run WOOP with a random binding id, so the markup comparison would fail on wall-clock time alone.
+ const pinCalendar=ctx=>vm.runInContext(`const CalendarDate=Date; Date=class extends CalendarDate {
+    constructor(...args){super(...(args.length?args:[new CalendarDate(2026,9,28,12).getTime()]));}
+    static now(){return new CalendarDate(2026,9,28,12).getTime();}
+  };`,ctx);
+ const old=await loadApp({...options,appSource:extractAppScript(baseline.stdout),beforeStateReady:pinCalendar}),current=await loadApp({...options,beforeStateReady:pinCalendar});
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
  for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
