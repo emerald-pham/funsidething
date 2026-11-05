@@ -429,6 +429,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK opening scenery hydration browser: with reduced motion a board that opens seconds late still renders before any scenery paint, and a board that never appears still gets scenery after the bounded wait in Chromium and WebKit
 - RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit
 - RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit
+- RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit
 
 ## Offline shell and updates
 

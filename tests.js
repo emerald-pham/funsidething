@@ -7925,6 +7925,61 @@ test('RISK opening scenery hydration browser: with reduced motion a board that o
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2194 rendered recapture (5cd941b): the Settings decline's refusal toasts
+// ran 10-12 lines at the enlarged 260 px phone width and covered the Settings
+// buttons for 9 s. Each refusal is one short sentence with the one action that
+// works; Help carries the detail. The messages are read from the shipped
+// decline function and shown through the app's own toast over open Settings.
+test('RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const source=html.slice(html.indexOf('async function declineAutomaticCloudRecovery('),html.indexOf('async function openAutomaticCloudSourceFallback('));
+ const refusals=[...source.matchAll(/refuse\("([^"]+)"\)/g)].map(match=>match[1]);
+ assert.equal(refusals.length,11,'every refusal of the decline is measured: '+JSON.stringify(refusals));
+ // No refusal names a Restore that is held while signed in (#2194 FAQ B2);
+ // the three whose case Review cloud recovery resolves name it.
+ for(const message of refusals)assert.doesNotMatch(message,/\bRestore\b/,'the refusal does not name a held Restore: '+message);
+ assert.equal(refusals.filter(message=>/Review cloud recovery/.test(message)).length,3,'three refusals point to Review cloud recovery: '+JSON.stringify(refusals));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const [width,height,budget] of [[260,563,4],[390,844,3]]){
+   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
+   try{
+    await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+     return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state==='object'&&state,null,{timeout:20000});
+    const {resolveExpectedFirstRunHelp}=await import('./scripts/browser-fixture-setup.mjs');
+    await page.evaluate(()=>document.getElementById('motionDialog')?.close?.());
+    await page.waitForSelector('#modalRoot .mback .modal',{timeout:5000}).catch(()=>{});await resolveExpectedFirstRunHelp(page);
+    await page.evaluate(()=>document.fonts.ready);
+    await page.locator('#appHeader [data-act="settings"]').click();
+    await page.waitForSelector('#modalRoot .modal');
+    for(const message of refusals){
+     const r=await page.evaluate(async message=>{
+      toast(message,9000);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const el=document.getElementById('toast'),rect=el.getBoundingClientRect(),ys=new Set();
+      const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let node;
+      while(node=walker.nextNode())for(let i=0;i<node.length;i++){if(!node.textContent[i].trim())continue;const range=document.createRange();range.setStart(node,i);range.setEnd(node,i+1);ys.add(Math.round(range.getBoundingClientRect().y));}
+      return {lines:ys.size,height:Math.round(rect.height),toastWidth:Math.round(rect.width),font:getComputedStyle(el).fontFamily,
+       splineLoaded:document.fonts.check('13.5px "Spline Sans"'),clip:el.scrollWidth>el.clientWidth||rect.left<0||rect.right>innerWidth||rect.bottom>innerHeight};
+     },message);
+     observed.push({engine:engineName,width,message,...r});
+     if(r.clip)failures.push(`${engineName}/${width}: the toast is clipped: ${message}`);
+     if(r.lines>budget)failures.push(`${engineName}/${width}: ${r.lines} lines (${r.height} px tall, budget ${budget}): ${message}`);
+    }
+    assert.deepEqual(errors,[],`${engineName}/${width}: no page errors`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2194 FAQ re-review B4: while the opening paint waits for a late board, a
 // resize, a return to the app (hide then show) or a pageshow ran refreshSky or
 // start(), which painted the scenery at once and released the normal-motion

@@ -12979,6 +12979,11 @@
       "root": "RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [
