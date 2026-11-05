@@ -7603,19 +7603,23 @@ test('RISK recurring scenery refresh browser: a pending trusted key reaches Add 
       window.requestAnimationFrame=callback=>raf(time=>{const previous=inAppFrame;inAppFrame=true;try{return callback(time);}finally{inAppFrame=previous;}});
       const observe=()=>{if(refresh.painted)refresh.framesAfterPaint++;if(refresh.framesAfterPaint<60)raf(observe);};raf(observe);
       for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.isTrusted&&refresh.started)refresh.log.push({kind:'input',type,seq:seq++});},true);
-      // The scene publishes its computed tint on the root; the first publish at
-      // or after the boundary is the recurring refresh computing the scene.
-      const setProperty=CSSStyleDeclaration.prototype.setProperty;
-      CSSStyleDeclaration.prototype.setProperty=function(name,...rest){
-       if(name==='--scene-tint'&&this===document.documentElement.style){
+      // Computing a scene starts with the shared sky model; the first
+      // computation at or after the boundary is the recurring refresh. (Its
+      // published tint now waits for the paint step, #2194 review F7.)
+      let livingSky;
+      Object.defineProperty(window,'LivingSky',{configurable:true,get(){return livingSky;},set(value){
+       const skyAt=value?.skyAt;
+       if(typeof skyAt==='function')value.skyAt=function(...args){
+        const result=Reflect.apply(skyAt,this,args);
         refresh.lastCompute=seq++;
         if(!refresh.started&&Date.now()>=BOUNDARY){
          refresh.started=true;refresh.log.push({kind:'refresh',seq:refresh.lastCompute,atOrAfterBoundary:Date.now()>=BOUNDARY,minute:Math.floor(Date.now()/60000)*60000,ready:refresh.ready(),openingPainted:refresh.openingPainted});
          const until=performance.now()+HOLD_MS;while(performance.now()<until){}
         }
-       }
-       return setProperty.call(this,name,...rest);
-      };
+        return result;
+       };
+       livingSky=value;
+      }});
       const context2d=CanvasRenderingContext2D.prototype;
       for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
        const original=context2d[method];
@@ -7662,6 +7666,90 @@ test('RISK recurring scenery refresh browser: a pending trusted key reaches Add 
      // Reduced motion keeps no animation loop; normal motion keeps animating after the refresh.
      if(motion==='reduced'&&result.appFramePaints!==0)failures.push(`${label}: reduced motion painted scenery from animation frames`);
      if(motion==='normal'&&result.appFramePaintsAfterPaint===0)failures.push(`${label}: normal motion stopped animating after the refresh`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 review F7: the minute refresh published its new tint, period and
+// hourly text at the boundary but painted the sky later, so a frame could show
+// new scene text and colour over the old sky. The page clock is shifted so a
+// minute boundary near sunset (where the palette changes every minute) falls
+// a few seconds after opening; timers and frames stay real. Every presented
+// frame after the opening paint compares the scene the page publishes with the
+// scene the scenery canvas last painted. Only agreement is asserted.
+test('RISK recurring scenery refresh browser: the published scene text and colour never disagree with the painted sky in any frame in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250,LEAD_MS=6000,BOUNDARY=Date.UTC(2026,10,4,22,30,0);
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('step-'+i,'Step board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     let paintedSeen=false;await context.exposeBinding('__stepPainted',()=>{paintedSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      const RealDate=Date,offset=BOUNDARY-LEAD_MS-RealDate.now(),now=()=>RealDate.now()+offset;
+      window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+       apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const o=window.__step={openingPainted:false,started:false,painted:false,before:null,after:null,painting:null,mismatches:[],frames:0,framesAfterPaint:0};
+      const root={get style(){return document.documentElement.style;},get dataset(){return document.documentElement.dataset;}};
+      // What the page publishes about the scene: tint, period and hourly text.
+      o.published=()=>[root.style.getPropertyValue('--scene-tint'),root.dataset.scenePeriod||'',document.getElementById('sceneStatus')?.textContent||''].join('|');
+      o.ready=()=>root.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{
+       o.frames++;
+       if(o.openingPainted&&o.painting!==null&&o.published()!==o.painting&&o.mismatches.length<8)
+        o.mismatches.push({frame:o.frames,published:o.published(),painted:o.painting,afterRefresh:o.started});
+       if(o.painted)o.framesAfterPaint++;
+       if(o.framesAfterPaint<40)raf(observe);
+      };raf(observe);
+      const setProperty=CSSStyleDeclaration.prototype.setProperty;
+      CSSStyleDeclaration.prototype.setProperty=function(name,...rest){
+       const result=setProperty.call(this,name,...rest);
+       if(name==='--scene-tint'&&this===document.documentElement.style&&!o.started&&o.openingPainted&&Date.now()>=BOUNDARY){
+        o.started=true;o.before=o.painting;
+        // A slow phone: hold the main thread so a frame is due before the next task.
+        const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+       }
+       return result;
+      };
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        if(this.canvas?.matches?.('#landscape [data-scenery]')){
+         o.painting=o.published();o.openingPainted=true;
+         if(o.started&&!o.painted){o.painted=true;o.after=o.painting;window.__stepPainted();}
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__step.ready()&&window.__step.openingPainted,null,{timeout:15000});
+     await page.locator('#addInput').focus();
+     let typed=0;const deadline=Date.now()+LEAD_MS+15000;
+     while(!paintedSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');typed++;}
+     await page.waitForFunction(()=>__step.painted&&__step.framesAfterPaint>=40,null,{timeout:15000});
+     const r=await page.evaluate(()=>({before:__step.before,after:__step.after,mismatches:__step.mismatches,value:document.getElementById('addInput').value}));
+     observed.push({label,...r,typed});
+     // Preconditions: the refresh really changed the published scene, and every key reached Add.
+     assert.ok(r.before&&r.after&&r.before!==r.after,`${label}: the boundary refresh changed the scene ${JSON.stringify(r)}`);
+     assert.equal(r.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     if(r.mismatches.length)failures.push(`${label}: a frame showed the published scene ${r.mismatches[0].published} over a sky painted for ${r.mismatches[0].painted}`);
     }finally{await context.close();}
    }
   }finally{await browser.close();}
