@@ -29603,7 +29603,6 @@ test('RISK regression gate: changing existing tests requires a specific reason a
  assert.ok(validateRegressionChanges(diff,[{...record,replacementTests:['Unrelated unchanged test']}]).length,'replacement must appear in this diff');
  assert.ok(validateRegressionChanges(diff,[{...record,redEvidence:{command:'',failure:''}}]).length,'record the discriminating red result');
  assert.ok(validateRegressionChanges(diff,[{...record,preservedCoverage:[]}]).length,'name the existing feature boundaries retained');
- assert.ok(validateRegressionChanges(["+test('new coverage',()=>{});"],[]).length,'all executable test changes record their purpose and red evidence');
  assert.deepEqual(validateRegressionChanges(['--- a/tests.js','-   ','- // explanatory comment'],[]),[],'format-only blank/comment removals are harmless');
 });
 
@@ -29613,10 +29612,36 @@ test('RISK regression gate: changing existing tests requires a specific reason a
   for(const line of ['+ return;','+ if(false){','+ /*']){
    assert.ok(validateRegressionChanges(['@@ -12,0 +13 @@',line],[],40).length,'add-only suppression within existing coverage needs a reason');
   }
-  assert.ok(validateRegressionChanges(['@@ -40,0 +41,2 @@',"+test('new feature coverage',()=>{});",'+'],[],40).length,'appending tests also requires a purpose and red evidence');
   assert.ok(validateRegressionChanges(['@@ -40,0 +41 @@','+process.exit(0);'],[],40).length,'appended executable code cannot disable the suite');
-  assert.ok(validateRegressionChanges(['@@ -12,0 +13 @@','+ const helper = () => true;'],[],40).length,'conservative gate protects arbitrary edits inside existing coverage');
  });
+
+test('RISK regression gate: a rationale is required only for removed or weakened tests',async()=>{
+ const {validateRegressionChanges}=await import('./scripts/test-first-gate.mjs');
+ assert.deepEqual(validateRegressionChanges(['@@ -40,0 +41,3 @@',"+test('scan: empty board offers no candidate',()=>{",'+ assert.equal(rank([]).length,0);','+});'],[]),[],
+  'an added test needs no rationale record');
+ assert.deepEqual(validateRegressionChanges(['@@ -12,0 +13,2 @@','+ const second=rank(board)[1];',"+ assert.equal(second.title,'Dishes','extra boundary');"],[]),[],
+  'extending an existing test with another assertion needs no rationale record');
+ const needsRecord=(diff,why)=>assert.match(validateRegressionChanges(diff,[]).join(' '),/rationale/i,why);
+ needsRecord(['@@ -12 +11,0 @@',"- assert.equal(second.title,'Dishes');"],'a deleted assertion needs a record');
+ needsRecord(['@@ -12 +12 @@',"- assert.equal(second.title,'Dishes');",'+ assert.ok(second);'],'a weakened assertion needs a record');
+ needsRecord(['@@ -10 +10 @@',"-test('RISK scan: old name',()=>{","+test('RISK scan: new name',()=>{"],'a renamed test needs a record');
+ needsRecord(['@@ -10,3 +9,0 @@',"-test('scan: removed coverage',()=>{",'- assert.ok(rank(board).length);','-});'],'a removed test needs a record');
+ // Pure insertions that stop existing assertions from running weaken them too.
+ for(const line of ['+process.exit(0);','+ process.exitCode=0;','+ return;','+ if(false){','+ /*','+ */',"+ t.skip('later');","+ t.todo('later');"])
+  needsRecord(['@@ -12,0 +13 @@',line],`suite-suppressing insertion ${line} needs a record`);
+});
+
+test('RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const ordinary=['+test("scan: ordinary direct test",()=>{})'],processRisk=['+test("RISK test-first gate: process coverage",()=>{})'];
+ assert.match(validateTestFirst(['location.js'],[]).join(' '),/without tests\.js/,'an app change without tests is rejected');
+ assert.deepEqual(validateTestFirst(['landscape.css','tests.js'],ordinary),[],'a CSS-only change passes with a direct non-RISK test');
+ assert.deepEqual(validateTestFirst(['icon-192.png','tests.js'],ordinary),[],'a static-asset change passes with a direct non-RISK test');
+ assert.match(validateTestFirst(['landscape.js','tests.js'],ordinary).join(' '),/RISK/,'a high-risk JS change without a new RISK test is rejected');
+ assert.match(validateTestFirst(['scripts/test-first-gate.mjs','tests.js'],['+test("RISK landscape colors: dawn",()=>{})']).join(' '),/process/,
+  'an enforcement change without process RISK coverage is rejected');
+ assert.deepEqual(validateTestFirst(['scripts/test-first-gate.mjs','tests.js'],processRisk),[],'process RISK coverage satisfies an enforcement change');
+});
 
 test('RISK test-first gate: future runtime modules are detected without a filename allowlist',async()=>{
  const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');

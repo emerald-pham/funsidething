@@ -53,13 +53,13 @@ or repository process boundary. An unrelated feature risk test cannot satisfy
 that process requirement.
 
 The hook and CI gate enforce structural requirements: tests appear in the app
-diff, a new risk case is named, and test changes carry a rationale with red
-command/failure evidence. They cannot independently prove that the command ran
-before implementation or that the recorded failure was observed. Keep the real
-red output with task or release evidence, then run focused tests and the
-risk-selected regression cohort after the fix. Distinguish contemporaneous RED
-from retrospective base-versus-fixed validation; the latter does not establish
-test-first chronology. Treat the rationale as a review aid, not proof of chronology.
+diff, a new risk case is named where required, and removed or weakened tests
+carry a rationale with red command/failure evidence. They cannot independently
+prove that the command ran before implementation or that the recorded failure
+was observed. Keep the real red output with task or release evidence, then run
+focused tests and the risk-selected regression cohort after the fix.
+Distinguish contemporaneous RED from retrospective base-versus-fixed
+validation; the latter does not establish test-first chronology. Treat the rationale as a review aid, not proof of chronology.
 
 For agent-tool command changes, use [agent evidence tools](agent-evidence.md) to
 select the focused and aggregate test entry points.
@@ -108,19 +108,25 @@ unless a user explicitly changes the behavior or concrete bug evidence shows the
 old expectation is wrong. Never weaken, delete, skip, or replace a regression
 test merely to make an implementation pass. Fix the implementation first.
 
-Every executable change in `tests.js`, including new coverage, needs an entry
-in `TEST_CHANGE_RATIONALES.json` with the exact protected-test-change fingerprint,
-the specific reason, previous and intended behavior, named replacement or new
-tests, remaining feature boundaries, and the command plus observed failure from
-the red run. Write and observe that failure before implementing the change. Keep
-unrelated protections intact. Update the entry if the test diff changes.
+A rationale entry in `TEST_CHANGE_RATIONALES.json` is required only when the
+`tests.js` diff removes or renames an existing test, or deletes, changes or
+weakens one of its lines. Adding a new test or extending an existing one with
+more assertions needs no entry. The entry carries the exact
+protected-test-change fingerprint of the whole test diff, the specific reason,
+previous and intended behavior, named replacement or new tests, remaining
+feature boundaries, and the command plus observed failure from the red run.
+Write and observe that failure before implementing the change. Keep unrelated
+protections intact. Update the entry if the test diff changes.
 
-`scripts/test-first-gate.mjs` runs in required CI and rejects test changes without
-this record, including test-only changes and deletion of `tests.js`. It protects
-all executable additions as well as removals: early returns, comment delimiters,
-and appended termination code cannot silently bypass the suite. Blank lines and
-single-line `//` comments are ignored; block-comment changes are protected
-because they can hide assertions. The record is evidence for review, not an
-automatic permission to regress: the independent reviewer must judge the reason,
-replacement coverage, and actual user-visible result on the final commit. CI
+`scripts/test-first-gate.mjs` runs in required CI and rejects removed or
+weakened tests without this record, including test-only changes and deletion of
+`tests.js`. A pure insertion still counts as weakening when it can stop existing
+assertions from running: a bare `return;`, `if(false)`/`if(0)`, a block-comment
+delimiter at the start or end of a line, `process.exit`/`process.exitCode`, or
+a `.skip(`/`.todo(` call. Blank lines and single-line `//` comments are
+ignored. The insertion check is a heuristic without a JavaScript parser; an
+insertion that suppresses assertions some other way is left to review. The
+record is evidence for review, not an automatic permission to regress: the
+independent reviewer must judge the reason, replacement coverage, and actual
+user-visible result on the final commit. CI
 checks the record and diff; it cannot itself prove that a command ran earlier.
