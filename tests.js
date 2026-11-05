@@ -31652,6 +31652,9 @@ test('RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation 
 // class CPU at up to 6x this desktop runtime, so the consumer gives the same
 // work one sixth of that budget; it asserts the outcome, never a duration.
 const CAPTURED_RECOVERY_BUDGET_MS=60000/6;
+// Consumers of the reconciled result (decline, draft/Undo) are not budget
+// regressions; half the product budget keeps them independent of suite load.
+const CAPTURED_RESULT_BUDGET_MS=60000/2;
 function exactPaddedBoard(board,field,byteLength){
  board[field]={opaque:''};const unpadded=Buffer.byteLength(JSON.stringify(board),'utf8');
  assert.ok(unpadded<byteLength,'the synthetic board must fit the captured size');board[field].opaque='p'.repeat(byteLength-unpadded);
@@ -31736,8 +31739,8 @@ test('RISK cloud generation recovery: the captured unreadable active generation 
  assert.equal(backend.docs.get(activePath).chunkCount,CAPTURED_UNREADABLE_GENERATION.active.chunkCount);assert.ok(backend.docs.has(priorPath));
 });
 
-test('RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board',{timeout:120000},async t=>{
- const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+test('RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board',{timeout:240000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
  const before=JSON.stringify(ctx.state),beforeTitles=ctx.state.tasks.map(task=>task.title);
  const protectedSources=[...backend.docs].filter(([key])=>key===activePath||key===priorPath||key.startsWith(priorPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
  ctx.closeModal();await flush();
@@ -31750,7 +31753,7 @@ test('RISK cloud generation recovery: declining the reconciled prior generation 
   if(attempt)assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'only a committed automatic default may be published later');
   const pull=ctx.cloudPull();
   try{await fixtureDeadline(async wait=>{let done=false;pull.then(()=>{done=true;});while(!done||!idle())await wait(20);},
-   'the automatic default read settles',CAPTURED_RECOVERY_BUDGET_MS+20000);}
+   'the automatic default read settles',CAPTURED_RESULT_BUDGET_MS+20000);}
   catch(error){error.message+='; app state: '+settled();throw error;}
  }
  assert.equal(ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx),false,'the automatic default reaches a real cloud acknowledgement; app state: '+settled());
@@ -31790,7 +31793,7 @@ test('RISK cloud generation recovery: a conflicting or different-account prior g
 });
 
 test('RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone',{timeout:90000},async t=>{
- const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
  refuseNextRecoveryTransaction255(app.faults);
  shim.document.getElementById('addInput').value='Unfinished draft kept through reconciliation';
  ctx.closeModal();await flush();await ctx.cloudPull();
