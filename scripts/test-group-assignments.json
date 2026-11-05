@@ -12819,6 +12819,11 @@
       "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [

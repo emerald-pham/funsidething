@@ -402,6 +402,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK landscape weather: organic rain storm and snow clouds darken smoothly with the night sky
 - RISK landscape water: lake clip overlaps the horizon contact at fractional pixel densities
 - RISK landscape water browser: GPU distortion preserves contact and sharp pixels while patches move independently
+- RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order
 
 ## Offline shell and updates
 
