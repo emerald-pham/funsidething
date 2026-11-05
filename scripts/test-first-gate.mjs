@@ -72,10 +72,10 @@ const protectedTestLines=lines=>{
     if(header){const name=header[1]||header[2];if(name)file=name==='tests.js'?'':name;continue;}
     if(line.startsWith('---')||line.startsWith('+++'))continue;
     const content=line.slice(1).trim(),meaningful=content&&!content.startsWith('//');
-    const at=`${file?file+':':''}${cursor??''}`;
-    if(line.startsWith('-')){if(meaningful)protectedLines.push(`${at}:-${content}`);if(cursor!==null)cursor++;}
+    const location=`${file?file+':':''}${cursor??''}`;
+    if(line.startsWith('-')){if(meaningful)protectedLines.push(`${location}:-${content}`);if(cursor!==null)cursor++;}
     else if(line.startsWith('+')){
-      if(meaningful)protectedLines.push(`${at}:+${content}`);
+      if(meaningful)protectedLines.push(`${location}:+${content}`);
     }else if(line.startsWith(' ')&&cursor!==null)cursor++;
   }
   return protectedLines;
