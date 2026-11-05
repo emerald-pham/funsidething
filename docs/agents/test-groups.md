@@ -6,6 +6,25 @@
 npm test
 ```
 
+## Test files
+
+Tests live in per-area files under `tests/`, one per group plus the
+repository-process tooling tests: `core.test.js`, `scenery.test.js`,
+`persistence-recovery.test.js`, `native-process.test.js` and
+`repository-process.test.js`. Shared fixtures and helpers live in
+`tests/shared.js`; area files import what they use from it. Add a test to the
+file of its group and give it a `rootAssignments` row naming that file. Tests
+that read or spawn their own file use `fileURLToPath(import.meta.url)`.
+`npm test` runs two files at a time, because the long core file's 5 s fixture
+deadlines expire when every file runs at once.
+
+A branch that still edits the old single `tests.js` ports by moving each new or
+changed test into the area file of its group, adding any new helper to
+`tests/shared.js` with an export, prefixing relative dynamic imports and
+`new URL(..., import.meta.url)` paths with `../`, and pointing its catalog rows
+at the new file. Do not merge a recreated `tests.js`: `npm test` and the group
+runner no longer run it.
+
 The additional `test:group` entry point runs one explicitly classified group in
 its own Node process. Group identifiers are stable: `core`, `scenery`,
 `persistence-recovery`, and `native-process`. Each process runs its selected

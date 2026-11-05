@@ -1,6 +1,6 @@
 # Risk-based test coverage inventory
 
-This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
+This map records the current named RISK contracts in the tests/ area files. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
 - RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights
 - RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles
@@ -8,7 +8,7 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 - RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog
 - RISK clocktower reduced motion: four fixed roof contacts fade gently without flight or posture animation
 
-The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
+The named-contract test in tests/repository-process.test.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
 - RISK repository process: unchanged CI inputs reuse an original successful gate across events
@@ -472,7 +472,7 @@ Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: s
 
 Start with the failure cost and the user-visible invariant. Persisted task or backup changes need cases for affected old data, undo, import or restore, deletion, and sync paths. Eligibility changes need valid and invalid prerequisites, boundaries, ordering, and recurrence. Location or time changes need invalid-input, saved-state, reload, and cross-device cases. Visual or motion changes need numeric paint or geometry contracts, reduced-motion behavior, and affected phone, tablet, or short-landscape sizes. Offline changes need shell fingerprints and offline reload checks. Keep unrelated established assertions intact.
 
-The editor hook blocks app or enforcement edits while tests.js has no staged or unstaged change. CI checks that relevant tests are in the final diff and, when existing tests are removed or weakened, that TEST_CHANGE_RATIONALES.json names the exact test diff, purpose, retained boundaries, and red command/failure. These checks do not prove that a test was run before implementation or that a red result was actually observed. Run the new focused risk test against the unmodified implementation, preserve the real red output in task or release evidence, implement the smallest fix, then run the focused test and npm test. Run npm run test:rules for Firestore rule changes and rendered/browser or offline checks when affected behavior needs them.
+The editor hook blocks app or enforcement edits while no file under tests/ has a staged, unstaged or new change. CI checks that relevant tests are in the final diff and, when existing tests are removed or weakened, that TEST_CHANGE_RATIONALES.json names the exact test diff, purpose, retained boundaries, and red command/failure. These checks do not prove that a test was run before implementation or that a red result was actually observed. Run the new focused risk test against the unmodified implementation, preserve the real red output in task or release evidence, implement the smallest fix, then run the focused test and npm test. Run npm run test:rules for Firestore rule changes and rendered/browser or offline checks when affected behavior needs them.
 
 ## Oldest never-done scan anchor
 

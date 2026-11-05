@@ -3,8 +3,8 @@
 ## Forced risk-based TDD and regression gates
 
 Before editing any scanner, landscape, location, or offline-shell behavior,
-write a discriminating test in `tests.js`, run it, and keep the red output for
-the release record. The edit guard covers every app module. The CI diff gate
+write a discriminating test in the matching `tests/` area file, run it, and
+keep the red output for the release record. The edit guard covers every app module. The CI diff gate
 also rejects app changes without changed tests. Browser/runtime JavaScript,
 HTML, the web manifest, Firestore rules, and the test-first gate, hook, or
 workflow require a new `RISK` test in the same diff. Runtime paths are matched
@@ -41,12 +41,12 @@ it. Inspect the rendered result when pixels or controls changed. Record test, br
 offline, CI, and live results separately.
 
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
-to an app, PWA shell, or enforcement file is refused while `tests.js` has no uncommitted changes.
+to an app, PWA shell, or enforcement file is refused while no file under `tests/` has uncommitted changes.
 Treat the block as correct and go write the test — do not work around it.
 
 `RISK_TEST_COVERAGE.md` maps the current high-cost feature contracts to their
 named tests. Add or rename its entry whenever a `RISK` test is added, removed,
-or renamed; a test in `tests.js` checks that the map stays complete. Changes to
+or renamed; a test in `tests/repository-process.test.js` checks that the map stays complete. Changes to
 the diff gate, edit hook, or CI workflow also need a new process-focused
 `RISK` test, named under the test-first gate, regression gate, test inventory,
 or repository process boundary. An unrelated feature risk test cannot satisfy
@@ -66,7 +66,7 @@ select the focused and aggregate test entry points.
 
 ## Installed-client regression
 
-The required process RISK in `tests.js` runs the two named installed-client
+The required process RISK in `tests/native-process.test.js` runs the two named installed-client
 native cases through a narrow Node child of the existing `npm test` command.
 It requires one completed successful outcome per case and rejects missing,
 duplicate, skipped, cancelled or failed outcomes. The runner-only child marker
@@ -104,10 +104,11 @@ old expectation is wrong. Never weaken, delete, skip, or replace a regression
 test merely to make an implementation pass. Fix the implementation first.
 
 A rationale entry in `TEST_CHANGE_RATIONALES.json` is required only when the
-`tests.js` diff removes or renames an existing test, or deletes, changes or
-weakens one of its lines. Adding a new test or extending an existing one with
-more assertions needs no entry. The entry carries the exact
-protected-test-change fingerprint of the whole test diff, the specific reason,
+test diff (every file under `tests/`) removes or renames an existing test, or
+deletes, changes or weakens one of its lines. Adding a new test or extending an
+existing one with more assertions needs no entry. The entry carries the exact
+protected-test-change fingerprint of the whole test diff (each line bound to its
+file, so a record cannot move to another file), the specific reason,
 previous and intended behavior, named replacement or new tests, remaining
 feature boundaries, and the command plus observed failure from the red run.
 Write and observe that failure before implementing the change. Keep unrelated
@@ -115,7 +116,7 @@ protections intact. Update the entry if the test diff changes.
 
 `scripts/test-first-gate.mjs` runs in required CI and rejects removed or
 weakened tests without this record, including test-only changes and deletion of
-`tests.js`. A pure insertion still counts as weakening when it can stop existing
+a test file. A pure insertion still counts as weakening when it can stop existing
 assertions from running: a bare `return;`, `if(false)`/`if(0)`, a block-comment
 delimiter at the start or end of a line, `process.exit`/`process.exitCode`, or
 a `.skip(`/`.todo(` call. Blank lines and single-line `//` comments are
