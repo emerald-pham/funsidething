@@ -31659,7 +31659,17 @@ function exactPaddedBoard(board,field,byteLength){
 }
 async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_RECOVERY_BUDGET_MS,priorVariant=null}={}){
  const {active,prior}=CAPTURED_UNREADABLE_GENERATION;
- const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,recoveryTimeoutMs}),{ctx,shim,backend,originalRoot}=app,codec=ctx.window.ChainStorageV2;
+ // The unproxied factory lets the multi-megabyte database be deleted below.
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,recoveryTimeoutMs,nativeDeviceConnection:true}),{ctx,shim,backend,originalRoot}=app,codec=ctx.window.ChainStorageV2;
+ // The runner retains finished hooks and, through them, each app realm. Its
+ // in-memory database keeps every transaction's multi-megabyte rollback log,
+ // so release the sources themselves or the full suite exhausts its heap.
+ t.after(async()=>{try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
+  backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
+  await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
+  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+   'unrepairableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
  const activePath='users/owner/generations/'+originalRoot.activeGeneration,priorPath='users/owner/generations/'+originalRoot.previousGeneration;
  // Prior generation: complete and verifiable, carrying one change this device
  // never saw, so its use is observable in the working board.
