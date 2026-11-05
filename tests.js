@@ -7544,6 +7544,115 @@ test('RISK opening scenery browser: a seeded board takes trusted typing and a fr
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2203: the scenery's recurring refresh must not hold up input. The page's
+// Date is shifted so the scene's own minute boundary falls a few seconds after
+// opening; timers and frames stay real. When the refresh computes the scene at
+// that boundary the fixture busy-holds the main thread briefly, so a trusted
+// key typed into Add is certainly pending, as on a slow phone. Only ordering is
+// asserted, never elapsed time.
+test('RISK recurring scenery refresh browser: a pending trusted key reaches Add before the minute refresh paints in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250,LEAD_MS=6000,BOUNDARY=Date.UTC(2026,10,4,17,30,0);
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('refresh-'+i,'Refresh board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     let paintedSeen=false;await context.exposeBinding('__refreshPainted',()=>{paintedSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // Shift only the wall clock so the scene's minute boundary is LEAD_MS away.
+      const RealDate=Date,offset=BOUNDARY-LEAD_MS-RealDate.now(),now=()=>RealDate.now()+offset;
+      window.Date=new Proxy(RealDate,{
+       construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+       apply(){return new RealDate(now()).toString();},
+       get(target,key){return key==='now'?now:Reflect.get(target,key);}
+      });
+      // A valid saved choice, so the first-run motion prompt cannot confound the refresh.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      let seq=0;
+      const refresh=window.__refresh={log:[],openingPainted:false,started:false,painted:false,lastCompute:-1,lastSceneryDraw:-1,framesAfterPaint:0,appFramePaints:0,appFramePaintsAfterPaint:0};
+      refresh.ready=()=>{
+       const panel=document.getElementById('addPanel'),body=document.getElementById('addBody'),input=document.getElementById('addInput'),button=document.getElementById('addButton'),scan=document.getElementById('scan');
+       return !!(panel&&body&&input&&button&&scan)&&document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!panel.closest('[hidden],[inert]')&&!body.hidden&&!input.disabled&&!button.disabled
+        &&input.getClientRects().length>0&&getComputedStyle(input).visibility==='visible'&&scan.children.length>0&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      };
+      const raf=window.requestAnimationFrame.bind(window);let inAppFrame=false;
+      window.requestAnimationFrame=callback=>raf(time=>{const previous=inAppFrame;inAppFrame=true;try{return callback(time);}finally{inAppFrame=previous;}});
+      const observe=()=>{if(refresh.painted)refresh.framesAfterPaint++;if(refresh.framesAfterPaint<60)raf(observe);};raf(observe);
+      for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.isTrusted&&refresh.started)refresh.log.push({kind:'input',type,seq:seq++});},true);
+      // The scene publishes its computed tint on the root; the first publish at
+      // or after the boundary is the recurring refresh computing the scene.
+      const setProperty=CSSStyleDeclaration.prototype.setProperty;
+      CSSStyleDeclaration.prototype.setProperty=function(name,...rest){
+       if(name==='--scene-tint'&&this===document.documentElement.style){
+        refresh.lastCompute=seq++;
+        if(!refresh.started&&Date.now()>=BOUNDARY){
+         refresh.started=true;refresh.log.push({kind:'refresh',seq:refresh.lastCompute,atOrAfterBoundary:Date.now()>=BOUNDARY,minute:Math.floor(Date.now()/60000)*60000,ready:refresh.ready(),openingPainted:refresh.openingPainted});
+         const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+        }
+       }
+       return setProperty.call(this,name,...rest);
+      };
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        const canvas=this.canvas;
+        if(canvas?.closest?.('#landscape')){
+         refresh.openingPainted=true;
+         if(inAppFrame){refresh.appFramePaints++;if(refresh.painted)refresh.appFramePaintsAfterPaint++;}
+         if(canvas.matches('[data-scenery]')){
+          refresh.lastSceneryDraw=seq++;
+          if(refresh.started&&!refresh.painted){refresh.painted=true;refresh.log.push({kind:'paint',seq:refresh.lastSceneryDraw,method,inAppFrame,ready:refresh.ready()});window.__refreshPainted();}
+         }
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__refresh.ready()&&window.__refresh.openingPainted,null,{timeout:15000});
+     const before=await page.evaluate(()=>({started:__refresh.started,controller:!!navigator.serviceWorker?.controller}));
+     assert.deepEqual(before,{started:false,controller:false},`${label}: the board and opening scenery are showing before the minute refresh, with no service worker in the way`);
+     await page.locator('#addInput').focus();
+     let typed=0;const deadline=Date.now()+LEAD_MS+15000;
+     while(!paintedSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');typed++;}
+     await page.waitForFunction(()=>__refresh.painted,null,{timeout:10000});
+     await page.waitForFunction(()=>__refresh.framesAfterPaint>=60,null,{timeout:15000});
+     const result=await page.evaluate(()=>({log:__refresh.log,lastCompute:__refresh.lastCompute,lastSceneryDraw:__refresh.lastSceneryDraw,appFramePaints:__refresh.appFramePaints,appFramePaintsAfterPaint:__refresh.appFramePaintsAfterPaint,value:document.getElementById('addInput').value,motion:document.documentElement.dataset.landscapeMotion}));
+     const {log}=result,start=log.find(entry=>entry.kind==='refresh'),paint=log.find(entry=>entry.kind==='paint');
+     const firstInput=log.find(entry=>entry.kind==='input'&&entry.seq>start?.seq);
+     const summary={label,refresh:start?.seq,paint:paint?.seq,paintInAppFrame:paint?.inAppFrame,firstInputAfterRefresh:firstInput?.seq,inputsBeforePaint:log.filter(entry=>entry.kind==='input'&&entry.seq>start?.seq&&entry.seq<paint?.seq).length,lastCompute:result.lastCompute,lastSceneryDraw:result.lastSceneryDraw,typed,appFramePaints:result.appFramePaints,appFramePaintsAfterPaint:result.appFramePaintsAfterPaint,motion:result.motion};observed.push(summary);
+     // Fixture preconditions: the board and opening scenery were up, the refresh ran at the scene's own boundary, and a key followed it.
+     assert.ok(start&&start.ready&&start.openingPainted,`${label}: the board and opening scenery were showing when the refresh began ${JSON.stringify(summary)}`);
+     assert.ok(start.atOrAfterBoundary&&start.minute===BOUNDARY,`${label}: the refresh computed the scene at the shared minute boundary`);
+     assert.ok(paint&&paint.seq>start.seq,`${label}: the refresh paints the scenery after computing it`);
+     assert.ok(firstInput,`${label}: a trusted key was typed after the refresh began ${JSON.stringify(summary)}`);
+     assert.equal(result.motion,motion,`${label}: the saved motion choice applies`);
+     assert.equal(result.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test: ordering only.
+     if(!(firstInput.seq<paint.seq))failures.push(`${label}: the first trusted key after the refresh began was handled only after the refresh painted`);
+     if(!paint.ready)failures.push(`${label}: the board was not usable when the refresh painted`);
+     if(!(result.lastSceneryDraw>result.lastCompute))failures.push(`${label}: the latest computed scene was never painted, leaving a stale frame`);
+     // Reduced motion keeps no animation loop; normal motion keeps animating after the refresh.
+     if(motion==='reduced'&&result.appFramePaints!==0)failures.push(`${label}: reduced motion painted scenery from animation frames`);
+     if(motion==='normal'&&result.appFramePaintsAfterPaint===0)failures.push(`${label}: normal motion stopped animating after the refresh`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 test('RISK list presentation browser: Top x default percent toggle dotted filters and reload work on actual phone tablet and desktop controls',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
  for(const engine of [chromium,webkit]){
