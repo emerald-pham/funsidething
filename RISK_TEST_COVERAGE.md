@@ -196,6 +196,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD STARTUP: repeated unavailable writes keep one bounded retry budget across successful read-before-write checks
 - RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
+- RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
 - RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving

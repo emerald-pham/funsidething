@@ -6366,6 +6366,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture",
       "group": "core",
       "file": "tests.js"

@@ -31893,6 +31893,42 @@ test('RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomi
  await store.close();
 });
 
+// #2194 review L2 (characterization): the Settings decline releases the
+// automatic recovery hold in the same transaction as the head. A tab holding
+// an older hold must not release a different stored one or move the head.
+test('RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ const storageV2=loadStorageV2({indexedDB});
+ const store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:'chain-scanner-hold-release-'+Date.now()+'-'+Math.random()});
+ await store.open();
+ const recover=async(payload,hold)=>{const result=await store.writeRecoveredSource({expectedSource:'source',encodeSource:()=>'source',payload,account:'owner@example.test',hold});
+  assert.equal(result.ok,true);return result;};
+ const firstHold={reason:'cloud-source-recovery',automaticRecovery:true,account:'owner@example.test',identity:'owner',originalKey:'original-a'};
+ await recover('{"tasks":[{"id":"recovered-a"}]}',firstHold);
+ const staleHold=await store.getRecoveryCloudHold();
+ assert.equal(staleHold.originalKey,'original-a','positive control: the first hold is stored');
+ // A later recovery replaces the head and the hold (another tab, for example).
+ await recover('{"tasks":[{"id":"recovered-b"}]}',{...firstHold,originalKey:'original-b'});
+ const head=await store.readHead(),storedHold=await store.getRecoveryCloudHold();
+ const declined='{"tasks":[{"id":"before-recovery"}]}';
+ const mismatch=await store.commitHead({expectedHash:head.hash,payload:declined,account:'owner@example.test',releaseRecoveryHold:{expectedHold:staleHold}});
+ assert.equal(mismatch.conflict,true,'a different stored hold aborts the commit as a conflict');
+ assert.equal(mismatch.hash,head.hash,'the conflict reports the unchanged head');
+ assert.deepEqual(await store.readHead(),head,'the head is unchanged');
+ assert.deepEqual(await store.getRecoveryCloudHold(),storedHold,'the different stored hold is kept exactly');
+ // Positive control: the exact stored hold is released with the head.
+ const released=await store.commitHead({expectedHash:head.hash,payload:declined,account:'owner@example.test',releaseRecoveryHold:{expectedHold:storedHold}});
+ assert.equal(released.ok,true,'the exact stored hold releases with the head');
+ assert.equal((await store.readHead()).payload,declined);
+ assert.equal(await store.getRecoveryCloudHold(),null,'the hold is deleted in the same commit');
+ // With no stored hold left, asking to release one is also a conflict.
+ const after=await store.readHead();
+ const missing=await store.commitHead({expectedHash:after.hash,payload:'{"tasks":[]}',account:'owner@example.test',releaseRecoveryHold:{expectedHold:storedHold}});
+ assert.equal(missing.conflict,true,'a missing stored hold aborts the commit');
+ assert.deepEqual(await store.readHead(),after,'the head is unchanged when no hold is stored');
+ await store.close();
+});
+
 test('RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact',async()=>{
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-gc-'+Date.now()+'-'+Math.random();
  const storageV2=loadStorageV2({indexedDB}),store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName});
