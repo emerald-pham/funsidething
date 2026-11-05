@@ -31763,12 +31763,14 @@ test('RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation 
 
 // #2201: the captured export re-fetched the same unreadable generation on every
 // opening. Bounds are counted store round trips, never elapsed milliseconds.
+// Only a caller holding a completed refusal opts in (reuseUnreadable); every
+// other pull, including a direct read after an in-place repair, reads in full.
 test('RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an unchanged manifest revision is not fetched again',async()=>{
- const fixture=await capturedUnreadableGenerationFixture();
- const first=await fixture.pullOnce();
+ const fixture=await capturedUnreadableGenerationFixture(),reuse={reuseUnreadable:true};
+ const first=await fixture.pullOnce(reuse);
  assert.deepEqual(first.calls,['readRoot','readGeneration','readChunks','readRoot'],'the first failing pull still proves the generation unreadable');
  for(let repeat=0;repeat<3;repeat++){
-  const again=await fixture.pullOnce();
+  const again=await fixture.pullOnce(reuse);
   assert.deepEqual(again.calls,['readRoot'],'an unchanged manifest re-reads only its server root, never the proved-unreadable header or chunks');
   assert.equal(again.roundTrips,1);
   assert.deepEqual({error:again.result.error,code:again.result.code,generationId:again.result.generationId,rev:again.result.rev,payload:again.result.payload},
@@ -31778,51 +31780,57 @@ test('RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an uncha
 });
 
 test('RISK CLOUD V2 RECOVERY FIXTURE: a revision, generation or account change and an explicit revalidation read the generation again',async()=>{
- const full=['readRoot','readGeneration','readChunks','readRoot'];
+ const full=['readRoot','readGeneration','readChunks','readRoot'],reuse={reuseUnreadable:true};
  const fixture=await capturedUnreadableGenerationFixture(),{adapter,uid}=fixture,root=structuredClone(adapter.roots.get(uid));
- assert.equal((await fixture.pullOnce()).result.code,'corrupt-generation');assert.deepEqual((await fixture.pullOnce()).calls,['readRoot']);
+ assert.equal((await fixture.pullOnce(reuse)).result.code,'corrupt-generation');assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot']);
  // A new manifest revision naming the same generation is a fresh question.
  adapter.roots.set(uid,{...root,rev:root.rev+1});
- const revised=await fixture.pullOnce();
+ const revised=await fixture.pullOnce(reuse);
  assert.deepEqual(revised.calls,full,'a changed manifest revision reads the generation again');
  assert.equal(revised.result.code,'corrupt-generation');assert.equal(revised.result.rev,root.rev+1);
  // A changed active generation at the same revision reads the new generation.
  adapter.roots.set(uid,{...root,activeGeneration:fixture.priorGenerationId,previousGeneration:fixture.activeGenerationId});
- const switched=await fixture.pullOnce();
+ const switched=await fixture.pullOnce(reuse);
  assert.deepEqual(switched.calls,full,'a changed active generation is read in full');
  assert.equal(switched.result.payload,fixture.priorPayload);assert.equal(switched.result.code,undefined);
  // Another account never inherits this account's conclusion, even for identical ids.
- adapter.roots.set(uid,root);assert.deepEqual((await fixture.pullOnce()).calls,full);assert.deepEqual((await fixture.pullOnce()).calls,['readRoot']);
+ adapter.roots.set(uid,root);assert.deepEqual((await fixture.pullOnce(reuse)).calls,full);assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot']);
  adapter.roots.set('other-owner',structuredClone(root));
  const healthy=adapter.generations.get(uid+'/'+fixture.priorGenerationId);
  adapter.generations.set('other-owner/'+fixture.activeGenerationId,structuredClone(healthy));
  const calls=[],original=adapter.readChunks;adapter.readChunks=(...args)=>{calls.push(args[0]);return original(...args);};
- const other=await fixture.store.pull('other-owner');adapter.readChunks=original;
+ const other=await fixture.store.pull('other-owner',reuse);adapter.readChunks=original;
  assert.deepEqual(calls,['other-owner'],'another account reads its own generation');assert.equal(other.payload,fixture.priorPayload);
- // An explicit revalidation (the Retry control) always proves the answer again.
- const retried=await fixture.pullOnce({revalidate:true});
+ // A pull that does not opt in (explicit Retry, a fresh sign-in, a direct read) proves the answer again.
+ const retried=await fixture.pullOnce();
  assert.deepEqual(retried.calls,full,'explicit revalidation reads the header and chunks again');
  assert.equal(retried.result.code,'corrupt-generation');
- assert.deepEqual((await fixture.pullOnce()).calls,['readRoot'],'the re-proved conclusion still bounds later ordinary pulls');
+ assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot'],'the re-proved conclusion still bounds later opted-in pulls');
+ // Chunks restored in place under the same root are found by the next full read.
+ const prior=fixture.generation(fixture.priorGenerationId),active=adapter.generations.get(uid+'/'+fixture.activeGenerationId);
+ active.header={...active.header,hash:prior.header.hash,byteLength:prior.header.byteLength,chunkCount:prior.header.chunkCount};
+ for(const chunk of prior.readableChunks)active.chunks.set(chunk.index,chunk);
+ const repaired=await fixture.pullOnce();
+ assert.deepEqual(repaired.calls,full);assert.equal(repaired.result.payload,fixture.priorPayload,'an in-place repair is read by an ordinary full pull');
 });
 
 test('RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remembered as unreadable and healthy reads stay complete',async()=>{
- const full=['readRoot','readGeneration','readChunks','readRoot'];
+ const full=['readRoot','readGeneration','readChunks','readRoot'],reuse={reuseUnreadable:true};
  for(const [method,code] of [['readChunks','unavailable'],['readGeneration','permission-denied'],['readChunks','deadline-exceeded']]){
   const fixture=await capturedUnreadableGenerationFixture(),{adapter}=fixture,original=adapter[method];
   adapter[method]=async()=>{adapter[method]=original;throw Object.assign(Error('isolated '+code),{code:'firestore/'+code});};
-  const failed=await fixture.pullOnce();
+  const failed=await fixture.pullOnce(reuse);
   assert.equal(failed.result.code,code,'a '+code+' read keeps its own code instead of becoming corruption');
-  const later=await fixture.pullOnce();
+  const later=await fixture.pullOnce(reuse);
   assert.deepEqual(later.calls,full,'after a transient '+code+' failure the next pull still downloads and checks the generation');
   assert.equal(later.result.code,'corrupt-generation');
   // Only a completed check that proved the generation unreadable bounds later pulls.
-  assert.deepEqual((await fixture.pullOnce()).calls,['readRoot']);
+  assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot']);
  }
  // A healthy board's read behavior is unchanged: every pull reads it in full.
  const healthy=await capturedUnreadableGenerationFixture({defect:false});
  for(let repeat=0;repeat<3;repeat++){
-  const read=await healthy.pullOnce();
+  const read=await healthy.pullOnce(reuse);
   assert.deepEqual(read.calls,full,'healthy pulls read the root, header and chunks, then recheck the root');
   assert.equal(read.result.payload,healthy.activePayload);assert.equal(read.result.code,undefined);
  }

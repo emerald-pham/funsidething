@@ -45,8 +45,11 @@
       return !!known&&known.rev===manifest.rev&&known.generationId===manifest.activeGeneration;
     };
 
-    // revalidate (explicit Retry) proves the answer again from the server.
-    async function pull(uid,{stillCurrent,revalidate=false}={}){
+    // Only a caller that already holds a completed refusal for this source
+    // opts in with reuseUnreadable. Every other pull (explicit Retry, a fresh
+    // sign-in, a direct read) proves the answer again, so a generation whose
+    // chunks were restored in place is still seen.
+    async function pull(uid,{stillCurrent,reuseUnreadable=false}={}){
       if(!uid) return {error:true,code:"missing-account"};
       let manifest=await adapter.readRoot(uid);
       if(!current(stillCurrent)) return {cancelled:true};
@@ -58,7 +61,7 @@
         const generationId=manifest.activeGeneration;
         if(typeof generationId!=="string"||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
           return {error:true,code:"invalid-manifest"};
-        if(!revalidate&&knownUnreadable(uid,manifest))
+        if(reuseUnreadable===true&&knownUnreadable(uid,manifest))
           return {error:true,code:"corrupt-generation",generationId,rev:manifest.rev,knownUnreadable:true};
         try{
           // Both immutable reads use the same manifest generation. Download
