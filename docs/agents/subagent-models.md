@@ -1,5 +1,9 @@
 # Subagent models and effort
 
+This is the Claude counterpart to the GPT delegation paragraph in
+[AGENTS.md](../../AGENTS.md). It governs every Claude Code Agent tool call;
+the AGENTS.md paragraph still governs GPT routes.
+
 Set `model` and `effort` explicitly on every Agent call. This section is the
 explicit instruction to do so. Fable is never authorized, in any version, in
 any role, even for escalation. Every effort level is authorized.
@@ -53,9 +57,11 @@ with the work restructured. Fable is never used.
 
 - Default to `model: "opus"`, `effort: "high"`. Per arena.ai Agent Arena, it
   outscored Sonnet 5.5 at lower median cost per task.
-- Use `max` for review or difficult work. Opus 5.5 (Max) ranks #1 on Agent
+- Use `max` for the high-risk reviews and hard bounded work the table assigns
+  it. Routine self-review stays at `xhigh`. Opus 5.5 (Max) ranks #1 on Agent
   Arena at about four times the cost of High, so use it deliberately.
-- Escalate from high to max only after a real failure: diagnosis plus an
+- Work the table starts at max stays at max. Raise a task that started at
+  high to max only after a real failure: diagnosis plus an
   attempted repair failed, and there is no credible next step. A failed test
   with an obvious fix is progress, not a reason to escalate. Beyond max, use
   only the Opus max escalation above.
@@ -66,6 +72,9 @@ with the work restructured. Fable is never used.
 - Never use `model: "fable"` or any Fable version, however new. Never let
   `subagent_type: "fork"` serve as a route to Fable: forks inherit the parent
   model, so do not fork from a Fable session.
+- A fork ignores `model` and `effort` and runs at the coordinator's settings
+  (Opus medium). For delegated work that needs Opus high or above, start a
+  fresh agent instead of a fork.
 - When a newer model ships, adopt it immediately per the rule above. Then
   check https://arena.ai/leaderboard/agent. If the newer model's ranking or
   cost changes which family or effort wins a role, update this table and
