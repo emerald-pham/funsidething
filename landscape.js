@@ -22,9 +22,16 @@
   let storage;try{storage=window.localStorage;}catch{storage=null;}
   const sceneStorage=S.createSceneMirror(storage);
   LandscapeMood.configureHistory(storage);
+  let personalQuotesKey=JSON.stringify(window.getScannerHourlyQuotes?.()||{});
   LandscapeMood.setPersonalHourlyQuotes(window.getScannerHourlyQuotes?.()||{});
+  // The board's first render announces its saved quotes. The same quotes do
+  // not repaint, and before the opening paint new ones only join it, so the
+  // task that first shows the board paints no scenery (#2194 review F9).
   window.addEventListener('scanner-hourly-quotes-change',event=>{
-    LandscapeMood.setPersonalHourlyQuotes(event.detail||{});refreshSky();
+    const key=JSON.stringify(event.detail||{});
+    if(key===personalQuotesKey)return;
+    personalQuotesKey=key;LandscapeMood.setPersonalHourlyQuotes(event.detail||{});
+    if(openingPaint)owedOpeningRefresh();else refreshSky();
   });
   let currentEntry=null,visibleBanners=[];
   function sceneTextVisible(element){
@@ -63,7 +70,16 @@
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world={elapsed:0,events:[]};
-  let skyTimer=0,resizeTimer=0,returnFocus=null;
+  let skyTimer=0,resizeTimer=0,refreshPaint=null,yieldChannel=null,returnFocus=null;
+  // Runs one pending step as a separate task after input already queued. A
+  // message task, unlike a timer, is not held back by a paused or virtual
+  // clock, so the step follows the refresh as closely as the browser allows.
+  function yieldStep(step){
+    refreshPaint=step;
+    if(typeof MessageChannel!=='function'){setTimeout(()=>{const next=refreshPaint;refreshPaint=null;next?.();});return;}
+    if(!yieldChannel){yieldChannel=new MessageChannel();yieldChannel.port1.onmessage=()=>{const next=refreshPaint;refreshPaint=null;next?.();};}
+    yieldChannel.port2.postMessage(0);
+  }
   const dialog=document.getElementById('motionDialog');
   const status=document.getElementById('sceneStatus');
   const motionButton=document.getElementById('motionButton');
@@ -345,6 +361,8 @@
     const gradient=b.createLinearGradient(0,0,0,hy+H*.12);
     p.sky.forEach((c,i)=>gradient.addColorStop(i/2,c));
     b.fillStyle=gradient;b.fillRect(0,0,W,H);
+    // The opaque canvas is shown only once it holds a sky (#2194 review F8).
+    if(back.style.visibility==='hidden')back.style.visibility='';
     const night=p.night;
     if(night>.05){
       for(const star of sky.stars){
@@ -1438,17 +1456,45 @@
   }
   new MutationObserver(updateChrome).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
   themeQuery.addEventListener('change',updateChrome);
-  function refreshSky(){
+  // Computing the scene (astronomy, palette, season, mood and hourly text) is
+  // kept apart from painting it, so opening can decide when the costly
+  // background and life passes run. refreshSky still does both, in order.
+  // With `deferred`, the computed scene becomes current (the sky the canvas
+  // reads and the tint, period and hourly text the page shows) only when its
+  // writes run, so a caller can apply them in the same step that paints the
+  // sky; otherwise new text could sit over the old sky (#2194 review F7).
+  // Without it every write happens at once, in the existing order.
+  function computeScene(deferred=null){
+    const apply=deferred?write=>deferred.push(write):write=>write();
     const location=globalThis.LivingLocation?.current();
-    sky=S.skyAt(S.sceneDate(new Date(Math.floor(Date.now()/60000)*60000),sceneStorage,location),location);p=S.palette(sky.sun.altitude);
-    if(globalThis.LandscapeMood){sceneSeason=LandscapeMood.season(sky.date,location).name;p=LandscapeMood.palette(p,sky.date,location);}
-    document.documentElement.dataset.sceneSeason=sceneSeason;syncScene(Date.now());updateChrome();
-    document.documentElement.style.setProperty('--scene-tint',p.tint);
-    document.documentElement.dataset.scenePeriod=sky.period;
-    const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},T.random(sceneSeed,'hourly-text',Math.floor(+sky.date/3600000)));
-    currentEntry=entry;
-    status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');
+    const nextSky=S.skyAt(S.sceneDate(new Date(Math.floor(Date.now()/60000)*60000),sceneStorage,location),location);let nextPalette=S.palette(nextSky.sun.altitude),nextSeason=sceneSeason;
+    if(globalThis.LandscapeMood){nextSeason=LandscapeMood.season(nextSky.date,location).name;nextPalette=LandscapeMood.palette(nextPalette,nextSky.date,location);}
+    apply(()=>{
+      sky=nextSky;p=nextPalette;sceneSeason=nextSeason;
+      document.documentElement.dataset.sceneSeason=sceneSeason;syncScene(Date.now());updateChrome();
+      document.documentElement.style.setProperty('--scene-tint',p.tint);
+      document.documentElement.dataset.scenePeriod=sky.period;
+    });
+    const entry=LandscapeMood.messageEntry(nextSky.date,{...location,sunAltitude:nextSky.sun.altitude},T.random(sceneSeed,'hourly-text',Math.floor(+nextSky.date/3600000)));
+    apply(()=>{currentEntry=entry;status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');});
+  }
+  function paintScene(){
     paintBackground();syncScene(Date.now());paintLife(world.elapsed);
+  }
+  // During the opening task a refresh computes the scene but owes its paint.
+  // Opening used to paint the whole landscape two or three times in the same
+  // task as the board's first input, so a visible board could not be used
+  // until the scenery finished drawing (#2202). A later refresh paints at
+  // once and settles the owed paint.
+  // Opening states: {opening:true} during the boot task (refreshes only compute);
+  // {opening:false} while the opening paint is owed, waiting for the board;
+  // null once it has painted. `due` says a computed scene still needs painting.
+  // nextPaint=Infinity holds the animation loop's paint for that same wait.
+  let openingPaint=null;
+  function refreshSky(){
+    computeScene();
+    if(openingPaint?.opening)openingPaint.due=true;
+    else{if(openingPaint)openingPaint.due=false;paintScene();}
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
@@ -1459,7 +1505,10 @@
     // Pixel budget prevents high-DPR phones from allocating desktop-size canvases.
     dpr=Math.min(window.devicePixelRatio||1,1.5,Math.sqrt(3000000/(W*H)));
     for(const canvas of [back,front,partyLayer]){canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.getContext('2d').setTransform(dpr,0,0,dpr,0,0);}
-    refreshSky();
+    // While the opening paint waits for the board, a resize joins it instead
+    // of painting first (#2194 FAQ re-review B4). Once the board shows, it
+    // paints at once as before, even before the opening paint's own frame.
+    if(openingPaint&&!openingPaint.boardShown)owedOpeningRefresh();else refreshSky();
   }
   function tick(now){
     if(reduced||document.hidden){frame=0;return;}
@@ -1514,6 +1563,11 @@
   }
   function advanceRooftopParty(dt){
     if(document.hidden||!geometry||!p)return;
+    // While the opening paint still waits for the board (or its bounded
+    // fallback), the reduced-motion timer paints nothing: its first run, a
+    // second after opening, drew the scenery over a late board (#2194 R1).
+    // The opening paint then draws the latest scene once.
+    if(openingPaint)return;
     // Static scenery repaints on membership changes, including the complete
     // barge crossing, without turning reduced motion into continuous animation.
     const before=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
@@ -1522,18 +1576,41 @@
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
-  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}
+  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=openingPaint&&!openingPaint.boardShown?Infinity:0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;refreshPaint=null;partyTimer=0;}
   function scheduleSky(){
     clearTimeout(skyTimer);if(document.hidden)return;
     const now=Date.now(),weather=S.weatherAt(new Date(now),sceneSeason);
     // Even static devices change weather at the shared episode boundary, not
     // one minute after whenever each device happened to open the app.
     const delays=[60000-now%60000,...[weather.start,weather.end].filter(at=>at>now).map(at=>at-now)];
-    skyTimer=setTimeout(()=>{refreshSky();scheduleSky();},Math.max(1,Math.min(...delays)));
+    skyTimer=setTimeout(()=>{
+      // The recurring refresh computes the scene on time but paints after
+      // yielding, so input queued behind this timer is handled first. Painting
+      // in the same task hitched typing and scrolling every minute (#2203).
+      // The paint draws whatever scene is current by then, so no stale frame.
+      // The scene's visible page changes wait for that same paint step.
+      // While the opening paint still waits for the board it joins that paint.
+      if(openingPaint)owedOpeningRefresh();
+      else{
+        // A refresh applied meanwhile (a scene-time choice, location or
+        // resize) already shows a newer scene; this one is then dropped.
+        const writes=[],shown=sky;computeScene(writes);
+        yieldStep(()=>{
+          if(sky!==shown)return;
+          // The writes already synced the scene clock in this same step.
+          for(const write of writes)write();
+          if(timeDialog.open)refreshSolarTimes();
+          if(!document.hidden)paintScene();
+        });
+      }
+      scheduleSky();
+    },Math.max(1,Math.min(...delays)));
   }
   function start(){
     stop();if(document.hidden)return;
-    if(W!==window.innerWidth||H!==window.innerHeight)resize();else refreshSky();
+    // A return to the app or a pageshow while the board is still opening
+    // joins the opening paint too (#2194 FAQ re-review B4).
+    if(W!==window.innerWidth||H!==window.innerHeight)resize();else if(openingPaint&&!openingPaint.boardShown)owedOpeningRefresh();else refreshSky();
     scheduleSky();if(!reduced)frame=requestAnimationFrame(tick);else partyTimer=setInterval(()=>advanceRooftopParty(1),1000);
   }
   function updateMotion(){
@@ -1594,7 +1671,9 @@
     sceneStorage.applySynced(time,season);
     renderSceneTimeChoice();
     if(timeDialog.open){seasonInput.value=season||'';refreshSolarTimes();}
-    refreshSky();
+    // Board hydration applies its saved choice; before the opening paint that
+    // only computes, so the board's first task paints no scenery (#2194 F9).
+    if(openingPaint)owedOpeningRefresh();else refreshSky();
   };
   seasonInput.addEventListener('change',refreshSolarTimes);
   document.addEventListener('click',event=>{
@@ -1652,17 +1731,81 @@
     // UTC scene; missed arrivals are never animated as a catch-up burst.
     if(document.hidden)stop();else {preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();}
   });
-  document.addEventListener('landscape-location-change',()=>{refreshSky();});
+  // A board adoption reapplies its saved location on every open. Only a
+  // location that actually changed repaints; the same one cost a full paint
+  // inside the task that first showed the board (#2194 review F9).
+  let sceneLocationKey=JSON.stringify(globalThis.LivingLocation?.current()??null);
+  document.addEventListener('landscape-location-change',()=>{
+    const key=JSON.stringify(globalThis.LivingLocation?.current()??null);
+    if(key===sceneLocationKey)return;
+    sceneLocationKey=key;if(openingPaint)owedOpeningRefresh();else refreshSky();
+  });
+  // A refresh that arrives while the opening paint is still owed computes the
+  // scene and joins that paint instead of painting first.
+  function owedOpeningRefresh(){computeScene();openingPaint.due=true;if(timeDialog.open)refreshSolarTimes();}
+  // Until the first paint the page shows the computed sky colour, not the
+  // stylesheet's fixed day placeholder, behind the board (#2194 review O1).
+  // The colours are also kept for the inline step in index.html that shows
+  // them on the next opening before this script runs (#2194 rendered R2).
+  function showScenePlaceholder(){
+    if(!p?.sky?.length)return;
+    host.style.backgroundColor=p.sky[Math.min(1,p.sky.length-1)];
+    host.style.backgroundImage='linear-gradient('+p.sky.join(',')+')';
+    try{localStorage.setItem('fvp:chain-scanner:scene-placeholder',JSON.stringify({v:1,at:Date.now(),sky:p.sky.slice(0,3)}));}catch{}
+  }
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
+  openingPaint={opening:true,due:false};
+  // A sized opaque canvas is black until painted (#2194 review F8).
+  back.style.visibility='hidden';
   resize();updateMotion();if(preference===null)openMotion();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
   document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));
+  // Paint the opening scene once, after the board is showing, its next frame
+  // and any input queued behind it, using the latest computed scene. The
+  // board may hydrate after this task (a large or slow device read): its
+  // hydration reapplies the saved scene choice, and every refresh owed to the
+  // opening paint only computes, so no scenery paint runs in the task that
+  // first shows the board (#2194 review F6, F9). A resize, a return to the
+  // app or a pageshow meanwhile only computes and keeps the loop's hold
+  // (#2194 FAQ re-review B4); other direct refreshes after this task still
+  // paint at once. If the board never signals, the scenery still
+  // paints after a bounded wait. Until then the normal-motion loop keeps
+  // running but its next paint is held, and the reduced-motion timer skips
+  // its runs until then.
+  openingPaint.opening=false;nextPaint=Infinity;showScenePlaceholder();
+  const boardShown=()=>document.documentElement.dataset.appReady==='true';
+  let boardObserver=null,boardFallback=0,openingReleased=false;
+  const releaseOpening=()=>{
+    if(openingReleased)return;
+    openingReleased=true;boardObserver?.disconnect();clearTimeout(boardFallback);
+    // From here a resize or return to the app paints at once again (B4).
+    if(openingPaint)openingPaint.boardShown=true;
+    showScenePlaceholder();
+    requestAnimationFrame(()=>setTimeout(()=>{
+      const owed=openingPaint?.due;openingPaint=null;
+      if(nextPaint===Infinity)nextPaint=0;
+      // Not redundant: the scene was computed at boot, and the background reads
+      // light states that must match this later instant (paintScene syncs only
+      // after painting the background).
+      if(owed&&!document.hidden){syncScene(Date.now());paintScene();}
+    }));
+  };
+  if(boardShown())releaseOpening();
+  else{
+    boardObserver=new MutationObserver(()=>{if(boardShown())releaseOpening();});
+    boardObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-app-ready']});
+    boardFallback=setTimeout(releaseOpening,4000);
+  }
   // The editable local file is precached for offline use. A failed first load
   // leaves hourly text blank and cannot interrupt animation startup.
   fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{
     if(!response.ok)throw new Error('Human text unavailable');
     return response.text();
-  }).then(markdown=>{LandscapeMood.setHumanText(markdown);refreshSky();}).catch(()=>{});
+  }).then(markdown=>{
+    LandscapeMood.setHumanText(markdown);
+    // Text that arrives before the opening paint joins it instead of painting first.
+    if(openingPaint){computeScene();openingPaint.due=true;}else refreshSky();
+  }).catch(()=>{});
 })();

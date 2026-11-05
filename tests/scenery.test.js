@@ -5,10 +5,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import {
-  test, __dirname, html, sceneTimeline, loadApp, SYNC_STORE_KEY, HOUR, syncTask, syncState,
-  STALE_CHAIN, staleState, cloudState, makeSyncHarness, syncSettle, PAST_DEBOUNCE, titlesOf,
-  pedestrianReservationPolicy, pedestrianDaytimeSpawnPolicy, assertPedestrianReservationBound,
-  paintedMotionWorldXs,
+  test, refuseNextRecoveryTransaction255, closeLegacyApp173, __dirname, html, sceneTimeline, flush,
+  loadApp, settle, fixtureDeadline, SYNC_STORE_KEY, HOUR, syncTask, syncState, STALE_CHAIN, staleState,
+  cloudState, makeSyncHarness, syncSettle, PAST_DEBOUNCE, titlesOf, CAPTURED_UNREADABLE_GENERATION,
+  CAPTURED_RESULT_BUDGET_MS, largeSerializedBytes2198, CAPTURED_PHONE_SERIALIZATION_BYTES,
+  capturedGenerationAcceptedApp2198, RECORDED_HEALTHY_STATUS_8CD524A, RECORDED_HEALTHY_READS_8CD524A,
+  faithfulModalQuery2194, declineButton2194, pendingAutomaticDefault2194, coldRelaunch2198,
+  syncStatus2200, pedestrianReservationPolicy, pedestrianDaytimeSpawnPolicy,
+  assertPedestrianReservationBound, paintedMotionWorldXs,
 } from "./shared.js";
 
 test('RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes',async()=>{
@@ -345,6 +349,613 @@ test("the revision this device last saw, not its clock, decides that it is ahead
   assert.deepEqual(ctx.state.chain, STALE_CHAIN,
     "same base revision plus local edits means this device is ahead, slow clock or not");
   assert.deepEqual(h.remoteChain(), STALE_CHAIN, "so its work goes up");
+});
+
+test('RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation',{timeout:90000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot,activePath,priorPath,priorPayload}=app,store=ctx.window.ScannerDeviceStore;
+ // Refuse only the first automatic publication so the local outcome is visible
+ // before any cloud acknowledgement exists.
+ refuseNextRecoveryTransaction255(app.faults);
+ const before=JSON.stringify(ctx.state),beforeBoard=JSON.parse(before),syncRevBefore=ctx.state.syncRev;
+ const cloudBefore=new Map([...backend.docs].map(([key,value])=>[key,JSON.stringify(value)]));
+ ctx.closeModal();await flush();
+ const serialized=await largeSerializedBytes2198(ctx,()=>ctx.cloudPull());
+ t.diagnostic('multi-megabyte serialization during the recovery pull: '+serialized.calls+' calls, '+serialized.bytes+' characters');
+ const hold=await store.getRecoveryCloudHold();
+ const observed=vm.runInContext('JSON.stringify({cloud:window.CloudSync?.errorCode??null,unrepairable:unrepairableCloudSource?.code??null,resume:automaticCloudSourceResumeStatus?.state??null,accepted:liveBoardAccepted})',ctx);
+ assert.ok(hold?.automaticRecovery===true&&hold.reason==='cloud-source-recovery','the captured state reconciles as an automatic recovery default instead of staying unaccepted; app state: '+observed);
+ const titles=ctx.state.tasks.map(task=>task.title);
+ assert.ok(titles.includes('Saved only in the intact prior generation'),'the complete prior generation supplies the working board');
+ for(const task of beforeBoard.tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task,'every accepted task, including the newer local edit, survives unchanged');
+ assert.ok(titles.includes('Newer local edit before reconciliation'));
+ const plain=value=>JSON.parse(JSON.stringify(value??null));
+ for(const key of ['decisionEvents','decisionBaseline','considered','cantAt','workedAt','chain','workLog','deletedTaskIds','clearedHistoryIds'])
+  assert.deepEqual(plain(ctx.state[key]),plain(beforeBoard[key]),'every accepted board decision survives: '+key);
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the reconciled board is the exact durable head');
+ assert.equal(ctx.state.syncRev,syncRevBefore,'the older generation never becomes the accepted revision');
+ assert.equal(ctx.state.syncDirty,true,'reading an older complete source is not a cloud acknowledgement');
+ for(const [key,raw] of cloudBefore)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'every cloud source, including the damaged active generation, stays untouched: '+key);
+ assert.equal(backend.docs.size,cloudBefore.size);
+ const archives=await store.listOpaqueArchives(),rawArchive=archives.find(row=>row.key===hold.originalKey);
+ assert.ok(rawArchive,'the exact device originals are archived before local adoption');
+ const sourceArchive=JSON.parse(archives.find(row=>JSON.parse(rawArchive.raw).sourceArchiveKeys.includes(row.key)).raw);
+ assert.equal(sourceArchive.defaultPolicy,'accepted-device-then-stable-source-key-v1');
+ assert.equal(sourceArchive.acceptedDeviceBoard,before,'the unreconciled accepted board stays byte-exact');
+ assert.ok(sourceArchive.candidateSources.some(row=>row.key==='cloud-generation:'+originalRoot.previousGeneration),'the selection is attributed to the prior generation');
+ assert.deepEqual(sourceArchive.unsupported.filter(row=>row.sourceRef?.id===originalRoot.activeGeneration).map(row=>row.reason),['generation-incomplete'],'the damaged active generation is recorded, never adopted');
+ const archivedPrior=sourceArchive.generations.find(row=>row.id===originalRoot.previousGeneration);
+ assert.equal(await ctx.window.ChainStorageV2.decodeSnapshot(archivedPrior.header,archivedPrior.chunks),priorPayload,'the prior generation is archived exactly');
+ assert.equal(backend.docs.get(activePath).chunkCount,CAPTURED_UNREADABLE_GENERATION.active.chunkCount);assert.ok(backend.docs.has(priorPath));
+ // The outcome above is reached inside the product budget on this host; the
+ // work count decides whether it also fits a phone, whatever this host's speed.
+ assert.ok(serialized.bytes<=CAPTURED_PHONE_SERIALIZATION_BYTES,'one recovery pull serializes no more than a phone can inside the product budget: '+JSON.stringify({...serialized,limit:CAPTURED_PHONE_SERIALIZATION_BYTES}));
+});
+test('RISK cloud generation recovery: a readable active generation of the captured shape leaves the saved board, cloud and status exactly as before',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{defect:false}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),archives=await store.listOpaqueArchives();
+ const cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length,reads=[];
+ app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx))await wait(10);},'the healthy pull settles');
+ const status=syncStatus2200(shim);
+ t.diagnostic('healthy pull: '+JSON.stringify({status,reads,writes:backend.writes.length-writes,errorCode:ctx.window.CloudSync.errorCode??null,known:ctx.window.CloudSync.knownDamagedSource??null}));
+ assert.equal(JSON.stringify(ctx.state),before,'the saved board is byte-for-byte the board before the pull');
+ assert.deepEqual(await store.readHead(),head,'the durable head is unchanged');
+ assert.deepEqual(await store.listOpaqueArchives(),archives,'no recovery archive is written');
+ assert.equal(await store.getRecoveryCloudHold(),null,'no recovery hold is written');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud document is unchanged');
+ assert.equal(backend.writes.length,writes,'the pull writes nothing to the cloud');
+ assert.equal(ctx.window.CloudSync.errorCode??null,null);
+ assert.deepEqual(status,RECORDED_HEALTHY_STATUS_8CD524A,'the sync status is the one main 8cd524a shows');
+ assert.deepEqual(reads,RECORDED_HEALTHY_READS_8CD524A.map(path=>path.replace('<active>',app.activePath).replace('<root>','users/owner')),'the pull reads what main 8cd524a reads');
+});
+
+test('RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board',{timeout:240000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),beforeTitles=ctx.state.tasks.map(task=>task.title);
+ const protectedSources=[...backend.docs].filter(([key])=>key===activePath||key===priorPath||key.startsWith(priorPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
+ ctx.closeModal();await flush();
+ // The automatic default publishes through the guarded revision path. Under
+ // load its first read budget can end after the local commit; the pending hold
+ // then publishes on the next ordinary pull. Wait for the real acknowledgement.
+ const settled=()=>vm.runInContext('JSON.stringify({dirty:state.syncDirty,pulling,pushing:cloudPushInFlight,busy:cloudSourceRecoveryBusy,hold:deviceRecoveryCloudHold?.reason??null,cloud:window.CloudSync?.errorCode??null})',ctx);
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ for(let attempt=0;attempt<3&&(attempt===0||ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx));attempt++){
+  if(attempt)assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'only a committed automatic default may be published later');
+  const pull=ctx.cloudPull();
+  try{await fixtureDeadline(async wait=>{let done=false;pull.then(()=>{done=true;});while(!done||!idle())await wait(20);},
+   'the automatic default read settles',CAPTURED_RESULT_BUDGET_MS+20000);}
+  catch(error){error.message+='; app state: '+settled();throw error;}
+ }
+ assert.equal(ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx),false,'the automatic default reaches a real cloud acknowledgement; app state: '+settled());
+ const published=backend.docs.get('users/owner');
+ assert.equal(published.rev,originalRoot.rev+1,'publication is one guarded revision after the damaged one');
+ assert.equal(published.previousGeneration,originalRoot.activeGeneration,'the damaged generation stays referenced, never overwritten');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'));
+ // Decline: a deliberate Paste Restore of the board this device held before.
+ ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=before;
+ shim.document.dispatchEvent({type:'input',target:box});
+ assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);
+ const reason=vm.runInContext('fileRestorePreview&&fileRestoreReadinessReason(fileRestorePreview)',ctx);
+ assert.equal(await ctx.onAction('confirm-file-restore',{}),true,'the deliberate restore is available after the automatic default; refusal: '+reason);
+ assert.deepEqual(ctx.state.tasks.map(task=>task.title),beforeTitles,'declining restores the unreconciled board rather than the older generation');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the restored board is the exact durable head');
+ const restored=await backend.CS.pull();
+ assert.equal(JSON.parse(restored.payload).tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'the older generation is not what the cloud keeps after declining');
+ for(const [key,raw] of protectedSources)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'the damaged and prior generations remain protected: '+key);
+});
+
+// #2194 review F2: declining before publication. While the automatic recovery
+// default is still pending and unpublished, Settings offers to return to the
+// exact board this device held before reconciliation. Nothing is published,
+// every source stays protected, and deliberate Restore stays available.
+test('RISK cloud generation recovery: declining the pending automatic recovery default in Settings restores the unreconciled board before any publication',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ // The first automatic publication is refused, so the default stays pending.
+ refuseNextRecoveryTransaction255(app.faults);
+ const before=JSON.stringify(ctx.state),beforeHead=(await store.readHead()).payload;
+ const cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the automatic default settles unpublished');
+ const pending=await store.getRecoveryCloudHold();
+ assert.ok(pending?.automaticRecovery===true&&pending.reason==='cloud-source-recovery','positive control: the automatic default is pending');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'positive control: the older generation is in use');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'nothing has been published');
+ const archivesBefore=await store.listOpaqueArchives();
+ ctx.openSettings();
+ const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/data-act="decline-automatic-cloud-recovery"/,'Settings offers to decline the pending automatic recovery default');
+ // The established keyboard path from Review cloud recovery to the next
+ // recovery control (the native recovery consumer) stays unchanged.
+ const order=['decline-automatic-cloud-recovery','review-cloud-source-recovery','sync-signout'].map(act=>settings.indexOf('data-act="'+act+'"'));
+ assert.ok(order.every(at=>at>=0)&&order[0]<order[1]&&order[1]<order[2],'the decline precedes Review cloud recovery, so Review still moves forward to the next recovery control: '+JSON.stringify(order));
+ assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'declining succeeds while the default is unpublished');
+ assert.equal(JSON.stringify(ctx.state),before,'declining restores the exact board this device held before reconciliation');
+ assert.equal((await store.readHead()).payload,beforeHead,'the restored board is the exact durable head');
+ assert.equal(await store.getRecoveryCloudHold(),null,'the pending automatic publication is cancelled');
+ const archivesAfter=await store.listOpaqueArchives();
+ for(const row of archivesBefore)assert.ok(archivesAfter.some(saved=>saved.key===row.key&&saved.raw===row.raw),'every recovery source stays protected: '+row.key);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'the damaged generation and every cloud source stay untouched');
+ // A later ordinary pull neither publishes the older copy nor reapplies it.
+ await ctx.cloudPull();await settle('a later pull settles');
+ assert.equal(JSON.stringify(ctx.state),before,'the declined default is not reapplied by the next pull');
+ assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published after declining');assert.equal(backend.writes.length,writes);
+ await ctx.onAction('undo',{});await ctx.persist();
+ assert.equal(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'Undo never brings back the declined older copy');
+ // Deliberate File or Paste Restore stays reachable.
+ ctx.openSettings();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-backup"/,'deliberate File or Paste Restore stays reachable');
+ ctx.closeModal();await flush();ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=before;
+ shim.document.dispatchEvent({type:'input',target:box});
+ assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'a deliberate Paste Restore preview opens after declining');
+ await ctx.onAction('cancel-file-restore',{});
+ // A relaunch over the same unchanged root does not reapply the declined default.
+ await closeLegacyApp173(app);backend.CS.suspend();
+ const coldReads=[],cold=await coldRelaunch2198(t,app,coldReads);
+ assert.equal(cold.ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'a relaunch does not reapply the declined older copy');
+ assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected after relaunch');
+ assert.ok(backend.docs.has(activePath)&&backend.docs.has(priorPath));
+});
+
+// #2194 review L1: the decline is remembered in device storage so the next
+// pull does not apply the older copy again. If that record cannot be written,
+// a decline reported as done would be silently undone and published; it must
+// fail closed instead, leaving the pending default exactly as it was.
+test('RISK cloud generation recovery: a decline whose choice cannot be remembered fails closed and a reported decline is never reapplied or published',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ // Publication stays refused until the decline has been attempted.
+ const refusal=Object.assign(Error('Controlled automatic publication refusal'),{code:'permission-denied'});let refusePublication=true;
+ Object.defineProperty(app.faults,'push',{configurable:true,get(){return refusePublication?refusal:undefined;}});
+ t.after(()=>{delete app.faults.push;});
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const olderOnly=()=>ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation');
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the automatic default settles unpublished');
+ const pending=await store.getRecoveryCloudHold();
+ assert.ok(pending?.automaticRecovery===true,'positive control: the automatic default is pending');
+ assert.ok(olderOnly(),'positive control: the older generation is in use');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'positive control: nothing has been published');
+ const recovered=JSON.stringify(ctx.state),recoveredHead=(await store.readHead()).payload;
+ // The device cannot remember the choice (a full origin quota, for example).
+ const key='fvp:chain-scanner:declined-automatic-cloud-recovery',setItem=shim.localStorage.setItem;let markerWrites=0;
+ shim.localStorage.setItem=function(name,value){if(name===key){markerWrites++;throw Object.assign(Error('Synthetic quota exceeded'),{name:'QuotaExceededError'});}return setItem.call(this,name,value);};
+ let declined;
+ try{declined=await ctx.onAction('decline-automatic-cloud-recovery',{});}finally{shim.localStorage.setItem=setItem;}
+ const afterDecline={state:JSON.stringify(ctx.state),head:(await store.readHead()).payload,hold:await store.getRecoveryCloudHold()};
+ // Storage and the cloud then work again, and the next ordinary pull runs.
+ refusePublication=false;const next=ctx.cloudPull();let nextDone=false;next.then(()=>{nextDone=true;},()=>{nextDone=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!nextDone||!idle())await wait(20);},'the next pull settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const reapplied=olderOnly(),published=backend.docs.get('users/owner').rev!==originalRoot.rev;
+ assert.equal(markerWrites,1,'the decline tried to remember the choice');
+ assert.ok(!(declined===true&&(reapplied||published)),'a decline reported as done is never reapplied or published by the next pull: '+JSON.stringify({declined,reapplied,published}));
+ assert.equal(declined,false,'a decline whose choice cannot be remembered fails closed');
+ assert.equal(afterDecline.state,recovered,'the refused decline leaves the working board unchanged');
+ assert.equal(afterDecline.head,recoveredHead,'the refused decline writes nothing to the device');
+ assert.deepEqual(afterDecline.hold,pending,'the refused decline keeps the pending automatic default exactly');
+});
+
+// #2194 FAQ review B2: while the automatic default is pending, cloud saving is
+// held, so a signed-in Restore is refused. A refused decline must point to a
+// route that works then, Review cloud recovery, rather than to Restore.
+test('RISK cloud generation recovery: a refused decline after later edits points to Review cloud recovery, which works while a signed-in Restore is held',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const refusal=Object.assign(Error('Controlled automatic publication refusal'),{code:'permission-denied'});
+ Object.defineProperty(app.faults,'push',{configurable:true,get(){return refusal;}});t.after(()=>{delete app.faults.push;});
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const unreconciled=JSON.stringify(ctx.state);
+ ctx.closeModal();await flush();const opening=ctx.cloudPull();let opened=false;opening.then(()=>{opened=true;},()=>{opened=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!opened||!idle())await wait(20);},'the automatic default settles unpublished',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery===true,'positive control: the automatic default is pending');
+ // The person keeps working on the older copy, as the label invites.
+ shim.document.getElementById('addInput').value='Work added after recovery';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await settle('the edit settles');
+ const edited=JSON.stringify(ctx.state);
+ assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),false,'positive control: the decline is refused after later edits');
+ const message=shim.document.getElementById('toast').textContent;
+ assert.equal(JSON.stringify(ctx.state),edited,'the refused decline changes nothing');
+ // The premise: a signed-in deliberate Restore is held while the default is pending.
+ ctx.closeModal();await flush();ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=unreconciled;
+ shim.document.dispatchEvent({type:'input',target:box});await ctx.onAction('preview-pasted-recovery',{});
+ const restoreRefusal=vm.runInContext('fileRestorePreview?fileRestoreReadinessReason(fileRestorePreview):"no preview"',ctx);
+ await ctx.onAction('cancel-file-restore',{});ctx.closeModal();await flush();
+ assert.match(String(restoreRefusal),/Cloud sync is held/,'a signed-in Restore is held while the automatic default is pending');
+ assert.doesNotMatch(message,/\bRestore\b/,'the refusal does not send the person to a Restore that is held: '+message);
+ assert.match(message,/Review cloud recovery/,'the refusal names Review cloud recovery: '+message);
+ ctx.openSettings();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="review-cloud-source-recovery"[^>]*>Review cloud recovery</,'Settings offers Review cloud recovery beside the decline');
+ const review=ctx.onAction('review-cloud-source-recovery',{});let reviewed=false;Promise.resolve(review).then(()=>{reviewed=true;},()=>{reviewed=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!reviewed||!idle())await wait(20);},'Review cloud recovery reads the sources',CAPTURED_RESULT_BUDGET_MS+20000);
+ const dialog=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(dialog,/Complete board open on this device/,'Review cloud recovery opens with the sources to choose from');
+ assert.match(dialog,/data-act="apply-cloud-source-recovery"/,'Review cloud recovery offers a deliberate choice');
+});
+
+// #2194 independent review B1: the decline's busy check counted the Settings
+// modal it is pressed from as an active editor, so in a real document every
+// press was refused with "A save or edit is running". Pressed from the open
+// Settings modal through the real click dispatcher, it must succeed.
+test('RISK cloud generation recovery: Use my board from before recovery succeeds when pressed in the open Settings modal',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),beforeHead=(await store.readHead()).payload;
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ const cloudBefore=JSON.stringify([...backend.docs]);
+ t.after(faithfulModalQuery2194(shim));
+ ctx.openSettings();
+ assert.ok(shim.document.querySelector('.mback, dialog[open]'),'positive control: the document reports the open Settings modal');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="decline-automatic-cloud-recovery"/,'Settings offers the decline');
+ shim.document.getElementById('toast').textContent='';
+ // A real press: pointerdown (which marks a scanner gesture) precedes the click.
+ const button=declineButton2194();
+ shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const message=shim.document.getElementById('toast').textContent;
+ assert.doesNotMatch(message,/save or edit is running/i,'the Settings modal the decline is pressed from is not an active editor: '+message);
+ assert.equal(await store.getRecoveryCloudHold(),null,'the decline releases the pending automatic default: '+message);
+ assert.equal(JSON.stringify(ctx.state),before,'the decline restores the exact board from before recovery');
+ assert.equal((await store.readHead()).payload,beforeHead,'the restored board is the exact durable head');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published');
+});
+
+// #2194 independent review N2: nothing re-checked the board after the
+// decline's device commit, so closing Settings (Escape) and adding a task
+// while that commit was in flight let the decline replace the new edit.
+// Board input stays held until the decline finishes; no edit is replaced.
+test('RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state);
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ t.after(faithfulModalQuery2194(shim));
+ // Hold only the decline's own device commit so input can be attempted during it.
+ const commitHead=store.commitHead;let release,entered=false;const gate=new Promise(resolve=>{release=resolve;});
+ store.commitHead=async function(options){if(options?.releaseRecoveryHold){entered=true;await gate;}return commitHead.call(this,options);};
+ t.after(()=>{store.commitHead=commitHead;release();});
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ shim.document.dispatchEvent({type:'click',detail:1,target:declineButton2194()});
+ await fixtureDeadline(async wait=>{while(!entered&&!shim.document.getElementById('toast').textContent)await wait(10);},'the decline reaches its device commit',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(entered,true,'positive control: the decline reaches its device commit: '+shim.document.getElementById('toast').textContent);
+ // Escape closes Settings, then Enter in Add submits a new task.
+ const closed=ctx.closeModal();
+ const title='Task added while the decline commits';
+ shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});
+ const accepted=ctx.state.tasks.some(task=>task.title===title);
+ shim.document.getElementById('toast').textContent='';release();
+ // The decline ends with its own toast, success or refusal.
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||!shim.document.getElementById('toast').textContent)await wait(20);},'the decline finishes',CAPTURED_RESULT_BUDGET_MS+20000);
+ const outcome=shim.document.getElementById('toast').textContent;
+ await ctx.persist();
+ const kept=ctx.state.tasks.some(task=>task.title===title)||shim.document.getElementById('addInput').value===title;
+ assert.ok(kept,'the edit attempted during the decline is never replaced: it is either on the board or still in the Add field ('+JSON.stringify({closed,accepted,outcome})+')');
+ assert.equal(accepted,false,'board input is held while the decline commits ('+outcome+')');
+ assert.equal(closed,false,'Settings stays open while the decline commits');
+ assert.equal(JSON.stringify(ctx.state),before,'the decline still restores the exact board from before recovery');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the device head matches the board on screen');
+});
+
+// #2194 independent review N1: a decline cancelled the in-flight automatic
+// recovery read and the requested background resume before its refusal
+// checks, so a refused decline still paused automatic cloud confirmation until
+// the next focus, pageshow or online event. A refused decline changes nothing.
+test('RISK cloud generation recovery: a refused decline leaves the automatic recovery read and its requested resume in place',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ t.after(faithfulModalQuery2194(shim));
+ // Keep working on the older copy, so the decline must refuse.
+ shim.document.getElementById('addInput').value='Work kept on the older copy';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(20);},'the edit settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const pending=await store.getRecoveryCloudHold();
+ // A returning tab requests the automatic resume (the app's own focus path),
+ // and an automatic recovery read is in flight (a local working recovery).
+ vm.runInContext('resumeCloudSync({type:"focus"})',ctx);
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(20);},'the focus pull settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(vm.runInContext('automaticCloudSourceResumeRequested',ctx),true,'positive control: the focus requested the automatic resume');
+ vm.runInContext('globalThis.__read2194={controller:new AbortController(),automaticFallback:true,serial:cloudSourceRecoverySerial};cloudSourceRecoveryRead=__read2194;cloudSourceRecoveryBusy=false;',ctx);
+ t.after(()=>{try{vm.runInContext('if(cloudSourceRecoveryRead===globalThis.__read2194)cloudSourceRecoveryRead=null;',ctx);}catch{}});
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),false,'positive control: the decline is refused after later edits');
+ const message=shim.document.getElementById('toast').textContent;
+ assert.match(message,/Board changed since recovery/,'the refusal is the board-changed case: '+message);
+ assert.equal(vm.runInContext('__read2194.controller.signal.aborted',ctx),false,'a refused decline does not abort the automatic recovery read');
+ assert.equal(vm.runInContext('cloudSourceRecoveryRead===__read2194',ctx),true,'a refused decline keeps the automatic recovery read current');
+ assert.equal(vm.runInContext('automaticCloudSourceResumeRequested',ctx),true,'a refused decline keeps the requested automatic resume');
+ assert.deepEqual(await store.getRecoveryCloudHold(),pending,'the refused decline keeps the pending automatic default exactly');
+});
+
+test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
+ for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+  refuseNextRecoveryTransaction255(app.faults);
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),cloudBefore=JSON.stringify([...backend.docs]);
+  ctx.closeModal();await flush();await ctx.cloudPull();
+  assert.equal(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'the unsafe prior generation is never adopted automatically');
+  assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected and unpublished');
+  if(variant==='ambiguous legacy rating'){
+   assert.equal(JSON.stringify(ctx.state),before,'a conflicting source waits for safe recovery');
+   assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null);
+  }else{
+   for(const task of JSON.parse(before).tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task,'accepted work is unchanged');
+   assert.equal(ctx.state.tasks.length,JSON.parse(before).tasks.length,'another account contributes nothing to this board');
+  }
+ });
+});
+
+// #2201: the captured export re-downloaded the same unreadable generation and
+// its multi-megabyte prior on every opening. A completed refusal over an
+// unchanged server root is reused; the root itself is still read from the
+// server each time, and Retry or an account change proves everything again.
+test('RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again',{timeout:180000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating',recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ const generationReads=since=>reads.slice(since).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath));
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=async message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the first opening read settles');
+ assert.equal(backend.CS.errorCode,'corrupt-generation');
+ assert.equal(JSON.stringify(ctx.state),before,'the conflicting prior generation waits; the accepted board is unchanged');
+ assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null);
+ const firstOpen=reads.length,firstChunks=generationReads(0).filter(path=>path.endsWith('/chunks'));
+ assert.ok(firstChunks.includes(activePath+'/chunks')&&firstChunks.includes(priorPath+'/chunks'),'the first opening proves both sources from the server');
+ t.diagnostic('First opening: '+firstOpen+' server reads, '+firstChunks.length+' generation chunk reads');
+ // Returning to the app (hide, then show) and a later automatic pull.
+ shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;
+ // resumeCloudSync starts its pull without returning it: wait for its first
+ // server read, then for the pull to finish, so an early check cannot pass empty.
+ const beforeResume=reads.length;vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);
+ await fixtureDeadline(async wait=>{while(reads.length===beforeResume||!settled())await wait(10);},'the resumed read settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const resumed=reads.slice(firstOpen);
+ t.diagnostic('Resume: '+resumed.length+' server reads '+JSON.stringify(resumed));
+ assert.deepEqual(generationReads(firstOpen),[],'resuming over the unchanged root downloads neither the unreadable generation nor its prior again');
+ assert.ok(resumed.includes('users/owner'),'the root is still read from the server, so a changed manifest is never missed');
+ const afterResume=reads.length;await ctx.cloudPull();await settle('a later automatic pull settles');
+ assert.deepEqual(reads.slice(afterResume),['users/owner'],'a later automatic pull costs one server root read');
+ // The held source still bounds ordinary work after the resume.
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;const afterPull=reads.length;
+ shim.document.getElementById('addInput').value='Local work after resuming a held source';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await settle('the ordinary edit settles');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the ordinary edit is durable');
+ assert.deepEqual(reads.slice(afterPull),[],'an ordinary edit after resuming triggers no cloud download');
+ assert.equal(ctx.state.syncDirty,true,'device durability is not a cloud acknowledgement');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');assert.equal(backend.writes.length,writes);
+ // Explicit Retry proves the answer again from the server.
+ const beforeRetry=reads.length;await ctx.onAction('sync-retry',{});await settle('Retry settles');
+ assert.ok(generationReads(beforeRetry).includes(activePath+'/chunks'),'explicit Retry downloads and checks the unreadable generation again');
+ // An account change never inherits the earlier account session's conclusion.
+ // The harness delivers the sign-in pull explicitly, as the cold-open fixtures do.
+ const beforeAccount=reads.length;backend.emitAuth(null);await flush();backend.emitAuth({uid:'owner',email:'owner@example.test'});await flush();
+ await ctx.cloudPull();await settle('the re-signed-in read settles');
+ assert.ok(generationReads(beforeAccount).includes(activePath+'/chunks'),'signing in again proves the source again');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Local work after resuming a held source'));
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected after Retry and sign-in');
+});
+test('RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating'}),{ctx,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ const generationReads=since=>reads.slice(since).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath));
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},'the first opening settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.ok(generationReads(0).includes(activePath+'/chunks')&&generationReads(0).includes(priorPath+'/chunks'),'saved data without a remembered conclusion proves both sources, as before');
+ const head=(await store.readHead()).payload,cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ await closeLegacyApp173(app);backend.CS.suspend();
+ // The installed app is relaunched over the same unchanged server root.
+ const coldReads=[],cold=await coldRelaunch2198(t,app,coldReads);
+ t.diagnostic('Cold launch: '+coldReads.length+' server reads '+JSON.stringify(coldReads));
+ assert.ok(coldReads.includes('users/owner'),'the root is still read from the server on a cold launch');
+ assert.equal(cold.backend.CS.errorCode,'corrupt-generation','the cold launch still reports the unreadable generation');
+ assert.deepEqual(coldReads.filter(path=>path.startsWith(activePath)||path.startsWith(priorPath)),[],'a cold launch over the unchanged root downloads neither the unreadable generation nor its prior again');
+ const coldStore=cold.ctx.window.ScannerDeviceStore;
+ assert.equal((await coldStore.readHead()).payload,head,'the remembered conclusion never produces a board');
+ assert.equal(await coldStore.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');assert.equal(backend.writes.length,writes);
+ // The relaunched app's ordinary edits are still held without downloads.
+ cold.ctx.window.CLOUD_PUSH_DELAY_MS=0;const beforeEdit=coldReads.length;
+ cold.shim.document.getElementById('addInput').value='Local work after a cold launch';await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true);
+ await cold.settle('the ordinary edit settles');
+ assert.deepEqual(coldReads.slice(beforeEdit),[],'an ordinary edit after the cold launch triggers no cloud download');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore);
+ // Explicit Retry proves the answer again from the server.
+ const beforeRetry=coldReads.length;await cold.ctx.onAction('sync-retry',{});await cold.settle('Retry settles');
+ assert.ok(coldReads.slice(beforeRetry).includes(activePath+'/chunks'),'explicit Retry downloads and checks the unreadable generation again');
+ // Signing out ends the conclusion: the next cold launch proves it again.
+ cold.backend.emitAuth(null);await flush();await cold.settle('sign-out settles');
+ await closeLegacyApp173(cold);cold.backend.CS.suspend();
+ const afterSignOut=[],again=await coldRelaunch2198(t,app,afterSignOut);
+ assert.ok(afterSignOut.includes(activePath+'/chunks'),'after signing out, the next sign-in proves the source again');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected after Retry and sign-out');
+ assert.ok(again.ctx.state.tasks.some(task=>task.title==='Local work after a cold launch'));
+});
+
+// #2194 review M1: a pull that fails before any server root is read (offline,
+// timeout, network, permission, interrupted) is no evidence about the source,
+// so it must not cost the completed refusal kept in device storage.
+test('RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating'}),{ctx,shim,backend,activePath,priorPath}=app;
+ const reads=[];let failRoot=null;
+ app.faults.serverRead=async path=>{reads.push(path);if(failRoot&&path==='users/owner'){const code=failRoot;failRoot=null;throw Object.assign(Error('Synthetic transient root failure'),{code});}};
+ t.after(()=>{delete app.faults.serverRead;});
+ const key='fvp:chain-scanner:proved-unreadable-cloud-source';
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const generationReads=since=>reads.slice(since).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath));
+ const cloudBefore=JSON.stringify([...backend.docs]);
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the first opening settles');
+ const recorded=shim.localStorage.getItem(key);
+ assert.ok(recorded,'positive control: the completed refusal is recorded on the device');
+ assert.ok(generationReads(0).includes(activePath+'/chunks'),'positive control: the first opening proves the source');
+ for(const code of ['unavailable','permission-denied','deadline-exceeded']){
+  failRoot=code;let at=reads.length;await ctx.cloudPull();await settle('the '+code+' pull settles');
+  assert.equal(failRoot,null,'the '+code+' failure was injected on the root read');
+  const kept=shim.localStorage.getItem(key);
+  at=reads.length;await ctx.cloudPull();await settle('the pull after '+code+' settles');
+  assert.equal(backend.CS.errorCode,'corrupt-generation','the next pull still reports the unreadable generation');
+  assert.deepEqual(generationReads(at).filter(path=>path.endsWith('/chunks')),[],'after a '+code+' failure the next pull over the unchanged root makes no chunk read');
+  assert.deepEqual(generationReads(at),[],'after a '+code+' failure the next pull over the unchanged root makes no header read');
+  assert.equal(kept,recorded,'a '+code+' pull failure keeps the completed refusal on the device');
+ }
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');
+ // Retry still proves the source again: the kept refusal is not permanent.
+ const beforeRetry=reads.length;await ctx.onAction('sync-retry',{});await settle('Retry settles');
+ assert.ok(generationReads(beforeRetry).includes(activePath+'/chunks'),'explicit Retry downloads and checks the unreadable generation again');
+});
+
+test('RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again',{timeout:180000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating',recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const reads=[];let roots=0,interrupted=false;
+ // Root reads of the first opening: the bounded pull, the exact-copy check's
+ // start and end, then the automatic default's first capture. Its closing root
+ // read fails transiently, after the exact-copy check has already completed.
+ app.faults.serverRead=async path=>{reads.push(path);
+  if(path==='users/owner'&&!interrupted&&++roots===5){interrupted=true;throw Object.assign(Error('Synthetic transient recovery read'),{code:'unavailable'});}};
+ t.after(()=>{delete app.faults.serverRead;});
+ const chunkReads=since=>reads.slice(since).filter(path=>path===activePath+'/chunks'||path===priorPath+'/chunks');
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=async message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const resume=async message=>{shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;
+  // The resumed pull is not returned: wait for its first server read, then idle.
+  const before=reads.length;vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);
+  await fixtureDeadline(async wait=>{while(reads.length===before||!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);};
+ const before=JSON.stringify(ctx.state),cloudBefore=JSON.stringify([...backend.docs]);
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the interrupted opening settles');
+ assert.equal(interrupted,true,'the transient failure reached the automatic recovery read');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore);
+ const afterInterrupted=reads.length;await resume('the next opening settles');
+ assert.ok(chunkReads(afterInterrupted).includes(priorPath+'/chunks'),'an interrupted check is not a conclusion: the next opening reads the sources again');
+ const afterCompleted=reads.length;await resume('a later opening settles');
+ assert.deepEqual(reads.slice(afterCompleted),['users/owner'],'once the check completes, a later opening reads only the server root');
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');
+});
+
+test('RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone',{timeout:90000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ refuseNextRecoveryTransaction255(app.faults);
+ shim.document.getElementById('addInput').value='Unfinished draft kept through reconciliation';
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'the automatic default applies with an unchanged unfinished draft');
+ assert.equal(shim.document.getElementById('addInput').value,'Unfinished draft kept through reconciliation','the unfinished draft remains');
+ const reconciled=ctx.state.tasks.map(task=>task.title);
+ assert.ok(reconciled.includes('Saved only in the intact prior generation'));
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Unfinished draft kept through reconciliation'));
+ assert.equal(await ctx.onAction('undo',{}),true);assert.equal(await ctx.persist(),true);
+ assert.deepEqual(ctx.state.tasks.map(task=>task.title),reconciled,'Undo removes only the later Add and never reverses the reconciliation');
+});
+test('RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot}=app;
+ let duringPublication=null;
+ app.faults.beforeTransaction=()=>{
+  const hold=ctx.window.ScannerDeviceRecoveryHold;
+  if(duringPublication||hold?.reason!=='cloud-source-recovery'||hold.automaticRecovery!==true)return;
+  duringPublication={...syncStatus2200(shim),dirty:ctx.state.syncDirty,rev:backend.docs.get('users/owner').rev,
+   olderOnly:ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation')};
+ };
+ ctx.closeModal();await flush();
+ const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
+ await fixtureDeadline(async wait=>{while(!duringPublication&&!pulled)await wait(20);},'the automatic recovery default reaches its publication',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.ok(duringPublication,'the automatic recovery default commits and starts its guarded publication');
+ assert.equal(duringPublication.olderOnly,true,'the older complete generation supplies the working board');
+ assert.equal(duringPublication.dirty,true,'reading the older complete generation is not a cloud acknowledgement');
+ assert.equal(duringPublication.rev,originalRoot.rev,'no cloud write has acknowledged the current saved board yet');
+ const status=duringPublication;
+ assert.equal(status.hidden,false);
+ assert.equal(status.text,'☁ older copy in use','the sync status names the older complete source; it is neither opening, synced nor an error: '+JSON.stringify(status));
+ assert.match(status.title,/older complete copy of your board is in use/i,'the status says an older complete source is in use');
+ assert.match(status.title,/cloud saving is not confirmed/i,'the status says cloud saving is not confirmed');
+ assert.match(status.title,/damaged newer cloud copy was not recovered/i,'the status says the damaged generation\'s missing data was not recovered');
+ assert.doesNotMatch(status.text+' '+status.title,/\bsynced\b|repaired|fixed|restored/i,'the status never reads as synced or repaired');
+ assert.doesNotMatch(status.className,/\bok\b/,'the status is never painted as success');
+});
+
+test('RISK cloud generation recovery status: genuine device and cloud errors stay visible over the older complete source status',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ let olderSource=null,deviceFailure=null;
+ app.faults.beforeTransaction=async()=>{
+  const hold=ctx.window.ScannerDeviceRecoveryHold;
+  if(olderSource||hold?.reason!=='cloud-source-recovery'||hold.automaticRecovery!==true)return;
+  olderSource=syncStatus2200(shim);
+  // #2194 review F5: opening keeps its own pending style. This is the real
+  // renderSync branch while the board has not hydrated and the cloud read is
+  // still running, as at boot.
+  olderSource.opening=JSON.parse(vm.runInContext('(()=>{const board=state,status=window.CloudSync.status;state=null;window.CloudSync.status="syncing";try{renderSync();const b=document.getElementById("syncBtn");return JSON.stringify({text:b.textContent,className:b.className,disabled:b.disabled});}finally{state=board;window.CloudSync.status=status;renderSync();}})()',ctx));
+  // A real device write failure (the storage boundary) while that older copy is in use.
+  const commitHead=store.commitHead;store.commitHead=async()=>({ok:false,code:'write-failed'});
+  try{shim.document.getElementById('addInput').value='Edit the device could not save';await ctx.onAction('add',{});
+   assert.equal(await ctx.persist(),false,'the device write really fails');deviceFailure=syncStatus2200(shim);}
+  finally{store.commitHead=commitHead;}
+  // The guarded publication itself is then refused by the cloud.
+  throw Object.assign(Error('Controlled publication refusal'),{code:'permission-denied'});
+ };
+ ctx.closeModal();await flush();
+ const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
+ await fixtureDeadline(async wait=>{while(!pulled)await wait(20);},'the refused automatic publication settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(olderSource?.text,'☁ older copy in use','positive control: the older complete source status was showing first');
+ // #2194 review F5: the three states keep their own existing styles; only a genuine error uses err.
+ assert.deepEqual(olderSource.className.split(/\s+/).sort(),['busy','syncbtn'],'an older complete source in use is pending, not an error: '+olderSource.className);
+ assert.deepEqual(olderSource.opening,{text:'☁ syncing',className:'syncbtn busy',disabled:true},'opening keeps its pending style');
+ assert.equal(deviceFailure.text,'☁ save error','a device save failure is not hidden by the older-source status: '+JSON.stringify(deviceFailure));
+ assert.match(deviceFailure.title,/latest edit is not saved on this device/i);
+ assert.match(deviceFailure.className,/\berr\b/,'a genuine device save error keeps the error style');
+ assert.equal(await ctx.persist(),true,'the device saves again once storage recovers');
+ assert.ok(await store.getRecoveryCloudHold(),'no cloud acknowledgement has cleared the older complete source');
+ // The cloud then refuses this account outright: a genuine cloud error.
+ const refusal=Object.assign(Error('Controlled cloud refusal'),{code:'permission-denied'});
+ app.faults.push=refusal;app.faults.pull=refusal;t.after(()=>{delete app.faults.push;delete app.faults.pull;});
+ const refused=ctx.cloudPull();let settled=false;refused.then(()=>{settled=true;});
+ await fixtureDeadline(async wait=>{while(!settled||vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx))await wait(20);},'the refused cloud attempt settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const cloudError=syncStatus2200(shim);
+ assert.equal(ctx.window.CloudSync.errorCode,'permission-denied','the refusal is a real cloud error');
+ assert.equal(cloudError.text,'☁ error','a genuine cloud error is not replaced by the older-source status: '+JSON.stringify(cloudError));
+ assert.match(cloudError.className,/\berr\b/,'a genuine cloud error keeps the error style');
+ assert.match(cloudError.title,/permission denied/i);
+ assert.ok(await store.getRecoveryCloudHold(),'the recovery hold and its warning stay in place after the error');
+});
+
+test('RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ refuseNextRecoveryTransaction255(app.faults);
+ ctx.closeModal();await flush();
+ const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
+ await fixtureDeadline(async wait=>{while(!pulled)await wait(20);},'the unconfirmed automatic recovery default settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'the automatic recovery default is in use without a cloud acknowledgement');
+ assert.equal(ctx.state.syncDirty,true);
+ ctx.openSettings();
+ const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Cloud recovery is pending/,'the existing recovery warning stays visible');
+ assert.match(settings,/has not been confirmed by cloud/);
+ assert.match(settings,/older complete copy of your board is in use/i,'Settings names the older complete source in use: '+settings.slice(0,1200));
+ assert.match(settings,/damaged newer cloud copy was not recovered/i,'Settings says the damaged generation\'s missing data was not recovered');
+ assert.doesNotMatch(settings,/The current board is confirmed by cloud|repaired/i,'Settings never claims a cloud acknowledgement or a repair');
+ assert.match(settings,/data-act="review-cloud-source-recovery"/,'cloud recovery review stays reachable');
+ assert.match(settings,/data-act="restore-backup"/,'deliberate File or Paste Restore stays reachable');
+});
+
+test('RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status',{timeout:240000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const seen=[];
+ app.faults.beforeTransaction=()=>{if(ctx.window.ScannerDeviceRecoveryHold?.automaticRecovery)seen.push({...syncStatus2200(shim),rev:backend.docs.get('users/owner').rev});};
+ ctx.closeModal();await flush();
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ for(let attempt=0;attempt<3&&(attempt===0||ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx));attempt++){
+  const pull=ctx.cloudPull();
+  await fixtureDeadline(async wait=>{let done=false;pull.then(()=>{done=true;});while(!done||!idle())await wait(20);},
+   'the automatic default read settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ }
+ assert.ok(seen.length>0,'the older complete source was in use before publication');
+ // Every observation is taken while the automatic hold is still unconfirmed on this device.
+ for(const status of seen)assert.notEqual(status.text,'☁ synced','a board still held for cloud confirmation is never labelled synced: '+JSON.stringify(seen));
+ assert.equal(seen[0].rev,originalRoot.rev,'the first observation precedes every cloud write');
+ assert.equal(seen[0].text,'☁ older copy in use');
+ assert.equal(ctx.state.syncDirty,false,'the automatic default reached a real cloud acknowledgement');
+ assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1,'the acknowledgement is the guarded next revision');
+ assert.equal((await backend.CS.pull()).payload,ctx.cloudPayload(),'the cloud now holds exactly the current saved board');
+ ctx.renderSync();const after=syncStatus2200(shim);
+ assert.equal(after.text,'☁ synced','after the real acknowledgement the board may be called synced');
+ assert.doesNotMatch(after.title,/older complete copy/i);
 });
 
 test('RISK night shows: launches lead to bounded fading bursts and the festival sails fully on and off screen',()=>{

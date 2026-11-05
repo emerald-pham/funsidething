@@ -1087,6 +1087,33 @@ test('RISK test inventory: risk map and source checks read every file in the tes
   assert.ok(source.includes(marker),`the test surface includes ${marker}`);
 });
 
+// #2194 CI (PR #2222): the group runner accepts only the 61 environment skips
+// captured in the baseline inventory, so every browser root this branch added
+// under {skip:!process.env.LANDSCAPE_BROWSER_URL} failed CI as an unexpected
+// skip. An added root may skip only through an explicit environmentSkips
+// declaration naming the variable its registration is gated on.
+test('RISK test inventory: every added environment-gated root is declared with the variable its registration skips on',()=>{
+ const assignments=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-assignments.json'),'utf8'));
+ const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-inventory.json'),'utf8'));
+ const baselineSkips=new Set(inventory.acceptedSkipCaseIds);
+ const source=testSurfaceSource();
+ const gated=new Map();
+ for(const match of source.matchAll(/^test\(\s*(['"])(.*?)\1\s*,\s*\{\s*skip\s*:\s*!process\.env\.([A-Z][A-Z0-9_]*)\s*\}/gm))gated.set(match[2],match[3]);
+ const added=[...gated].filter(([root])=>!baselineSkips.has(root));
+ assert.ok(added.length>=10,'positive control: this branch adds environment-gated browser roots: '+added.length);
+ const declared=new Map((assignments.environmentSkips||[]).map(entry=>[entry.root,entry]));
+ for(const [root,environment] of added){
+  assert.ok(declared.has(root),'the added environment-gated root is declared: '+root);
+  assert.equal(declared.get(root).environment,environment,'the declaration names the variable the registration skips on: '+root);
+  assert.ok(String(declared.get(root).reason||'').trim().length>=20,'the declaration explains why the root cannot run in CI: '+root);
+ }
+ for(const root of declared.keys()){
+  assert.ok(gated.has(root),'every declaration names an environment-gated root in the test directory: '+root);
+  assert.equal(baselineSkips.has(root),false,'baseline skips stay in the independent inventory, not in declarations: '+root);
+  assert.ok(assignments.rootAssignments.some(entry=>entry.root===root),'every declared root keeps its group assignment: '+root);
+ }
+});
+
 test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{
  const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');
  assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');

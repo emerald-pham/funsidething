@@ -290,8 +290,32 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     }
     controlIds.add(control.id);
   }
+  // An added root whose registration is gated on an environment variable
+  // (for example the env-gated browser tests) skips wherever that variable is
+  // absent, as CI groups are. The baseline's own environment skips live in
+  // the independent inventory; an added one is accepted only through an
+  // explicit, justified declaration that names the variable its registration
+  // actually skips on (#2194 CI, PR #2222).
+  const environmentSkips = new Map();
+  if (assignments.environmentSkips !== undefined && !Array.isArray(assignments.environmentSkips)) fail('environmentSkips must be an array when present.');
+  for (const entry of assignments.environmentSkips || []) {
+    const label = JSON.stringify(entry?.root);
+    if (!entry || typeof entry.root !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(entry.environment || '') ||
+        typeof entry.reason !== 'string' || entry.reason.trim().length < 20 || environmentSkips.has(entry.root)) {
+      fail(`Environment skip ${label} needs one unique root, an environment variable name and a reason.`);
+    }
+    if (inventoryIndex.roots.has(entry.root) || replacementTargets.has(entry.root)) fail(`Environment skip ${label} must name an added root; baseline skips belong to the independent inventory.`);
+    const assignment = assignmentsByRoot.get(entry.root);
+    if (!assignment) fail(`Environment skip ${label} has no group assignment.`);
+    const escaped = entry.root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const registration = new RegExp(`^\\s*test\\(\\s*(['"])${escaped}\\1\\s*,\\s*\\{\\s*skip\\s*:\\s*!process\\.env\\.${entry.environment}\\s*\\}`, 'm');
+    if (!registration.test(fs.readFileSync(path.join(ROOT, assignment.file), 'utf8'))) {
+      fail(`Environment skip ${label} is not registered with {skip:!process.env.${entry.environment}} in ${assignment.file}.`);
+    }
+    environmentSkips.set(entry.root, entry);
+  }
   const nightlyRoots = validateNightlyRoots(assignments, fileSet, assignmentsByRoot);
-  return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup, nightlyRoots };
+  return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup, environmentSkips, nightlyRoots };
 }
 
 // Cross-engine native checks run in the scheduled/dispatched nightly job, not
@@ -702,6 +726,12 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
     const replacement = assignments.replacementByBaseline.get(root);
     return normalizeTapIdentity(replacement ? replacementCaseId(id, replacement) : id);
   }));
+  // A declared added root may skip only as a whole and only while its
+  // variable is absent here; set, it must run like any other root.
+  for (const entry of assignments.environmentSkips?.values() || []) {
+    const id = normalizeTapIdentity(entry.root);
+    if (selectedRootSet.has(id) && !process.env[entry.environment]) acceptedSkips.add(id);
+  }
   for (const item of cases) {
     if (item.status === 'failed') errors.push(`Test case failed: ${item.id}`);
     else if (item.status === 'todo') errors.push(`Test case was unexpectedly marked TODO: ${item.id}`);
@@ -1161,6 +1191,11 @@ async function main() {
       files: selectedFiles,
       source,
     });
+    // Each declared environment skip in this group, with its actual outcome.
+    result.environmentSkips = [...assignmentIndex.environmentSkips.values()]
+      .filter(entry => assignmentIndex.assignmentsByRoot.get(entry.root)?.group === options.group)
+      .map(entry => ({ root: entry.root, environment: entry.environment,
+        status: childResult.cases.find(item => item.id === normalizeTapIdentity(entry.root))?.status ?? 'missing' }));
     if (childResult.exit.code !== 0) result.issues.unshift(`Test process exited with ${childResult.exit.code ?? childResult.exit.signal ?? childResult.exit.error}.`);
     if (gitStatus.trim() && !source.dirty) result.issues.push('Checkout dirty state could not be reconciled with its identity.');
     result.status = result.issues.length ? 'failed' : 'passed';

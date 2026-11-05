@@ -38,18 +38,18 @@ import {
   pwaUpdateHarness, updateNoticeKey, releaseFingerprint, prepareReleaseNotice, SOLAR_AUDIT_FIXTURES,
   changeQuickEvergreen, recoveringCloudStatusHarness, recentDeletionAt, deletionEvidence,
   repeatedDeletionBoard, loadStorageV2, loadCloudV2, cloudV2Payload, cloudV2Adapter,
-  decisionBackend146, decisionCandidate146, liveScanSyncClients, delayedEvergreenReadFixture,
-  liveModeDeliverySnapshot, settleLiveModePublication, releasedDependencyHydrator, MODE_LIFECYCLE_NOW,
-  modeLifecycleCopy, modeLifecycleEdit, modeLifecycleWaitFor, privateMigratedDeleteFixture,
-  privateRewriteDurableBackup, privateVisibleBackupRows, privateClickBackupDelete,
-  privateAssertBackupSurvives, PRIVATE_EXPIRY_NOW, PRIVATE_EXPIRY_OLD, privateLegacyExpiryFixture,
-  privateExpiryLegacyRows, privateExpirySave, privateExpiryAssertCurrentBoard,
-  mountPrivateEditInterval, installPrivateDateValueDescriptors, chanceWeatherPaint,
-  sharedSkywriterConsumer, overdueWoopFixture, overdueWoopControl, pedestrianReservationPolicy,
-  pedestrianDaytimeSpawnPolicy, assertPedestrianReservationBound, pedestrianFrameSelection,
-  pedestrianPresentationConsumer, heldDecisionFixture188, heldDecisionApp188, settleRecovery188,
-  recoveryReleasedArtifacts188, settleRecoveryOperations188, retainedWorkerCacheHarness,
-  divergentCloudSourceApp187, retentionSDK253,
+  capturedUnreadableGenerationFixture, decisionBackend146, decisionCandidate146, liveScanSyncClients,
+  delayedEvergreenReadFixture, liveModeDeliverySnapshot, settleLiveModePublication,
+  releasedDependencyHydrator, MODE_LIFECYCLE_NOW, modeLifecycleCopy, modeLifecycleEdit,
+  modeLifecycleWaitFor, privateMigratedDeleteFixture, privateRewriteDurableBackup,
+  privateVisibleBackupRows, privateClickBackupDelete, privateAssertBackupSurvives, PRIVATE_EXPIRY_NOW,
+  PRIVATE_EXPIRY_OLD, privateLegacyExpiryFixture, privateExpiryLegacyRows, privateExpirySave,
+  privateExpiryAssertCurrentBoard, mountPrivateEditInterval, installPrivateDateValueDescriptors,
+  chanceWeatherPaint, sharedSkywriterConsumer, overdueWoopFixture, overdueWoopControl,
+  pedestrianReservationPolicy, pedestrianDaytimeSpawnPolicy, assertPedestrianReservationBound,
+  pedestrianFrameSelection, pedestrianPresentationConsumer, heldDecisionFixture188, heldDecisionApp188,
+  settleRecovery188, recoveryReleasedArtifacts188, settleRecoveryOperations188,
+  retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
 } from "./shared.js";
 
 test('RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text',async t=>{
@@ -527,7 +527,9 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
- const latest=current.match(/<li>(.*?)<\/li>/)?.[1]||'';
+ // Keyed by its release date: a later dated entry (#2202) is now listed above it.
+ assert.ok(current.includes('<h3>October 28, 2026</h3>'),'the October 28 recovery note stays in the current changelog');
+ const latest=current.split('<h3>October 28, 2026</h3>')[1]?.match(/<li>(.*?)<\/li>/)?.[1]||'';
  assert.match(latest,/saved board needs recovery.*preserved local copies/);
  assert.match(latest,/syncing label.*board is still opening.*not that cloud saving is confirmed/);
  assert.match(latest,/genuine errors and recovery warnings remain visible/);
@@ -5205,7 +5207,7 @@ test('RISK shared scenery reduced motion: the ambient timer repaints isolated wo
  for(const [previous,next] of [[[],[{id:'private-woodland-arrival'}]],[[{id:'private-woodland-expiry'}],[]]]){
   for(const reduced of [true,false]){
    let paints=0,backgrounds=0,syncs=0;
-   const woodland={events:previous},context={visits,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{events:[{id:'unchanged-train',type:'train',age:1,duration:100}],elapsed:1},woodland,
+   const woodland={events:previous},context={visits,openingPaint:null,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{events:[{id:'unchanged-train',type:'train',age:1,duration:100}],elapsed:1},woodland,
     rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:42,sceneSnapshot:{windowsSlot:42},reduced,
     syncScene(){syncs++;woodland.events=next;},paintBackground(){backgrounds++;},paintLife(){paints++;},Date};
    vm.runInNewContext(functionSource+';advanceRooftopParty(1)',context);
@@ -5415,6 +5417,704 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
    }
   }finally{await browser.close();}
  }
+});
+
+// #2202: opening must leave the board usable before the scenery paints. The
+// scenery boot is held at its spawn-rate fetch until the seeded board is ready,
+// then released while trusted keys are typed into Add. The first scenery canvas
+// sizing busy-holds the main thread briefly so a typed key is certainly pending
+// during the scenery's opening task, as on a slow phone. Only ordering is
+// asserted, never elapsed time. The in-process app harness never runs the
+// scenery runtime, so this seam is the real browser.
+test('RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('opening-'+i,'Opening board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     let releaseRates;const ratesHeld=new Promise(resolve=>{releaseRates=resolve;});
+     await context.route('**/*',async route=>{
+      const url=new URL(route.request().url());if(url.origin!==origin)return route.abort();
+      if(url.pathname.endsWith('/SPAWN_RATES.md'))await ratesHeld;
+      return route.continue();
+     });
+     let paintedSeen=false;await context.exposeBinding('__openingPainted',()=>{paintedSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const opening=window.__opening={log:[],booted:false,painted:false,framesAfterPaint:0,appFramePaints:0};
+      opening.ready=()=>{
+       const panel=document.getElementById('addPanel'),body=document.getElementById('addBody'),input=document.getElementById('addInput'),button=document.getElementById('addButton'),scan=document.getElementById('scan');
+       return !!(panel&&body&&input&&button&&scan)&&document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!panel.closest('[hidden],[inert]')&&!body.hidden&&!input.disabled&&!button.disabled
+        &&input.getClientRects().length>0&&getComputedStyle(input).visibility==='visible'&&scan.children.length>0&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      };
+      const raf=window.requestAnimationFrame.bind(window);let inAppFrame=false;
+      window.requestAnimationFrame=callback=>raf(time=>{const previous=inAppFrame;inAppFrame=true;try{return callback(time);}finally{inAppFrame=previous;}});
+      const observe=()=>{if(opening.painted)opening.framesAfterPaint++;else if(opening.booted)opening.log.push({kind:'frame'});if(opening.framesAfterPaint<60)raf(observe);};raf(observe);
+      for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.isTrusted)opening.log.push({kind:'input',type,afterBoot:opening.booted,afterPaint:opening.painted,target:event.target?.id||''});},true);
+      const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+      Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+       if(!opening.booted&&this.closest?.('#landscape')){
+        opening.booted=true;opening.log.push({kind:'boot',ready:opening.ready()});
+        const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+       }
+       width.set.call(this,value);
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        if(this.canvas?.closest?.('#landscape')){
+         if(!opening.painted){opening.painted=true;opening.log.push({kind:'paint',method,ready:opening.ready(),motionPrompt:!!document.getElementById('motionDialog')?.open});window.__openingPainted();}
+         else if(inAppFrame&&opening.framesAfterPaint>0)opening.appFramePaints++;
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__opening.ready(),null,{timeout:15000});
+     const held=await page.evaluate(()=>({booted:__opening.booted,painted:__opening.painted,sky:typeof LivingSky,controller:!!navigator.serviceWorker?.controller}));
+     assert.deepEqual(held,{booted:false,painted:false,sky:'object',controller:false},`${label}: the scenery runtime is loaded but still held, with no service worker in the way`);
+     await page.locator('#addInput').focus();
+     releaseRates();
+     let typed=0;const deadline=Date.now()+20000;
+     while(!paintedSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');typed++;}
+     assert.ok(paintedSeen,`${label}: the released scenery actually paints`);
+     await page.waitForFunction(()=>__opening.framesAfterPaint>=60,null,{timeout:15000});
+     const result=await page.evaluate(()=>({log:__opening.log,appFramePaints:__opening.appFramePaints,value:document.getElementById('addInput').value,motion:document.documentElement.dataset.landscapeMotion}));
+     const {log}=result,boot=log.findIndex(entry=>entry.kind==='boot'),paint=log.findIndex(entry=>entry.kind==='paint');
+     const firstInput=log.findIndex((entry,index)=>index>boot&&entry.kind==='input'),frames=log.slice(boot+1,paint).filter(entry=>entry.kind==='frame').length;
+     const summary={label,boot,paint,firstInputAfterBoot:firstInput,framesBetweenBootAndPaint:frames,inputsAfterBootBeforePaint:log.slice(boot+1,paint).filter(entry=>entry.kind==='input').length,typed,appFramePaints:result.appFramePaints,motion:result.motion};observed.push(summary);
+     // Fixture preconditions: the board was usable when the scenery began, the scenery landed, and a typed key followed its start.
+     assert.ok(boot>=0&&log[boot].ready,`${label}: the seeded board is usable before the scenery begins`);
+     assert.ok(paint>boot,`${label}: the scenery paints after it begins`);
+     assert.ok(firstInput>boot,`${label}: a trusted key was typed after the scenery began ${JSON.stringify(summary)}`);
+     assert.equal(result.motion,motion,`${label}: the saved motion choice applies`);
+     assert.equal(result.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test: ordering only.
+     if(!(firstInput<paint))failures.push(`${label}: the first trusted key after the scenery began was handled only after the scenery's first paint`);
+     if(frames<1)failures.push(`${label}: no frame was presented between the scenery starting and its first paint`);
+     if(!log[paint].ready||log[paint].motionPrompt)failures.push(`${label}: the board was not usable at the scenery's first paint`);
+     // Reduced motion keeps no animation loop; normal motion resumes it after opening.
+     if(motion==='reduced'&&result.appFramePaints!==0)failures.push(`${label}: reduced motion painted scenery from animation frames`);
+     if(motion==='normal'&&result.appFramePaints===0)failures.push(`${label}: normal motion did not resume its animation`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2203: the scenery's recurring refresh must not hold up input. The page's
+// Date is shifted so the scene's own minute boundary falls a few seconds after
+// opening; timers and frames stay real. When the refresh computes the scene at
+// that boundary the fixture busy-holds the main thread briefly, so a trusted
+// key typed into Add is certainly pending, as on a slow phone. Only ordering is
+// asserted, never elapsed time.
+test('RISK recurring scenery refresh browser: a pending trusted key reaches Add before the minute refresh paints in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250,LEAD_MS=6000,BOUNDARY=Date.UTC(2026,10,4,17,30,0);
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('refresh-'+i,'Refresh board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     let paintedSeen=false;await context.exposeBinding('__refreshPainted',()=>{paintedSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      // Shift only the wall clock so the scene's minute boundary is LEAD_MS away.
+      const RealDate=Date,offset=BOUNDARY-LEAD_MS-RealDate.now(),now=()=>RealDate.now()+offset;
+      window.Date=new Proxy(RealDate,{
+       construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+       apply(){return new RealDate(now()).toString();},
+       get(target,key){return key==='now'?now:Reflect.get(target,key);}
+      });
+      // A valid saved choice, so the first-run motion prompt cannot confound the refresh.
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      let seq=0;
+      const refresh=window.__refresh={log:[],openingPainted:false,started:false,painted:false,lastCompute:-1,lastSceneryDraw:-1,framesAfterPaint:0,appFramePaints:0,appFramePaintsAfterPaint:0};
+      refresh.ready=()=>{
+       const panel=document.getElementById('addPanel'),body=document.getElementById('addBody'),input=document.getElementById('addInput'),button=document.getElementById('addButton'),scan=document.getElementById('scan');
+       return !!(panel&&body&&input&&button&&scan)&&document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!panel.closest('[hidden],[inert]')&&!body.hidden&&!input.disabled&&!button.disabled
+        &&input.getClientRects().length>0&&getComputedStyle(input).visibility==='visible'&&scan.children.length>0&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      };
+      const raf=window.requestAnimationFrame.bind(window);let inAppFrame=false;
+      window.requestAnimationFrame=callback=>raf(time=>{const previous=inAppFrame;inAppFrame=true;try{return callback(time);}finally{inAppFrame=previous;}});
+      const observe=()=>{if(refresh.painted)refresh.framesAfterPaint++;if(refresh.framesAfterPaint<60)raf(observe);};raf(observe);
+      for(const type of ['keydown','keyup'])document.addEventListener(type,event=>{if(event.isTrusted&&refresh.started)refresh.log.push({kind:'input',type,seq:seq++});},true);
+      // Computing a scene starts with the shared sky model; the first
+      // computation at or after the boundary is the recurring refresh. (Its
+      // published tint now waits for the paint step, #2194 review F7.)
+      let livingSky;
+      Object.defineProperty(window,'LivingSky',{configurable:true,get(){return livingSky;},set(value){
+       const skyAt=value?.skyAt;
+       if(typeof skyAt==='function')value.skyAt=function(...args){
+        const result=Reflect.apply(skyAt,this,args);
+        refresh.lastCompute=seq++;
+        if(!refresh.started&&Date.now()>=BOUNDARY){
+         refresh.started=true;refresh.log.push({kind:'refresh',seq:refresh.lastCompute,atOrAfterBoundary:Date.now()>=BOUNDARY,minute:Math.floor(Date.now()/60000)*60000,ready:refresh.ready(),openingPainted:refresh.openingPainted});
+         const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+        }
+        return result;
+       };
+       livingSky=value;
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        const canvas=this.canvas;
+        if(canvas?.closest?.('#landscape')){
+         refresh.openingPainted=true;
+         if(inAppFrame){refresh.appFramePaints++;if(refresh.painted)refresh.appFramePaintsAfterPaint++;}
+         if(canvas.matches('[data-scenery]')){
+          refresh.lastSceneryDraw=seq++;
+          if(refresh.started&&!refresh.painted){refresh.painted=true;refresh.log.push({kind:'paint',seq:refresh.lastSceneryDraw,method,inAppFrame,ready:refresh.ready()});window.__refreshPainted();}
+         }
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__refresh.ready()&&window.__refresh.openingPainted,null,{timeout:15000});
+     const before=await page.evaluate(()=>({started:__refresh.started,controller:!!navigator.serviceWorker?.controller}));
+     assert.deepEqual(before,{started:false,controller:false},`${label}: the board and opening scenery are showing before the minute refresh, with no service worker in the way`);
+     await page.locator('#addInput').focus();
+     let typed=0;const deadline=Date.now()+LEAD_MS+15000;
+     while(!paintedSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');typed++;}
+     await page.waitForFunction(()=>__refresh.painted,null,{timeout:10000});
+     await page.waitForFunction(()=>__refresh.framesAfterPaint>=60,null,{timeout:15000});
+     const result=await page.evaluate(()=>({log:__refresh.log,lastCompute:__refresh.lastCompute,lastSceneryDraw:__refresh.lastSceneryDraw,appFramePaints:__refresh.appFramePaints,appFramePaintsAfterPaint:__refresh.appFramePaintsAfterPaint,value:document.getElementById('addInput').value,motion:document.documentElement.dataset.landscapeMotion}));
+     const {log}=result,start=log.find(entry=>entry.kind==='refresh'),paint=log.find(entry=>entry.kind==='paint');
+     const firstInput=log.find(entry=>entry.kind==='input'&&entry.seq>start?.seq);
+     const summary={label,refresh:start?.seq,paint:paint?.seq,paintInAppFrame:paint?.inAppFrame,firstInputAfterRefresh:firstInput?.seq,inputsBeforePaint:log.filter(entry=>entry.kind==='input'&&entry.seq>start?.seq&&entry.seq<paint?.seq).length,lastCompute:result.lastCompute,lastSceneryDraw:result.lastSceneryDraw,typed,appFramePaints:result.appFramePaints,appFramePaintsAfterPaint:result.appFramePaintsAfterPaint,motion:result.motion};observed.push(summary);
+     // Fixture preconditions: the board and opening scenery were up, the refresh ran at the scene's own boundary, and a key followed it.
+     assert.ok(start&&start.ready&&start.openingPainted,`${label}: the board and opening scenery were showing when the refresh began ${JSON.stringify(summary)}`);
+     assert.ok(start.atOrAfterBoundary&&start.minute===BOUNDARY,`${label}: the refresh computed the scene at the shared minute boundary`);
+     assert.ok(paint&&paint.seq>start.seq,`${label}: the refresh paints the scenery after computing it`);
+     assert.ok(firstInput,`${label}: a trusted key was typed after the refresh began ${JSON.stringify(summary)}`);
+     assert.equal(result.motion,motion,`${label}: the saved motion choice applies`);
+     assert.equal(result.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     // Behavior under test: ordering only.
+     if(!(firstInput.seq<paint.seq))failures.push(`${label}: the first trusted key after the refresh began was handled only after the refresh painted`);
+     if(!paint.ready)failures.push(`${label}: the board was not usable when the refresh painted`);
+     if(!(result.lastSceneryDraw>result.lastCompute))failures.push(`${label}: the latest computed scene was never painted, leaving a stale frame`);
+     // Reduced motion keeps no animation loop; normal motion keeps animating after the refresh.
+     if(motion==='reduced'&&result.appFramePaints!==0)failures.push(`${label}: reduced motion painted scenery from animation frames`);
+     if(motion==='normal'&&result.appFramePaintsAfterPaint===0)failures.push(`${label}: normal motion stopped animating after the refresh`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 review F7: the minute refresh published its new tint, period and
+// hourly text at the boundary but painted the sky later, so a frame could show
+// new scene text and colour over the old sky. The page clock is shifted so a
+// minute boundary near sunset (where the palette changes every minute) falls
+// a few seconds after opening; timers and frames stay real. Every presented
+// frame after the opening paint compares the scene the page publishes with the
+// scene the scenery canvas last painted. Only agreement is asserted.
+test('RISK recurring scenery refresh browser: the published scene text and colour never disagree with the painted sky in any frame in Chromium and WebKit under both motion choices',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=250,LEAD_MS=6000,BOUNDARY=Date.UTC(2026,10,4,22,30,0);
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('step-'+i,'Step board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced']){
+    const label=`${engineName}/${motion}`,context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     let paintedSeen=false;await context.exposeBinding('__stepPainted',()=>{paintedSeen=true;});
+     await context.addInitScript(({board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      const RealDate=Date,offset=BOUNDARY-LEAD_MS-RealDate.now(),now=()=>RealDate.now()+offset;
+      window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+       apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const o=window.__step={openingPainted:false,started:false,painted:false,before:null,after:null,painting:null,mismatches:[],frames:0,framesAfterPaint:0};
+      const root={get style(){return document.documentElement.style;},get dataset(){return document.documentElement.dataset;}};
+      // What the page publishes about the scene: tint, period and hourly text.
+      o.published=()=>[root.style.getPropertyValue('--scene-tint'),root.dataset.scenePeriod||'',document.getElementById('sceneStatus')?.textContent||''].join('|');
+      o.ready=()=>root.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{
+       o.frames++;
+       if(o.openingPainted&&o.painting!==null&&o.published()!==o.painting&&o.mismatches.length<8)
+        o.mismatches.push({frame:o.frames,published:o.published(),painted:o.painting,afterRefresh:o.started});
+       if(o.painted)o.framesAfterPaint++;
+       if(o.framesAfterPaint<40)raf(observe);
+      };raf(observe);
+      const setProperty=CSSStyleDeclaration.prototype.setProperty;
+      CSSStyleDeclaration.prototype.setProperty=function(name,...rest){
+       const result=setProperty.call(this,name,...rest);
+       if(name==='--scene-tint'&&this===document.documentElement.style&&!o.started&&o.openingPainted&&Date.now()>=BOUNDARY){
+        o.started=true;o.before=o.painting;
+        // A slow phone: hold the main thread so a frame is due before the next task.
+        const until=performance.now()+HOLD_MS;while(performance.now()<until){}
+       }
+       return result;
+      };
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        if(this.canvas?.matches?.('#landscape [data-scenery]')){
+         o.painting=o.published();o.openingPainted=true;
+         if(o.started&&!o.painted){o.painted=true;o.after=o.painting;window.__stepPainted();}
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,HOLD_MS,LEAD_MS,BOUNDARY});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__step.ready()&&window.__step.openingPainted,null,{timeout:15000});
+     await page.locator('#addInput').focus();
+     let typed=0;const deadline=Date.now()+LEAD_MS+15000;
+     while(!paintedSeen&&Date.now()<deadline){await page.keyboard.press('KeyQ');typed++;}
+     await page.waitForFunction(()=>__step.painted&&__step.framesAfterPaint>=40,null,{timeout:15000});
+     const r=await page.evaluate(()=>({before:__step.before,after:__step.after,mismatches:__step.mismatches,value:document.getElementById('addInput').value}));
+     observed.push({label,...r,typed});
+     // Preconditions: the refresh really changed the published scene, and every key reached Add.
+     assert.ok(r.before&&r.after&&r.before!==r.after,`${label}: the boundary refresh changed the scene ${JSON.stringify(r)}`);
+     assert.equal(r.value,'q'.repeat(typed),`${label}: every trusted key reached Add`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     if(r.mismatches.length)failures.push(`${label}: a frame showed the published scene ${r.mismatches[0].published} over a sky painted for ${r.mismatches[0].painted}`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 review F6, F8, F9 and O1: the opening paint must wait for the board
+// itself, not only for the scenery's own boot task. Each arm opens a 30-task
+// board cold (first load), as a returning user (reload) and with a board whose
+// device read finishes late (the delayed-local-board fixture), in Chromium and
+// WebKit under both motion choices. The page's clock is shifted to a fixed
+// night instant so the computed sky is dark; timers and frames stay real.
+// Only ordering, presence and colour are asserted, never elapsed time.
+test('RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,NIGHT=Date.UTC(2026,10,5,4,0,0),DELAY_MS=800;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('hydrate-'+i,'Hydration board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ const luminance=css=>{const m=String(css).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);return m?(0.2126*m[1]+0.7152*m[2]+0.0722*m[3])/255:null;};
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced'])for(const delayed of [false,true]){
+    const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,motion,ROWS,NIGHT,DELAY_MS,delayed})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      const RealDate=Date,offset=NIGHT-RealDate.now(),now=()=>RealDate.now()+offset;
+      window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+       apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(delayed){
+       // The existing delayed-local-board shape: the device read settles late.
+       window.storage={async get(){await new Promise(resolve=>setTimeout(resolve,DELAY_MS));return {value:board};},async set(){}};
+      }else if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const o=window.__hydration={booted:false,painted:false,frames:0,framesAfterPaint:0,rowFrame:-1,paintFrame:-1,episodes:[],bootRaf:null,paintRows:null,paintReady:null};
+      const rows=()=>document.querySelectorAll('#listBody [data-row]').length;
+      o.ready=()=>document.documentElement.dataset.appReady==='true'&&rows()===ROWS&&!!document.getElementById('addInput')?.getClientRects().length;
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{o.frames++;if(o.rowFrame<0&&!o.painted&&o.ready())o.rowFrame=o.frames;if(o.painted)o.framesAfterPaint++;if(o.framesAfterPaint<40)raf(observe);};raf(observe);
+      const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+      Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+       width.set.call(this,value);
+       if(!o.booted&&this.matches?.('#landscape [data-scenery]')){
+        o.booted=true;
+        // The first frame after the scenery canvas is sized.
+        raf(()=>{const canvas=document.querySelector('#landscape [data-scenery]'),host=document.getElementById('landscape');
+         let pixel=null;try{pixel=Array.from(canvas.getContext('2d').getImageData(0,0,1,1).data).join();}catch(error){pixel=String(error);}
+         const style=getComputedStyle(canvas),hostStyle=getComputedStyle(host);
+         o.bootRaf={unpainted:!o.painted,pixel,canvasVisible:style.visibility!=='hidden'&&style.display!=='none'&&style.opacity!=='0',
+          hostBackground:hostStyle.backgroundColor,hostImage:hostStyle.backgroundImage,period:document.documentElement.dataset.scenePeriod||null};});
+       }
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;let episode=null;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        if(this.canvas?.matches?.('#landscape [data-scenery]')){
+         if(!o.painted){o.painted=true;o.paintFrame=o.frames;o.paintRows=rows();o.paintReady=o.ready();}
+         if(!episode){episode={rowsAtStart:rows()};o.episodes.push(episode);queueMicrotask(()=>{episode.rowsAtTaskEnd=rows();episode=null;});}
+         if(o.countDraws)o.countedDraws++;
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,NIGHT,DELAY_MS,delayed});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     for(const load of delayed?['delayed']:['cold','returning']){
+      const label=`${engineName}/${motion}/${load}`;
+      if(load==='returning')await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>window.__hydration.ready()&&window.__hydration.painted&&window.__hydration.framesAfterPaint>=40,null,{timeout:20000});
+      const r=await page.evaluate(()=>{const o=window.__hydration;return {rowFrame:o.rowFrame,paintFrame:o.paintFrame,paintRows:o.paintRows,paintReady:o.paintReady,bootRaf:o.bootRaf,episodes:o.episodes.slice(0,12),period:document.documentElement.dataset.scenePeriod,motion:document.documentElement.dataset.landscapeMotion};});
+      // An unchanged location, as a board adoption applies it, must not repaint.
+      const unchanged=await page.evaluate(()=>{const o=window.__hydration;o.countDraws=true;o.countedDraws=0;const location=globalThis.LivingLocation.current();let events=0;
+       const count=()=>{events++;};document.addEventListener('landscape-location-change',count);
+       try{globalThis.LivingLocation.applySynced(location);}finally{document.removeEventListener('landscape-location-change',count);o.countDraws=false;}
+       return {draws:o.countedDraws,events};});
+      observed.push({label,...r,episodes:r.episodes.map(e=>`${e.rowsAtStart}->${e.rowsAtTaskEnd}`),unchanged});
+      // Preconditions: the scene was computed for the night instant and the saved motion applies.
+      assert.equal(r.period,'night',`${label}: the shifted clock gives a night scene`);
+      assert.equal(r.motion,motion,`${label}: the saved motion choice applies`);
+      assert.ok(r.bootRaf,`${label}: a frame followed the scenery canvas being sized`);
+      assert.deepEqual(errors,[],`${label}: no page errors`);
+      // F6: the opening paint waits for the board.
+      if(!r.paintReady||r.paintRows!==ROWS)failures.push(`${label}: the scenery painted before the board was rendered (${r.paintRows} rows)`);
+      if(!(r.rowFrame>=0&&r.rowFrame<=r.paintFrame))failures.push(`${label}: no frame showed the usable board before the scenery's first paint`);
+      // F9: no scenery paint inside the task that renders the board's rows.
+      if(r.episodes.some(e=>e.rowsAtStart===0&&e.rowsAtTaskEnd>0))failures.push(`${label}: a scenery paint ran inside the task that rendered the board`);
+      // F8: a sized scenery canvas is never presented unpainted (Chromium shows it opaque black).
+      if(r.bootRaf.unpainted&&r.bootRaf.canvasVisible&&r.bootRaf.pixel==='0,0,0,255')failures.push(`${label}: an unpainted opaque black scenery canvas was presented`);
+      // O1: before the first paint the background follows the computed night scene, not the day placeholder.
+      const background=luminance(r.bootRaf.hostBackground);
+      if(r.bootRaf.unpainted&&(r.bootRaf.hostBackground==='rgb(142, 212, 243)'||background===null||background>0.45))failures.push(`${label}: the background before the first paint was ${r.bootRaf.hostBackground}, not the computed night sky`);
+      // F9: an unchanged location does not repaint.
+      if(unchanged.draws!==0)failures.push(`${label}: applying the unchanged location repainted the scenery (${unchanged.draws} draws)`);
+     }
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 rendered acceptance R1: the reduced-motion timer first runs a second
+// after opening. A board whose device read settles 1.5 s or later used to get
+// the full scenery background from that timer before the board appeared. The
+// reduced-motion paint must keep the same board wait and bounded fallback.
+test('RISK opening scenery hydration browser: with reduced motion a board that opens seconds late still renders before any scenery paint, and a board that never appears still gets scenery after the bounded wait in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,NIGHT=Date.UTC(2026,10,5,4,0,0);
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('late-'+i,'Late board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   // 2000 ms: late, inside the bounded wait. 6500 ms: past it.
+   for(const delayMs of [2000,6500]){
+    const label=`${engineName}/reduced/${delayMs}ms`;
+    const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:'reduce'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,ROWS,NIGHT,delayMs})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      const RealDate=Date,offset=NIGHT-RealDate.now(),now=()=>RealDate.now()+offset;
+      window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+       apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+      const o=window.__late={painted:false,paintReady:null,paintRows:null,readyAt:null,paintAt:null,settled:false};
+      window.storage={async get(){await new Promise(resolve=>setTimeout(resolve,delayMs));o.settled=true;return {value:board};},async set(){}};
+      const rows=()=>document.querySelectorAll('#listBody [data-row]').length;
+      o.ready=()=>document.documentElement.dataset.appReady==='true'&&rows()===ROWS;
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{if(o.readyAt===null&&o.ready())o.readyAt=performance.now();raf(observe);};raf(observe);
+      const context2d=CanvasRenderingContext2D.prototype;
+      for(const method of ['clearRect','fillRect','fill','stroke','drawImage','putImageData','fillText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        if(!o.painted&&this.canvas?.matches?.('#landscape [data-scenery]')){o.painted=true;o.paintAt=performance.now();o.paintRows=rows();o.paintReady=o.ready();}
+        return original.apply(this,args);
+       };
+      }
+     },{board,ROWS,NIGHT,delayMs});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__late.painted&&window.__late.readyAt!==null,null,{timeout:30000});
+     const r=await page.evaluate(()=>{const o=window.__late;return {paintReady:o.paintReady,paintRows:o.paintRows,readyAt:Math.round(o.readyAt),paintAt:Math.round(o.paintAt),
+      motion:document.documentElement.dataset.landscapeMotion,period:document.documentElement.dataset.scenePeriod};});
+     observed.push({label,...r});
+     assert.equal(r.motion,'reduced',`${label}: reduced motion applies`);
+     assert.equal(r.period,'night',`${label}: the shifted clock gives a night scene`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+     if(delayMs===2000&&!(r.paintReady&&r.paintRows===ROWS))failures.push(`${label}: the scenery painted before the late board was rendered (${r.paintRows} rows, paint ${r.paintAt} ms, board ${r.readyAt} ms)`);
+     // The bounded wait still releases the scenery when the board is very late.
+     if(delayMs===6500&&r.paintReady!==false)failures.push(`${label}: the scenery waited past its bounded fallback for a board that had not appeared (paint ${r.paintAt} ms, board ${r.readyAt} ms)`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 rendered recapture (5cd941b): the Settings decline's refusal toasts
+// ran 10-12 lines at the enlarged 260 px phone width and covered the Settings
+// buttons for 9 s. Each refusal is one short sentence with the one action that
+// works; Help carries the detail. The messages are read from the shipped
+// decline function and shown through the app's own toast over open Settings.
+test('RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const source=html.slice(html.indexOf('async function declineAutomaticCloudRecovery('),html.indexOf('async function openAutomaticCloudSourceFallback('));
+ const refusals=[...source.matchAll(/refuse\("([^"]+)"\)/g)].map(match=>match[1]);
+ assert.equal(refusals.length,11,'every refusal of the decline is measured: '+JSON.stringify(refusals));
+ // No refusal names a Restore that is held while signed in (#2194 FAQ B2);
+ // the three whose case Review cloud recovery resolves name it.
+ for(const message of refusals)assert.doesNotMatch(message,/\bRestore\b/,'the refusal does not name a held Restore: '+message);
+ assert.equal(refusals.filter(message=>/Review cloud recovery/.test(message)).length,3,'three refusals point to Review cloud recovery: '+JSON.stringify(refusals));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const [width,height,budget] of [[260,563,4],[390,844,3]]){
+   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
+   try{
+    await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+     return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state==='object'&&state,null,{timeout:20000});
+    const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+    await page.evaluate(()=>document.getElementById('motionDialog')?.close?.());
+    await page.waitForSelector('#modalRoot .mback .modal',{timeout:5000}).catch(()=>{});await resolveExpectedFirstRunHelp(page);
+    await page.evaluate(()=>document.fonts.ready);
+    await page.locator('#appHeader [data-act="settings"]').click();
+    await page.waitForSelector('#modalRoot .modal');
+    for(const message of refusals){
+     const r=await page.evaluate(async message=>{
+      toast(message,9000);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const el=document.getElementById('toast'),rect=el.getBoundingClientRect(),ys=new Set();
+      const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let node;
+      while(node=walker.nextNode())for(let i=0;i<node.length;i++){if(!node.textContent[i].trim())continue;const range=document.createRange();range.setStart(node,i);range.setEnd(node,i+1);ys.add(Math.round(range.getBoundingClientRect().y));}
+      return {lines:ys.size,height:Math.round(rect.height),toastWidth:Math.round(rect.width),font:getComputedStyle(el).fontFamily,
+       splineLoaded:document.fonts.check('13.5px "Spline Sans"'),clip:el.scrollWidth>el.clientWidth||rect.left<0||rect.right>innerWidth||rect.bottom>innerHeight};
+     },message);
+     observed.push({engine:engineName,width,message,...r});
+     if(r.clip)failures.push(`${engineName}/${width}: the toast is clipped: ${message}`);
+     if(r.lines>budget)failures.push(`${engineName}/${width}: ${r.lines} lines (${r.height} px tall, budget ${budget}): ${message}`);
+    }
+    assert.deepEqual(errors,[],`${engineName}/${width}: no page errors`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 rendered capture (f917bc7): the decline's success toast ran 10 lines
+// at the enlarged 260 px phone width and covered half of Review cloud
+// recovery. It and the wait notice shown while the decline holds Settings
+// (#2194 N2) keep the refusals' budget; Help carries the detail.
+test('RISK cloud generation recovery browser: the decline success and wait toasts fit four lines at the enlarged 260 px phone width in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const decline=html.slice(html.indexOf('async function runAutomaticRecoveryDecline('),html.indexOf('async function openAutomaticCloudSourceFallback('));
+ const closing=html.slice(html.indexOf('function closeModal(){'),html.indexOf('function modalShell('));
+ const success=[...decline.matchAll(/toast\("([^"]+)",9000\)/g)].map(match=>match[1]);
+ const waiting=[...closing.matchAll(/if\(automaticRecoveryDeclineBusy\)\{toast\("([^"]+)"/g)].map(match=>match[1]);
+ assert.equal(success.length,1,'the decline has one success toast: '+JSON.stringify(success));
+ assert.equal(waiting.length,1,'closing Settings during the decline has one wait notice: '+JSON.stringify(waiting));
+ assert.match(success[0],/cloud saving/i,'the success toast still says cloud saving is not confirmed: '+success[0]);
+ const messages=[...success,...waiting],failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const [width,height,budget] of [[260,563,4],[390,844,3]]){
+   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
+   try{
+    await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+     return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state==='object'&&state,null,{timeout:20000});
+    const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+    await page.evaluate(()=>document.getElementById('motionDialog')?.close?.());
+    await page.waitForSelector('#modalRoot .mback .modal',{timeout:5000}).catch(()=>{});await resolveExpectedFirstRunHelp(page);
+    await page.evaluate(()=>document.fonts.ready);
+    await page.locator('#appHeader [data-act="settings"]').click();await page.waitForSelector('#modalRoot .modal');
+    for(const message of messages){
+     const r=await page.evaluate(async message=>{
+      toast(message,9000);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const el=document.getElementById('toast'),rect=el.getBoundingClientRect(),ys=new Set();
+      const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let node;
+      while(node=walker.nextNode())for(let i=0;i<node.length;i++){if(!node.textContent[i].trim())continue;const range=document.createRange();range.setStart(node,i);range.setEnd(node,i+1);ys.add(Math.round(range.getBoundingClientRect().y));}
+      return {lines:ys.size,height:Math.round(rect.height),toastWidth:Math.round(rect.width),splineLoaded:document.fonts.check('13.5px "Spline Sans"'),
+       clip:el.scrollWidth>el.clientWidth||rect.left<0||rect.right>innerWidth||rect.bottom>innerHeight};
+     },message);
+     observed.push({engine:engineName,width,message,...r});
+     if(r.clip)failures.push(`${engineName}/${width}: the toast is clipped: ${message}`);
+     if(r.lines>budget)failures.push(`${engineName}/${width}: ${r.lines} lines (${r.height} px tall, budget ${budget}): ${message}`);
+    }
+    assert.deepEqual(errors,[],`${engineName}/${width}: no page errors`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 FAQ re-review B4: while the opening paint waits for a late board, a
+// resize, a return to the app (hide then show) or a pageshow ran refreshSky or
+// start(), which painted the scenery at once and released the normal-motion
+// loop's hold. During the wait they must only compute and join the single
+// opening paint; once it has happened they repaint as before.
+test('RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,NIGHT=Date.UTC(2026,10,5,4,0,0),DELAY_MS=2500;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('wait-'+i,'Waiting board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ const fire=async(page,event)=>{
+  if(event==='resize'){const size=page.viewportSize();await page.setViewportSize({width:size.width-30,height:size.height-60});await page.waitForTimeout(400);await page.setViewportSize(size);await page.waitForTimeout(400);}
+  else await page.evaluate(async event=>{
+   const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+   if(event==='hide-show'){
+    // Headless pages stay visible, so the page's own visibility is overridden.
+    window.__fakeHidden=true;document.dispatchEvent(new Event('visibilitychange'));await pause(150);
+    window.__fakeHidden=false;document.dispatchEvent(new Event('visibilitychange'));await pause(300);
+   }else{window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:false}));await pause(300);}
+  },event);
+ };
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const motion of ['normal','reduced'])for(const event of ['resize','hide-show','pageshow']){
+   const label=`${engineName}/${motion}/${event}`;
+   const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({board,ROWS,NIGHT,DELAY_MS,motion})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     const RealDate=Date,offset=NIGHT-RealDate.now(),now=()=>RealDate.now()+offset;
+     window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+      apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+     window.__fakeHidden=false;
+     Object.defineProperty(Document.prototype,'hidden',{configurable:true,get(){return window.__fakeHidden;}});
+     Object.defineProperty(Document.prototype,'visibilityState',{configurable:true,get(){return window.__fakeHidden?'hidden':'visible';}});
+     const o=window.__wait={booted:false,painted:false,paintReady:null,paintRows:null,draws:0};
+     window.storage={async get(){await new Promise(resolve=>setTimeout(resolve,DELAY_MS));return {value:board};},async set(){}};
+     const rows=()=>document.querySelectorAll('#listBody [data-row]').length;
+     o.ready=()=>document.documentElement.dataset.appReady==='true'&&rows()===ROWS;
+     const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+     Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+      width.set.call(this,value);if(this.matches?.('#landscape [data-scenery]'))o.booted=true;}});
+     const context2d=CanvasRenderingContext2D.prototype;
+     for(const method of ['clearRect','fillRect','fill','stroke','drawImage','putImageData','fillText']){
+      const original=context2d[method];
+      context2d[method]=function(...args){
+       if(this.canvas?.matches?.('#landscape [data-scenery]')){o.draws++;if(!o.painted){o.painted=true;o.paintRows=rows();o.paintReady=o.ready();}}
+       return original.apply(this,args);
+      };
+     }
+    },{board,ROWS,NIGHT,DELAY_MS,motion});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.__wait.booted&&document.documentElement.dataset.landscapeMotion!==undefined,null,{timeout:20000});
+    await fire(page,event);
+    const during=await page.evaluate(()=>({ready:window.__wait.ready(),painted:window.__wait.painted}));
+    await page.waitForFunction(()=>window.__wait.painted&&window.__wait.ready(),null,{timeout:30000});
+    const r=await page.evaluate(()=>({paintReady:window.__wait.paintReady,paintRows:window.__wait.paintRows,motion:document.documentElement.dataset.landscapeMotion}));
+    // After the opening paint the same event still repaints the scenery.
+    await page.waitForTimeout(300);
+    const before=await page.evaluate(()=>window.__wait.draws);
+    await fire(page,event);
+    const after=await page.evaluate(()=>window.__wait.draws);
+    observed.push({label,during,...r,repaintDraws:after-before});
+    assert.equal(r.motion,motion,`${label}: the motion choice applies`);
+    assert.equal(during.ready,false,`${label}: the event happened while the board was still opening`);
+    assert.deepEqual(errors,[],`${label}: no page errors`);
+    if(!(r.paintReady&&r.paintRows===ROWS))failures.push(`${label}: the scenery painted before the board was rendered (${r.paintRows} rows)`);
+    if(!(after>before))failures.push(`${label}: after the opening paint the ${event} no longer repaints the scenery`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2194 rendered acceptance R2: on a returning night reload Chromium shows the
+// board for a few frames before landscape.js runs, over the stylesheet's fixed
+// day-blue. Until the scenery boots, the background must show the sky last
+// computed on this device instead.
+test('RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,NIGHT=Date.UTC(2026,10,5,4,0,0),RELOADS=3,DAY_BLUE='rgb(142, 212, 243)';
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('preboot-'+i,'Pre-boot board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true,settings:{...syncState().settings,theme:'dark'}}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const motion of ['normal','reduced']){
+   const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',colorScheme:'light',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({board,motion,NIGHT})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     const RealDate=Date,offset=NIGHT-RealDate.now(),now=()=>RealDate.now()+offset;
+     window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+      apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null){
+      localStorage.setItem('fvp:chain-scanner:v1',board);localStorage.setItem('fvp:chain-scanner:theme','dark');
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+     }
+     const o=window.__preboot={booted:false,frames:[]};
+     const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+     Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+      width.set.call(this,value);if(this.matches?.('#landscape [data-scenery]'))o.booted=true;}});
+     const raf=window.requestAnimationFrame.bind(window);
+     const observe=()=>{
+      const host=document.getElementById('landscape'),rows=document.querySelectorAll('#listBody [data-row]').length;
+      if(!o.booted&&host)o.frames.push({rows,background:getComputedStyle(host).backgroundColor,theme:document.documentElement.dataset.theme||null});
+      if(!o.booted)raf(observe);
+     };
+     raf(observe);
+    },{board,motion,NIGHT});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&document.documentElement.dataset.scenePeriod==='night',null,{timeout:20000});
+    // Let the first visit's opening paint settle before the returning reloads.
+    await page.waitForTimeout(1500);
+    for(let reload=1;reload<=RELOADS;reload++){
+     const label=`${engineName}/${motion}/reload ${reload}`;
+     await page.reload({waitUntil:'domcontentloaded'});
+     await page.waitForFunction(()=>window.__preboot.booted&&document.documentElement.dataset.appReady==='true',null,{timeout:20000});
+     const frames=await page.evaluate(()=>window.__preboot.frames);
+     const dayBlueWithBoard=frames.filter(frame=>frame.rows>0&&frame.background===DAY_BLUE).length;
+     observed.push({label,preBootFrames:frames.length,withBoard:frames.filter(frame=>frame.rows>0).length,dayBlueWithBoard,backgrounds:[...new Set(frames.map(frame=>frame.background))]});
+     assert.ok(frames.every(frame=>frame.theme==='dark'),`${label}: the dark theme applies before the scenery boots`);
+     if(dayBlueWithBoard)failures.push(`${label}: ${dayBlueWithBoard} frame(s) showed the board over the day-blue placeholder before the scenery booted`);
+    }
+    assert.deepEqual(errors,[],`${engineName}/${motion}: no page errors`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
 test('RISK list presentation browser: Top x default percent toggle dotted filters and reload work on actual phone tablet and desktop controls',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
@@ -12692,17 +13392,17 @@ test('RISK saved view invisible startup: real IndexedDB reload paints the prior 
 
 test('RISK opening board presentation: shared markup retains released cards contexts task rows and history',async()=>{
  const baseline=spawnSync('git',['show','6c67fb0c9988d3e578579c7bb23a8ed0731aac3f:index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(baseline.status,0,baseline.stderr);
- const tasks=['first','bench','candidate'].map((id,i)=>({...syncTask(id,'Saved <'+id+'> & title'),mu:25+i,ctx:['home'],evergreen:i===2,due:i===2?'2026-10-29':null}));
+ // #2194 CI (PR #2222): the candidate's due date was the literal 2026-10-29,
+ // written as a date a few days ahead. Once it passed, both apps offered the
+ // overdue Run WOOP control with its own random binding id, so the released
+ // and current markup could never match again. Keep it a few days ahead.
+ const dueSoon=(()=>{const day=new Date(Date.now()+3*86400000);return day.getFullYear()+'-'+String(day.getMonth()+1).padStart(2,'0')+'-'+String(day.getDate()).padStart(2,'0');})();
+ const tasks=['first','bench','candidate'].map((id,i)=>({...syncTask(id,'Saved <'+id+'> & title'),mu:25+i,ctx:['home'],evergreen:i===2,due:i===2?dueSoon:null}));
  tasks.push({...syncTask('done','Finished <saved> task'),done:true,completedAt:1});
  const board=syncState({tasks,contexts:[{id:'home',name:'Home & <garden>',active:true}],chain:['first','bench'],candidateId:'candidate',listOpen:true,ctxOpen:true,histOpen:true,
   workLog:[{id:'work-log',taskId:'first',title:'Earlier <work>',kind:'worked',at:2}],settings:{...syncState().settings,dateFormat:'mdy'}}),raw=JSON.stringify(board);
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
- // Pin the calendar before the fixture's 2026-10-29 due date: once it is overdue both builds offer Run WOOP with a random binding id, so the markup comparison would fail on wall-clock time alone.
- const pinCalendar=ctx=>vm.runInContext(`const CalendarDate=Date; Date=class extends CalendarDate {
-    constructor(...args){super(...(args.length?args:[new CalendarDate(2026,9,28,12).getTime()]));}
-    static now(){return new CalendarDate(2026,9,28,12).getTime();}
-  };`,ctx);
- const old=await loadApp({...options,appSource:extractAppScript(baseline.stdout),beforeStateReady:pinCalendar}),current=await loadApp({...options,beforeStateReady:pinCalendar});
+ const old=await loadApp({...options,appSource:extractAppScript(baseline.stdout)}),current=await loadApp(options);
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
  for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
@@ -21665,6 +22365,82 @@ test('Weather synchronization: reduced-motion refreshes align with UTC and exact
  }
 });
 
+// Characterization for #2199. It runs the real refresh, resize and start
+// source with recording stand-ins so the scene is computed (astronomy,
+// palette, season, mood, hourly text) before it is painted, in the existing
+// order, whichever functions the refresh is split into.
+test('RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const chromeStart=source.indexOf('  function updateChrome(){'),chromeEnd=source.indexOf('  new MutationObserver(updateChrome)',chromeStart);
+ const listener="  themeQuery.addEventListener('change',updateChrome);\n",refreshStart=source.indexOf(listener)+listener.length,refreshEnd=source.indexOf('  function tick(now){',refreshStart);
+ const startStart=source.indexOf('  function start(){'),startEnd=source.indexOf('  function updateMotion(){',startStart);
+ assert.ok(chromeStart>0&&chromeEnd>chromeStart&&refreshStart>listener.length&&refreshEnd>refreshStart&&startStart>refreshEnd&&startEnd>startStart,'the refresh, resize and start source stays sliceable');
+ const code=source.slice(chromeStart,chromeEnd)+source.slice(refreshStart,refreshEnd)+source.slice(startStart,startEnd);
+ const NOW=Date.UTC(2026,10,4,23,37,12,345),MINUTE='2026-11-04T23:37:00.000Z',LOC={lat:28.4,lon:-81.6,timezone:'America/New_York'};
+ const run=({theme='light',dark=false,dialogOpen=false,reduced=false,hidden=false,size=[390,844],viewport=size,ratio=3,previous=null}={})=>{
+  const log=[],sceneStorage={mirror:true},entry={text:'Evening light',author:'Human',seenKey:'k'};let syncs=0;
+  const dataset=new Proxy({},{set(target,key,value){log.push(`dataset.${String(key)}=${value}`);target[key]=value;return true;}});
+  const meta={set content(value){log.push(`theme-color ${value}`);}};
+  const status={set textContent(value){log.push(`status ${value}`);this.value=value;},get textContent(){return this.value;}};
+  const canvas=name=>({set width(value){log.push(`${name}.width=${value}`);},set height(value){log.push(`${name}.height=${value}`);},getContext:()=>({setTransform:(...args)=>log.push(`${name}.setTransform ${args.join(',')}`)})});
+  class FixedDate extends Date{static now(){return NOW;}}
+  const ctx=vm.createContext({Math,JSON,Date:FixedDate,LivingLocation:{current:()=>LOC},sceneStorage,sceneSeed:'seed',sky:undefined,p:undefined,sceneSeason:previous?.sceneSeason,currentEntry:null,status,world:{elapsed:0},timeDialog:{open:dialogOpen},
+   reduced,frame:0,partyTimer:0,W:previous?.W,H:previous?.H,hy:undefined,dpr:undefined,geometry:undefined,cityLights:{windows:['old']},rooftopParty:null,clocktowerVisit:null,
+   host:{clientWidth:size[0],clientHeight:size[1]},window:{devicePixelRatio:ratio,innerWidth:viewport[0],innerHeight:viewport[1]},back:canvas('back'),front:canvas('front'),partyLayer:canvas('party'),
+   themeQuery:{get matches(){return dark;}},
+   document:{hidden,documentElement:{dataset,getAttribute:name=>name==='data-theme'?theme:null,style:{setProperty:(name,value)=>log.push(`style ${name}=${value}`)}},querySelector:selector=>selector==='meta[name="theme-color"]'?meta:null},
+   S:{sceneDate(date,storage,location){log.push(`sceneDate ${date.toISOString()} ${storage===sceneStorage} ${location===LOC}`);return date;},
+    skyAt(date,location){log.push(`skyAt ${date.toISOString()} ${location===LOC}`);return {date,sun:{altitude:-4.5},period:'dusk'};},
+    palette(altitude){log.push(`palette ${altitude}`);return {tint:'#102030',night:.4};},
+    mixHex(a,b,amount){return `mix(${a},${b},${amount})`;}},
+   LandscapeMood:{season(date,location){log.push(`season ${date.toISOString()} ${location===LOC}`);return {name:'autumn'};},
+    palette(base,date,location){log.push(`moodPalette ${base.tint} ${date.toISOString()} ${location===LOC}`);return {...base,tint:'#405060',mood:'calm'};},
+    messageEntry(date,context,random){log.push(`messageEntry ${date.toISOString()} ${JSON.stringify(context)} ${random}`);return entry;}},
+   T:{random(seed,label,hour){log.push(`random ${seed} ${label} ${hour}`);return .25;}},
+   LandscapeGeometry:{create(width,height){log.push(`geometry ${width}x${height}`);return {horizon:height*.6};}},
+   syncScene(now){syncs++;ctx.world.elapsed=syncs*10;log.push(`syncScene ${now}`);},
+   paintBackground(){log.push(`paintBackground ${ctx.sky.period} ${ctx.p.tint} ${ctx.status.textContent} ${dataset.sceneSeason} ${dataset.scenePeriod}`);},
+   paintLife(t){log.push(`paintLife ${t} ${ctx.p.tint}`);},refreshSolarTimes(){log.push('refreshSolarTimes');},
+   stop(){log.push('stop');},scheduleSky(){log.push('scheduleSky');},tick(){},advanceRooftopParty(){},
+   requestAnimationFrame(callback){log.push(`requestAnimationFrame ${callback===ctx.tick}`);return 7;},setInterval(callback,ms){log.push(`setInterval ${ms}`);return 9;}});
+  vm.runInContext(code,ctx);
+  return {ctx,log,entry};
+ };
+ // Expected values are written out from the stand-ins above, not read back from landscape.js.
+ const refresh=({theme='light',dark=false,dialogOpen=false}={})=>{
+  const chrome=theme==='dark'||(theme!=='light'&&dark)?'#344b5f':'#ffffff';
+  return [`sceneDate ${MINUTE} true true`,`skyAt ${MINUTE} true`,'palette -4.5',`season ${MINUTE} true`,`moodPalette #102030 ${MINUTE} true`,
+   'dataset.sceneSeason=autumn',`syncScene ${NOW}`,`theme-color mix(${chrome},#405060,0.03)`,'style --scene-tint=#405060','dataset.scenePeriod=dusk',
+   'random seed hourly-text 498287',`messageEntry ${MINUTE} {"lat":28.4,"lon":-81.6,"timezone":"America/New_York","sunAltitude":-4.5} 0.25`,'status Evening light · Human written',
+   'paintBackground dusk #405060 Evening light · Human written autumn dusk',`syncScene ${NOW}`,'paintLife 20 #405060',...(dialogOpen?['refreshSolarTimes']:[])];
+ };
+ const sized=([width,height],[pixelWidth,pixelHeight],ratio)=>[`geometry ${width}x${height}`,
+  ...['back','front','party'].flatMap(name=>[`${name}.width=${pixelWidth}`,`${name}.height=${pixelHeight}`,`${name}.setTransform ${ratio},0,0,${ratio},0,0`])];
+ for(const [theme,dark] of [['light',false],['dark',false],['system',true],['system',false]])for(const dialogOpen of [false,true]){
+  const first=run({theme,dark,dialogOpen});first.ctx.refreshSky();
+  assert.deepEqual(first.log,refresh({theme,dark,dialogOpen}),`refreshSky computes then paints in the existing order (${theme}/${dark}/${dialogOpen})`);
+  assert.deepEqual(JSON.parse(JSON.stringify({sky:first.ctx.sky,p:first.ctx.p,season:first.ctx.sceneSeason})),{sky:{date:MINUTE,sun:{altitude:-4.5},period:'dusk'},p:{tint:'#405060',night:.4,mood:'calm'},season:'autumn'});
+  assert.equal(first.ctx.currentEntry,first.entry,'the hourly message entry is the one observed for reading');
+  const again=run({theme,dark,dialogOpen});again.ctx.refreshSky();
+  assert.deepEqual(again.log,first.log,'identical inputs resolve to identical scene values and paint order');
+ }
+ for(const [size,ratio,pixels,dpr] of [[[390,844],3,[585,1266],1.5],[[2560,1440],2,[2309,1299],0.9021097956087902]]){
+  const resized=run({size,ratio});resized.ctx.resize();
+  assert.deepEqual(resized.log,[...sized(size,pixels,dpr),...refresh()],`resize builds geometry and sizes canvases before one compute-then-paint refresh (${size})`);
+  assert.equal(resized.ctx.W,size[0]);assert.equal(resized.ctx.H,size[1]);assert.equal(resized.ctx.hy,size[1]*.6);assert.equal(resized.ctx.dpr,dpr);
+  assert.equal(resized.ctx.cityLights.windows.length,0,'resize clears lit windows before repainting');
+ }
+ for(const reduced of [false,true]){
+  const loop=reduced?['setInterval 1000']:['requestAnimationFrame true'];
+  const same=run({reduced,previous:{W:390,H:844}});same.ctx.start();
+  assert.deepEqual(same.log,['stop',...refresh(),'scheduleSky',...loop],`unchanged start refreshes once before scheduling (${reduced})`);
+  const changed=run({reduced,previous:{W:320,H:640}});changed.ctx.start();
+  assert.deepEqual(changed.log,['stop',...sized([390,844],[585,1266],1.5),...refresh(),'scheduleSky',...loop],`resized start sizes then refreshes once before scheduling (${reduced})`);
+  const hidden=run({reduced,hidden:true,previous:{W:390,H:844}});hidden.ctx.start();
+  assert.deepEqual(hidden.log,['stop'],'a hidden page computes and paints nothing');
+ }
+});
+
 test('Landscape browser: live Sun, Moon, and stars repaint on minute ticks while a chosen hour stays fixed',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
  try{
@@ -24487,6 +25263,42 @@ test('RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomi
  await store.close();
 });
 
+// #2194 review L2 (characterization): the Settings decline releases the
+// automatic recovery hold in the same transaction as the head. A tab holding
+// an older hold must not release a different stored one or move the head.
+test('RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ const storageV2=loadStorageV2({indexedDB});
+ const store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:'chain-scanner-hold-release-'+Date.now()+'-'+Math.random()});
+ await store.open();
+ const recover=async(payload,hold)=>{const result=await store.writeRecoveredSource({expectedSource:'source',encodeSource:()=>'source',payload,account:'owner@example.test',hold});
+  assert.equal(result.ok,true);return result;};
+ const firstHold={reason:'cloud-source-recovery',automaticRecovery:true,account:'owner@example.test',identity:'owner',originalKey:'original-a'};
+ await recover('{"tasks":[{"id":"recovered-a"}]}',firstHold);
+ const staleHold=await store.getRecoveryCloudHold();
+ assert.equal(staleHold.originalKey,'original-a','positive control: the first hold is stored');
+ // A later recovery replaces the head and the hold (another tab, for example).
+ await recover('{"tasks":[{"id":"recovered-b"}]}',{...firstHold,originalKey:'original-b'});
+ const head=await store.readHead(),storedHold=await store.getRecoveryCloudHold();
+ const declined='{"tasks":[{"id":"before-recovery"}]}';
+ const mismatch=await store.commitHead({expectedHash:head.hash,payload:declined,account:'owner@example.test',releaseRecoveryHold:{expectedHold:staleHold}});
+ assert.equal(mismatch.conflict,true,'a different stored hold aborts the commit as a conflict');
+ assert.equal(mismatch.hash,head.hash,'the conflict reports the unchanged head');
+ assert.deepEqual(await store.readHead(),head,'the head is unchanged');
+ assert.deepEqual(await store.getRecoveryCloudHold(),storedHold,'the different stored hold is kept exactly');
+ // Positive control: the exact stored hold is released with the head.
+ const released=await store.commitHead({expectedHash:head.hash,payload:declined,account:'owner@example.test',releaseRecoveryHold:{expectedHold:storedHold}});
+ assert.equal(released.ok,true,'the exact stored hold releases with the head');
+ assert.equal((await store.readHead()).payload,declined);
+ assert.equal(await store.getRecoveryCloudHold(),null,'the hold is deleted in the same commit');
+ // With no stored hold left, asking to release one is also a conflict.
+ const after=await store.readHead();
+ const missing=await store.commitHead({expectedHash:after.hash,payload:'{"tasks":[]}',account:'owner@example.test',releaseRecoveryHold:{expectedHold:storedHold}});
+ assert.equal(missing.conflict,true,'a missing stored hold aborts the commit');
+ assert.deepEqual(await store.readHead(),after,'the head is unchanged when no hold is stored');
+ await store.close();
+});
+
 test('RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact',async()=>{
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-gc-'+Date.now()+'-'+Math.random();
  const storageV2=loadStorageV2({indexedDB}),store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName});
@@ -24553,6 +25365,224 @@ test('RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and
  const corrupt=await store.pull('owner');assert.equal(corrupt.error,true);assert.match(corrupt.code,/corrupt|hash/i);
  assert.notEqual(JSON.parse(adapter.generations.get('owner/'+newRoot.previousGeneration).chunks.get(0).text).tasks[0].id,undefined,
   'the previous generation stays available for explicit recovery but is never silently made current');
+});
+
+test('RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation',async()=>{
+ for(let run=0;run<2;run++){
+  const fixture=await capturedUnreadableGenerationFixture();
+  const root=fixture.adapter.roots.get(fixture.uid);
+  assert.equal(root.rev,2346);assert.equal(root.activeGeneration,fixture.activeGenerationId);assert.equal(root.previousGeneration,fixture.priorGenerationId);
+  const active=fixture.generation(fixture.activeGenerationId),prior=fixture.generation(fixture.priorGenerationId);
+  assert.equal(active.header.state,'published');assert.equal(active.header.chunkCount,8);assert.equal(active.header.byteLength,2057012);
+  assert.equal(active.readableChunks.length,0,'the captured active generation declares 8 chunks but none are readable');
+  assert.equal(prior.header.chunkCount,8);assert.equal(prior.header.byteLength,2014008);assert.equal(prior.readableChunks.length,8);
+  assert.equal(await fixture.decodeGeneration(fixture.priorGenerationId),fixture.priorPayload,'the prior generation decodes losslessly to its original payload');
+  for(const payload of [fixture.priorPayload,fixture.activePayload]){
+   assert.equal(JSON.parse(payload).settings.fixture,'synthetic-2195');assert.doesNotMatch(payload,/@/,'no account identifier appears in fixture data');
+  }
+  const first=await fixture.pullOnce();
+  assert.deepEqual({error:first.result.error,code:first.result.code,generationId:first.result.generationId,payload:first.result.payload},
+   {error:true,code:'corrupt-generation',generationId:fixture.activeGenerationId,payload:undefined});
+  assert.deepEqual(first.calls,['readRoot','readGeneration','readChunks','readRoot'],'one failing pull reads the root, header and chunks, then re-reads the root');
+  assert.equal(first.roundTrips,4);
+  const again=await fixture.pullOnce();
+  assert.equal(again.result.code,'corrupt-generation','the condition is persistent rather than transient');
+  assert.equal(again.result.generationId,fixture.activeGenerationId);
+  assert.equal(fixture.adapter.roots.get(fixture.uid).rev,2346,'failing pulls never write');
+ }
+ // Non-vacuity: the same fixture without the missing chunks reads normally.
+ const healthy=await capturedUnreadableGenerationFixture({defect:false});
+ assert.equal(healthy.generation(healthy.activeGenerationId).readableChunks.length,8);
+ const {result}=await healthy.pullOnce();
+ assert.equal(result.code,undefined);assert.equal(result.payload,healthy.activePayload);assert.equal(result.rev,2346);
+});
+
+// #2201: the captured export re-fetched the same unreadable generation on every
+// opening. Bounds are counted store round trips, never elapsed milliseconds.
+// Only a caller holding a completed refusal opts in (reuseUnreadable); every
+// other pull, including a direct read after an in-place repair, reads in full.
+test('RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an unchanged manifest revision is not fetched again',async()=>{
+ const fixture=await capturedUnreadableGenerationFixture(),reuse={reuseUnreadable:true};
+ const first=await fixture.pullOnce(reuse);
+ assert.deepEqual(first.calls,['readRoot','readGeneration','readChunks','readRoot'],'the first failing pull still proves the generation unreadable');
+ for(let repeat=0;repeat<3;repeat++){
+  const again=await fixture.pullOnce(reuse);
+  assert.deepEqual(again.calls,['readRoot'],'an unchanged manifest re-reads only its server root, never the proved-unreadable header or chunks');
+  assert.equal(again.roundTrips,1);
+  assert.deepEqual({error:again.result.error,code:again.result.code,generationId:again.result.generationId,rev:again.result.rev,payload:again.result.payload},
+   {error:true,code:'corrupt-generation',generationId:fixture.activeGenerationId,rev:2346,payload:undefined});
+ }
+ assert.equal(fixture.adapter.roots.get(fixture.uid).rev,2346,'bounded pulls never write');
+});
+
+test('RISK CLOUD V2 RECOVERY FIXTURE: a revision, generation or account change and an explicit revalidation read the generation again',async()=>{
+ const full=['readRoot','readGeneration','readChunks','readRoot'],reuse={reuseUnreadable:true};
+ const fixture=await capturedUnreadableGenerationFixture(),{adapter,uid}=fixture,root=structuredClone(adapter.roots.get(uid));
+ assert.equal((await fixture.pullOnce(reuse)).result.code,'corrupt-generation');assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot']);
+ // A new manifest revision naming the same generation is a fresh question.
+ adapter.roots.set(uid,{...root,rev:root.rev+1});
+ const revised=await fixture.pullOnce(reuse);
+ assert.deepEqual(revised.calls,full,'a changed manifest revision reads the generation again');
+ assert.equal(revised.result.code,'corrupt-generation');assert.equal(revised.result.rev,root.rev+1);
+ // A changed active generation at the same revision reads the new generation.
+ adapter.roots.set(uid,{...root,activeGeneration:fixture.priorGenerationId,previousGeneration:fixture.activeGenerationId});
+ const switched=await fixture.pullOnce(reuse);
+ assert.deepEqual(switched.calls,full,'a changed active generation is read in full');
+ assert.equal(switched.result.payload,fixture.priorPayload);assert.equal(switched.result.code,undefined);
+ // Another account never inherits this account's conclusion, even for identical ids.
+ adapter.roots.set(uid,root);assert.deepEqual((await fixture.pullOnce(reuse)).calls,full);assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot']);
+ adapter.roots.set('other-owner',structuredClone(root));
+ const healthy=adapter.generations.get(uid+'/'+fixture.priorGenerationId);
+ adapter.generations.set('other-owner/'+fixture.activeGenerationId,structuredClone(healthy));
+ const calls=[],original=adapter.readChunks;adapter.readChunks=(...args)=>{calls.push(args[0]);return original(...args);};
+ const other=await fixture.store.pull('other-owner',reuse);adapter.readChunks=original;
+ assert.deepEqual(calls,['other-owner'],'another account reads its own generation');assert.equal(other.payload,fixture.priorPayload);
+ // A pull that does not opt in (explicit Retry, a fresh sign-in, a direct read) proves the answer again.
+ const retried=await fixture.pullOnce();
+ assert.deepEqual(retried.calls,full,'explicit revalidation reads the header and chunks again');
+ assert.equal(retried.result.code,'corrupt-generation');
+ assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot'],'the re-proved conclusion still bounds later opted-in pulls');
+ // Chunks restored in place under the same root are found by the next full read.
+ const prior=fixture.generation(fixture.priorGenerationId),active=adapter.generations.get(uid+'/'+fixture.activeGenerationId);
+ active.header={...active.header,hash:prior.header.hash,byteLength:prior.header.byteLength,chunkCount:prior.header.chunkCount};
+ for(const chunk of prior.readableChunks)active.chunks.set(chunk.index,chunk);
+ const repaired=await fixture.pullOnce();
+ assert.deepEqual(repaired.calls,full);assert.equal(repaired.result.payload,fixture.priorPayload,'an in-place repair is read by an ordinary full pull');
+});
+
+test('RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remembered as unreadable and healthy reads stay complete',async()=>{
+ const full=['readRoot','readGeneration','readChunks','readRoot'],reuse={reuseUnreadable:true};
+ for(const [method,code] of [['readChunks','unavailable'],['readGeneration','permission-denied'],['readChunks','deadline-exceeded']]){
+  const fixture=await capturedUnreadableGenerationFixture(),{adapter}=fixture,original=adapter[method];
+  adapter[method]=async()=>{adapter[method]=original;throw Object.assign(Error('isolated '+code),{code:'firestore/'+code});};
+  const failed=await fixture.pullOnce(reuse);
+  assert.equal(failed.result.code,code,'a '+code+' read keeps its own code instead of becoming corruption');
+  const later=await fixture.pullOnce(reuse);
+  assert.deepEqual(later.calls,full,'after a transient '+code+' failure the next pull still downloads and checks the generation');
+  assert.equal(later.result.code,'corrupt-generation');
+  // Only a completed check that proved the generation unreadable bounds later pulls.
+  assert.deepEqual((await fixture.pullOnce(reuse)).calls,['readRoot']);
+ }
+ // A healthy board's read behavior is unchanged: every pull reads it in full.
+ const healthy=await capturedUnreadableGenerationFixture({defect:false});
+ for(let repeat=0;repeat<3;repeat++){
+  const read=await healthy.pullOnce(reuse);
+  assert.deepEqual(read.calls,full,'healthy pulls read the root, header and chunks, then recheck the root');
+  assert.equal(read.result.payload,healthy.activePayload);assert.equal(read.result.code,undefined);
+ }
+});
+
+test('RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What does “older copy in use” mean?</dt><dd>')[1]?.split('</dd>')[0];
+ assert.ok(answer,'the extended FAQ explains the new status label');
+ assert.match(answer,/last complete cloud copy is open/);
+ assert.match(answer,/Anything saved only in the damaged newer copy was not recovered/);
+ assert.match(answer,/Cloud saving is not confirmed/);
+ assert.match(answer,/shows synced only after the cloud confirms your current board/);
+ assert.match(answer,/errors still show/);
+ assert.match(answer,/Settings keeps Review cloud recovery and Restore/);
+ const damaged=help.split('<dt>What if a cloud save is damaged?</dt><dd>')[1]?.split('</dd>')[0];
+ assert.match(damaged,/the last complete one opens automatically/,'the damaged-save answer no longer limits the older copy to fresh devices');
+ const release=help.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/older copy in use/,'the dated release note names the new status');
+ assert.match(release,/was not recovered/);
+});
+
+// #2194 review H1: Help and the current changelog describe what the review
+// fixes changed: a known unreadable cloud copy is not downloaded again on
+// opening, restart, resume or reconnect; the pending older copy can be
+// declined from Settings; the opening paint waits for the board and shows the
+// scene's sky colour meanwhile; and minute updates change sky, colours and
+// hourly message together.
+test('RISK review fixes guidance: mounted Help and the November 4 changelog describe bounded rereads, declining the older copy and the scenery waiting for the board',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>help.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ const damaged=answer('Can I keep working with a damaged cloud save?');
+ assert.match(damaged,/opening or returning to the app checks only whether the cloud has changed, even after a restart/,'Help says a known unreadable copy is not downloaded again on opening, resume or restart');
+ assert.match(damaged,/Retry sync, signing in again or a newer cloud update checks everything again/);
+ const older=answer('What does “older copy in use” mean?');
+ assert.match(older,/Use my board from before recovery/,'Help names the Settings decline');
+ assert.match(older,/without saving the older copy to the cloud/);
+ const scenery=answer('Why does the scenery fill in after the board opens?');
+ // #2194 FAQ review B3: the opening paint has a bounded fallback, so "only"
+ // was inaccurate; the bounded wait is asserted in the B1-B3 guidance test.
+ assert.match(scenery,/drawn after the board appears/,'Help says the scenery waits for the board');
+ assert.match(scenery,/the background shows the scene’s sky colour/);
+ assert.match(scenery,/change the sky, its colours and the hourly message together/);
+ for(const [name,text] of [['damaged',damaged],['older',older],['scenery',scenery]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
+ const release=help.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/not downloaded again when the app opens, restarts, returns from the background or comes back online/,'the release note covers #2201');
+ assert.match(release,/Settings can return to your board from before recovery/,'the release note covers declining the older copy');
+ assert.match(release,/drawn just after the board appears/,'the release note says the scenery waits for the board');
+ assert.match(release,/together with the sky/,'the release note says minute updates change text and sky together');
+});
+
+// #2194 FAQ review B1-B3, S1-S4: Help says when the decline is offered and
+// refused, what follows it (including that signing out forgets it), that the
+// scenery draws anyway after a bounded wait, that the cloud recovery review
+// itself chooses nothing, which checks are remembered, and what each cloud
+// button label means.
+// #2194 rendered capture (f917bc7): the shortened decline success toast drops
+// "the older and damaged cloud copies stay protected"; Help keeps it.
+test('RISK review fixes guidance: mounted Help says both cloud copies stay protected after returning to the board from before recovery',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const back=help.split('<dt>Can I go back to my board from before recovery?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(back,/Afterwards your board saves on this device, cloud saving stays paused, both cloud copies stay protected/,'Help says both cloud copies stay protected after the decline');
+ assert.ok(back.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+});
+
+test('RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>help.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ // B1 and B2: availability of the decline and the state after it.
+ const back=answer('Can I go back to my board from before recovery?');
+ assert.ok(back,'Help has an entry for returning to the board from before recovery');
+ assert.match(back,/you are signed in/,'the decline is offered only while signed in');
+ assert.match(back,/unavailable once you change the board, during a save or edit, or when this device had no earlier board/,'Help names when the decline is refused');
+ assert.match(back,/use Review cloud recovery instead/,'Help points to the route that works when the decline is refused');
+ assert.match(back,/Once the cloud confirms the board, the choice is gone/);
+ assert.match(back,/cloud saving stays paused/,'Help says cloud saving stays paused after declining');
+ assert.match(back,/Retry sync checks the copy again and keeps your choice/);
+ assert.match(back,/Signing out forgets it, so signing in again can reopen the older copy/,'Help says signing out forgets the decline');
+ assert.match(back,/A newer cloud save or a healthy cloud read also ends it/);
+ const older=answer('What does “older copy in use” mean?');
+ assert.match(older,/if you have not changed the board since/,'the older-copy answer qualifies the decline');
+ const release=help.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/Until the cloud confirms it, and if you have not changed the board since, Settings can return to your board from before recovery/,'the release note qualifies the decline');
+ // B3: the bounded wait; reduced motion waits in the same way.
+ const scenery=answer('Why does the scenery fill in after the board opens?');
+ assert.doesNotMatch(scenery,/drawn only after the board appears/,'Help no longer says the scenery waits without limit');
+ assert.match(scenery,/If the board takes longer than a few seconds, the scenery draws anyway/,'Help names the bounded scenery wait');
+ assert.match(scenery,/Reduced motion still keeps the scenery still and waits for the board in the same way/);
+ assert.match(release,/If a large board takes more than a few seconds, the scenery draws without waiting/,'the release note names the bounded scenery wait');
+ assert.doesNotMatch(release,/even when a large board opens late/,'the release note no longer promises an unbounded wait');
+ // S1: the recovery review itself chooses nothing; the automatic default does.
+ const damagedSave=answer('What if a cloud save is damaged?');
+ assert.match(damagedSave,/use Review cloud recovery sources from the cloud warning or restored-device hold; original sources stay protected\. There, choices await verification; none is selected by default/,'the no-default sentence is scoped to the review');
+ // Its neighbouring answer keeps its protected wording; it is already scoped
+ // to the review by the sentence before it.
+ assert.match(answer('What can I inspect while cloud checks wait?'),/The whole source review has a one-minute limit\. When safe, changed sources get one fresh check within that minute; nothing is chosen automatically\./);
+ // S2 and S3: which checks are remembered, and the separate incomplete-copy recheck.
+ const working=answer('Can I keep working with a damaged cloud save?');
+ assert.match(working,/Once a finished check finds a cloud copy unreadable/,'only a completed check is remembered');
+ assert.match(working,/even after a restart or a failed connection/,'a failed connection keeps the remembered check');
+ assert.match(working,/so do an interrupted check, a changed board base or device storage that cannot open/);
+ assert.match(working,/Incomplete earlier copies kept after an older copy opens are separate: reconnecting checks them/);
+ // S4: every cloud button label.
+ const labels=answer('What do the cloud button labels mean?');
+ for(const label of ['syncing','synced','older copy in use','recovery pending','save error','error','sign in'])
+  assert.match(labels,new RegExp('<b>'+label+'</b>'),'Help explains the '+label+' label');
+ for(const [name,text] of [['back',back],['older',older],['scenery',scenery],['working',working],['labels',labels]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
 });
 
 test('Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async t=>{
@@ -28767,7 +29797,7 @@ test('RISK fireworks reduced motion: static blooms stay on the stationary barge 
 
 test('RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),c=sceneTimeline(),visits=c.LandscapeVisits.create(),code=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty('))),paints=[];
- const context={visits,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[{id:'festival:unchanged',type:'festival',age:59,duration:150}]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},Date:{now:()=>60000},syncScene(){context.world.events[0].age=60;context.world.elapsed=60;},paintBackground(){throw Error('unrelated background must stay unchanged');},paintLife(age){paints.push(age);}};
+ const context={visits,openingPaint:null,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[{id:'festival:unchanged',type:'festival',age:59,duration:150}]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},Date:{now:()=>60000},syncScene(){context.world.events[0].age=60;context.world.elapsed=60;},paintBackground(){throw Error('unrelated background must stay unchanged');},paintLife(age){paints.push(age);}};
  vm.runInNewContext(code+';advanceRooftopParty(1)',context);
  assert.deepEqual(paints,[],'sixty seconds no longer expires barge fireworks');
  context.advanceRooftopParty(1);assert.deepEqual(paints,[],'unchanged static membership cannot start continuous animation');
@@ -32014,7 +33044,7 @@ test('RISK pedestrian slot guidance: extended FAQ separates arrival budget from 
 
 test('RISK pedestrian reduced retirement consumer: shared slot expiry repaints a still scene even when retained IDs do not change',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),advance=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop(',source.indexOf('  function advanceRooftopParty('))),c=sceneTimeline(),visits=c.LandscapeVisits.create();
- let painted=0;const event={id:'retained',type:'walker',age:59,duration:2373,activityDuration:60},context={visits,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[event]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},syncScene(){event.age=61;context.world.elapsed=61;},paintBackground(){throw Error('unrelated background should remain cached');},paintLife(){painted++;}};
+ let painted=0;const event={id:'retained',type:'walker',age:59,duration:2373,activityDuration:60},context={visits,openingPaint:null,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[event]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},syncScene(){event.age=61;context.world.elapsed=61;},paintBackground(){throw Error('unrelated background should remain cached');},paintLife(){painted++;}};
  vm.runInNewContext(advance+';advanceRooftopParty(1);',context);
  assert.equal(painted,1,'expiry of a shared admission slot must remove its old reduced representative');
  assert.equal(context.world.events[0].age,61,'retained shared walking recipe remains available to normal motion');

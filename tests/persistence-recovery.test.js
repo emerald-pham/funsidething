@@ -8,18 +8,18 @@ import { spawnSync } from "node:child_process";
 import {
   test, editRawDevice187, deviceFaultProvider187, damagedAcknowledgedApp187,
   automaticSourceLifecycle254, freshSourceCheckFixture187, runNativeRecoveryInspection226,
-  coldDamagedSourceWithoutAck214, closeLegacyApp173, scopedUndoClients, __dirname, html, loadEngine,
-  extractAppScript, appSrc, makeFakeElement, flush, loadApp, setFakeTime, settle, persisted,
-  deferredSyncFixture, fixtureDeadline, observeSyncFixtureCalls, observeQueuedNativeSaves,
-  settleSavedViewPublication, openingBoardSelfHosted, openingBoardFixture, invisibleSavedViewBrowser,
-  SYNC_STORE_KEY, LOCAL_HEAD_KEY, LOCAL_BACKUPS_KEY, DEVICE_AUTHORITY_KEY, HOUR, sharedScannerStorage,
-  loadCloudBackendV2, decodeManualArchiveTypedValue, loadBackupFileFixtureApp,
-  prepareBackupFileFixtureSource, syncTask, syncState, saveEditorChoice, loadAppAtTime,
-  hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN, cloudState, makeSyncHarness,
-  syncSettle, PAST_DEBOUNCE, titlesOf, pwaUpdateHarness, recentDeletionAt, deletionEvidence,
-  loadStorageV2, exerciseCompletionEditorBoundaries, liveScanSyncClients, liveDoneDeliverySnapshot,
-  ordinaryEditDebounceControl, settleRecovery188, settleRecoveryOperations188,
-  divergentCloudSourceApp187, replaceIndependentServerPayload263,
+  conflictingPriorGeneration2201, coldDamagedSourceWithoutAck214, closeLegacyApp173, scopedUndoClients,
+  __dirname, html, loadEngine, extractAppScript, appSrc, makeFakeElement, flush, loadApp, setFakeTime,
+  settle, persisted, channel, deferredSyncFixture, fixtureDeadline, observeSyncFixtureCalls,
+  observeQueuedNativeSaves, settleSavedViewPublication, openingBoardSelfHosted, openingBoardFixture,
+  invisibleSavedViewBrowser, SYNC_STORE_KEY, LOCAL_HEAD_KEY, LOCAL_BACKUPS_KEY, DEVICE_AUTHORITY_KEY,
+  HOUR, sharedScannerStorage, loadCloudBackendV2, decodeManualArchiveTypedValue,
+  loadBackupFileFixtureApp, prepareBackupFileFixtureSource, syncTask, syncState, saveEditorChoice,
+  loadAppAtTime, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN, cloudState,
+  makeSyncHarness, syncSettle, PAST_DEBOUNCE, titlesOf, pwaUpdateHarness, recentDeletionAt,
+  deletionEvidence, loadStorageV2, exerciseCompletionEditorBoundaries, liveScanSyncClients,
+  liveDoneDeliverySnapshot, ordinaryEditDebounceControl, settleRecovery188,
+  settleRecoveryOperations188, divergentCloudSourceApp187, replaceIndependentServerPayload263,
 } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
@@ -706,6 +706,7 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
  const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(different));
  backend.docs.set(headerPath,{...backend.docs.get(headerPath),hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
  assert.equal(encoded.chunkCount,8,'the supported damaged source represents a populated eight-chunk board');
+ await conflictingPriorGeneration2201(backend,originalRoot.previousGeneration,ctx.window.ChainStorageV2);
  let reads=0;app.faults.serverRead=async()=>{reads++;};t.after(()=>{delete app.faults.serverRead;});
  await ctx.cloudPull();assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);assert.ok(reads>0);
  const originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,attemptReads=reads,byAction=[];
@@ -740,7 +741,7 @@ test('RISK corrupt cloud work budget: ordinary actions stay durable without rere
 });
 
 test('RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads',{timeout:20000},async t=>{
- const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true}),{ctx,shim,backend,counts,originalRoot}=app;
+ const app=await coldDamagedSourceWithoutAck214(t,{newerLocalWork:true,conflictingPrior:true}),{ctx,shim,backend,counts,originalRoot}=app;
  assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(backend.CS.knownDamagedSource,true);
  const initialReads=counts.reads,originalCloud=JSON.stringify([...backend.docs]),writes=backend.writes.length,byAction=[];
  assert.ok(initialReads>0);ctx.window.CLOUD_PUSH_DELAY_MS=0;
@@ -958,6 +959,56 @@ test("RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  finally{releasePublication();await settleSavedViewPublication(cold,h,'later informed return and Done publication');}
  assert.deepEqual(Array.from(h.remoteState().chain),[referenceId,peerCandidateId]);assert.ok(h.remoteState().decisionEvents.some(event=>event.id===nextReturn.id)&&h.remoteState().decisionEvents.some(event=>event.id===laterCompletion.id));
 
+});
+
+// #2194 independent review B1 at the real consumer: a real click on the
+// decline button inside open Settings was refused as "A save or edit is
+// running", because Settings itself is an open .mback. The browser has no cloud
+// backend, so the pending hold and cloud fields are set in page (as in the
+// rendered captures); the stored device hold then differs, so a decline that
+// passes the busy check stops at its next refusal, "Recovery changed".
+test('RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state==='object'&&state,null,{timeout:20000});
+    const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+    await page.evaluate(()=>document.getElementById('motionDialog')?.close?.());
+    await page.waitForSelector('#modalRoot .mback .modal',{timeout:5000}).catch(()=>{});await resolveExpectedFirstRunHelp(page);
+    // A saved board gives this fresh profile device-storage authority, as a real device has.
+    await page.locator('#addInput').fill('Saved board task');await page.locator('#addInput').press('Enter');
+    await page.waitForFunction(()=>deviceStorageAuthority&&liveBoardAccepted&&state.tasks.some(task=>task.title==='Saved board task'),null,{timeout:20000});
+    const board=await page.evaluate(()=>{
+     const CS=window.CloudSync;CS.readRecoverySource=async()=>({error:true,code:'fixture'});CS.recoveryIdentity=()=>'fixture-identity';
+     Object.assign(CS,{configured:true,ready:true,user:'owner@example.test',status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+     deviceRecoveryCloudHold={v:1,reason:'cloud-source-recovery',automaticRecovery:true,account:'owner@example.test',identity:'fixture-identity',epoch:1,originalKey:'automatic-device-recovery:fixture'};
+     renderSync();return JSON.stringify(state);});
+    await page.locator('#appHeader [data-act="settings"]').click();
+    const button=page.locator('#modalRoot [data-act="decline-automatic-cloud-recovery"]');
+    await button.waitFor();
+    assert.equal(await page.evaluate(()=>!!document.querySelector('.mback')),true,'positive control: Settings is an open .mback modal');
+    await page.evaluate(()=>{const el=document.getElementById('toast');if(el)el.textContent='';});
+    await button.click();
+    await page.waitForFunction(()=>!!document.getElementById('toast')?.textContent,null,{timeout:15000});
+    const result=await page.evaluate(()=>({message:document.getElementById('toast').textContent,board:JSON.stringify(state),settingsOpen:!!document.querySelector('#modalRoot [data-act="decline-automatic-cloud-recovery"]')}));
+    observed.push({engine:engineName,message:result.message});
+    assert.doesNotMatch(result.message,/save or edit is running/i,`${engineName}: the open Settings modal is not an active editor: ${result.message}`);
+    assert.match(result.message,/Recovery changed/,`${engineName}: the decline passes its busy, storage and account checks and reaches the device check: ${result.message}`);
+    assert.equal(result.board,board,`${engineName}: the refused decline changes nothing`);
+    assert.deepEqual(errors,[],`${engineName}: no page errors`);
+   }finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
 });
 
 test('RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible',async t=>{

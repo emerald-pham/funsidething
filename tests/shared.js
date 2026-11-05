@@ -625,8 +625,32 @@ async function runNativeRecoveryInspectionMatrix226(t,engine,viewForCase){
  assert.equal(launches.length,1,'all four independent theme/viewport scenarios should reuse one browser process');assert.equal(launches[0],sharedBrowser);
 }
 
-async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false}={}){
+// #2201: these budget contracts must not depend on the recovery read expiring.
+// They hold a damaged source whose complete prior generation would otherwise
+// reconcile automatically (#2198). Give that prior a conflicting legacy rating
+// (the #2408 refusal shape) so the automatic default genuinely has to wait.
+// Decodes one stored cloud generation, lets `edit` return its new payload,
+// and stores that payload re-encoded in place of the old header and chunks.
+async function rewriteGenerationFixture(backend,generationPath,codec,edit){
+ const header=backend.docs.get(generationPath);
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(generationPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const payload=await edit(JSON.parse(await codec.decodeSnapshot(header,chunks))),encoded=await codec.encodeSnapshot(payload);
+ for(const key of [...backend.docs.keys()])if(key.startsWith(generationPath+'/chunks/'))backend.docs.delete(key);
+ backend.docs.set(generationPath,{...header,hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount});
+ for(const chunk of encoded.chunks)backend.docs.set(generationPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ return {payload,encoded};
+}
+async function conflictingPriorGeneration2201(backend,previousGeneration,codec){
+ await rewriteGenerationFixture(backend,'users/owner/generations/'+previousGeneration,codec,board=>{
+  const task=board.tasks.find(row=>row.id==='a');
+  assert.equal(board.decisionBaseline,undefined);assert.equal(task.mu,25,'the accepted board rates this task differently');task.mu=26;
+  return JSON.stringify(board);
+ });
+}
+
+async function coldDamagedSourceWithoutAck214(t,{newerLocalWork=false,conflictingPrior=false}={}){
  const seed=await damagedAcknowledgedApp187(t,{sourcePadding:2000000});
+ if(conflictingPrior)await conflictingPriorGeneration2201(seed.backend,seed.originalRoot.previousGeneration,seed.ctx.window.ChainStorageV2);
  if(newerLocalWork){seed.shim.document.getElementById('addInput').value='Newer local task without an ACK export';await seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true);}
  const raw=seed.ctx.cloudPayload(),originalRoot={...seed.originalRoot},originalHeader={...seed.originalHeader},provider=[...seed.backend.docs];
  assert.equal(Object.hasOwn(JSON.parse(raw),'decisionBase'),false,'the supported export does not carry the private ACK payload');
@@ -2814,6 +2838,197 @@ function cloudV2Adapter(){
  return api;
 }
 
+// #2195: the shape a real diagnostics export captured (spec #2194), rebuilt from
+// isolated synthetic data only. Recovery (#2198) and read-cost (#2201) tickets
+// reuse capturedUnreadableGenerationFixture() instead of inventing a failure.
+const CAPTURED_UNREADABLE_GENERATION=Object.freeze({rev:2346,
+ active:Object.freeze({chunkCount:8,byteLength:2057012}),prior:Object.freeze({chunkCount:8,byteLength:2014008})});
+function syntheticBoardOfBytes(label,byteLength){
+ const board={tasks:Array.from({length:3000},(_,index)=>({id:`${label}-${index}`,title:`Synthetic ${label} task ${index}`,done:false})),
+  settings:{fixture:'synthetic-2195',pad:''}};
+ const unpadded=Buffer.byteLength(JSON.stringify(board),'utf8');assert.ok(unpadded<byteLength,'synthetic board must fit the captured size');
+ board.settings.pad='x'.repeat(byteLength-unpadded);
+ const payload=JSON.stringify(board);assert.equal(Buffer.byteLength(payload,'utf8'),byteLength);
+ return payload;
+}
+async function capturedUnreadableGenerationFixture({defect=true,uid='fixture-owner'}={}){
+ const adapter=cloudV2Adapter(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto}),codec=loadStorageV2();
+ const {rev,active,prior}=CAPTURED_UNREADABLE_GENERATION;
+ const priorGenerationId='fixture-prior-generation',activeGenerationId='fixture-active-generation';
+ const priorPayload=syntheticBoardOfBytes('prior',prior.byteLength),activePayload=syntheticBoardOfBytes('active',active.byteLength);
+ // Earlier history is irrelevant to the capture; seed its revision so the two
+ // real publishes land on rev-1 (prior) and rev (active) through the store.
+ adapter.roots.set(uid,{schemaVersion:2,rev:rev-2,activeGeneration:null,previousGeneration:null,updatedAt:1});
+ assert.equal((await store.push(uid,priorPayload,2,rev-2,{generationId:priorGenerationId})).ok,true);
+ assert.equal((await store.push(uid,activePayload,3,rev-1,{generationId:activeGenerationId})).ok,true);
+ // The defect: the published active header still declares its chunks and
+ // bytes, but none of its chunks remain readable on the server.
+ if(defect)adapter.generations.get(uid+'/'+activeGenerationId).chunks.clear();
+ const reads=[];
+ for(const method of ['readRoot','readGeneration','readChunks']){
+  const original=adapter[method];adapter[method]=(...args)=>{reads.push(method);return original(...args);};
+ }
+ const generation=id=>{const stored=adapter.generations.get(uid+'/'+id);
+  return {header:structuredClone(stored.header),readableChunks:[...stored.chunks.values()].sort((a,b)=>a.index-b.index).map(chunk=>structuredClone(chunk))};};
+ return {adapter,store,uid,rev,priorGenerationId,activeGenerationId,priorPayload,activePayload,generation,
+  decodeGeneration:id=>{const {header,readableChunks}=generation(id);return codec.decodeSnapshot(header,readableChunks);},
+  async pullOnce(options){const start=reads.length,result=await store.pull(uid,options),calls=reads.slice(start);return {result,calls,roundTrips:calls.length};}};
+}
+
+// #2198: the same captured shape (#2195) reaching the real app consumer. The
+// device holds an accepted board whose acknowledged copy no longer matches the
+// damaged active header, and the immediately prior generation is complete.
+// The product reads sources inside one 60s budget, and every consumer here
+// keeps exactly that budget. Whether recovery fits a phone is decided by
+// counting work (multi-megabyte serializations), never by elapsed time, so a
+// slow or loaded host cannot change any verdict (#2194 review F3).
+const CAPTURED_RECOVERY_BUDGET_MS=60000;
+const CAPTURED_RESULT_BUDGET_MS=CAPTURED_RECOVERY_BUDGET_MS;
+// Sums the length of every serialization of at least one mebibyte made by the
+// app realm while `work` runs. The #2198 defect re-encoded the same captured
+// multi-megabyte copies at every cloud read stage; that work is the same count
+// on any host, so it is measured instead of the time it takes.
+async function largeSerializedBytes2198(ctx,work){
+ const counter=vm.runInContext(`(()=>{const original=JSON.stringify,state={bytes:0,calls:0};
+  JSON.stringify=function(...args){const result=Reflect.apply(original,this,args);
+   if(typeof result==='string'&&result.length>=1048576){state.bytes+=result.length;state.calls++;}return result;};
+  return {state,restore(){JSON.stringify=original;}};})()`,ctx);
+ try{await work();}finally{counter.restore();}
+ return {bytes:counter.state.bytes,calls:counter.state.calls};
+}
+// What one recovery pull may serialize on a phone inside the product budget.
+// Fixed constants, never measured at test time: desktop JSON serialization of
+// this board shape ran at 425 MB/s (2026-11-05), spec #2194 puts phone class
+// CPU at up to 6x slower, and the captured export spent 9.57 s of the 60 s
+// budget in network chunk stages. Before the #2198 fix one pull serialized
+// about 4.9 GB, which is about 70 s of phone CPU.
+const CAPTURED_PHONE_SERIALIZATION_BYTES=Math.floor((60-9.57)*425e6/6);
+function exactPaddedBoard(board,field,byteLength){
+ board[field]={opaque:''};const unpadded=Buffer.byteLength(JSON.stringify(board),'utf8');
+ assert.ok(unpadded<byteLength,'the synthetic board must fit the captured size');board[field].opaque='p'.repeat(byteLength-unpadded);
+ const payload=JSON.stringify(board);assert.equal(Buffer.byteLength(payload,'utf8'),byteLength);return payload;
+}
+async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_RECOVERY_BUDGET_MS,priorVariant=null,defect=true}={}){
+ const {active,prior}=CAPTURED_UNREADABLE_GENERATION;
+ // The unproxied factory lets the multi-megabyte database be deleted below.
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,recoveryTimeoutMs,nativeDeviceConnection:true}),{ctx,shim,backend,originalRoot}=app,codec=ctx.window.ChainStorageV2;
+ // The runner retains finished hooks and, through them, each app realm. Its
+ // in-memory database keeps every transaction's multi-megabyte rollback log,
+ // so release the sources themselves or the full suite exhausts its heap.
+ t.after(async()=>{try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
+  backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
+  await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
+  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+   'unrepairableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  try{vm.runInContext('decisionBaseIdentityCache.length=0',ctx);}catch{}
+  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
+ const activePath='users/owner/generations/'+originalRoot.activeGeneration,priorPath='users/owner/generations/'+originalRoot.previousGeneration;
+ // Prior generation: complete and verifiable, carrying one change this device
+ // never saw, so its use is observable in the working board.
+ const {payload:priorPayload,encoded:priorEncoded}=await rewriteGenerationFixture(backend,priorPath,codec,priorBoard=>{
+  priorBoard.tasks.push(syncTask('captured-prior-only','Saved only in the intact prior generation'));
+  // Unsafe variants must keep waiting: an ambiguous legacy rating (the #2408
+  // refusal shape) or a board saved under another account.
+  if(priorVariant==='ambiguous legacy rating'){assert.equal(priorBoard.decisionBaseline,undefined);priorBoard.tasks.find(row=>row.id==='a').mu=26;}
+  else if(priorVariant==='different account')priorBoard.syncAccount='other-account@example.com';
+  else assert.equal(priorVariant,null);
+  return exactPaddedBoard(priorBoard,'futurePriorGenerationFixture',prior.byteLength);
+ });
+ assert.equal(priorEncoded.chunkCount,prior.chunkCount);
+ // Active generation: a different source whose header declares the captured
+ // chunks and bytes while none of its chunks remain readable.
+ const different=JSON.parse(ctx.state.decisionBase.payload);
+ const activeEncoded=await codec.encodeSnapshot(exactPaddedBoard(different,'futureUnreadableActiveFixture',active.byteLength));
+ assert.equal(activeEncoded.chunkCount,active.chunkCount);
+ backend.docs.set(activePath,{...backend.docs.get(activePath),hash:activeEncoded.hash,byteLength:activeEncoded.byteLength,chunkCount:activeEncoded.chunkCount});
+ // {defect:false}: the same captured sizes with every declared chunk readable.
+ if(!defect)for(const chunk of activeEncoded.chunks)backend.docs.set(activePath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ else assert.equal([...backend.docs.keys()].filter(key=>key.startsWith(activePath+'/chunks/')).length,0,'none of the declared active chunks are readable');
+ const setupRead=await backend.CS.pull();
+ if(defect)assert.equal(setupRead.code,'corrupt-generation','the real pull reproduces the captured failure');
+ else assert.equal(createHash('sha256').update(setupRead.payload,'utf8').digest('hex'),activeEncoded.hash,'the healthy active generation reads byte-exactly');
+ // Newer accepted local work that no cloud generation contains.
+ shim.document.getElementById('addInput').value='Newer local edit before reconciliation';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await settleSourceFixtureSave187(app,'the newer local edit is durably saved before the cloud read',true);
+ return {...app,activePath,priorPath,priorPayload};
+}
+
+// #2194 review F4, a characterization (it passes on the pre-#2194 app as well):
+// with a readable active generation nothing #2198/#2200/#2201 added may run.
+// The reference is independent of the code under test: the board saved before
+// the pull, the cloud documents before it, and the status, writes and stores
+// recorded once from main 8cd524a running this same fixture.
+// Recorded from main 8cd524a (2026-11-05T04:5xZ, rf/logs/F4-record-main.log).
+const RECORDED_HEALTHY_STATUS_8CD524A=Object.freeze({text:'☁ syncing',title:'Cloud sync is pending for e@example.com; this board is not acknowledged yet.',className:'syncbtn busy',hidden:false});
+const RECORDED_HEALTHY_READS_8CD524A=Object.freeze(['<root>','<active>','<active>/chunks','<root>']);
+
+// #2194 independent review B1: the in-process document's querySelector always
+// answers null, so no test could see that Settings itself is an open modal
+// (.mback). This makes the shim report the mounted modal faithfully for the
+// modal selectors the app uses, and leaves every other selector unchanged.
+function faithfulModalQuery2194(shim){
+ const original=shim.document.querySelector;
+ shim.document.querySelector=function(selector){
+  const open=/class="mback"/.test(String(shim.document.getElementById('modalRoot').innerHTML||''));
+  const parts=String(selector).split(',').map(part=>part.trim());
+  if(open&&parts.some(part=>part==='.mback'||part==='#modalRoot .mback'))return {matches:()=>true,closest:()=>null,contains:()=>true,getAttribute:()=>null};
+  return original.call(this,selector);
+ };
+ return ()=>{shim.document.querySelector=original;};
+}
+function declineButton2194(){
+ const button={dataset:{act:'decline-automatic-cloud-recovery'},classList:{contains:()=>false},closest(){return button;}};
+ return button;
+}
+async function pendingAutomaticDefault2194(t,app){
+ const {ctx}=app,store=ctx.window.ScannerDeviceStore;
+ // Publication stays refused, so the automatic default stays pending.
+ const refusal=Object.assign(Error('Controlled automatic publication refusal'),{code:'permission-denied'});
+ Object.defineProperty(app.faults,'push',{configurable:true,get(){return refusal;}});t.after(()=>{delete app.faults.push;});
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ ctx.closeModal();await flush();const opening=ctx.cloudPull();let opened=false;opening.then(()=>{opened=true;},()=>{opened=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!opened||!idle())await wait(20);},'the automatic default settles unpublished',CAPTURED_RESULT_BUDGET_MS+20000);
+ const pending=await store.getRecoveryCloudHold();
+ assert.ok(pending?.automaticRecovery===true,'positive control: the automatic default is pending');
+ return {idle,pending};
+}
+
+// #2194 review F1: the reporter's case is an installed app relaunched. A
+// completed refusal over an unchanged server root must survive that cold
+// launch, keyed by account, revision and generation. The root is still a
+// forced server read, and the conclusion only ever holds writes.
+async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
+ let reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});
+ if(!reopened.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),reopened.ctx,{filename:'device-store-v2.js'});reopened.ctx.window.ChainStorageV2=reopened.ctx.ChainStorageV2;}
+ await reopened.ctx.__dataReady;reopened.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ const faults={authPending:true,serverRead:async path=>{reads.push(path);}};
+ let backend=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,sharedDocs:app.backend.docs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:CAPTURED_RECOVERY_BUDGET_MS,recordSyncError:reopened.ctx.recordSyncError});
+ // The same release as the #2198 fixture: the runner retains finished hooks
+ // and their realms, and the shared in-memory database keeps every multi-
+ // megabyte transaction log until it is deleted after this connection closes.
+ t.after(async()=>{backend.CS.suspend();try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',reopened.ctx);}catch{}
+  try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();backend.docs.clear();try{reopened.shim.localStorage.clear();}catch{}
+  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+   'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',reopened.ctx);}catch{}
+  try{vm.runInContext('decisionBaseIdentityCache.length=0',reopened.ctx);}catch{}
+  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});
+  // This retained hook must not keep the relaunched realm or its backend alive.
+  reopened=null;backend=null;});
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy||automaticCloudFallbackBootCapturePending',reopened.ctx);
+ const relaunched={...reopened,backend,faults,settle:message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000)};
+ if(signIn){backend.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await flush();await reopened.ctx.cloudPull();await relaunched.settle('the relaunched opening settles');}
+ return relaunched;
+}
+
+// #2200: what the person sees while the automatic recovery default (#2198) is
+// using the older complete generation and no cloud acknowledgement exists yet.
+// The status is read from the real sync control at the moment the guarded
+// publication starts, before any cloud write can acknowledge the board.
+function syncStatus2200(shim){
+ const button=shim.document.getElementById('syncBtn');
+ return {text:button.textContent,title:button.title,className:button.className,hidden:button.hidden};
+}
+
 async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=null}={}){
  const pending=new Set(),auth={currentUser:{uid,email:'e@example.com'}},events=[];
  const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,host(v)])):value;
@@ -3493,48 +3708,54 @@ export {
   automaticSourceLifecycle254, automaticDefaultApp251, recoveryReadClock187,
   settleSourceFixtureSave187, freshSourceCheckFixture187, inspectCompleteSource230,
   waitForNativeHistoryAck226, runNativeRecoveryInspection226, runNativeRecoveryInspectionMatrix226,
-  coldDamagedSourceWithoutAck214, APOLOGY_NOTICE_ID, ORIGINAL_APOLOGY, channelReleaseEnvelope,
-  LEGACY_COMPLETION_RELEASE, legacyCompletionSource173, closeLegacyApp173, upgradedLegacyApp173,
-  releasedExpiryStartSource173, scopedUndoClients, woopFixture, woopStep, woopDislodgeTwice,
-  ratingHistoryCopy, ratingHistoryTask, ratingHistoryFixture, __dirname, HTML_PATH, html, lzStringSrc,
-  sceneTimelineScripts, runSceneTimelineScript, sceneTimeline, livingSky, livingLocation,
-  landscapeLuminance, manifestHrefFromHtml, serviceWorkerSource, appShellContract,
-  serviceWorkerHarness, slice, engineSrc, mulberry32, SEED_SNIPPET, loadEngine, readConst,
-  extractAppScript, appSrc, makeFakeElement, makeDomShim, flush, loadApp, setFakeTime, realNow,
-  publishedBetaContinuation, SAVE_DEBOUNCE_MS, settle, persisted, makeFakeCloudSyncFactory, setInput,
-  WH_STORE_KEY, preChangeState, localAt, addTaskAged, titleOf, scanHtmlOf, benchAction, fillEditPane,
-  STORE_KEY, THEME_HINT_KEY, themeBootSrc, runThemeBoot, themeBtnText, styleSrc, COLOR_RE, WHITE_RE,
-  INVARIANT_PROPS, ALLOWED_DECLS, declarations, lightDarkArgs, offendingDeclarations,
-  ALLOWED_NON_ASCII, decodeEscapes, themeTokens, channel, luminance, contrast, CONTRAST_PAIRS,
-  openList, listHTML, listCount, selectedListIds, tagRowHTML, litTags, deferredSyncFixture,
-  fixtureDeadline, observeSyncFixtureCalls, observeQueuedNativeSaves, holdNextSyncFixturePush,
-  settleSavedViewPublication, delayedLocalBoardBrowser, openingBoardSelfHosted, openingBoardFixture,
-  invisibleSavedViewBrowser, tagLabels, tagKeys, clickTag, rowTitles, SYNC_STORE_KEY, LOCAL_HEAD_KEY,
-  LOCAL_BACKUPS_KEY, DEVICE_AUTHORITY_KEY, HOUR, sharedScannerStorage, loadCloudBackend,
-  loadCloudBackendV2, cloudAdapterCryptoGate, releaseCloudAdapterCryptoAfterDeadline,
-  decodeManualArchiveTypedValue, backupFileFixtures, loadBackupFileFixtureApp,
-  prepareBackupFileFixtureSource, syncTask, syncState, saveEditorChoice, loadAppAtTime,
-  hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN, cloudState, makeSyncHarness,
-  decisionRecoveryApp146, mixedSharedOutcome146, recordMixedDecisionActions146,
-  decisionMixedActionsApp146, syncSettle, PAST_DEBOUNCE, doneTitles, seedDuplicateCompletion,
-  renamedCloud, titlesOf, workedLog, MORNING, EVENING, DAY_BEFORE, seedWorkLog, moodRuntime, atNoon,
-  hourLabel, nativeSource, runNativeInstall, loadSeasonalRepair, seasonalRepairCanvas,
-  seasonalRepairPalette, seasonalRepairNight, seasonalRepairWeather, seasonalRepairRain,
-  seasonalRepairStorm, seasonalRepairSnow, seasonalRepairSnowstorm, seasonalEnvelopeRuntime,
-  chanceProbabilityFixture, pwaUpdateHarness, updateNoticeKey, releaseMarkup, releaseFingerprint,
-  prepareReleaseNotice, SOLAR_AUDIT_FIXTURES, changeQuickEvergreen, releaseGateGit, releaseGateHash,
-  releaseGateCanonicalJson, releaseGateReseal, makeReleaseGateFixture, releaseGateInput,
-  cleanupReleaseGateFixture, riskBasedReleaseInput, testSurfaceSource, recoveringCloudStatusHarness,
-  recentDeletionAt, deletionEvidence, repeatedDeletionBoard, loadStorageV2, loadCloudV2,
-  cloudV2Payload, cloudV2Adapter, decisionBackend146, decisionCandidate146,
-  exerciseCompletionEditorBoundaries, liveScanSyncClients, delayedEvergreenReadFixture,
-  liveDoneDeliverySnapshot, ordinaryEditDebounceControl, liveModeDeliverySnapshot,
-  settleLiveModePublication, releasedDependencyHydrator, MODE_LIFECYCLE_NOW, modeLifecycleCopy,
-  modeLifecycleEdit, modeLifecycleWaitFor, privateMigratedDeleteFixture, privateRewriteDurableBackup,
-  privateVisibleBackupRows, privateClickBackupDelete, privateAssertBackupSurvives, PRIVATE_EXPIRY_NOW,
-  PRIVATE_EXPIRY_OLD, privateLegacyExpiryFixture, privateExpiryLegacyRows, privateExpirySave,
-  privateExpiryAssertCurrentBoard, mountPrivateEditInterval, installPrivateDateValueDescriptors,
-  SCALED_REVIEW_POLICY_TEXT, makeScaledReviewFixture, scaledPlan, SCALED_FAQ_COVERAGE,
+  rewriteGenerationFixture, conflictingPriorGeneration2201, coldDamagedSourceWithoutAck214,
+  APOLOGY_NOTICE_ID, ORIGINAL_APOLOGY, channelReleaseEnvelope, LEGACY_COMPLETION_RELEASE,
+  legacyCompletionSource173, closeLegacyApp173, upgradedLegacyApp173, releasedExpiryStartSource173,
+  scopedUndoClients, woopFixture, woopStep, woopDislodgeTwice, ratingHistoryCopy, ratingHistoryTask,
+  ratingHistoryFixture, __dirname, HTML_PATH, html, lzStringSrc, sceneTimelineScripts,
+  runSceneTimelineScript, sceneTimeline, livingSky, livingLocation, landscapeLuminance,
+  manifestHrefFromHtml, serviceWorkerSource, appShellContract, serviceWorkerHarness, slice, engineSrc,
+  mulberry32, SEED_SNIPPET, loadEngine, readConst, extractAppScript, appSrc, makeFakeElement,
+  makeDomShim, flush, loadApp, setFakeTime, realNow, publishedBetaContinuation, SAVE_DEBOUNCE_MS,
+  settle, persisted, makeFakeCloudSyncFactory, setInput, WH_STORE_KEY, preChangeState, localAt,
+  addTaskAged, titleOf, scanHtmlOf, benchAction, fillEditPane, STORE_KEY, THEME_HINT_KEY, themeBootSrc,
+  runThemeBoot, themeBtnText, styleSrc, COLOR_RE, WHITE_RE, INVARIANT_PROPS, ALLOWED_DECLS,
+  declarations, lightDarkArgs, offendingDeclarations, ALLOWED_NON_ASCII, decodeEscapes, themeTokens,
+  channel, luminance, contrast, CONTRAST_PAIRS, openList, listHTML, listCount, selectedListIds,
+  tagRowHTML, litTags, deferredSyncFixture, fixtureDeadline, observeSyncFixtureCalls,
+  observeQueuedNativeSaves, holdNextSyncFixturePush, settleSavedViewPublication,
+  delayedLocalBoardBrowser, openingBoardSelfHosted, openingBoardFixture, invisibleSavedViewBrowser,
+  tagLabels, tagKeys, clickTag, rowTitles, SYNC_STORE_KEY, LOCAL_HEAD_KEY, LOCAL_BACKUPS_KEY,
+  DEVICE_AUTHORITY_KEY, HOUR, sharedScannerStorage, loadCloudBackend, loadCloudBackendV2,
+  cloudAdapterCryptoGate, releaseCloudAdapterCryptoAfterDeadline, decodeManualArchiveTypedValue,
+  backupFileFixtures, loadBackupFileFixtureApp, prepareBackupFileFixtureSource, syncTask, syncState,
+  saveEditorChoice, loadAppAtTime, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN,
+  cloudState, makeSyncHarness, decisionRecoveryApp146, mixedSharedOutcome146,
+  recordMixedDecisionActions146, decisionMixedActionsApp146, syncSettle, PAST_DEBOUNCE, doneTitles,
+  seedDuplicateCompletion, renamedCloud, titlesOf, workedLog, MORNING, EVENING, DAY_BEFORE,
+  seedWorkLog, moodRuntime, atNoon, hourLabel, nativeSource, runNativeInstall, loadSeasonalRepair,
+  seasonalRepairCanvas, seasonalRepairPalette, seasonalRepairNight, seasonalRepairWeather,
+  seasonalRepairRain, seasonalRepairStorm, seasonalRepairSnow, seasonalRepairSnowstorm,
+  seasonalEnvelopeRuntime, chanceProbabilityFixture, pwaUpdateHarness, updateNoticeKey, releaseMarkup,
+  releaseFingerprint, prepareReleaseNotice, SOLAR_AUDIT_FIXTURES, changeQuickEvergreen, releaseGateGit,
+  releaseGateHash, releaseGateCanonicalJson, releaseGateReseal, makeReleaseGateFixture,
+  releaseGateInput, cleanupReleaseGateFixture, riskBasedReleaseInput, testSurfaceSource,
+  recoveringCloudStatusHarness, recentDeletionAt, deletionEvidence, repeatedDeletionBoard,
+  loadStorageV2, loadCloudV2, cloudV2Payload, cloudV2Adapter, CAPTURED_UNREADABLE_GENERATION,
+  syntheticBoardOfBytes, capturedUnreadableGenerationFixture, CAPTURED_RECOVERY_BUDGET_MS,
+  CAPTURED_RESULT_BUDGET_MS, largeSerializedBytes2198, CAPTURED_PHONE_SERIALIZATION_BYTES,
+  exactPaddedBoard, capturedGenerationAcceptedApp2198, RECORDED_HEALTHY_STATUS_8CD524A,
+  RECORDED_HEALTHY_READS_8CD524A, faithfulModalQuery2194, declineButton2194,
+  pendingAutomaticDefault2194, coldRelaunch2198, syncStatus2200, decisionBackend146,
+  decisionCandidate146, exerciseCompletionEditorBoundaries, liveScanSyncClients,
+  delayedEvergreenReadFixture, liveDoneDeliverySnapshot, ordinaryEditDebounceControl,
+  liveModeDeliverySnapshot, settleLiveModePublication, releasedDependencyHydrator, MODE_LIFECYCLE_NOW,
+  modeLifecycleCopy, modeLifecycleEdit, modeLifecycleWaitFor, privateMigratedDeleteFixture,
+  privateRewriteDurableBackup, privateVisibleBackupRows, privateClickBackupDelete,
+  privateAssertBackupSurvives, PRIVATE_EXPIRY_NOW, PRIVATE_EXPIRY_OLD, privateLegacyExpiryFixture,
+  privateExpiryLegacyRows, privateExpirySave, privateExpiryAssertCurrentBoard,
+  mountPrivateEditInterval, installPrivateDateValueDescriptors, SCALED_REVIEW_POLICY_TEXT,
+  makeScaledReviewFixture, scaledPlan, SCALED_FAQ_COVERAGE,
   chanceWeatherPaint, sharedSkywriterConsumer, overdueWoopFixture, overdueWoopControl,
   pedestrianReservationPolicy, pedestrianDaytimeSpawnPolicy, assertPedestrianReservationBound,
   pedestrianFrameSelection, pedestrianPresentationConsumer, paintedMotionWorldXs,
