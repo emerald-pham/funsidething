@@ -20,7 +20,7 @@ body, alongside the release gates that apply to the change;
 
 - [ ] Behavioral RED observed, then GREEN
 - [ ] Owner exact-diff review
-- [ ] Independent review
+- [ ] Any other reviews the derived plan requires
 - [ ] Required CI green on the exact head
 - [ ] Nightly cross-engine native job dispatched and green on the exact head (Stable releases)
 - [ ] Merged and Pages deployment verified

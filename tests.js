@@ -30476,6 +30476,26 @@ test('RISK repository process: cross-engine native checks run nightly outside th
  }
 });
 
+// #2216: GitHub-side branch protection lives outside the repository, so a
+// ruleset edit could silently drop a required check. The nightly drift check is
+// pinned at the CI workflow seam (CI-routing tests) and its comparison at the
+// drift tool's command line with fixture GitHub responses; this process RISK
+// requires those pins to execute and pass.
+test('RISK repository process: nightly run fails when the live main ruleset drifts from the committed required checks',()=>{
+ const pins={
+  'scripts/agent-tools/ci-routing.test.mjs':['workflow checks the live main ruleset against the committed required checks every night'],
+  'scripts/agent-tools/ruleset-drift.test.mjs':['ruleset drift passes for the committed set and names missing and extra checks on a mismatch','ruleset drift fails visibly and names the manual comparison when the rules cannot be read'],
+ };
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const [file,names] of Object.entries(pins)){
+  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+names.join('|')+')$',file],{cwd:__dirname,env,encoding:'utf8',timeout:300000,maxBuffer:8*1024*1024});
+  assert.equal(result.status,0,'The ruleset drift pins must pass: '+result.stdout+'\n'+result.stderr);
+  assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,names.length,'every named ruleset drift pin must execute');
+  assert.match(result.stdout,/^# skipped 0$/m);
+  for(const name of names)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+name)),'pin did not pass: '+name);
+ }
+});
+
 // The weekly velocity report is pinned at the agreed seams (the CI-monitor
 // agent-tool tests with fixture GitHub responses, and the CI workflow files in
 // the CI-routing tests); this process RISK requires those pins to execute and pass.

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "branch": "main",
+  "readFrom": "GET /repos/emerald-pham/funsidething/rules/branches/main on 2026-11-04 (ruleset 23880568, \"Protect main with data safety checks\")",
+  "note": "The Nightly ruleset-drift job fails when the rules that apply to main require a different set. Change this file and the ruleset together, in the same reviewed change.",
+  "requiredStatusChecks": [
+    { "context": "scanner-tests", "integrationId": 15368 },
+    { "context": "funsidething/memory-audit" },
+    { "context": "funsidething/independent-review" },
+    { "context": "funsidething/specialist-review" }
+  ]
+}

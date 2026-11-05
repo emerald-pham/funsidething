@@ -55,19 +55,19 @@ cases, unsupported runtime and incomplete cleanup remain failures.
 
 Keep actual command omission/duplicate/skip and native wrong-candidate,
 stale-byte, unsafe-replacement and source-loss sensitivity evidence distinct
-from the original process RED. Existing independent code and relevant
-data/sync reviewers inspect these exact results and limits with the retained
-app-consumer regressions. This adds no review role or release status. Native
-ephemeral Chromium evidence does not imply deployed or physical-device proof;
-existing compatibility, FAQ, rendered, CI and live gates still apply.
+from the original process RED. The reviewers the derived plan requires inspect
+these exact results and limits with the retained app-consumer regressions.
+This adds no review role or release status. Native ephemeral Chromium evidence
+does not imply deployed or physical-device proof; the compatibility, CI and live
+gates and the derived review plan still apply.
 
 ## Nightly cross-engine native checks
 
 The cross-engine (Chromium + WebKit) native button checks run in the `Nightly`
-workflow's `cross-engine-native` job, not in the per-push required cohort, so an
-engine-specific failure cannot block unrelated fixes. The job runs every night
-on `main` and on manual dispatch. The Chromium installed-client cases above stay
-required on every change.
+workflow's `cross-engine-native` job every night on `main` and on manual
+dispatch, so an engine-specific failure cannot block unrelated fixes.
+[Test groups](test-groups.md#nightly-cross-engine-cohort) defines which cases
+are nightly and which stay in the required cohort.
 
 Before a Stable release, dispatch `Nightly` on the release candidate ref
 (`gh workflow run nightly.yml --ref <candidate-branch>`) and require that run to
@@ -75,6 +75,15 @@ pass on the exact candidate head. A failed, skipped or missing run blocks the
 release until it is fixed or the maintainer accepts the named failure. A
 failing scheduled run fails the workflow and GitHub notifies the maintainer;
 treat it as a release blocker for the next Stable release, not as noise.
+
+## Ruleset drift
+
+The `Nightly` workflow's `ruleset-drift` job compares the required status
+checks that GitHub applies to `main` with
+[`.github/required-status-checks.json`](../../.github/required-status-checks.json)
+and fails naming each missing or extra check. Change the ruleset and that file
+together in one reviewed change. If the job reports it could not read the
+rules, run the `gh api` comparison it prints before the next Stable release.
 
 ## Risk-based exact-commit release gates
 
@@ -190,12 +199,14 @@ empty-profile public passes retain their original scope; they do not establish
 recovery of a newly reported populated source. This adds no review role or
 blanket runtime matrix; existing exact-candidate and release gates still apply.
 
-## Independent typography review for final releases
+## Independent typography review
 
-Owner instruction, 2026-10-08: every final product checkpoint release and
-equivalent release requires a typography reviewer independent of the
-implementer. Under the scaled review policy this review is required only when
-the derived plan sets `requiresTypographyReview`. Review the actual final built candidate, identify its commit and
+A typography reviewer independent of the implementer is required when the
+derived plan sets `requiresTypographyReview`, which happens only when rendered
+markup or stylesheet content changes. Candidates under the October 2026 policy,
+whose base predates the scaled review policy, keep the owner instruction of
+2026-10-08: every final product checkpoint release needs this review. Review
+the actual final built candidate, identify its commit and
 build artifact, and compare it with the intended typography contract and
 previous released build. Automated typography checks do not substitute for this
 review. Recheck affected evidence if the reviewed candidate materially changes.
@@ -251,5 +262,3 @@ known limitations. Audit existing features for omissions when reorganizing it.
 Record the exact-SHA `faqReview` and fingerprinted report in the release receipt.
 The release validator requires this evidence for executable candidates under
 this policy and binds it into the existing required release statuses.
-Pure documentation housekeeping retains owner review. Typography review remains
-a separate required check of final rendered evidence.
