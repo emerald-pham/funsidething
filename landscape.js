@@ -1481,13 +1481,11 @@
   function paintScene(){
     paintBackground();syncScene(Date.now());paintLife(world.elapsed);
   }
-  // Until the opening paint a refresh computes the scene but owes its paint.
+  // During the opening task a refresh computes the scene but owes its paint.
   // Opening used to paint the whole landscape two or three times in the same
   // task as the board's first input, so a visible board could not be used
-  // until the scenery finished drawing (#2202). A resize, a return to the app
-  // or a pageshow while the board is still opening reaches this refresh too;
-  // it used to paint before the board (#2194 FAQ re-review B4), so it now
-  // joins the single opening paint. After that paint a refresh paints at once.
+  // until the scenery finished drawing (#2202). A later refresh paints at
+  // once and settles the owed paint.
   // Opening states: {opening:true} during the boot task (refreshes only compute);
   // {opening:false} while the opening paint is owed, waiting for the board;
   // null once it has painted. `due` says a computed scene still needs painting.
@@ -1495,8 +1493,8 @@
   let openingPaint=null;
   function refreshSky(){
     computeScene();
-    if(openingPaint)openingPaint.due=true;
-    else paintScene();
+    if(openingPaint?.opening)openingPaint.due=true;
+    else{if(openingPaint)openingPaint.due=false;paintScene();}
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
@@ -1507,7 +1505,10 @@
     // Pixel budget prevents high-DPR phones from allocating desktop-size canvases.
     dpr=Math.min(window.devicePixelRatio||1,1.5,Math.sqrt(3000000/(W*H)));
     for(const canvas of [back,front,partyLayer]){canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.getContext('2d').setTransform(dpr,0,0,dpr,0,0);}
-    refreshSky();
+    // While the opening paint waits for the board, a resize joins it instead
+    // of painting first (#2194 FAQ re-review B4). Once the board shows, it
+    // paints at once as before, even before the opening paint's own frame.
+    if(openingPaint&&!openingPaint.boardShown)owedOpeningRefresh();else refreshSky();
   }
   function tick(now){
     if(reduced||document.hidden){frame=0;return;}
@@ -1575,7 +1576,7 @@
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
-  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=openingPaint?Infinity:0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;refreshPaint=null;partyTimer=0;}
+  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=openingPaint&&!openingPaint.boardShown?Infinity:0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;refreshPaint=null;partyTimer=0;}
   function scheduleSky(){
     clearTimeout(skyTimer);if(document.hidden)return;
     const now=Date.now(),weather=S.weatherAt(new Date(now),sceneSeason);
@@ -1607,7 +1608,9 @@
   }
   function start(){
     stop();if(document.hidden)return;
-    if(W!==window.innerWidth||H!==window.innerHeight)resize();else refreshSky();
+    // A return to the app or a pageshow while the board is still opening
+    // joins the opening paint too (#2194 FAQ re-review B4).
+    if(W!==window.innerWidth||H!==window.innerHeight)resize();else if(openingPaint&&!openingPaint.boardShown)owedOpeningRefresh();else refreshSky();
     scheduleSky();if(!reduced)frame=requestAnimationFrame(tick);else partyTimer=setInterval(()=>advanceRooftopParty(1),1000);
   }
   function updateMotion(){
@@ -1766,7 +1769,8 @@
   // opening paint only computes, so no scenery paint runs in the task that
   // first shows the board (#2194 review F6, F9). A resize, a return to the
   // app or a pageshow meanwhile only computes and keeps the loop's hold
-  // (#2194 FAQ re-review B4). If the board never signals, the scenery still
+  // (#2194 FAQ re-review B4); other direct refreshes after this task still
+  // paint at once. If the board never signals, the scenery still
   // paints after a bounded wait. Until then the normal-motion loop keeps
   // running but its next paint is held, and the reduced-motion timer skips
   // its runs until then.
@@ -1776,6 +1780,8 @@
   const releaseOpening=()=>{
     if(openingReleased)return;
     openingReleased=true;boardObserver?.disconnect();clearTimeout(boardFallback);
+    // From here a resize or return to the app paints at once again (B4).
+    if(openingPaint)openingPaint.boardShown=true;
     showScenePlaceholder();
     requestAnimationFrame(()=>setTimeout(()=>{
       const owed=openingPaint?.due;openingPaint=null;
