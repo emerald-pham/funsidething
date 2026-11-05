@@ -22,6 +22,7 @@ body, alongside the release gates that apply to the change;
 - [ ] Owner exact-diff review
 - [ ] Independent review
 - [ ] Required CI green on the exact head
+- [ ] Nightly cross-engine native job dispatched and green on the exact head (Stable releases)
 - [ ] Merged and Pages deployment verified
 - [ ] Live behavior checked on Stable
 - [ ] Branch and worktree cleaned up

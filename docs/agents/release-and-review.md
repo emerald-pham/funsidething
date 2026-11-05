@@ -61,6 +61,21 @@ app-consumer regressions. This adds no review role or release status. Native
 ephemeral Chromium evidence does not imply deployed or physical-device proof;
 existing compatibility, FAQ, rendered, CI and live gates still apply.
 
+## Nightly cross-engine native checks
+
+The cross-engine (Chromium + WebKit) native button checks run in the `Nightly`
+workflow's `cross-engine-native` job, not in the per-push required cohort, so an
+engine-specific failure cannot block unrelated fixes. The job runs every night
+on `main` and on manual dispatch. The Chromium installed-client cases above stay
+required on every change.
+
+Before a Stable release, dispatch `Nightly` on the release candidate ref
+(`gh workflow run nightly.yml --ref <candidate-branch>`) and require that run to
+pass on the exact candidate head. A failed, skipped or missing run blocks the
+release until it is fixed or the maintainer accepts the named failure. A
+failing scheduled run fails the workflow and GitHub notifies the maintainer;
+treat it as a release blocker for the next Stable release, not as noise.
+
 ## Risk-based exact-commit release gates
 
 Every candidate needs an owner review of its exact diff. The release validator

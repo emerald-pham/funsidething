@@ -87,6 +87,33 @@ This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
 
+## Nightly cross-engine cohort
+
+`scripts/test-group-assignments.json` lists cross-engine native roots under
+`nightlyRoots` (root title, source file, reason). They belong to no required
+group: `--describe`, the four group runs, the unclassified-root guard and
+`--aggregate` neither run nor require them. A nightly root cannot also be a
+required root or process control, and the Chromium installed-client cases
+(the owner root and its signed-out and reconcile-held children) can never be
+declared nightly. To move a case to nightly, remove its `rootAssignments` row
+and add a `nightlyRoots` row; a baseline root cannot move because the baseline
+must stay fully assigned.
+
+The `Nightly` workflow runs them with Chromium and WebKit installed:
+
+```sh
+npm run test:group -- --group nightly-cross-engine --output-dir <new-empty-dir> \
+  --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> \
+  --source-sha <sha> --comparison-base <sha>
+```
+
+The run fails when no nightly root is declared, when a declared root is not
+registered exactly once in its file, or when any nightly case fails, is skipped
+or is missing. It writes `result.json` and TAP like a group run, but it is not
+a required group and cannot be described, covered or aggregated. When and how
+releases depend on it is in
+[release and review](release-and-review.md#nightly-cross-engine-native-checks).
+
 ## Parallel Actions aggregation
 
 Data safety describes the required cohort before routing with the same runner's
