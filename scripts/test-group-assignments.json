@@ -5856,12 +5856,22 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again",
       "group": "persistence-recovery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: a readable active generation of the captured shape leaves the saved board, cloud and status exactly as before",
       "group": "persistence-recovery",
       "file": "tests.js"
     },

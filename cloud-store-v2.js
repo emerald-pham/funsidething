@@ -49,7 +49,9 @@
     // opts in with reuseUnreadable. Every other pull (explicit Retry, a fresh
     // sign-in, a direct read) proves the answer again, so a generation whose
     // chunks were restored in place is still seen.
-    async function pull(uid,{stillCurrent,reuseUnreadable=false}={}){
+    // A caller may also pass a conclusion it kept from an earlier launch for
+    // this account; it is honoured only for the same fresh manifest.
+    async function pull(uid,{stillCurrent,reuseUnreadable=false,knownUnreadable:remembered=null}={}){
       if(!uid) return {error:true,code:"missing-account"};
       let manifest=await adapter.readRoot(uid);
       if(!current(stillCurrent)) return {cancelled:true};
@@ -61,7 +63,8 @@
         const generationId=manifest.activeGeneration;
         if(typeof generationId!=="string"||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
           return {error:true,code:"invalid-manifest"};
-        if(reuseUnreadable===true&&knownUnreadable(uid,manifest))
+        if(reuseUnreadable===true&&(knownUnreadable(uid,manifest)||
+          remembered?.rev===manifest.rev&&remembered.generationId===generationId))
           return {error:true,code:"corrupt-generation",generationId,rev:manifest.rev,knownUnreadable:true};
         try{
           // Both immutable reads use the same manifest generation. Download

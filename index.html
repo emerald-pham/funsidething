@@ -4823,8 +4823,11 @@ let automaticCloudRecovery = null; // protected exact-source evidence for one co
 let unrepairableCloudSource = null; // one completed unsafe-repair check, bound to its owner and ACK
 // That check's completed refusal for one exact server revision and generation.
 // Unlike the hold it survives a hide/resume, so reopening over the same root
-// does not download the same unreadable sources again (#2201).
+// does not download the same unreadable sources again (#2201). A copy keyed by
+// account, revision and generation is kept in device storage so an installed
+// app relaunched over the same root does not download them either.
 let provedUnreadableCloudSource = null;
+const PROVED_UNREADABLE_CLOUD_SOURCE_KEY="fvp:chain-scanner:proved-unreadable-cloud-source";
 let cloudPullRevalidate = false; // explicit Retry proves every source again
 let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
 let cloudAdoptionHeld = false; // a newer read could not be safely adopted; prior read cannot authorize writes
@@ -4991,6 +4994,9 @@ function observeCloudIdentity(){
     }
     clearCloudRetry();
   }
+  // Signing out or another account ends a remembered conclusion. Before the
+  // backend knows the restored session, its empty user is not a sign-out.
+  if(window.CloudSync?.ready===true)forgetPersistedUnreadableCloudSourceUnless(identity,user);
   observedCloudUser=user;observedCloudUid=identity;observedCloudIdentity=true;
 }
 function cloudAccountIdentity(){try{return window.CloudSync?.recoveryIdentity?.()??null;}catch{return null;}}
@@ -5256,7 +5262,7 @@ async function sendPush(){
   const heldStillCurrent=()=>cloudAdoptionHeld&&unrepairableCloudSource===heldSource&&heldSourceMatchesBoard(heldSource);
   if(heldStillCurrent()){
     if(await heldSourceStillHolds(heldSource,heldStillCurrent)){pendingPush=true;renderSync();return;}
-    provedUnreadableCloudSource=null;
+    forgetProvedUnreadableCloudSource();
   }
   unrepairableCloudSource=null;
   if(deviceStorageRequired&&!deviceStorageAuthority){
@@ -5486,7 +5492,7 @@ function bindDecisionBase(account,revision,payload){
   const identity=cloudAccountIdentity(),identityChanged=identity!==null&&state.syncIdentity!==identity;
   if(identity!==null)state.syncIdentity=identity;
   if(JSON.stringify(state.decisionBase)===JSON.stringify(next))return identityChanged;
-  unrepairableCloudSource=null;provedUnreadableCloudSource=null;
+  unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();
   state.decisionBase=next;
   return true;
 }
@@ -5993,6 +5999,63 @@ async function exactAcknowledgedCloudSource(failed,account){
         recoveryPending:evidence.pending,validateBeforePublish}}};
   }catch{return null;}
 }
+// The completed refusal no longer applies: forget it here and on the device.
+function forgetProvedUnreadableCloudSource(){
+  provedUnreadableCloudSource=null;
+  try{localStorage.removeItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);}catch{}
+}
+function readPersistedUnreadableCloudSource(){
+  try{const raw=localStorage.getItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);return raw&&raw.length<=8192?JSON.parse(raw):null;}catch{return null;}
+}
+function forgetPersistedUnreadableCloudSourceUnless(identity,account){
+  const record=readPersistedUnreadableCloudSource();
+  if(record&&(!identity||record.identity!==identity||record.account!==account))
+    try{localStorage.removeItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);}catch{}
+}
+const unreadableProofHash=value=>value===null||typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
+function unreadableProofPointer(pointer){
+  if(pointer===null)return true;
+  if(!pointer||typeof pointer!=="object"||Array.isArray(pointer))return false;
+  if(pointer.malformed===true)return Object.keys(pointer).length===1;
+  return Object.keys(pointer).length===1&&Array.isArray(pointer.values)&&pointer.values.length===5&&
+    pointer.values.every(value=>value===null||["boolean","number"].includes(typeof value)||typeof value==="string"&&value.length<=1024);
+}
+// Only a completed refusal is kept: its identity, the server revision and
+// generation it covers, and the hash of the accepted board it held, never the
+// board itself. A storage failure keeps today's behaviour of proving again.
+async function rememberProvedUnreadableCloudSource(proved){
+  const hold=proved.hold;
+  try{
+    const basePayloadHash=typeof hold.payload==="string"?await ChainStorageV2.hashPayload(hold.payload):null;
+    if(provedUnreadableCloudSource!==proved)return;
+    localStorage.setItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY,JSON.stringify({v:1,account:proved.account,identity:proved.identity,
+      rev:proved.rev,generationId:proved.generationId,revision:hold.revision,baseId:hold.baseId??null,basePayloadHash,
+      hash:hold.hash??null,byteLength:hold.byteLength??null,
+      ...(hold.pendingPointer!==undefined?{pendingPointer:hold.pendingPointer,pendingLossy:hold.pendingLossy===true}:{})}));
+  }catch{}
+}
+// Rebuilds the write hold of a remembered refusal for this exact account and
+// accepted board. It never produces a board: the caller still reads the server
+// root, and the store answers from it only while that root names the same
+// revision and generation. A record that no longer matches is forgotten.
+async function restoreProvedUnreadableCloudSource(backend,account,identity,stillCurrent){
+  const record=readPersistedUnreadableCloudSource();
+  if(!record)return null;
+  const base=state?.decisionBase;
+  const valid=record.v===1&&typeof record.account==="string"&&record.account===account&&typeof record.identity==="string"&&record.identity===identity&&
+    Number.isSafeInteger(record.rev)&&record.rev>=1&&typeof record.generationId==="string"&&record.generationId.length>0&&record.generationId.length<=256&&
+    record.revision===state.syncRev&&(record.baseId??null)===(base?.id??null)&&unreadableProofHash(record.basePayloadHash)&&
+    unreadableProofHash(record.hash)&&(record.byteLength===null||Number.isSafeInteger(record.byteLength)&&record.byteLength>=0)&&
+    (record.pendingPointer===undefined||unreadableProofPointer(record.pendingPointer))&&liveBoardAccepted&&deviceStorageAuthority;
+  if(!valid){if(stillCurrent())forgetProvedUnreadableCloudSource();return null;}
+  let basePayloadHash;
+  try{basePayloadHash=typeof base?.payload==="string"?await ChainStorageV2.hashPayload(base.payload):null;}catch{return null;}
+  if(!stillCurrent()||provedUnreadableCloudSource||readPersistedUnreadableCloudSource()?.generationId!==record.generationId)return null;
+  if(basePayloadHash!==record.basePayloadHash){forgetProvedUnreadableCloudSource();return null;}
+  const hold={backend,account,identity,revision:state.syncRev,baseId:base?.id,payload:base?.payload,hash:record.hash,byteLength:record.byteLength,
+    ...(record.pendingPointer!==undefined?{pendingPointer:record.pendingPointer,pendingLossy:record.pendingLossy===true}:{})};
+  return provedUnreadableCloudSource={backend,account,identity,rev:record.rev,generationId:record.generationId,hold,persisted:true};
+}
 // A freshly read unreadable root still matches the completed refusal: same
 // backend, account and identity, the same server revision and generation, and
 // the same held board evidence that sendPush checks before every write.
@@ -6095,8 +6158,8 @@ async function cloudPull(){
   const pullStillCurrent=()=>cloudReady()&&window.CloudSync===pullBackend&&pullBackend.user===acct&&
     cloudAccountIdentity()===pullIdentity&&!cloudSuspended&&!cloudResumePending;
   const revalidate=cloudPullRevalidate;cloudPullRevalidate=false;
-  const priorUnreadable=revalidate?null:provedUnreadableCloudSource;
-  if(revalidate)provedUnreadableCloudSource=null;
+  let priorUnreadable=revalidate?null:provedUnreadableCloudSource;
+  if(revalidate)forgetProvedUnreadableCloudSource();
   unrepairableCloudSource=null;
   pulling = true;
   let rebuildingCloudSource=false,rebuildContext=null,healthyCloudRead=false;
@@ -6105,9 +6168,13 @@ async function cloudPull(){
   // from finally using that stale authority, forming a network-speed loop.
   cloudAdoptionHeld = true;
   try{
+    // A relaunched app starts from the conclusion kept in device storage,
+    // rebuilt only when it still matches this account and accepted board.
+    if(!priorUnreadable&&!revalidate)priorUnreadable=await restoreProvedUnreadableCloudSource(pullBackend,acct,pullIdentity,pullStillCurrent);
     // The store may answer from its unreadable conclusion only when this app
     // holds a completed refusal for it; every other pull reads the source.
-    let remote = await window.CloudSync.pull({reuseUnreadable:!!priorUnreadable});
+    let remote = await window.CloudSync.pull({reuseUnreadable:!!priorUnreadable,
+      provedUnreadable:priorUnreadable?.persisted?{identity:priorUnreadable.identity,rev:priorUnreadable.rev,generationId:priorUnreadable.generationId}:null});
     if(!cloudReady() || window.CloudSync.user !== acct || cloudAccountIdentity()!==pullIdentity || remote?.cancelled || cloudSuspended || cloudResumePending) return;
     if(hasActiveEditor() || scannerGestureActive){ deferredCloudPull = true; return; }
     /* Three-way answer, and the destructive branch is the one that has to
@@ -6127,7 +6194,7 @@ async function cloudPull(){
       if(priorUnreadable&&await provedUnreadableStillDecides(priorUnreadable,remote,pullStillCurrent)){
         unrepairableCloudSource=priorUnreadable.hold;
       }else{
-        provedUnreadableCloudSource=null;
+        forgetProvedUnreadableCloudSource();
         const exact=await exactAcknowledgedCloudSource(remote,acct);
         if(exact){remote=exact;rebuildingCloudSource=true;rebuildContext=exact.automaticRecovery;}
         else{
@@ -6138,8 +6205,8 @@ async function cloudPull(){
           const hold=unrepairableCloudSource;
           if(hold&&remote.code==="corrupt-generation"&&Number.isSafeInteger(remote.rev)&&
             outcome.refused?.rev===remote.rev&&outcome.refused.generationId===remote.generationId&&pullStillCurrent())
-            provedUnreadableCloudSource={backend:pullBackend,account:acct,identity:pullIdentity,
-              rev:remote.rev,generationId:remote.generationId,hold};
+            await rememberProvedUnreadableCloudSource(provedUnreadableCloudSource={backend:pullBackend,account:acct,identity:pullIdentity,
+              rev:remote.rev,generationId:remote.generationId,hold});
         }
       }
     }
@@ -6150,7 +6217,7 @@ async function cloudPull(){
     if(hasActiveEditor()||scannerGestureActive){deferredCloudPull=true;return;}
     const haveRemote = !!(remote && remote.payload);
     healthyCloudRead=(haveRemote||remote?.empty===true)&&!rebuildingCloudSource;
-    if(healthyCloudRead)provedUnreadableCloudSource=null;
+    if(healthyCloudRead)forgetProvedUnreadableCloudSource();
     if(remote?.error){scheduleCloudRetry(acct);return;}
     if(!haveRemote && !(remote && remote.empty)){reportCloudReconcileError("malformed-response");return;}
     let remoteState = null, remotePayload = null, remoteHadScene = false, remoteDeletionLogRepaired = false;
@@ -11960,7 +12027,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         deviceRecoveryCloudHold=savedHold;deviceHeadHash=saved.hash;lastPersistedRaw=saved.payload;
         persistedChanceSeed=next.chance?.seed??null;freshClient=false;verifiedEmptyDeviceStore=false;
         deviceStorageRequired=true;liveBoardAccepted=false;unacceptedDeviceSource={reason:"missing-authoritative-head"};
-        state=next;automaticCloudFallbackBootBaseline=null;unrepairableCloudSource=null;provedUnreadableCloudSource=null;cloudAdoptionHeld=true;pendingPush=false;
+        state=next;automaticCloudFallbackBootBaseline=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();cloudAdoptionHeld=true;pendingPush=false;
         render();renderSync();toast("The complete older cloud copy is saved on this device, but browser storage could not finish activating it. Keep this tab open and retry when storage is available.",9000);
         return false;
       }
@@ -11971,7 +12038,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       deviceRecoveryCloudHold=savedHold;deviceHeadHash=saved.hash;lastPersistedRaw=saved.payload;
       persistedChanceSeed=next.chance?.seed??null;freshClient=false;liveBoardAccepted=true;
       unacceptedDeviceSource=null;
-      state=next;automaticCloudFallbackBootBaseline=null;unrepairableCloudSource=null;provedUnreadableCloudSource=null;cloudAdoptionHeld=true;pendingPush=false;
+      state=next;automaticCloudFallbackBootBaseline=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();cloudAdoptionHeld=true;pendingPush=false;
       if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}
       if(cloudRetryTimer&&cloudRetryOwner!=="automatic-source"){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
       render();renderSync();
@@ -12292,7 +12359,7 @@ async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null
       const finalIdentity=await backend.recoveryEvidence();
       if(!current()||finalIdentity.identity!==identity||finalIdentity.epoch!==evidence.epoch||finalIdentity.pending)return false;
       state=next;deviceHeadHash=saved.hash;lastPersistedRaw=applied;persistedChanceSeed=next.chance?.seed??null;
-      deviceRecoveryCloudHold=null;automaticCloudRecovery=null;unrepairableCloudSource=null;provedUnreadableCloudSource=null;
+      deviceRecoveryCloudHold=null;automaticCloudRecovery=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();
       lastKnownCloudPayload=payload;lastKnownCloudAccount=account;lastKnownCloudRevision=result.rev;lastPushed=payload;
       reconciledAs=account;pendingPush=false;cloudAdoptionHeld=false;cloudResumePending=false;deferredCloudPull=false;
       cloudWriteFailure=null;clearCloudRetry();bindConfirmedDeviceCloudOwner();
@@ -15736,7 +15803,7 @@ if(configured){
        {error:true}         — the read did not happen, so we learned nothing
        Collapsing the last two into null is what let a stale device "seed"
        an empty cloud that was never empty. See cloudPull(). */
-    CS.pull = async ({reuseUnreadable=false}={})=>{
+    CS.pull = async ({reuseUnreadable=false,provedUnreadable=null}={})=>{
       const pullUser=auth.currentUser;
       if(suspended)return {cancelled:true};
       if(!pullUser) return { error:true };
@@ -15751,8 +15818,13 @@ if(configured){
           if(auth.currentUser?.uid!==pullUid || operation!==pullOperation)return {cancelled:true};
           // Every new sign-in proves the source again; only a later pull in the
           // same sign-in that asks for it may skip a known unreadable download.
-          const reuse=reuseUnreadable===true&&unreadableProofEpoch===recoveryAuthEpoch;unreadableProofEpoch=recoveryAuthEpoch;
-          return generationStore.pull(pullUid,{stillCurrent:()=>auth.currentUser?.uid===pullUid&&operation===pullOperation,reuseUnreadable:reuse});
+          // A relaunched app's remembered conclusion for this same account
+          // also qualifies: the app forgets it on sign-out or account change.
+          const restored=reuseUnreadable===true&&provedUnreadable?.identity===pullUid&&
+            Number.isSafeInteger(provedUnreadable.rev)&&typeof provedUnreadable.generationId==="string";
+          const reuse=reuseUnreadable===true&&(unreadableProofEpoch===recoveryAuthEpoch||restored);unreadableProofEpoch=recoveryAuthEpoch;
+          return generationStore.pull(pullUid,{stillCurrent:()=>auth.currentUser?.uid===pullUid&&operation===pullOperation,reuseUnreadable:reuse,
+            knownUnreadable:restored?{rev:provedUnreadable.rev,generationId:provedUnreadable.generationId}:null});
         })());
         if(auth.currentUser?.uid!==pullUid || operation!==pullOperation) return {cancelled:true};
         if(result?.error){

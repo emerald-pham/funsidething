@@ -32197,6 +32197,62 @@ test('RISK corrupt cloud work budget: resuming over an unchanged unreadable gene
  assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected after Retry and sign-in');
 });
 
+// #2194 review F1: the reporter's case is an installed app relaunched. A
+// completed refusal over an unchanged server root must survive that cold
+// launch, keyed by account, revision and generation. The root is still a
+// forced server read, and the conclusion only ever holds writes.
+async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
+ const reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});
+ if(!reopened.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),reopened.ctx,{filename:'device-store-v2.js'});reopened.ctx.window.ChainStorageV2=reopened.ctx.ChainStorageV2;}
+ await reopened.ctx.__dataReady;reopened.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ const faults={authPending:true,serverRead:async path=>{reads.push(path);}};
+ const backend=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,sharedDocs:app.backend.docs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:CAPTURED_RECOVERY_BUDGET_MS,recordSyncError:reopened.ctx.recordSyncError});
+ t.after(async()=>{backend.CS.suspend();try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',reopened.ctx);}catch{}
+  try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();try{vm.runInContext('state=null;undoStack=null;lastPersistedRaw=null',reopened.ctx);}catch{}});
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy||automaticCloudFallbackBootCapturePending',reopened.ctx);
+ const relaunched={...reopened,backend,faults,settle:message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000)};
+ if(signIn){backend.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await flush();await reopened.ctx.cloudPull();await relaunched.settle('the relaunched opening settles');}
+ return relaunched;
+}
+test('RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating'}),{ctx,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ const generationReads=since=>reads.slice(since).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath));
+ const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},'the first opening settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(backend.CS.errorCode,'corrupt-generation');assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.ok(generationReads(0).includes(activePath+'/chunks')&&generationReads(0).includes(priorPath+'/chunks'),'saved data without a remembered conclusion proves both sources, as before');
+ const head=(await store.readHead()).payload,cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ await closeLegacyApp173(app);backend.CS.suspend();
+ // The installed app is relaunched over the same unchanged server root.
+ const coldReads=[],cold=await coldRelaunch2198(t,app,coldReads);
+ t.diagnostic('Cold launch: '+coldReads.length+' server reads '+JSON.stringify(coldReads));
+ assert.ok(coldReads.includes('users/owner'),'the root is still read from the server on a cold launch');
+ assert.equal(cold.backend.CS.errorCode,'corrupt-generation','the cold launch still reports the unreadable generation');
+ assert.deepEqual(coldReads.filter(path=>path.startsWith(activePath)||path.startsWith(priorPath)),[],'a cold launch over the unchanged root downloads neither the unreadable generation nor its prior again');
+ const coldStore=cold.ctx.window.ScannerDeviceStore;
+ assert.equal((await coldStore.readHead()).payload,head,'the remembered conclusion never produces a board');
+ assert.equal(await coldStore.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected');assert.equal(backend.writes.length,writes);
+ // The relaunched app's ordinary edits are still held without downloads.
+ cold.ctx.window.CLOUD_PUSH_DELAY_MS=0;const beforeEdit=coldReads.length;
+ cold.shim.document.getElementById('addInput').value='Local work after a cold launch';await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true);
+ await cold.settle('the ordinary edit settles');
+ assert.deepEqual(coldReads.slice(beforeEdit),[],'an ordinary edit after the cold launch triggers no cloud download');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore);
+ // Explicit Retry proves the answer again from the server.
+ const beforeRetry=coldReads.length;await cold.ctx.onAction('sync-retry',{});await cold.settle('Retry settles');
+ assert.ok(coldReads.slice(beforeRetry).includes(activePath+'/chunks'),'explicit Retry downloads and checks the unreadable generation again');
+ // Signing out ends the conclusion: the next cold launch proves it again.
+ cold.backend.emitAuth(null);await flush();await cold.settle('sign-out settles');
+ await closeLegacyApp173(cold);cold.backend.CS.suspend();
+ const afterSignOut=[],again=await coldRelaunch2198(t,app,afterSignOut);
+ assert.ok(afterSignOut.includes(activePath+'/chunks'),'after signing out, the next sign-in proves the source again');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected after Retry and sign-out');
+ assert.ok(again.ctx.state.tasks.some(task=>task.title==='Local work after a cold launch'));
+});
+
 test('RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again',{timeout:180000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t,{priorVariant:'ambiguous legacy rating',recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
  const reads=[];let roots=0,interrupted=false;
