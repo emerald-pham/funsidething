@@ -6094,6 +6094,18 @@ async function provedUnreadableStillDecides(proved,remote,stillCurrent){
     provedUnreadableCloudSource!==proved||!stillCurrent()||!heldSourceMatchesBoard(proved.hold))return false;
   return heldSourceStillHolds(proved.hold,()=>stillCurrent()&&heldSourceMatchesBoard(proved.hold));
 }
+// Resolves after the board's next frame and a task, so input already queued
+// is handled before cloud recovery work (#2226). A hidden page draws no frame;
+// the bounded fallback still resumes it and the caller rechecks currency. A
+// host that draws no frames at all has no queued input to let through.
+function boardBeforeCloudRecoveryWork(){
+  if(typeof window.requestAnimationFrame!=="function")return Promise.resolve();
+  return new Promise(resolve=>{
+    let released=false,fallback=0;
+    const release=()=>{if(released)return;released=true;clearTimeout(fallback);setTimeout(resolve,0);};
+    fallback=setTimeout(release,1000);window.requestAnimationFrame(release);
+  });
+}
 async function cloudPull(){
   // Even source-only repair waits for boot to classify its saved sources.
   // A bounded unavailable startup still replays this queued request afterward.
@@ -6223,6 +6235,16 @@ async function cloudPull(){
       if(priorUnreadable&&await provedUnreadableStillDecides(priorUnreadable,remote,pullStillCurrent)){
         unrepairableCloudSource=priorUnreadable.hold;
       }else{
+        // #2226 (spec #2224): an unreadable generation starts recovery-source
+        // reads and the automatic recovery default, which can be heavy on a
+        // large board. Let the board's next frame and any input queued behind
+        // it go first, as the opening scenery does (#2194). Input that opened
+        // an editor defers this pull exactly like the check after the read.
+        if(remote.code==="corrupt-generation"){
+          await boardBeforeCloudRecoveryWork();
+          if(!pullStillCurrent())return;
+          if(hasActiveEditor()||scannerGestureActive){deferredCloudPull=true;return;}
+        }
         // #2194 review M1: only an answer that read the server root can show
         // the refusal no longer applies. A thrown read (offline, timeout,
         // network, permission, interrupted) carries no code and says nothing
