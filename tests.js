@@ -32342,6 +32342,10 @@ test('RISK cloud generation recovery: declining the pending automatic recovery d
  ctx.openSettings();
  const settings=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(settings,/data-act="decline-automatic-cloud-recovery"/,'Settings offers to decline the pending automatic recovery default');
+ // The established keyboard path from Review cloud recovery to the next
+ // recovery control (the native recovery consumer) stays unchanged.
+ const order=['decline-automatic-cloud-recovery','review-cloud-source-recovery','sync-signout'].map(act=>settings.indexOf('data-act="'+act+'"'));
+ assert.ok(order.every(at=>at>=0)&&order[0]<order[1]&&order[1]<order[2],'the decline precedes Review cloud recovery, so Review still moves forward to the next recovery control: '+JSON.stringify(order));
  assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'declining succeeds while the default is unpublished');
  assert.equal(JSON.stringify(ctx.state),before,'declining restores the exact board this device held before reconciliation');
  assert.equal((await store.readHead()).payload,beforeHead,'the restored board is the exact durable head');
@@ -32450,8 +32454,14 @@ async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
  await reopened.ctx.__dataReady;reopened.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  const faults={authPending:true,serverRead:async path=>{reads.push(path);}};
  const backend=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,sharedDocs:app.backend.docs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:CAPTURED_RECOVERY_BUDGET_MS,recordSyncError:reopened.ctx.recordSyncError});
+ // The same release as the #2198 fixture: the runner retains finished hooks
+ // and their realms, and the shared in-memory database keeps every multi-
+ // megabyte transaction log until it is deleted after this connection closes.
  t.after(async()=>{backend.CS.suspend();try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',reopened.ctx);}catch{}
-  try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();try{vm.runInContext('state=null;undoStack=null;lastPersistedRaw=null',reopened.ctx);}catch{}});
+  try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();backend.docs.clear();try{reopened.shim.localStorage.clear();}catch{}
+  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+   'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer'])try{vm.runInContext(name+'=null',reopened.ctx);}catch{}
+  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
  const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy||automaticCloudFallbackBootCapturePending',reopened.ctx);
  const relaunched={...reopened,backend,faults,settle:message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000)};
  if(signIn){backend.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await flush();await reopened.ctx.cloudPull();await relaunched.settle('the relaunched opening settles');}
