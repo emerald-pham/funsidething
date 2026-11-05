@@ -56,18 +56,13 @@ The hook and CI gate enforce structural requirements: tests appear in the app
 diff, a new risk case is named where required, and removed or weakened tests
 carry a rationale with red command/failure evidence. They cannot independently
 prove that the command ran before implementation or that the recorded failure
-was observed. Keep the real red output with task or release evidence, then run
-focused tests and the risk-selected regression cohort after the fix.
-Distinguish contemporaneous RED from retrospective base-versus-fixed
-validation; the latter does not establish test-first chronology. Treat the rationale as a review aid, not proof of chronology.
+was observed, so the rationale is a review aid, not proof of chronology. Keep
+RED evidence and chronology as [workflow](workflow.md#strict-tdd-at-agreed-seams)
+requires, which also defines the prose-only exemption, then run focused tests
+and the risk-selected regression cohort after the fix.
 
 For agent-tool command changes, use [agent evidence tools](agent-evidence.md) to
 select the focused and aggregate test entry points.
-
-Only pure prose, comments and nonfunctional housekeeping are exempt from a
-functional RED/GREEN loop. Configuration, dependencies and code deletion need
-the same test-first evidence whenever they change functionality. Keep focused
-cohorts; do not expand into blanket account matrices without a changed risk.
 
 ## Installed-client regression
 

@@ -52,7 +52,9 @@ observe its assertion fail on the intended baseline BEFORE functional code.
 Missing modules, import/compile errors, syntax failures, absent credentials or
 broken test infrastructure do not count as feature RED. Establish a runnable
 boundary and observe the intended behavioral mismatch first. Then implement the
-minimum, observe GREEN, and repeat one vertical slice at a time. Changes to
+minimum, observe GREEN, and repeat one vertical slice at a time. Inventory the
+cases up front, but write each test only in its own slice. A test that passes
+on first run needs investigation, not a fabricated RED. Changes to
 configuration, dependencies or deletion also require this loop when functional.
 Pure prose/nonfunctional housekeeping uses exact-diff and consistency review.
 
@@ -108,8 +110,9 @@ For error handling, retries, reconnects or stale reads, follow
 
 ## Finish and hand off
 
-Review the exact final diff against requirements and standards. Keep independent
-changed-code and specialist review required by the repository. For changed UI,
+Review the exact final diff against requirements and standards. Obtain the
+reviews its derived plan requires; [release and review](release-and-review.md#risk-based-exact-commit-release-gates)
+defines that plan. For changed UI,
 inspect actual final rendered typography, overflow, focus, accessibility and
 relevant viewports/states; a source or unit pass cannot close a runtime gap.
 Preserve data/privacy/sync safety, FAQ/documentation duties and release gates.

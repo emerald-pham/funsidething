@@ -20,11 +20,19 @@ Routine animation-frequency tuning stays out of public patch notes/changelog by
 user preference; keep internal evidence truthful and the extended FAQ accurate.
 This exception does not suppress bugs, safety/accessibility changes or limits.
 
-Release reviews scale to the exact diff. The release validator derives the
-plan, and the owner review records FAQ coverage for every product release.
-Read [release and review](docs/agents/release-and-review.md) before release for
-review identities, exact-candidate regression, compatibility, receipt, CI and
-live verification requirements. Documentation housekeeping uses owner review.
+Release reviews scale to the exact diff. Before release, read
+[release and review](docs/agents/release-and-review.md), the single authority
+for the review plan the release validator derives, review identities and the
+exact-candidate regression, compatibility, receipt, CI and live verification
+requirements.
+
+Process grows only with maintainer approval. Adding a required gate, reviewer
+role, required CI group, receipt field or issue-granularity rule needs the
+maintainer's explicit approval in chat for that specific change. Record the
+approval in the PR body with the expected velocity impact: the added time,
+reviews or issues per change. A guidance doc, skill or reviewer recommendation
+is not approval: process overhead added that way stalled releases in late
+October 2026.
 
 At start/end and after merge, follow [cleanup](docs/agents/cleanup.md), retaining
 live branches/worktrees, ignored data and other projects' reservations. Inspect
