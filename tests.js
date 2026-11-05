@@ -32737,6 +32737,61 @@ test('RISK cloud generation recovery: a refused decline after later edits points
  assert.match(dialog,/data-act="apply-cloud-source-recovery"/,'Review cloud recovery offers a deliberate choice');
 });
 
+// #2194 independent review B1: the in-process document's querySelector always
+// answers null, so no test could see that Settings itself is an open modal
+// (.mback). This makes the shim report the mounted modal faithfully for the
+// modal selectors the app uses, and leaves every other selector unchanged.
+function faithfulModalQuery2194(shim){
+ const original=shim.document.querySelector;
+ shim.document.querySelector=function(selector){
+  const open=/class="mback"/.test(String(shim.document.getElementById('modalRoot').innerHTML||''));
+  const parts=String(selector).split(',').map(part=>part.trim());
+  if(open&&parts.some(part=>part==='.mback'||part==='#modalRoot .mback'))return {matches:()=>true,closest:()=>null,contains:()=>true,getAttribute:()=>null};
+  return original.call(this,selector);
+ };
+ return ()=>{shim.document.querySelector=original;};
+}
+function declineButton2194(){
+ const button={dataset:{act:'decline-automatic-cloud-recovery'},classList:{contains:()=>false},closest(){return button;}};
+ return button;
+}
+async function pendingAutomaticDefault2194(t,app){
+ const {ctx}=app,store=ctx.window.ScannerDeviceStore;
+ // Publication stays refused, so the automatic default stays pending.
+ const refusal=Object.assign(Error('Controlled automatic publication refusal'),{code:'permission-denied'});
+ Object.defineProperty(app.faults,'push',{configurable:true,get(){return refusal;}});t.after(()=>{delete app.faults.push;});
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ ctx.closeModal();await flush();const opening=ctx.cloudPull();let opened=false;opening.then(()=>{opened=true;},()=>{opened=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!opened||!idle())await wait(20);},'the automatic default settles unpublished',CAPTURED_RESULT_BUDGET_MS+20000);
+ const pending=await store.getRecoveryCloudHold();
+ assert.ok(pending?.automaticRecovery===true,'positive control: the automatic default is pending');
+ return {idle,pending};
+}
+
+// #2194 independent review B1: the decline's busy check counted the Settings
+// modal it is pressed from as an active editor, so in a real document every
+// press was refused with "A save or edit is running". Pressed from the open
+// Settings modal through the real click dispatcher, it must succeed.
+test('RISK cloud generation recovery: Use my board from before recovery succeeds when pressed in the open Settings modal',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),beforeHead=(await store.readHead()).payload;
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ const cloudBefore=JSON.stringify([...backend.docs]);
+ t.after(faithfulModalQuery2194(shim));
+ ctx.openSettings();
+ assert.ok(shim.document.querySelector('.mback, dialog[open]'),'positive control: the document reports the open Settings modal');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="decline-automatic-cloud-recovery"/,'Settings offers the decline');
+ shim.document.getElementById('toast').textContent='';
+ shim.document.dispatchEvent({type:'click',detail:1,target:declineButton2194()});
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const message=shim.document.getElementById('toast').textContent;
+ assert.doesNotMatch(message,/save or edit is running/i,'the Settings modal the decline is pressed from is not an active editor: '+message);
+ assert.equal(await store.getRecoveryCloudHold(),null,'the decline releases the pending automatic default: '+message);
+ assert.equal(JSON.stringify(ctx.state),before,'the decline restores the exact board from before recovery');
+ assert.equal((await store.readHead()).payload,beforeHead,'the restored board is the exact durable head');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published');
+});
+
 test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
  for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
   const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;

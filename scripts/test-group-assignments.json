@@ -5901,6 +5901,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery: Use my board from before recovery succeeds when pressed in the open Settings modal",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
       "group": "persistence-recovery",
       "file": "tests.js"

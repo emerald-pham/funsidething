@@ -11849,6 +11849,15 @@ function automaticCloudRecoveryDeclined(account,identity,failed){
   // Another root or account: the earlier choice no longer describes it.
   forgetDeclinedAutomaticCloudRecovery();return false;
 }
+// The decline is pressed inside Settings, which is itself a modal (.mback),
+// so hasActiveEditor() was always true there and every press was refused
+// (#2194 independent review B1). Only another open dialog or a focused field
+// outside that modal counts as an editor for it.
+function declineEditorActive(){
+  const active=document.activeElement,root=document.getElementById("modalRoot");
+  return !!(document.querySelector("dialog[open]")||
+    active?.matches?.('input, textarea, select, [contenteditable="true"]')&&!root?.contains?.(active));
+}
 async function declineAutomaticCloudRecovery(){
   const hold=deviceRecoveryCloudHold,backend=window.CloudSync,account=backend?.user??null,identity=cloudAccountIdentity();
   // Each refusal is one short sentence (four lines or fewer at an enlarged
@@ -11856,7 +11865,7 @@ async function declineAutomaticCloudRecovery(){
   const refuse=message=>{toast(message,9000);return false;};
   if(hold?.automaticRecovery!==true||hold.reason!=="cloud-source-recovery")return refuse("No recovery is waiting. Nothing changed.");
   if(!deviceStore||!liveBoardAccepted||!deviceStorageAuthority)return refuse("Storage isn't ready. Try again shortly.");
-  if(cloudPushInFlight||fileRestoreBusy||hasActiveEditor()||scannerGestureActive)return refuse("A save or edit is running. Try again soon.");
+  if(cloudPushInFlight||fileRestoreBusy||declineEditorActive()||scannerGestureActive)return refuse("A save or edit is running. Try again soon.");
   if(hold.account!==account||hold.identity!==identity)return refuse("Account switched. Nothing changed.");
   // Stop the pending publication first: an aborted read cannot publish, and
   // a cleared hold gives later pulls nothing to publish.
