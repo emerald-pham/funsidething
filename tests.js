@@ -1090,7 +1090,9 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
- const latest=current.match(/<li>(.*?)<\/li>/)?.[1]||'';
+ // The opening-recovery note is the first entry of its own October 28 release;
+ // later dated releases may precede it in the current changelog.
+ const latest=current.split('<h3>October 28, 2026</h3>')[1]?.match(/<li>(.*?)<\/li>/)?.[1]||'';
  assert.match(latest,/saved board needs recovery.*preserved local copies/);
  assert.match(latest,/syncing label.*board is still opening.*not that cloud saving is confirmed/);
  assert.match(latest,/genuine errors and recovery warnings remain visible/);
@@ -31805,6 +31807,138 @@ test('RISK cloud generation recovery: an unfinished draft survives reconciliatio
  assert.ok(ctx.state.tasks.some(task=>task.title==='Unfinished draft kept through reconciliation'));
  assert.equal(await ctx.onAction('undo',{}),true);assert.equal(await ctx.persist(),true);
  assert.deepEqual(ctx.state.tasks.map(task=>task.title),reconciled,'Undo removes only the later Add and never reverses the reconciliation');
+});
+
+// #2200: what the person sees while the automatic recovery default (#2198) is
+// using the older complete generation and no cloud acknowledgement exists yet.
+// The status is read from the real sync control at the moment the guarded
+// publication starts, before any cloud write can acknowledge the board.
+function syncStatus2200(shim){
+ const button=shim.document.getElementById('syncBtn');
+ return {text:button.textContent,title:button.title,className:button.className,hidden:button.hidden};
+}
+test('RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot}=app;
+ let duringPublication=null;
+ app.faults.beforeTransaction=()=>{
+  const hold=ctx.window.ScannerDeviceRecoveryHold;
+  if(duringPublication||hold?.reason!=='cloud-source-recovery'||hold.automaticRecovery!==true)return;
+  duringPublication={...syncStatus2200(shim),dirty:ctx.state.syncDirty,rev:backend.docs.get('users/owner').rev,
+   olderOnly:ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation')};
+ };
+ ctx.closeModal();await flush();
+ const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
+ await fixtureDeadline(async wait=>{while(!duringPublication&&!pulled)await wait(20);},'the automatic recovery default reaches its publication',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.ok(duringPublication,'the automatic recovery default commits and starts its guarded publication');
+ assert.equal(duringPublication.olderOnly,true,'the older complete generation supplies the working board');
+ assert.equal(duringPublication.dirty,true,'reading the older complete generation is not a cloud acknowledgement');
+ assert.equal(duringPublication.rev,originalRoot.rev,'no cloud write has acknowledged the current saved board yet');
+ const status=duringPublication;
+ assert.equal(status.hidden,false);
+ assert.equal(status.text,'☁ older copy in use','the sync status names the older complete source; it is neither opening, synced nor an error: '+JSON.stringify(status));
+ assert.match(status.title,/older complete copy of your board is in use/i,'the status says an older complete source is in use');
+ assert.match(status.title,/cloud saving is not confirmed/i,'the status says cloud saving is not confirmed');
+ assert.match(status.title,/damaged newer cloud copy was not recovered/i,'the status says the damaged generation\'s missing data was not recovered');
+ assert.doesNotMatch(status.text+' '+status.title,/\bsynced\b|repaired|fixed|restored/i,'the status never reads as synced or repaired');
+ assert.doesNotMatch(status.className,/\bok\b/,'the status is never painted as success');
+});
+
+test('RISK cloud generation recovery status: genuine device and cloud errors stay visible over the older complete source status',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ let olderSource=null,deviceFailure=null;
+ app.faults.beforeTransaction=async()=>{
+  const hold=ctx.window.ScannerDeviceRecoveryHold;
+  if(olderSource||hold?.reason!=='cloud-source-recovery'||hold.automaticRecovery!==true)return;
+  olderSource=syncStatus2200(shim);
+  // A real device write failure (the storage boundary) while that older copy is in use.
+  const commitHead=store.commitHead;store.commitHead=async()=>({ok:false,code:'write-failed'});
+  try{shim.document.getElementById('addInput').value='Edit the device could not save';await ctx.onAction('add',{});
+   assert.equal(await ctx.persist(),false,'the device write really fails');deviceFailure=syncStatus2200(shim);}
+  finally{store.commitHead=commitHead;}
+  // The guarded publication itself is then refused by the cloud.
+  throw Object.assign(Error('Controlled publication refusal'),{code:'permission-denied'});
+ };
+ ctx.closeModal();await flush();
+ const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
+ await fixtureDeadline(async wait=>{while(!pulled)await wait(20);},'the refused automatic publication settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(olderSource?.text,'☁ older copy in use','positive control: the older complete source status was showing first');
+ assert.equal(deviceFailure.text,'☁ save error','a device save failure is not hidden by the older-source status: '+JSON.stringify(deviceFailure));
+ assert.match(deviceFailure.title,/latest edit is not saved on this device/i);
+ assert.equal(await ctx.persist(),true,'the device saves again once storage recovers');
+ assert.ok(await store.getRecoveryCloudHold(),'no cloud acknowledgement has cleared the older complete source');
+ // The cloud then refuses this account outright: a genuine cloud error.
+ const refusal=Object.assign(Error('Controlled cloud refusal'),{code:'permission-denied'});
+ app.faults.push=refusal;app.faults.pull=refusal;t.after(()=>{delete app.faults.push;delete app.faults.pull;});
+ const refused=ctx.cloudPull();let settled=false;refused.then(()=>{settled=true;});
+ await fixtureDeadline(async wait=>{while(!settled||vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx))await wait(20);},'the refused cloud attempt settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const cloudError=syncStatus2200(shim);
+ assert.equal(ctx.window.CloudSync.errorCode,'permission-denied','the refusal is a real cloud error');
+ assert.equal(cloudError.text,'☁ error','a genuine cloud error is not replaced by the older-source status: '+JSON.stringify(cloudError));
+ assert.match(cloudError.title,/permission denied/i);
+ assert.ok(await store.getRecoveryCloudHold(),'the recovery hold and its warning stay in place after the error');
+});
+
+test('RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ refuseNextRecoveryTransaction255(app.faults);
+ ctx.closeModal();await flush();
+ const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
+ await fixtureDeadline(async wait=>{while(!pulled)await wait(20);},'the unconfirmed automatic recovery default settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'the automatic recovery default is in use without a cloud acknowledgement');
+ assert.equal(ctx.state.syncDirty,true);
+ ctx.openSettings();
+ const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Cloud recovery is pending/,'the existing recovery warning stays visible');
+ assert.match(settings,/has not been confirmed by cloud/);
+ assert.match(settings,/older complete copy of your board is in use/i,'Settings names the older complete source in use: '+settings.slice(0,1200));
+ assert.match(settings,/damaged newer cloud copy was not recovered/i,'Settings says the damaged generation\'s missing data was not recovered');
+ assert.doesNotMatch(settings,/The current board is confirmed by cloud|repaired/i,'Settings never claims a cloud acknowledgement or a repair');
+ assert.match(settings,/data-act="review-cloud-source-recovery"/,'cloud recovery review stays reachable');
+ assert.match(settings,/data-act="restore-backup"/,'deliberate File or Paste Restore stays reachable');
+});
+
+test('RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What does “older copy in use” mean?</dt><dd>')[1]?.split('</dd>')[0];
+ assert.ok(answer,'the extended FAQ explains the new status label');
+ assert.match(answer,/last complete cloud copy is open/);
+ assert.match(answer,/Anything saved only in the damaged newer copy was not recovered/);
+ assert.match(answer,/Cloud saving is not confirmed/);
+ assert.match(answer,/shows synced only after the cloud confirms your current board/);
+ assert.match(answer,/errors still show/);
+ assert.match(answer,/Settings keeps Review cloud recovery and Restore/);
+ const damaged=help.split('<dt>What if a cloud save is damaged?</dt><dd>')[1]?.split('</dd>')[0];
+ assert.match(damaged,/the last complete one opens automatically/,'the damaged-save answer no longer limits the older copy to fresh devices');
+ const release=help.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/older copy in use/,'the dated release note names the new status');
+ assert.match(release,/was not recovered/);
+});
+
+test('RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status',{timeout:240000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const seen=[];
+ app.faults.beforeTransaction=()=>{if(ctx.window.ScannerDeviceRecoveryHold?.automaticRecovery)seen.push({...syncStatus2200(shim),rev:backend.docs.get('users/owner').rev});};
+ ctx.closeModal();await flush();
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ for(let attempt=0;attempt<3&&(attempt===0||ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx));attempt++){
+  const pull=ctx.cloudPull();
+  await fixtureDeadline(async wait=>{let done=false;pull.then(()=>{done=true;});while(!done||!idle())await wait(20);},
+   'the automatic default read settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ }
+ assert.ok(seen.length>0,'the older complete source was in use before publication');
+ // Every observation is taken while the automatic hold is still unconfirmed on this device.
+ for(const status of seen)assert.notEqual(status.text,'☁ synced','a board still held for cloud confirmation is never labelled synced: '+JSON.stringify(seen));
+ assert.equal(seen[0].rev,originalRoot.rev,'the first observation precedes every cloud write');
+ assert.equal(seen[0].text,'☁ older copy in use');
+ assert.equal(ctx.state.syncDirty,false,'the automatic default reached a real cloud acknowledgement');
+ assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1,'the acknowledgement is the guarded next revision');
+ assert.equal((await backend.CS.pull()).payload,ctx.cloudPayload(),'the cloud now holds exactly the current saved board');
+ ctx.renderSync();const after=syncStatus2200(shim);
+ assert.equal(after.text,'☁ synced','after the real acknowledgement the board may be called synced');
+ assert.doesNotMatch(after.title,/older complete copy/i);
 });
 
 async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=null}={}){
