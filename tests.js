@@ -32185,7 +32185,8 @@ async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_R
   backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
   await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
   for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
-   'unrepairableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer'])try{vm.runInContext(name+'=null',ctx);}catch{}
+   'unrepairableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  try{vm.runInContext('decisionBaseIdentityCache.length=0',ctx);}catch{}
   await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
  const activePath='users/owner/generations/'+originalRoot.activeGeneration,priorPath='users/owner/generations/'+originalRoot.previousGeneration;
  // Prior generation: complete and verifiable, carrying one change this device
@@ -32460,7 +32461,8 @@ async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
  t.after(async()=>{backend.CS.suspend();try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',reopened.ctx);}catch{}
   try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();backend.docs.clear();try{reopened.shim.localStorage.clear();}catch{}
   for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
-   'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer'])try{vm.runInContext(name+'=null',reopened.ctx);}catch{}
+   'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',reopened.ctx);}catch{}
+  try{vm.runInContext('decisionBaseIdentityCache.length=0',reopened.ctx);}catch{}
   await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});
   // This retained hook must not keep the relaunched realm or its backend alive.
   reopened=null;backend=null;});
