@@ -1,37 +1,45 @@
 # Atomic issues
 
-All repository actions must belong to atomic GitHub issues. Each atomic issue
-completes the smallest possible unit of work: one bounded outcome that can be
-completed and verified independently.
+Track repository work as one GitHub issue per **independently shippable
+outcome**: a change that can be reviewed, merged and released on its own,
+usually one PR. Before starting work, identify its owning issue and confirm the
+work is in scope. Use the [GitHub tracker](issue-tracker.md) for publication.
 
-Before starting an action, identify its owning atomic issue and confirm that
-the action is within scope. Apply this to investigation, planning, code, tests,
-tooling, documentation, integration, review, validation, delivery and cleanup.
-Use the [GitHub tracker](issue-tracker.md) for ticket publication and tracking.
+State each issue's outcome, scope, prerequisites and observable acceptance
+criteria. Close it when its acceptance is verified.
 
-## Split before execution
+## Steps are checklist items
 
-Break every request or issue containing multiple actionable steps or outcomes
-into separate, linked atomic issues before executing those steps. Repeat the
-breakdown until no issue contains a step or outcome that can be completed and
-verified separately. A checklist inside a broad issue does not replace atomic
-issues.
+Investigation, planning, review, receipts, CI, deployment, live verification
+and cleanup are steps toward an outcome. Track them as a checklist in the PR
+body, alongside the release gates that apply to the change;
+[release and review](release-and-review.md) defines those gates. For example:
 
-Keep broad specs and parent issues as scope and progress containers. Execute
-the atomic leaf issues, recording their parent links and blocking dependencies.
-For each leaf, state its single outcome, bounded scope, required inputs and
-prerequisites, and observable acceptance criteria. Split again whenever any
-part can be completed and accepted independently.
+```markdown
+## Release checklist
 
-If work uncovers another step or an expanded outcome, create or reuse the
-appropriate linked atomic issue before starting that work. Preserve the
-original scope, evidence and ownership. Complete a leaf only when its own
-acceptance is verified; complete a parent only when all required children are
-complete.
+- [ ] Behavioral RED observed, then GREEN
+- [ ] Owner exact-diff review
+- [ ] Independent review
+- [ ] Required CI green on the exact head
+- [ ] Merged and Pages deployment verified
+- [ ] Live behavior checked on Stable
+- [ ] Branch and worktree cleaned up
+```
 
-## Delivery and existing requirements
+When work uncovers another step, add it to the checklist. When it uncovers a
+separate shippable outcome, create or reuse an issue for that outcome before
+working on it.
 
-Atomic tracking preserves checkpoint batching: related issues may share one
-reconciled candidate, PR, CI run and release, with completion evidence mapped
-back to each issue. Keep existing authorization, task holds, host coordination,
-test-first work, review, release and cleanup requirements in force.
+## Multi-PR specs
+
+Use a parent issue with linked child issues only when a spec needs several PRs
+to deliver. Each child is itself one shippable outcome; record its parent link
+and blocking dependencies. Close the parent when all required children are
+closed.
+
+## Batching
+
+Related outcomes may share one PR, CI run and release, with completion evidence
+mapped back to each issue. Batching changes how work is tracked, never which
+authorization, holds, test-first, review or release requirements apply.

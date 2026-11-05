@@ -130,16 +130,18 @@ test('RISK Quick start content: essential steps stay brief and detailed help rem
 test('UNSELECTED FULL SUITE SENTINEL', () => { process.stdout.write('PREFLIGHT_FULL_SUITE_CHILD_SENTINEL\\n'); });
 `;
   const testsPath = path.join(fixtureRoot, 'tests.js');
-  await writeFile(testsPath, selectedTests);
+  // A rationale is required only when an existing test is removed or weakened
+  // (#2208), so the fixture removes a committed test rather than adding one.
+  await writeFile(testsPath, `${selectedTests}\ntest('existing fixture test removed without rationale', () => {});\n`);
   runGit(fixtureRoot, ['init', '-b', 'main']);
   runGit(fixtureRoot, ['config', 'user.email', 'preflight-fixture@example.invalid']);
   runGit(fixtureRoot, ['config', 'user.name', 'Preflight fixture']);
   runGit(fixtureRoot, ['add', 'scripts/test-first-gate.mjs', 'TEST_CHANGE_RATIONALES.json', 'tests.js']);
   runGit(fixtureRoot, ['commit', '-m', 'fixture base']);
   const base = runGit(fixtureRoot, ['rev-parse', 'HEAD']);
-  await writeFile(testsPath, `${selectedTests}\ntest('added fixture test without rationale', () => {});\n`);
+  await writeFile(testsPath, selectedTests);
   runGit(fixtureRoot, ['add', 'tests.js']);
-  runGit(fixtureRoot, ['commit', '-m', 'fixture protected test change']);
+  runGit(fixtureRoot, ['commit', '-m', 'fixture removes a protected test']);
 
   const result = spawnSync(process.execPath, [preflight, '--base', base], {
     cwd: fixtureRoot,
