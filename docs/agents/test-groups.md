@@ -6,6 +6,26 @@
 npm test
 ```
 
+## Test files
+
+Tests live in per-area files under `tests/`, one per group plus the
+repository-process tooling tests: `core.test.js`, `scenery.test.js`,
+`persistence-recovery.test.js`, `native-process.test.js` and
+`repository-process.test.js`. Shared fixtures and helpers live in
+`tests/shared.js`; area files import what they use from it. Add a test to the
+file of its group and give it a `rootAssignments` row naming that file. Tests
+that read or spawn their own file use `fileURLToPath(import.meta.url)`.
+`npm test` runs two files at a time, because the long core file's 5 s fixture
+deadlines expire when every file runs at once.
+
+A branch that still edits the old single `tests.js` ports by moving each new or
+changed test into the area file of its group, adding any new helper to
+`tests/shared.js` with an export, prefixing relative dynamic imports and
+`new URL(..., import.meta.url)` paths with `../`, and pointing its catalog rows
+at the new file. A recreated `tests.js` cannot merge: the test-first gate rejects
+a diff that adds or changes it, and `npm test` and the group
+runner no longer run it.
+
 The additional `test:group` entry point runs one explicitly classified group in
 its own Node process. Group identifiers are stable: `core`, `scenery`,
 `persistence-recovery`, and `native-process`. Each process runs its selected
@@ -86,6 +106,33 @@ full-versus-grouped result reconciliation.
 This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
+
+## Nightly cross-engine cohort
+
+`scripts/test-group-assignments.json` lists cross-engine native roots under
+`nightlyRoots` (root title, source file, reason). They belong to no required
+group: `--describe`, the four group runs, the unclassified-root guard and
+`--aggregate` neither run nor require them. A nightly root cannot also be a
+required root or process control, and the Chromium installed-client cases
+(the owner root and its signed-out and reconcile-held children) can never be
+declared nightly. To move a case to nightly, remove its `rootAssignments` row
+and add a `nightlyRoots` row; a baseline root cannot move because the baseline
+must stay fully assigned.
+
+The `Nightly` workflow runs them with Chromium and WebKit installed:
+
+```sh
+npm run test:group -- --group nightly-cross-engine --output-dir <new-empty-dir> \
+  --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> \
+  --source-sha <sha> --comparison-base <sha>
+```
+
+The run fails when no nightly root is declared, when a declared root is not
+registered exactly once in its file, or when any nightly case fails, is skipped
+or is missing. It writes `result.json` and TAP like a group run, but it is not
+a required group and cannot be described, covered or aggregated. When and how
+releases depend on it is in
+[release and review](release-and-review.md#nightly-cross-engine-native-checks).
 
 ## Parallel Actions aggregation
 

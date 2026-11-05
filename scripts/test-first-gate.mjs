@@ -16,8 +16,14 @@ const processFiles=new Set([
   '.claude/hooks/test-first-guard.sh',
 ]);
 const isProcessFile=file=>processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
+// The test surface is the per-area tests/ directory (#2213). The edit hook's
+// tests/* case mirrors this predicate (a shell hook cannot import it), so keep
+// the two in sync. A root tests.js is not a test file any more: npm test and
+// the group runner stopped running it, so a test written there protects nothing.
+const isTestFile=file=>file.startsWith('tests/');
+const LEGACY_TEST_FILE='tests.js';
 const isAppFile=file=>{
-  if(file==='tests.js')return false;
+  if(isTestFile(file))return false;
   if(file==='firestore.rules')return true;
   if(file.split('/').some(segment=>nonAppDirectories.has(segment)))return false;
   return runtimeFilePattern.test(file);
@@ -29,36 +35,47 @@ const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&/\.(?:h
 const hasAddedRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK\b/.test(line));
 const hasAddedProcessRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK (?:test-first gate|regression gate|test inventory|repository process)\b/.test(line));
 
-export function validateTestFirst(changedFiles,addedTestLines){
+// deletedFiles lets the split itself through: against a base from before
+// #2213, the diff deletes tests.js, and those deleted lines stay protected by
+// the rationale check below. Adding or editing a root tests.js is rejected.
+export function validateTestFirst(changedFiles,addedTestLines,deletedFiles=[]){
+  const errors=[];
+  if(changedFiles.includes(LEGACY_TEST_FILE)&&!deletedFiles.includes(LEGACY_TEST_FILE))
+    errors.push('A root tests.js was added or changed, but tests now live in the per-area files under tests/ and nothing runs tests.js. Move the change into the area file of its group as the porting note in docs/agents/test-groups.md describes.');
   const edited=changedFiles.filter(isAppFile);
   const enforcementEdits=changedFiles.filter(isProcessFile);
-  if(!edited.length&&!enforcementEdits.length)return [];
-  const errors=[];
-  if(!changedFiles.includes('tests.js')){
-    if(edited.length)errors.push(`App files changed (${edited.join(', ')}) without tests.js in the diff.`);
-    if(enforcementEdits.length)errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without tests.js process coverage in the diff.`);
+  if(!edited.length&&!enforcementEdits.length)return errors;
+  if(!changedFiles.some(isTestFile)){
+    if(edited.length)errors.push(`App files changed (${edited.join(', ')}) without a tests/ file in the diff.`);
+    if(enforcementEdits.length)errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without tests/ process coverage in the diff.`);
   }
   const highRisk=[...edited.filter(isHighRiskAppFile),...enforcementEdits];
   if(highRisk.length&&!hasAddedRiskTest(addedTestLines))
-    errors.push(`A high-risk app or enforcement file changed (${highRisk.join(', ')}) without a new RISK test in tests.js.`);
+    errors.push(`A high-risk app or enforcement file changed (${highRisk.join(', ')}) without a new RISK test in the test files.`);
   if(enforcementEdits.length&&!hasAddedProcessRiskTest(addedTestLines))
-    errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without a new RISK process test in tests.js.`);
+    errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without a new RISK process test in the test files.`);
   return errors;
 }
 
-// Every executable test change needs a purpose and red evidence. Exempting
-// appended code allowed process.exit(0) to bypass the suite; a uniform rule
-// avoids pretending to distinguish safe additions without a JavaScript parser.
+// The fingerprint covers every executable test change so a record cannot be
+// reused for a different diff. Blank lines and single-line comments cannot
+// change what runs, so they are left out. With several test files each line
+// also carries its file path, so a record cannot move to another file (#2213);
+// tests.js lines keep their earlier form so records written for diffs against
+// pre-split bases (which delete or edit tests.js) still verify.
 const protectedTestLines=lines=>{
-  const protectedLines=[];let cursor=null;
+  const protectedLines=[];let cursor=null,file='';
   for(const line of lines){
     const hunk=line.match(/^@@ -(\d+)(?:,(\d+))? \+/);
     if(hunk){cursor=Number(hunk[1])+(hunk[2]==='0'?1:0);continue;}
+    const header=line.match(/^(?:--- (?:a\/(.+)|\/dev\/null)|\+\+\+ (?:b\/(.+)|\/dev\/null))$/);
+    if(header){const name=header[1]||header[2];if(name)file=name==='tests.js'?'':name;continue;}
     if(line.startsWith('---')||line.startsWith('+++'))continue;
     const content=line.slice(1).trim(),meaningful=content&&!content.startsWith('//');
-    if(line.startsWith('-')){if(meaningful)protectedLines.push(`${cursor??''}:-${content}`);if(cursor!==null)cursor++;}
+    const location=`${file?file+':':''}${cursor??''}`;
+    if(line.startsWith('-')){if(meaningful)protectedLines.push(`${location}:-${content}`);if(cursor!==null)cursor++;}
     else if(line.startsWith('+')){
-      if(meaningful)protectedLines.push(`${cursor??''}:+${content}`);
+      if(meaningful)protectedLines.push(`${location}:+${content}`);
     }else if(line.startsWith(' ')&&cursor!==null)cursor++;
   }
   return protectedLines;
@@ -66,8 +83,22 @@ const protectedTestLines=lines=>{
 export function protectedTestFingerprint(lines){
   return createHash('sha256').update(protectedTestLines(lines).join('\n')).digest('hex');
 }
+// A rationale is required only when existing coverage can shrink: a removed or
+// changed line (deleted, renamed or weakened assertion), or a pure insertion
+// that stops later assertions from running. Appended process.exit(0) once
+// bypassed the whole suite and inserted returns or block comments can hide
+// assertions, so those insertions still count as weakening. Ordinary added or
+// extended tests cannot hide an existing contract and need no record (#2208).
+const suppressesExistingTests=content=>
+  /\bprocess\.exit(?:Code)?\b/.test(content)||/^return\s*;?$/.test(content)||
+  /^if\s*\(\s*(?:false|0)\s*\)/.test(content)||/^\/\*|\/\*$|^\*\//.test(content)||
+  /\.(?:skip|todo)\s*\(/.test(content);
+const weakensExistingTests=lines=>protectedTestLines(lines).some(line=>{
+  const change=line.slice(line.search(/:[-+]/)+1);
+  return change.startsWith('-')||suppressesExistingTests(change.slice(1));
+});
 export function validateRegressionChanges(lines,records){
-  if(!protectedTestLines(lines).length)return [];
+  if(!weakensExistingTests(lines))return [];
   const record=Array.isArray(records)&&records.find(entry=>entry?.testChangesSha256===protectedTestFingerprint(lines));
   if(!record)return ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'];
   const errors=[],substantive=value=>typeof value==='string'&&value.trim().length>=20;
@@ -94,9 +125,12 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
     try{
       const diff=(...args)=>execFileSync('git',['diff',...args,`${base}...HEAD`],{encoding:'utf8'});
       const changed=diff('--name-only','--diff-filter=ACMRTD').trim().split('\n').filter(Boolean);
-      const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--','tests.js'],{encoding:'utf8'}).split('\n');
+      const deleted=diff('--name-only','--diff-filter=D').trim().split('\n').filter(Boolean);
+      // tests.js stays in the protected diff because a base from before the
+      // split still has it: deleting its tests must need a record like any other.
+      const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--',LEGACY_TEST_FILE,'tests'],{encoding:'utf8',maxBuffer:256*1024*1024}).split('\n');
       const records=fs.existsSync('TEST_CHANGE_RATIONALES.json')?JSON.parse(fs.readFileSync('TEST_CHANGE_RATIONALES.json','utf8')):[];
-      const errors=[...validateTestFirst(changed,testDiff),...validateRegressionChanges(testDiff,records)];
+      const errors=[...validateTestFirst(changed,testDiff,deleted),...validateRegressionChanges(testDiff,records)];
       if(errors.length){process.stderr.write(errors.join('\n')+'\n');process.exitCode=1;}
       else process.stdout.write('Test-first diff gate passed.\n');
     }catch(error){process.stderr.write(`Could not compare ${base} to HEAD: ${error.message}\n`);process.exitCode=2;}

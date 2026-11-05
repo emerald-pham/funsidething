@@ -18,22 +18,10 @@ caret, text and adjacent controls; containment alone does not establish usable
 editing. Inspect captures before closing the allocated session so transient
 overlays or hidden controls can be corrected within that window.
 
-Every release candidate receives an owner review of its exact diff. The release
-validator derives the minimum review plan from the candidate's exact
-base-to-commit diff; the input cannot choose a lower-risk plan. An optional
-`additionalSpecialistDomains` input may add known domains to raise the review
-plan, but it cannot replace or remove any domain derived from the diff, and its
-value is bound into the receipt. Ambiguous auth, state-persistence, and
-session-persistence changes fail closed to their relevant specialists. Pure
-documentation, comments, copy, and repository housekeeping with no executable,
-configuration, test, release-gate, data, or product-behavior change need only the
-owner's exact-diff review. Ordinary code or behavior needs one independent
-code/behavior review. Shared session state, callable or authorization behavior,
-Firestore rules, deployment or authentication infrastructure, data migration,
-memory, cloud persistence, and synchronization need the relevant specialist
-review. When both code behavior and a specialist domain are materially affected,
-record both independent reviews. When only one domain is affected, only its
-reviewer is required.
+The release validator derives the review plan from the candidate's exact
+base-to-commit diff. Which reviews each plan requires is defined in
+[release and review](docs/agents/release-and-review.md#risk-based-exact-commit-release-gates);
+this file defines the evidence those reviews record.
 
 Schema version 1 receipts retain their original review policy: both a
 memory/cloud/sync audit and a distinct code/behavior review are required. They
@@ -206,7 +194,8 @@ code, and specialist reports as evidence of those human actions.
 
 ## FAQ coverage evidence
 
-Product candidates also require `faqReview` with the same approved exact-SHA,
+This section covers candidates whose base predates the scaled review policy
+below. Such product candidates also require `faqReview` with the same approved exact-SHA,
 completedAt, summary, scope, external evidencePath and evidenceSha256 shape as
 `independentReview`. Use a reviewer task distinct from owner, code, and specialist
 reviewers. The immutable receipt copies `faq-review.md`; verification checks its
@@ -228,3 +217,37 @@ deletion. Deployment verification fetches the associated merged PR's retained
 `refs/pull/<number>/head` when that exact object is absent, then requires its SHA
 to match GitHub's reviewed head before deriving policy. A missing, invalid, or
 moved ref fails closed; fetching does not replace the deployed checkout.
+
+## Scaled review policy evidence
+
+When the committed AGENTS.md at both the exact head and the base contains
+"Release reviews scale to the exact diff.", the validator derives a plan with
+`schemaVersion: 2` inside the schema version 2 receipt. The plan adds
+`requiresTypographyReview` and `requiresOwnerFaqCoverage`, and sets
+`requiresFaqReview` to false; see
+[release and review](docs/agents/release-and-review.md#scaled-review-policy)
+for what each bit requires and the combined independent review checklist. A
+candidate whose base predates the wording keeps the earlier plan and evidence.
+
+Whenever `requiresOwnerFaqCoverage` is true, the owner review carries the FAQ
+coverage result; omit it otherwise. Do not include `faqReview`:
+
+```json
+"ownerReview": {
+  "...": "the owner fields shown above",
+  "faqCoverage": {
+    "result": "updated",
+    "summary": "<which extended FAQ entries changed, or why no user-facing behavior changed>"
+  }
+}
+```
+
+`result` is `updated` or `no-user-facing-change`. Schema version 1 receipts
+are rejected for scaled-policy candidates. The publisher sends all three
+contexts with the same compact description ending in `v=4`. Local verification
+rejects a scaled receipt for an old-policy candidate because its plan no longer
+matches the exact diff. Pages accepts `v=4` only when the exact reviewed head
+and base derive the scaled policy, and requires `v=4` for those candidates;
+`v=2`, `v=3` and schema-1 bindings keep verifying for their own candidates. An
+unreadable head cannot claim `v=4`. Deployment still binds the exact reviewed
+head, tree, base and receipt digest.

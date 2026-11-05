@@ -7,8 +7,20 @@ import { fileURLToPath } from 'node:url';
 import { validateInputPass } from './agent-tools/ci-pass-reuse.mjs';
 
 export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-process'];
+// Not a required group: the scheduled/dispatched nightly job runs it alone.
+export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// The one definition of a registered test file (#2213): a *.test.js file in the
+// top-level tests/ directory; tests/shared.js holds helpers, not tests. The
+// runner, preflight and the compatibility gate all list tests this way. The
+// test-first gate and edit hook deliberately use the wider test surface
+// (anything under tests/), since a helper edit is still a test edit.
+export const isTestFile = file => /^tests\/[^/]+\.test\.js$/.test(file);
+export function listTestFiles(root = ROOT) {
+  return fs.readdirSync(path.join(root, 'tests')).map(file => `tests/${file}`).filter(isTestFile).sort();
+}
 const INVENTORY_PATH = path.join(ROOT, 'scripts/test-group-inventory.json');
 const ASSIGNMENTS_PATH = path.join(ROOT, 'scripts/test-group-assignments.json');
 const sha1Pattern = /^[0-9a-f]{40}$/;
@@ -88,7 +100,9 @@ function requiredIdentity(options) {
   for (const key of ['group', 'repository', 'eventPolicy', 'runId', 'runAttempt', 'sourceSha', 'comparisonBase']) {
     if (typeof options[key] !== 'string' || !options[key].trim()) fail(`Missing required group identity field: ${key}.`);
   }
-  if (!GROUP_IDS.includes(options.group)) fail(`Unknown group ${JSON.stringify(options.group)}; expected ${GROUP_IDS.join(', ')}.`);
+  if (options.group === NIGHTLY_GROUP_ID) {
+    if (options.aggregate || options.describe || options.covered) fail(`The ${NIGHTLY_GROUP_ID} cohort is not part of the required cohort; it cannot be described, covered or aggregated.`);
+  } else if (!GROUP_IDS.includes(options.group)) fail(`Unknown group ${JSON.stringify(options.group)}; expected ${GROUP_IDS.join(', ')} or ${NIGHTLY_GROUP_ID}.`);
   if (!/^[^/\s]+\/[^/\s]+$/.test(options.repository)) fail('Repository identity must use owner/name form.');
   if (!/^[A-Za-z0-9_.-]+$/.test(options.eventPolicy)) fail('Event policy must be a compact policy/event identifier.');
   if (!/^[A-Za-z0-9_.:-]+$/.test(options.runId)) fail('Run id contains unsupported characters.');
@@ -104,16 +118,27 @@ function readJson(file, label) {
   catch (error) { fail(`Could not read ${label}: ${error.message}`); }
 }
 
+// The full suite is the per-area test directory (#2213); nothing runs a root
+// tests.js any more, so its old command is not accepted.
+// tests/shared.js holds helpers, not tests, so only *.test.js files count.
+// npm test runs two files at a time: with every area file in parallel, timer
+// deadlines in the long core file expired under load (5 s fixture deadlines),
+// which never happened while tests.js ran as one serial process.
+const FULL_SUITE_COMMANDS = new Map([
+  ['node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs', () => listTestFiles()],
+]);
+
 function testFiles() {
   const packageJson = readJson(path.join(ROOT, 'package.json'), 'package.json');
-  if (packageJson.scripts?.test !== 'node --test tests.js scripts/agent-tools/*.test.mjs') {
+  const suiteFiles = FULL_SUITE_COMMANDS.get(packageJson.scripts?.test);
+  if (!suiteFiles) {
     fail('The full npm test entry point changed; update the group runner contract explicitly before grouping this suite.');
   }
   const scriptFiles = fs.readdirSync(path.join(ROOT, 'scripts/agent-tools'))
     .filter(file => file.endsWith('.test.mjs'))
     .sort()
     .map(file => `scripts/agent-tools/${file}`);
-  const files = ['tests.js', ...scriptFiles];
+  const files = [...suiteFiles(), ...scriptFiles];
   for (const file of files) if (!fs.statSync(path.join(ROOT, file)).isFile()) fail(`Missing full-suite file ${file}.`);
   return files;
 }
@@ -289,7 +314,38 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     }
     environmentSkips.set(entry.root, entry);
   }
-  return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup, environmentSkips };
+  const nightlyRoots = validateNightlyRoots(assignments, fileSet, assignmentsByRoot);
+  return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup, environmentSkips, nightlyRoots };
+}
+
+// Cross-engine native checks run in the scheduled/dispatched nightly job, not
+// the per-push required cohort (#2210): one flaky or engine-specific WebKit
+// failure blocked unrelated fixes for about an hour per run. Declared nightly
+// roots are classified (so the registration guards accept them) but belong to
+// no required group, so describe, group runs and the aggregate never need them.
+// The Chromium installed-client cases protect installed-client delivery and saved
+// boards on every change, so they can never be moved to the nightly job.
+const INSTALLED_CLIENT_CASES = new Set([
+  'RISK repository process: required installed-client native outcomes and artifacts execute exactly once',
+  'RISK native installed-client delivery: signed-out',
+  'RISK native installed-client delivery: reconcile-held',
+]);
+function validateNightlyRoots(assignments, fileSet, assignmentsByRoot) {
+  const entries = assignments.nightlyRoots || [];
+  if (!Array.isArray(entries)) fail('nightlyRoots must be an array when present.');
+  const nightlyRoots = new Map();
+  for (const entry of entries) {
+    if (!entry || typeof entry.root !== 'string' || !entry.root.trim() || !fileSet.has(entry.file)) {
+      fail('Every nightly root must name a full-suite source file.');
+    }
+    if (INSTALLED_CLIENT_CASES.has(entry.root)) fail(`Installed-client case ${JSON.stringify(entry.root)} must stay in the required cohort, not the nightly job.`);
+    if (assignmentsByRoot.has(entry.root) || assignments.processControls.some(control => control.id === entry.root)) {
+      fail(`Nightly root ${JSON.stringify(entry.root)} is also a required case; move it out of the required cohort instead of declaring it twice.`);
+    }
+    if (nightlyRoots.has(entry.root)) fail(`Nightly root ${JSON.stringify(entry.root)} is declared more than once.`);
+    nightlyRoots.set(entry.root, entry);
+  }
+  return nightlyRoots;
 }
 
 function cohortDigest(inventory, assignments, assignmentIndex) {
@@ -309,24 +365,45 @@ function cohortDigest(inventory, assignments, assignmentIndex) {
   return sha256(JSON.stringify({ expectedGroups: GROUP_IDS, requiredCaseIds, rootAssignments, rootReplacements, processControls }));
 }
 
-function addedRootRegistrations(comparisonBase, files) {
-  const diff = git(['diff', '--no-ext-diff', '--unified=0', comparisonBase, '--', ...files]);
-  const names = new Set();
-  const capture = line => {
-    const match = line.match(/^\s*test\s*\(\s*(['"])(.*?)\1/);
-    if (match) names.add(match[2]);
-  };
-  for (const line of diff.split('\n')) if (line.startsWith('+') && !line.startsWith('+++')) capture(line.slice(1));
-  const untracked = git(['ls-files', '--others', '--exclude-standard', '--', ...files]).split('\n').filter(Boolean);
-  for (const file of untracked) {
-    const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
-    for (const line of source.split('\n')) capture(line);
+function decodeStringLiteral(body) {
+  const simple = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', 0: '\0' };
+  return body.replace(/\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g, (_, escape) => {
+    if (escape[0] === 'u' && escape.length > 1) return String.fromCodePoint(parseInt(escape.replace(/[u{}]/g, ''), 16));
+    if (escape[0] === 'x' && escape.length === 3) return String.fromCharCode(parseInt(escape.slice(1), 16));
+    return simple[escape] ?? escape;
+  });
+}
+
+// A registration is added when its title is registered more often now than in
+// the comparison commit's full-suite files. Comparing titles rather than diff
+// lines keeps tests moved between files (#2213: tests.js into tests/*.test.js)
+// from counting as new roots; titles compare by value, so \u and \' escapes
+// match their assignment.
+function registeredTitleCounts(sources) {
+  const counts = new Map();
+  for (const source of sources) for (const line of source.split('\n')) {
+    const match = line.match(/^\s*test\s*\(\s*(['"])((?:\\.|(?!\1)[^\\])*)\1/);
+    if (!match) continue;
+    const title = decodeStringLiteral(match[2]);
+    counts.set(title, (counts.get(title) || 0) + 1);
   }
-  return names;
+  return counts;
+}
+
+function addedRootRegistrations(comparisonBase, files) {
+  const current = registeredTitleCounts(files.map(file => fs.readFileSync(path.join(ROOT, file), 'utf8')));
+  // A comparison base from before the split (main until #2205 lands) still
+  // registers its tests in the root tests.js, so the baseline reads it too.
+  const baselineFiles = git(['ls-tree', '-r', '--name-only', comparisonBase, '--', 'tests.js', 'tests', 'scripts/agent-tools'])
+    .split('\n').filter(file => file === 'tests.js' || isTestFile(file) || /^scripts\/agent-tools\/[^/]+\.test\.mjs$/.test(file));
+  const baseline = registeredTitleCounts(baselineFiles.map(file => git(['show', `${comparisonBase}:${file}`])));
+  return new Set([...current].filter(([title, count]) => count > (baseline.get(title) || 0)).map(([title]) => title));
 }
 
 function validateAddedRegistrations(assignments, inventoryIndex, index, files, inventorySourceSha) {
-  const added = addedRootRegistrations(inventorySourceSha, files);
+  // Source titles are plain strings; catalog roots are TAP identities (# is
+  // escaped as \#). Compare both in TAP form.
+  const added = new Set([...addedRootRegistrations(inventorySourceSha, files)].map(title => title.replace(/[\\#]/g, '\\$&')));
   const baseline = inventoryIndex.roots;
   const mappedBaseline = new Set(index.replacementByBaseline.keys());
   for (const replacement of index.replacementByBaseline.values()) {
@@ -341,7 +418,7 @@ function validateAddedRegistrations(assignments, inventoryIndex, index, files, i
   for (const title of added) {
     const assignment = index.assignmentsByRoot.get(title);
     const controlled = assignments.processControls.some(control => control.id === title);
-    if (!assignment && !controlled) fail(`New top-level test ${JSON.stringify(title)} has no explicit group assignment or process-control declaration.`);
+    if (!assignment && !controlled && !index.nightlyRoots.has(title)) fail(`New top-level test ${JSON.stringify(title)} has no explicit group assignment or process-control declaration.`);
   }
   const addedRootTitles = [...index.assignmentsByRoot.keys()].filter(root => !baseline.has(root)).sort();
   return { addedRootTitles, mappedBaselineRoots: [...mappedBaseline].sort() };
@@ -679,6 +756,37 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
   return errors;
 }
 
+// The nightly job exists so engine regressions stay visible before a Stable
+// release. An empty, missing, skipped or failed nightly case therefore fails
+// the run instead of passing quietly.
+function nightlySelection(assignmentIndex) {
+  const entries = [...assignmentIndex.nightlyRoots.values()];
+  if (!entries.length) fail('No nightly cross-engine roots are declared in scripts/test-group-assignments.json.');
+  for (const entry of entries) {
+    const count = countTestRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+    if (count !== 1) fail(`Nightly cross-engine root ${JSON.stringify(entry.root)} is registered ${count} times in ${entry.file}; expected exactly one.`);
+  }
+  return { files: [...new Set(entries.map(entry => entry.file))].sort(), roots: entries.map(entry => entry.root).sort() };
+}
+
+function verifyNightlyResults(cases, roots) {
+  const errors = [];
+  const rootSet = new Set(roots.map(normalizeTapIdentity));
+  const executed = cases.filter(item => item.id === item.root).map(item => item.root);
+  for (const root of rootSet) {
+    const count = executed.filter(item => item === root).length;
+    if (count !== 1) errors.push(`Nightly root ${JSON.stringify(root)} executed ${count} times; expected exactly once.`);
+  }
+  for (const item of cases) {
+    if (!rootSet.has(item.root)) errors.push(`Case ${JSON.stringify(item.id)} is outside the nightly cohort.`);
+    if (item.status === 'failed') errors.push(`Nightly case failed: ${item.id}`);
+    else if (item.status === 'skipped') errors.push(`Nightly case was skipped: ${item.id}`);
+    else if (item.status === 'todo') errors.push(`Nightly case was marked TODO: ${item.id}`);
+  }
+  if (!cases.length) errors.push('The nightly cohort produced no results.');
+  return errors;
+}
+
 function artifactInventory(nativeDir) {
   const artifacts = [];
   const visit = directory => {
@@ -854,7 +962,8 @@ async function unclassifiedRootGuard(files, assignments, outputDir) {
   const env = {...process.env}; delete env.NODE_TEST_CONTEXT;
   const reports=[],errors=[];
   for (const [index,file] of files.entries()) {
-    const roots=[...assignments.assignmentsByRoot.values()].filter(entry=>entry.file===file).map(entry=>normalizeTapIdentity(entry.root));
+    // Nightly roots are classified too; the guard must not run them here.
+    const roots=[...assignments.assignmentsByRoot.values(),...assignments.nightlyRoots.values()].filter(entry=>entry.file===file).map(entry=>normalizeTapIdentity(entry.root));
     const patterns=testNamePatternArguments(roots).map(argument=>argument.replace('--test-name-pattern=','--test-skip-pattern='));
     const prefix=`unclassified-${index}`;
     const stdoutPath=path.join(outputDir,prefix+'.tap'),stderrPath=path.join(outputDir,prefix+'.stderr.log'),summaryPath=path.join(outputDir,prefix+'.summary.jsonl');
@@ -931,7 +1040,7 @@ async function runChild(files, roots, outputDir, options, source) {
 
 async function main() {
   if (process.argv.slice(2).includes('--help')) {
-    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha>\n');
+    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha>\n');
     return 0;
   }
   let outputDir;
@@ -1032,13 +1141,14 @@ async function main() {
       }
     }
 
-    const selectedFiles = [...new Set([
+    const nightly = options.group === NIGHTLY_GROUP_ID ? nightlySelection(assignmentIndex) : null;
+    const selectedFiles = nightly ? nightly.files : [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
     ])].sort();
-    const selectedRoots = assignmentIndex.rootsPerGroup.get(options.group).sort();
+    const selectedRoots = nightly ? nightly.roots : assignmentIndex.rootsPerGroup.get(options.group).sort();
     if (!selectedFiles.length || !selectedRoots.length) fail(`Required group ${options.group} is empty.`);
 
-    result.inventory = {
+    if (!nightly) result.inventory = {
       baselineRunId: inventory.baseline.runId,
       baselineSourceSha: inventory.baseline.sourceSha,
       baselineCheckoutSha: inventory.baseline.checkoutSha,
@@ -1051,7 +1161,7 @@ async function main() {
       baselineEstimatedDurationMs: assignments.groups.find(group => group.id === options.group).baselineEstimatedDurationMs,
       groupAssignmentMethod: assignments.assignmentMethod,
     };
-    result.processControls = assignments.processControls.filter(control => control.group === options.group).map(control => ({
+    if (!nightly) result.processControls = assignments.processControls.filter(control => control.group === options.group).map(control => ({
       id: control.id,
       group: control.group,
       file: control.file,
@@ -1073,7 +1183,7 @@ async function main() {
     };
     result.cases = childResult.cases.map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
     result.artifacts = [...artifactInventory(nativeDir), ...artifactInventory(childResult.recoveryDir)];
-    result.issues = verifyResults({
+    result.issues = nightly ? verifyNightlyResults(childResult.cases, selectedRoots) : verifyResults({
       cases: childResult.cases,
       group: options.group,
       inventory,

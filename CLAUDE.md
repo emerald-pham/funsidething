@@ -2,8 +2,8 @@
 
 A ranked FVP task scanner with a PWA/offline shell and cloud-synced saved boards.
 
-For every repository task and action, follow
-[atomic issues](docs/agents/atomic-issues.md) before starting work.
+Before starting work, identify its owning issue as defined in
+[atomic issues](docs/agents/atomic-issues.md).
 
 ## Agent skills
 
@@ -23,28 +23,25 @@ work, read [responsiveness guidance](docs/agents/responsiveness.md).
 
 ## Test-first and regression
 
-Every functional change requires meaningful observed RED before implementation,
-then GREEN. Preserve red output and actual chronology. Use risk-based focused
-cohorts and the full suite when required. Read [TDD and regression gates](docs/agents/tdd-and-regression.md)
-before any runtime, visual, test or enforcement-file edit: its hook, RISK cases,
-coverage map and fingerprinted rationales remain mandatory. Existing passing
-feature assertions remain protected.
-
-Use one agreed seam/test/minimal implementation per vertical cycle; inventory
-cases up front without writing every future test before implementation. A test
-that unexpectedly passes needs investigation, not a fabricated RED. Configuration
-or dependency changes follow the same behavioral loop when functional.
+Before any runtime, visual, test or enforcement-file edit, read
+[TDD and regression gates](docs/agents/tdd-and-regression.md), the single
+authority for when tests, `RISK` cases and rationales are required. The
+behavioral RED→GREEN loop, with its red output and chronology, is defined in
+[workflow](docs/agents/workflow.md#strict-tdd-at-agreed-seams). Run risk-based
+focused cohorts during a slice and the full suite when a release gate requires it.
 
 ## Review and release
 
 Before browser interaction or rendered web review, follow
 [browser choice](docs/agents/workflow.md#browser-choice).
 
-Read [AGENTS.md](AGENTS.md) for maintenance authorization, FAQ duties and holds.
-Before release, read [release and review](docs/agents/release-and-review.md) and
-[RELEASE_GATES.md](RELEASE_GATES.md). Preserve independent changed-code/specialist,
-FAQ and final rendered typography reviews, exact-candidate evidence, compatibility,
-CI, Pages and live-asset/behavior checks. Local GREEN alone is not shipment.
+Read [AGENTS.md](AGENTS.md) for maintenance authorization, FAQ duties, holds and
+the maintainer approval new process needs; read it before adding any required
+gate, reviewer, CI group, receipt field or issue rule.
+Before release, read [release and review](docs/agents/release-and-review.md), the
+authority for which reviews the exact diff requires, and
+[RELEASE_GATES.md](RELEASE_GATES.md) for the evidence they record. Local GREEN
+alone is not shipment.
 
 Verify the applied theme attribute, computed color scheme and paint before
 accepting each theme capture; theme labels alone do not establish coverage.

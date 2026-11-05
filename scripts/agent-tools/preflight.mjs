@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { listTestFiles } from '../test-groups.mjs';
 
 const focusedChecks = [
   'Landscape location: visible default-sky copy does not name Orlando',
@@ -145,7 +146,7 @@ async function main() {
     '--test',
     `--test-name-pattern=${testNamePattern}`,
     '--test-reporter=spec',
-    'tests.js',
+    ...listTestFiles(repositoryRoot),
   ]);
   const testOutput = `${tests.stdout ?? ''}\n${tests.stderr ?? ''}`;
   const missingChecks = focusedChecks.filter(check =>

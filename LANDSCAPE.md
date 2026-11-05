@@ -28,12 +28,12 @@ Distant facades have restrained, stable color variation. Shorter buildings favor
 
 ## Validation
 
-Run `node --test tests.js` for core, scanner and PWA contracts. Browser coverage is opt-in because this repository has no browser package dependency. Serve this directory, then run with an installed Playwright module:
+Run `npm test` for core, scanner and PWA contracts. Browser coverage is opt-in because this repository has no browser package dependency. Serve this directory, then run with an installed Playwright module:
 
 ```sh
 LANDSCAPE_BROWSER_URL=http://127.0.0.1:8766/ \
 LANDSCAPE_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs \
-node --test --test-name-pattern='Landscape browser:' tests.js
+node --test --test-name-pattern='Landscape browser:' tests/core.test.js
 ```
 
 The default browser channel is Chrome; set `LANDSCAPE_BROWSER_CHANNEL` for a compatible installed channel. Browser tests cover first-launch focus, live reduced-motion changes, hidden-tab suspension, independent themes, persistence, overflow, and return navigation. Rendered review additionally covers narrow phones, tablets, wide desktops, short landscape, and day/dawn/dusk/night against both theme modes.

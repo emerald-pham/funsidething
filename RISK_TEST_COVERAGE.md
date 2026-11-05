@@ -1,6 +1,6 @@
 # Risk-based test coverage inventory
 
-This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
+This map records the current named RISK contracts in the tests/ area files. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
 - RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights
 - RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles
@@ -8,7 +8,7 @@ This map records the current named RISK contracts in tests.js. It lets reviewers
 - RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog
 - RISK clocktower reduced motion: four fixed roof contacts fade gently without flight or posture animation
 
-The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
+The named-contract test in tests/repository-process.test.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
 - RISK repository process: unchanged CI inputs reuse an original successful gate across events
@@ -453,12 +453,19 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK regression gate: changing existing tests requires a specific reason and replacement coverage
 - RISK regression gate: insertions cannot silently disable existing assertions
+- RISK regression gate: a rationale is required only for removed or weakened tests
+- RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files
 - RISK test-first gate: future runtime modules are detected without a filename allowlist
 - RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case
 - RISK test-first gate: changing enforcement code requires process tests and a new risk case
 - RISK test-first gate: unrelated risk cases cannot approve enforcement edits
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
+- RISK test-first gate: an app change paired with an edit to any split test file is accepted
+- RISK test-first gate: the edit hook treats the test directory as the test surface
+- RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected
+- RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test
 - RISK test inventory: every named risk contract maps to a feature boundary
+- RISK test inventory: risk map and source checks read every file in the test directory
 - RISK test inventory: every added environment-gated root is declared with the variable its registration skips on
 - RISK test inventory: the group runner accepts an added environment-gated skip only when declared and its variable is absent
 
@@ -487,12 +494,16 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: status publication needs a valid exact-SHA receipt
 - RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses
 - RISK repository process: CI makes verified release evidence a deployment prerequisite
+- RISK repository process: CI runs once per pull request commit and never cancels main
+- RISK repository process: cross-engine native checks run nightly outside the required cohort
+- RISK repository process: nightly run fails when the live main ruleset drifts from the committed required checks
+- RISK repository process: nightly velocity report alerts on merge stalls and issue spikes
 - RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator
 - RISK repository process: custom hook paths are compared with the shared git default
 - RISK repository process: release hooks reject marker-only or tampered dispatchers
 - RISK test-first gate: release evidence scripts receive edit-time process protection
 
-The release gate derives a review plan from the exact candidate diff: the owner reviews every diff, ordinary behavior changes require one independent code reviewer, and high-risk domains require a specialist. It requires both independent roles only when code behavior and specialist risk are materially affected. Ambiguous auth, state-persistence, and session changes fail closed to relevant specialists; callers may add known specialist domains to raise the plan but cannot replace or remove derived domains. Memory/cloud/sync specialist evidence records source fingerprints, per-domain impact, and rationale. Every affected domain lists focused tests; an all-unaffected assessment still includes at least one focused preservation test across the assessed domains. Schema version 1 receipts remain verifiable under their former two-review rule, and their publisher also emits a third specialist-compatibility status bound to the same receipt so current branch protection can accept them without inventing a new reviewer. The local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head, derived status plan, and latest statuses. Statuses bind receipts but cannot prove that a person actually read or reviewed them.
+The release gate derives the review plan from the exact candidate diff; [release and review](docs/agents/release-and-review.md#risk-based-exact-commit-release-gates) defines which reviews each plan requires. The tests above pin that derivation, the fail-closed specialist cases, schema version 1 receipt compatibility, the local hook and the main deployment verification. Statuses bind receipts but cannot prove that a person actually read or reviewed them.
 
 Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy; LOCAL BACKUPS: a manual backup remains restorable after the seven-day window; LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched; HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes; and HARD GATE: unreadable backup index is preserved instead of overwritten by a save.
 
@@ -500,7 +511,7 @@ Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: s
 
 Start with the failure cost and the user-visible invariant. Persisted task or backup changes need cases for affected old data, undo, import or restore, deletion, and sync paths. Eligibility changes need valid and invalid prerequisites, boundaries, ordering, and recurrence. Location or time changes need invalid-input, saved-state, reload, and cross-device cases. Visual or motion changes need numeric paint or geometry contracts, reduced-motion behavior, and affected phone, tablet, or short-landscape sizes. Offline changes need shell fingerprints and offline reload checks. Keep unrelated established assertions intact.
 
-The editor hook blocks app or enforcement edits while tests.js has no staged or unstaged change. CI checks that relevant tests are in the final diff and that TEST_CHANGE_RATIONALES.json names the exact test diff, purpose, retained boundaries, and red command/failure. These checks do not prove that a test was run before implementation or that a red result was actually observed. Run the new focused risk test against the unmodified implementation, preserve the real red output in task or release evidence, implement the smallest fix, then run the focused test and npm test. Run npm run test:rules for Firestore rule changes and rendered/browser or offline checks when affected behavior needs them.
+The editor hook blocks app or enforcement edits while no file under tests/ has a staged, unstaged or new change. CI checks that relevant tests are in the final diff and, when existing tests are removed or weakened, that TEST_CHANGE_RATIONALES.json names the exact test diff, purpose, retained boundaries, and red command/failure. These checks do not prove that a test was run before implementation or that a red result was actually observed. Run the new focused risk test against the unmodified implementation, preserve the real red output in task or release evidence, implement the smallest fix, then run the focused test and npm test. Run npm run test:rules for Firestore rule changes and rendered/browser or offline checks when affected behavior needs them.
 
 ## Oldest never-done scan anchor
 
@@ -540,6 +551,8 @@ The Settings board-data area exposes one Download backup action with current-boa
 ## Cross-release compatibility gate
 
 - RISK repository process: backward compatibility is a mandatory fail-closed release gate
+- RISK repository process: backward compatibility finds its required families across the test directory
+- RISK repository process: the Firestore rules command loads every registered Firestore rules test
 - RISK repository process: backward compatibility pins released code and rejects broken roundtrips
 - RISK repository process: backward compatibility rejects skipped or empty gate runs
 - RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions
@@ -1040,6 +1053,16 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Last task WOOP: rendered Delete binding rejects same-ID board replacement and restored head
 - RISK repository process: FAQ policy rejects legacy verified receipts and old deployment descriptions
 - RISK repository process: Pages FAQ policy reads exact head and base from a full release-evidence checkout
+- RISK repository process: scaled review plan pins ordinary code to owner plus independent and docs to owner only
+- RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes
+- RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence
+- RISK repository process: scaled review plan sets typography only for markup or stylesheet content
+- RISK repository process: scaled review plan treats the test directory like the single test file
+- RISK repository process: scaled review policy needs its committed AGENTS.md wording at both the exact head and base
+- RISK repository process: scaled receipts record FAQ coverage in the owner review instead of a separate reviewer
+- RISK repository process: scaled receipts publish the v=4 binding and cannot cross policy boundaries
+- RISK repository process: Pages accepts the v=4 binding only for scaled-policy candidates
+- RISK repository process: the repository AGENTS.md wording switches on the scaled review policy
 - RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks
 - RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent
 - RISK Last task WOOP: imported long causal chains validate without recursive stack failure
