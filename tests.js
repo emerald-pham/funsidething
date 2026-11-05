@@ -32377,6 +32377,43 @@ test('RISK cloud generation recovery: declining the pending automatic recovery d
  assert.ok(backend.docs.has(activePath)&&backend.docs.has(priorPath));
 });
 
+// #2194 review L1: the decline is remembered in device storage so the next
+// pull does not apply the older copy again. If that record cannot be written,
+// a decline reported as done would be silently undone and published; it must
+// fail closed instead, leaving the pending default exactly as it was.
+test('RISK cloud generation recovery: a decline whose choice cannot be remembered fails closed and a reported decline is never reapplied or published',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ // Publication stays refused until the decline has been attempted.
+ const refusal=Object.assign(Error('Controlled automatic publication refusal'),{code:'permission-denied'});let refusePublication=true;
+ Object.defineProperty(app.faults,'push',{configurable:true,get(){return refusePublication?refusal:undefined;}});
+ t.after(()=>{delete app.faults.push;});
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ const olderOnly=()=>ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation');
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the automatic default settles unpublished');
+ const pending=await store.getRecoveryCloudHold();
+ assert.ok(pending?.automaticRecovery===true,'positive control: the automatic default is pending');
+ assert.ok(olderOnly(),'positive control: the older generation is in use');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'positive control: nothing has been published');
+ const recovered=JSON.stringify(ctx.state),recoveredHead=(await store.readHead()).payload;
+ // The device cannot remember the choice (a full origin quota, for example).
+ const key='fvp:chain-scanner:declined-automatic-cloud-recovery',setItem=shim.localStorage.setItem;let markerWrites=0;
+ shim.localStorage.setItem=function(name,value){if(name===key){markerWrites++;throw Object.assign(Error('Synthetic quota exceeded'),{name:'QuotaExceededError'});}return setItem.call(this,name,value);};
+ let declined;
+ try{declined=await ctx.onAction('decline-automatic-cloud-recovery',{});}finally{shim.localStorage.setItem=setItem;}
+ const afterDecline={state:JSON.stringify(ctx.state),head:(await store.readHead()).payload,hold:await store.getRecoveryCloudHold()};
+ // Storage and the cloud then work again, and the next ordinary pull runs.
+ refusePublication=false;const next=ctx.cloudPull();let nextDone=false;next.then(()=>{nextDone=true;},()=>{nextDone=true;});
+ await fixtureDeadline(async wait=>{await wait(5);while(!nextDone||!idle())await wait(20);},'the next pull settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ const reapplied=olderOnly(),published=backend.docs.get('users/owner').rev!==originalRoot.rev;
+ assert.equal(markerWrites,1,'the decline tried to remember the choice');
+ assert.ok(!(declined===true&&(reapplied||published)),'a decline reported as done is never reapplied or published by the next pull: '+JSON.stringify({declined,reapplied,published}));
+ assert.equal(declined,false,'a decline whose choice cannot be remembered fails closed');
+ assert.equal(afterDecline.state,recovered,'the refused decline leaves the working board unchanged');
+ assert.equal(afterDecline.head,recoveredHead,'the refused decline writes nothing to the device');
+ assert.deepEqual(afterDecline.hold,pending,'the refused decline keeps the pending automatic default exactly');
+});
+
 test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
  for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
   const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;

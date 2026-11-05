@@ -11872,15 +11872,22 @@ async function declineAutomaticCloudRecovery(){
   if(!next||JSON.stringify(next)!==prior||(next.syncAccount??account)!==account)
     return refuse("The earlier board could not be reopened exactly. Use Restore below; every source stays protected.");
   const encodeHold=value=>JSON.stringify(encodeManualArchiveValue(value,"device recovery hold"));
+  // #2194 review L1: remember the choice before the device commit, and stop if
+  // it cannot be remembered. Written afterwards, a failed write let the next
+  // pull apply and publish the older copy over a decline reported as done.
+  // While the hold still exists the record changes nothing, so a commit that
+  // fails below only has to forget it again.
+  try{localStorage.setItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY,JSON.stringify({v:1,account,identity,rev:manifest.rev,generationId:manifest.activeGeneration}));}
+  catch{return refuse("This device could not remember the choice, so nothing was changed. Free some browser storage and try again; every source stays protected.");}
   let committed;
   try{committed=await deviceWriteBeforeDiagnostics("commitHead",{expectedHash:head.hash,payload:prior,account:head.account??null,
     releaseRecoveryHold:{expectedHold:stored,encodeHold}});}catch{committed=null;}
-  if(!committed?.ok||committed.superseded)return refuse("The earlier board could not be saved on this device. Nothing was lost; try again.");
+  if(!committed?.ok||committed.superseded){forgetDeclinedAutomaticCloudRecovery();
+    return refuse("The earlier board could not be saved on this device. Nothing was lost; try again.");}
   sealUndoFrame();
   state=next;deviceHeadHash=committed.head?.hash||committed.hash;lastPersistedRaw=prior;persistedChanceSeed=next.chance?.seed??null;
   deviceRecoveryCloudHold=null;automaticCloudRecovery=null;forgetUnreadableCloudSourceHold();
   cloudAdoptionHeld=true;pendingPush=false;
-  try{localStorage.setItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY,JSON.stringify({v:1,account,identity,rev:manifest.rev,generationId:manifest.activeGeneration}));}catch{}
   applyTheme();recomputeRanks();closeModal();render();renderSync();
   toast("Your board from before recovery is back. The older and damaged cloud copies stay protected, and cloud saving is still not confirmed.",9000);
   return true;

@@ -5891,6 +5891,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery: a decline whose choice cannot be remembered fails closed and a reported decline is never reapplied or published",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
       "group": "persistence-recovery",
       "file": "tests.js"
