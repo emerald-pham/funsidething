@@ -31948,13 +31948,31 @@ test('RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remember
 // #2198: the same captured shape (#2195) reaching the real app consumer. The
 // device holds an accepted board whose acknowledged copy no longer matches the
 // damaged active header, and the immediately prior generation is complete.
-// The product reads sources inside one 60s budget. Spec #2194 measured phone
-// class CPU at up to 6x this desktop runtime, so the consumer gives the same
-// work one sixth of that budget; it asserts the outcome, never a duration.
-const CAPTURED_RECOVERY_BUDGET_MS=60000/6;
-// Consumers of the reconciled result (decline, draft/Undo) are not budget
-// regressions; half the product budget keeps them independent of suite load.
-const CAPTURED_RESULT_BUDGET_MS=60000/2;
+// The product reads sources inside one 60s budget, and every consumer here
+// keeps exactly that budget. Whether recovery fits a phone is decided by
+// counting work (multi-megabyte serializations), never by elapsed time, so a
+// slow or loaded host cannot change any verdict (#2194 review F3).
+const CAPTURED_RECOVERY_BUDGET_MS=60000;
+const CAPTURED_RESULT_BUDGET_MS=CAPTURED_RECOVERY_BUDGET_MS;
+// Sums the length of every serialization of at least one mebibyte made by the
+// app realm while `work` runs. The #2198 defect re-encoded the same captured
+// multi-megabyte copies at every cloud read stage; that work is the same count
+// on any host, so it is measured instead of the time it takes.
+async function largeSerializedBytes2198(ctx,work){
+ const counter=vm.runInContext(`(()=>{const original=JSON.stringify,state={bytes:0,calls:0};
+  JSON.stringify=function(...args){const result=Reflect.apply(original,this,args);
+   if(typeof result==='string'&&result.length>=1048576){state.bytes+=result.length;state.calls++;}return result;};
+  return {state,restore(){JSON.stringify=original;}};})()`,ctx);
+ try{await work();}finally{counter.restore();}
+ return {bytes:counter.state.bytes,calls:counter.state.calls};
+}
+// What one recovery pull may serialize on a phone inside the product budget.
+// Fixed constants, never measured at test time: desktop JSON serialization of
+// this board shape ran at 425 MB/s (2026-11-05), spec #2194 puts phone class
+// CPU at up to 6x slower, and the captured export spent 9.57 s of the 60 s
+// budget in network chunk stages. Before the #2198 fix one pull serialized
+// about 4.9 GB, which is about 70 s of phone CPU.
+const CAPTURED_PHONE_SERIALIZATION_BYTES=Math.floor((60-9.57)*425e6/6);
 function exactPaddedBoard(board,field,byteLength){
  board[field]={opaque:''};const unpadded=Buffer.byteLength(JSON.stringify(board),'utf8');
  assert.ok(unpadded<byteLength,'the synthetic board must fit the captured size');board[field].opaque='p'.repeat(byteLength-unpadded);
@@ -32011,7 +32029,9 @@ test('RISK cloud generation recovery: the captured unreadable active generation 
  refuseNextRecoveryTransaction255(app.faults);
  const before=JSON.stringify(ctx.state),beforeBoard=JSON.parse(before),syncRevBefore=ctx.state.syncRev;
  const cloudBefore=new Map([...backend.docs].map(([key,value])=>[key,JSON.stringify(value)]));
- ctx.closeModal();await flush();await ctx.cloudPull();
+ ctx.closeModal();await flush();
+ const serialized=await largeSerializedBytes2198(ctx,()=>ctx.cloudPull());
+ t.diagnostic('multi-megabyte serialization during the recovery pull: '+serialized.calls+' calls, '+serialized.bytes+' characters');
  const hold=await store.getRecoveryCloudHold();
  const observed=vm.runInContext('JSON.stringify({cloud:window.CloudSync?.errorCode??null,unrepairable:unrepairableCloudSource?.code??null,resume:automaticCloudSourceResumeStatus?.state??null,accepted:liveBoardAccepted})',ctx);
  assert.ok(hold?.automaticRecovery===true&&hold.reason==='cloud-source-recovery','the captured state reconciles as an automatic recovery default instead of staying unaccepted; app state: '+observed);
@@ -32037,6 +32057,9 @@ test('RISK cloud generation recovery: the captured unreadable active generation 
  const archivedPrior=sourceArchive.generations.find(row=>row.id===originalRoot.previousGeneration);
  assert.equal(await ctx.window.ChainStorageV2.decodeSnapshot(archivedPrior.header,archivedPrior.chunks),priorPayload,'the prior generation is archived exactly');
  assert.equal(backend.docs.get(activePath).chunkCount,CAPTURED_UNREADABLE_GENERATION.active.chunkCount);assert.ok(backend.docs.has(priorPath));
+ // The outcome above is reached inside the product budget on this host; the
+ // work count decides whether it also fits a phone, whatever this host's speed.
+ assert.ok(serialized.bytes<=CAPTURED_PHONE_SERIALIZATION_BYTES,'one recovery pull serializes no more than a phone can inside the product budget: '+JSON.stringify({...serialized,limit:CAPTURED_PHONE_SERIALIZATION_BYTES}));
 });
 
 test('RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board',{timeout:240000},async t=>{
