@@ -31740,14 +31740,20 @@ test('RISK cloud generation recovery: declining the reconciled prior generation 
  const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
  const before=JSON.stringify(ctx.state),beforeTitles=ctx.state.tasks.map(task=>task.title);
  const protectedSources=[...backend.docs].filter(([key])=>key===activePath||key===priorPath||key.startsWith(priorPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
- ctx.closeModal();await flush();const pull=ctx.cloudPull();
- // The automatic default publishes through the guarded revision path; wait
- // for its real acknowledgement and for the bounded source checks to finish.
+ ctx.closeModal();await flush();
+ // The automatic default publishes through the guarded revision path. Under
+ // load its first read budget can end after the local commit; the pending hold
+ // then publishes on the next ordinary pull. Wait for the real acknowledgement.
  const settled=()=>vm.runInContext('JSON.stringify({dirty:state.syncDirty,pulling,pushing:cloudPushInFlight,busy:cloudSourceRecoveryBusy,hold:deviceRecoveryCloudHold?.reason??null,cloud:window.CloudSync?.errorCode??null})',ctx);
- try{await fixtureDeadline(async wait=>{let done=false;pull.then(()=>{done=true;});
-  while(!done||ctx.state.syncDirty||vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy||!!deviceRecoveryCloudHold',ctx))await wait(20);},
-  'the automatic default reaches a real cloud acknowledgement',CAPTURED_RECOVERY_BUDGET_MS+20000);}
- catch(error){error.message+='; app state: '+settled();throw error;}
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ for(let attempt=0;attempt<3&&(attempt===0||ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx));attempt++){
+  if(attempt)assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'only a committed automatic default may be published later');
+  const pull=ctx.cloudPull();
+  try{await fixtureDeadline(async wait=>{let done=false;pull.then(()=>{done=true;});while(!done||!idle())await wait(20);},
+   'the automatic default read settles',CAPTURED_RECOVERY_BUDGET_MS+20000);}
+  catch(error){error.message+='; app state: '+settled();throw error;}
+ }
+ assert.equal(ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx),false,'the automatic default reaches a real cloud acknowledgement; app state: '+settled());
  const published=backend.docs.get('users/owner');
  assert.equal(published.rev,originalRoot.rev+1,'publication is one guarded revision after the damaged one');
  assert.equal(published.previousGeneration,originalRoot.activeGeneration,'the damaged generation stays referenced, never overwritten');
