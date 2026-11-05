@@ -2322,3 +2322,10 @@ Protect actual automatic recovery, manual source review, exact protected copies 
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
 
 The real Sync → Review action and Copy debug log consumer distinguish failed pending-upload, recovery-hold and head reads, fixed exception categories and temporary connection aliases. Repeated failures still stop after the existing one recheck. Exact device/cloud originals, unfinished drafts, source-selection guards and the 24 KiB report/512-byte event limits stay intact. Arbitrary error messages, paths, account identifiers, out-of-range aliases, extra fields and changing/throwing getters cannot enter the copied report. The current physical-phone failure remains unreproduced; these diagnostics do not repair data or establish its cause.
+
+## Large board opening memory
+
+- RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit
+- RISK large board opening guidance: mounted FAQ and changelog explain that a large board opens from this device with less memory
+
+The generated large-board fixture (447 tasks, long rating histories, 368 decision events, about 2.4 MB) opens from device storage on a served build. Peak web-process memory is sampled by the harness from the operating system and compared only with an empty board in the same run on the same engine (#2225, spec #2224).

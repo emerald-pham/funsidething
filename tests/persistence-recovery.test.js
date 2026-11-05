@@ -3,6 +3,7 @@ import { createHash, webcrypto } from "node:crypto";
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
@@ -20,6 +21,7 @@ import {
   deletionEvidence, loadStorageV2, exerciseCompletionEditorBoundaries, liveScanSyncClients,
   liveDoneDeliverySnapshot, ordinaryEditDebounceControl, settleRecovery188,
   settleRecoveryOperations188, divergentCloudSourceApp187, replaceIndependentServerPayload263,
+  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
 } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
@@ -1009,6 +1011,89 @@ test('RISK cloud generation recovery browser: a real click on Use my board from 
   }finally{await browser.close();}
  }
  t.diagnostic(JSON.stringify(observed));
+});
+
+// #2225 (spec #2224): opening a large board from this device's storage, with
+// no cloud, held several full parsed copies of the board and its decisions at
+// once: about 500 MB over an empty board in WebKit for a board shaped like the
+// owner's. Each scenario seeds a fresh browser profile through the app's own
+// first open (which moves the saved board into device storage, as on a real
+// device), then measures a cold open of a fresh browser on that profile. Peak
+// web-process memory is read by the harness from the operating system and is
+// compared only with the empty board in the same run on the same engine,
+// never with an absolute byte count. The fixed margin covers showing this many
+// tasks at all: in WebKit the same 447 tasks with no history or decisions
+// opened about 75 MiB over an empty board. The per-byte cost bounds the work on
+// the saved histories and decisions; before #2225 it was about 60-65 bytes of
+// memory per serialized byte in WebKit (218-236 MiB over empty for this board).
+const LARGE_BOARD_OPEN_FIXED_MARGIN=96*1024*1024,LARGE_BOARD_OPEN_BYTES_FACTOR=32;
+test('RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),{stats}=fixture;
+ // The fixture is at least as large as the measured board on every measure.
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.decisionEvents.count>=LARGE_BOARD_SHAPE.decisionEvents);
+ assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ assert.ok(stats.decisionEvents.meanBytes>=LARGE_BOARD_SHAPE.eventMeanBytes&&stats.decisionEvents.maxBytes>=LARGE_BOARD_SHAPE.eventMaxBytes);
+ assert.ok(stats.ratingHistory.meanBytes>=LARGE_BOARD_SHAPE.historyMeanBytes&&stats.ratingHistory.maxBytes>=LARGE_BOARD_SHAPE.historyMaxBytes);
+ const emptyBoard=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true}));
+ const allowance=LARGE_BOARD_OPEN_FIXED_MARGIN+LARGE_BOARD_OPEN_BYTES_FACTOR*stats.serializedBytes;
+ const SETTLE_MS=4000,observed=[],failures=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const open=async(scenario,payload,taskCount)=>{
+   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2225-'+engineName+'-'+scenario+'-'));
+   const launch=async(tag,seed)=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(seed=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);},seed);
+    return context;
+   };
+   const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
+    &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
+   try{
+    const tag=`chain-2225-${engineName}-${scenario}-${process.pid}-${Date.now()}`;
+    let context=await launch(tag+'-seed',payload);
+    try{
+     const page=context.pages()[0]||await context.newPage();
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+     // Fixture precondition: the board is saved in device storage before the measured open.
+     await page.waitForFunction(()=>new Promise(resolve=>{const request=indexedDB.open('chain-scanner-v2');request.onerror=()=>resolve(false);
+      request.onsuccess=()=>{const names=[...request.result.objectStoreNames];request.result.close();resolve(names.length>0);};}),null,{timeout:30000});
+     await page.waitForTimeout(1000);
+    }finally{await context.close();}
+    context=await launch(tag,null);
+    let result;
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const sampler=webProcessMemorySampler(tag);
+     let memory;
+     try{
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+      await page.waitForTimeout(SETTLE_MS);
+     }finally{memory=await sampler.stop();}
+     // Visible and editable: every saved task is listed and a new one is accepted and kept.
+     const titles=await page.$$eval('#listBody [data-row]',rows=>rows.map(row=>row.textContent));
+     await page.locator('#addInput').fill('Added after opening '+scenario);await page.locator('#addInput').press('Enter');
+     await shown(taskCount+1)(page);
+     result={memory,titles,errors};
+    }finally{await context.close();}
+    return result;
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const empty=await open('empty',emptyBoard,0),large=await open('large',fixture.payload,LARGE_BOARD_SHAPE.tasks);
+  const extra=large.memory.peakBytes-empty.memory.peakBytes,mib=bytes=>Math.round(bytes/1048576);
+  const summary={engine:engineName,emptyPeakMiB:mib(empty.memory.peakBytes),largePeakMiB:mib(large.memory.peakBytes),extraMiB:mib(extra),allowanceMiB:mib(allowance),
+   processes:[empty.memory.processes,large.memory.processes],samples:[empty.memory.samples,large.memory.samples]};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  // Measurement preconditions: the harness saw this browser's own web process.
+  assert.ok(empty.memory.processes>0&&large.memory.processes>0&&empty.memory.samples>10&&large.memory.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
+  for(const [index,id] of fixture.ids.entries())assert.ok(large.titles.some(text=>new RegExp('Large board task '+index+'(?!\\d)').test(text)),`${engineName}: task ${id} is listed after opening`);
+  assert.deepEqual([empty.errors,large.errors],[[],[]],`${engineName}: no page errors`);
+  if(extra>allowance)failures.push(`${engineName}: opening the large board peaked ${mib(extra)} MiB over the empty board, above the ${mib(allowance)} MiB allowance`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
 test('RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible',async t=>{
