@@ -10007,7 +10007,9 @@ function renderSync(){
   const damagedPull=s==="error"&&!failure&&CS.errorStage==="pull"&&CS.errorCode==="corrupt-generation";
   if(olderCompleteCloudSourceInUse()&&(s!=="error"||damagedPull)){
     const unsaved=!!lastDeviceSaveIssue;
-    el.disabled=false;el.className="syncbtn err";el.textContent=unsaved?"☁ save error":"☁ older copy in use";
+    // Pending, not an error: saving is unconfirmed, not failing. Only the
+    // device save failure keeps the error style (#2194 review F5).
+    el.disabled=false;el.className=unsaved?"syncbtn err":"syncbtn busy";el.textContent=unsaved?"☁ save error":"☁ older copy in use";
     el.title=unsaved?"The latest edit is not saved on this device. Keep this tab open. "+OLDER_CLOUD_SOURCE_STATUS
       :OLDER_CLOUD_SOURCE_STATUS+" Open Settings → Data and backups to review recovery.";mirrorSavedAppearanceSyncStatus(el);return;
   }

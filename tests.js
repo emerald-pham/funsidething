@@ -32416,6 +32416,36 @@ test('RISK cloud generation recovery status: genuine device and cloud errors sta
  assert.ok(await store.getRecoveryCloudHold(),'the recovery hold and its warning stay in place after the error');
 });
 
+// #2194 review F5: the older-copy label used the error style and storm glyph.
+// The three states are told apart by their existing classes: opening and an
+// older complete source in use are pending (busy), only a genuine error is err.
+test('RISK cloud generation recovery status: opening, the older complete source in use and a genuine error each keep their own sync style',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ let older=null,saveError=null;
+ app.faults.beforeTransaction=async()=>{
+  const hold=ctx.window.ScannerDeviceRecoveryHold;
+  if(older||hold?.reason!=='cloud-source-recovery'||hold.automaticRecovery!==true)return;
+  older=syncStatus2200(shim);
+  // Opening: the real renderSync branch while the board has not hydrated and
+  // the cloud read is still running, as at boot.
+  older.opening=JSON.parse(vm.runInContext('(()=>{const board=state,status=window.CloudSync.status;state=null;window.CloudSync.status="syncing";try{renderSync();const b=document.getElementById("syncBtn");return JSON.stringify({text:b.textContent,className:b.className,disabled:b.disabled});}finally{state=board;window.CloudSync.status=status;renderSync();}})()',ctx));
+  const commitHead=store.commitHead;store.commitHead=async()=>({ok:false,code:'write-failed'});
+  try{shim.document.getElementById('addInput').value='Edit the device could not save';await ctx.onAction('add',{});
+   assert.equal(await ctx.persist(),false);saveError=syncStatus2200(shim);}
+  finally{store.commitHead=commitHead;}
+  throw Object.assign(Error('Controlled publication refusal'),{code:'permission-denied'});
+ };
+ ctx.closeModal();await flush();
+ const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
+ await fixtureDeadline(async wait=>{while(!pulled)await wait(20);},'the refused automatic publication settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.equal(older?.text,'☁ older copy in use','positive control: the older complete source is in use');
+ assert.deepEqual(older.className.split(/\s+/).sort(),['busy','syncbtn'],'an older complete source in use is pending, not an error: '+older.className);
+ assert.deepEqual(older.opening,{text:'☁ syncing',className:'syncbtn busy',disabled:true},'opening keeps its pending style');
+ assert.equal(saveError.text,'☁ save error');
+ assert.match(saveError.className,/\berr\b/,'a genuine device save error keeps the error style');
+ assert.equal(await ctx.persist(),true);
+});
+
 test('RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore',{timeout:120000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
  refuseNextRecoveryTransaction255(app.faults);
