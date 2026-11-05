@@ -9201,6 +9201,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK regression gate: a rationale is required only for removed or weakened tests",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK regression gate: changing existing tests requires a specific reason and replacement coverage",
       "group": "core",
       "file": "tests.js"
@@ -10792,6 +10797,11 @@
     },
     {
       "root": "RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files",
       "group": "core",
       "file": "tests.js"
     },
