@@ -5852,67 +5852,67 @@
     },
     {
       "root": "RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: a readable active generation of the captured shape leaves the saved board, cloud and status exactly as before",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: declining the pending automatic recovery default in Settings restores the unreconciled board before any publication",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: a decline whose choice cannot be remembered fails closed and a reported decline is never reapplied or published",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: a refused decline after later edits points to Review cloud recovery, which works while a signed-in Restore is held",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: Use my board from before recovery succeeds when pressed in the open Settings modal",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: a refused decline leaves the automatic recovery read and its requested resume in place",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
@@ -5922,27 +5922,27 @@
     },
     {
       "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery status: genuine device and cloud errors stay visible over the older complete source status",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
       "root": "RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
@@ -5967,7 +5967,7 @@
     },
     {
       "root": "RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status",
-      "group": "persistence-recovery",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
