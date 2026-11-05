@@ -12934,15 +12934,6 @@
       "root": "RISK recurring scenery refresh browser: a pending trusted key reaches Add before the minute refresh paints in Chromium and WebKit under both motion choices",
       "group": "core",
       "file": "tests.js"
-    }
-  ],
-  "processControls": [
-    {
-      "id": "RISK native installed-client delivery: signed-out",
-      "group": "native-process",
-      "file": "tests.js",
-      "ownerRoot": "RISK repository process: required installed-client native outcomes and artifacts execute exactly once",
-      "expectedExecutions": 1
     },
     {
       "root": "RISK recurring scenery refresh browser: the published scene text and colour never disagree with the painted sky in any frame in Chromium and WebKit under both motion choices",
@@ -12953,6 +12944,15 @@
       "root": "RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit",
       "group": "core",
       "file": "tests.js"
+    }
+  ],
+  "processControls": [
+    {
+      "id": "RISK native installed-client delivery: signed-out",
+      "group": "native-process",
+      "file": "tests.js",
+      "ownerRoot": "RISK repository process: required installed-client native outcomes and artifacts execute exactly once",
+      "expectedExecutions": 1
     },
     {
       "id": "RISK native installed-client delivery: reconcile-held",
