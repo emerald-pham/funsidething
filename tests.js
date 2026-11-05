@@ -37843,6 +37843,48 @@ test('RISK repository process: scaled receipts publish the v=4 binding and canno
  }finally{for(const fixture of [ordinary,docs,legacyInput,introducing])cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: Pages accepts the v=4 binding only for scaled-policy candidates',async()=>{
+ const {deriveReleaseReviewPlan,recordReleaseEvidence,publishReleaseStatuses,verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs');
+ const app={base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}};
+ const scaled=makeScaledReviewFixture(app);
+ const introducing=makeScaledReviewFixture({...app,agentsBase:'Independent FAQ coverage review is required for every product release.\n'});
+ const mainSha='d'.repeat(40);
+ const pages=(f,statuses,repoRoot=f.repo)=>verifyDeploymentEvidence({repoRoot,repository:'emerald-pham/funsidething',deployedSha:mainSha,beforeSha:f.baseSha,token:'fixture',
+  fetchImpl:async url=>{
+   const pathname=new URL(url).pathname;let body;
+   if(pathname.endsWith('/commits/'+mainSha+'/pulls'))body=[{number:41,merge_commit_sha:mainSha,merged_at:new Date().toISOString(),base:{ref:'main'},head:{sha:f.candidateSha}}];
+   else if(pathname.endsWith('/commits/'+mainSha))body={parents:[{sha:f.baseSha}],commit:{tree:{sha:f.treeSha}}};
+   else if(pathname.endsWith('/commits/'+f.candidateSha+'/statuses'))body=statuses.map((row,i)=>({...row,created_at:new Date(Date.now()+i).toISOString()}));
+   else if(pathname.endsWith('/commits/'+f.candidateSha))body={commit:{tree:{sha:f.treeSha}}};
+   else if(pathname.includes('/compare/'))body={status:'ahead'};else throw Error(pathname);
+   return {ok:true,status:200,json:async()=>body};
+  }});
+ const rebind=(statuses,from,to)=>statuses.map(row=>({...row,description:row.description.replace(from,to)}));
+ try{
+  const recorded=recordReleaseEvidence(scaled.repo,riskBasedReleaseInput(scaled,{specialistReview:false,input:{ownerReview:{faqCoverage:SCALED_FAQ_COVERAGE}}}));
+  const statuses=[];await publishReleaseStatuses(scaled.repo,scaled.candidateSha,async row=>statuses.push(row));
+  const accepted=await pages(scaled,statuses);
+  assert.equal(accepted.ok,true,accepted.errors.join('; '));
+  assert.deepEqual([accepted.reviewedSha,accepted.treeSha,accepted.baseSha,accepted.receiptSha256],
+   [scaled.candidateSha,scaled.treeSha,scaled.baseSha,recorded.receipt.receiptSha256],'Pages still binds the exact head, tree, base and receipt digest');
+  for(const older of [';v=2',';v=3'])assert.equal((await pages(scaled,rebind(statuses,';v=4',older))).ok,false,older+' cannot authorize a scaled-policy candidate');
+  const legacy=statuses.map(row=>({...row,description:'receipt-sha256='+recorded.receipt.receiptSha256+';base='+scaled.baseSha}));
+  assert.equal((await pages(scaled,legacy)).ok,false,'the schema-1 binding cannot authorize a scaled-policy candidate');
+  const unknownHead=path.join(scaled.root,'empty');fs.mkdirSync(unknownHead);releaseGateGit(unknownHead,['init','-q']);
+  assert.equal((await pages(scaled,statuses,unknownHead)).ok,false,'v=4 fails closed when the exact head policy cannot be read');
+
+  const plan=deriveReleaseReviewPlan(introducing.repo,introducing.candidateSha,introducing.baseSha);assert.equal(plan.requiresFaqReview,true);
+  const input=riskBasedReleaseInput(introducing,{specialistReview:plan.requiresSpecialistReview,domains:plan.specialistDomains});
+  const faqPath=path.join(introducing.root,'faq.md');fs.writeFileSync(faqPath,'Reviewed changed controls, saved data, defaults and complete FAQ coverage.\n');
+  input.faqReview={...input.independentReview,task:'/root/faq-distinct-reviewer',evidencePath:faqPath,evidenceSha256:releaseGateHash(faqPath)};
+  recordReleaseEvidence(introducing.repo,input);
+  const historical=[];await publishReleaseStatuses(introducing.repo,introducing.candidateSha,async row=>historical.push(row));
+  assert.ok(historical.every(row=>/;v=3$/.test(row.description)),'an old-policy candidate keeps its FAQ binding');
+  assert.equal((await pages(introducing,historical)).ok,true,'historical v=3 bindings still verify for their own candidates');
+  assert.equal((await pages(introducing,rebind(historical,';v=3',';v=4'))).ok,false,'v=4 is rejected for an old-policy candidate');
+ }finally{cleanupReleaseGateFixture(scaled);cleanupReleaseGateFixture(introducing);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);

@@ -1065,7 +1065,11 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
       localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
       if(!localHead)throw new Error('Exact review head remains unavailable after fetching its PR ref.');
     }
-    const faqPolicy=localHead ? !!deriveReleaseReviewPlan(repoRoot,headSha,baseSha).requiresFaqReview : false;
+    const headPlan=localHead ? deriveReleaseReviewPlan(repoRoot,headSha,baseSha) : null;
+    const faqPolicy=!!headPlan?.requiresFaqReview;
+    // The v=4 binding is honored only when the exact head and base carry the
+    // scaled policy; an unreadable head can never claim it (fails closed).
+    const scaledPolicy=headPlan?.schemaVersion===2;
     const reviewedCommit = await githubJson(fetchImpl, api + '/commits/' + headSha, token);
     if (!treeSha || reviewedCommit.commit?.tree?.sha !== treeSha) {
       throw new Error('The reviewed pull request head tree does not exactly match the deployed main tree.');
@@ -1080,12 +1084,14 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
     const riskBasedDescription = latest.get('funsidething/specialist-review')?.status?.description ||
       latest.get('funsidething/independent-review')?.status?.description || '';
     if(faqPolicy&&!/;v=3$/.test(riskBasedDescription))throw new Error('FAQ coverage policy requires FAQ-approved exact-head deployment evidence.');
-    if (/;v=[23]$/.test(riskBasedDescription)) {
+    if (scaledPolicy && !/;v=4$/.test(riskBasedDescription)) throw new Error('Scaled review policy requires v=4 exact-head deployment evidence.');
+    if (!scaledPolicy && /;v=4$/.test(riskBasedDescription)) throw new Error('The v=4 review binding is accepted only for scaled-policy candidates.');
+    if (/;v=[234]$/.test(riskBasedDescription)) {
       const statusPlan = new Map();
       for (const context of RISK_BASED_RELEASE_STATUS_CONTEXTS) {
         const status = latest.get(context)?.status;
         if (!status || status.state !== 'success') throw new Error('Latest exact-head status is missing or unsuccessful: ' + context + '.');
-        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=([23])$/);
+        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=([234])$/);
         if (!match || match[2] !== baseSha) throw new Error('Risk-based exact-head status is not bound to the deployed base and receipt: ' + context + '.');
         statusPlan.set(context, match.slice(1));
       }
