@@ -5531,6 +5531,26 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an unchanged manifest revision is not fetched again",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: a revision, generation or account change and an explicit revalidation read the generation again",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remembered as unreadable and healthy reads stay complete",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data",
       "group": "core",
       "file": "tests.js"
@@ -5828,6 +5848,126 @@
     {
       "root": "RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations",
       "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: a readable active generation of the captured shape leaves the saved board, cloud and status exactly as before",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: declining the pending automatic recovery default in Settings restores the unreconciled board before any publication",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: a decline whose choice cannot be remembered fails closed and a reported decline is never reapplied or published",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: a refused decline after later edits points to Review cloud recovery, which works while a signed-in Restore is held",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: Use my board from before recovery succeeds when pressed in the open Settings modal",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: a refused decline leaves the automatic recovery read and its requested resume in place",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: genuine device and cloud errors stay visible over the older complete source status",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore",
+      "group": "scenery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK review fixes guidance: mounted Help and the November 4 changelog describe bounded rereads, declining the older copy and the scenery waiting for the board",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK review fixes guidance: mounted Help says both cloud copies stay protected after returning to the board from before recovery",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status",
+      "group": "scenery",
       "file": "tests.js"
     },
     {
@@ -6257,6 +6397,11 @@
     },
     {
       "root": "RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact",
       "group": "core",
       "file": "tests.js"
     },
@@ -12819,6 +12964,118 @@
       "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK recurring scenery refresh browser: a pending trusted key reaches Add before the minute refresh paints in Chromium and WebKit under both motion choices",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK recurring scenery refresh browser: the published scene text and colour never disagree with the painted sky in any frame in Chromium and WebKit under both motion choices",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery hydration browser: with reduced motion a board that opens seconds late still renders before any scenery paint, and a board that never appears still gets scenery after the bounded wait in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery browser: the decline success and wait toasts fit four lines at the enlarged 260 px phone width in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK test inventory: every added environment-gated root is declared with the variable its registration skips on",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK test inventory: the group runner accepts an added environment-gated skip only when declared and its variable is absent",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    }
+  ],
+  "environmentSkips": [
+    {
+      "root": "RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK recurring scenery refresh browser: a pending trusted key reaches Add before the minute refresh paints in Chromium and WebKit under both motion choices",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK recurring scenery refresh browser: the published scene text and colour never disagree with the painted sky in any frame in Chromium and WebKit under both motion choices",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK opening scenery hydration browser: with reduced motion a board that opens seconds late still renders before any scenery paint, and a board that never appears still gets scenery after the bounded wait in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK cloud generation recovery browser: the decline success and wait toasts fit four lines at the enlarged 260 px phone width in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     }
   ],
   "processControls": [

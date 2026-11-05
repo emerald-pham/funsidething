@@ -196,6 +196,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD STARTUP: repeated unavailable writes keep one bounded retry budget across successful read-before-write checks
 - RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
+- RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
 - RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving
@@ -236,6 +237,30 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
+- RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation
+- RISK CLOUD V2 RECOVERY FIXTURE: a generation proved unreadable at an unchanged manifest revision is not fetched again
+- RISK CLOUD V2 RECOVERY FIXTURE: a revision, generation or account change and an explicit revalidation read the generation again
+- RISK CLOUD V2 RECOVERY FIXTURE: transient read failures are never remembered as unreadable and healthy reads stay complete
+- RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation
+- RISK cloud generation recovery: a readable active generation of the captured shape leaves the saved board, cloud and status exactly as before
+- RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board
+- RISK cloud generation recovery: declining the pending automatic recovery default in Settings restores the unreconciled board before any publication
+- RISK cloud generation recovery: a decline whose choice cannot be remembered fails closed and a reported decline is never reapplied or published
+- RISK cloud generation recovery: a refused decline after later edits points to Review cloud recovery, which works while a signed-in Restore is held
+- RISK cloud generation recovery: Use my board from before recovery succeeds when pressed in the open Settings modal
+- RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes
+- RISK cloud generation recovery: a refused decline leaves the automatic recovery read and its requested resume in place
+- RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit
+- RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted
+- RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone
+- RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered
+- RISK cloud generation recovery status: genuine device and cloud errors stay visible over the older complete source status
+- RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore
+- RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status
+- RISK review fixes guidance: mounted Help and the November 4 changelog describe bounded rereads, declining the older copy and the scenery waiting for the board
+- RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label
+- RISK review fixes guidance: mounted Help says both cloud copies stay protected after returning to the board from before recovery
+- RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status
 - RISK repository process: compatibility round trips preserve independently hashed production bytes
 - RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest
 - RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest
@@ -401,6 +426,16 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK landscape weather: organic rain storm and snow clouds darken smoothly with the night sky
 - RISK landscape water: lake clip overlaps the horizon contact at fractional pixel densities
 - RISK landscape water browser: GPU distortion preserves contact and sharp pixels while patches move independently
+- RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order
+- RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices
+- RISK recurring scenery refresh browser: a pending trusted key reaches Add before the minute refresh paints in Chromium and WebKit under both motion choices
+- RISK recurring scenery refresh browser: the published scene text and colour never disagree with the painted sky in any frame in Chromium and WebKit under both motion choices
+- RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit
+- RISK opening scenery hydration browser: with reduced motion a board that opens seconds late still renders before any scenery paint, and a board that never appears still gets scenery after the bounded wait in Chromium and WebKit
+- RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit
+- RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit
+- RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit
+- RISK cloud generation recovery browser: the decline success and wait toasts fit four lines at the enlarged 260 px phone width in Chromium and WebKit
 
 ## Offline shell and updates
 
@@ -424,6 +459,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: unrelated risk cases cannot approve enforcement edits
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
 - RISK test inventory: every named risk contract maps to a feature boundary
+- RISK test inventory: every added environment-gated root is declared with the variable its registration skips on
+- RISK test inventory: the group runner accepts an added environment-gated skip only when declared and its variable is absent
 
 ## Release memory/cloud/sync and independent code review
 
@@ -2039,6 +2076,10 @@ The held-demotion native boundary requires one Current and one Previous heading 
 
 - RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
+- RISK corrupt cloud work budget: resuming over an unchanged unreadable generation keeps its completed refusal without downloading it again
+- RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again
+- RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing
+- RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again
 - RISK populated task responsiveness: three rapid Yes actions retain history and reopen within the interaction budget
 - RISK populated completion responsiveness: rapid Done and Undo preserve earlier completions without full-pool stalls
 - RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams

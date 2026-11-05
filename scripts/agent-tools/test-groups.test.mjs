@@ -423,6 +423,50 @@ test('test group runner rejects unexpected skips and missing required cases', t 
   assert.match(missing.evidence?.issues?.join('\n') || '', /Required baseline case.*missing/);
 });
 
+// #2194 CI (PR #2222): an added browser root gated on an environment variable
+// skips in CI. It is accepted only through an explicit environmentSkips
+// declaration that names the variable its registration actually skips on,
+// only for a root the baseline inventory does not already own, and only while
+// that variable is absent from the runner's environment.
+test('RISK test inventory: the group runner accepts an added environment-gated skip only when declared and its variable is absent', t => {
+  const addedRoot = 'fixture added environment-gated browser root';
+  const reason = 'Needs a served app plus installed Chromium and WebKit, which CI groups do not provide.';
+  const add = (fixture, { declare = true, environment = 'FIXTURE_BROWSER_URL', root = addedRoot } = {}) => {
+    fs.appendFileSync(path.join(fixture.root, 'tests.js'), `\ntest(${JSON.stringify(addedRoot)},{skip:!process.env.FIXTURE_BROWSER_URL},()=>{});\n`);
+    const file = path.join(fixture.root, 'scripts/test-group-assignments.json'), value = JSON.parse(fs.readFileSync(file, 'utf8'));
+    value.rootAssignments.push({ root: addedRoot, group: 'core', file: 'tests.js' });
+    if (declare) value.environmentSkips = [{ root, environment, reason }];
+    writeJson(file, value);
+  };
+  const issues = result => result.evidence?.issues?.join('\n') || `${result.stdout}\n${result.stderr}`;
+  const undeclared = createFixture(t); add(undeclared, { declare: false });
+  const rejected = invoke(undeclared);
+  assert.notEqual(rejected.status, 0);
+  assert.match(issues(rejected), /unexpectedly skipped: fixture added environment-gated browser root/);
+
+  const declared = createFixture(t); add(declared);
+  const accepted = invoke(declared);
+  assert.equal(accepted.status, 0, issues(accepted));
+  assert.deepEqual(accepted.evidence?.environmentSkips, [{ root: addedRoot, environment: 'FIXTURE_BROWSER_URL', status: 'skipped' }],
+    'the result records the declared environment skip it accepted');
+
+  const running = createFixture(t); add(running);
+  const executed = invoke(running, { env: { FIXTURE_BROWSER_URL: 'http://127.0.0.1:1/' } });
+  assert.equal(executed.status, 0, issues(executed));
+  assert.deepEqual(executed.evidence?.environmentSkips, [{ root: addedRoot, environment: 'FIXTURE_BROWSER_URL', status: 'passed' }],
+    'with its variable set the declared root runs and passes');
+
+  const mismatched = createFixture(t); add(mismatched, { environment: 'OTHER_BROWSER_URL' });
+  const wrongVariable = invoke(mismatched);
+  assert.notEqual(wrongVariable.status, 0);
+  assert.match(issues(wrongVariable), /Environment skip .* is not registered with \{skip:!process\.env\.OTHER_BROWSER_URL\}/);
+
+  const baseline = createFixture(t); add(baseline, { root: fixtureRoots.scenery });
+  const baselineDeclared = invoke(baseline);
+  assert.notEqual(baselineDeclared.status, 0);
+  assert.match(issues(baselineDeclared), /Environment skip .* must name an added root/);
+});
+
 test('test group runner removes only its process temp files after failure', t => {
   const fixture = createFixture(t, { failOnRequest: true });
   const foreignPath = path.join(fixture.root, 'foreign-owner-data.txt');
