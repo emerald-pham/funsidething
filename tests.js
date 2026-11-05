@@ -37910,6 +37910,18 @@ test('RISK repository process: Pages accepts the v=4 binding only for scaled-pol
  }finally{cleanupReleaseGateFixture(scaled);cleanupReleaseGateFixture(introducing);}
 });
 
+test('RISK repository process: the repository AGENTS.md wording switches on the scaled review policy',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ // Guidance cleanups must keep the exact sentence the release validator reads.
+ const agents=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
+ const f=makeScaledReviewFixture({agentsBase:agents,agentsHead:agents,base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}});
+ try{
+  const plan=deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);
+  assert.equal(plan.schemaVersion,2,'the committed AGENTS.md must carry the scaled review policy wording');
+  assert.equal(plan.requiresFaqReview,false);assert.equal(plan.requiresOwnerFaqCoverage,true);
+ }finally{cleanupReleaseGateFixture(f);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);
