@@ -7980,6 +7980,109 @@ test('RISK cloud generation recovery browser: every decline refusal toast fits f
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2194 independent review B1 at the real consumer: a real click on the
+// decline button inside open Settings was refused as "A save or edit is
+// running", because Settings itself is an open .mback. The browser has no cloud
+// backend, so the pending hold and cloud fields are set in page (as in the
+// rendered captures); the stored device hold then differs, so a decline that
+// passes the busy check stops at its next refusal, "Recovery changed".
+test('RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state==='object'&&state,null,{timeout:20000});
+    const {resolveExpectedFirstRunHelp}=await import('./scripts/browser-fixture-setup.mjs');
+    await page.evaluate(()=>document.getElementById('motionDialog')?.close?.());
+    await page.waitForSelector('#modalRoot .mback .modal',{timeout:5000}).catch(()=>{});await resolveExpectedFirstRunHelp(page);
+    // A saved board gives this fresh profile device-storage authority, as a real device has.
+    await page.locator('#addInput').fill('Saved board task');await page.locator('#addInput').press('Enter');
+    await page.waitForFunction(()=>deviceStorageAuthority&&liveBoardAccepted&&state.tasks.some(task=>task.title==='Saved board task'),null,{timeout:20000});
+    const board=await page.evaluate(()=>{
+     const CS=window.CloudSync;CS.readRecoverySource=async()=>({error:true,code:'fixture'});CS.recoveryIdentity=()=>'fixture-identity';
+     Object.assign(CS,{configured:true,ready:true,user:'owner@example.test',status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+     deviceRecoveryCloudHold={v:1,reason:'cloud-source-recovery',automaticRecovery:true,account:'owner@example.test',identity:'fixture-identity',epoch:1,originalKey:'automatic-device-recovery:fixture'};
+     renderSync();return JSON.stringify(state);});
+    await page.locator('#appHeader [data-act="settings"]').click();
+    const button=page.locator('#modalRoot [data-act="decline-automatic-cloud-recovery"]');
+    await button.waitFor();
+    assert.equal(await page.evaluate(()=>!!document.querySelector('.mback')),true,'positive control: Settings is an open .mback modal');
+    await page.evaluate(()=>{const el=document.getElementById('toast');if(el)el.textContent='';});
+    await button.click();
+    await page.waitForFunction(()=>!!document.getElementById('toast')?.textContent,null,{timeout:15000});
+    const result=await page.evaluate(()=>({message:document.getElementById('toast').textContent,board:JSON.stringify(state),settingsOpen:!!document.querySelector('#modalRoot [data-act="decline-automatic-cloud-recovery"]')}));
+    observed.push({engine:engineName,message:result.message});
+    assert.doesNotMatch(result.message,/save or edit is running/i,`${engineName}: the open Settings modal is not an active editor: ${result.message}`);
+    assert.match(result.message,/Recovery changed/,`${engineName}: the decline passes its busy, storage and account checks and reaches the device check: ${result.message}`);
+    assert.equal(result.board,board,`${engineName}: the refused decline changes nothing`);
+    assert.deepEqual(errors,[],`${engineName}: no page errors`);
+   }finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+});
+
+// #2194 rendered capture (f917bc7): the decline's success toast ran 10 lines
+// at the enlarged 260 px phone width and covered half of Review cloud
+// recovery. It and the wait notice shown while the decline holds Settings
+// (#2194 N2) keep the refusals' budget; Help carries the detail.
+test('RISK cloud generation recovery browser: the decline success and wait toasts fit four lines at the enlarged 260 px phone width in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const decline=html.slice(html.indexOf('async function runAutomaticRecoveryDecline('),html.indexOf('async function openAutomaticCloudSourceFallback('));
+ const closing=html.slice(html.indexOf('function closeModal(){'),html.indexOf('function modalShell('));
+ const success=[...decline.matchAll(/toast\("([^"]+)",9000\)/g)].map(match=>match[1]);
+ const waiting=[...closing.matchAll(/if\(automaticRecoveryDeclineBusy\)\{toast\("([^"]+)"/g)].map(match=>match[1]);
+ assert.equal(success.length,1,'the decline has one success toast: '+JSON.stringify(success));
+ assert.equal(waiting.length,1,'closing Settings during the decline has one wait notice: '+JSON.stringify(waiting));
+ assert.match(success[0],/cloud saving/i,'the success toast still says cloud saving is not confirmed: '+success[0]);
+ const messages=[...success,...waiting],failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{for(const [width,height,budget] of [[260,563,4],[390,844,3]]){
+   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
+   try{
+    await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+     return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state==='object'&&state,null,{timeout:20000});
+    const {resolveExpectedFirstRunHelp}=await import('./scripts/browser-fixture-setup.mjs');
+    await page.evaluate(()=>document.getElementById('motionDialog')?.close?.());
+    await page.waitForSelector('#modalRoot .mback .modal',{timeout:5000}).catch(()=>{});await resolveExpectedFirstRunHelp(page);
+    await page.evaluate(()=>document.fonts.ready);
+    await page.locator('#appHeader [data-act="settings"]').click();await page.waitForSelector('#modalRoot .modal');
+    for(const message of messages){
+     const r=await page.evaluate(async message=>{
+      toast(message,9000);await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      const el=document.getElementById('toast'),rect=el.getBoundingClientRect(),ys=new Set();
+      const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let node;
+      while(node=walker.nextNode())for(let i=0;i<node.length;i++){if(!node.textContent[i].trim())continue;const range=document.createRange();range.setStart(node,i);range.setEnd(node,i+1);ys.add(Math.round(range.getBoundingClientRect().y));}
+      return {lines:ys.size,height:Math.round(rect.height),toastWidth:Math.round(rect.width),splineLoaded:document.fonts.check('13.5px "Spline Sans"'),
+       clip:el.scrollWidth>el.clientWidth||rect.left<0||rect.right>innerWidth||rect.bottom>innerHeight};
+     },message);
+     observed.push({engine:engineName,width,message,...r});
+     if(r.clip)failures.push(`${engineName}/${width}: the toast is clipped: ${message}`);
+     if(r.lines>budget)failures.push(`${engineName}/${width}: ${r.lines} lines (${r.height} px tall, budget ${budget}): ${message}`);
+    }
+    assert.deepEqual(errors,[],`${engineName}/${width}: no page errors`);
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2194 FAQ re-review B4: while the opening paint waits for a late board, a
 // resize, a return to the app (hide then show) or a pageshow ran refreshSky or
 // start(), which painted the scenery at once and released the normal-motion
@@ -32782,7 +32885,9 @@ test('RISK cloud generation recovery: Use my board from before recovery succeeds
  assert.ok(shim.document.querySelector('.mback, dialog[open]'),'positive control: the document reports the open Settings modal');
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="decline-automatic-cloud-recovery"/,'Settings offers the decline');
  shim.document.getElementById('toast').textContent='';
- shim.document.dispatchEvent({type:'click',detail:1,target:declineButton2194()});
+ // A real press: pointerdown (which marks a scanner gesture) precedes the click.
+ const button=declineButton2194();
+ shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
  await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',CAPTURED_RESULT_BUDGET_MS+20000);
  const message=shim.document.getElementById('toast').textContent;
  assert.doesNotMatch(message,/save or edit is running/i,'the Settings modal the decline is pressed from is not an active editor: '+message);
@@ -33218,6 +33323,16 @@ test('RISK review fixes guidance: mounted Help and the November 4 changelog desc
 // scenery draws anyway after a bounded wait, that the cloud recovery review
 // itself chooses nothing, which checks are remembered, and what each cloud
 // button label means.
+// #2194 rendered capture (f917bc7): the shortened decline success toast drops
+// "the older and damaged cloud copies stay protected"; Help keeps it.
+test('RISK review fixes guidance: mounted Help says both cloud copies stay protected after returning to the board from before recovery',async t=>{
+ const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const back=help.split('<dt>Can I go back to my board from before recovery?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(back,/Afterwards your board saves on this device, cloud saving stays paused, both cloud copies stay protected/,'Help says both cloud copies stay protected after the decline');
+ assert.ok(back.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+});
+
 test('RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label',async t=>{
  const {ctx,shim,dispose}=await loadApp();t.after(()=>dispose?.());
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];

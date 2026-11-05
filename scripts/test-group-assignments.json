@@ -5916,6 +5916,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
       "group": "persistence-recovery",
       "file": "tests.js"
@@ -5952,6 +5957,11 @@
     },
     {
       "root": "RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK review fixes guidance: mounted Help says both cloud copies stay protected after returning to the board from before recovery",
       "group": "core",
       "file": "tests.js"
     },
@@ -12997,6 +13007,11 @@
     },
     {
       "root": "RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery browser: the decline success and wait toasts fit four lines at the enlarged 260 px phone width in Chromium and WebKit",
       "group": "core",
       "file": "tests.js"
     }

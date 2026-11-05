@@ -250,6 +250,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud generation recovery: Use my board from before recovery succeeds when pressed in the open Settings modal
 - RISK cloud generation recovery: an edit attempted while the decline commits is never replaced and Settings stays open until it finishes
 - RISK cloud generation recovery: a refused decline leaves the automatic recovery read and its requested resume in place
+- RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit
 - RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted
 - RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone
 - RISK cloud generation recovery status: while the automatic recovery default uses the older complete generation, the sync status claims no cloud acknowledgement and says the damaged generation was not recovered
@@ -258,6 +259,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK cloud generation recovery status: mounted Help and the current changelog explain the older complete source status
 - RISK review fixes guidance: mounted Help and the November 4 changelog describe bounded rereads, declining the older copy and the scenery waiting for the board
 - RISK review fixes guidance: mounted Help explains when the decline is available, what follows it, the bounded scenery wait and every cloud button label
+- RISK review fixes guidance: mounted Help says both cloud copies stay protected after returning to the board from before recovery
 - RISK cloud generation recovery status: only a real cloud acknowledgement of the current saved board ends the older complete source status
 - RISK repository process: compatibility round trips preserve independently hashed production bytes
 - RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest
@@ -433,6 +435,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit
 - RISK opening scenery hydration browser: a resize, a return to the app or a pageshow during a late board never paints the scenery before the board, and still repaints after it, in Chromium and WebKit
 - RISK cloud generation recovery browser: every decline refusal toast fits four lines at the enlarged 260 px phone width and names the action that works in Chromium and WebKit
+- RISK cloud generation recovery browser: the decline success and wait toasts fit four lines at the enlarged 260 px phone width in Chromium and WebKit
 
 ## Offline shell and updates
 
