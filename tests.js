@@ -32366,7 +32366,7 @@ test('RISK cloud generation recovery: declining the pending automatic recovery d
  ctx.closeModal();await flush();ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=before;
  shim.document.dispatchEvent({type:'input',target:box});
  assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'a deliberate Paste Restore preview opens after declining');
- ctx.closeModal();
+ await ctx.onAction('cancel-file-restore',{});
  // A relaunch over the same unchanged root does not reapply the declined default.
  await closeLegacyApp173(app);backend.CS.suspend();
  const coldReads=[],cold=await coldRelaunch2198(t,app,coldReads);
@@ -32449,11 +32449,11 @@ test('RISK corrupt cloud work budget: resuming over an unchanged unreadable gene
 // launch, keyed by account, revision and generation. The root is still a
 // forced server read, and the conclusion only ever holds writes.
 async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
- const reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});
+ let reopened=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});
  if(!reopened.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),reopened.ctx,{filename:'device-store-v2.js'});reopened.ctx.window.ChainStorageV2=reopened.ctx.ChainStorageV2;}
  await reopened.ctx.__dataReady;reopened.ctx.window.CLOUD_PUSH_DELAY_MS=60000;
  const faults={authPending:true,serverRead:async path=>{reads.push(path);}};
- const backend=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,sharedDocs:app.backend.docs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:CAPTURED_RECOVERY_BUDGET_MS,recordSyncError:reopened.ctx.recordSyncError});
+ let backend=await loadCloudBackendV2({runtimeWindow:reopened.ctx.window,sharedDocs:app.backend.docs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:CAPTURED_RECOVERY_BUDGET_MS,recordSyncError:reopened.ctx.recordSyncError});
  // The same release as the #2198 fixture: the runner retains finished hooks
  // and their realms, and the shared in-memory database keeps every multi-
  // megabyte transaction log until it is deleted after this connection closes.
@@ -32461,7 +32461,9 @@ async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
   try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();backend.docs.clear();try{reopened.shim.localStorage.clear();}catch{}
   for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
    'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer'])try{vm.runInContext(name+'=null',reopened.ctx);}catch{}
-  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
+  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});
+  // This retained hook must not keep the relaunched realm or its backend alive.
+  reopened=null;backend=null;});
  const settled=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy||automaticCloudFallbackBootCapturePending',reopened.ctx);
  const relaunched={...reopened,backend,faults,settle:message=>fixtureDeadline(async wait=>{await wait(5);while(!settled())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000)};
  if(signIn){backend.emitAuth({uid:'owner',email:'e@example.com'});reopened.ctx.closeModal();await flush();await reopened.ctx.cloudPull();await relaunched.settle('the relaunched opening settles');}
@@ -32590,6 +32592,10 @@ test('RISK cloud generation recovery status: genuine device and cloud errors sta
   const hold=ctx.window.ScannerDeviceRecoveryHold;
   if(olderSource||hold?.reason!=='cloud-source-recovery'||hold.automaticRecovery!==true)return;
   olderSource=syncStatus2200(shim);
+  // #2194 review F5: opening keeps its own pending style. This is the real
+  // renderSync branch while the board has not hydrated and the cloud read is
+  // still running, as at boot.
+  olderSource.opening=JSON.parse(vm.runInContext('(()=>{const board=state,status=window.CloudSync.status;state=null;window.CloudSync.status="syncing";try{renderSync();const b=document.getElementById("syncBtn");return JSON.stringify({text:b.textContent,className:b.className,disabled:b.disabled});}finally{state=board;window.CloudSync.status=status;renderSync();}})()',ctx));
   // A real device write failure (the storage boundary) while that older copy is in use.
   const commitHead=store.commitHead;store.commitHead=async()=>({ok:false,code:'write-failed'});
   try{shim.document.getElementById('addInput').value='Edit the device could not save';await ctx.onAction('add',{});
@@ -32602,8 +32608,12 @@ test('RISK cloud generation recovery status: genuine device and cloud errors sta
  const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
  await fixtureDeadline(async wait=>{while(!pulled)await wait(20);},'the refused automatic publication settles',CAPTURED_RESULT_BUDGET_MS+20000);
  assert.equal(olderSource?.text,'☁ older copy in use','positive control: the older complete source status was showing first');
+ // #2194 review F5: the three states keep their own existing styles; only a genuine error uses err.
+ assert.deepEqual(olderSource.className.split(/\s+/).sort(),['busy','syncbtn'],'an older complete source in use is pending, not an error: '+olderSource.className);
+ assert.deepEqual(olderSource.opening,{text:'☁ syncing',className:'syncbtn busy',disabled:true},'opening keeps its pending style');
  assert.equal(deviceFailure.text,'☁ save error','a device save failure is not hidden by the older-source status: '+JSON.stringify(deviceFailure));
  assert.match(deviceFailure.title,/latest edit is not saved on this device/i);
+ assert.match(deviceFailure.className,/\berr\b/,'a genuine device save error keeps the error style');
  assert.equal(await ctx.persist(),true,'the device saves again once storage recovers');
  assert.ok(await store.getRecoveryCloudHold(),'no cloud acknowledgement has cleared the older complete source');
  // The cloud then refuses this account outright: a genuine cloud error.
@@ -32614,38 +32624,9 @@ test('RISK cloud generation recovery status: genuine device and cloud errors sta
  const cloudError=syncStatus2200(shim);
  assert.equal(ctx.window.CloudSync.errorCode,'permission-denied','the refusal is a real cloud error');
  assert.equal(cloudError.text,'☁ error','a genuine cloud error is not replaced by the older-source status: '+JSON.stringify(cloudError));
+ assert.match(cloudError.className,/\berr\b/,'a genuine cloud error keeps the error style');
  assert.match(cloudError.title,/permission denied/i);
  assert.ok(await store.getRecoveryCloudHold(),'the recovery hold and its warning stay in place after the error');
-});
-
-// #2194 review F5: the older-copy label used the error style and storm glyph.
-// The three states are told apart by their existing classes: opening and an
-// older complete source in use are pending (busy), only a genuine error is err.
-test('RISK cloud generation recovery status: opening, the older complete source in use and a genuine error each keep their own sync style',{timeout:120000},async t=>{
- const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
- let older=null,saveError=null;
- app.faults.beforeTransaction=async()=>{
-  const hold=ctx.window.ScannerDeviceRecoveryHold;
-  if(older||hold?.reason!=='cloud-source-recovery'||hold.automaticRecovery!==true)return;
-  older=syncStatus2200(shim);
-  // Opening: the real renderSync branch while the board has not hydrated and
-  // the cloud read is still running, as at boot.
-  older.opening=JSON.parse(vm.runInContext('(()=>{const board=state,status=window.CloudSync.status;state=null;window.CloudSync.status="syncing";try{renderSync();const b=document.getElementById("syncBtn");return JSON.stringify({text:b.textContent,className:b.className,disabled:b.disabled});}finally{state=board;window.CloudSync.status=status;renderSync();}})()',ctx));
-  const commitHead=store.commitHead;store.commitHead=async()=>({ok:false,code:'write-failed'});
-  try{shim.document.getElementById('addInput').value='Edit the device could not save';await ctx.onAction('add',{});
-   assert.equal(await ctx.persist(),false);saveError=syncStatus2200(shim);}
-  finally{store.commitHead=commitHead;}
-  throw Object.assign(Error('Controlled publication refusal'),{code:'permission-denied'});
- };
- ctx.closeModal();await flush();
- const pull=ctx.cloudPull();let pulled=false;pull.then(()=>{pulled=true;});
- await fixtureDeadline(async wait=>{while(!pulled)await wait(20);},'the refused automatic publication settles',CAPTURED_RESULT_BUDGET_MS+20000);
- assert.equal(older?.text,'☁ older copy in use','positive control: the older complete source is in use');
- assert.deepEqual(older.className.split(/\s+/).sort(),['busy','syncbtn'],'an older complete source in use is pending, not an error: '+older.className);
- assert.deepEqual(older.opening,{text:'☁ syncing',className:'syncbtn busy',disabled:true},'opening keeps its pending style');
- assert.equal(saveError.text,'☁ save error');
- assert.match(saveError.className,/\berr\b/,'a genuine device save error keeps the error style');
- assert.equal(await ctx.persist(),true);
 });
 
 test('RISK cloud generation recovery status: Settings says the older complete source is in use and keeps cloud recovery review and deliberate Restore',{timeout:120000},async t=>{
