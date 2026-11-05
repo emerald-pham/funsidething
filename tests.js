@@ -30419,6 +30419,19 @@ test('RISK repository process: CI makes verified release evidence a deployment p
   'Pages deployment must wait for both behavior checks and reviewer/memory evidence');
 });
 
+// The trigger and concurrency decisions are interpreted at the agreed CI workflow
+// seam in the CI-routing agent-tool tests; this process RISK requires those pins to
+// execute and pass rather than duplicating their workflow interpretation here.
+test('RISK repository process: CI runs once per pull request commit and never cancels main',()=>{
+ const pins=['workflow runs once per pull request commit and keeps push validation on main','workflow cancels superseded non-main runs and never cancels main'];
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+pins.join('|')+')$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:60000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The CI trigger and concurrency pins must pass: '+result.stdout+'\n'+result.stderr);
+ assert.match(result.stdout,new RegExp('^# tests '+pins.length+'$','m'),'every named CI trigger pin must execute');
+ assert.match(result.stdout,/^# skipped 0$/m);
+ for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
+});
+
 test('RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator',async()=>{
  const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
  const fixture=makeReleaseGateFixture();

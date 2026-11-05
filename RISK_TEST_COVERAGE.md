@@ -450,6 +450,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: status publication needs a valid exact-SHA receipt
 - RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses
 - RISK repository process: CI makes verified release evidence a deployment prerequisite
+- RISK repository process: CI runs once per pull request commit and never cancels main
 - RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator
 - RISK repository process: custom hook paths are compared with the shared git default
 - RISK repository process: release hooks reject marker-only or tampered dispatchers

@@ -9266,6 +9266,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK repository process: CI runs once per pull request commit and never cancels main",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK repository process: compatibility round trips preserve independently hashed production bytes",
       "group": "core",
       "file": "tests.js"
@@ -12392,6 +12397,16 @@
     },
     {
       "root": "metadata edits continue past verified covered runs to the original full producer",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow runs once per pull request commit and keeps push validation on main",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "workflow cancels superseded non-main runs and never cancels main",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
