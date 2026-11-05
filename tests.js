@@ -37812,6 +37812,37 @@ test('RISK repository process: scaled receipts record FAQ coverage in the owner 
  }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
 });
 
+const SCALED_FAQ_COVERAGE={result:'no-user-facing-change',summary:'The change alters no control, default or saved data the extended FAQ describes.'};
+
+test('RISK repository process: scaled receipts publish the v=4 binding and cannot cross policy boundaries',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence,publishReleaseStatuses}=await import('./scripts/release-evidence.mjs');
+ const app={base:{'src/landscape.mjs':'const hue = 30;\n'},candidate:{'src/landscape.mjs':'const hue = 32;\n'}};
+ const ordinary=makeScaledReviewFixture(app);
+ const docs=makeScaledReviewFixture({base:{'README.md':'Old note.\n'},candidate:{'README.md':'New note.\n'}});
+ const legacyInput=makeScaledReviewFixture(app);
+ const introducing=makeScaledReviewFixture({...app,agentsBase:'Independent FAQ coverage review is required for every product release.\n'});
+ try{
+  const recorded=recordReleaseEvidence(ordinary.repo,riskBasedReleaseInput(ordinary,{specialistReview:false,input:{ownerReview:{faqCoverage:SCALED_FAQ_COVERAGE}}}));
+  const statuses=[];await publishReleaseStatuses(ordinary.repo,ordinary.candidateSha,async status=>statuses.push(status));
+  assert.deepEqual(statuses.map(status=>status.context).sort(),['funsidething/independent-review','funsidething/memory-audit','funsidething/specialist-review'],
+   'all three required contexts are still published');
+  assert.ok(statuses.every(status=>/;c=1;s=0;v=4$/.test(status.description)&&status.description.length<=140),'scaled receipts publish the new v=4 binding');
+  recordReleaseEvidence(docs.repo,riskBasedReleaseInput(docs,{codeReview:false,specialistReview:false}));
+  const docsStatuses=[];await publishReleaseStatuses(docs.repo,docs.candidateSha,async status=>docsStatuses.push(status));
+  assert.ok(docsStatuses.every(status=>/;c=0;s=0;v=4$/.test(status.description)));
+  assert.throws(()=>recordReleaseEvidence(legacyInput.repo,releaseGateInput(legacyInput)),/schemaVersion 2/,
+   'the historical two-review receipt cannot stand in for a scaled-policy candidate');
+  // Rebind the scaled receipt onto a candidate whose base predates the policy.
+  const target=path.join(introducing.repo,'.git','funsidething-release-evidence',introducing.candidateSha);
+  fs.cpSync(path.dirname(recorded.receiptPath),target,{recursive:true});
+  const moved=JSON.parse(fs.readFileSync(recorded.receiptPath,'utf8'));
+  moved.candidate={commitSha:introducing.candidateSha,treeSha:introducing.treeSha,baseSha:introducing.baseSha};
+  for(const key of ['ownerReview','independentReview'])moved[key].reviewedSha=introducing.candidateSha;
+  releaseGateReseal(moved);fs.writeFileSync(path.join(target,'receipt.json'),JSON.stringify(moved));
+  assert.equal(verifyReleaseEvidence(introducing.repo,introducing.candidateSha).ok,false,'the scaled receipt is rejected for an old-policy candidate');
+ }finally{for(const fixture of [ordinary,docs,legacyInput,introducing])cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);

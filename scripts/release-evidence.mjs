@@ -416,6 +416,14 @@ function evidenceFile(repoRoot, sourcePath, expectedSha, label) {
   return fs.readFileSync(resolved);
 }
 
+// Schema-1 receipts remain valid only for candidates from before the FAQ and
+// scaled policies; both later policies require schema-2 review objects.
+function schemaVersionOneConflict(plan) {
+  if (plan.schemaVersion === 2) return 'Scaled review policy requires schemaVersion 2 evidence.';
+  if (plan.requiresFaqReview) return 'FAQ coverage policy requires schemaVersion 2 evidence.';
+  return null;
+}
+
 function validateInput(repoRoot, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Release evidence input must be a JSON object.');
   if (input.schemaVersion !== 1) throw new Error('Release evidence input must use schemaVersion 1.');
@@ -425,7 +433,8 @@ function validateInput(repoRoot, input) {
   const actualTree = candidateTree(repoRoot, commitSha);
   if (!SHA1.test(treeSha || '') || actualTree !== treeSha) throw new Error('Candidate tree SHA does not match the exact commit.');
   assertAncestor(repoRoot, baseSha, commitSha);
-  if(deriveReleaseReviewPlan(repoRoot,commitSha,baseSha).requiresFaqReview)throw new Error('FAQ coverage policy requires schemaVersion 2 evidence.');
+  const legacyPlanError = schemaVersionOneConflict(deriveReleaseReviewPlan(repoRoot, commitSha, baseSha));
+  if (legacyPlanError) throw new Error(legacyPlanError);
   const ownerTask = taskId(input.ownerTask, 'ownerTask');
   const auditorTask = taskId(input.memoryAudit?.task, 'memoryAudit.task');
   const reviewerTask = taskId(input.independentReview?.task, 'independentReview.task');
@@ -867,7 +876,12 @@ export function verifyReleaseEvidence(repoRoot, commitSha) {
     return { ok: false, errors: ['Missing or malformed exact-SHA release receipt: ' + error.message], receiptPath };
   }
   if (receipt?.schemaVersion === 2) return verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath);
-  try{if(deriveReleaseReviewPlan(repoRoot,commitSha,receipt?.candidate?.baseSha).requiresFaqReview)errors.push('FAQ coverage policy requires schemaVersion 2 evidence.');}catch(error){errors.push(error.message);}
+  try {
+    const legacyPlanError = schemaVersionOneConflict(deriveReleaseReviewPlan(repoRoot, commitSha, receipt?.candidate?.baseSha));
+    if (legacyPlanError) errors.push(legacyPlanError);
+  } catch (error) {
+    errors.push(error.message);
+  }
   if (!receipt || typeof receipt !== 'object' || receipt.schemaVersion !== 1) errors.push('Release receipt schemaVersion must be 1.');
   if (receipt?.candidate?.commitSha !== commitSha) errors.push('Release receipt is stale or names a different candidate SHA.');
   if (receipt?.candidate?.commitSha && SHA1.test(receipt.candidate.commitSha)) {
@@ -964,6 +978,14 @@ export function validatePrePushUpdates(repoRoot, updates) {
   return errors;
 }
 
+// Status binding versions: v=2 is the original risk-based plan, v=3 the
+// October 2026 FAQ-reviewer policy, and v=4 the scaled policy (plan schema 2).
+// Each verifier accepts a binding only for candidates carrying its own policy.
+function statusBindingVersion(reviewPlan) {
+  if (reviewPlan.schemaVersion === 2) return ';v=4';
+  return reviewPlan.requiresFaqReview ? ';v=3' : ';v=2';
+}
+
 export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
   const result = verifyReleaseEvidence(repoRoot, commitSha);
   if (!result.ok) throw new Error('Cannot publish release statuses without a valid exact-SHA receipt: ' + result.errors.join(' '));
@@ -973,7 +995,7 @@ export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
     ? 'r=' + result.receipt.receiptSha256 + ';b=' + result.receipt.candidate.baseSha +
       ';p=' + sha256(Buffer.from(canonicalJson(result.receipt.reviewPlan))).slice(0, 12) +
       ';c=' + (result.receipt.reviewPlan.requiresCodeReview ? '1' : '0') +
-      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
+      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + statusBindingVersion(result.receipt.reviewPlan)
     : 'receipt-sha256=' + result.receipt.receiptSha256 + ';base=' + result.receipt.candidate.baseSha;
   const targetUrl = 'https://github.com/' + git(repoRoot, ['remote', 'get-url', 'origin']).replace(/^.*github\.com[:/]/, '').replace(/\.git$/, '') + '/commit/' + commitSha;
   const base = result.receipt.candidate.baseSha;
