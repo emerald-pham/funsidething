@@ -31978,7 +31978,7 @@ function exactPaddedBoard(board,field,byteLength){
  assert.ok(unpadded<byteLength,'the synthetic board must fit the captured size');board[field].opaque='p'.repeat(byteLength-unpadded);
  const payload=JSON.stringify(board);assert.equal(Buffer.byteLength(payload,'utf8'),byteLength);return payload;
 }
-async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_RECOVERY_BUDGET_MS,priorVariant=null}={}){
+async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_RECOVERY_BUDGET_MS,priorVariant=null,defect=true}={}){
  const {active,prior}=CAPTURED_UNREADABLE_GENERATION;
  // The unproxied factory lets the multi-megabyte database be deleted below.
  const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,recoveryTimeoutMs,nativeDeviceConnection:true}),{ctx,shim,backend,originalRoot}=app,codec=ctx.window.ChainStorageV2;
@@ -32014,8 +32014,12 @@ async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_R
  const activeEncoded=await codec.encodeSnapshot(exactPaddedBoard(different,'futureUnreadableActiveFixture',active.byteLength));
  assert.equal(activeEncoded.chunkCount,active.chunkCount);
  backend.docs.set(activePath,{...backend.docs.get(activePath),hash:activeEncoded.hash,byteLength:activeEncoded.byteLength,chunkCount:activeEncoded.chunkCount});
- assert.equal([...backend.docs.keys()].filter(key=>key.startsWith(activePath+'/chunks/')).length,0,'none of the declared active chunks are readable');
- assert.equal((await backend.CS.pull()).code,'corrupt-generation','the real pull reproduces the captured failure');
+ // {defect:false}: the same captured sizes with every declared chunk readable.
+ if(!defect)for(const chunk of activeEncoded.chunks)backend.docs.set(activePath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ else assert.equal([...backend.docs.keys()].filter(key=>key.startsWith(activePath+'/chunks/')).length,0,'none of the declared active chunks are readable');
+ const setupRead=await backend.CS.pull();
+ if(defect)assert.equal(setupRead.code,'corrupt-generation','the real pull reproduces the captured failure');
+ else assert.equal(createHash('sha256').update(setupRead.payload,'utf8').digest('hex'),activeEncoded.hash,'the healthy active generation reads byte-exactly');
  // Newer accepted local work that no cloud generation contains.
  shim.document.getElementById('addInput').value='Newer local edit before reconciliation';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
  await settleSourceFixtureSave187(app,'the newer local edit is durably saved before the cloud read',true);
@@ -32060,6 +32064,34 @@ test('RISK cloud generation recovery: the captured unreadable active generation 
  // The outcome above is reached inside the product budget on this host; the
  // work count decides whether it also fits a phone, whatever this host's speed.
  assert.ok(serialized.bytes<=CAPTURED_PHONE_SERIALIZATION_BYTES,'one recovery pull serializes no more than a phone can inside the product budget: '+JSON.stringify({...serialized,limit:CAPTURED_PHONE_SERIALIZATION_BYTES}));
+});
+
+// #2194 review F4, a characterization (it passes on the pre-#2194 app as well):
+// with a readable active generation nothing #2198/#2200/#2201 added may run.
+// The reference is independent of the code under test: the board saved before
+// the pull, the cloud documents before it, and the status, writes and stores
+// recorded once from main 8cd524a running this same fixture.
+// Recorded from main 8cd524a (2026-11-05T04:5xZ, rf/logs/F4-record-main.log).
+const RECORDED_HEALTHY_STATUS_8CD524A=Object.freeze({text:'☁ syncing',title:'Cloud sync is pending for e@example.com; this board is not acknowledged yet.',className:'syncbtn busy',hidden:false});
+const RECORDED_HEALTHY_READS_8CD524A=Object.freeze(['<root>','<active>','<active>/chunks','<root>']);
+test('RISK cloud generation recovery: a readable active generation of the captured shape leaves the saved board, cloud and status exactly as before',{timeout:120000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{defect:false}),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),archives=await store.listOpaqueArchives();
+ const cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length,reads=[];
+ app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{while(vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx))await wait(10);},'the healthy pull settles');
+ const status=syncStatus2200(shim);
+ t.diagnostic('healthy pull: '+JSON.stringify({status,reads,writes:backend.writes.length-writes,errorCode:ctx.window.CloudSync.errorCode??null,known:ctx.window.CloudSync.knownDamagedSource??null}));
+ assert.equal(JSON.stringify(ctx.state),before,'the saved board is byte-for-byte the board before the pull');
+ assert.deepEqual(await store.readHead(),head,'the durable head is unchanged');
+ assert.deepEqual(await store.listOpaqueArchives(),archives,'no recovery archive is written');
+ assert.equal(await store.getRecoveryCloudHold(),null,'no recovery hold is written');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud document is unchanged');
+ assert.equal(backend.writes.length,writes,'the pull writes nothing to the cloud');
+ assert.equal(ctx.window.CloudSync.errorCode??null,null);
+ assert.deepEqual(status,RECORDED_HEALTHY_STATUS_8CD524A,'the sync status is the one main 8cd524a shows');
+ assert.deepEqual(reads,RECORDED_HEALTHY_READS_8CD524A.map(path=>path.replace('<active>',app.activePath).replace('<root>','users/owner')),'the pull reads what main 8cd524a reads');
 });
 
 test('RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board',{timeout:240000},async t=>{
