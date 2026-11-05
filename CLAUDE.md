@@ -2,8 +2,8 @@
 
 A ranked FVP task scanner with a PWA/offline shell and cloud-synced saved boards.
 
-For every repository task and action, follow
-[atomic issues](docs/agents/atomic-issues.md) before starting work.
+Before starting work, identify its owning issue as defined in
+[atomic issues](docs/agents/atomic-issues.md).
 
 ## Agent skills
 
