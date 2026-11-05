@@ -277,6 +277,16 @@ test('RISK cloud recovery device read guidance: mounted FAQ and changelog explai
  assert.match(markup,/<li>Cloud recovery retries a temporary device database failure without changing saved sources/,'the mounted changelog includes the released behavior');
 });
 
+// #2225 (spec #2224): opening a large board from this device uses less memory.
+test('RISK large board opening guidance: mounted FAQ and changelog explain that a large board opens from this device with less memory',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<dt>Why could a large board fail to open\?<\/dt><dd>/);
+ assert.match(markup,/checks its saved decisions without repeating work for every earlier decision/);
+ assert.match(markup,/<li>A large saved board opens from this device with less memory/,'the mounted changelog includes the released behavior');
+});
+
 test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
  const app=await loadApp();app.ctx.openHelp();
  const markup=app.shim.document.getElementById('modalRoot').innerHTML;
