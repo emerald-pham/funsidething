@@ -20762,5 +20762,30 @@
       "command": "node --test --test-name-pattern='a rationale is required only for removed or weakened tests' tests.js",
       "failure": "Before the gate change the new test failed: AssertionError 'an added test needs no rationale record' (actual ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'], expected [])."
     }
+  },
+  {
+    "baseCommit": "01696695d5e9ad2f7709f9e47f6303da34faa82d",
+    "testChangesSha256": "508acfac95cc4dd2fa7c3bc1b81d6e225dcd33d6baa06dc07e37c4879380e24b",
+    "reason": "Spec #2205 / ticket #2213: tests.js (4.2 MB) is split into per-area files under tests/ (core, scenery, persistence-recovery, native-process, repository-process) with helpers and fixtures in tests/shared.js. The split is a pure move: no test is removed, renamed or weakened. The diff shows tests.js removed only because its tests now live in the new files.",
+    "previousBehavior": "Every test, helper and fixture lived in the single tests.js; npm test, the group runner, the test-first gate, the edit hook, preflight, the compatibility gate and the RISK map check all read that one file.",
+    "intendedBehavior": "The same tests, with byte-identical names, bodies and assertions, live in the tests/ area files in their original order. Only imports and an enumerated set of self-location paths changed: 93 dynamic import specifiers and 9 repository file URLs now resolve from tests/, and 23 lines in tests that read, copy or spawn their own test file name the file they now live in. The tooling treats tests/ (and a legacy tests.js) as the test surface.",
+    "replacementTests": [
+      "RISK test-first gate: an app change paired with an edit to any split test file is accepted",
+      "RISK test-first gate: the edit hook treats the test directory as the test surface",
+      "RISK test inventory: risk map and source checks read every file in the test directory",
+      "RISK repository process: backward compatibility finds its required families across the test directory",
+      "RISK repository process: the Firestore rules command loads every registered Firestore rules test",
+      "RISK repository process: scaled review plan treats the test directory like the single test file"
+    ],
+    "preservedCoverage": [
+      "Name-and-count equivalence: the pre-split tests.js and the post-split tests/*.test.js register identical top-level test-name sets and counts (2372 by default, 1547 RISK) under the default environment and under each installed-client env flag that registers gated tests.",
+      "Source equivalence: all 2604 non-import top-level chunks of the pre-split tests.js appear exactly once across tests/*.js, byte for byte after the enumerated edits, in their original relative order within each file.",
+      "The full suite before and after the split has the same failing set: only the environment-dependent native cases that need CHAIN_NATIVE_CANDIDATE_* / CHAIN_NATIVE_PORT locally.",
+      "The RISK coverage-map check, the waitForFunction source check, the compatibility gate and the Firestore rules command read every file in tests/, so no RISK test or required family drops out of their scope."
+    ],
+    "redEvidence": {
+      "command": "node equivalence.mjs <repo> <pre-split commit> <negative-control commit> (scratchpad check from ticket #2213), run against a throwaway commit that removed one moved test and inverted one assertion in tests/scenery.test.js",
+      "failure": "RESULT: FAIL (7): '[default] registered top-level tests: pre 2372, post 2371: DIFFERENT; missing after split: RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip', and the source check reported the edited chunk as matching no pre-split chunk. The split itself is a move, so no behavioral RED applies; the tooling slices each have their own observed RED."
+    }
   }
 ]
