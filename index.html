@@ -6011,6 +6011,8 @@ function forgetPersistedUnreadableCloudSourceUnless(identity,account){
   const record=readPersistedUnreadableCloudSource();
   if(record&&(!identity||record.identity!==identity||record.account!==account))
     try{localStorage.removeItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);}catch{}
+  const declined=readDeclinedAutomaticCloudRecovery();
+  if(declined&&(!identity||declined.identity!==identity||declined.account!==account))forgetDeclinedAutomaticCloudRecovery();
 }
 const unreadableProofHash=value=>value===null||typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
 function unreadableProofPointer(pointer){
@@ -6217,7 +6219,7 @@ async function cloudPull(){
     if(hasActiveEditor()||scannerGestureActive){deferredCloudPull=true;return;}
     const haveRemote = !!(remote && remote.payload);
     healthyCloudRead=(haveRemote||remote?.empty===true)&&!rebuildingCloudSource;
-    if(healthyCloudRead)forgetProvedUnreadableCloudSource();
+    if(healthyCloudRead){forgetProvedUnreadableCloudSource();forgetDeclinedAutomaticCloudRecovery();}
     if(remote?.error){scheduleCloudRetry(acct);return;}
     if(!haveRemote && !(remote && remote.empty)){reportCloudReconcileError("malformed-response");return;}
     let remoteState = null, remotePayload = null, remoteHadScene = false, remoteDeletionLogRepaired = false;
@@ -11797,6 +11799,73 @@ async function commitAutomaticRecoveryDeviceSource({captured,payload,archives=[]
   if(!current())return refuse("current-attempt-changed-after-readback");
   return {ok:true,head:saved,hold:savedHold,rawArchive:rawArchiveRow,archives:archiveRows,hash:saved.hash};
 }
+// The person declined the automatic recovery default for one unreadable
+// server revision and generation (#2194 review F2). Kept in device storage so a
+// relaunch over the same root does not apply it again; a changed root, a
+// healthy read, sign-out or another account forgets it.
+const DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY="fvp:chain-scanner:declined-automatic-cloud-recovery";
+function readDeclinedAutomaticCloudRecovery(){
+  try{const raw=localStorage.getItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY);return raw&&raw.length<=2048?JSON.parse(raw):null;}catch{return null;}
+}
+function forgetDeclinedAutomaticCloudRecovery(){try{localStorage.removeItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY);}catch{}}
+function automaticCloudRecoveryDeclined(account,identity,failed){
+  const record=readDeclinedAutomaticCloudRecovery();
+  if(!record)return false;
+  if(record.v===1&&record.account===account&&record.identity===identity&&record.rev===failed?.rev&&record.generationId===failed?.generationId)return true;
+  // Another root or account: the earlier choice no longer describes it.
+  forgetDeclinedAutomaticCloudRecovery();return false;
+}
+async function declineAutomaticCloudRecovery(){
+  const hold=deviceRecoveryCloudHold,backend=window.CloudSync,account=backend?.user??null,identity=cloudAccountIdentity();
+  const refuse=message=>{toast(message,9000);return false;};
+  if(hold?.automaticRecovery!==true||hold.reason!=="cloud-source-recovery")return refuse("No automatic recovery is waiting on this device. Nothing was changed.");
+  if(!deviceStore||!liveBoardAccepted||!deviceStorageAuthority)return refuse("Device storage is not ready. Your board and every saved source stay protected; try again shortly.");
+  if(cloudPushInFlight||fileRestoreBusy||hasActiveEditor()||scannerGestureActive)return refuse("Cloud saving or an edit is in progress. Nothing was changed; try again when it finishes.");
+  if(hold.account!==account||hold.identity!==identity)return refuse("The signed-in account changed. Nothing was changed.");
+  // Stop the pending publication first: an aborted read cannot publish, and
+  // a cleared hold gives later pulls nothing to publish.
+  if(cloudSourceRecoveryRead)cancelCloudSourceRecoveryRead({record:false});
+  automaticCloudSourceResumeRequested=false;
+  const board=JSON.stringify(state);
+  let stored,archives,head;
+  try{[stored,archives,head]=await Promise.all([deviceStore.getRecoveryCloudHold(),deviceStore.listOpaqueArchives(),deviceStore.readHead()]);}
+  catch{return refuse("Saved recovery sources could not be read. Nothing was changed; try again.");}
+  const current=()=>deviceRecoveryCloudHold===hold&&JSON.stringify(state)===board&&window.CloudSync===backend&&backend?.user===account&&
+    cloudAccountIdentity()===identity&&!cloudPushInFlight&&!fileRestoreBusy;
+  if(!current()||!recoverySourceValueEqual(stored,hold))return refuse("Recovery changed while it was being read. Nothing was changed; open Settings again.");
+  // Only the board this recovery itself wrote may be replaced: later edits
+  // would otherwise be lost, so they keep the deliberate Restore route.
+  if(head?.hash!==deviceHeadHash||head.payload!==board||head.hash!==stored.headHash)
+    return refuse("This board has changed since recovery. Use Restore below to choose a board deliberately; every source stays protected.");
+  let source=null;
+  try{
+    const original=archives.find(row=>row.key===hold.originalKey);
+    for(const key of JSON.parse(original.raw).sourceArchiveKeys){
+      const parsed=JSON.parse(archives.find(row=>row.key===key)?.raw??"null");
+      if(parsed?.format==="chain-scanner.cloud-recovery-source"&&parsed.automaticRecovery===true){source=parsed;break;}
+    }
+  }catch{source=null;}
+  const prior=source?.acceptedDeviceBoard,manifest=source?.manifest;
+  if(typeof prior!=="string"||!Number.isSafeInteger(manifest?.rev)||typeof manifest.activeGeneration!=="string")
+    return refuse("This recovery kept no earlier board on this device to return to. Use Restore below; every source stays protected.");
+  let next;
+  try{next=JSON.parse(prior);hydrateState(next);}catch{next=null;}
+  if(!next||JSON.stringify(next)!==prior||(next.syncAccount??account)!==account)
+    return refuse("The earlier board could not be reopened exactly. Use Restore below; every source stays protected.");
+  const encodeHold=value=>JSON.stringify(encodeManualArchiveValue(value,"device recovery hold"));
+  let committed;
+  try{committed=await deviceWriteBeforeDiagnostics("commitHead",{expectedHash:head.hash,payload:prior,account:head.account??null,
+    releaseRecoveryHold:{expectedHold:stored,encodeHold}});}catch{committed=null;}
+  if(!committed?.ok||committed.superseded)return refuse("The earlier board could not be saved on this device. Nothing was lost; try again.");
+  sealUndoFrame();
+  state=next;deviceHeadHash=committed.head?.hash||committed.hash;lastPersistedRaw=prior;persistedChanceSeed=next.chance?.seed??null;
+  deviceRecoveryCloudHold=null;automaticCloudRecovery=null;unrepairableCloudSource=null;forgetProvedUnreadableCloudSource();
+  cloudAdoptionHeld=true;pendingPush=false;
+  try{localStorage.setItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY,JSON.stringify({v:1,account,identity,rev:manifest.rev,generationId:manifest.activeGeneration}));}catch{}
+  applyTheme();recomputeRanks();closeModal();render();renderSync();
+  toast("Your board from before recovery is back. The older and damaged cloud copies stay protected, and cloud saving is still not confirmed.",9000);
+  return true;
+}
 async function openAutomaticCloudSourceFallback(failed,{account,backend,identity,pullStillCurrent,outcome=null}={}){
   const baseline=automaticCloudFallbackBootBaseline;
   const localIntent=failed?.code==="device-source-recovery"?deviceRecoveryCloudHold:null,localIntentDraft=localIntent?cloudSourceRecoveryDraft():null;
@@ -11823,6 +11892,12 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       (recoveryMode==="fresh-empty"?baseline?.mode==="fresh-empty":baseline?.mode==="readable-malformed");
   };
   if(!bootStillCurrent())return false;
+  // The person declined this default for the same unreadable root: their
+  // board stays, and the choice counts as a completed refusal (#2194 F2).
+  if(failed?.code==="corrupt-generation"&&recoveryMode==="accepted"&&automaticCloudRecoveryDeclined(account,identity,failed)){
+    if(outcome)outcome.refused={rev:failed.rev,generationId:failed.generationId};
+    return false;
+  }
   const serial=++cloudSourceRecoverySerial,read={controller:new AbortController(),automaticFallback:true,backend,account,identity,serial,
     ...(backgroundResume?{automaticHistoryResume:true}: {})};
   let backgroundRetryCode=null,backgroundPairRestartUsed=false,backgroundSourceBaseline=null;
@@ -13560,7 +13635,7 @@ function openSettings(){
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + (!liveBoardAccepted?'<p class="kv warn" role="status"><b>Saved device source needs recovery.</b> It is unreadable, missing or unsupported. Its originals stay untouched. Use Restore below to choose a supported recovery board, then review and confirm it. This recovery view is not a saved empty board.</p>':'')
     + (openingRecoveryHeld?'<p class="kv warn">'+(window.SavedAppearance?.recoveryVisible?'The complete retained board stays read-only because device storage could not finish opening.':'Device storage could not finish opening. This recovery view remains read-only.')+' Reload app tries again while saved sources remain protected. Cloud saving still needs confirmation.</p><div class="mbtns"><button class="btn subtle" data-act="sync-reload">Reload app</button></div>':'')
-    + (deviceRecoveryCloudHold?'<p class="kv warn" role="status"><b>Cloud recovery is pending.</b> '+(memoryRecoveryWorkspace||deviceRecoveryCloudHold.workspace==="memory-only"?'A new workspace is open only in this tab. New work is not saved. Keep this tab open; earlier saved sources remain untouched.':deviceRecoveryCloudHold.workspace==="new-work"?'A new offline workspace is open. Earlier saved data could not be opened. New work saves on this device; the earlier sources remain protected.':(olderCompleteCloudSourceInUse()?OLDER_CLOUD_SOURCE_NOTICE+' ':'')+'Your working board and later edits save on this device. Unknown cloud changes and earlier sources remain protected.')+' This board has not been confirmed by cloud.</p>'+(cloudReady()&&typeof window.CloudSync?.readRecoverySource==="function"?'<div class="mbtns"><button class="btn subtle" data-act="review-cloud-source-recovery">Review cloud recovery</button></div>':'<p class="kv">Sign in to review the cloud source before resuming sync.</p>'):'')
+    + (deviceRecoveryCloudHold?'<p class="kv warn" role="status"><b>Cloud recovery is pending.</b> '+(memoryRecoveryWorkspace||deviceRecoveryCloudHold.workspace==="memory-only"?'A new workspace is open only in this tab. New work is not saved. Keep this tab open; earlier saved sources remain untouched.':deviceRecoveryCloudHold.workspace==="new-work"?'A new offline workspace is open. Earlier saved data could not be opened. New work saves on this device; the earlier sources remain protected.':(olderCompleteCloudSourceInUse()?OLDER_CLOUD_SOURCE_NOTICE+' ':'')+'Your working board and later edits save on this device. Unknown cloud changes and earlier sources remain protected.')+' This board has not been confirmed by cloud.</p>'+(cloudReady()&&typeof window.CloudSync?.readRecoverySource==="function"?'<div class="mbtns"><button class="btn subtle" data-act="review-cloud-source-recovery">Review cloud recovery</button>'+(deviceRecoveryCloudHold.automaticRecovery===true&&deviceRecoveryCloudHold.reason==="cloud-source-recovery"?'<button class="btn subtle" data-act="decline-automatic-cloud-recovery">Use my board from before recovery</button>':'')+'</div>':'<p class="kv">Sign in to review the cloud source before resuming sync.</p>'):'')
     + (automaticCloudSourceResumeStatus.state!=="idle"?'<p id="automaticCloudSourceResumeStatus" class="kv" role="status">'+esc(automaticCloudSourceResumeMessage(automaticCloudSourceResumeStatus))+'</p>':'')
     + ((deviceRecoveryCloudHold||!liveBoardAccepted)&&window.CloudSync?.configured
       ? '<p class="kv">Signing in or changing accounts keeps the recovery sources protected. Authentication alone does not choose or upload a board.</p>'
@@ -14875,6 +14950,7 @@ function onAction(act, el){
       break;
     }
     case "review-cloud-source-recovery": return reviewCloudSourceRecovery();
+    case "decline-automatic-cloud-recovery": return declineAutomaticCloudRecovery();
     case "choose-cloud-recovery-source":
       if(!cloudSourceRecoveryBusy&&cloudSourceRecoveryPreview&&!cloudSourceRecoveryPreview.issue&&cloudSourceRecoveryPreview.candidates.some(row=>row.id===el?.dataset?.value&&row.board)){cloudSourceRecoveryPreview.choice=el.dataset.value;renderCloudSourceRecovery();return true;}return false;
     case "apply-cloud-source-recovery": return applyCloudSourceRecovery();

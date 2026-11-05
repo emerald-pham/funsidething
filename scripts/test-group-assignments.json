@@ -5881,6 +5881,11 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery: declining the pending automatic recovery default in Settings restores the unreconciled board before any publication",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
       "group": "persistence-recovery",
       "file": "tests.js"

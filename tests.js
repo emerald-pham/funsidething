@@ -32129,6 +32129,57 @@ test('RISK cloud generation recovery: declining the reconciled prior generation 
  for(const [key,raw] of protectedSources)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'the damaged and prior generations remain protected: '+key);
 });
 
+// #2194 review F2: declining before publication. While the automatic recovery
+// default is still pending and unpublished, Settings offers to return to the
+// exact board this device held before reconciliation. Nothing is published,
+// every source stays protected, and deliberate Restore stays available.
+test('RISK cloud generation recovery: declining the pending automatic recovery default in Settings restores the unreconciled board before any publication',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ // The first automatic publication is refused, so the default stays pending.
+ refuseNextRecoveryTransaction255(app.faults);
+ const before=JSON.stringify(ctx.state),beforeHead=(await store.readHead()).payload;
+ const cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ const settle=message=>fixtureDeadline(async wait=>{await wait(5);while(!idle())await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+ ctx.closeModal();await flush();await ctx.cloudPull();await settle('the automatic default settles unpublished');
+ const pending=await store.getRecoveryCloudHold();
+ assert.ok(pending?.automaticRecovery===true&&pending.reason==='cloud-source-recovery','positive control: the automatic default is pending');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'positive control: the older generation is in use');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'nothing has been published');
+ const archivesBefore=await store.listOpaqueArchives();
+ ctx.openSettings();
+ const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/data-act="decline-automatic-cloud-recovery"/,'Settings offers to decline the pending automatic recovery default');
+ assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'declining succeeds while the default is unpublished');
+ assert.equal(JSON.stringify(ctx.state),before,'declining restores the exact board this device held before reconciliation');
+ assert.equal((await store.readHead()).payload,beforeHead,'the restored board is the exact durable head');
+ assert.equal(await store.getRecoveryCloudHold(),null,'the pending automatic publication is cancelled');
+ const archivesAfter=await store.listOpaqueArchives();
+ for(const row of archivesBefore)assert.ok(archivesAfter.some(saved=>saved.key===row.key&&saved.raw===row.raw),'every recovery source stays protected: '+row.key);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'the damaged generation and every cloud source stay untouched');
+ // A later ordinary pull neither publishes the older copy nor reapplies it.
+ await ctx.cloudPull();await settle('a later pull settles');
+ assert.equal(JSON.stringify(ctx.state),before,'the declined default is not reapplied by the next pull');
+ assert.equal(await store.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published after declining');assert.equal(backend.writes.length,writes);
+ await ctx.onAction('undo',{});await ctx.persist();
+ assert.equal(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'Undo never brings back the declined older copy');
+ // Deliberate File or Paste Restore stays reachable.
+ ctx.openSettings();
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-backup"/,'deliberate File or Paste Restore stays reachable');
+ ctx.closeModal();await flush();ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=before;
+ shim.document.dispatchEvent({type:'input',target:box});
+ assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true,'a deliberate Paste Restore preview opens after declining');
+ ctx.closeModal();
+ // A relaunch over the same unchanged root does not reapply the declined default.
+ await closeLegacyApp173(app);backend.CS.suspend();
+ const coldReads=[],cold=await coldRelaunch2198(t,app,coldReads);
+ assert.equal(cold.ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'a relaunch does not reapply the declined older copy');
+ assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected after relaunch');
+ assert.ok(backend.docs.has(activePath)&&backend.docs.has(priorPath));
+});
+
 test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
  for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
   const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;

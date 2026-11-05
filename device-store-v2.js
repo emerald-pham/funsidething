@@ -445,7 +445,9 @@
       return {ok:true,verified:head?.payload===legacy.headPayload&&head?.hash===headHash&&exactBackups&&exactOpaque,hash:headHash};
     }
 
-    async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[]}={}){
+    // releaseRecoveryHold deletes the exact expected recovery hold in the same
+    // transaction as the head, so a crash cannot leave one without the other.
+    async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[],releaseRecoveryHold=null}={}){
       ensureOpen();
       if(typeof payload!=="string") return {error:true,code:"invalid-payload"};
       const nextHash=await sha(payload);
@@ -465,7 +467,10 @@
       // Compare all original metadata inside the same transaction as the write.
       let sameHead=expectedHead===undefined;
       if(!sameHead)try{const expected=encodeHead(expectedHead),actual=encodeHead(current??null);sameHead=typeof expected==="string"&&typeof actual==="string"&&expected===actual;}catch{}
-      if((current?.hash??null)!==(expectedHash??null)||!sameHead){
+      let sameHold=!releaseRecoveryHold;
+      if(!sameHold)try{const encode=releaseRecoveryHold.encodeHold||pendingJSON,expected=encode(releaseRecoveryHold.expectedHold),actual=encode(recoveryHold??null);
+        sameHold=!!recoveryHold&&typeof expected==="string"&&typeof actual==="string"&&expected===actual;}catch{}
+      if((current?.hash??null)!==(expectedHash??null)||!sameHead||!sameHold){
         tx.abort();try{await transactionDone(tx);}catch(e){}
         return {conflict:true,hash:current?.hash??null};
       }
@@ -485,6 +490,7 @@
       snapshotStore.put({hash:nextHash,payload},nextHash);
       const committedHead={...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()};
       metaStore.put(committedHead,"head");
+      if(releaseRecoveryHold)metaStore.delete("recoveryCloudHold");
       // Snapshot payloads are immutable and shared by the live head and any
       // number of recovery references. Retire only blobs that will have no
       // reference after this transaction; interrupted commits keep the old
