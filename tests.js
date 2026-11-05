@@ -31645,6 +31645,168 @@ test('RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation 
  assert.equal(result.code,undefined);assert.equal(result.payload,healthy.activePayload);assert.equal(result.rev,2346);
 });
 
+// #2198: the same captured shape (#2195) reaching the real app consumer. The
+// device holds an accepted board whose acknowledged copy no longer matches the
+// damaged active header, and the immediately prior generation is complete.
+// The product reads sources inside one 60s budget. Spec #2194 measured phone
+// class CPU at up to 6x this desktop runtime, so the consumer gives the same
+// work one sixth of that budget; it asserts the outcome, never a duration.
+const CAPTURED_RECOVERY_BUDGET_MS=60000/6;
+// Consumers of the reconciled result (decline, draft/Undo) are not budget
+// regressions; half the product budget keeps them independent of suite load.
+const CAPTURED_RESULT_BUDGET_MS=60000/2;
+function exactPaddedBoard(board,field,byteLength){
+ board[field]={opaque:''};const unpadded=Buffer.byteLength(JSON.stringify(board),'utf8');
+ assert.ok(unpadded<byteLength,'the synthetic board must fit the captured size');board[field].opaque='p'.repeat(byteLength-unpadded);
+ const payload=JSON.stringify(board);assert.equal(Buffer.byteLength(payload,'utf8'),byteLength);return payload;
+}
+async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_RECOVERY_BUDGET_MS,priorVariant=null}={}){
+ const {active,prior}=CAPTURED_UNREADABLE_GENERATION;
+ // The unproxied factory lets the multi-megabyte database be deleted below.
+ const app=await damagedAcknowledgedApp187(t,{sourcePadding:2000000,recoveryTimeoutMs,nativeDeviceConnection:true}),{ctx,shim,backend,originalRoot}=app,codec=ctx.window.ChainStorageV2;
+ // The runner retains finished hooks and, through them, each app realm. Its
+ // in-memory database keeps every transaction's multi-megabyte rollback log,
+ // so release the sources themselves or the full suite exhausts its heap.
+ t.after(async()=>{try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
+  backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
+  await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
+  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+   'unrepairableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
+ const activePath='users/owner/generations/'+originalRoot.activeGeneration,priorPath='users/owner/generations/'+originalRoot.previousGeneration;
+ // Prior generation: complete and verifiable, carrying one change this device
+ // never saw, so its use is observable in the working board.
+ const priorHeader=backend.docs.get(priorPath);
+ const priorChunks=[...backend.docs].filter(([key])=>key.startsWith(priorPath+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ const priorBoard=JSON.parse(await codec.decodeSnapshot(priorHeader,priorChunks));
+ priorBoard.tasks.push(syncTask('captured-prior-only','Saved only in the intact prior generation'));
+ // Unsafe variants must keep waiting: an ambiguous legacy rating (the #2408
+ // refusal shape) or a board saved under another account.
+ if(priorVariant==='ambiguous legacy rating'){assert.equal(priorBoard.decisionBaseline,undefined);priorBoard.tasks.find(row=>row.id==='a').mu=26;}
+ else if(priorVariant==='different account')priorBoard.syncAccount='other-account@example.com';
+ else assert.equal(priorVariant,null);
+ const priorPayload=exactPaddedBoard(priorBoard,'futurePriorGenerationFixture',prior.byteLength),priorEncoded=await codec.encodeSnapshot(priorPayload);
+ assert.equal(priorEncoded.chunkCount,prior.chunkCount);
+ for(const key of [...backend.docs.keys()])if(key.startsWith(priorPath+'/chunks/'))backend.docs.delete(key);
+ backend.docs.set(priorPath,{...priorHeader,hash:priorEncoded.hash,byteLength:priorEncoded.byteLength,chunkCount:priorEncoded.chunkCount});
+ for(const chunk of priorEncoded.chunks)backend.docs.set(priorPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ // Active generation: a different source whose header declares the captured
+ // chunks and bytes while none of its chunks remain readable.
+ const different=JSON.parse(ctx.state.decisionBase.payload);
+ const activeEncoded=await codec.encodeSnapshot(exactPaddedBoard(different,'futureUnreadableActiveFixture',active.byteLength));
+ assert.equal(activeEncoded.chunkCount,active.chunkCount);
+ backend.docs.set(activePath,{...backend.docs.get(activePath),hash:activeEncoded.hash,byteLength:activeEncoded.byteLength,chunkCount:activeEncoded.chunkCount});
+ assert.equal([...backend.docs.keys()].filter(key=>key.startsWith(activePath+'/chunks/')).length,0,'none of the declared active chunks are readable');
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation','the real pull reproduces the captured failure');
+ // Newer accepted local work that no cloud generation contains.
+ shim.document.getElementById('addInput').value='Newer local edit before reconciliation';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await settleSourceFixtureSave187(app,'the newer local edit is durably saved before the cloud read',true);
+ return {...app,activePath,priorPath,priorPayload};
+}
+
+test('RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation',{timeout:90000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot,activePath,priorPath,priorPayload}=app,store=ctx.window.ScannerDeviceStore;
+ // Refuse only the first automatic publication so the local outcome is visible
+ // before any cloud acknowledgement exists.
+ refuseNextRecoveryTransaction255(app.faults);
+ const before=JSON.stringify(ctx.state),beforeBoard=JSON.parse(before),syncRevBefore=ctx.state.syncRev;
+ const cloudBefore=new Map([...backend.docs].map(([key,value])=>[key,JSON.stringify(value)]));
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ const hold=await store.getRecoveryCloudHold();
+ const observed=vm.runInContext('JSON.stringify({cloud:window.CloudSync?.errorCode??null,unrepairable:unrepairableCloudSource?.code??null,resume:automaticCloudSourceResumeStatus?.state??null,accepted:liveBoardAccepted})',ctx);
+ assert.ok(hold?.automaticRecovery===true&&hold.reason==='cloud-source-recovery','the captured state reconciles as an automatic recovery default instead of staying unaccepted; app state: '+observed);
+ const titles=ctx.state.tasks.map(task=>task.title);
+ assert.ok(titles.includes('Saved only in the intact prior generation'),'the complete prior generation supplies the working board');
+ for(const task of beforeBoard.tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task,'every accepted task, including the newer local edit, survives unchanged');
+ assert.ok(titles.includes('Newer local edit before reconciliation'));
+ const plain=value=>JSON.parse(JSON.stringify(value??null));
+ for(const key of ['decisionEvents','decisionBaseline','considered','cantAt','workedAt','chain','workLog','deletedTaskIds','clearedHistoryIds'])
+  assert.deepEqual(plain(ctx.state[key]),plain(beforeBoard[key]),'every accepted board decision survives: '+key);
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the reconciled board is the exact durable head');
+ assert.equal(ctx.state.syncRev,syncRevBefore,'the older generation never becomes the accepted revision');
+ assert.equal(ctx.state.syncDirty,true,'reading an older complete source is not a cloud acknowledgement');
+ for(const [key,raw] of cloudBefore)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'every cloud source, including the damaged active generation, stays untouched: '+key);
+ assert.equal(backend.docs.size,cloudBefore.size);
+ const archives=await store.listOpaqueArchives(),rawArchive=archives.find(row=>row.key===hold.originalKey);
+ assert.ok(rawArchive,'the exact device originals are archived before local adoption');
+ const sourceArchive=JSON.parse(archives.find(row=>JSON.parse(rawArchive.raw).sourceArchiveKeys.includes(row.key)).raw);
+ assert.equal(sourceArchive.defaultPolicy,'accepted-device-then-stable-source-key-v1');
+ assert.equal(sourceArchive.acceptedDeviceBoard,before,'the unreconciled accepted board stays byte-exact');
+ assert.ok(sourceArchive.candidateSources.some(row=>row.key==='cloud-generation:'+originalRoot.previousGeneration),'the selection is attributed to the prior generation');
+ assert.deepEqual(sourceArchive.unsupported.filter(row=>row.sourceRef?.id===originalRoot.activeGeneration).map(row=>row.reason),['generation-incomplete'],'the damaged active generation is recorded, never adopted');
+ const archivedPrior=sourceArchive.generations.find(row=>row.id===originalRoot.previousGeneration);
+ assert.equal(await ctx.window.ChainStorageV2.decodeSnapshot(archivedPrior.header,archivedPrior.chunks),priorPayload,'the prior generation is archived exactly');
+ assert.equal(backend.docs.get(activePath).chunkCount,CAPTURED_UNREADABLE_GENERATION.active.chunkCount);assert.ok(backend.docs.has(priorPath));
+});
+
+test('RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board',{timeout:240000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),beforeTitles=ctx.state.tasks.map(task=>task.title);
+ const protectedSources=[...backend.docs].filter(([key])=>key===activePath||key===priorPath||key.startsWith(priorPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
+ ctx.closeModal();await flush();
+ // The automatic default publishes through the guarded revision path. Under
+ // load its first read budget can end after the local commit; the pending hold
+ // then publishes on the next ordinary pull. Wait for the real acknowledgement.
+ const settled=()=>vm.runInContext('JSON.stringify({dirty:state.syncDirty,pulling,pushing:cloudPushInFlight,busy:cloudSourceRecoveryBusy,hold:deviceRecoveryCloudHold?.reason??null,cloud:window.CloudSync?.errorCode??null})',ctx);
+ const idle=()=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx);
+ for(let attempt=0;attempt<3&&(attempt===0||ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx));attempt++){
+  if(attempt)assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'only a committed automatic default may be published later');
+  const pull=ctx.cloudPull();
+  try{await fixtureDeadline(async wait=>{let done=false;pull.then(()=>{done=true;});while(!done||!idle())await wait(20);},
+   'the automatic default read settles',CAPTURED_RESULT_BUDGET_MS+20000);}
+  catch(error){error.message+='; app state: '+settled();throw error;}
+ }
+ assert.equal(ctx.state.syncDirty||vm.runInContext('!!deviceRecoveryCloudHold',ctx),false,'the automatic default reaches a real cloud acknowledgement; app state: '+settled());
+ const published=backend.docs.get('users/owner');
+ assert.equal(published.rev,originalRoot.rev+1,'publication is one guarded revision after the damaged one');
+ assert.equal(published.previousGeneration,originalRoot.activeGeneration,'the damaged generation stays referenced, never overwritten');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'));
+ // Decline: a deliberate Paste Restore of the board this device held before.
+ ctx.onAction('open-paste-recovery',{});const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=before;
+ shim.document.dispatchEvent({type:'input',target:box});
+ assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);
+ const reason=vm.runInContext('fileRestorePreview&&fileRestoreReadinessReason(fileRestorePreview)',ctx);
+ assert.equal(await ctx.onAction('confirm-file-restore',{}),true,'the deliberate restore is available after the automatic default; refusal: '+reason);
+ assert.deepEqual(ctx.state.tasks.map(task=>task.title),beforeTitles,'declining restores the unreconciled board rather than the older generation');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the restored board is the exact durable head');
+ const restored=await backend.CS.pull();
+ assert.equal(JSON.parse(restored.payload).tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'the older generation is not what the cloud keeps after declining');
+ for(const [key,raw] of protectedSources)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'the damaged and prior generations remain protected: '+key);
+});
+
+test('RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted',{timeout:180000},async t=>{
+ for(const variant of ['ambiguous legacy rating','different account'])await t.test(variant,{timeout:90000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub,{priorVariant:variant}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
+  refuseNextRecoveryTransaction255(app.faults);
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),cloudBefore=JSON.stringify([...backend.docs]);
+  ctx.closeModal();await flush();await ctx.cloudPull();
+  assert.equal(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'the unsafe prior generation is never adopted automatically');
+  assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'every cloud source stays protected and unpublished');
+  if(variant==='ambiguous legacy rating'){
+   assert.equal(JSON.stringify(ctx.state),before,'a conflicting source waits for safe recovery');
+   assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null);
+  }else{
+   for(const task of JSON.parse(before).tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task,'accepted work is unchanged');
+   assert.equal(ctx.state.tasks.length,JSON.parse(before).tasks.length,'another account contributes nothing to this board');
+  }
+ });
+});
+
+test('RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone',{timeout:90000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ refuseNextRecoveryTransaction255(app.faults);
+ shim.document.getElementById('addInput').value='Unfinished draft kept through reconciliation';
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'the automatic default applies with an unchanged unfinished draft');
+ assert.equal(shim.document.getElementById('addInput').value,'Unfinished draft kept through reconciliation','the unfinished draft remains');
+ const reconciled=ctx.state.tasks.map(task=>task.title);
+ assert.ok(reconciled.includes('Saved only in the intact prior generation'));
+ await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Unfinished draft kept through reconciliation'));
+ assert.equal(await ctx.onAction('undo',{}),true);assert.equal(await ctx.persist(),true);
+ assert.deepEqual(ctx.state.tasks.map(task=>task.title),reconciled,'Undo removes only the later Add and never reverses the reconciliation');
+});
+
 async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=null}={}){
  const pending=new Set(),auth={currentUser:{uid,email:'e@example.com'}},events=[];
  const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,host(v)])):value;

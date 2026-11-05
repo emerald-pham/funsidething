@@ -237,6 +237,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
 - RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation
+- RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation
+- RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board
+- RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted
+- RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone
 - RISK repository process: compatibility round trips preserve independently hashed production bytes
 - RISK CLOUD TRANSACTION: full app codec and backend share the independent UTF8 digest
 - RISK CLOUD TRANSACTION: the SDK consumer verifies published UTF8 bytes against an independent digest
