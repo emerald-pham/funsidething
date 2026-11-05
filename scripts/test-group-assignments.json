@@ -12834,6 +12834,48 @@
       "root": "RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening",
       "group": "persistence-recovery",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK repository process: cross-engine native checks run nightly outside the required cohort",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "test group required cohort passes without nightly cross-engine cases and never executes them",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group nightly declarations cannot remove required or installed-client cases from the required cohort",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group aggregate with nightly roots still fails closed on missing duplicate skipped failed groups and installed-client reports",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group nightly cohort runs only the declared cross-engine cases and fails visibly",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "workflow runs the cross-engine native checks nightly and on dispatch outside the required cohort",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    }
+  ],
+  "nightlyRoots": [
+    {
+      "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
+      "file": "tests.js",
+      "reason": "#2210: cross-engine (Chromium + WebKit) native button check; runs in the Nightly workflow, not the per-push required cohort. Registered by the WebKit button-safety work (#285)."
+    },
+    {
+      "root": "RISK repository process: native button gate detects errors raised by a real click",
+      "file": "tests.js",
+      "reason": "#2210: cross-engine (Chromium + WebKit) native button check; runs in the Nightly workflow, not the per-push required cohort. Registered by the WebKit button-safety work (#285)."
     }
   ],
   "processControls": [

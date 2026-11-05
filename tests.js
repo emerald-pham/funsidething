@@ -30457,6 +30457,25 @@ test('RISK repository process: CI runs once per pull request commit and never ca
  for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
 });
 
+// The nightly cross-engine move is pinned at the agreed seams (the CI workflow
+// files in the CI-routing tests, and test:group --aggregate in the test-group
+// tests); this process RISK requires those pins to execute and pass.
+test('RISK repository process: cross-engine native checks run nightly outside the required cohort',()=>{
+ const pins={
+  'scripts/agent-tools/test-groups.test.mjs':['test group required cohort passes without nightly cross-engine cases and never executes them','test group nightly declarations cannot remove required or installed-client cases from the required cohort','test group aggregate with nightly roots still fails closed on missing duplicate skipped failed groups and installed-client reports','test group nightly cohort runs only the declared cross-engine cases and fails visibly'],
+  'scripts/agent-tools/ci-routing.test.mjs':['workflow runs the cross-engine native checks nightly and on dispatch outside the required cohort'],
+ };
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const [file,names] of Object.entries(pins)){
+  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+names.join('|')+')$',file],{cwd:__dirname,env,encoding:'utf8',timeout:300000,maxBuffer:8*1024*1024});
+  assert.equal(result.status,0,'The nightly cross-engine pins must pass: '+result.stdout+'\n'+result.stderr);
+  // Several pins carry subtests, so count top-level outcomes, not "# tests".
+  assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,names.length,'every named nightly pin must execute');
+  assert.match(result.stdout,/^# skipped 0$/m);
+  for(const name of names)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+name)),'pin did not pass: '+name);
+ }
+});
+
 test('RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator',async()=>{
  const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
  const fixture=makeReleaseGateFixture();

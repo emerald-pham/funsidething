@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -718,4 +718,54 @@ test('workflow cancels superseded non-main runs and never cancels main', () => {
   const mainRun = (run_id, sha) => workflowContext('push', 'refs/heads/main', { run_id, sha });
   assert.deepEqual(laterRunCancelsEarlier(workflow, mainRun('201', 'e'.repeat(40)), mainRun('202', 'f'.repeat(40))), { shared: false, inProgress: false, pending: false }, 'a later main push must never cancel or replace an earlier main run or its deploy');
   assert.equal(workflowConcurrency(workflow, mainRun('201', 'e'.repeat(40))).cancelInProgress, false, 'main runs never cancel in-progress work');
+});
+
+// #2210: the cross-engine (Chromium + WebKit) native button checks leave the
+// per-push required cohort for a scheduled and manually dispatchable job. Every
+// workflow file is read, so the pin holds wherever that job lives.
+function workflowJobIds(workflow) {
+  const jobs = workflowBlock(workflow, 'jobs');
+  return jobs ? [...jobs.body.matchAll(/^  ([A-Za-z_][\w-]*):\s*$/gm)].map(match => match[1]) : [];
+}
+function workflowJobText(workflow, job) {
+  return workflowBlock(workflowBlock(workflow, 'jobs').body, job, '  ').body;
+}
+function workflowsRunningNightlyCohort(context) {
+  const directory = path.join(repo, '.github/workflows'), running = [];
+  for (const name of readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort()) {
+    const workflow = readFileSync(path.join(directory, name), 'utf8');
+    const workflowName = workflow.match(/^name: (.+)$/m)?.[1]?.trim();
+    const scoped = { github: { ...context.github, workflow: workflowName } };
+    if (!workflowTriggers(workflow, scoped)) continue;
+    for (const job of workflowJobIds(workflow)) {
+      if (/--group nightly-cross-engine\b/.test(workflowJobText(workflow, job)) && workflowJobRuns(workflow, job, scoped)) running.push({ name, job, text: workflowJobText(workflow, job) });
+    }
+  }
+  return running;
+}
+
+test('workflow runs the cross-engine native checks nightly and on dispatch outside the required cohort', () => {
+  const scheduled = workflowsRunningNightlyCohort(workflowContext('schedule', 'refs/heads/main'));
+  assert.equal(scheduled.length, 1, 'a scheduled run on main must execute the nightly cross-engine cohort exactly once');
+  const dispatched = workflowsRunningNightlyCohort(workflowContext('workflow_dispatch', 'refs/heads/release-candidate'));
+  assert.equal(dispatched.length, 1, 'a manual dispatch on a release candidate must execute the nightly cross-engine cohort');
+  for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
+    assert.deepEqual(workflowsRunningNightlyCohort(context), [], `${context.github.event_name} runs must not wait on the nightly cross-engine cohort`);
+  const { text } = scheduled[0];
+  assert.match(text, /playwright install --with-deps (?:chromium webkit|webkit chromium)\b/, 'the nightly job must install both named engines');
+  assert.doesNotMatch(text, /continue-on-error/, 'a failing nightly case must fail the scheduled workflow visibly');
+
+  const required = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  assert.doesNotMatch(required, /nightly-cross-engine/, 'the required Data safety workflow must not run or aggregate the nightly cohort');
+  const matrix = workflowBlock(workflowBlock(workflowJobText(required, 'regression'), 'matrix', '      ').body, 'group', '        ');
+  assert.deepEqual(workflowList(matrix.inline), ['core', 'scenery', 'persistence-recovery', 'native-process'], 'the required group matrix stays the four stable groups');
+
+  const catalog = JSON.parse(readFileSync(path.join(repo, 'scripts/test-group-assignments.json'), 'utf8'));
+  const crossEngine = ['RISK repository process: required native button actions execute in Chromium and WebKit', 'RISK repository process: native button gate detects errors raised by a real click'];
+  const nightlyRoots = (catalog.nightlyRoots || []).map(entry => entry.root);
+  for (const root of crossEngine) {
+    assert.ok(nightlyRoots.includes(root), `cross-engine case must be declared nightly: ${root}`);
+    assert.equal(catalog.rootAssignments.some(entry => entry.root === root), false, `cross-engine case must be absent from the required groups: ${root}`);
+  }
+  assert.equal(catalog.rootAssignments.find(entry => entry.root === 'RISK repository process: required installed-client native outcomes and artifacts execute exactly once')?.group, 'native-process', 'the Chromium installed-client cases stay in the required native group');
 });

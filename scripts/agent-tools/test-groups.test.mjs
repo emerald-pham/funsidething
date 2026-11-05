@@ -593,6 +593,98 @@ test('test group aggregate rejects corrupt outcomes identities jobs and native e
   for(const [name,mutate]of scenarios)await parent.test(name,t=>{const result=aggregateCopy(t,fixture,mutate);assert.notEqual(result.status,0,'aggregate must reject '+name);});
 });
 
+// Cross-engine (Chromium + WebKit) native checks run in the scheduled and
+// manually dispatched nightly job instead of the per-push required cohort, so an
+// engine-specific failure cannot block unrelated fixes (#2210). A declared
+// nightly root stays out of every required group, never executes there, and is
+// never needed by the required aggregate.
+const installedClientRoot='RISK repository process: required installed-client native outcomes and artifacts execute exactly once';
+const nightlyFixtureRoot='fixture cross-engine native button root';
+function nightlyFixture(t,{body='()=>{if(process.env.CHAIN_NIGHTLY_SENTINEL)fs.writeFileSync(process.env.CHAIN_NIGHTLY_SENTINEL,"executed");}',nightlyRoots=[{root:nightlyFixtureRoot,file:'tests.js',reason:'Fixture cross-engine case runs in the nightly job only.'}]}={}){
+  const fixture=createFixture(t,{nativeTitle:installedClientRoot,nativeReports:true});
+  fs.appendFileSync(path.join(fixture.root,'tests.js'),`\ntest(${JSON.stringify(nightlyFixtureRoot)},${body});\n`);
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));catalog.nightlyRoots=nightlyRoots;writeJson(file,catalog);
+  git(fixture.root,'add','.');git(fixture.root,'commit','-qm','nightly cross-engine root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group required cohort passes without nightly cross-engine cases and never executes them', t => {
+  const fixture=nightlyFixture(t),sentinel=path.join(fixture.root,'nightly-executed');
+  const description=invoke(fixture,{args:['--describe']});
+  assert.equal(description.status,0,description.stdout+description.stderr);
+  const descriptor=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'),'utf8'));
+  assert.ok(descriptor.groups.every(group=>!group.roots.includes(nightlyFixtureRoot)&&!group.requiredCaseIds.some(id=>id===nightlyFixtureRoot||id.startsWith(nightlyFixtureRoot+' > '))),'the required cohort must exclude nightly cross-engine cases');
+  assert.ok(descriptor.groups.find(group=>group.id==='native-process').roots.includes(installedClientRoot),'the installed-client cases stay in the required cohort');
+  fixture.originals=new Map();
+  for(const group of groups){const result=invoke(fixture,{group,env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+  const result=aggregateCopy(t,fixture);
+  assert.equal(result.status,0,'the required aggregate must pass without the nightly cases: '+result.stdout+result.stderr);
+  assert.equal(fs.existsSync(sentinel),false,'no required group or registration guard may execute a nightly case');
+  const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'),'utf8'));
+  assert.equal(report.status,'passed');assert.equal(report.groups.length,4);assert.equal(report.caseCount,6);
+});
+test('test group nightly declarations cannot remove required or installed-client cases from the required cohort', async parent => {
+  const nightly=root=>({root,file:'tests.js',reason:'Attempted move of a required case to the nightly job.'});
+  const scenarios=[
+    ['installed-client owner root',installedClientRoot],
+    ['installed-client signed-out case','RISK native installed-client delivery: signed-out'],
+    ['installed-client reconcile-held case','RISK native installed-client delivery: reconcile-held'],
+    ['required group root',fixtureRoots.scenery],
+  ];
+  for(const [name,root]of scenarios)await parent.test(name,t=>{
+    const fixture=nightlyFixture(t);fixture.originals=new Map();
+    for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+    const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+    catalog.nightlyRoots.push(nightly(root));writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','declare a required case nightly');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'describing the required cohort must refuse a nightly '+name);
+    assert.match(description.stderr,/nightly/i);
+    const aggregate=aggregateCopy(t,fixture);
+    assert.notEqual(aggregate.status,0,'the required aggregate must refuse a nightly '+name);
+    assert.match(aggregate.stderr,/nightly/i,'the aggregate must name the nightly declaration, not an unrelated identity mismatch');
+  });
+});
+test('test group aggregate with nightly roots still fails closed on missing duplicate skipped failed groups and installed-client reports', async parent => {
+  const fixture=nightlyFixture(parent);fixture.originals=new Map();
+  for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+  const scenarios=[
+    ['missing required group',root=>fs.rmSync(path.join(root,'native-process'),{recursive:true,force:true})],
+    ['duplicate required group',root=>fs.cpSync(path.join(root,'core'),path.join(root,'core-copy'),{recursive:true})],
+    ['nightly results offered as a required group',root=>fs.cpSync(path.join(root,'native-process'),path.join(root,'nightly-cross-engine'),{recursive:true})],
+    ['skipped required job',(_root,file)=>{const needs=JSON.parse(fs.readFileSync(file));needs.regression.result='skipped';writeJson(file,needs);}],
+    ['failed required group',root=>{const f=path.join(root,'scenery/result.json'),x=JSON.parse(fs.readFileSync(f));x.status='failed';writeJson(f,x);}],
+    ['missing installed-client signed-out report',root=>fs.rmSync(path.join(root,'native-process/native/signed-out.json'))],
+    ['missing installed-client reconcile-held report',root=>fs.rmSync(path.join(root,'native-process/native/reconcile-held.json'))],
+  ];
+  for(const [name,mutate]of scenarios)await parent.test(name,t=>{const result=aggregateCopy(t,fixture,mutate);assert.notEqual(result.status,0,'aggregate must reject '+name);});
+});
+test('test group nightly cohort runs only the declared cross-engine cases and fails visibly', async parent => {
+  await parent.test('passing nightly case',t=>{
+    const fixture=nightlyFixture(t),sentinel=path.join(fixture.root,'nightly-executed');
+    const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.equal(result.evidence.status,'passed');
+    assert.deepEqual(result.evidence.cases.map(item=>[item.id,item.status]),[[nightlyFixtureRoot,'passed']],'only the declared nightly case executes');
+    assert.equal(fs.existsSync(sentinel),true,'the nightly cohort must actually execute its case');
+  });
+  const failures=[
+    ['failing engine case',{body:'()=>{throw new Error("webkit pageerror")}'},/failed/i],
+    ['skipped engine case',{body:'{skip:"webkit unavailable"},()=>{}'},/skipped/i],
+    ['declared case that is not registered',{nightlyRoots:[{root:nightlyFixtureRoot,file:'tests.js',reason:'Fixture cross-engine case runs in the nightly job only.'},{root:'fixture absent cross-engine root',file:'tests.js',reason:'Declared but missing from the source.'}]},/fixture absent cross-engine root/],
+    ['no declared nightly cases',{nightlyRoots:[]},/no nightly cross-engine roots/i],
+  ];
+  for(const [name,options,message]of failures)await parent.test(name,t=>{
+    const fixture=nightlyFixture(t,options);
+    if(!options.nightlyRoots?.some(entry=>entry.root===nightlyFixtureRoot)&&options.nightlyRoots){
+      // Without a declaration the appended root is unclassified; keep the fixture valid by assigning it to core.
+      const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:'tests.js'});writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','assign root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    }
+    const result=invoke(fixture,{group:'nightly-cross-engine'});
+    assert.notEqual(result.status,0,'a nightly '+name+' must fail the nightly run');
+    assert.notEqual(result.evidence?.status,'passed');
+    assert.match(result.stderr,message);
+  });
+});
+
 test('test group workflow scanner command rejects missing parallel group evidence', t => {
   const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
   t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));
