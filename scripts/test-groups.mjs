@@ -111,8 +111,11 @@ function readJson(file, label) {
 // The full suite is the per-area test directory (#2213). The single tests.js
 // layout stays accepted so older checkouts and runner fixtures still group.
 // tests/shared.js holds helpers, not tests, so only *.test.js files count.
+// npm test runs two files at a time: with every area file in parallel, timer
+// deadlines in the long core file expired under load (5 s fixture deadlines),
+// which never happened while tests.js ran as one serial process.
 const FULL_SUITE_COMMANDS = new Map([
-  ['node --test tests/*.test.js scripts/agent-tools/*.test.mjs', () => fs.readdirSync(path.join(ROOT, 'tests'))
+  ['node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs', () => fs.readdirSync(path.join(ROOT, 'tests'))
     .filter(file => file.endsWith('.test.js')).sort().map(file => `tests/${file}`)],
   ['node --test tests.js scripts/agent-tools/*.test.mjs', () => ['tests.js']],
 ]);
@@ -330,24 +333,43 @@ function cohortDigest(inventory, assignments, assignmentIndex) {
   return sha256(JSON.stringify({ expectedGroups: GROUP_IDS, requiredCaseIds, rootAssignments, rootReplacements, processControls }));
 }
 
-function addedRootRegistrations(comparisonBase, files) {
-  const diff = git(['diff', '--no-ext-diff', '--unified=0', comparisonBase, '--', ...files]);
-  const names = new Set();
-  const capture = line => {
-    const match = line.match(/^\s*test\s*\(\s*(['"])(.*?)\1/);
-    if (match) names.add(match[2]);
-  };
-  for (const line of diff.split('\n')) if (line.startsWith('+') && !line.startsWith('+++')) capture(line.slice(1));
-  const untracked = git(['ls-files', '--others', '--exclude-standard', '--', ...files]).split('\n').filter(Boolean);
-  for (const file of untracked) {
-    const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
-    for (const line of source.split('\n')) capture(line);
+function decodeStringLiteral(body) {
+  const simple = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', 0: '\0' };
+  return body.replace(/\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g, (_, escape) => {
+    if (escape[0] === 'u' && escape.length > 1) return String.fromCodePoint(parseInt(escape.replace(/[u{}]/g, ''), 16));
+    if (escape[0] === 'x' && escape.length === 3) return String.fromCharCode(parseInt(escape.slice(1), 16));
+    return simple[escape] ?? escape;
+  });
+}
+
+// A registration is added when its title is registered more often now than in
+// the comparison commit's full-suite files. Comparing titles rather than diff
+// lines keeps tests moved between files (#2213: tests.js into tests/*.test.js)
+// from counting as new roots; titles compare by value, so \u and \' escapes
+// match their assignment.
+function registeredTitleCounts(sources) {
+  const counts = new Map();
+  for (const source of sources) for (const line of source.split('\n')) {
+    const match = line.match(/^\s*test\s*\(\s*(['"])((?:\\.|(?!\1)[^\\])*)\1/);
+    if (!match) continue;
+    const title = decodeStringLiteral(match[2]);
+    counts.set(title, (counts.get(title) || 0) + 1);
   }
-  return names;
+  return counts;
+}
+
+function addedRootRegistrations(comparisonBase, files) {
+  const current = registeredTitleCounts(files.map(file => fs.readFileSync(path.join(ROOT, file), 'utf8')));
+  const baselineFiles = git(['ls-tree', '-r', '--name-only', comparisonBase, '--', 'tests.js', 'tests', 'scripts/agent-tools'])
+    .split('\n').filter(file => file === 'tests.js' || /^tests\/[^/]+\.test\.js$/.test(file) || /^scripts\/agent-tools\/[^/]+\.test\.mjs$/.test(file));
+  const baseline = registeredTitleCounts(baselineFiles.map(file => git(['show', `${comparisonBase}:${file}`])));
+  return new Set([...current].filter(([title, count]) => count > (baseline.get(title) || 0)).map(([title]) => title));
 }
 
 function validateAddedRegistrations(assignments, inventoryIndex, index, files, inventorySourceSha) {
-  const added = addedRootRegistrations(inventorySourceSha, files);
+  // Source titles are plain strings; catalog roots are TAP identities (# is
+  // escaped as \#). Compare both in TAP form.
+  const added = new Set([...addedRootRegistrations(inventorySourceSha, files)].map(title => title.replace(/[\\#]/g, '\\$&')));
   const baseline = inventoryIndex.roots;
   const mappedBaseline = new Set(index.replacementByBaseline.keys());
   for (const replacement of index.replacementByBaseline.values()) {

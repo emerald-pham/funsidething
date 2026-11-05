@@ -13009,6 +13009,16 @@
       "root": "preflight runs the focused checks from the per-area test directory",
       "group": "native-process",
       "file": "scripts/agent-tools/preflight.test.mjs"
+    },
+    {
+      "root": "test group runner matches added root titles written with string escapes",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "test group runner treats registrations moved into split files as existing",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
     }
   ],
   "nightlyRoots": [

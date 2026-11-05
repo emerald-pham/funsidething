@@ -950,7 +950,7 @@ function convertToSplitLayout(fixture, { duplicateCoreRoot = false } = {}) {
   fs.rmSync(path.join(fixture.root, 'tests.js'));
   const packagePath = path.join(fixture.root, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-  packageJson.scripts.test = 'node --test tests/*.test.js scripts/agent-tools/*.test.mjs';
+  packageJson.scripts.test = 'node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs';
   writeJson(packagePath, packageJson);
   const catalogPath = path.join(fixture.root, 'scripts/test-group-assignments.json');
   const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
@@ -960,6 +960,56 @@ function convertToSplitLayout(fixture, { duplicateCoreRoot = false } = {}) {
   git(fixture.root, 'commit', '-qm', 'split tests.js into per-area files');
   fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
 }
+
+// Moving tests into new files makes every registration an added line, so a
+// title written with string escapes must match its assignment by value. The
+// catalog stores TAP identities, where # is escaped as \#.
+test('test group runner matches added root titles written with string escapes', t => {
+  const fixture = createFixture(t);
+  const titles = ['fixture Settings → Import root', "fixture today's escaped root", 'fixture #hash root'];
+  fs.appendFileSync(path.join(fixture.root, 'tests.js'),
+    "\ntest(\"fixture Settings \\u2192 Import root\", () => {});\ntest('fixture today\\'s escaped root', () => {});\ntest('fixture #hash root', () => {});\n");
+  const catalogPath = path.join(fixture.root, 'scripts/test-group-assignments.json');
+  const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+  catalog.rootAssignments.push(...titles.map(root => ({ root: root.replace('#', '\\#'), group: 'core', file: 'tests.js' })));
+  writeJson(catalogPath, catalog);
+  git(fixture.root, 'add', '--all');
+  git(fixture.root, 'commit', '-qm', 'add roots with escaped titles');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.equal(described.status, 0, described.stdout + described.stderr);
+  const core = invoke(fixture);
+  assert.equal(core.status, 0, core.stdout + core.stderr);
+  for (const title of titles) assert.equal(core.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1, title);
+});
+
+// A moved registration is not a new root. Env-gated registrations (such as
+// the installed-client sensitivity controls) have no group because they never
+// register in ordinary runs, and moving them into a split file keeps that.
+test('test group runner treats registrations moved into split files as existing', t => {
+  const fixture = createFixture(t);
+  fs.appendFileSync(path.join(fixture.root, 'tests.js'), "\nif (process.env.CHAIN_FIXTURE_GATED === '1') {\n  test('fixture env-gated sensitivity root', () => {});\n}\n");
+  git(fixture.root, 'add', 'tests.js');
+  git(fixture.root, 'commit', '-qm', 'baseline env-gated registration');
+  const head = git(fixture.root, 'rev-parse', 'HEAD');
+  const inventoryPath = path.join(fixture.root, 'scripts/test-group-inventory.json');
+  const baselineInventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+  Object.assign(baselineInventory.baseline, { sourceSha: head, sourceTree: git(fixture.root, 'rev-parse', 'HEAD^{tree}'), checkoutSha: head, checkoutTree: git(fixture.root, 'rev-parse', 'HEAD^{tree}'), comparisonBase: head });
+  writeJson(inventoryPath, baselineInventory);
+  git(fixture.root, 'add', 'scripts/test-group-inventory.json');
+  git(fixture.root, 'commit', '-qm', 'rebind inventory to the gated baseline');
+  fixture.comparisonBase = git(fixture.root, 'rev-parse', 'HEAD');
+  convertToSplitLayout(fixture);
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.equal(described.status, 0, described.stdout + described.stderr);
+  fs.appendFileSync(path.join(fixture.root, 'tests/other.test.js'), "\ntest('fixture genuinely new root', () => {});\n");
+  git(fixture.root, 'add', '--all');
+  git(fixture.root, 'commit', '-qm', 'add an unassigned root');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  const rejected = invoke(fixture, { args: ['--describe'] });
+  assert.notEqual(rejected.status, 0, 'a genuinely new root still needs an assignment');
+  assert.match(rejected.stderr, /fixture genuinely new root/);
+});
 
 test('test group runner resolves every root across split per-area test files', t => {
   const fixture = createFixture(t);
