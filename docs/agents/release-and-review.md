@@ -100,6 +100,51 @@ cannot prove that a person actually performed the review; repository writers
 with status permission and protection-bypassing administrators remain inside
 the trust boundary.
 
+### Scaled review policy
+
+The validator applies the scaled review policy when the committed AGENTS.md at
+both the exact candidate head and its base contains the sentence "Release
+reviews scale to the exact diff." A candidate whose base predates that wording,
+including the change that introduced it, keeps the earlier policy above and the
+FAQ reviewer below. Under the scaled policy the derived plan (plan schema
+version 2) requires:
+
+- Documentation-only diffs: the owner exact-diff review only.
+- Ordinary code or behavior: the owner review plus one combined independent
+  review, using the checklist below.
+- A specialist only for memory, cloud persistence and sync, shared session
+  state, Firestore rules, callable/auth behavior, deployment or authentication
+  infrastructure (including the release receipt verifier, pre-push gate and
+  workflows) and data migration. Ambiguous auth, state and session persistence
+  still fail closed to the specialist. Process files such as the RISK map, test
+  rationales, hooks and guidance keep the code review but no longer derive the
+  `release-process` specialist; `additionalSpecialistDomains` can still add it.
+- `requiresTypographyReview` is true only when rendered markup or stylesheet
+  content changes: CSS, HTML outside inline scripts, or script lines that build
+  markup, classes or styles. Tests and tooling never set it.
+- `requiresFaqReview` is false. Whenever the plan includes product behavior
+  (`requiresOwnerFaqCoverage`), the owner review records the extended-FAQ
+  coverage result instead.
+
+Receipts stay schema version 2 and publish the `v=4` status binding on all
+three required contexts. See [RELEASE_GATES.md](../../RELEASE_GATES.md#scaled-review-policy-evidence).
+
+### Combined independent review checklist
+
+One independent reviewer, distinct from the owner, covers in one pass:
+
+1. Code behavior: the full exact base-to-candidate diff, including error paths,
+   compatibility with older saved data and clients, and anything the diff removes.
+2. Relevant tests: an observed behavioral RED and GREEN for each functional
+   change, discriminating assertions with independent expected values, and no
+   removed or weakened protection without a recorded rationale.
+3. User-visible and data safety: what users see and do, saved boards, backups,
+   cloud sync, Undo and offline behavior affected by the change, and the
+   extended FAQ where behavior changed.
+
+Record the result as the receipt's `independentReview` with all three scope
+flags set.
+
 ## Saved-board incident review
 
 For fixes to reported populated-board startup, import or cloud-login adoption,
@@ -134,7 +179,8 @@ blanket runtime matrix; existing exact-candidate and release gates still apply.
 
 Owner instruction, 2026-10-08: every final product checkpoint release and
 equivalent release requires a typography reviewer independent of the
-implementer. Review the actual final built candidate, identify its commit and
+implementer. Under the scaled review policy this review is required only when
+the derived plan sets `requiresTypographyReview`. Review the actual final built candidate, identify its commit and
 build artifact, and compare it with the intended typography contract and
 previous released build. Automated typography checks do not substitute for this
 review. Recheck affected evidence if the reviewed candidate materially changes.
@@ -178,7 +224,11 @@ earlier draft review does not approve the final commit.
 
 ## Independent FAQ coverage release check
 
-Independent FAQ coverage review is required for every product release. The
+This section applies to candidates under the October 2026 policy, whose base
+predates the scaled review policy; scaled-policy candidates record FAQ coverage
+in the owner review instead.
+
+Independent FAQ coverage review is required for every such product release. The
 reviewer must be distinct from the implementation owner, code reviewer, and
 state/sync specialist. Review the exact candidate against the Settings-aligned
 extended FAQ, including changed controls, defaults, saved-data lifecycle, and
