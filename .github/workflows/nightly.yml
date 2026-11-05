@@ -49,3 +49,26 @@ jobs:
           name: nightly-cross-engine-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nightly-cross-engine
           if-no-files-found: error
+
+  # Weekly velocity report (#2217). Merges stopped for a week before anyone
+  # noticed while CI stayed green, so each night this summarizes the last 7 days
+  # (merged PRs, CI duration, issues opened, open PR ages) in the step summary.
+  # No merge to main while PRs are open, or more than 100 new issues, fails the
+  # job with an annotation and files (or comments on) one needs-triage issue.
+  velocity-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Weekly velocity report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/agent-tools/ci-monitor.mjs velocity-report --repo "$GITHUB_REPOSITORY"

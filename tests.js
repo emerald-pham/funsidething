@@ -30476,6 +30476,25 @@ test('RISK repository process: cross-engine native checks run nightly outside th
  }
 });
 
+// The weekly velocity report is pinned at the agreed seams (the CI-monitor
+// agent-tool tests with fixture GitHub responses, and the CI workflow files in
+// the CI-routing tests); this process RISK requires those pins to execute and pass.
+test('RISK repository process: nightly velocity report alerts on merge stalls and issue spikes',()=>{
+ const pins={
+  'scripts/agent-tools/ci-monitor.test.mjs':['velocity report writes a readable weekly summary and raises no alert when neither threshold trips','velocity report alerts when nothing merged to main in 7 days while PRs are open','velocity report alerts when more than 100 issues are opened in a week','velocity report reuses an existing open alert issue instead of filing a duplicate','velocity report dry run reports the alert without writing to GitHub'],
+  'scripts/agent-tools/ci-routing.test.mjs':['workflow runs the weekly velocity report nightly with only the permissions its alert needs'],
+ };
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const [file,names] of Object.entries(pins)){
+  const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+names.join('|')+')$',file],{cwd:__dirname,env,encoding:'utf8',timeout:300000,maxBuffer:8*1024*1024});
+  assert.equal(result.status,0,'The velocity report pins must pass: '+result.stdout+'\n'+result.stderr);
+  // The summary pin carries subtests, so count top-level outcomes, not "# tests".
+  assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,names.length,'every named velocity pin must execute');
+  assert.match(result.stdout,/^# skipped 0$/m);
+  for(const name of names)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+name)),'pin did not pass: '+name);
+ }
+});
+
 test('RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator',async()=>{
  const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
  const fixture=makeReleaseGateFixture();

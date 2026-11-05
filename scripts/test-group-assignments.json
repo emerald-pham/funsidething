@@ -12914,6 +12914,41 @@
       "root": "workflow runs the cross-engine native checks nightly and on dispatch outside the required cohort",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK repository process: nightly velocity report alerts on merge stalls and issue spikes",
+      "group": "core",
+      "file": "tests.js"
+    },
+    {
+      "root": "velocity report writes a readable weekly summary and raises no alert when neither threshold trips",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "velocity report alerts when nothing merged to main in 7 days while PRs are open",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "velocity report alerts when more than 100 issues are opened in a week",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "velocity report reuses an existing open alert issue instead of filing a duplicate",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "velocity report dry run reports the alert without writing to GitHub",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-monitor.test.mjs"
+    },
+    {
+      "root": "workflow runs the weekly velocity report nightly with only the permissions its alert needs",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
     }
   ],
   "nightlyRoots": [

@@ -769,3 +769,40 @@ test('workflow runs the cross-engine native checks nightly and on dispatch outsi
   }
   assert.equal(catalog.rootAssignments.find(entry => entry.root === 'RISK repository process: required installed-client native outcomes and artifacts execute exactly once')?.group, 'native-process', 'the Chromium installed-client cases stay in the required native group');
 });
+
+// #2217: the weekly velocity report runs from the nightly schedule as its own
+// job, so a stall alert never hides (or is hidden by) a cross-engine failure,
+// and it holds only the permissions it needs to read activity and file one
+// deduplicated needs-triage issue.
+function workflowJobsRunning(context, pattern) {
+  const directory = path.join(repo, '.github/workflows'), running = [];
+  for (const name of readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort()) {
+    const workflow = readFileSync(path.join(directory, name), 'utf8');
+    const scoped = { github: { ...context.github, workflow: workflow.match(/^name: (.+)$/m)?.[1]?.trim() } };
+    if (!workflowTriggers(workflow, scoped)) continue;
+    for (const job of workflowJobIds(workflow)) {
+      const text = workflowJobText(workflow, job);
+      if (pattern.test(text) && workflowJobRuns(workflow, job, scoped)) running.push({ name, job, text });
+    }
+  }
+  return running;
+}
+
+test('workflow runs the weekly velocity report nightly with only the permissions its alert needs', () => {
+  const report = /node scripts\/agent-tools\/ci-monitor\.mjs velocity-report\b/;
+  const scheduled = workflowJobsRunning(workflowContext('schedule', 'refs/heads/main'), report);
+  assert.equal(scheduled.length, 1, 'a scheduled run on main must produce the velocity report exactly once');
+  assert.equal(workflowJobsRunning(workflowContext('workflow_dispatch', 'refs/heads/main'), report).length, 1, 'the maintainer can run the report on demand');
+  for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
+    assert.deepEqual(workflowJobsRunning(context, report), [], `${context.github.event_name} runs must not file velocity alerts`);
+  const { text } = scheduled[0];
+  assert.doesNotMatch(text, /--group nightly-cross-engine/, 'the report is a sibling job, so one nightly failure never hides the other');
+  assert.match(text, /velocity-report --repo (?:"\$GITHUB_REPOSITORY"|\$\{\{ github\.repository \}\})/, 'the report reads the repository the workflow runs in');
+  assert.doesNotMatch(text, /--dry-run/, 'the nightly report must actually file its alert issue');
+  assert.doesNotMatch(text, /continue-on-error/, 'an alert must fail the nightly run visibly');
+  assert.match(text, /GH_TOKEN: \$\{\{ (?:github\.token|secrets\.GITHUB_TOKEN) \}\}/, 'gh needs the job token');
+  const permissions = workflowBlock(text, 'permissions', '    ');
+  assert.ok(permissions && !permissions.inline, 'the job must declare its own permissions');
+  const granted = Object.fromEntries(permissions.body.split('\n').filter(line => line.trim()).map(line => line.trim().split(/:\s*/)));
+  assert.deepEqual(granted, { contents: 'read', actions: 'read', 'pull-requests': 'read', issues: 'write' }, 'issues: write is the only write the report needs');
+});
