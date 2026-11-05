@@ -420,6 +420,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order
 - RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices
 - RISK recurring scenery refresh browser: a pending trusted key reaches Add before the minute refresh paints in Chromium and WebKit under both motion choices
+- RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit
 
 ## Offline shell and updates
 

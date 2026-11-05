@@ -7670,6 +7670,106 @@ test('RISK recurring scenery refresh browser: a pending trusted key reaches Add 
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2194 review F6, F8, F9 and O1: the opening paint must wait for the board
+// itself, not only for the scenery's own boot task. Each arm opens a 30-task
+// board cold (first load), as a returning user (reload) and with a board whose
+// device read finishes late (the delayed-local-board fixture), in Chromium and
+// WebKit under both motion choices. The page's clock is shifted to a fixed
+// night instant so the computed sky is dark; timers and frames stay real.
+// Only ordering, presence and colour are asserted, never elapsed time.
+test('RISK opening scenery hydration browser: the board renders before any scenery paint, no unpainted canvas or day placeholder shows, and an unchanged location never repaints in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,NIGHT=Date.UTC(2026,10,5,4,0,0),DELAY_MS=800;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('hydrate-'+i,'Hydration board task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ const luminance=css=>{const m=String(css).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);return m?(0.2126*m[1]+0.7152*m[2]+0.0722*m[3])/255:null;};
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const motion of ['normal','reduced'])for(const delayed of [false,true]){
+    const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/New_York',serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference'});
+    try{
+     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+     await context.addInitScript(({board,motion,ROWS,NIGHT,DELAY_MS,delayed})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      const RealDate=Date,offset=NIGHT-RealDate.now(),now=()=>RealDate.now()+offset;
+      window.Date=new Proxy(RealDate,{construct(target,args,newTarget){return Reflect.construct(target,args.length?args:[now()],newTarget);},
+       apply(){return new RealDate(now()).toString();},get(target,key){return key==='now'?now:Reflect.get(target,key);}});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+      if(delayed){
+       // The existing delayed-local-board shape: the device read settles late.
+       window.storage={async get(){await new Promise(resolve=>setTimeout(resolve,DELAY_MS));return {value:board};},async set(){}};
+      }else if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+      const o=window.__hydration={booted:false,painted:false,frames:0,framesAfterPaint:0,rowFrame:-1,paintFrame:-1,episodes:[],bootRaf:null,paintRows:null,paintReady:null};
+      const rows=()=>document.querySelectorAll('#listBody [data-row]').length;
+      o.ready=()=>document.documentElement.dataset.appReady==='true'&&rows()===ROWS&&!!document.getElementById('addInput')?.getClientRects().length;
+      const raf=window.requestAnimationFrame.bind(window);
+      const observe=()=>{o.frames++;if(o.rowFrame<0&&!o.painted&&o.ready())o.rowFrame=o.frames;if(o.painted)o.framesAfterPaint++;if(o.framesAfterPaint<40)raf(observe);};raf(observe);
+      const width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width');
+      Object.defineProperty(HTMLCanvasElement.prototype,'width',{configurable:true,enumerable:width.enumerable,get(){return width.get.call(this);},set(value){
+       width.set.call(this,value);
+       if(!o.booted&&this.matches?.('#landscape [data-scenery]')){
+        o.booted=true;
+        // The first frame after the scenery canvas is sized.
+        raf(()=>{const canvas=document.querySelector('#landscape [data-scenery]'),host=document.getElementById('landscape');
+         let pixel=null;try{pixel=Array.from(canvas.getContext('2d').getImageData(0,0,1,1).data).join();}catch(error){pixel=String(error);}
+         const style=getComputedStyle(canvas),hostStyle=getComputedStyle(host);
+         o.bootRaf={unpainted:!o.painted,pixel,canvasVisible:style.visibility!=='hidden'&&style.display!=='none'&&style.opacity!=='0',
+          hostBackground:hostStyle.backgroundColor,hostImage:hostStyle.backgroundImage,period:document.documentElement.dataset.scenePeriod||null};});
+       }
+      }});
+      const context2d=CanvasRenderingContext2D.prototype;let episode=null;
+      for(const method of ['clearRect','fillRect','strokeRect','fill','stroke','drawImage','putImageData','fillText','strokeText']){
+       const original=context2d[method];
+       context2d[method]=function(...args){
+        if(this.canvas?.matches?.('#landscape [data-scenery]')){
+         if(!o.painted){o.painted=true;o.paintFrame=o.frames;o.paintRows=rows();o.paintReady=o.ready();}
+         if(!episode){episode={rowsAtStart:rows()};o.episodes.push(episode);queueMicrotask(()=>{episode.rowsAtTaskEnd=rows();episode=null;});}
+         if(o.countDraws)o.countedDraws++;
+        }
+        return original.apply(this,args);
+       };
+      }
+     },{board,motion,ROWS,NIGHT,DELAY_MS,delayed});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     for(const load of delayed?['delayed']:['cold','returning']){
+      const label=`${engineName}/${motion}/${load}`;
+      if(load==='returning')await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>window.__hydration.ready()&&window.__hydration.painted&&window.__hydration.framesAfterPaint>=40,null,{timeout:20000});
+      const r=await page.evaluate(()=>{const o=window.__hydration;return {rowFrame:o.rowFrame,paintFrame:o.paintFrame,paintRows:o.paintRows,paintReady:o.paintReady,bootRaf:o.bootRaf,episodes:o.episodes.slice(0,12),period:document.documentElement.dataset.scenePeriod,motion:document.documentElement.dataset.landscapeMotion};});
+      // An unchanged location, as a board adoption applies it, must not repaint.
+      const unchanged=await page.evaluate(()=>{const o=window.__hydration;o.countDraws=true;o.countedDraws=0;const location=globalThis.LivingLocation.current();let events=0;
+       const count=()=>{events++;};document.addEventListener('landscape-location-change',count);
+       try{globalThis.LivingLocation.applySynced(location);}finally{document.removeEventListener('landscape-location-change',count);o.countDraws=false;}
+       return {draws:o.countedDraws,events};});
+      observed.push({label,...r,episodes:r.episodes.map(e=>`${e.rowsAtStart}->${e.rowsAtTaskEnd}`),unchanged});
+      // Preconditions: the scene was computed for the night instant and the saved motion applies.
+      assert.equal(r.period,'night',`${label}: the shifted clock gives a night scene`);
+      assert.equal(r.motion,motion,`${label}: the saved motion choice applies`);
+      assert.ok(r.bootRaf,`${label}: a frame followed the scenery canvas being sized`);
+      assert.deepEqual(errors,[],`${label}: no page errors`);
+      // F6: the opening paint waits for the board.
+      if(!r.paintReady||r.paintRows!==ROWS)failures.push(`${label}: the scenery painted before the board was rendered (${r.paintRows} rows)`);
+      if(!(r.rowFrame>=0&&r.rowFrame<=r.paintFrame))failures.push(`${label}: no frame showed the usable board before the scenery's first paint`);
+      // F9: no scenery paint inside the task that renders the board's rows.
+      if(r.episodes.some(e=>e.rowsAtStart===0&&e.rowsAtTaskEnd>0))failures.push(`${label}: a scenery paint ran inside the task that rendered the board`);
+      // F8: a sized scenery canvas is never presented unpainted (Chromium shows it opaque black).
+      if(r.bootRaf.unpainted&&r.bootRaf.canvasVisible&&r.bootRaf.pixel==='0,0,0,255')failures.push(`${label}: an unpainted opaque black scenery canvas was presented`);
+      // O1: before the first paint the background follows the computed night scene, not the day placeholder.
+      const background=luminance(r.bootRaf.hostBackground);
+      if(r.bootRaf.unpainted&&(r.bootRaf.hostBackground==='rgb(142, 212, 243)'||background===null||background>0.45))failures.push(`${label}: the background before the first paint was ${r.bootRaf.hostBackground}, not the computed night sky`);
+      // F9: an unchanged location does not repaint.
+      if(unchanged.draws!==0)failures.push(`${label}: applying the unchanged location repainted the scenery (${unchanged.draws} draws)`);
+     }
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 test('RISK list presentation browser: Top x default percent toggle dotted filters and reload work on actual phone tablet and desktop controls',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
  for(const engine of [chromium,webkit]){

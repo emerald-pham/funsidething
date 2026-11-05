@@ -345,6 +345,8 @@
     const gradient=b.createLinearGradient(0,0,0,hy+H*.12);
     p.sky.forEach((c,i)=>gradient.addColorStop(i/2,c));
     b.fillStyle=gradient;b.fillRect(0,0,W,H);
+    // The opaque canvas is shown only once it holds a sky (#2194 review F8).
+    if(back.style.visibility==='hidden')back.style.visibility='';
     const night=p.night;
     if(night>.05){
       for(const star of sky.stars){
@@ -1680,24 +1682,58 @@
     // UTC scene; missed arrivals are never animated as a catch-up burst.
     if(document.hidden)stop();else {preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();}
   });
-  document.addEventListener('landscape-location-change',()=>{refreshSky();});
+  // A board adoption reapplies its saved location on every open. Only a
+  // location that actually changed repaints; the same one cost a full paint
+  // inside the task that first showed the board (#2194 review F9).
+  let sceneLocationKey=JSON.stringify(globalThis.LivingLocation?.current()??null);
+  document.addEventListener('landscape-location-change',()=>{
+    const key=JSON.stringify(globalThis.LivingLocation?.current()??null);
+    if(key===sceneLocationKey)return;
+    sceneLocationKey=key;refreshSky();
+  });
+  // Until the first paint the page shows the computed sky colour, not the
+  // stylesheet's fixed day placeholder, behind the board (#2194 review O1).
+  function showScenePlaceholder(){
+    if(!p?.sky?.length)return;
+    host.style.backgroundColor=p.sky[Math.min(1,p.sky.length-1)];
+    host.style.backgroundImage='linear-gradient('+p.sky.join(',')+')';
+  }
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
   openingPaint={opening:true,due:false};
+  // A sized opaque canvas is black until painted (#2194 review F8).
+  back.style.visibility='hidden';
   resize();updateMotion();if(preference===null)openMotion();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
   document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));
-  // Paint the opening scene once, after the board's next frame and any input
-  // queued behind this task, using the latest computed scene. Until then the
-  // normal-motion loop keeps running but its next paint is held; the
-  // reduced-motion timer first runs a second after opening.
-  openingPaint.opening=false;nextPaint=Infinity;
-  requestAnimationFrame(()=>setTimeout(()=>{
-    const owed=openingPaint?.due;openingPaint=null;
-    if(nextPaint===Infinity)nextPaint=0;
-    if(owed&&!document.hidden){syncScene(Date.now());paintScene();}
-  }));
+  // Paint the opening scene once, after the board is showing, its next frame
+  // and any input queued behind it, using the latest computed scene. The
+  // board may hydrate after this task (a large or slow device read); its
+  // hydration reapplies the scene choice, which then only computes, so no
+  // scenery paint runs in the task that first shows the board (#2194 review
+  // F6, F9). If the board never signals, the scenery still paints after a
+  // bounded wait. Until then the normal-motion loop keeps running but its
+  // next paint is held; the reduced-motion timer first runs a second after opening.
+  showScenePlaceholder();nextPaint=Infinity;
+  const boardShown=()=>document.documentElement.dataset.appReady==='true';
+  let boardObserver=null,boardFallback=0;
+  const releaseOpening=()=>{
+    if(!openingPaint?.opening)return;
+    openingPaint.opening=false;boardObserver?.disconnect();clearTimeout(boardFallback);
+    showScenePlaceholder();
+    requestAnimationFrame(()=>setTimeout(()=>{
+      const owed=openingPaint?.due;openingPaint=null;
+      if(nextPaint===Infinity)nextPaint=0;
+      if(owed&&!document.hidden){syncScene(Date.now());paintScene();}
+    }));
+  };
+  if(boardShown())releaseOpening();
+  else{
+    boardObserver=new MutationObserver(()=>{if(boardShown())releaseOpening();});
+    boardObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-app-ready']});
+    boardFallback=setTimeout(releaseOpening,4000);
+  }
   // The editable local file is precached for offline use. A failed first load
   // leaves hourly text blank and cannot interrupt animation startup.
   fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{
