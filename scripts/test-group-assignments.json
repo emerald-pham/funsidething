@@ -5831,6 +5831,26 @@
       "file": "tests.js"
     },
     {
+      "root": "RISK cloud generation recovery: the captured unreadable active generation reconciles an accepted board onto its intact prior generation",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: a conflicting or different-account prior generation still waits and is never adopted",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
+      "root": "RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone",
+      "group": "persistence-recovery",
+      "file": "tests.js"
+    },
+    {
       "root": "RISK corrupt work budget fixture: one shared action deadline rejects an actually held device commit",
       "group": "persistence-recovery",
       "file": "tests.js"
