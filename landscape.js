@@ -63,7 +63,7 @@
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world={elapsed:0,events:[]};
-  let skyTimer=0,resizeTimer=0,returnFocus=null;
+  let skyTimer=0,resizeTimer=0,refreshPaint=0,returnFocus=null;
   const dialog=document.getElementById('motionDialog');
   const status=document.getElementById('sceneStatus');
   const motionButton=document.getElementById('motionButton');
@@ -1538,14 +1538,26 @@
     const after=JSON.stringify([(reduced?visits.forPaint(world.events,geometry,true,{membershipOnly:true}):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
-  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}
+  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearTimeout(refreshPaint);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;refreshPaint=0;partyTimer=0;}
   function scheduleSky(){
     clearTimeout(skyTimer);if(document.hidden)return;
     const now=Date.now(),weather=S.weatherAt(new Date(now),sceneSeason);
     // Even static devices change weather at the shared episode boundary, not
     // one minute after whenever each device happened to open the app.
     const delays=[60000-now%60000,...[weather.start,weather.end].filter(at=>at>now).map(at=>at-now)];
-    skyTimer=setTimeout(()=>{refreshSky();scheduleSky();},Math.max(1,Math.min(...delays)));
+    skyTimer=setTimeout(()=>{
+      // The recurring refresh computes the scene on time but paints after
+      // yielding, so input queued behind this timer is handled first. Painting
+      // in the same task hitched typing and scrolling every minute (#2203).
+      // The paint draws whatever scene is current by then, so no stale frame.
+      if(openingPaint)refreshSky();
+      else{
+        computeScene();if(timeDialog.open)refreshSolarTimes();
+        clearTimeout(refreshPaint);
+        refreshPaint=setTimeout(()=>{refreshPaint=0;if(!document.hidden){syncScene(Date.now());paintScene();}});
+      }
+      scheduleSky();
+    },Math.max(1,Math.min(...delays)));
   }
   function start(){
     stop();if(document.hidden)return;
