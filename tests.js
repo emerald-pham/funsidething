@@ -1090,7 +1090,9 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
- const latest=current.match(/<li>(.*?)<\/li>/)?.[1]||'';
+ // Keyed by its release date: a later dated entry (#2202) is now listed above it.
+ assert.ok(current.includes('<h3>October 28, 2026</h3>'),'the October 28 recovery note stays in the current changelog');
+ const latest=current.split('<h3>October 28, 2026</h3>')[1]?.match(/<li>(.*?)<\/li>/)?.[1]||'';
  assert.match(latest,/saved board needs recovery.*preserved local copies/);
  assert.match(latest,/syncing label.*board is still opening.*not that cloud saving is confirmed/);
  assert.match(latest,/genuine errors and recovery warnings remain visible/);
