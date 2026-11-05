@@ -37695,6 +37695,42 @@ test('RISK repository process: scaled review plan pins ordinary code to owner pl
  }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
 });
 
+test('RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const neutral={base:'const value = 1;\n',head:'const value = 2;\n'};
+ const fixtures={
+  // The release receipt verifier and pre-push gate are deployment infrastructure
+  // even when the changed line itself looks neutral.
+  releaseVerifier:makeScaledReviewFixture({base:{'scripts/release-evidence.mjs':neutral.base},candidate:{'scripts/release-evidence.mjs':neutral.head}}),
+  pushGate:makeScaledReviewFixture({base:{'scripts/install-release-hook.mjs':neutral.base},candidate:{'scripts/install-release-hook.mjs':neutral.head}}),
+  workflow:makeScaledReviewFixture({base:{'.github/workflows/data-safety.yml':'on: push\n'},candidate:{'.github/workflows/data-safety.yml':'on: pull_request\n'}}),
+  cloud:makeScaledReviewFixture({base:{'src/cloud-sync.mjs':neutral.base},candidate:{'src/cloud-sync.mjs':neutral.head}}),
+  rules:makeScaledReviewFixture({base:{'firestore.rules':neutral.base},candidate:{'firestore.rules':neutral.head}}),
+  callable:makeScaledReviewFixture({base:{'src/handlers.mjs':'exports.limit = https.onCall((request) => checkOwner(request));\n'},
+   candidate:{'src/handlers.mjs':'exports.limit = https.onCall((request) => checkTeam(request));\n'}}),
+  migration:makeScaledReviewFixture({base:{'src/upgrade.mjs':'const schemaVersion = 3;\n'},candidate:{'src/upgrade.mjs':'const schemaVersion = 4;\n'}}),
+  ambiguous:makeScaledReviewFixture({base:{'src/current-context.mjs':'export function saveSession(session) { return adapter.write(session); }\n'},
+   candidate:{'src/current-context.mjs':'export function saveSession(session) { return adapter.remove(session); }\n'}}),
+  ordinary:makeScaledReviewFixture({base:{'src/landscape.mjs':neutral.base},candidate:{'src/landscape.mjs':neutral.head}}),
+ };
+ try{
+  const domains=(name,options)=>deriveReleaseReviewPlan(fixtures[name].repo,fixtures[name].candidateSha,fixtures[name].baseSha,options).specialistDomains;
+  assert.deepEqual(domains('releaseVerifier'),['security-deployment'],'the receipt verifier keeps its deployment specialist');
+  assert.deepEqual(domains('pushGate'),['security-deployment'],'the pre-push release gate keeps its deployment specialist');
+  assert.deepEqual(domains('workflow'),['security-deployment'],'CI and Pages workflow edits keep the deployment specialist');
+  assert.deepEqual(domains('cloud'),['memory-cloud-sync']);
+  assert.deepEqual(domains('rules'),['memory-cloud-sync','security-deployment']);
+  assert.deepEqual(domains('callable'),['security-deployment']);
+  assert.deepEqual(domains('migration'),['data-migration']);
+  assert.deepEqual(domains('ambiguous'),['memory-cloud-sync','shared-session-state'],'ambiguous session persistence still fails closed to the specialist');
+  const cloudPlan=deriveReleaseReviewPlan(fixtures.cloud.repo,fixtures.cloud.candidateSha,fixtures.cloud.baseSha);
+  assert.equal(cloudPlan.mode,'dual-review');assert.equal(cloudPlan.schemaVersion,2);
+  assert.deepEqual(domains('ordinary',{additionalSpecialistDomains:['release-process']}),['release-process'],'the owner can still add a known domain');
+  assert.deepEqual(domains('cloud',{additionalSpecialistDomains:[]}),['memory-cloud-sync'],'an empty declaration cannot remove a derived domain');
+  assert.deepEqual(domains('rules',{additionalSpecialistDomains:['data-migration']}),['data-migration','memory-cloud-sync','security-deployment'],'declarations only add');
+ }finally{for(const fixture of Object.values(fixtures))cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
  const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
  const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);

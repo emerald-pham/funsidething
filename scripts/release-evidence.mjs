@@ -254,6 +254,9 @@ function reviewDomainsForPath(file, scaled = false) {
   // Under the scaled policy, process files (test map, rationales, guidance)
   // keep the independent code review but no longer summon a specialist.
   if (isReleaseProcessPath(file) && !scaled) domains.add('release-process');
+  // The receipt verifier, Pages deployment check and pre-push gate are
+  // deployment infrastructure, so they keep a specialist under the scaled policy.
+  if (scaled && /^scripts\/(?:release-evidence|install-release-hook)\.mjs$/.test(normalized)) domains.add('security-deployment');
   if (/(?:cloud|firestore|sync|storage|persist|backup|recovery|migration|indexeddb|localstorage|local-storage|account)/.test(normalized)) {
     domains.add('memory-cloud-sync');
   }
