@@ -32,7 +32,24 @@
       }catch{return false;}
     };
 
-    async function pull(uid,{stillCurrent}={}){
+    // One process-local conclusion per account: "this server manifest revision
+    // names a generation already proved unreadable". A published generation is
+    // immutable, so downloading the same unreadable bytes again cannot change
+    // the answer. The root is still read from the server on every pull: only
+    // a fresh manifest can say whether the conclusion still applies, and the
+    // conclusion only ever yields an error, never a payload, so it cannot let
+    // a stale copy decide the board.
+    const unreadable=new Map();
+    const knownUnreadable=(uid,manifest)=>{
+      const known=unreadable.get(uid);
+      return !!known&&known.rev===manifest.rev&&known.generationId===manifest.activeGeneration;
+    };
+
+    // Only a caller that already holds a completed refusal for this source
+    // opts in with reuseUnreadable. Every other pull (explicit Retry, a fresh
+    // sign-in, a direct read) proves the answer again, so a generation whose
+    // chunks were restored in place is still seen.
+    async function pull(uid,{stillCurrent,reuseUnreadable=false}={}){
       if(!uid) return {error:true,code:"missing-account"};
       let manifest=await adapter.readRoot(uid);
       if(!current(stillCurrent)) return {cancelled:true};
@@ -44,6 +61,8 @@
         const generationId=manifest.activeGeneration;
         if(typeof generationId!=="string"||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
           return {error:true,code:"invalid-manifest"};
+        if(reuseUnreadable===true&&knownUnreadable(uid,manifest))
+          return {error:true,code:"corrupt-generation",generationId,rev:manifest.rev,knownUnreadable:true};
         try{
           // Both immutable reads use the same manifest generation. Download
           // together, then verify the complete snapshot and recheck the root;
@@ -76,7 +95,8 @@
              (latest.rev!==manifest.rev||latest.activeGeneration!==generationId)){
             manifest=latest;continue;
           }
-          return {error:true,code:"corrupt-generation",generationId};
+          unreadable.set(uid,{rev:manifest.rev,generationId});
+          return {error:true,code:"corrupt-generation",generationId,rev:manifest.rev};
         }
       }
       return {error:true,code:"manifest-changed"};
