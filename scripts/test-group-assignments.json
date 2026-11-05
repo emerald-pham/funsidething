@@ -12874,6 +12874,11 @@
       "root": "RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order",
       "group": "core",
       "file": "tests.js"
+    },
+    {
+      "root": "RISK opening scenery browser: a seeded board takes trusted typing and a frame before the scenery first paints in Chromium and WebKit under both motion choices",
+      "group": "core",
+      "file": "tests.js"
     }
   ],
   "processControls": [
