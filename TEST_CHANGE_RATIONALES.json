@@ -21410,7 +21410,7 @@
   },
   {
     "baseCommit": "dae7ee0e8a06cb53a0e7bb0b097eac4e06c79ba4",
-    "testChangesSha256": "a18890e19d579fe5491b3a15353adefb6c3929bc5144e35dbe1f0ecdd14b157a",
+    "testChangesSha256": "45ecf5786546097fb75701c3ff154d0f69b6bb8a6c7f662bcbf85e3b8a48ffd7",
     "reason": "#2234 limits the pre-push receipt check to pushes to main, so work branches can run CI before reviews. The existing pre-push test pushed its candidate to refs/heads/release; that push target changes to refs/heads/main so the test still exercises the guarded path. Every assertion (deletions pass, a dirty worktree is refused, each distinct outgoing tip needs its own receipt) is unchanged.",
     "previousBehavior": "validatePrePushUpdates required a valid exact-SHA receipt and a clean worktree for every outgoing non-deletion tip on any branch, so the test could use refs/heads/release as its remote ref.",
     "intendedBehavior": "validatePrePushUpdates checks only outgoing updates whose remote ref is refs/heads/main: those still need a clean worktree and an exact-SHA receipt per tip. Updates to other refs pass without a receipt. The existing test pushes to main and keeps all its assertions; the new test pins that a work-branch push needs neither.",
