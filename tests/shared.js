@@ -2860,14 +2860,13 @@ function largeSignedInBoardFixture(account){
  if(!largeSignedInBoardFixtures.has(account))largeSignedInBoardFixtures.set(account,buildLargeBoardFixture({account}));
  return largeSignedInBoardFixtures.get(account);
 }
-async function buildLargeBoardFixture(){
+async function buildLargeBoardFixture({account:signedInAccount=null}={}){
  const shape=LARGE_BOARD_SHAPE,start=Date.parse('2026-06-01T12:00:00Z'),rand=mulberry32(2225);
  const ids=Array.from({length:shape.tasks},(_,i)=>'large-board-task-'+String(i).padStart(3,'0'));
  const seeded=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
   tasks:ids.map((id,i)=>({...syncTask(id,'Large board task '+i),ctx:['home'],createdAt:start-(shape.tasks-i)*3600000}))});
  // #2227: largeSignedInBoardFixture passes {account}; the scan below then
  // records every decision for that account, exactly as a signed-in app does.
- const signedInAccount=arguments[0]?.account??null;
  if(signedInAccount!==null)seeded.syncAccount=signedInAccount;
  const app=await loadApp({seed:2225,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}});
  try{

@@ -62,6 +62,19 @@ The alternatives remain protected, and later acknowledged work becomes the basis
 for subsequent reconciliation.
 _Avoid_: Newest snapshot, invented decision
 
+**Recovery wait**:
+The automatic recovery default holding off because rebuilding the board from an
+older cloud copy could need more memory than a phone allows. The board stays
+open and saves on this device, every recovery source stays protected and nothing
+is confirmed by cloud until a deliberate run or a newer cloud save.
+_Avoid_: Failed recovery, paused sync
+
+**Deliberate run**:
+A recovery the person starts on purpose, with Retry sync or by signing in again,
+that goes ahead even when the automatic recovery default would wait. Opening,
+returning to or reconnecting the app never starts one.
+_Avoid_: Forced recovery, automatic retry
+
 **Lossless recovery**:
 Recovery that retains every accepted board decision, unfinished draft and
 newer edit. A validated older source can provide a local working board while
