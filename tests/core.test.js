@@ -16779,6 +16779,54 @@ test('RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved source
   assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===copied),'the exact package remains protected for repair');
 });
 
+// #2246: the owner must be able to export the recovery archive from a large
+// board without hitting the iPhone memory limit. A repair export too large to
+// show is offered as one downloaded file instead of being rendered into the
+// dialog, and the file still holds the open board and every saved source
+// exactly, so the existing Restore preview accepts it.
+test('RISK DATABASE REPAIR EXPORT: a large repair export downloads one lossless file instead of showing it, and Restore accepts that file',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),{resolveObjectURL}=await import('node:buffer');
+  const dbName='database-repair-large-'+Date.now(),app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:dbName}),{ctx,shim}=app;
+  t.after(()=>app.dispose());ctx.addTask('Large repair task',false);await prepareBackupFileFixtureSource(app);
+  // About 1.5 MB of supported unknown task data, saved on this device too.
+  ctx.state.tasks[0].futureRepairField={keep:'large repair field 🌿 '.repeat(75000)};await ctx.persist();
+  const store=ctx.window.ScannerDeviceStore,account='repair-large@example.test';
+  await store.setPendingUpload(account,{generationId:'large-repair-pending-not-replayed',payloadHash:'c'.repeat(64),baseRev:4,updatedAt:1});
+  // Expected values from the app's realm, compared as plain JSON data.
+  const raw=await store.readRawExportSnapshot(),local=JSON.parse(JSON.stringify(ctx.readManualArchiveLocalSources())),board=JSON.parse(ctx.currentBoardExportPayload()),boardBefore=JSON.stringify(ctx.state);
+  ctx.Blob=Blob;let clicked=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{clicked={href:link.href,name:link.download};};
+  const createElement=shim.document.createElement;shim.document.createElement=tag=>tag==='a'?link:createElement.call(shim.document,tag);
+  ctx.openSettings();assert.equal(await ctx.onAction('view-database-repair',{}),true);
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(markup,/id="databaseRepairData"/,'a large repair export is not rendered into the dialog');
+  assert.ok(markup.length<64*1024,'the dialog does not carry the archive text');
+  const download=markup.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download file<\/button>/);assert.ok(download,'the dialog offers the repair export as a file');
+  await ctx.onAction(download[1],{});assert.ok(clicked?.href,'the download control saves the file');assert.match(clicked.name,/\.json$/);
+  const text=await resolveObjectURL(clicked.href).text(),exported=JSON.parse(text);
+  // Lossless: the open board, every local source and every saved database row, exactly.
+  assert.equal(exported.format,'chain-scanner.recovery-archive');assert.equal(exported.formatVersion,1);
+  assert.equal(exported.manifest.status,'complete');assert.deepEqual(exported.manifest.failures,[]);
+  assert.deepEqual(exported.currentBoard,board);assert.deepEqual(exported.appSources.localStorage,local);
+  assert.equal(exported.appSources.indexedDB.database,dbName);
+  for(const name of ['meta','snapshots','backups','opaque']){
+   const rows=exported.appSources.indexedDB.stores[name];
+   assert.equal(JSON.stringify(rows.map(row=>decodeManualArchiveTypedValue(row.key))),JSON.stringify(raw.stores[name].keys),`${name} keys are exact`);
+   assert.equal(JSON.stringify(rows.map(row=>decodeManualArchiveTypedValue(row.value))),JSON.stringify(raw.stores[name].values),`${name} values are exact`);
+   assert.deepEqual(exported.manifest.sources.indexedDB.stores[name],{status:'included',rowCount:raw.stores[name].keys.length});
+  }
+  assert.ok(text.includes('large-repair-pending-not-replayed'));assert.equal(exported.repairInfo.debugLog.metadataOnly,true);
+  assert.equal(JSON.stringify(ctx.state),boardBefore,'repair export is read-only');
+  // The downloaded file restores through the existing Restore preview.
+  const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-large-restore-'+Date.now()});
+  t.after(()=>destination.dispose());target.addTask('Before large repair-file restore',false);await prepareBackupFileFixtureSource(target);
+  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;dom.document.dispatchEvent({type:'input',target:box});
+  assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
+  assert.equal(await target.onAction('confirm-file-restore',{}),true);
+  assert.equal(target.state.tasks.find(task=>task.title==='Large repair task')?.futureRepairField.keep,board.tasks[0].futureRepairField.keep);
+  assert.equal(await target.window.ScannerDeviceStore.getPendingUpload(account),null,'restoring the current board never replays archived pending work');
+});
+
 test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics',async t=>{
   const {IDBFactory,IDBDatabase}=await import('fake-indexeddb');
   for(const failure of ['no device database','database read failure','one local source unreadable'])await t.test(failure,async subtest=>{

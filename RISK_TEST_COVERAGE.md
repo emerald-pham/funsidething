@@ -202,6 +202,7 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
 - RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes
+- RISK DATABASE REPAIR EXPORT: a large repair export downloads one lossless file instead of showing it, and Restore accepts that file
 - RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics
 - RISK DATABASE REPAIR EXPORT: Settings keeps the combined repair export and the Debug log dialog exports only its metadata report
 - RISK support diagnostics export: every export the Debug log offers copies or downloads only the bounded metadata report and reads no saved board or database copy
@@ -2345,6 +2346,8 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 
 - RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit
 - RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit
+- RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit
+- RISK database repair export visual browser: Download file renders like Back to Settings and Copy JSON beside it in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation
 - RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately

@@ -1571,27 +1571,25 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
-// #2246: exporting the Debug log crashed the owner's iPhone app with a large
-// board while cloud recovery waited. The same signed-in large-board fixture and
-// in-page fake cloud as the #2228 wait test bring the page to "☁ recovery
-// waiting". The person then opens Settings → Data and backups → View debug log
-// and uses each export the dialog offers, finishing with Copy when the export
-// opens its own dialog. Before #2246 the only one was the combined repair
-// export: a 16 MB archive of the whole board and every device copy, about 1.2
-// GiB of WebKit memory over the waiting page and a 28 s main-thread stall. The
-// export must stay metadata-only and cost about the same whatever the board
-// size: peak web-process memory is compared with an idle window of the same
-// page with the Debug log open, in the same run on the same engine.
-const DIAGNOSTICS_EXPORT_MEMORY_MARGIN=64*1024*1024,DIAGNOSTICS_EXPORT_STALL_MS=1000;
-test('RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+// #2246: exporting from a large board crashed the owner's iPhone app while
+// cloud recovery waited. The same signed-in large-board fixture and in-page
+// fake cloud as the #2228 wait test bring the page to "☁ recovery waiting";
+// the clipboard is faked in the page (the system boundary) and downloads are
+// read from the browser. Peak web-process memory of an export is compared
+// with an idle window of the same page with the starting dialog open, in the
+// same run on the same engine; the longest gap between main-thread tasks is
+// the stall. Before #2246 the repair export built a 16 MB archive string of the
+// whole board and every device copy and rendered it into the dialog: about
+// 0.9-1.3 GiB over the open dialog and a 28 s main-thread stall in WebKit.
+const LARGE_BOARD_EXPORT_STALL_MS=1000;
+async function largeBoardExportWhileRecoveryWaits(t,label,exercise){
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
  assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
- const HEADER_PATH='/__chain-2246/earlier-header.json',WAIT_MS=90000,EXPORT_MS=120000,WINDOW_MS=2500,observed=[],failures=[],mib=bytes=>Math.round(bytes/1048576);
- const NOT_EXPORTS=['select-support-diagnostics','refresh-support-diagnostics','return-support-diagnostics','close-modal'];
+ const HEADER_PATH='/__chain-2246/earlier-header.json',WAIT_MS=90000,observed=[],failures=[];
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
   let earlierHeader=null;
-  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2246-'+engineName+'-'));
+  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2246-'+label+'-'+engineName+'-'));
   const launch=async(tag,seed,withCloud)=>{
    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',acceptDownloads:true,
     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -1631,21 +1629,9 @@ test('RISK large board diagnostics export browser: while cloud recovery waits, e
   };
   const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
    &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
-  const openDebugLog=async page=>{
-   // Closing the Debug log returns to Settings; close every dialog first.
-   await page.evaluate(()=>{for(let i=0;i<4&&document.querySelector('.mback');i++)closeModal();});
-   await page.locator('#appHeader [data-act="settings"]').click();
-   const section=page.locator('#modalRoot details.settings-section:has([data-act="view-support-diagnostics"])');
-   if(await section.count()&&!await section.first().evaluate(el=>el.open))await section.first().locator(':scope > summary').click();
-   await page.locator('#modalRoot [data-act="view-support-diagnostics"]').click();
-   await page.waitForFunction(()=>!!document.getElementById('supportDiagnosticsData')?.value,null,{timeout:10000});
-  };
-  // The longest gap between main-thread tasks while an export runs.
-  const startGaps=page=>page.evaluate(()=>{const gaps=window.__diagnosticsGaps={max:0,last:performance.now(),on:true};
-   const tick=()=>{const now=performance.now();gaps.max=Math.max(gaps.max,now-gaps.last);gaps.last=now;if(gaps.on)setTimeout(tick,0);};setTimeout(tick,0);});
   const summary={engine:engineName,exports:[]};
   try{
-   const tag=`chain-2246-${engineName}-${process.pid}-${Date.now()}`;
+   const tag=`chain-2246-${label}-${engineName}-${process.pid}-${Date.now()}`;
    let context=await launch(tag+'-seed',fixture.payload,false);
    let earlier;
    try{
@@ -1667,57 +1653,235 @@ test('RISK large board diagnostics export browser: while cloud recovery waits, e
     summary.waiting=await page.waitForFunction(()=>document.getElementById('syncBtn')?.textContent==='☁ recovery waiting',null,{timeout:WAIT_MS}).then(()=>true,()=>false);
     assert.ok(summary.waiting,`${engineName}: fixture precondition: cloud recovery is waiting`);
     await page.waitForTimeout(2000);
-    await openDebugLog(page);
-    const exports=await page.$$eval('#modalRoot button[data-act]',(buttons,skip)=>buttons.map(button=>button.dataset.act).filter(act=>!skip.includes(act)),NOT_EXPORTS);
-    summary.offered=exports;
-    if(!exports.length)failures.push(`${engineName}: the Debug log offers no export`);
-    for(const act of exports){
-     await openDebugLog(page);
-     // The same page with the Debug log open and idle: the baseline.
-     const idleSampler=webProcessMemorySampler(tag);await page.waitForTimeout(WINDOW_MS);const idle=await idleSampler.stop();
-     const copiedBefore=await page.evaluate(()=>__diagnosticsCopied.length),downloadsBefore=downloads.length;
-     await startGaps(page);const sampler=webProcessMemorySampler(tag);let memory,finished=false;const started=Date.now();
-     try{
-      await page.locator('#modalRoot [data-act="'+act+'"]').click({timeout:EXPORT_MS});
-      // An export that opens its own dialog finishes with that dialog's Copy.
-      const exported=()=>page.evaluate(copied=>__diagnosticsCopied.length>copied,copiedBefore).then(done=>done||downloads.length>downloadsBefore);
-      const copy=page.locator('#modalRoot button[data-act^="copy-"]');
-      for(let copied=false;Date.now()-started<EXPORT_MS&&!finished;await page.waitForTimeout(100)){
-       finished=await exported();
-       if(!finished&&!copied&&await copy.count()){copied=true;await copy.first().click({timeout:EXPORT_MS});}
-      }
-      await page.waitForTimeout(WINDOW_MS);
-     }finally{memory=await sampler.stop();}
-     const elapsedMs=Date.now()-started,stallMs=Math.round(await page.evaluate(()=>{__diagnosticsGaps.on=false;return __diagnosticsGaps.max;}));
-     // What was exported, summarized in the page so a large export is not moved here.
-     const outputs=await page.evaluate(copied=>__diagnosticsCopied.slice(copied).map(text=>{let report=null;try{report=JSON.parse(text);}catch{}
-      return {bytes:new TextEncoder().encode(text).length,board:/Large board task \d/.test(text),schema:report?.schema??report?.format??null,metadataOnly:report?.metadataOnly===true&&report?.boardDataIncluded===false};}),copiedBefore);
-     for(const download of downloads.slice(downloadsBefore)){const text=fs.readFileSync(await download.path(),'utf8');let report=null;try{report=JSON.parse(text);}catch{}
-      outputs.push({bytes:Buffer.byteLength(text,'utf8'),board:/Large board task \d/.test(text),schema:report?.schema??report?.format??null,metadataOnly:report?.metadataOnly===true&&report?.boardDataIncluded===false});}
-     const row={act,finished,elapsedMs,stallMs,idlePeakMiB:mib(idle.peakBytes),exportPeakMiB:mib(memory.peakBytes),extraMiB:mib(memory.peakBytes-idle.peakBytes),outputs,samples:[idle.samples,memory.samples]};
-     summary.exports.push(row);t.diagnostic(JSON.stringify({engine:engineName,...row}));
-     // Measurement preconditions: the harness saw this browser's own web process.
-     assert.ok(idle.processes>0&&memory.processes>0&&idle.samples>10&&memory.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(row)}`);
-     if(!finished||!outputs.length)failures.push(`${engineName}: ${act} exported nothing ${JSON.stringify(row)}`);
-     for(const output of outputs){
-      if(output.board)failures.push(`${engineName}: ${act} exported board content ${JSON.stringify(output)}`);
-      if(output.schema!=='funsidething.support-diagnostics'||!output.metadataOnly)failures.push(`${engineName}: ${act} exported something other than the metadata-only Debug log ${JSON.stringify(output)}`);
-      if(output.bytes>24*1024)failures.push(`${engineName}: ${act} exported ${output.bytes} bytes, above the 24 KiB report limit`);
-     }
-     if(memory.peakBytes-idle.peakBytes>DIAGNOSTICS_EXPORT_MEMORY_MARGIN)failures.push(`${engineName}: ${act} peaked ${row.extraMiB} MiB over the open Debug log, above the ${mib(DIAGNOSTICS_EXPORT_MEMORY_MARGIN)} MiB margin`);
-     if(stallMs>DIAGNOSTICS_EXPORT_STALL_MS)failures.push(`${engineName}: ${act} stalled the page ${stallMs} ms`);
-    }
+    await exercise({t,engineName,page,tag,downloads,summary,failures});
     summary.crashed=crashed;summary.errors=errors;summary.log=await page.evaluate(()=>__diagnosticsExport.log.slice());
     summary.status=await page.evaluate(()=>document.getElementById('syncBtn').textContent);
    }finally{await context.close();}
   }finally{fs.rmSync(profile,{recursive:true,force:true});}
   observed.push(summary);
   assert.equal(summary.crashed,false,`${engineName}: the page did not crash`);assert.deepEqual(summary.errors,[],`${engineName}: no page errors`);
-  // Exporting diagnostics starts no recovery work and publishes nothing.
-  if(summary.log.some(entry=>['source-read','protect','push'].includes(entry)))failures.push(`${engineName}: exporting the Debug log started recovery or publication ${JSON.stringify(summary.log)}`);
+  // Exporting starts no recovery work and publishes nothing.
+  if(summary.log.some(entry=>['source-read','protect','push'].includes(entry)))failures.push(`${engineName}: exporting started recovery or publication ${JSON.stringify(summary.log)}`);
   if(summary.status!=='☁ recovery waiting')failures.push(`${engineName}: the export ended the waiting status ${summary.status}`);
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
+}
+// Opens Settings with the section holding act expanded.
+async function openSettingsSectionFor(page,act){
+ // Closing a dialog opened from Settings returns to Settings; close them all first.
+ await page.evaluate(()=>{for(let i=0;i<4&&document.querySelector('.mback');i++)closeModal();});
+ await page.locator('#appHeader [data-act="settings"]').click();
+ const section=page.locator('#modalRoot details.settings-section:has([data-act="'+act+'"])');
+ if(await section.count()&&!await section.first().evaluate(el=>el.open))await section.first().locator(':scope > summary').click();
+}
+// Measures one export: an idle window with the starting dialog open, then the
+// click and whatever finishes it (finish returns true once it is saved).
+async function measureLargeBoardExport({page,tag,start,finish,limitMs=120000,windowMs=2500}){
+ const idleSampler=webProcessMemorySampler(tag);await page.waitForTimeout(windowMs);const idle=await idleSampler.stop();
+ await page.evaluate(()=>{const gaps=window.__exportGaps={max:0,last:performance.now(),on:true};
+  const tick=()=>{const now=performance.now();gaps.max=Math.max(gaps.max,now-gaps.last);gaps.last=now;if(gaps.on)setTimeout(tick,0);};setTimeout(tick,0);});
+ const sampler=webProcessMemorySampler(tag),started=Date.now();let memory,finished=false;
+ try{
+  await start();
+  while(!finished&&Date.now()-started<limitMs){finished=await finish();if(!finished)await page.waitForTimeout(100);}
+  await page.waitForTimeout(windowMs);
+ }finally{memory=await sampler.stop();}
+ const stallMs=Math.round(await page.evaluate(()=>{__exportGaps.on=false;return __exportGaps.max;}));
+ // Measurement preconditions: the harness saw this browser's own web process.
+ assert.ok(idle.processes>0&&memory.processes>0&&idle.samples>10&&memory.samples>10,'web-process memory was sampled');
+ return {finished,elapsedMs:Date.now()-started,stallMs,idle,memory,extraBytes:memory.peakBytes-idle.peakBytes};
+}
+const mibOf=bytes=>Math.round(bytes/1048576);
+
+// The person opens Settings → Data and backups → View debug log and uses each
+// export the dialog offers, finishing with Copy when an export opens its own
+// dialog. It must stay metadata-only and cost about the same whatever the
+// board size.
+const DIAGNOSTICS_EXPORT_MEMORY_MARGIN=64*1024*1024;
+test('RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'diagnostics',async({t,engineName,page,tag,downloads,summary,failures})=>{
+ const NOT_EXPORTS=['select-support-diagnostics','refresh-support-diagnostics','return-support-diagnostics','close-modal'];
+ const openDebugLog=async()=>{
+  await openSettingsSectionFor(page,'view-support-diagnostics');await page.locator('#modalRoot [data-act="view-support-diagnostics"]').click();
+  await page.waitForFunction(()=>!!document.getElementById('supportDiagnosticsData')?.value,null,{timeout:10000});
+ };
+ await openDebugLog();
+ const exports=await page.$$eval('#modalRoot button[data-act]',(buttons,skip)=>buttons.map(button=>button.dataset.act).filter(act=>!skip.includes(act)),NOT_EXPORTS);
+ summary.offered=exports;
+ if(!exports.length)failures.push(`${engineName}: the Debug log offers no export`);
+ for(const act of exports){
+  await openDebugLog();
+  const copiedBefore=await page.evaluate(()=>__diagnosticsCopied.length),downloadsBefore=downloads.length;
+  // An export that opens its own dialog finishes with that dialog's Copy.
+  const copy=page.locator('#modalRoot button[data-act^="copy-"]');let copied=false;
+  const result=await measureLargeBoardExport({page,tag,start:()=>page.locator('#modalRoot [data-act="'+act+'"]').click({timeout:120000}),
+   finish:async()=>{
+    if(await page.evaluate(count=>__diagnosticsCopied.length>count,copiedBefore)||downloads.length>downloadsBefore)return true;
+    if(!copied&&await copy.count()){copied=true;await copy.first().click({timeout:120000});}
+    return false;}});
+  // What was exported, summarized in the page so a large export is not moved here.
+  const outputs=await page.evaluate(copied=>__diagnosticsCopied.slice(copied).map(text=>{let report=null;try{report=JSON.parse(text);}catch{}
+   return {bytes:new TextEncoder().encode(text).length,board:/Large board task \d/.test(text),schema:report?.schema??report?.format??null,metadataOnly:report?.metadataOnly===true&&report?.boardDataIncluded===false};}),copiedBefore);
+  for(const download of downloads.slice(downloadsBefore)){const text=fs.readFileSync(await download.path(),'utf8');let report=null;try{report=JSON.parse(text);}catch{}
+   outputs.push({bytes:Buffer.byteLength(text,'utf8'),board:/Large board task \d/.test(text),schema:report?.schema??report?.format??null,metadataOnly:report?.metadataOnly===true&&report?.boardDataIncluded===false});}
+  const row={act,finished:result.finished,elapsedMs:result.elapsedMs,stallMs:result.stallMs,idlePeakMiB:mibOf(result.idle.peakBytes),exportPeakMiB:mibOf(result.memory.peakBytes),
+   extraMiB:mibOf(result.extraBytes),outputs,samples:[result.idle.samples,result.memory.samples]};
+  summary.exports.push(row);t.diagnostic(JSON.stringify({engine:engineName,...row}));
+  if(!result.finished||!outputs.length)failures.push(`${engineName}: ${act} exported nothing ${JSON.stringify(row)}`);
+  for(const output of outputs){
+   if(output.board)failures.push(`${engineName}: ${act} exported board content ${JSON.stringify(output)}`);
+   if(output.schema!=='funsidething.support-diagnostics'||!output.metadataOnly)failures.push(`${engineName}: ${act} exported something other than the metadata-only Debug log ${JSON.stringify(output)}`);
+   if(output.bytes>24*1024)failures.push(`${engineName}: ${act} exported ${output.bytes} bytes, above the 24 KiB report limit`);
+  }
+  if(result.extraBytes>DIAGNOSTICS_EXPORT_MEMORY_MARGIN)failures.push(`${engineName}: ${act} peaked ${row.extraMiB} MiB over the open Debug log, above the ${mibOf(DIAGNOSTICS_EXPORT_MEMORY_MARGIN)} MiB margin`);
+  if(result.stallMs>LARGE_BOARD_EXPORT_STALL_MS)failures.push(`${engineName}: ${act} stalled the page ${result.stallMs} ms`);
+ }
+}));
+
+// The owner must be able to export the recovery itself: Settings → Data and
+// backups → View / copy database for repair, finished with the dialog's
+// download (or, before #2246, its Copy JSON). The archive is lossless (the open
+// board and every saved device row, exactly as the page reads them afterwards)
+// and saved as a file, and building it holds about one saved source at a time,
+// so its cost does not grow with the number of saved copies. Before #2246 it
+// peaked 1.05-1.16 GiB over the open Settings (28 s stall in WebKit); after,
+// 38-43 MiB for a 14 MB file. 96 MiB leaves room for a larger saved copy.
+const REPAIR_EXPORT_MEMORY_MARGIN=96*1024*1024;
+test('RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'repair',async({t,engineName,page,tag,downloads,summary,failures})=>{
+ await openSettingsSectionFor(page,'view-database-repair');
+ const copiedBefore=await page.evaluate(()=>__diagnosticsCopied.length),downloadsBefore=downloads.length;
+ const save=page.locator('#modalRoot button:text-is("Download file")'),copy=page.locator('#modalRoot button[data-act="copy-database-repair"]');let pressed=false;
+ const result=await measureLargeBoardExport({page,tag,start:()=>page.locator('#modalRoot [data-act="view-database-repair"]').click({timeout:120000}),
+  finish:async()=>{
+   if(downloads.length>downloadsBefore||await page.evaluate(count=>__diagnosticsCopied.length>count,copiedBefore))return true;
+   if(!pressed&&await save.count()){pressed=true;await save.first().click({timeout:120000});}
+   else if(!pressed&&await copy.count()){pressed=true;await copy.first().click({timeout:120000});}
+   return false;}});
+ const saved=downloads.slice(downloadsBefore);
+ const row={finished:result.finished,file:saved.length>0,elapsedMs:result.elapsedMs,stallMs:result.stallMs,idlePeakMiB:mibOf(result.idle.peakBytes),exportPeakMiB:mibOf(result.memory.peakBytes),
+  extraMiB:mibOf(result.extraBytes),samples:[result.idle.samples,result.memory.samples]};
+ // Lossless: compared with what the page reads afterwards, outside the measured window.
+ let text=null;
+ if(saved.length)text=fs.readFileSync(await saved[0].path(),'utf8');
+ else row.copiedBytes=await page.evaluate(count=>__diagnosticsCopied.slice(count).map(text=>text.length),copiedBefore);
+ if(text!==null){
+  const archive=JSON.parse(text);row.bytes=Buffer.byteLength(text,'utf8');
+  const expected=await page.evaluate(async()=>{const snapshot=await deviceStore.readRawExportSnapshot();
+   return {board:JSON.parse(cloudPayload()),stores:Object.fromEntries(Object.entries(snapshot.stores).map(([name,{keys,values}])=>[name,{keys:JSON.stringify(keys),values:values.map(value=>JSON.stringify(value))}]))};});
+  row.manifest=archive.manifest?.status;row.rows=Object.fromEntries(Object.entries(archive.appSources?.indexedDB?.stores||{}).map(([name,rows])=>[name,rows.length]));
+  if(archive.format!=='chain-scanner.recovery-archive'||archive.manifest?.status!=='complete')failures.push(`${engineName}: the repair file is not a complete recovery archive ${JSON.stringify(row)}`);
+  if(JSON.stringify(archive.currentBoard)!==JSON.stringify(expected.board))failures.push(`${engineName}: the repair file's board differs from the open board`);
+  for(const [name,{keys,values}] of Object.entries(expected.stores)){
+   const rows=archive.appSources?.indexedDB?.stores?.[name]||[];
+   if(JSON.stringify(rows.map(row=>decodeManualArchiveTypedValue(row.key)))!==keys)failures.push(`${engineName}: the repair file's ${name} keys differ`);
+   const decoded=rows.map(row=>JSON.stringify(decodeManualArchiveTypedValue(row.value)));
+   if(decoded.length!==values.length||decoded.some((value,index)=>value!==values[index]))failures.push(`${engineName}: the repair file's ${name} rows differ`);
+  }
+ }
+ summary.exports.push(row);t.diagnostic(JSON.stringify({engine:engineName,...row}));
+ if(!result.finished)failures.push(`${engineName}: the repair export did not finish ${JSON.stringify(row)}`);
+ if(!saved.length)failures.push(`${engineName}: the repair export was not saved as a file ${JSON.stringify(row)}`);
+ if(result.extraBytes>REPAIR_EXPORT_MEMORY_MARGIN)failures.push(`${engineName}: the repair export peaked ${row.extraMiB} MiB over the open Settings, above the ${mibOf(REPAIR_EXPORT_MEMORY_MARGIN)} MiB margin`);
+ if(result.stallMs>LARGE_BOARD_EXPORT_STALL_MS)failures.push(`${engineName}: the repair export stalled the page ${result.stallMs} ms`);
+}));
+
+// #2246: an actual visual test for the repair export's new Download repair
+// file control, measured beside its established neighbours in the same
+// dialog's button row: Back to Settings always, and Copy JSON when a small
+// export is still shown. A small board, and a board whose saved unknown task
+// data makes the export larger than the dialog shows (only Download and Back
+// to Settings remain). Day and night themes (attribute, computed color scheme
+// and paint checked), phone, the enlarged 260 px phone and desktop, ordinary
+// and 150% dialog text, native keyboard focus, Chromium and WebKit.
+// Screenshots go to REPAIR_EXPORT_VISUAL_DIR when it is set.
+test('RISK database repair export visual browser: Download file renders like Back to Settings and Copy JSON beside it in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const output=process.env.REPAIR_EXPORT_VISUAL_DIR?path.resolve(process.env.REPAIR_EXPORT_VISUAL_DIR):null;
+ if(output)fs.mkdirSync(output,{recursive:true});
+ const ROWS=12,boards=new Map();
+ for(const theme of ['light','dark'])for(const size of ['small','large']){
+  const tasks=Array.from({length:ROWS},(_,i)=>({...syncTask('visual-repair-'+i,'Visual repair task '+i),ctx:['home']}));
+  // About 1.5 MB of supported unknown task data makes the export too large to show.
+  if(size==='large')tasks[0].futureRepairField={keep:'large repair field '.repeat(90000)};
+  const seed=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,settings:{...syncState().settings,theme},tasks}));
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:seed}});
+  try{boards.set(theme+'/'+size,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
+ }
+ const viewports=[['phone',390,844],['phone-enlarged',260,563],['desktop',1280,800]];
+ const ENLARGED='#modalRoot .modal{font-size:150%} #modalRoot .modal :is(p,button,label,summary,select,input){font-size:1em}';
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  // WebKit on macOS moves keyboard focus between buttons with Alt+Tab.
+  const forward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',backward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
+  try{
+   for(const theme of ['light','dark'])for(const size of ['small','large'])for(const [viewName,width,height] of viewports){
+    const where=`${engineName}/${theme}/${size}/${viewName}`;
+    const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});
+    try{
+     await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+      return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+     await context.addInitScript(board=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     },boards.get(theme+'/'+size));
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     await page.waitForFunction(rows=>document.documentElement.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===rows,ROWS,{timeout:60000});
+     await page.evaluate(()=>document.fonts.ready);
+     await openSettingsSectionFor(page,'view-database-repair');
+     await page.locator('#modalRoot [data-act="view-database-repair"]').click();
+     const download=page.locator('#modalRoot button[data-act="download-database-repair"]');
+     if(!await download.waitFor({timeout:30000}).then(()=>true,()=>false)){failures.push(`${where}: the repair export offers no Download file`);continue;}
+     await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),null,{timeout:15000}).catch(()=>{});
+     const state={theme:await page.evaluate(()=>({attribute:document.documentElement.getAttribute('data-theme'),scheme:getComputedStyle(document.documentElement).colorScheme,
+      paint:getComputedStyle(document.querySelector('#modalRoot .modal')).backgroundColor,textarea:!!document.getElementById('databaseRepairData')})),scale:{}};
+     for(const scale of [1,1.5]){
+      const enlarged=scale>1?await page.addStyleTag({content:ENLARGED}):null;
+      await download.scrollIntoViewIfNeeded();
+      state.scale[scale]=await page.evaluate(()=>{
+       const modal=document.querySelector('#modalRoot .modal'),pane=modal.getBoundingClientRect(),paneStyle=getComputedStyle(modal);
+       const read=button=>{if(!button)return null;const style=getComputedStyle(button),rect=button.getBoundingClientRect(),hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+        return {text:button.textContent,fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,borderColor:style.borderTopColor,backgroundColor:style.backgroundColor,
+         height:Math.round(rect.height),clipped:button.scrollWidth>button.clientWidth+1,
+         inside:rect.left>=pane.left+parseFloat(paneStyle.paddingLeft)-1&&rect.right<=pane.right-parseFloat(paneStyle.paddingRight)+1,unobscured:hit===button||button.contains(hit)};};
+       return {download:read(modal.querySelector('[data-act="download-database-repair"]')),back:read(modal.querySelector('.mbtns [data-act="settings"]')),copy:read(modal.querySelector('[data-act="copy-database-repair"]')),
+        overflow:modal.scrollWidth>modal.clientWidth+1,pageOverflow:document.documentElement.scrollWidth>innerWidth};
+      });
+      if(output)await page.screenshot({path:path.join(output,`${engineName}-${theme}-${size}-${viewName}-${scale}.png`)});
+      if(enlarged)await enlarged.evaluate(element=>element.remove());
+     }
+     // Native keyboard focus: from Download to its neighbour and back.
+     const focusOf=async locator=>{await locator.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+      return locator.evaluate(button=>{const style=getComputedStyle(button);return {active:document.activeElement===button,visible:button.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor};});};
+     state.focus={download:await focusOf(download),back:await focusOf(page.locator('#modalRoot .mbtns [data-act="settings"]'))};
+     state.errors=errors;observed.push({where,...state});
+     if(state.theme.attribute!==theme||!String(state.theme.scheme).split(/\s+/).includes(theme))failures.push(`${where}: theme not applied ${JSON.stringify(state.theme)}`);
+     if(state.theme.textarea!==(size==='small'))failures.push(`${where}: the export text is ${state.theme.textarea?'':'not '}shown for a ${size} export`);
+     for(const scale of [1,1.5]){
+      const row=state.scale[scale];
+      if(!row.download||row.download.text!=='Download file')failures.push(`${where}/${scale}: Download file label ${JSON.stringify(row.download)}`);
+      if(row.download?.clipped||!row.download?.inside||!row.download?.unobscured)failures.push(`${where}/${scale}: Download file is clipped, outside the pane insets or covered ${JSON.stringify(row.download)}`);
+      if(row.overflow||row.pageOverflow)failures.push(`${where}/${scale}: the dialog scrolls sideways`);
+      for(const [name,neighbour] of [['Back to Settings',row.back],...(size==='small'?[['Copy JSON',row.copy]]:[])]){
+       if(!neighbour){failures.push(`${where}/${scale}: no ${name} beside Download`);continue;}
+       for(const key of ['fontFamily','fontSize','fontWeight','color','borderColor','backgroundColor','height'])
+        if(row.download?.[key]!==neighbour[key])failures.push(`${where}/${scale}: Download ${key} differs from ${name}: ${row.download?.[key]} / ${neighbour[key]}`);
+      }
+     }
+     if(!(parseFloat(state.scale[1.5].download?.fontSize)>parseFloat(state.scale[1].download?.fontSize)))failures.push(`${where}: enlarged dialog text is not larger`);
+     const {download:focus,back}=state.focus;
+     if(!focus.active||!focus.visible||focus.outlineStyle==='none'||parseFloat(focus.outlineWidth)<2)failures.push(`${where}: Download keyboard focus is not shown ${JSON.stringify(focus)}`);
+     for(const key of ['outlineStyle','outlineWidth','outlineColor'])if(focus[key]!==back[key])failures.push(`${where}: Download focus ${key} differs from Back to Settings: ${focus[key]} / ${back[key]}`);
+     if(errors.length)failures.push(`${where}: page errors ${JSON.stringify(errors)}`);
+    }finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed.map(({where,theme,focus})=>({where,theme,focus}))));
+ assert.ok(observed.length===24,`every engine, theme, size and viewport was measured (${observed.length})`);
+ assert.deepEqual(failures,[],JSON.stringify(observed.slice(0,2)));
 });
 
 // #2228 review: an actual visual test for the "☁ recovery waiting" cloud

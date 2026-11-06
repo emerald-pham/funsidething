@@ -12821,6 +12821,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK DATABASE REPAIR EXPORT: a large repair export downloads one lossless file instead of showing it, and Restore accepts that file",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13246,6 +13251,16 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK database repair export visual browser: Download file renders like Back to Settings and Copy JSON beside it in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
@@ -13441,6 +13456,16 @@
     },
     {
       "root": "RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK database repair export visual browser: Download file renders like Back to Settings and Copy JSON beside it in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
