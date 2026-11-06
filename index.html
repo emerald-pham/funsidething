@@ -4860,6 +4860,11 @@ const PROVED_UNREADABLE_CLOUD_SOURCE_KEY="fvp:chain-scanner:proved-unreadable-cl
 // editor, boot classification, file restore) is replayed later by callers that
 // pass nothing, and the request must survive until a pull actually reads.
 let cloudPullRevalidate = false;
+// #2228 (spec #2224): an automatic recovery default whose estimated work is
+// over its budget waits instead of running. This names the unreadable
+// generation it waits on; the board, its saves and every source stay as they
+// are, and the completed refusal above holds cloud writes.
+let automaticRecoveryWaiting = null;
 let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
 let cloudAdoptionHeld = false; // a newer read could not be safely adopted; prior read cannot authorize writes
 let adoptedSafety = null; // one exact locally saved union and the stable snapshot it was built from
@@ -6156,12 +6161,13 @@ async function exactAcknowledgedCloudSource(failed,account){
 // account-change observation keeps the device record, which only a resolved
 // sign-out or another account clears (observeCloudIdentity).
 function forgetUnreadableCloudSourceHold({keepDeviceRecord=false}={}){
-  unrepairableCloudSource=null;
+  unrepairableCloudSource=null;automaticRecoveryWaiting=null;
   if(keepDeviceRecord)provedUnreadableCloudSource=null;else forgetProvedUnreadableCloudSource();
 }
 // The completed refusal no longer applies: forget it here and on the device.
+// A recovery waiting on it (#2228) is evaluated again by whatever reads next.
 function forgetProvedUnreadableCloudSource(){
-  provedUnreadableCloudSource=null;
+  provedUnreadableCloudSource=null;automaticRecoveryWaiting=null;
   try{localStorage.removeItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);}catch{}
 }
 function readPersistedUnreadableCloudSource(){
@@ -10185,6 +10191,15 @@ function olderCompleteCloudSourceInUse(){
   const hold=deviceRecoveryCloudHold;
   return hold?.reason==="cloud-source-recovery"&&hold.automaticRecovery===true&&window.CloudSync?.knownDamagedSource===true;
 }
+// #2228 (spec #2224): the automatic recovery default is waiting because it is
+// over its work budget, for this account and the generation it waits on.
+const CLOUD_RECOVERY_WAITING_NOTICE="Cloud recovery is waiting. The current cloud copy cannot be read, and rebuilding this board from an older cloud copy could need more memory than this device allows, so it has not started. Your board stays open and saves on this device, and every cloud and device copy stays protected.",
+  CLOUD_RECOVERY_WAITING_STATUS=CLOUD_RECOVERY_WAITING_NOTICE+" Cloud saving is not confirmed.";
+function automaticRecoveryWaitingCurrent(){
+  const waiting=automaticRecoveryWaiting,backend=window.CloudSync;
+  return !!waiting&&!!backend&&waiting.backend===backend&&waiting.account===backend.user&&waiting.identity===cloudAccountIdentity()&&
+    !deviceRecoveryCloudHold&&liveBoardAccepted;
+}
 function renderSync(){
   const sourceStatus=document.getElementById("automaticCloudSourceResumeStatus");
   if(sourceStatus)sourceStatus.textContent=automaticCloudSourceResumeMessage(automaticCloudSourceResumeStatus);
@@ -10214,6 +10229,15 @@ function renderSync(){
     el.disabled=false;el.className=unsaved?"syncbtn err":"syncbtn busy";el.textContent=unsaved?"☁ save error":"☁ older copy in use";
     el.title=unsaved?"The latest edit is not saved on this device. Keep this tab open. "+OLDER_CLOUD_SOURCE_STATUS
       :OLDER_CLOUD_SOURCE_STATUS+" Open Settings → Data and backups to review recovery.";mirrorSavedAppearanceSyncStatus(el);return;
+  }
+  // #2228: the same unreadable generation is the reason for the wait, so it
+  // is not shown as a separate error; a device save failure or any other
+  // cloud error still is.
+  if(automaticRecoveryWaitingCurrent()&&(s!=="error"||damagedPull)){
+    const unsaved=!!lastDeviceSaveIssue;
+    el.disabled=false;el.className=unsaved?"syncbtn err":"syncbtn busy";el.textContent=unsaved?"☁ save error":"☁ recovery waiting";
+    el.title=(unsaved?"The latest edit is not saved on this device. Keep this tab open. ":"")+CLOUD_RECOVERY_WAITING_STATUS
+      +" Open Settings → Data and backups to review recovery.";mirrorSavedAppearanceSyncStatus(el);return;
   }
   if(s!=="error"&&(deviceRecoveryCloudHold||state&&!liveBoardAccepted)){
     el.disabled=false;el.className="syncbtn err";el.textContent="\u2601 recovery pending";
@@ -12172,6 +12196,30 @@ async function runAutomaticRecoveryDecline(){
   toast("Your earlier board is back. Cloud saving is paused.",9000);
   return true;
 }
+// #2228 (spec #2224): what the automatic recovery default over an unreadable
+// generation must take apart, estimated from serialized lengths before any of
+// it is decoded: each complete cloud generation it would read (its header's
+// byte length), this device's tasks and History, and its decision events.
+// Settings, unknown fields and the private acknowledged copy are carried as
+// whole values, so they add no reconciliation work and are not counted.
+// Recovery's peak grows with this work (#2227 measured about 330 bytes of
+// WebKit peak per byte of a large board), and the limit that matters is the
+// phone's fixed memory, so the budget is a fixed amount rather than a multiple
+// of the board: any multiple would let a large board through whenever it lets
+// the same board in miniature through.
+const AUTOMATIC_RECOVERY_WORK_BUDGET_BYTES=2.5*1048576;
+function automaticRecoveryWorkBudget(){
+  const override=Number(window.CLOUD_RECOVERY_WORK_BUDGET_BYTES);
+  return Number.isFinite(override)&&override>=0?override:AUTOMATIC_RECOVERY_WORK_BUDGET_BYTES;
+}
+function automaticRecoveryWorkEstimate(generations,board){
+  const length=value=>{try{return value==null?0:JSON.stringify(value)?.length??0;}catch{return Infinity;}};
+  let generationBytes=0;
+  for(const row of Array.isArray(generations)?generations:[])
+    if(Array.isArray(row?.chunks)&&row.chunks.length&&Number.isSafeInteger(row.header?.byteLength)&&row.header.byteLength>0)generationBytes+=row.header.byteLength;
+  const boardBytes=length(board?.tasks)+length(board?.workLog),decisionBytes=length(board?.decisionEvents);
+  return {generationBytes,boardBytes,decisionBytes,totalBytes:generationBytes+boardBytes+decisionBytes};
+}
 async function openAutomaticCloudSourceFallback(failed,{account,backend,identity,pullStillCurrent,outcome=null}={}){
   const baseline=automaticCloudFallbackBootBaseline;
   const localIntent=failed?.code==="device-source-recovery"?deviceRecoveryCloudHold:null,localIntentDraft=localIntent?cloudSourceRecoveryDraft():null;
@@ -12236,6 +12284,17 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         !cloudSourceRecoveryFreshBaseline(p,p)||manifest?.schemaVersion!==2||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
         return false;
       if(!backgroundResume&&!localIntent&&recoveryMode!=="readable-malformed"&&activeId!==failed.generationId)return false;
+      // #2228: over its work budget the default waits before decoding,
+      // reconciling or archiving anything. The board stays as it is, nothing
+      // is written, and the caller remembers this as a completed refusal.
+      if(failed?.code==="corrupt-generation"&&!backgroundResume&&!localIntent){
+        const estimate=automaticRecoveryWorkEstimate(p.source.generations,state);
+        if(estimate.totalBytes>automaticRecoveryWorkBudget()){
+          if(outcome)outcome.refused={rev:p.rev,generationId:activeId};
+          automaticRecoveryWaiting={backend,account,identity,rev:p.rev,generationId:activeId};
+          return false;
+        }
+      }
       if(recoveryMode==="fresh-empty"&&(typeof previousId!=="string"||previousId===activeId||
         !p.source.generations.some(row=>row.id===activeId)||!p.source.generations.some(row=>row.id===previousId)))return false;
       const namedIds=new Set([activeId,previousId,p.evidence.pending?.generationId,...additionalGenerationIds].filter(id=>typeof id==="string"));
@@ -14019,6 +14078,8 @@ function openSettings(){
     + (!liveBoardAccepted?'<p class="kv warn" role="status"><b>Saved device source needs recovery.</b> It is unreadable, missing or unsupported. Its originals stay untouched. Use Restore below to choose a supported recovery board, then review and confirm it. This recovery view is not a saved empty board.</p>':'')
     + (openingRecoveryHeld?'<p class="kv warn">'+(window.SavedAppearance?.recoveryVisible?'The complete retained board stays read-only because device storage could not finish opening.':'Device storage could not finish opening. This recovery view remains read-only.')+' Reload app tries again while saved sources remain protected. Cloud saving still needs confirmation.</p><div class="mbtns"><button class="btn subtle" data-act="sync-reload">Reload app</button></div>':'')
     + (deviceRecoveryCloudHold?'<p class="kv warn" role="status"><b>Cloud recovery is pending.</b> '+(memoryRecoveryWorkspace||deviceRecoveryCloudHold.workspace==="memory-only"?'A new workspace is open only in this tab. New work is not saved. Keep this tab open; earlier saved sources remain untouched.':deviceRecoveryCloudHold.workspace==="new-work"?'A new offline workspace is open. Earlier saved data could not be opened. New work saves on this device; the earlier sources remain protected.':(olderCompleteCloudSourceInUse()?OLDER_CLOUD_SOURCE_NOTICE+' ':'')+'Your working board and later edits save on this device. Unknown cloud changes and earlier sources remain protected.')+' This board has not been confirmed by cloud.</p>'+(cloudReady()&&typeof window.CloudSync?.readRecoverySource==="function"?'<div class="mbtns">'+(deviceRecoveryCloudHold.automaticRecovery===true&&deviceRecoveryCloudHold.reason==="cloud-source-recovery"?'<button class="btn subtle" data-act="decline-automatic-cloud-recovery">Use my board from before recovery</button>':'')+'<button class="btn subtle" data-act="review-cloud-source-recovery">Review cloud recovery</button></div>':'<p class="kv">Sign in to review the cloud source before resuming sync.</p>'):'')
+    + (automaticRecoveryWaitingCurrent()?'<p class="kv warn" role="status"><b>Cloud recovery is waiting.</b> '+esc(CLOUD_RECOVERY_WAITING_NOTICE.slice("Cloud recovery is waiting. ".length))+' This board has not been confirmed by cloud.</p>'
+      +(cloudReady()&&typeof window.CloudSync?.readRecoverySource==="function"?'<div class="mbtns"><button class="btn subtle" data-act="review-cloud-source-recovery">Review cloud recovery</button></div>':''):'')
     + (automaticCloudSourceResumeStatus.state!=="idle"?'<p id="automaticCloudSourceResumeStatus" class="kv" role="status">'+esc(automaticCloudSourceResumeMessage(automaticCloudSourceResumeStatus))+'</p>':'')
     + ((deviceRecoveryCloudHold||!liveBoardAccepted)&&window.CloudSync?.configured
       ? '<p class="kv">Signing in or changing accounts keeps the recovery sources protected. Authentication alone does not choose or upload a board.</p>'
