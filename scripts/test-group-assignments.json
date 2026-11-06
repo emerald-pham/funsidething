@@ -12836,6 +12836,21 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK DOWNLOADS: a board edit while the saved rows are read marks the recovery file partial",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DOWNLOADS: Download recovery file says it is preparing while it runs, and says so when a protected recovery action stops it",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DOWNLOADS: an unavailable Debug log is recorded as missing and keeps an otherwise complete recovery file complete and restorable",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK DATABASE REPAIR EXPORT: a large recovery file downloads losslessly without being shown, and Restore accepts that file",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13276,12 +13291,12 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
-      "root": "RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit",
+      "root": "RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },
     {
-      "root": "RISK downloads visual browser: Download board and Download recovery file render like the Restore button beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "root": "RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },
@@ -13485,12 +13500,12 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit",
+      "root": "RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK downloads visual browser: Download board and Download recovery file render like the Restore button beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "root": "RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },

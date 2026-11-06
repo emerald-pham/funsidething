@@ -204,6 +204,9 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact saved sources and repair metadata without writes
 - RISK DOWNLOADS: Settings offers exactly one board export and one recovery export, and both files round-trip through Restore
 - RISK DOWNLOADS: Restore still accepts every earlier export format: board JSON, compact and pretty recovery archives and repair exports
+- RISK DOWNLOADS: a board edit while the saved rows are read marks the recovery file partial
+- RISK DOWNLOADS: Download recovery file says it is preparing while it runs, and says so when a protected recovery action stops it
+- RISK DOWNLOADS: an unavailable Debug log is recorded as missing and keeps an otherwise complete recovery file complete and restorable
 - RISK DATABASE REPAIR EXPORT: a large recovery file downloads losslessly without being shown, and Restore accepts that file
 - RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics
 - RISK DATABASE REPAIR EXPORT: Settings offers the recovery file and the Debug log dialog exports only its metadata report
@@ -542,7 +545,7 @@ The editor hook blocks app or enforcement edits while no file under tests/ has a
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
 - RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore
 
-The Settings board-data area exposes one Download backup action with current-board JSON, complete recovery archive, and source-only raw export formats as applicable, plus one Restore action that routes File or Paste into the existing protected preview. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. Current-board view/copy and Support diagnostics remain separate; lower local/app backup controls are outside this consolidation.
+The Settings board-data area exposes Download board (ordinary board JSON, only with an accepted board) and Download recovery file (the board when accepted, every readable saved source, build details and the Debug log, marked partial when a source cannot be captured), plus one Restore action that routes File or Paste into the existing protected preview. View and Download raw backup data remain only while an older backup list exists. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. The Debug log remains separate; lower local/app backup controls are outside this consolidation.
 
 ## Returning-user first upload
 
@@ -2351,8 +2354,8 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 
 - RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit
 - RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit
-- RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit
-- RISK downloads visual browser: Download board and Download recovery file render like the Restore button beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
+- RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit
+- RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation
 - RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately

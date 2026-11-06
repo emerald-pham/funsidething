@@ -1827,9 +1827,12 @@ test('RISK large board diagnostics export browser: while cloud recovery waits, e
 // and the Full recovery archive 178-239 MiB with nine more copies (a 41 MB
 // file). After, 25-63 MiB for a 14 MB file and 41-122 MiB for 39 MB: what is
 // retained is about one saved copy, and the rest is per-row garbage the
-// engines collect lazily, which still grows a little with the number of rows.
-// 160 MiB sits above that and below every earlier run.
-const REPAIR_EXPORT_MEMORY_MARGIN=160*1024*1024,ARCHIVE_EXTRA_COPIES=9;
+// engines collect lazily. The assertion is on growth: the extra peak memory
+// the nine copies add, per byte they add to the file. The Full recovery
+// archive grew 3.7 (WebKit) and 7.8 (Chromium) bytes of memory per added file
+// byte; the streamed file grows 0.3-2.5. Growth, not an absolute peak, is what
+// separates them, and it does not depend on the host's baseline memory.
+const ARCHIVE_EXTRA_COPIES=9,ARCHIVE_GROWTH_PER_FILE_BYTE=3;
 // Saves count more distinct full-board copies on the device, as manual
 // backups. Each differs, so the store keeps each as its own saved snapshot.
 const saveExtraBoardCopies=(page,count)=>page.evaluate(async count=>{
@@ -1855,6 +1858,7 @@ async function archiveLosslessFailures(page,text,where){
 }
 // One archive export, ordinary and again with more saved copies.
 const archiveExportExercise=(kind,{open,start,finish})=>async({t,engineName,page,tag,downloads,summary,failures})=>{
+ const measured={};
  for(const extra of [0,ARCHIVE_EXTRA_COPIES]){
   const where=`${engineName}/${kind}/${extra} extra copies`;
   if(extra){
@@ -1879,24 +1883,35 @@ const archiveExportExercise=(kind,{open,start,finish})=>async({t,engineName,page
   summary.exports.push(row);t.diagnostic(JSON.stringify({engine:engineName,...row}));
   if(!result.finished)failures.push(`${where}: the export did not finish ${JSON.stringify(row)}`);
   if(!saved.length)failures.push(`${where}: the export was not saved as a file ${JSON.stringify(row)}`);
-  if(result.extraBytes>REPAIR_EXPORT_MEMORY_MARGIN)failures.push(`${where}: the export peaked ${row.extraMiB} MiB over the open Settings, above the ${mibOf(REPAIR_EXPORT_MEMORY_MARGIN)} MiB margin`);
+  measured[extra]={extraBytes:result.extraBytes,fileBytes:row.bytes??0};
   if(result.stallMs>LARGE_BOARD_EXPORT_STALL_MS)failures.push(`${where}: the export stalled the page ${result.stallMs} ms`);
  }
+ const few=measured[0],many=measured[ARCHIVE_EXTRA_COPIES],addedFile=many.fileBytes-few.fileBytes;
+ const growth=addedFile>0?(many.extraBytes-few.extraBytes)/addedFile:Infinity;
+ summary.growthPerFileByte=Math.round(growth*100)/100;t.diagnostic(JSON.stringify({engine:engineName,kind,growthPerFileByte:summary.growthPerFileByte,addedFileMiB:mibOf(addedFile)}));
+ if(!(addedFile>ARCHIVE_EXTRA_COPIES*1024*1024))failures.push(`${engineName}/${kind}: the saved copies did not grow the file (${addedFile} bytes)`);
+ if(growth>ARCHIVE_GROWTH_PER_FILE_BYTE)failures.push(`${engineName}/${kind}: memory grew ${summary.growthPerFileByte} bytes per added file byte with more saved copies, above ${ARCHIVE_GROWTH_PER_FILE_BYTE}`);
 };
-test('RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'recovery-file',archiveExportExercise('recovery-file',{
+test('RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'recovery-file',archiveExportExercise('recovery-file',{
  open:page=>openSettingsSectionFor(page,'download-recovery-file'),
  start:page=>page.locator('#modalRoot [data-act="download-recovery-file"]').click({timeout:120000}),
  finish:async()=>false})));
 
-// #2246: an actual visual test for the two downloads that replace the format
-// choice and the view/copy dialogs, Download board and Download recovery file,
-// measured beside their established neighbour in the same Data and backups
-// pane: the Restore button. Day and night themes (attribute, computed color
-// scheme and paint checked), phone, the enlarged 260 px phone and desktop,
-// ordinary and 150% Settings text, native keyboard focus, Chromium and WebKit.
-// Screenshots go to DOWNLOADS_VISUAL_DIR when it is set.
-test('RISK downloads visual browser: Download board and Download recovery file render like the Restore button beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+// #2246: an actual visual test for the controls #2246 adds, each measured
+// beside its established neighbour in the same pane:
+// - Download board and Download recovery file beside Restore in Data and
+//   backups, with an accepted board;
+// - Download recovery file alone beside Restore when the device has no
+//   accepted board (an unreadable original opens an empty new-work board);
+// - the Debug log dialog's Copy debug log and Download debug log beside its
+//   Select all and Refresh log.
+// Day and night themes (attribute, computed color scheme and the modal's own
+// paint, which must differ between them and be opaque), phone, the enlarged
+// 260 px phone and desktop, ordinary and 150% text, native keyboard focus,
+// Chromium and WebKit. Screenshots go to DOWNLOADS_VISUAL_DIR when it is set.
+test('RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
  const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
  const output=process.env.DOWNLOADS_VISUAL_DIR?path.resolve(process.env.DOWNLOADS_VISUAL_DIR):null;
  if(output)fs.mkdirSync(output,{recursive:true});
@@ -1907,85 +1922,112 @@ test('RISK downloads visual browser: Download board and Download recovery file r
   const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:seed}});
   try{boards.set(theme,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
  }
+ const scenarios=[
+  {name:'downloads',controls:[['download-current-board','Download board'],['download-recovery-file','Download recovery file']],neighbours:[['restore-backup','Restore']],absent:[],
+   open:page=>openSettingsSectionFor(page,'download-recovery-file')},
+  {name:'no-board',unreadable:true,controls:[['download-recovery-file','Download recovery file']],neighbours:[['restore-backup','Restore']],absent:['download-current-board'],
+   open:page=>openSettingsSectionFor(page,'download-recovery-file')},
+  {name:'debug-log',controls:[['copy-support-diagnostics','Copy debug log'],['download-support-diagnostics','Download debug log']],neighbours:[['select-support-diagnostics','Select all'],['refresh-support-diagnostics','Refresh log']],absent:[],
+   open:async page=>{await openSettingsSectionFor(page,'view-support-diagnostics');await page.locator('#modalRoot [data-act="view-support-diagnostics"]').click();
+    await page.waitForFunction(()=>!!document.getElementById('supportDiagnosticsData')?.value,null,{timeout:10000});}},
+ ];
  const viewports=[['phone',390,844],['phone-enlarged',260,563],['desktop',1280,800]];
  const ENLARGED='#modalRoot .modal{font-size:150%} #modalRoot .modal :is(p,button,label,summary,select,input){font-size:1em}';
  const STYLE_KEYS=['fontFamily','fontSize','fontWeight','color','borderColor','backgroundColor','height','paddingLeft','borderRadius'];
- const failures=[],observed=[];
+ const failures=[],observed=[],paints={};
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   // WebKit on macOS moves keyboard focus between buttons with Alt+Tab.
   const forward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',backward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
   try{
-   for(const theme of ['light','dark'])for(const [viewName,width,height] of viewports){
-    const where=`${engineName}/${theme}/${viewName}`;
-    const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});
+   for(const scenario of scenarios)for(const theme of ['light','dark'])for(const [viewName,width,height] of viewports){
+    const where=`${engineName}/${scenario.name}/${theme}/${viewName}`;
+    const context=await browser.newContext({viewport:{width,height},colorScheme:theme,serviceWorkers:'block',reducedMotion:'reduce'});
     try{
      await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
       return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
-     await context.addInitScript(board=>{
+     await context.addInitScript(([board,unreadable])=>{
       Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
       localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
-      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
-     },boards.get(theme));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null){
+       if(unreadable){localStorage.setItem('fvp:chain-scanner:v1','{unreadable original source');localStorage.setItem('fvp:chain-scanner:protected:v1','different protected original');}
+       else localStorage.setItem('fvp:chain-scanner:v1',board);
+      }
+     },[boards.get(theme),!!scenario.unreadable]);
      const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
-     await page.waitForFunction(rows=>document.documentElement.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===rows,ROWS,{timeout:60000});
+     if(scenario.unreadable){
+      await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.ScannerDeviceStore,null,{timeout:60000});
+      const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
+      const opened=await page.evaluate(()=>({accepted:liveBoardAccepted,emptyNewWork:emptyNewWorkWorkspace()}));
+      if(opened.accepted&&!opened.emptyNewWork)failures.push(`${where}: fixture: the device has an accepted board ${JSON.stringify(opened)}`);
+     }else await page.waitForFunction(rows=>document.documentElement.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===rows,ROWS,{timeout:60000});
      await page.evaluate(()=>document.fonts.ready);
      await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),null,{timeout:15000}).catch(()=>{});
-     await openSettingsSectionFor(page,'download-recovery-file');
+     await scenario.open(page);
      const state={theme:await page.evaluate(()=>({attribute:document.documentElement.getAttribute('data-theme'),scheme:getComputedStyle(document.documentElement).colorScheme,
       paint:getComputedStyle(document.querySelector('#modalRoot .modal')).backgroundColor})),scale:{}};
+     const acts=[...scenario.controls,...scenario.neighbours].map(([act])=>act);
      for(const scale of [1,1.5]){
       const enlarged=scale>1?await page.addStyleTag({content:ENLARGED}):null;
-      await page.locator('#modalRoot [data-act="download-recovery-file"]').scrollIntoViewIfNeeded();
-      state.scale[scale]=await page.evaluate(()=>{
+      await page.locator('#modalRoot [data-act="'+scenario.controls[0][0]+'"]').scrollIntoViewIfNeeded();
+      state.scale[scale]=await page.evaluate(([acts,absent,controlCount])=>{
        const modal=document.querySelector('#modalRoot .modal'),pane=modal.getBoundingClientRect(),paneStyle=getComputedStyle(modal);
-       const read=button=>{if(!button)return null;const style=getComputedStyle(button),rect=button.getBoundingClientRect(),hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+       const read=button=>{if(!button)return null;button.scrollIntoView({block:'nearest'});const style=getComputedStyle(button),rect=button.getBoundingClientRect(),hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
         return {text:button.textContent,fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,borderColor:style.borderTopColor,backgroundColor:style.backgroundColor,
-         height:Math.round(rect.height),paddingLeft:style.paddingLeft,borderRadius:style.borderTopLeftRadius,clipped:button.scrollWidth>button.clientWidth+1,
+         height:Math.round(rect.height),paddingLeft:style.paddingLeft,borderRadius:style.borderTopLeftRadius,clipped:button.scrollWidth>button.clientWidth+1,group:button.parentElement,
          inside:rect.left>=pane.left+parseFloat(paneStyle.paddingLeft)-1&&rect.right<=pane.right-parseFloat(paneStyle.paddingRight)+1,unobscured:hit===button||button.contains(hit)};};
-       const board=modal.querySelector('[data-act="download-current-board"]'),recovery=modal.querySelector('[data-act="download-recovery-file"]');
-       return {board:read(board),recovery:read(recovery),restore:read(modal.querySelector('[data-act="restore-backup"]')),sameGroup:!!board&&board.parentElement===recovery?.parentElement,
+       const rows=Object.fromEntries(acts.map(act=>[act,read(modal.querySelector('button[data-act="'+act+'"]'))]));
+       const groups=new Set(acts.slice(0,controlCount).map(act=>rows[act]).filter(Boolean).map(row=>row.group));
+       for(const row of Object.values(rows))if(row)delete row.group;
+       return {rows,controlGroups:groups.size,present:absent.filter(act=>!!modal.querySelector('[data-act="'+act+'"]')),
         overflow:modal.scrollWidth>modal.clientWidth+1,pageOverflow:document.documentElement.scrollWidth>innerWidth};
-      });
-      if(output)await page.screenshot({path:path.join(output,`${engineName}-${theme}-${viewName}-${scale}.png`)});
+      },[acts,scenario.absent,scenario.controls.length]);
+      if(output)await page.screenshot({path:path.join(output,`${engineName}-${scenario.name}-${theme}-${viewName}-${scale}.png`)});
       if(enlarged)await enlarged.evaluate(element=>element.remove());
      }
      // Native keyboard focus: from each control to its neighbour and back.
-     const focusOf=async act=>{const locator=page.locator('#modalRoot [data-act="'+act+'"]');await locator.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+     const focusOf=async act=>{const locator=page.locator('#modalRoot button[data-act="'+act+'"]');await locator.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
       return locator.evaluate(button=>{const style=getComputedStyle(button);return {active:document.activeElement===button,visible:button.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor};});};
-     state.focus={board:await focusOf('download-current-board'),recovery:await focusOf('download-recovery-file'),restore:await focusOf('restore-backup')};
+     state.focus={};for(const act of acts)state.focus[act]=await focusOf(act);
      state.errors=errors;observed.push({where,...state});
-     if(state.theme.attribute!==theme||!String(state.theme.scheme).split(/\s+/).includes(theme))failures.push(`${where}: theme not applied ${JSON.stringify(state.theme)}`);
+     (paints[engineName+'/'+scenario.name]||={})[theme+'/'+viewName]=state.theme.paint;
+     if(!String(state.theme.scheme).split(/\s+/).includes(theme)||!(state.theme.attribute===theme||state.theme.attribute===null&&scenario.unreadable))failures.push(`${where}: theme not applied ${JSON.stringify(state.theme)}`);
+     if(!/^rgb\(/.test(state.theme.paint))failures.push(`${where}: the modal paint is not opaque: ${state.theme.paint}`);
+     const neighbour=scenario.neighbours[0][0];
      for(const scale of [1,1.5]){
       const row=state.scale[scale];
-      if(row.board?.text!=='Download board'||row.recovery?.text!=='Download recovery file')failures.push(`${where}/${scale}: labels ${row.board?.text} / ${row.recovery?.text}`);
-      if(!row.sameGroup)failures.push(`${where}/${scale}: the two downloads are not one group`);
-      for(const [name,control] of [['Download board',row.board],['Download recovery file',row.recovery]]){
-       if(!control)continue;
+      if(row.present.length)failures.push(`${where}/${scale}: offers ${row.present.join(', ')}`);
+      for(const [act,label] of [...scenario.controls,...scenario.neighbours])if(row.rows[act]?.text!==label)failures.push(`${where}/${scale}: ${act} label ${row.rows[act]?.text}`);
+      if(row.controlGroups!==1)failures.push(`${where}/${scale}: the new controls are not one group`);
+      for(const [act,name] of scenario.controls){
+       const control=row.rows[act],reference=row.rows[neighbour];if(!control||!reference)continue;
        if(control.clipped||!control.inside||!control.unobscured)failures.push(`${where}/${scale}: ${name} is clipped, outside the pane insets or covered ${JSON.stringify(control)}`);
        // At the enlarged 260 px width the longer labels wrap onto a second
-       // line (59 px for one wrapped line at ordinary text); everything else
-       // still matches Restore, and a wrapped label stays whole inside its button.
-       const wraps=viewName==='phone-enlarged'&&control.height>row.restore.height;
-       for(const key of STYLE_KEYS)if(!(wraps&&key==='height')&&control[key]!==row.restore?.[key])failures.push(`${where}/${scale}: ${name} ${key} differs from Restore: ${control[key]} / ${row.restore?.[key]}`);
-       if(wraps&&control.height>2*row.restore.height)failures.push(`${where}/${scale}: ${name} wraps onto more than two lines (${control.height} px)`);
+       // line; everything else still matches the neighbour, and a wrapped
+       // label stays whole inside its button.
+       const wraps=viewName==='phone-enlarged'&&control.height>reference.height;
+       for(const key of STYLE_KEYS)if(!(wraps&&key==='height')&&control[key]!==reference[key])failures.push(`${where}/${scale}: ${name} ${key} differs from ${scenario.neighbours[0][1]}: ${control[key]} / ${reference[key]}`);
+       if(wraps&&control.height>2*reference.height)failures.push(`${where}/${scale}: ${name} wraps onto more than two lines (${control.height} px)`);
       }
-      if(row.overflow||row.pageOverflow)failures.push(`${where}/${scale}: the Settings pane scrolls sideways`);
+      if(row.overflow||row.pageOverflow)failures.push(`${where}/${scale}: the pane scrolls sideways`);
      }
-     if(!(parseFloat(state.scale[1.5].recovery?.fontSize)>parseFloat(state.scale[1].recovery?.fontSize)))failures.push(`${where}: enlarged Settings text is not larger`);
-     for(const name of ['board','recovery']){
-      const focus=state.focus[name];
+     if(!(parseFloat(state.scale[1.5].rows[scenario.controls[0][0]]?.fontSize)>parseFloat(state.scale[1].rows[scenario.controls[0][0]]?.fontSize)))failures.push(`${where}: enlarged text is not larger`);
+     for(const [act,name] of scenario.controls){
+      const focus=state.focus[act];
       if(!focus.active||!focus.visible||focus.outlineStyle==='none'||parseFloat(focus.outlineWidth)<2)failures.push(`${where}: ${name} keyboard focus is not shown ${JSON.stringify(focus)}`);
-      for(const key of ['outlineStyle','outlineWidth','outlineColor'])if(focus[key]!==state.focus.restore[key])failures.push(`${where}: ${name} focus ${key} differs from Restore: ${focus[key]} / ${state.focus.restore[key]}`);
+      for(const key of ['outlineStyle','outlineWidth','outlineColor'])if(focus[key]!==state.focus[neighbour][key])failures.push(`${where}: ${name} focus ${key} differs from ${scenario.neighbours[0][1]}: ${focus[key]} / ${state.focus[neighbour][key]}`);
      }
      if(errors.length)failures.push(`${where}: page errors ${JSON.stringify(errors)}`);
     }finally{await context.close();}
    }
   }finally{await browser.close();}
  }
- t.diagnostic(JSON.stringify(observed.map(({where,theme,focus})=>({where,theme,focus}))));
- assert.equal(observed.length,12,'every engine, theme and viewport was measured');
+ // Day and night really paint the dialog differently.
+ for(const [key,byView] of Object.entries(paints))for(const [viewName] of viewports)
+  if(byView['light/'+viewName]===byView['dark/'+viewName])failures.push(`${key}/${viewName}: the modal paints the same in day and night (${byView['light/'+viewName]})`);
+ t.diagnostic(JSON.stringify({paints,focus:observed.map(({where,focus})=>({where,focus}))}));
+ assert.equal(observed.length,36,'every engine, view, theme and viewport was measured');
  assert.deepEqual(failures,[],JSON.stringify(observed.slice(0,2)));
 });
 

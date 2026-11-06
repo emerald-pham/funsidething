@@ -16814,28 +16814,95 @@ test('RISK DOWNLOADS: Settings offers exactly one board export and one recovery 
 });
 
 // #2246: removing the format choice and the view/copy dialogs must not strand
-// files people already hold. Restore accepts ordinary board JSON, the new
-// compact recovery file, an older pretty-printed Full recovery archive (no
-// repair details) and an older pretty-printed repair export, and refuses a
+// files people already hold. The older files are made by the 552c3ee app
+// itself (its Full recovery archive, its repair export dialog and its board
+// download), the way legacyCompletionSource173 uses a released app. Restore
+// accepts them, the new compact recovery file and board JSON, and refuses a
 // partial one. Raw backup lists keep their own restore tests (the raw backup
 // chooser cases) and their own View/Download raw backup data controls.
+const EARLIER_EXPORT_RELEASE='552c3eee6394edc93512df257ac4d4719ef7106c';
 test('RISK DOWNLOADS: Restore still accepts every earlier export format: board JSON, compact and pretty recovery archives and repair exports',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
+  const released=file=>{const out=spawnSync('git',['show',EARLIER_EXPORT_RELEASE+':'+file],{cwd:__dirname,encoding:'utf8',maxBuffer:64*1024*1024});assert.equal(out.status,0,out.stderr);return out.stdout;};
+  const unescape=text=>text.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');
+  // The released app writes its own files.
+  const base=await loadBackupFileFixtureApp({appSource:extractAppScript(released('index.html')),artifacts:{storage:released('device-store-v2.js'),cloud:released('cloud-store-v2.js')},
+   indexedDBProvider:new IDBFactory(),deviceDbName:'earlier-formats-base-'+Date.now()});t.after(()=>base.dispose());
+  base.ctx.addTask('Held in every format',false);await prepareBackupFileFixtureSource(base);
+  const baseFiles=captureDownloads(base);
+  assert.equal(await base.ctx.exportRecoveryArchive(),true,'the released Full recovery archive');const baseArchive=await downloadedText(baseFiles.at(-1));
+  assert.match(baseArchive,/\n  "format": "chain-scanner\.recovery-archive"/,'the released archive is pretty-printed');
+  base.ctx.openSettings();assert.equal(await base.ctx.exportRecoveryArchive({forRepair:true}),true,'the released repair export');
+  const shown=base.shim.document.getElementById('modalRoot').innerHTML.match(/<textarea\b[^>]*id="databaseRepairData"[^>]*>([\s\S]*?)<\/textarea>/)?.[1];assert.ok(shown);
+  const baseRepair=unescape(shown);assert.ok(JSON.parse(baseRepair).repairInfo,'the released repair export carries repair details');
+  assert.equal(base.ctx.downloadCurrentBoard(),true);const baseBoard=await downloadedText(baseFiles.at(-1));
+  // This app's own files.
   const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'earlier-formats-'+Date.now()}),{ctx}=app;
   t.after(()=>app.dispose());ctx.addTask('Held in every format',false);await prepareBackupFileFixtureSource(app);
   const files=captureDownloads(app);ctx.openSettings();
   await ctx.onAction('download-current-board',{});await ctx.onAction('download-recovery-file',{});for(let i=0;i<100&&files.length<2;i++)await flush();
   const boardText=await downloadedText(files[0]),recoveryText=await downloadedText(files[1]);
-  const archive=JSON.parse(recoveryText),{repairInfo,...fullArchive}=archive;assert.ok(repairInfo,'the recovery file carries repair details');
   const partial=JSON.parse(recoveryText);partial.manifest.status='partial';partial.manifest.failures=[{source:'indexedDB',code:'read-failed'}];
-  const formats=[['board JSON',boardText,true],['compact recovery file',recoveryText,true],['older pretty Full recovery archive',JSON.stringify(fullArchive,null,2),true],
-   ['older pretty repair export',JSON.stringify(archive,null,2),true],['partial repair export',JSON.stringify(partial,null,2),false]];
+  const formats=[['board JSON',boardText,true],['compact recovery file',recoveryText,true],['552c3ee board JSON',baseBoard,true],['552c3ee Full recovery archive',baseArchive,true],
+   ['552c3ee repair export',baseRepair,true],['partial recovery file',JSON.stringify(partial),false]];
   for(const [label,text,accepted] of formats){
    const restored=await restorePasted(text,label.replace(/\W+/g,'-'));t.after(()=>restored.target.dispose());
    assert.equal(restored.previewed,accepted,`${label}: Restore ${accepted?'previews':'refuses'} it (${restored.toast})`);
    if(accepted){assert.equal(restored.confirmed,true,`${label}: Restore applies it`);
     assert.ok(restored.target.ctx.state.tasks.some(task=>task.title==='Held in every format'),`${label}: the board round-trips`);}
   }
+});
+
+// #2246 review: a board edit made while the saved rows are being read means
+// the file no longer shows one consistent moment, so it is marked partial.
+async function heldRecoveryFile(t){
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'held-recovery-file-'+Date.now()+'-'+Math.random()});
+  t.after(()=>app.dispose());app.ctx.addTask('Before export',false);await prepareBackupFileFixtureSource(app);
+  const files=captureDownloads(app),store=app.ctx.window.ScannerDeviceStore,rows=store.readRawExportRows.bind(store);
+  let release,started;const begun=new Promise(resolve=>{started=resolve;});
+  store.readRawExportRows=async(...args)=>{started();await new Promise(resolve=>{release=resolve;});return rows(...args);};
+  app.ctx.openSettings();const running=app.ctx.onAction('download-recovery-file',{});await begun;
+  return {app,files,running,release:()=>release()};
+}
+test('RISK DOWNLOADS: a board edit while the saved rows are read marks the recovery file partial',async t=>{
+  const {app,files,running,release}=await heldRecoveryFile(t);
+  app.ctx.addTask('Added while the rows are read',false);
+  release();assert.equal(await running,true);
+  const archive=JSON.parse(await downloadedText(files.at(-1)));
+  assert.equal(archive.manifest.status,'partial','a board edit during capture never yields a complete file');
+  assert.ok(archive.manifest.failures.some(row=>row.source==='currentBoard'&&row.code==='changed-during-capture'),'the changed board is named');
+});
+
+// #2246 review (responsiveness): an export can take seconds, so it says it is
+// preparing as soon as it starts, and a run that a protected recovery action
+// stops says so instead of ending silently.
+test('RISK DOWNLOADS: Download recovery file says it is preparing while it runs, and says so when a protected recovery action stops it',async t=>{
+  const {app,files,running,release}=await heldRecoveryFile(t);
+  assert.match(app.shim.document.getElementById('toast').textContent,/Preparing the recovery file/,'pending feedback while the export runs');
+  vm.runInContext('fileRestoreBusy=true',app.ctx);
+  try{release();assert.equal(await running,false);}finally{vm.runInContext('fileRestoreBusy=false',app.ctx);}
+  assert.equal(files.length,0,'no file is saved');
+  assert.match(app.shim.document.getElementById('toast').textContent,/stopped/i,'the stopped export says so');
+});
+
+// #2246 review: the Debug log is diagnostics, not a saved source. When it
+// cannot be read, the file records it as missing and stays complete, so
+// Restore still accepts it.
+test('RISK DOWNLOADS: an unavailable Debug log is recorded as missing and keeps an otherwise complete recovery file complete and restorable',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'missing-debug-log-'+Date.now()}),{ctx}=app;
+  t.after(()=>app.dispose());ctx.addTask('Kept without a debug log',false);await prepareBackupFileFixtureSource(app);
+  ctx.supportDiagnosticsText=()=>JSON.stringify({schema:'funsidething.support-diagnostics',version:1,metadataOnly:true,boardDataIncluded:false,
+   capturedAt:{value:null,status:'unavailable',observedAt:null},reportStatus:'unavailable'});
+  const files=captureDownloads(app);ctx.openSettings();assert.equal(await ctx.onAction('download-recovery-file',{}),true);
+  const text=await downloadedText(files.at(-1)),archive=JSON.parse(text);
+  assert.equal(archive.manifest.status,'complete','an unavailable Debug log does not make the file partial');
+  assert.deepEqual(archive.manifest.failures,[]);
+  assert.equal(archive.repairInfo.debugLog.reportStatus,'unavailable','the missing Debug log is recorded');
+  const restored=await restorePasted(text,'missing-debug-log');t.after(()=>restored.target.dispose());
+  assert.equal(restored.previewed,true,restored.toast);assert.equal(restored.confirmed,true);
+  assert.ok(restored.target.ctx.state.tasks.some(task=>task.title==='Kept without a debug log'));
 });
 
 // #2246: the owner must be able to export the recovery archive from a large
@@ -16976,7 +17043,8 @@ test('RISK support diagnostics export: every export the Debug log offers copies 
   const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostics-export-2246-'+Date.now()}),{ctx,shim}=app;t.after(()=>app.dispose());
   ctx.addTask(TITLE,false);await ctx.persist();
   const store=ctx.window.ScannerDeviceStore;assert.equal(typeof store?.readRawExportSnapshot,'function','fixture: the board is saved in device storage');
-  let databaseReads=0;const read=store.readRawExportSnapshot;store.readRawExportSnapshot=function(...args){databaseReads++;return read.apply(this,args);};
+  let databaseReads=0;
+  for(const name of ['readRawExportSnapshot','readRawExportRows','readRawRows']){const read=store[name];assert.equal(typeof read,'function',name);store[name]=function(...args){databaseReads++;return read.apply(this,args);};}
   const outputs=[];ctx.navigator={clipboard:{async writeText(value){outputs.push(value);}}};
   let blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{outputs.push(blob);};
   const createElement=shim.document.createElement;shim.document.createElement=tag=>tag==='a'?link:createElement.call(shim.document,tag);
@@ -17275,7 +17343,11 @@ test('RISK MANUAL JSON EXPORT: unreadable, unsupported, changing and hydration-p
     validStore.readRawExportRows=withOpaqueRow(label,value);
     const archive=await exported();
     assert.equal(archive.manifest.status,'partial',`${label}: a value without a lossless representation never makes a complete file`);
-    assert.deepEqual(archive.manifest.failures.filter(row=>row.source==='indexedDB'),[{source:'indexedDB',code:'unsupported-source-value'}]);
+    const failed=archive.manifest.failures.filter(row=>row.source==='indexedDB');
+    assert.equal(failed.length,1);assert.equal(failed[0].code,'unsupported-source-value');
+    assert.equal(failed[0].store,'opaque',`${label}: the failing store is named`);
+    assert.equal(decodeManualArchiveTypedValue(failed[0].key),label,`${label}: the failing row is named`);
+    assert.match(failed[0].reason,label.startsWith('unsupported')?/unsupported RegExp/:/repeated reference or cycle/,`${label}: why it failed is named`);
     assert.equal(archive.appSources.indexedDB.stores,null,`${label}: no partial database is presented as the saved rows`);
     assert.equal(archive.currentBoard.tasks.length,valid.ctx.state.tasks.length,'the open board is still included');
   }
