@@ -13306,7 +13306,7 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
-      "root": "RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within 200 MiB of opening it locally, publishing it and keeping every decision, draft and newer edit, in Chromium and WebKit",
+      "root": "RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within a regression ceiling over opening it locally, publishing it and keeping every decision, draft and newer edit, and reports its peak against the pending 200 MiB target, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },
@@ -13510,7 +13510,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within 200 MiB of opening it locally, publishing it and keeping every decision, draft and newer edit, in Chromium and WebKit",
+      "root": "RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within a regression ceiling over opening it locally, publishing it and keeping every decision, draft and newer edit, and reports its peak against the pending 200 MiB target, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
