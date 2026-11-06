@@ -21441,5 +21441,25 @@
       "command": "node --test --test-name-pattern='RISK DOWNLOADS: Settings offers exactly one board export' tests/core.test.js (2026-11-06T14:27:55Z, 0950c6d); node --test --test-name-pattern='RISK DOWNLOADS|unreadable, unsupported, changing and hydration|every export the Debug log offers copies' tests/core.test.js (2026-11-06T16:26:22Z, 6d95cfa); LANDSCAPE_BROWSER_URL=http://127.0.0.1:47321/ node --test --test-name-pattern='RISK backup format browser' tests/core.test.js on an extract of 552c3ee",
       "failure": "'exactly one board export and one recovery export' (actual ['Download backup', ...]); 31 moved tests failed against the removal before they moved (for example 'The input did not match the regular expression /View \\/ copy current board/'); review RED: 'pending feedback while the export runs', 'an unavailable Debug log does not make the file partial', 'unsupported-export-fixture-190: the failing store is named'; the board-edit case passed first and failed as a negative control with the board-change check disabled ('a board edit during capture never yields a complete file'); browser precondition on 552c3ee: 'true !== false' at assert.equal(liveBoardAccepted,false)."
     }
+  },
+  {
+    "baseCommit": "bd7ae9f94ba903adec80c16288249d9c789c015d",
+    "testChangesSha256": "8200a39dd5553ce4271bfe53476e41dc53bc1a5e3298903567ecda56ac64583a",
+    "reason": "#2234 limits the pre-push receipt check to pushes to main, so work branches can run CI before reviews. The existing pre-push test pushed its candidate to refs/heads/release; that push target changes to refs/heads/main so the test still exercises the guarded path. Every assertion (deletions pass, a dirty worktree is refused, each distinct outgoing tip needs its own receipt) is unchanged.",
+    "previousBehavior": "validatePrePushUpdates required a valid exact-SHA receipt and a clean worktree for every outgoing non-deletion tip on any branch, so the test could use refs/heads/release as its remote ref.",
+    "intendedBehavior": "validatePrePushUpdates checks only outgoing updates whose remote ref is refs/heads/main: those still need a clean worktree and an exact-SHA receipt per tip. Updates to other refs pass without a receipt. The existing test pushes to main and keeps all its assertions; the new test pins that a work-branch push needs neither.",
+    "preservedCoverage": [
+      "A push to main is refused while the worktree is dirty.",
+      "Each distinct outgoing commit tip pushed to main needs its own exact-SHA receipt.",
+      "Branch deletions never need a receipt.",
+      "The main ruleset statuses and the Pages deployment verifier still bind the exact reviewed head (their tests are unchanged)."
+    ],
+    "replacementTests": [
+      "RISK repository process: pre-push lets branch pushes run CI before review and still guards main"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='pre-push lets branch pushes' tests/repository-process.test.js (2026-11-06T17:56:44Z, before the validator change)",
+      "failure": "AssertionError 'a work branch can be pushed for CI before its reviews exist (#2234)': validatePrePushUpdates returned the dirty-worktree and missing-receipt errors for a refs/heads/fix/2234 push instead of []. After the validator change the old test failed with 'local changes cannot be confused with the reviewed immutable commit' until its push target became refs/heads/main."
+    }
   }
 ]
