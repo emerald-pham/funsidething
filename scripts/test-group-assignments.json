@@ -13121,6 +13121,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: a Retry sync that waits for Settings opened during its read or the board frame still runs recovery deliberately when Settings closes",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"

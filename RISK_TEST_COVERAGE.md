@@ -2346,6 +2346,7 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 - RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately
 - RISK recovery wait: a changed unreadable generation is evaluated afresh and a readable one ends the wait
 - RISK recovery wait: the deployed app ignores a page script that sets the work-budget override, so a recovery within the product budget still runs
+- RISK recovery wait: a Retry sync that waits for Settings opened during its read or the board frame still runs recovery deliberately when Settings closes
 - RISK large board recovery wait guidance: mounted FAQ and changelog explain that cloud recovery of a large board waits, what stays protected, and that Retry sync or signing in again runs it
 
 The signed-in large-board fixture opens on a served build with the same in-page fake cloud as the large board recovery test: an unreadable current generation over an intact earlier generation of similar size, and a newer Add on the device. The automatic recovery default is over its work budget, so it must wait: no earlier-generation task applied, no guarded publication attempted, the newer edit kept, an ordinary Add still saved, the page answering a frame promptly, the cloud button saying "recovery waiting" with an explanation that cloud saving is not confirmed, and Settings saying cloud recovery is waiting while Review cloud recovery, the debug log and Restore stay reachable (#2228, spec #2224).

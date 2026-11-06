@@ -912,6 +912,38 @@ test('RISK recovery wait: the deployed app ignores a page script that sets the w
  assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'the recovery default runs within the product budget');
  assert.equal(syncStatus2200(shim).text,'☁ older copy in use');
 });
+// #2228 review: Retry sync's pull takes the deliberate request before its
+// cloud read. A pull that then waits for Settings, opened during that read or
+// while recovery lets the board's next frame go first (#2226), is replayed
+// when Settings closes and must still run recovery deliberately.
+test('RISK recovery wait: a Retry sync that waits for Settings opened during its read or the board frame still runs recovery deliberately when Settings closes',{timeout:300000},async t=>{
+ for(const moment of ['during the cloud read','while the board frame goes first'])await t.test(moment,{timeout:150000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub),{ctx,shim}=app;
+  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+  sub.after(faithfulModalQuery2194(shim));
+  const PRIOR='Saved only in the intact prior generation';
+  ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+  assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+  // Publication is refused, so the deliberate run's outcome stays visible.
+  refuseNextRecoveryTransaction255(app.faults);
+  let opened=false;
+  if(moment==='during the cloud read')app.faults.serverRead=async path=>{if(!opened&&path==='users/owner'){opened=true;ctx.openSettings();}};
+  // Only the wait that lets the board's next frame go first asks the page for
+  // a frame. The harness's timers do not hold the process open, so this does.
+  else{
+   ctx.window.requestAnimationFrame=callback=>{if(!opened&&vm.runInContext('pulling',ctx)){opened=true;ctx.openSettings();}setTimeout(callback,0);return 1;};
+   const alive=setInterval(()=>{},20);sub.after(()=>clearInterval(alive));
+  }
+  sub.after(()=>{delete app.faults.serverRead;delete ctx.window.requestAnimationFrame;});
+  await ctx.onAction('sync-retry',{});await recoveryWaitSettle2228(ctx,'the Retry pull settles');
+  assert.equal(opened,true,'Settings opened '+moment);
+  assert.equal(vm.runInContext('deferredCloudPull',ctx),true,'the Retry pull waits for Settings to close');
+  assert.equal(ctx.state.tasks.some(task=>task.title===PRIOR),false,'nothing runs while Settings is open');
+  ctx.closeModal();await flush();await recoveryWaitSettle2228(ctx,'the replayed pull settles');
+  assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'closing Settings runs the recovery default deliberately');
+  assert.equal(syncStatus2200(shim).text,'☁ older copy in use','the wait has ended');
+ });
+});
 
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,
