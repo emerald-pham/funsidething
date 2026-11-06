@@ -837,7 +837,13 @@ test('RISK recovery wait: an over-budget automatic recovery default waits withou
  assert.equal(JSON.stringify(cold.ctx.state),edited,'the cold launch opens the same accepted board');
  assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);
  assert.equal(syncStatus2200(cold.shim).text,'☁ recovery waiting','a cold launch still says cloud recovery is waiting');
- assert.equal(recoveryBudgetEvents2228(cold.ctx).length,0,'a cold launch did not evaluate the budget again');
+ // #2228 review: the cold launch records the remembered wait, metadata only,
+ // without weighing it again (it downloads no generation, above).
+ const coldEvents=recoveryBudgetEvents2228(cold.ctx);
+ assert.equal(coldEvents.length,1,'a cold launch over the remembered wait records it once');
+ assert.equal(coldEvents[0].metadata.budgetRemembered,true,'a cold launch did not evaluate the budget again');
+ for(const key of ['budgetOutcome','generationKiB','boardKiB','decisionKiB','estimateKiB','budgetKiB'])
+  assert.equal(coldEvents[0].metadata[key],metadata[key],key+' is the remembered evaluation');
  assert.equal(JSON.stringify([...backend.docs]),cloudBefore);
 });
 test('RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately',{timeout:300000},async t=>{
@@ -969,6 +975,33 @@ test('RISK recovery wait: an over-budget opening decides to wait from the genera
  const [event]=recoveryBudgetEvents2228(ctx);
  assert.equal(event?.metadata.budgetOutcome,'deferred');
  assert.equal(event.metadata.generationKiB,Math.round(CAPTURED_UNREADABLE_GENERATION.prior.byteLength/1024),'the complete earlier generation is still counted, and the unreadable one is not');
+});
+
+// #2228 review: the restart record saved for support kept every budget
+// evaluation alike (its stage and status), so a restart during a deliberate
+// over-budget run could not be told from one within the budget. The saved
+// record now keeps the latest evaluation's outcome, whatever stages follow it.
+test('RISK recovery wait: the saved restart record tells a recovery that waited, ran within its budget or ran deliberately apart',{timeout:300000},async t=>{
+ const saved=ctx=>{const report=JSON.parse(ctx.supportDiagnosticsText()).restartDiagnostics;
+  return report.documents.find(row=>row.document===report.currentDocument)?.recoveryBudget?.detail??null;};
+ const PRIOR='Saved only in the intact prior generation';
+ await t.test('within the budget',{timeout:150000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub),{ctx}=app;
+  refuseNextRecoveryTransaction255(app.faults);
+  ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+  assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'positive control: recovery ran');
+  assert.equal(saved(ctx),'within');
+ });
+ await t.test('waiting, then deliberately',{timeout:150000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub),{ctx}=app;
+  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+  ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+  assert.equal(saved(ctx),'deferred');
+  refuseNextRecoveryTransaction255(app.faults);
+  await ctx.onAction('sync-retry',{});await recoveryWaitSettle2228(ctx,'Retry sync settles');
+  assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'positive control: the deliberate run ran');
+  assert.equal(saved(ctx),'deliberate');
+ });
 });
 
 // #2194 review M1: a pull that fails before any server root is read (offline,

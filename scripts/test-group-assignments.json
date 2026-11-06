@@ -13131,6 +13131,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: the saved restart record tells a recovery that waited, ran within its budget or ran deliberately apart",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"
