@@ -1255,6 +1255,41 @@ test('RISK cloud source recovery automatic union: an intact earlier generation b
  assert.ok(acks.some(ack=>ack.resolvedGenerationIds.includes(originalRoot.previousGeneration)),'the acknowledgement resolves the earlier generation');
 });
 
+// #2239 round 2 (direction b): the cloud-source archive kept the accepted
+// board three more times when the saved head was that board (as the head, and
+// inside the head's record) and when the acknowledged copy was its own (that
+// copy sits inside the board). Each now names the field that holds the same
+// text, so the board is archived once; a different saved head is still kept in
+// full. Use my board from before recovery still restores the exact board.
+test('RISK cloud source recovery automatic union: the cloud-source archive keeps the accepted board once when the saved head and the acknowledged copy are that board own, and the decline still restores it',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+ const activePath='users/owner/generations/'+originalRoot.activeGeneration,other=JSON.parse(ctx.state.decisionBase.payload);
+ other.futureUnreadableActiveFixture={opaque:'unreadable current source'};
+ const otherEncoded=await codec.encodeSnapshot(JSON.stringify(other));
+ backend.docs.set(activePath,{...backend.docs.get(activePath),hash:otherEncoded.hash,byteLength:otherEncoded.byteLength,chunkCount:otherEncoded.chunkCount});
+ shim.document.getElementById('addInput').value='Newer local edit before reconciliation';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const before=JSON.stringify(ctx.state),savedHead=await store.readHead();
+ assert.equal(savedHead.payload,before,'fixture: the saved head is the accepted board');
+ refuseNextRecoveryTransaction255(app.faults);
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ const hold=await store.getRecoveryCloudHold();
+ assert.equal(hold?.automaticRecovery,true,'positive control: the automatic recovery default adopted a board');
+ const archives=await store.listOpaqueArchives(),envelope=JSON.parse(archives.find(row=>row.key===hold.originalKey).raw);
+ const source=JSON.parse(archives.find(row=>row.key===envelope.sourceArchiveKeys[0]).raw);
+ assert.equal(source.acceptedDeviceBoard,before,'the accepted board is archived byte for byte');
+ assert.deepEqual(source.deviceHead,{sameAs:'acceptedDeviceBoard'},'the saved head names the accepted board instead of repeating it');
+ assert.equal(source.deviceHeadRecord?.sameAs,'acceptedDeviceBoard','the saved head record names the accepted board for its payload');
+ const {payload:ignored,...headMeta}=savedHead;
+ assert.equal(JSON.stringify(source.deviceHeadRecord.record),JSON.stringify(ctx.encodeManualArchiveValue(headMeta,'device head authority')),'the rest of the saved head record stays exact');
+ assert.deepEqual(source.acknowledgedDecisionBase,{sameAs:'acceptedDeviceBoard.decisionBase',id:JSON.parse(before).decisionBase.id},'the acknowledged copy names the copy inside the accepted board');
+ const sourceRaw=archives.find(row=>row.key===envelope.sourceArchiveKeys[0]).raw,boardText=JSON.stringify(before);
+ assert.equal(sourceRaw.split(boardText).length-1,1,'the cloud-source archive holds the accepted board text once');
+ // The decline restores the exact accepted board from the archive.
+ ctx.openSettings();assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'Use my board from before recovery succeeds');
+ assert.equal(JSON.stringify(ctx.state),before,'the board from before recovery is restored exactly');
+ assert.equal((await store.readHead()).payload,before);
+});
+
 test('RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers',async t=>{
  const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;
  const accepted=JSON.parse(JSON.stringify(ctx.state)),rootBefore=JSON.stringify(backend.docs.get('users/owner'));

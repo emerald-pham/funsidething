@@ -5231,6 +5231,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK cloud source recovery automatic union: the cloud-source archive keeps the accepted board once when the saved head and the acknowledged copy are that board own, and the decline still restores it",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive",
       "group": "core",
       "file": "tests/core.test.js"
