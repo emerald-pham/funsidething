@@ -203,13 +203,14 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
 - RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes
 - RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics
-- RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export
+- RISK DATABASE REPAIR EXPORT: Settings keeps the combined repair export and the Debug log dialog exports only its metadata report
+- RISK support diagnostics export: every export the Debug log offers copies or downloads only the bounded metadata report and reads no saved board or database copy
 - RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire
 - RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes
 - RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft
 - RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board
 - RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits
-- RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
+- RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the repair export for repairs
 - RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
 - RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
@@ -2343,6 +2344,7 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 ## Large board recovery wait
 
 - RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit
+- RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit
 - RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation
 - RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately

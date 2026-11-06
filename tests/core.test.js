@@ -16811,15 +16811,61 @@ test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial
   });
 });
 
-test('RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export',async t=>{
+// #2246: the Debug log dialog exports only its bounded metadata report; the
+// combined repair export (board and every saved copy) stays in Settings.
+test('RISK DATABASE REPAIR EXPORT: Settings keeps the combined repair export and the Debug log dialog exports only its metadata report',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());const {ctx,shim}=app;
   ctx.openSettings();let markup=shim.document.getElementById('modalRoot').innerHTML;
   assert.match(markup,/data-act="view-database-repair"/);
   assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/,'Settings has no redundant standalone Debug log exporters');
   await ctx.onAction('view-support-diagnostics',{});markup=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(markup,/data-act="view-database-repair"/,'quick log inspection links to the same combined exporter');
-  assert.doesNotMatch(markup,/data-act="(?:copy|download)-support-diagnostics"/);
+  assert.doesNotMatch(markup,/data-act="view-database-repair"/,'the Debug log dialog no longer links to the board-sized repair export');
+  assert.match(markup,/<button[^>]*data-act="copy-support-diagnostics"[^>]*>Copy debug log</);
+  assert.match(markup,/<button[^>]*data-act="download-support-diagnostics"[^>]*>Download debug log</);
   assert.match(markup,/data-act="select-support-diagnostics"/,'the log remains manually selectable for quick inspection');
+});
+
+// #2246: exporting the Debug log crashed the iPhone app with a large board.
+// The Debug log dialog's only export was the combined repair export, which
+// serializes the whole board and every saved device copy into one string (16
+// MB for a 2.4 MB board, 1.2 GiB of WebKit memory). Every export the dialog
+// offers must be the bounded metadata report: no board content and no read of
+// the saved database, so its cost does not grow with the board.
+test('RISK support diagnostics export: every export the Debug log offers copies or downloads only the bounded metadata report and reads no saved board or database copy',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),TITLE='BOARD-CONTENT-2246-must-not-export';
+  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostics-export-2246-'+Date.now()}),{ctx,shim}=app;t.after(()=>app.dispose());
+  ctx.addTask(TITLE,false);await ctx.persist();
+  const store=ctx.window.ScannerDeviceStore;assert.equal(typeof store?.readRawExportSnapshot,'function','fixture: the board is saved in device storage');
+  let databaseReads=0;const read=store.readRawExportSnapshot;store.readRawExportSnapshot=function(...args){databaseReads++;return read.apply(this,args);};
+  const outputs=[];ctx.navigator={clipboard:{async writeText(value){outputs.push(value);}}};
+  let blob=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{outputs.push(blob);};
+  const createElement=shim.document.createElement;shim.document.createElement=tag=>tag==='a'?link:createElement.call(shim.document,tag);
+  ctx.Blob=class{constructor(parts){blob=parts.join('');}};ctx.URL={createObjectURL(){return 'blob:diagnostics-2246';},revokeObjectURL(){}};
+  const NOT_EXPORTS=new Set(['select-support-diagnostics','refresh-support-diagnostics','return-support-diagnostics','close-modal']);
+  const actions=markup=>[...markup.matchAll(/<button\b[^>]*\bdata-act="([a-z-]+)"/g)].map(match=>match[1]);
+  ctx.openSettings();await ctx.onAction('view-support-diagnostics',{});
+  const exports=actions(shim.document.getElementById('modalRoot').innerHTML).filter(act=>!NOT_EXPORTS.has(act));
+  assert.ok(exports.length>0,'the Debug log offers a way to export it');
+  for(const act of exports){
+   ctx.openSettings();await ctx.onAction('view-support-diagnostics',{});const before=outputs.length;
+   await ctx.onAction(act,{});await flush();
+   // An export that opens its own dialog finishes with that dialog's copy
+   // control, which copies the text the dialog shows (the test DOM keeps
+   // textarea markup, not values, so the shown text is placed in the box).
+   const shownMarkup=shim.document.getElementById('modalRoot').innerHTML;
+   for(const [,id,shown] of shownMarkup.matchAll(/<textarea\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/textarea>/g)){const box=shim.document.getElementById(id);
+    if(box)box.value=shown.replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&lt;','<').replaceAll('&gt;','>').replaceAll('&amp;','&');}
+   for(const copy of actions(shownMarkup).filter(name=>/^copy-/.test(name)))await ctx.onAction(copy,{});
+   assert.ok(outputs.length>before,`${act}: the export produced a copy or file`);
+   for(const text of outputs.slice(before)){
+    assert.doesNotMatch(text,new RegExp(TITLE),`${act}: the export contains no board content`);
+    const report=JSON.parse(text);
+    assert.equal(report.schema,'funsidething.support-diagnostics',`${act}: the export is the Debug log`);
+    assert.equal(report.metadataOnly,true);assert.equal(report.boardDataIncluded,false);
+    assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,`${act}: the export stays within the 24 KiB report limit`);
+   }
+  }
+  assert.equal(databaseReads,0,'exporting the Debug log reads no saved database copy');
 });
 
 test('RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire',async t=>{
@@ -16888,11 +16934,11 @@ test('RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnosti
   assert.match(log,/Database repair export/);
 });
 
-test('RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed',async t=>{
+test('RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the repair export for repairs',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  assert.doesNotMatch(help,/Copy debug log|Download debug log/,'no FAQ advertises a removed standalone export control');
   const reload=help.match(/<dt>Why did the app reload\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(reload);
-  assert.match(reload,/View \/ copy database for repair/);assert.match(reload,/partial|unreadable/i);
+  assert.match(reload,/View debug log, then Copy debug log or Download debug log/);assert.match(reload,/metadata only/);
+  assert.match(reload,/Database repair export/);assert.match(reload,/partial|unreadable/i);
 });
 
 test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage',async()=>{
