@@ -1028,7 +1028,7 @@ test('RISK cloud generation recovery browser: a real click on Use my board from 
 // the saved histories and decisions; before #2225 it was about 60-65 bytes of
 // memory per serialized byte in WebKit (218-236 MiB over empty for this board).
 const LARGE_BOARD_OPEN_FIXED_MARGIN=96*1024*1024,LARGE_BOARD_OPEN_BYTES_FACTOR=32;
-test('RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+async function largeBoardOpeningWithinMargin(t,motion){
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fixture=await largeBoardFixture(),{stats}=fixture;
  // The fixture is at least as large as the measured board on every measure.
@@ -1041,20 +1041,20 @@ test('RISK large board opening browser: a large saved board opens from device st
  const SETTLE_MS=4000,observed=[],failures=[];
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
   const open=async(scenario,payload,taskCount)=>{
-   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2225-'+engineName+'-'+scenario+'-'));
+   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2225-'+engineName+'-'+motion+'-'+scenario+'-'));
    const launch=async(tag,seed)=>{
-    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference',
      env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
     await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
-    await context.addInitScript(seed=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
-     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
-     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);},seed);
+    await context.addInitScript(({seed,motion})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);},{seed,motion});
     return context;
    };
    const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
     &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
    try{
-    const tag=`chain-2225-${engineName}-${scenario}-${process.pid}-${Date.now()}`;
+    const tag=`chain-2225-${engineName}-${motion}-${scenario}-${process.pid}-${Date.now()}`;
     let context=await launch(tag+'-seed',payload);
     try{
      const page=context.pages()[0]||await context.newPage();
@@ -1085,7 +1085,7 @@ test('RISK large board opening browser: a large saved board opens from device st
   };
   const empty=await open('empty',emptyBoard,0),large=await open('large',fixture.payload,LARGE_BOARD_SHAPE.tasks);
   const extra=large.memory.peakBytes-empty.memory.peakBytes,mib=bytes=>Math.round(bytes/1048576);
-  const summary={engine:engineName,emptyPeakMiB:mib(empty.memory.peakBytes),largePeakMiB:mib(large.memory.peakBytes),extraMiB:mib(extra),allowanceMiB:mib(allowance),
+  const summary={engine:engineName,motion,emptyPeakMiB:mib(empty.memory.peakBytes),largePeakMiB:mib(large.memory.peakBytes),extraMiB:mib(extra),allowanceMiB:mib(allowance),
    processes:[empty.memory.processes,large.memory.processes],samples:[empty.memory.samples,large.memory.samples]};
   observed.push(summary);t.diagnostic(JSON.stringify(summary));
   // Measurement preconditions: the harness saw this browser's own web process.
@@ -1095,7 +1095,12 @@ test('RISK large board opening browser: a large saved board opens from device st
   if(extra>allowance)failures.push(`${engineName}: opening the large board peaked ${mib(extra)} MiB over the empty board, above the ${mib(allowance)} MiB allowance`);
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
-});
+}
+test('RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'reduced'));
+// #2228 review (story 19): the same opening guarantee with normal motion,
+// where the scenery animates. Both scenarios share the motion choice, so the
+// margin over the empty board stays the same.
+test('RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'normal'));
 
 // #2226 (spec #2224): the accepted device board appears and takes input before
 // any automatic recovery default work starts, extending #2194's board before
@@ -1236,7 +1241,7 @@ test('RISK cloud generation recovery browser: the board renders and a trusted ke
 // reading them back exactly before publication. 384 leaves about 15% above
 // the highest WebKit run; WebKit is the engine closest to the phone.
 const LARGE_BOARD_RECOVERY_BYTES_FACTOR=384;
-test('RISK large board recovery browser: the automatic recovery default reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK large board recovery browser: a deliberate run of the automatic recovery default from Retry sync reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  // Signed in, as the owner's phone is: its decisions belong to the account.
  const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
