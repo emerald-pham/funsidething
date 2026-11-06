@@ -1123,6 +1123,9 @@ test('RISK test inventory: every added environment-gated root is declared with t
  const assignments=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-assignments.json'),'utf8'));
  const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-inventory.json'),'utf8'));
  const baselineSkips=new Set(inventory.acceptedSkipCaseIds);
+ // A baseline root renamed through rootReplacements keeps its baseline skip:
+ // scripts/test-groups.mjs maps it and refuses a declaration for it (#2246).
+ for(const replacement of assignments.rootReplacements||[])if(baselineSkips.has(replacement.baselineRoot))baselineSkips.add(replacement.currentRoot);
  const source=testSurfaceSource();
  const gated=new Map();
  for(const match of source.matchAll(/^test\(\s*(['"])(.*?)\1\s*,\s*\{\s*skip\s*:\s*!process\.env\.([A-Z][A-Z0-9_]*)\s*\}/gm))gated.set(match[2],match[3]);
