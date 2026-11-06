@@ -212,6 +212,32 @@
       }
     }
 
+    // #2227 (spec #2224): only the named rows, in one readonly transaction,
+    // shaped like readRawExportSnapshot() restricted to the rows present. A
+    // recovery check that compares a few rows no longer reads every saved
+    // archive (many times the board's size after a recovery) to find them.
+    async function readRawRows(request){
+      ensureOpen();
+      const names=storeNames.filter(name=>Array.isArray(request?.[name]));
+      if(!names.length)return {stores:{}};
+      const tx=await beginTransaction(names,"readonly"),done=transactionDone(tx);
+      try{
+        const entries=await Promise.all(names.map(async name=>{
+          const store=tx.objectStore(name),wanted=[...new Set(request[name])];
+          const rows=await Promise.all(wanted.map(key=>Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key))])));
+          const present=rows.filter(([key])=>key!==undefined);
+          return [name,{keys:present.map(([key])=>key),values:present.map(([,value])=>value)}];
+        }));
+        await done;
+        return {stores:Object.fromEntries(entries)};
+      }catch(error){
+        try{tx.abort();}catch(e){}
+        try{await done;}catch(e){}
+        observeRecovery("failed",error,"raw-snapshot",tx.db);
+        throw error;
+      }
+    }
+
     async function readHead(){
       ensureOpen();
       const tx=await beginTransaction(["meta","snapshots"],"readonly");
@@ -301,7 +327,15 @@
         throw new Error("Durable opaque recovery row is corrupt or unprotected");
       });
       const visible=readable.sort((a,b)=>(a.order||0)-(b.order||0)).map(({order,...row})=>row);
-      return typeof root.structuredClone==="function" ? root.structuredClone(visible) : visible;
+      if(typeof root.structuredClone!=="function")return visible;
+      // #2227 (spec #2224): the clone keeps its detached plain rows, but the
+      // archive text itself is immutable and already this read's own copy, so
+      // it is not copied a second time: that doubled every saved archive (many
+      // times the board's size after a recovery) in memory. Each row's fields
+      // keep their order.
+      const cloned=root.structuredClone(visible.map(row=>typeof row.raw==="string"?{...row,raw:""}:row));
+      cloned.forEach((row,index)=>{if(typeof visible[index].raw==="string")row.raw=visible[index].raw;});
+      return cloned;
     }
 
     async function protectRecoverySource({expectedHash,key,raw}={}){
@@ -385,7 +419,9 @@
           // Keep every unknown/orphan snapshot and pending record. The exact
           // overwritten metadata already lives in the immutable raw archive.
         }
-        const snapshot=await rawTransactionSnapshot(tx);
+        // #2227: only a write without a payload returns this in-transaction
+        // view; a recovered head is verified by readHead() below instead.
+        const snapshot=payload===undefined?await rawTransactionSnapshot(tx):null;
         await done;
         if(payload===undefined)return {ok:true,snapshot};
         const head=await readHead();
@@ -656,7 +692,7 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint};
     return api;
   }

@@ -5964,11 +5964,100 @@ document.addEventListener("close",resumeDeferredBrowserCopy,true);
 function resumeDeferredCloudPull(){
   if(deferredCloudPull && !hasActiveEditor()) cloudPull();
 }
+// #2227 (spec #2224): whether encodeManualArchiveValue(a) and (b) serialize
+// alike, decided without building either encoding when both hold only plain
+// objects, arrays, strings, numbers, booleans, null and undefined. A value the
+// encoder refuses (a function, a symbol, a repeated reference) compares false,
+// as it does there. Dates, binary data, maps and sets, and any other value
+// answer null, and the caller encodes as before. Recovery compares device
+// head records, each carrying the whole board, many times per check.
+function sameArchiveEncoding(a,b){
+  const seenA=new WeakSet(),seenB=new WeakSet();let doubt=false;
+  const plain=value=>{
+    if(Object.prototype.toString.call(value)!=="[object Object]")return false;
+    const proto=Object.getPrototypeOf(value);return proto===null||Object.getPrototypeOf(proto)===null;
+  };
+  const walk=(x,y)=>{
+    const tx=typeof x,ty=typeof y;
+    if(tx==="symbol"||tx==="function"||ty==="symbol"||ty==="function")return false;
+    if(x===null||y===null||tx!=="object"||ty!=="object"){
+      if(tx!==ty||(x===null)!==(y===null))return false;
+      return tx==="bigint"?x.toString()===y.toString():Object.is(x,y);
+    }
+    if(seenA.has(x)||seenB.has(y))return false;
+    seenA.add(x);seenB.add(y);
+    const ax=Array.isArray(x),ay=Array.isArray(y);
+    if(ax!==ay)return false;
+    if(ax){
+      if(Object.prototype.toString.call(x)!=="[object Array]"||Object.prototype.toString.call(y)!=="[object Array]"){doubt=true;return false;}
+      if(x.length!==y.length)return false;
+      for(let i=0;i<x.length;i++){
+        const hx=Object.hasOwn(x,i),hy=Object.hasOwn(y,i);
+        if(hx!==hy||hx&&!walk(x[i],y[i]))return false;
+      }
+      const extra=value=>Object.keys(value).filter(key=>{const index=Number(key);return !(Number.isInteger(index)&&index>=0&&index<4294967295&&String(index)===key);});
+      const kx=extra(x),ky=extra(y);
+      if(kx.length!==ky.length)return false;
+      for(let i=0;i<kx.length;i++)if(kx[i]!==ky[i]||!walk(x[kx[i]],y[ky[i]]))return false;
+      return true;
+    }
+    if(!plain(x)||!plain(y)){doubt=true;return false;}
+    const kx=Object.keys(x),ky=Object.keys(y);
+    if(kx.length!==ky.length)return false;
+    for(let i=0;i<kx.length;i++)if(kx[i]!==ky[i]||!walk(x[kx[i]],y[ky[i]]))return false;
+    return true;
+  };
+  const same=walk(a,b);
+  return doubt?null:same;
+}
 function recoverySourceValueEqual(a,b){
+  const decided=sameArchiveEncoding(a,b);if(decided!==null)return decided;
   // One reference is encoded once: an unsupported value still compares false.
   try{if(a===b){JSON.stringify(encodeManualArchiveValue(a,"recovery evidence"));return true;}
     return JSON.stringify(encodeManualArchiveValue(a,"recovery evidence"))===JSON.stringify(encodeManualArchiveValue(b,"recovery evidence"));}
   catch{return false;}
+}
+// #2227 (spec #2224): JSON.stringify(a)===JSON.stringify(b), without building
+// either string when both are plain JSON data: plain objects and arrays,
+// strings, finite numbers, booleans and null. Recovery compares the same
+// multi-megabyte captures many times, and each comparison used to allocate two
+// full serialized copies. Anything else (a toJSON or class value, undefined, a
+// function, a non-finite number, a cycle) falls back to that serialized
+// comparison, so the verdict is always the same.
+function sameJsonValue(a,b){
+  let doubt=false;const path=new Set();
+  const kind=value=>{
+    if(value===null||typeof value==="string"||typeof value==="boolean")return "value";
+    if(typeof value==="number")return Number.isFinite(value)?"value":null;
+    if(typeof value!=="object"||typeof value.toJSON==="function")return null;
+    const proto=Object.getPrototypeOf(value);
+    if(Array.isArray(value))return proto===Array.prototype?"array":null;
+    return proto===Object.prototype||proto===null?"object":null;
+  };
+  const walk=(x,y)=>{
+    const kx=kind(x),ky=kind(y);
+    if(!kx||!ky){doubt=true;return false;}
+    if(kx!==ky)return false;
+    if(kx==="value")return x===y;
+    if(path.has(x)||path.has(y)){doubt=true;return false;}
+    path.add(x);path.add(y);
+    try{
+      if(kx==="array"){
+        if(x.length!==y.length)return false;
+        for(let i=0;i<x.length;i++)if(!walk(x[i],y[i]))return false;
+        return true;
+      }
+      const xKeys=Object.keys(x),yKeys=Object.keys(y);
+      // A key JSON omits (an undefined or function value) needs the real serializer.
+      for(const [source,keys] of [[x,xKeys],[y,yKeys]])
+        for(const key of keys){const t=typeof source[key];if(t==="undefined"||t==="function"||t==="symbol"){doubt=true;return false;}}
+      if(xKeys.length!==yKeys.length)return false;
+      for(let i=0;i<xKeys.length;i++)if(xKeys[i]!==yKeys[i]||!walk(x[xKeys[i]],y[yKeys[i]]))return false;
+      return true;
+    }finally{path.delete(x);path.delete(y);}
+  };
+  const same=walk(a,b);
+  return doubt?JSON.stringify(a)===JSON.stringify(b):same;
 }
 function recoveryPendingPointer(pending){
   if(pending===null)return null;
@@ -10952,9 +11041,36 @@ function modalShell(inner){
    path grants authority only to a fresh, explicit appearance choice. Exact
    originals remain ordinary durable backup rows, including pending uploads. */
 let decisionRecoveryPreview=null,decisionRecoveryBusy=false,decisionRecoveryNotice="",decisionRecoveryReviewSerial=0;
+// #2227 (spec #2224): every recovery guard asks for the prepared choices, and
+// readLocalBackups() parses the whole browser backup index (full board copies)
+// plus both browser boards for protected IDs each time. A prepared choice is
+// never an automatic kind, so expiry and protected IDs cannot hide one: the
+// same rows come from the index alone, parsed once per unchanged index text.
+let decisionRecoveryChoiceIndex={raw:undefined,rows:[]};
+function decisionRecoveryChoiceRows(){
+  const choice=row=>row&&row.kind==="decision-recovery-choice";
+  let legacy;
+  try{
+    const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
+    if(decisionRecoveryChoiceIndex.raw!==raw){
+      const rows=parseBackupIndex(raw);
+      decisionRecoveryChoiceIndex={raw,rows:Array.isArray(rows)?rows.filter(row=>choice(row)&&typeof row.id==="string"&&
+        typeof row.day==="string"&&typeof row.payload==="string"):[]};
+    }
+    legacy=decisionRecoveryChoiceIndex.rows.map(row=>({...row}));
+  }catch(e){legacy=[];}
+  if(!deviceStorageAuthority)return legacy;
+  // The same first-copy dedupe readLocalBackups applies; kind is in its key.
+  const seen=new Set(),out=[];
+  for(const row of [...deviceBackupCache.filter(choice),...legacy]){
+    const key=String(row?.id||"")+"\u0000"+String(row?.kind||"")+"\u0000"+String(row?.payload||"");
+    if(!seen.has(key)){seen.add(key);out.push(row);}
+  }
+  return out;
+}
 function decisionRecoveryHolds(account=window.CloudSync?.user){
   const identity=window.CloudSync?.recoveryIdentity?.();
-  return readLocalBackups().filter(row=>{
+  return decisionRecoveryChoiceRows().filter(row=>{
     if(row.kind!=="decision-recovery-choice")return false;
     try{const board=JSON.parse(row.payload);return board.syncAccount===account&&(!identity||!board.recoveryChoice?.identity||board.recoveryChoice.identity===identity);}
     catch(error){return true;}
@@ -11378,11 +11494,38 @@ function automaticCloudFallbackBaselineMatches(baseline,{local=JSON.stringify(st
   return automaticCloudFallbackRawBaselineMatches(baseline,{rawSourceIdentity,rawBrowserSources})&&
     state===baseline.stateRef&&local===baseline.board&&draft===baseline.draft;
 }
-function cloudSourceRecoveryDeviceCandidates(account){
+// #2227 (spec #2224): one automatic recovery attempt captures the device
+// sources several times, and each capture validated the same unchanged board
+// text again (two parses and a full decision replay per board). Within one
+// attempt the same text and account reuse that verdict. Captured boards are
+// never changed in place: recovery binds copies of them.
+function attemptRecoverySourceBoard(readAttempt,raw,account){
+  if(!readAttempt||typeof raw!=="string")return cloudSourceRecoveryBoard(raw,account);
+  const memo=readAttempt.recoverySourceBoards??=[];
+  const hit=memo.find(row=>row.account===account&&row.raw===raw);
+  if(hit)return hit.result;
+  const result=cloudSourceRecoveryBoard(raw,account);
+  memo.push({raw,account,result});if(memo.length>4)memo.shift();
+  return result;
+}
+// #2227: the adopted payload is checked as a supported source right after
+// reconciliation, again before the device commit and again before
+// publication: the same text each time. Within one attempt only the verdict
+// is kept, so no board copy outlives the check.
+function attemptRecoverySourceSupported(readAttempt,raw,account){
+  if(!readAttempt||typeof raw!=="string")return !!cloudSourceRecoveryBoard(raw,account).board;
+  const memo=readAttempt.recoverySourceVerdicts??=[];
+  const hit=memo.find(row=>row.account===account&&row.raw===raw);
+  if(hit)return hit.supported;
+  const supported=!!cloudSourceRecoveryBoard(raw,account).board;
+  memo.push({raw,account,supported});if(memo.length>4)memo.shift();
+  return supported;
+}
+function cloudSourceRecoveryDeviceCandidates(account,readAttempt=null){
   if(!useLocal)return [];
   const candidates=[];
   for(const copy of legacyBoardCopies()){
-    const validated=cloudSourceRecoveryBoard(copy.raw,account);
+    const validated=attemptRecoverySourceBoard(readAttempt,copy.raw,account);
     if(!validated.board)continue;
     candidates.push({key:copy.key,board:validated.board,sourceRef:Object.freeze({kind:"browser",key:copy.key})});
   }
@@ -11397,7 +11540,7 @@ function automaticRecoveryDeviceAuthorityCurrent(captured){
       JSON.stringify(state)!==captured.local||cloudSourceRecoveryDraft()!==captured.draft||
       deviceStorageRequired!==authority.deviceStorageRequired||deviceStorageAuthority!==authority.deviceStorageAuthority||
       deviceHeadHash!==captured.headHash||!automaticRecoveryExpectedHoldCurrent(captured)||
-      JSON.stringify(readManualArchiveLocalSources())!==JSON.stringify(captured.rawBrowserSources))return false;
+      !sameJsonValue(readManualArchiveLocalSources(),captured.rawBrowserSources))return false;
     if(captured.recoveryMode==="accepted")return liveBoardAccepted&&deviceStorageAuthority;
     if(captured.recoveryMode==="fresh-empty"||captured.recoveryMode==="readable-malformed")
       return automaticCloudFallbackBaselineMatches(automaticCloudFallbackBootBaseline,{local:captured.local,draft:captured.draft,
@@ -11433,17 +11576,18 @@ async function boundedCloudSourceRecoveryRead(work,read){
   try{return await Promise.race([work(attempt),interrupted]);}
   finally{clearTimeout(timer);controller.signal.removeEventListener("abort",interrupt);}
 }
+// #2227: compared without serializing either capture (sameJsonValue).
 function cloudSourceRecoverySame(a,b,{afterPublication=false}={}){
   const hasRawAuthority=!!a?.deviceRawAuthority,hasNextRawAuthority=!!b?.deviceRawAuthority;
   const rawAuthorityMatches=hasRawAuthority===hasNextRawAuthority&&(!hasRawAuthority||
-    a.rawSourceIdentity===b.rawSourceIdentity&&JSON.stringify(a.rawBrowserSources)===JSON.stringify(b.rawBrowserSources));
+    a.rawSourceIdentity===b.rawSourceIdentity&&sameJsonValue(a.rawBrowserSources,b.rawBrowserSources));
   return rawAuthorityMatches&&a.backend===b.backend&&a.account===b.account&&a.local===b.local&&a.headHash===b.headHash&&a.head===b.head&&recoverySourceValueEqual(a.headRecord,b.headRecord)&&a.draft===b.draft&&
-    JSON.stringify(a.browser)===JSON.stringify(b.browser)&&recoverySourceValueEqual(a.hold,b.hold)&&
+    sameJsonValue(a.browser,b.browser)&&recoverySourceValueEqual(a.hold,b.hold)&&
     a.freshEmpty===b.freshEmpty&&a.recoveryMode===b.recoveryMode&&
-    JSON.stringify(a.acceptedBaseline)===JSON.stringify(b.acceptedBaseline)&&JSON.stringify(a.deviceCandidates)===JSON.stringify(b.deviceCandidates)&&
+    sameJsonValue(a.acceptedBaseline,b.acceptedBaseline)&&sameJsonValue(a.deviceCandidates,b.deviceCandidates)&&
     a.evidence.identity===b.evidence.identity&&a.evidence.epoch===b.evidence.epoch&&
-    (afterPublication||JSON.stringify(a.evidence.pending)===JSON.stringify(b.evidence.pending)&&JSON.stringify(a.source)===JSON.stringify(b.source))&&
-    JSON.stringify(a.holds)===JSON.stringify(b.holds);
+    (afterPublication||sameJsonValue(a.evidence.pending,b.evidence.pending)&&sameJsonValue(a.source,b.source))&&
+    sameJsonValue(a.holds,b.holds);
 }
 function cloudSourceRecoverySameHead(firstHead,nextHead){
   // committedAt is the observed metadata-only case. Ownership, source identity
@@ -11459,7 +11603,7 @@ function cloudSourceRecoveryFreshBaseline(a,b){
   // Its JSON-only copies then equal themselves, so only live state is
   // re-serialized; a multi-megabyte board otherwise spent its whole recovery
   // budget re-encoding the same captured copies (#2198).
-  const sameJSON=(x,y)=>a===b||JSON.stringify(x)===JSON.stringify(y);
+  const sameJSON=(x,y)=>a===b||sameJsonValue(x,y);
   const hasRawAuthority=!!a?.deviceRawAuthority,hasNextRawAuthority=!!b?.deviceRawAuthority;
   const rawAuthorityMatches=hasRawAuthority===hasNextRawAuthority&&(!hasRawAuthority||
     a.rawSourceIdentity===b.rawSourceIdentity&&sameJSON(a.rawBrowserSources,b.rawBrowserSources));
@@ -11726,10 +11870,10 @@ async function cloudSourceRecoveryDeviceSources(readAttempt=null,{allowFreshEmpt
     !recoverySourceValueEqual(hold,localRecoveryIntent)||!recoverySourceValueEqual(deviceRecoveryCloudHold,localRecoveryIntent)||
     !await verifiedLocalWorkingRecoveryIntent(localRecoveryIntent,raw,account,evidence.identity)))
     throw Error("The protected local recovery source changed or still has incompatible alternatives.");
-  const deviceCandidates=captureRawAuthority&&!localRecoveryIntent?cloudSourceRecoveryDeviceCandidates(account):undefined;
+  const deviceCandidates=captureRawAuthority&&!localRecoveryIntent?cloudSourceRecoveryDeviceCandidates(account,readAttempt):undefined;
   let acceptedBaseline=null;
   if(recoveryMode==="accepted"&&captureRawAuthority){
-    const validated=cloudSourceRecoveryBoard(local,account);
+    const validated=attemptRecoverySourceBoard(readAttempt,local,account);
     if(!validated.board)throw Error("The accepted device board is not a supported source for this account. Keep current work and review sources again.");
     acceptedBaseline=validated.board;
   }
@@ -11868,8 +12012,7 @@ async function commitAutomaticRecoveryDeviceSource({captured,payload,archives=[]
     catch{return false;}
   };
   if(!current())return refuse("stale-source-or-account");
-  const validated=cloudSourceRecoveryBoard(payload,captured.account);
-  if(!validated.board)return refuse("unsupported-recovery-payload");
+  if(!attemptRecoverySourceSupported(readAttempt,payload,captured.account))return refuse("unsupported-recovery-payload");
   let referenceCapture;
   try{referenceCapture=await automaticRecoveryReferenceCapture(captured,authority,readAttempt);}catch{return refuse("archive-reference-capture-failed");}
   if(!current())return refuse("stale-source-or-account");
@@ -11883,11 +12026,6 @@ async function commitAutomaticRecoveryDeviceSource({captured,payload,archives=[]
     sourceFingerprint:null,hold,guard:current},authority.store);
   if(!committed?.ok)return committed?.conflict?refuse("raw-source-changed"):refuse(committed?.code||"archive-or-write-refused");
   if(!current())return refuse("current-attempt-changed-after-write");
-  let saved,readbackRaw,savedHold,opaque;
-  try{
-    [saved,readbackRaw,savedHold,opaque]=await Promise.all([authority.store.readHead(),authority.store.readRawExportSnapshot(),
-      authority.store.getRecoveryCloudHold?.()??Promise.resolve(null),authority.store.listOpaqueArchives()]);
-  }catch{return refuse("archive-readback-unavailable");}
   const exactArchive=(source,row)=>{
     const store=source?.stores?.opaque,index=store?.keys?.findIndex(key=>key===row.key)??-1;
     return index>=0&&store.values[index]?.key===row.key&&store.values[index]?.raw===row.raw;
@@ -11907,9 +12045,25 @@ async function commitAutomaticRecoveryDeviceSource({captured,payload,archives=[]
     }
     return true;
   };
+  // #2227 (spec #2224): one large readback at a time, each checked and
+  // released before the next. The raw readback and the archive list each hold
+  // every saved archive, which recovery has just made several times the
+  // board's size, and reading them together held both at once. The same
+  // checks run on the same kinds of readback.
+  let saved,savedHold,readbackRaw,opaque;
+  try{[saved,savedHold]=await Promise.all([authority.store.readHead(),authority.store.getRecoveryCloudHold?.()??Promise.resolve(null)]);}
+  catch{return refuse("archive-readback-unavailable");}
+  // Only the archive and reference rows checked below are read back.
+  const readbackKeys=[rawArchiveRow.key,...archiveRows.map(row=>row.key),...referenceCapture.indexedDBCapture.references.map(reference=>reference.key)];
+  try{readbackRaw=typeof authority.store.readRawRows==="function"?await authority.store.readRawRows({opaque:readbackKeys}):await authority.store.readRawExportSnapshot();}
+  catch{return refuse("archive-readback-unavailable");}
+  const rawReadbackExact=exactArchive(readbackRaw,rawArchiveRow)&&!archiveRows.some(row=>!exactArchive(readbackRaw,row))&&await exactReferences(readbackRaw);
+  readbackRaw=null;
+  try{opaque=await authority.store.listOpaqueArchives();}catch{return refuse("archive-readback-unavailable");}
+  const listedArchivesExact=!archiveRows.some(row=>!opaque.some(savedRow=>savedRow.key===row.key&&savedRow.raw===row.raw));
+  opaque=null;
   if(!saved||saved.hash!==committed.hash||saved.payload!==payload||!recoverySourceValueEqual(saved,committed.head)||
-    !exactArchive(readbackRaw,rawArchiveRow)||archiveRows.some(row=>!exactArchive(readbackRaw,row))||!await exactReferences(readbackRaw)||
-    archiveRows.some(row=>!opaque.some(savedRow=>savedRow.key===row.key&&savedRow.raw===row.raw))||
+    !rawReadbackExact||!listedArchivesExact||
     !recoverySourceValueEqual(savedHold,{...hold,headHash:saved.hash}))
     return refuse("archive-head-or-hold-readback-mismatch");
   if(!current())return refuse("current-attempt-changed-after-readback");
@@ -12053,6 +12207,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
   const serial=++cloudSourceRecoverySerial,read={controller:new AbortController(),automaticFallback:true,backend,account,identity,serial,
     ...(backgroundResume?{automaticHistoryResume:true}: {})};
   let backgroundRetryCode=null,backgroundPairRestartUsed=false,backgroundSourceBaseline=null;
+  const PUBLISH_ADOPTED_RECOVERY=Object.freeze({});
   cloudSourceRecoveryPreview=null;cloudSourceRecoveryBusy=true;cloudSourceRecoveryRead=read;
   let diagnosticOperation=supportDiagnosticsSourceOperation();
   try{
@@ -12085,19 +12240,21 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         !p.source.generations.some(row=>row.id===activeId)||!p.source.generations.some(row=>row.id===previousId)))return false;
       const namedIds=new Set([activeId,previousId,p.evidence.pending?.generationId,...additionalGenerationIds].filter(id=>typeof id==="string"));
         const sourceIssues=[],candidates=[];
-      const identityBoundBoard=(board,key,sourceRef,reason)=>{
+      // #2227: a board parsed here for this attempt alone (owned) is bound in
+      // place; one shared with the capture is copied, as before.
+      const identityBoundBoard=(board,key,sourceRef,reason,owned=false)=>{
         if(!board||board.syncAccount!==account||board.syncIdentity!=null&&board.syncIdentity!==identity){
           sourceIssues.push({key,sourceRef,reason:reason||"account-or-identity-mismatch"});return;
         }
-        const copy=automaticRecoveryClone(board);copy.syncAccount=account;copy.syncIdentity=identity;
+        const copy=owned?board:automaticRecoveryClone(board);copy.syncAccount=account;copy.syncIdentity=identity;
         const candidate={key,board:copy,sourceRef};candidates.push(candidate);return candidate;
       };
-      const requiredCandidate=(board,key,sourceRef,reason)=>{
+      const requiredCandidate=(board,key,sourceRef,reason,owned=false)=>{
         if(!board||board.syncAccount!==account||board.syncIdentity!=null&&board.syncIdentity!==identity){
           candidates.push({key,board:null,sourceRef});
           sourceIssues.push({key,sourceRef,reason:reason||"account-or-identity-mismatch"});return null;
         }
-        return identityBoundBoard(board,key,sourceRef);
+        return identityBoundBoard(board,key,sourceRef,undefined,owned);
       };
       for(const candidate of p.deviceCandidates||[])
         identityBoundBoard(candidate.board,candidate.key,candidate.sourceRef,"browser-source-identity-mismatch");
@@ -12108,7 +12265,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
           requiredCandidate(null,key,sourceRef,"durable-device-head-capture-mismatch");
         else{
           const headBoard=cloudSourceRecoveryBoard(p.head,account);
-          requiredCandidate(headBoard.board,key,sourceRef,headBoard.issue?"unsupported-durable-device-head":"durable-device-head-identity-mismatch");
+          requiredCandidate(headBoard.board,key,sourceRef,headBoard.issue?"unsupported-durable-device-head":"durable-device-head-identity-mismatch",true);
         }
       }
       for(const row of p.source.generations){
@@ -12136,7 +12293,7 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         readAttempt.checkBudget();
         const validated=cloudSourceRecoveryBoard(raw,account);
         if(!validated.board){sourceIssues.push({key,sourceRef,reason:"unsupported-cloud-board"});continue;}
-        requiredCandidate(validated.board,key,sourceRef,"cloud-generation-identity-mismatch");
+        requiredCandidate(validated.board,key,sourceRef,"cloud-generation-identity-mismatch",true);
       }
       if(p.evidence.pending&&!p.source.generations.some(row=>row.id===p.evidence.pending.generationId))
         sourceIssues.push({key:"cloud-pending:"+p.evidence.pending.generationId,sourceRef:{kind:"cloud-pending",id:p.evidence.pending.generationId},reason:"pending-generation-unavailable"});
@@ -12205,13 +12362,15 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
         return false;
       }
       const archiveKey="automatic-cloud-source:"+uid(),holdKey="automatic-device-recovery:"+uid();
-      const next=automaticRecoveryClone(reduced.board);
+      // #2227: the reduced board is already this attempt's own copy.
+      const next=reduced.board;
       if(acceptedBaseline)for(const field of ["syncRev","syncAccount","syncIdentity","lastCloudServerAt","decisionBase"])
         next[field]=acceptedBaseline[field];
       next.syncAccount=account;next.syncIdentity=identity;next.syncRev=acceptedBaseline?.syncRev??p.rev;
       next.syncDirty=true;
-      const nextPayload=JSON.stringify(next),verifiedNext=cloudSourceRecoveryBoard(nextPayload,account);
-      if(!verifiedNext.board||currentChoiceSourceIssue(next)||decisionEvidenceIssue(next,account)||decisionProjectionIssue(next))return false;
+      // #2227: decisionEvidenceIssue already includes the projection check.
+      const nextPayload=JSON.stringify(next);
+      if(!attemptRecoverySourceSupported(readAttempt,nextPayload,account)||currentChoiceSourceIssue(next)||decisionEvidenceIssue(next,account))return false;
       const sourceArchive=JSON.stringify({format:"chain-scanner.cloud-recovery-source",version:1,automaticRecovery:true,
         recoveryMode:p.recoveryMode,adoptedHeadHash:await ChainStorageV2.hashPayload(nextPayload),identity:p.evidence.identity,manifest:p.source.manifest,generations:p.source.generations,
         acceptedDeviceBoard:p.recoveryMode==="accepted"?p.local:null,
@@ -12243,11 +12402,16 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       const committed=await commitAutomaticRecoveryDeviceSource({captured:p,payload:nextPayload,
         archives:[{key:archiveKey,raw:sourceArchive}],hold,guard,readAttempt});
       if(!committed?.ok)return false;
-      const [saved,archives,savedHold,finalEvidence]=await Promise.all([deviceStore.readHead(),deviceStore.listOpaqueArchives(),
+      // #2227 (spec #2224): an ok commit has just read both archives back
+      // exactly, raw and through the archive list, and publication reads them
+      // back again before any cloud write. A third full read of every archive
+      // here (many times the board's size) only added memory, so this check
+      // relies on the commit's verified readback for the archives.
+      const [saved,savedHold,finalEvidence]=await Promise.all([deviceStore.readHead(),
         deviceStore.getRecoveryCloudHold(),backend.recoveryEvidence()]);
       if(saved?.payload!==nextPayload||saved.hash!==(committed.hash||committed.head?.hash)||
-        !recoverySourceValueEqual(saved,committed.head)||!archives.some(row=>row.key===archiveKey&&row.raw===sourceArchive)||
-        !archives.some(row=>row.key===holdKey&&row.raw===committed.rawArchive?.raw)||
+        !recoverySourceValueEqual(saved,committed.head)||
+        committed.rawArchive?.key!==holdKey||!committed.archives?.some(row=>row.key===archiveKey&&row.raw===sourceArchive)||
         !recoverySourceValueEqual(savedHold,{...hold,headHash:saved.hash})||
         !recoverySourceValueEqual(finalEvidence,p.evidence)||!guard())return false;
       if(!markDeviceStorageAuthority()){
@@ -12269,7 +12433,16 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}
       if(cloudRetryTimer&&cloudRetryOwner!=="automatic-source"){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
       render();renderSync();
-      if(backgroundResume||read.automaticFallback){
+      // #2227 (spec #2224): publication runs after this capture returns, so
+      // its source captures, candidate boards, reduced board and archive text
+      // are released first instead of staying alive while publication reads
+      // the new archives back. The device read cache describes the source
+      // before adoption, which changed, so it is dropped too.
+      if(backgroundResume||read.automaticFallback){delete readAttempt.rawDeviceSource;delete readAttempt.recoverySourceBoards;return PUBLISH_ADOPTED_RECOVERY;}
+      toast("Recovery is open on this device. Cloud confirmation is still pending.",8000);
+      return true;
+      };
+      const publishAdopted=async()=>{
         const publisherState={};let published=false;
         for(;;){
           published=await publishAutomaticCloudRecovery({sharedRead:read,sharedAttempt:readAttempt,resumeContext:publisherState});
@@ -12298,9 +12471,6 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
           }
         }else automaticCloudSourceResumeRequested=false;
         return true;
-      }
-      toast("Recovery is open on this device. Cloud confirmation is still pending.",8000);
-      return true;
       };
       let refresh=0;
       for(;;){
@@ -12326,7 +12496,8 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
             read.automaticGenerationIds=[...additionalGenerationIds];
             setAutomaticCloudSourceResumeStatus({state:"checking",unresolvedCount:count,unresolved:count,permanent:0});
           }
-          if(await capture())return true;
+          const captured=await capture();
+          if(captured===PUBLISH_ADOPTED_RECOVERY?await publishAdopted():captured)return true;
         }catch(caught){error=caught;}
         if(backgroundResume){
           const code=backgroundRetryCode||error?.code||(error?supportDiagnosticsErrorCode(error):null);
@@ -12406,7 +12577,7 @@ async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null
       const current=()=>{
         try{attempt.checkBudget();return serial===cloudSourceRecoverySerial&&cloudSourceRecoveryRead===read&&!attempt.signal.aborted&&
           deviceRecoveryCloudHold===hold&&JSON.stringify(state)===local&&cloudSourceRecoveryDraft()===draft&&
-          JSON.stringify(readManualArchiveLocalSources())===JSON.stringify(browser)&&window.CloudSync===backend&&
+          sameJsonValue(readManualArchiveLocalSources(),browser)&&window.CloudSync===backend&&
           backend.user===account&&cloudAccountIdentity()===identity&&!cloudSuspended&&!cloudResumePending&&
           liveBoardAccepted&&deviceStorageAuthority&&!hasActiveEditor()&&!scannerGestureActive&&
           !fileRestoreBusy&&!decisionRecoveryHolds(account).length;}catch{return false;}
@@ -12431,15 +12602,26 @@ async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null
           !recoverySourceValueEqual(source.browserRawSources,envelope.localStorage))return false;
       }catch{return false;}
       const row=(snapshot,name,key)=>{const store=snapshot.stores[name],at=store.keys.indexOf(key);return at<0?undefined:store.values[at];};
-      const snapshot=await deviceStore.readRawExportSnapshot(),initial=row(snapshot,"snapshots",hold.headHash);
+      // #2227 (spec #2224): every saved archive row is read only when the
+      // original names earlier archives by reference; otherwise the adopted
+      // head snapshot is the only row this check reads.
+      const referencesArchives=Array.isArray(envelope.indexedDBCapture?.references)&&envelope.indexedDBCapture.references.length>0;
+      let snapshot=referencesArchives||typeof deviceStore.readRawRows!=="function"?await deviceStore.readRawExportSnapshot():
+        await deviceStore.readRawRows({snapshots:[hold.headHash],opaque:[]});
+      const initial=row(snapshot,"snapshots",hold.headHash);
       if(!current()||!initial||typeof initial.payload!=="string"||await ChainStorageV2.hashPayload(initial.payload)!==hold.headHash||
-        !cloudSourceRecoveryBoard(initial.payload,account).board)return false;
+        !attemptRecoverySourceSupported(attempt,initial.payload,account))return false;
       const referenceCopies=await automaticRecoveryVerifiedArchiveReferences(envelope,identity,archives,snapshot,attempt);
       if(!referenceCopies)return false;
+      // Verified: the parsed original and the readback are not needed again.
+      snapshot=null;envelope=null;
       const requiredArchives=[original,sourceRow,...referenceCopies];
       const exactStored=async(publicationPending=evidence.pending,expectedHead=head,expectedHold=hold)=>{
         if(!current())return false;
-        const raw=await deviceStore.readRawExportSnapshot(),meta=row(raw,"meta","head"),saved=row(raw,"snapshots",expectedHead.hash);
+        // #2227: read only the rows compared here, not every saved archive.
+        const wanted={meta:["head","recoveryCloudHold","pending:"+identity],snapshots:[expectedHead.hash],opaque:requiredArchives.map(copy=>copy.key)};
+        const raw=typeof deviceStore.readRawRows==="function"?await deviceStore.readRawRows(wanted):await deviceStore.readRawExportSnapshot(),
+          meta=row(raw,"meta","head"),saved=row(raw,"snapshots",expectedHead.hash);
         return current()&&recoverySourceValueEqual({...meta,payload:saved?.payload},expectedHead)&&
           recoverySourceValueEqual(row(raw,"meta","recoveryCloudHold")??null,expectedHold)&&
           recoverySourceValueEqual(row(raw,"meta","pending:"+identity)??null,publicationPending)&&
@@ -12749,6 +12931,10 @@ async function automaticRecoveryVerifiedArchiveReferences(envelope,identity,arch
   readAttempt?.checkBudget();
   const physical=automaticRecoveryOpaqueRows(snapshot),copies=await automaticRecoveryReferencedArchiveRows(envelope,physical,readAttempt);
   if(!copies)return null;
+  // #2227: with no referenced copies the verified index below has nothing to
+  // match, yet hashing it re-serializes every recovery archive (the new ones
+  // are many times the board's size). The result is the same empty list.
+  if(!copies.length)return [];
   const verified=await automaticRecoveryArchiveIndex(snapshot,identity,readAttempt),verifiedByKey=new Map(verified.map(row=>[row.key,row])),result=[];
   for(const copy of copies){
     readAttempt?.checkBudget();
@@ -12759,12 +12945,13 @@ async function automaticRecoveryVerifiedArchiveReferences(envelope,identity,arch
   }
   return result;
 }
-function automaticRecoveryRecordedRatings(board){
+// #2227: decisionEvidenceIssue already answers decisionProjectionIssue for
+// the same board, so the replay runs once. A reduction passes its memo.
+function automaticRecoveryRecordedRatings(board,evidenceIssue=decisionEvidenceIssue){
   const account=board?.syncAccount??null;
-  return supportedDecisionBaseline(board?.decisionBaseline,account)&&
-    !decisionEvidenceIssue(board,account)&&!decisionProjectionIssue(board);
+  return supportedDecisionBaseline(board?.decisionBaseline,account)&&!evidenceIssue(board,account);
 }
-function automaticRecoverySourceFacts(board,{includeRecordedRatings=false}={}){
+function automaticRecoverySourceFacts(board,{includeRecordedRatings=false,evidenceIssue=decisionEvidenceIssue}={}){
   const facts=new Map(),causalRoot=new Set([...DEVICE_LOCAL_KEYS,"updatedAt","tasks","contexts","workLog","deletionLog",
     "deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps","clearedHistoryIds","restoredHistoryIds",
     "restoredHistoryOps","clearedAfterRestoreOps","decisionEvents","decisionEventsRecovery","decisionBaseline","decisionBaselineRecovery"]);
@@ -12775,7 +12962,7 @@ function automaticRecoverySourceFacts(board,{includeRecordedRatings=false}={}){
   // Coherently recorded ratings are derived replay results, not separate
   // saved-number choices. Legacy/unprojectable numbers remain ordinary facts;
   // cross-source baseline/identity compatibility is still checked separately.
-  if(!includeRecordedRatings&&automaticRecoveryRecordedRatings(board)){
+  if(!includeRecordedRatings&&automaticRecoveryRecordedRatings(board,evidenceIssue)){
     causalTask.add("mu");causalTask.add("sigma");
   }
   const put=(path,present,value)=>facts.set(JSON.stringify(path),canonicalDecisionFact({present,...(present?{value}:{})}));
@@ -12831,8 +13018,8 @@ function automaticRecoveryIdentityFacts(board){
     if(!entry||typeof entry!=="object"||Array.isArray(entry))conflicts.push("history:unsupported");else add("history:"+historyEntryKey(entry),entry);
   return {rows,conflicts};
 }
-function automaticRecoveryBoardIssue(board,account){
-  const issue=currentChoiceSourceIssue(board)||decisionEvidenceIssue(board,account);if(issue)return issue;
+function automaticRecoveryBoardIssue(board,account,evidenceIssue=decisionEvidenceIssue){
+  const issue=currentChoiceSourceIssue(board)||evidenceIssue(board,account);if(issue)return issue;
   for(const task of Array.isArray(board?.tasks)?board.tasks:[]){
     if(!validComparisonOps(task)||task.comparisonRecovery!==undefined&&(!Array.isArray(task.comparisonRecovery)||task.comparisonRecovery.length))return "unsupported-comparison-evidence";
     if(!supportedPostponeEvidence(task))return "unsupported-postpone-evidence";
@@ -12843,15 +13030,32 @@ function automaticRecoveryBoardIssue(board,account){
   }
   return null;
 }
-function automaticRecoveryCandidateConflicts(sources,account){
-  const conflicts=[];
+// #2227 (spec #2224): one reduction asks for the same unchanged source's facts
+// again and again: once per source pair, and once per resolved field for every
+// source. Each request replays that source's decisions, so a large board with
+// a few hundred resolved fields took minutes and peaked hundreds of MiB above
+// opening it, past the recovery budget and the phone's memory. Within one
+// reduction the source boards are never changed, so each board's facts are
+// computed once and kept only until the reduction returns. The verdicts are
+// unchanged.
+function automaticRecoveryFactsMemo(){
+  const sourceFacts=new Map(),identityFacts=new Map(),evidenceIssues=new Map();
+  const remember=(cache,board,make)=>{if(!cache.has(board))cache.set(board,make(board));return cache.get(board);};
+  // The decision replay is the costliest check; one per board and account.
+  const evidence=(board,account)=>remember(evidenceIssues,board,()=>new Map()).has(account)?evidenceIssues.get(board).get(account):
+    evidenceIssues.get(board).set(account,decisionEvidenceIssue(board,account)).get(account);
+  return {evidence,facts:board=>remember(sourceFacts,board,item=>automaticRecoverySourceFacts(item,{evidenceIssue:evidence})),
+    identity:board=>remember(identityFacts,board,automaticRecoveryIdentityFacts)};
+}
+function automaticRecoveryCandidateConflicts(sources,account,memo=null){
+  const conflicts=[],sourceFacts=memo?.facts??(board=>automaticRecoverySourceFacts(board)),identityFacts=memo?.identity??automaticRecoveryIdentityFacts;
   for(let i=0;i<sources.length;i++)for(let j=i+1;j<sources.length;j++){
     const left=sources[i],right=sources[j],base=automaticRecoverySharedBase(left.board,right.board,account);
-    const leftFacts=base?automaticRecoveryChangedFacts(left.board,base):automaticRecoverySourceFacts(left.board);
-    const rightFacts=base?automaticRecoveryChangedFacts(right.board,base):automaticRecoverySourceFacts(right.board);
+    const leftFacts=base?automaticRecoveryChangedFacts(left.board,base):sourceFacts(left.board);
+    const rightFacts=base?automaticRecoveryChangedFacts(right.board,base):sourceFacts(right.board);
     for(const [path,value] of leftFacts){const other=rightFacts.get(path);if(other!==undefined&&other!==value)
       conflicts.push({kind:"supported-field-ambiguity",path:JSON.parse(path),sourceKeys:[left.key,right.key],sourceRefs:[left.sourceRef,right.sourceRef]});}
-    const leftIdentity=automaticRecoveryIdentityFacts(left.board),rightIdentity=automaticRecoveryIdentityFacts(right.board);
+    const leftIdentity=identityFacts(left.board),rightIdentity=identityFacts(right.board);
     for(const key of new Set([...leftIdentity.conflicts,...rightIdentity.conflicts]))
       conflicts.push({kind:"unsupported-operation-identity",identity:key,sourceKeys:[left.key,right.key],sourceRefs:[left.sourceRef,right.sourceRef]});
     for(const [key,value] of leftIdentity.rows)if(rightIdentity.rows.has(key)&&rightIdentity.rows.get(key)!==value)
@@ -12883,6 +13087,8 @@ function reduceAutomaticRecoveryCandidates({acceptedBaseline=null,candidates=[]}
     }
   };
   if(!Array.isArray(candidates))return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported:[{reason:"candidate-list-unavailable"}]};
+  // #2227: facts and decision replays computed once per board, for this call.
+  const memo=automaticRecoveryFactsMemo();
   const ordered=[],byKey=new Map();
   for(const candidate of candidates){
     preserve(candidate);
@@ -12890,23 +13096,25 @@ function reduceAutomaticRecoveryCandidates({acceptedBaseline=null,candidates=[]}
       unsupported.push({key:candidate?.key??null,sourceRef:candidate?.sourceRef??null,reason:"candidate-projection-unsupported"});continue;
     }
     const account=candidate.board.syncAccount??acceptedBaseline?.syncAccount??null;
-    const issue=automaticRecoveryBoardIssue(candidate.board,account);
+    const issue=automaticRecoveryBoardIssue(candidate.board,account,memo.evidence);
     if(issue){unsupported.push({key:candidate.key,sourceRef:candidate.sourceRef,reason:issue});continue;}
-    const identityFacts=automaticRecoveryIdentityFacts(candidate.board);
+    const identityFacts=memo.identity(candidate.board);
     if(identityFacts.conflicts.length){unsupported.push({key:candidate.key,sourceRef:candidate.sourceRef,reason:"conflicting-operation-identity"});continue;}
     const prior=byKey.get(candidate.key);
     if(prior){
       if(canonicalDecisionFact(prior.board)!==canonicalDecisionFact(candidate.board))unsupported.push({key:candidate.key,sourceRef:candidate.sourceRef,reason:"source-key-collision"});
       continue;
     }
-    const row={key:candidate.key,board:automaticRecoveryClone(candidate.board),sourceRef:candidate.sourceRef};byKey.set(row.key,row);ordered.push(row);
+    // #2227: read in place. Every change below is made to a clone (next,
+    // trial, incoming), so the candidates need no defensive copy here.
+    const row={key:candidate.key,board:candidate.board,sourceRef:candidate.sourceRef};byKey.set(row.key,row);ordered.push(row);
   }
   ordered.sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0);
   const accepted=acceptedBaseline==null?null:automaticRecoveryPlainObject(acceptedBaseline)&&Array.isArray(acceptedBaseline.tasks)
-    ?{key:"accepted-baseline",board:automaticRecoveryClone(acceptedBaseline),sourceRef:null}:null;
+    ?{key:"accepted-baseline",board:acceptedBaseline,sourceRef:null}:null;
   if(acceptedBaseline!=null&&!accepted){unsupported.push({reason:"accepted-baseline-unsupported"});return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};}
   if(accepted){
-    const account=accepted.board.syncAccount??null,issue=automaticRecoveryBoardIssue(accepted.board,account);
+    const account=accepted.board.syncAccount??null,issue=automaticRecoveryBoardIssue(accepted.board,account,memo.evidence);
     if(issue){unsupported.push({key:accepted.key,reason:"accepted-baseline-"+issue});return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};}
   }
   if(unsupported.length)return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};
@@ -12919,8 +13127,12 @@ function reduceAutomaticRecoveryCandidates({acceptedBaseline=null,candidates=[]}
     compatible.push(row);
   }
   if(unsupported.length)return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};
-  const sources=[anchor,...compatible.filter(row=>row!==anchor&&canonicalDecisionFact(row.board)!==canonicalDecisionFact(anchor.board))];
-  const conflicts=automaticRecoveryCandidateConflicts(sources,account),resolvedAmbiguities=[];
+  // #2227: compare every source with the anchor once, holding one canonical
+  // copy besides the anchor's at a time, instead of twice per source.
+  const anchorCanonical=canonicalDecisionFact(anchor.board),sameAsAnchor=new Set([anchor]);
+  for(const row of compatible)if(row!==anchor&&canonicalDecisionFact(row.board)===anchorCanonical)sameAsAnchor.add(row);
+  const sources=[anchor,...compatible.filter(row=>!sameAsAnchor.has(row))];
+  const conflicts=automaticRecoveryCandidateConflicts(sources,account,memo),resolvedAmbiguities=[];
   for(const conflict of conflicts){
     // A scalar preference can use a reversible default. Immutable identities
     // and incompatible rating inputs cannot be repaired by choosing a value.
@@ -12929,47 +13141,57 @@ function reduceAutomaticRecoveryCandidates({acceptedBaseline=null,candidates=[]}
     else resolvedAmbiguities.push({...conflict,chosenKey:anchor.key,policy:accepted?"accepted-device":"stable-source-key"});
   }
   if(unsupported.length)return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};
-  const acceptedIdentity=accepted?automaticRecoveryIdentityFacts(accepted.board):{conflicts:[]};
+  const acceptedIdentity=accepted?memo.identity(accepted.board):{conflicts:[]};
   if(acceptedIdentity.conflicts.length){unsupported.push({key:accepted.key,reason:"conflicting-operation-identity"});return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};}
   let next=automaticRecoveryClone(anchor.board);
   for(const candidate of compatible){
-    if(candidate===anchor||canonicalDecisionFact(candidate.board)===canonicalDecisionFact(anchor.board))continue;
+    if(sameAsAnchor.has(candidate))continue;
     const base=automaticRecoverySharedBase(next,candidate.board,account),trial=automaticRecoveryClone(next),incoming=automaticRecoveryClone(candidate.board);
     if(base)rebasePendingBoardFields(trial,incoming,base);
     carryMissingRecoveryFields(trial,incoming);
     for(const task of trial.tasks){const peer=(incoming.tasks||[]).find(row=>row?.id===task.id);if(peer)carryMissingRecoveryFields(task,peer);}
     automaticRecoveryAddContexts(trial,incoming,base);
     mergeUndeletedTasks(trial,incoming);carryProtectedBackupIds(trial,incoming);
-    const issue=automaticRecoveryBoardIssue(trial,account);
+    const issue=automaticRecoveryBoardIssue(trial,account,memo.evidence);
     if(issue){unsupported.push({key:candidate.key,sourceRef:candidate.sourceRef,reason:"reduced-board-"+issue});continue;}
     next=trial;
   }
   if(unsupported.length)return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};
-  const resultFacts=automaticRecoverySourceFacts(next),decisionIndex=currentChoiceProjectionIndex(next.decisionEvents||[]),cancelled=decisionUndoTargets(next);
+  const resultFacts=automaticRecoverySourceFacts(next,{evidenceIssue:memo.evidence}),decisionIndex=currentChoiceProjectionIndex(next.decisionEvents||[]),cancelled=decisionUndoTargets(next);
+  // #2227: which recorded choices can decide a field does not depend on the
+  // field, so they are found once rather than once per resolved field, and
+  // each event is canonicalized at most once.
+  const eventPath=event=>event.target?.type==="task"?["tasks",event.target.id,event.target.property]:
+    event.target?.type==="context"?["contexts",event.target.id,event.target.property]:
+    event.target?.type==="setting"?["board","settings",event.target.property]:event.target?.type==="pass"?["board",event.target.property]:null;
+  const choiceEvents=[];
+  for(const event of decisionIndex.values()){
+    const target=eventPath(event);
+    if(event.kind==="current-choice"&&supportedCurrentChoiceEvent(event)&&!cancelled.has(event.id)&&target)choiceEvents.push({event,target});
+  }
+  const canonicalEvents=new Map(),canonicalEvent=event=>{
+    if(!canonicalEvents.has(event))canonicalEvents.set(event,canonicalDecisionFact(event));
+    return canonicalEvents.get(event);
+  };
   for(const resolution of resolvedAmbiguities){
-    const path=resolution.path,matching=sources.filter(source=>automaticRecoverySourceFacts(source.board).get(JSON.stringify(path))===resultFacts.get(JSON.stringify(path)));
-    const eventPath=event=>event.target?.type==="task"?["tasks",event.target.id,event.target.property]:
-      event.target?.type==="context"?["contexts",event.target.id,event.target.property]:
-      event.target?.type==="setting"?["board","settings",event.target.property]:event.target?.type==="pass"?["board",event.target.property]:null;
-    const events=[...decisionIndex.values()].filter(event=>{
-      const target=eventPath(event);return event.kind==="current-choice"&&supportedCurrentChoiceEvent(event)&&!cancelled.has(event.id)&&target&&
-        target.every((part,index)=>path[index]===part);
-    });
+    const path=resolution.path,key=JSON.stringify(path),matching=sources.filter(source=>memo.facts(source.board).get(key)===resultFacts.get(key));
+    const events=choiceEvents.filter(({target})=>target.every((part,index)=>path[index]===part)).map(({event})=>event);
     const winner=latestCurrentChoiceEvent(events,decisionIndex);
-    const recorded=winner&&matching.find(source=>(source.board.decisionEvents||[]).some(event=>event.id===winner.id&&canonicalDecisionFact(event)===canonicalDecisionFact(winner)));
+    const recorded=winner&&matching.find(source=>(source.board.decisionEvents||[]).some(event=>event.id===winner.id&&canonicalEvent(event)===canonicalEvent(winner)));
     if(recorded){resolution.chosenKey=recorded.key;resolution.policy="recorded-decision";resolution.decisionId=winner.id;}
     else if(matching.length){resolution.chosenKey=matching[0].key;resolution.policy=accepted&&matching[0]===anchor?"accepted-device":"stable-source-key";}
   }
+  // A legacy source still requires its exact saved numbers to survive.
+  // The result may omit those facts only because its own ratings are derived;
+  // compare the actual projected numbers rather than treating omission as loss.
+  const resultIncludingRatings=automaticRecoverySourceFacts(next,{includeRecordedRatings:true}),
+    resolvedPaths=new Set(resolvedAmbiguities.map(row=>JSON.stringify(row.path)));
   for(const candidate of compatible){
     const base=automaticRecoverySharedBase(anchor.board,candidate.board,account);
-    const expected=base?automaticRecoveryChangedFacts(candidate.board,base):automaticRecoverySourceFacts(candidate.board);
-    // A legacy source still requires its exact saved numbers to survive.
-    // The result may omit those facts only because its own ratings are derived;
-    // compare the actual projected numbers rather than treating omission as loss.
-    const resultIncludingRatings=automaticRecoverySourceFacts(next,{includeRecordedRatings:true});
+    const expected=base?automaticRecoveryChangedFacts(candidate.board,base):memo.facts(candidate.board);
     if([...expected].some(([path,value])=>{
       const parts=JSON.parse(path),actual=parts[0]==="tasks"&&["mu","sigma"].includes(parts[2])?resultIncludingRatings.get(path):resultFacts.get(path);
-      return actual!==value&&!resolvedAmbiguities.some(row=>JSON.stringify(row.path)===path);
+      return actual!==value&&!resolvedPaths.has(path);
     }))unsupported.push({key:candidate.key,sourceRef:candidate.sourceRef,reason:"candidate-delta-not-represented"});
   }
   if(unsupported.length)return {board:null,alternativesToPreserve,supportedAmbiguities,unsupported};
