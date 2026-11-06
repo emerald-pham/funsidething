@@ -361,6 +361,18 @@ test('RISK large board deliberate recovery guidance: mounted FAQ and changelog e
  assert.match(release,/<li>Cloud recovery of a large board reads, encodes and checks each saved copy less often, so Retry sync rebuilds it with less memory\. A large board still waits for Retry sync\./,'the mounted changelog includes the released behavior');
  assert.match(release,/If a Retry sync run stops before it finishes, cloud recovery waits again; opening or returning to the app does not start it over\./);
 });
+// #2239 round 2 (owner decision): a large board can wait for Retry sync, so no
+// changelog item or FAQ answer may describe a large board recovering from an
+// older or earlier cloud copy without saying that it can wait.
+test('RISK large board recovery guidance: no mounted changelog item or FAQ answer says a large board recovers from an older cloud copy without saying it can wait for Retry sync',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const entries=[...markup.matchAll(/<li>([\s\S]*?)<\/li>|<dd>([\s\S]*?)<\/dd>/g)].map(match=>(match[1]??match[2]).replace(/<[^>]+>/g,''));
+ assert.ok(entries.some(text=>/large board/i.test(text)&&/older (complete )?(cloud )?copy/i.test(text)),'the mounted Help includes large-board recovery entries');
+ const promises=entries.filter(text=>/large (board|one)/i.test(text)&&/(older|earlier) (complete )?(cloud )?copy/i.test(text)&&!/Retry sync|wait/i.test(text));
+ assert.deepEqual(promises,[],'each mention of a large board recovering from an older cloud copy says it can wait for Retry sync');
+});
 
 // #2226 (spec #2224) review: the board shows and takes input before cloud
 // recovery starts. Its Help answer and changelog line had no direct check, and

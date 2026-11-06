@@ -12806,6 +12806,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK large board recovery guidance: no mounted changelog item or FAQ answer says a large board recovers from an older cloud copy without saying it can wait for Retry sync",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts",
       "group": "core",
       "file": "tests/core.test.js"
