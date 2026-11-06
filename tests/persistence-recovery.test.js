@@ -1388,6 +1388,141 @@ test('RISK large board recovery browser: the automatic recovery default reconcil
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2228 (spec #2224): the automatic recovery default over a board shaped like
+// the owner's waits instead of running. #2227 bounded that recovery, but it
+// still peaks about 780 MiB above the local opening in WebKit (about 330 bytes
+// per serialized byte), which a phone may not allow. The same signed-in
+// large-board fixture and in-page fake cloud as the #2227 test: an unreadable
+// current generation over an intact earlier generation of similar size, and a
+// newer Add on the device. Recovery must not run: the board this device
+// accepted stays open and editable with nothing from the earlier generation
+// applied and nothing published, the cloud button and Settings say cloud
+// recovery is waiting, the page keeps answering, and Review cloud recovery and
+// Restore stay reachable. Memory is recorded for the report, not asserted:
+// desktop engines do not enforce a phone's limit.
+test('RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ const PRIOR_TITLE='Saved only in the intact earlier generation',NEWER_TITLE='Newer local edit before the wait',WAITING_TITLE='Added while cloud recovery waits';
+ const GENERATION_PATH='/__chain-2228/earlier-generation.json',WAIT_MS=90000,observed=[],failures=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  let earlier=null;
+  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2228-'+engineName+'-'));
+  const launch=async(tag,seed,withCloud)=>{
+   const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+    env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
+   await context.addInitScript(({seed,withCloud,GENERATION_PATH,ACCOUNT})=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
+    if(!withCloud)return;
+    const log=window.__recoveryWait={log:[],pulls:0};
+    let release;const answer=new Promise(resolve=>{release=resolve;});log.releasePull=()=>{setTimeout(release,0);};
+    const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
+    const cloud={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+     signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+     async pull(){
+      if(++log.pulls===1)await answer;log.log.push('pull');
+      Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+      window.dispatchEvent(new CustomEvent('cloudsync'));
+      return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+     },
+     async push(){log.log.push('push');return {error:true,code:'permission-denied'};},
+     async recoveryEvidence(){return {identity:'fixture-identity',epoch:1,pending:null};},
+     async readRecoverySource(){
+      log.log.push('source-read');
+      const payload=await (await fetch(GENERATION_PATH,{cache:'no-store'})).text(),encoded=await window.ChainStorageV2.encodeSnapshot(payload);
+      const header=(hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash,baseRev});
+      return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+       {id:root.activeGeneration,header:header('e'.repeat(64),6),chunks:[]},
+       {id:root.previousGeneration,header:header(encoded.hash,5),chunks:encoded.chunks}]};
+     },
+     async protectRecoverySources(){log.log.push('protect');return {error:true,code:'permission-denied'};},
+    };
+    Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+    document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+   },{seed,withCloud,GENERATION_PATH,ACCOUNT});
+   return context;
+  };
+  const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
+   &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
+  const summary={engine:engineName};
+  try{
+   const tag=`chain-2228-${engineName}-${process.pid}-${Date.now()}`;
+   let context=await launch(tag+'-seed',fixture.payload,false);
+   try{
+    const page=context.pages()[0]||await context.newPage();
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks)(page);
+    // The earlier generation: this device's accepted board before the newer edit.
+    const accepted=JSON.parse(await page.evaluate(()=>JSON.stringify(state)));
+    earlier=JSON.stringify({...accepted,tasks:[...accepted.tasks,{...syncTask('large-board-earlier-only',PRIOR_TITLE),ctx:['home']}]});
+    await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(LARGE_BOARD_SHAPE.tasks+1)(page);
+    await page.waitForTimeout(1500);
+   }finally{await context.close();}
+   context=await launch(tag,null,true);
+   try{
+    const page=context.pages()[0]||await context.newPage(),errors=[];let crashed=false;
+    page.on('pageerror',error=>errors.push(error.message));page.on('crash',()=>{crashed=true;});
+    const sampler=webProcessMemorySampler(tag);let memory;
+    try{
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks+1)(page);
+     const released=Date.now();await page.evaluate(()=>__recoveryWait.releasePull());
+     // Settled: either the waiting state, or recovery ran far enough to try
+     // its guarded publication (which a waiting recovery never reaches).
+     summary.settled=await page.waitForFunction(()=>{const text=document.getElementById('syncBtn')?.textContent||'';
+      return text==='☁ recovery waiting'||__recoveryWait.log.includes('protect')||text==='☁ older copy in use';},null,{timeout:WAIT_MS}).then(()=>true,()=>false);
+     summary.settleMs=Date.now()-released;
+     await page.waitForTimeout(2000);
+     summary.status=await page.evaluate(()=>{const el=document.getElementById('syncBtn');return {text:el.textContent,title:el.title,className:el.className};});
+     summary.log=await page.evaluate(()=>__recoveryWait.log.slice());
+     // Responsive: a frame and a task still run promptly.
+     summary.frameMs=await page.evaluate(()=>new Promise(resolve=>{const started=performance.now();requestAnimationFrame(()=>setTimeout(()=>resolve(Math.round(performance.now()-started)),0));}));
+     summary.titles=await page.$$eval('#listBody [data-row]',rows=>rows.map(row=>row.textContent));
+     // Editable: an ordinary Add still works while recovery waits.
+     await page.locator('#addInput').fill(WAITING_TITLE);await page.locator('#addInput').press('Enter');
+     summary.editable=await shown(LARGE_BOARD_SHAPE.tasks+2)(page).then(()=>true,()=>false);
+     await page.waitForTimeout(1000);
+     summary.statusAfterEdit=await page.evaluate(()=>document.getElementById('syncBtn').textContent);
+     summary.logAfterEdit=await page.evaluate(()=>__recoveryWait.log.slice());
+     // Settings says so, and keeps Review cloud recovery, the debug log and Restore.
+     await page.locator('#appHeader [data-act="settings"]').click();
+     for(const act of ['view-support-diagnostics','restore-backup','review-cloud-source-recovery']){
+      const section=page.locator('#modalRoot details.settings-section:has([data-act="'+act+'"])');
+      if(await section.count()&&!await section.first().evaluate(el=>el.open))await section.first().locator(':scope > summary').click();
+     }
+     summary.settings=await page.evaluate(()=>{const read=act=>{const el=document.querySelector('#modalRoot [data-act="'+act+'"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;};
+      return {waiting:/Cloud recovery is waiting\./.test(document.getElementById('modalRoot').textContent),review:read('review-cloud-source-recovery'),restore:read('restore-backup'),debugLog:read('view-support-diagnostics')};});
+     await page.keyboard.press('Escape');await page.evaluate(()=>closeModal());
+     // The cloud button keeps Review cloud recovery.
+     await page.locator('#syncBtn').click();
+     summary.cloudReview=await page.evaluate(()=>{const el=document.querySelector('#modalRoot [data-act="review-cloud-source-recovery"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;});
+     await page.evaluate(()=>closeModal());
+    }finally{memory=await sampler.stop();}
+    summary.peakMiB=Math.round(memory.peakBytes/1048576);summary.samples=memory.samples;summary.crashed=crashed;summary.errors=errors;
+   }finally{await context.close();}
+  }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  const {titles,...reported}=summary;observed.push(reported);t.diagnostic(JSON.stringify(reported));
+  assert.ok(summary.settled,`${engineName}: the opening settled within ${WAIT_MS/1000} s ${JSON.stringify(reported)}`);
+  assert.equal(summary.crashed,false,`${engineName}: the page did not crash`);assert.deepEqual(summary.errors,[],`${engineName}: no page errors`);
+  // Behavior under test: recovery waits instead of running.
+  if(summary.status.text!=='☁ recovery waiting')failures.push(`${engineName}: the cloud button does not say cloud recovery is waiting ${JSON.stringify(summary.status)}`);
+  if(!/cloud recovery is waiting/i.test(summary.status.title)||!/not confirmed/i.test(summary.status.title))failures.push(`${engineName}: the cloud button title does not explain the wait ${JSON.stringify(summary.status)}`);
+  if(summary.logAfterEdit.includes('protect')||summary.logAfterEdit.includes('push'))failures.push(`${engineName}: recovery ran or published while waiting ${JSON.stringify(summary.logAfterEdit)}`);
+  if(titles.some(text=>text.includes(PRIOR_TITLE)))failures.push(`${engineName}: the earlier generation was applied instead of waiting`);
+  if(!titles.some(text=>text.includes(NEWER_TITLE)))failures.push(`${engineName}: the accepted newer edit is missing`);
+  if(summary.frameMs>1000)failures.push(`${engineName}: the page stalled ${summary.frameMs} ms after the wait`);
+  if(!summary.editable)failures.push(`${engineName}: the board was not editable while recovery waits`);
+  if(summary.statusAfterEdit!=='☁ recovery waiting')failures.push(`${engineName}: an edit ended the waiting status ${summary.statusAfterEdit}`);
+  if(!summary.settings?.waiting)failures.push(`${engineName}: Settings does not say cloud recovery is waiting ${JSON.stringify(summary.settings)}`);
+  for(const key of ['review','restore','debugLog'])if(!summary.settings?.[key]?.visible||summary.settings[key].disabled)failures.push(`${engineName}: Settings does not offer ${key} while recovery waits ${JSON.stringify(summary.settings)}`);
+  if(!summary.cloudReview?.visible||summary.cloudReview.disabled)failures.push(`${engineName}: the cloud button does not offer Review cloud recovery while recovery waits ${JSON.stringify(summary.cloudReview)}`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 test('RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='broken-board-hydration-'+Date.now()+'-'+Math.random(),broken='{broken saved device board',
   board=syncState({tasks:[syncTask('recovered-phone-board','Saved iPhone board')],futureSaved:{keep:['exact',31]}}),raw=JSON.stringify(board),
