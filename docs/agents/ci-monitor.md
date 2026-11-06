@@ -84,9 +84,9 @@ only. Keep CI batching, required review identities, exact-commit evidence,
 compatibility checks, deployment verification, and live behavior checks in
 [`release-and-review.md`](release-and-review.md).
 
-Metadata-only PR `edited` events may reuse an already completed exact canonical
-merge context. A head, base, merge, workflow or cohort change requires full
-validation; pending producers never count as success. Public observation errors
+PR `edited` events start no Data safety run (#2232); a retargeted base is
+validated by the next push. A head, base, merge, workflow or cohort change
+requires full validation; pending producers never count as success. Public observation errors
 use the full-cohort fallback or the observer's unresolved exit, as appropriate.
 The handoff meanings remain: exit 0 is verified success, 1 is failure/cancellation
 or identity mismatch, and 2 requires continued observation or investigation.

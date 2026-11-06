@@ -125,11 +125,11 @@ async function main() {
     }
     return { pull, cohort: boundContext(repository, sourceSha, sourceTree, merge.sha, merge.tree.sha, pull.base.sha, 'canonical-pr-merge-v1') };
   }
-  const metadataEdit = eventName === 'pull_request' && event.action === 'edited' && !event.changes?.base;
-  if (!args['plan-only'] && ((eventName === 'push' && !isMain) || metadataEdit)) {
+  // PR events, edited included, always execute their own cohort: the workflow
+  // no longer fires on PR edits (#2232), so there is no metadata-edit reuse.
+  if (!args['plan-only'] && eventName === 'push' && !isMain) {
     try {
       const canonical = canonicalPull();
-      if (metadataEdit && (canonical.cohort.checkoutSha !== checkoutSha || canonical.cohort.checkoutTree !== checkoutTree || canonical.cohort.comparisonBase !== args['comparison-base'])) throw new Error('Edited PR has a different actual merge context.');
       const expected = hash(canonical.cohort);
       const deadline = Date.now() + args.maxWaitMs;
       while (true) {
@@ -166,8 +166,8 @@ async function main() {
           if(result.jobs.some(job=>!required.includes(job.name)&&!['release-evidence','deploy-pages'].includes(job.name)))throw new Error('Producer topology is unknown.');
         }
         const completed = steps.filter(step => (cohort ? new RegExp(`^Complete regression context ${expected} report [a-f0-9]{64}$`).test(step.name) : step.name === `Complete regression context ${expected}`) && step.conclusion === 'success');
-        // Metadata-only edited runs can themselves be covered. They are never
-        // producers: continue to the original completed full run instead.
+        // A covered (reuse-mode) run is never itself a producer: continue to
+        // the original completed full run instead.
         const coveredMarkers=cohort?steps.filter(step=>new RegExp(`^Verified complete cohort ${expected} report [a-f0-9]{64} mode reuse$`).test(step.name)&&step.conclusion==='success'):[];
         if(cohort&&completed.length===0&&coveredMarkers.length===1&&!steps.some(step=>step.name.startsWith('Complete regression context ')))continue;
         if (completed.length !== 1) throw new Error('The full cohort has no unique successful completion attestation.');

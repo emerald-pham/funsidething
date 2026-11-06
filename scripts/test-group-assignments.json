@@ -12411,7 +12411,7 @@
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
     {
-      "root": "metadata-only PR edits reuse completed full merge coverage without treating pending as success",
+      "root": "a routed pull request edited event executes its own cohort instead of reusing the head producer",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
@@ -12431,7 +12431,7 @@
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
     {
-      "root": "grouped metadata-only edited PR reuses only its completed exact merge context",
+      "root": "grouped routing of a pull request edited event executes its own cohort",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
@@ -12451,7 +12451,7 @@
       "file": "tests/repository-process.test.js"
     },
     {
-      "root": "metadata edits continue past verified covered runs to the original full producer",
+      "root": "routing continues past verified covered runs to the original full producer",
       "group": "native-process",
       "file": "scripts/agent-tools/ci-routing.test.mjs"
     },
@@ -13359,6 +13359,16 @@
       "root": "RISK test inventory: the group runner accepts an added environment-gated skip only when declared and its variable is absent",
       "group": "native-process",
       "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "workflow starts no run and no test group for a pull request edited event",
+      "group": "native-process",
+      "file": "scripts/agent-tools/ci-routing.test.mjs"
+    },
+    {
+      "root": "RISK repository process: a pull request edit starts no CI run and executes no test group",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
     }
   ],
   "nightlyRoots": [

@@ -530,15 +530,20 @@ test('workflow fails instead of claiming completion when the routing record cann
 });
 
 
-test('metadata-only PR edits reuse completed full merge coverage without treating pending as success', t => {
+// #2232: the workflow no longer fires on PR edits, so the router keeps no
+// metadata-edit reuse path. An edited event that still reaches it (a manual or
+// future trigger) executes its own cohort like any other fresh PR event.
+test('a routed pull request edited event executes its own cohort instead of reusing the head producer', t => {
   const f=fixture(t);
   const producer=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge});
   published(f,producer.record);
-  const result=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,action:'edited',changes:{body:{from:'prior evidence'}}});
-  assert.equal(result.status,0,result.stdout+result.stderr);
-  assert.equal(executions(f).length,1,'an unchanged exact PR context must not repeat the complete cohort for body metadata');
-  assert.equal(result.record?.decision,'reuse');
-  assert.equal(result.record.coveredBy.runAttempt,'2');
+  for (const changes of [{body:{from:'prior evidence'}},{title:{from:'earlier title'}}]) {
+    const result=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,action:'edited',changes});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.equal(result.record?.decision,'full',result.stdout);
+    assert.equal(result.record.observations.some(item=>item.url.includes('/pulls')),false,'an edited event must not wait on or reuse a canonical PR producer');
+  }
+  assert.equal(executions(f).length,3);
 });
 
 
@@ -592,21 +597,24 @@ test('grouped routing reuses only an exact completed reconciled producer and pre
   });
 });
 
-test('grouped metadata-only edited PR reuses only its completed exact merge context', t => {
+test('grouped routing of a pull request edited event executes its own cohort', t => {
   const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);publishedGroups(f,first.record);
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'previous evidence'}},environment:descriptorFor(f,f.merge)});
-  assert.equal(edited.status,0,edited.stdout+edited.stderr);assert.equal(edited.record.decision,'reuse');assert.equal(executions(f).length,1);
+  assert.equal(edited.status,0,edited.stdout+edited.stderr);assert.equal(edited.record.decision,'full',edited.stdout);assert.equal(executions(f).length,2);
   const baseEdit=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{base:{ref:{from:'previous-base'}}},environment:descriptorFor(f,f.merge)});
-  assert.equal(baseEdit.status,0,baseEdit.stderr);assert.equal(baseEdit.record.decision,'full');assert.equal(executions(f).length,2);
+  assert.equal(baseEdit.status,0,baseEdit.stderr);assert.equal(baseEdit.record.decision,'full');assert.equal(executions(f).length,3);
 });
 
 
-test('metadata edits continue past verified covered runs to the original full producer', t => {
+// A covered (reuse-mode) run is never itself a producer; the router continues to
+// the original full run. Migrated from the removed metadata-edit path (#2232) to
+// the outgoing branch push, which still routes through canonical producers.
+test('routing continues past verified covered runs to the original full producer', t => {
   const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
   const github=publishedGroups(f,first.record),covered=github.jobs.map(job=>({...job,run_id:72,run_attempt:1,steps:job.name==='scanner-tests'?[{name:`Verified complete cohort ${first.record.contextSha256} report ${'9'.repeat(64)} mode reuse`,conclusion:'success'}]:job.steps}));
   github.jobsByRun={'71':github.jobs,'72':covered};github.runs.unshift({...github.runs[0],id:72,run_attempt:1});writeFileSync(f.external,JSON.stringify(github));
-  const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
-  assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
+  const pushed=invoke(f,{environment:descriptorFor(f,f.head)});
+  assert.equal(pushed.status,0,pushed.stderr);assert.equal(pushed.record.decision,'reuse',pushed.stdout);assert.equal(pushed.record.coveredBy.runId,'71');assert.equal(pushed.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
 });
 
 // GitHub decides triggers, concurrency and job conditions before any repository
@@ -695,13 +703,25 @@ test('workflow runs once per pull request commit and keeps push validation on ma
   assert.equal(workflowTriggers(workflow, branchPush), false, 'a PR branch push must not start a second run beside its pull_request run');
   assert.equal(workflowTriggers(workflow, workflowContext('push', 'refs/heads/main-backup')), false, 'only the exact main branch keeps push validation');
   assert.equal(workflowTriggers(workflow, mainPush), true, 'deployment must still follow a verified main push build');
-  for (const action of ['opened', 'synchronize', 'reopened', 'edited'])
+  for (const action of ['opened', 'synchronize', 'reopened'])
     assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action } })), true, `pull_request ${action} must keep its run`);
   assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'labeled' } })), false, 'unrelated PR activity stays outside CI');
   for (const job of ['release-evidence', 'deploy-pages']) {
     assert.equal(workflowJobRuns(workflow, job, mainPush), true, `${job} must still run for a push to main`);
     assert.equal(workflowJobRuns(workflow, job, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })), false, `${job} must never run for a pull request`);
   }
+});
+
+// #2232: an automated PR-description update fired a second full run on the same
+// SHA. Nothing in the workflow re-reads the PR body, so an edited event (body,
+// title or base) starts no run and executes no test group; the next push does.
+test('workflow starts no run and no test group for a pull request edited event', () => {
+  const workflow = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  for (const changes of [{ body: { from: 'earlier evidence' } }, { title: { from: 'earlier title' } }, { base: { ref: { from: 'old-base' } } }]) {
+    const edited = workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'edited', changes } });
+    assert.equal(workflowTriggers(workflow, edited), false, `a PR edit (${Object.keys(changes)[0]}) must not start a Data safety run`);
+  }
+  assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })), true, 'a pushed commit still gets its run');
 });
 
 test('workflow cancels superseded non-main runs and never cancels main', () => {
@@ -712,9 +732,6 @@ test('workflow cancels superseded non-main runs and never cancels main', () => {
   assert.deepEqual(laterRunCancelsEarlier(workflow, older, pr('reopened', '102', 'c'.repeat(40))), { shared: true, inProgress: true, pending: true }, 'a reopened PR candidate supersedes the earlier run too');
   assert.equal(laterRunCancelsEarlier(workflow, older, pr('synchronize', '103', 'd'.repeat(40), 18)).shared, false, 'another PR must never cancel this one');
   assert.equal(laterRunCancelsEarlier(workflow, older, pr('synchronize', '104', 'd'.repeat(40), 17, 'Other workflow')).shared, false, 'the group is keyed by workflow as well as ref');
-  const edited = pr('edited', '105', 'b'.repeat(40));
-  assert.equal(laterRunCancelsEarlier(workflow, older, edited).inProgress, false, 'a PR metadata edit must not cancel the full producer it reuses');
-  assert.deepEqual(laterRunCancelsEarlier(workflow, edited, newer), { shared: true, inProgress: true, pending: true }, 'a newer commit supersedes a metadata-edit run waiting on the old commit');
   const mainRun = (run_id, sha) => workflowContext('push', 'refs/heads/main', { run_id, sha });
   assert.deepEqual(laterRunCancelsEarlier(workflow, mainRun('201', 'e'.repeat(40)), mainRun('202', 'f'.repeat(40))), { shared: false, inProgress: false, pending: false }, 'a later main push must never cancel or replace an earlier main run or its deploy');
   assert.equal(workflowConcurrency(workflow, mainRun('201', 'e'.repeat(40))).cancelInProgress, false, 'main runs never cancel in-progress work');

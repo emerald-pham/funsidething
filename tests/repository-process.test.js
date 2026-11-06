@@ -922,6 +922,20 @@ test('RISK repository process: CI runs once per pull request commit and never ca
  for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
 });
 
+// #2232: a PR description update started a second full run on the same SHA.
+// The edited trigger is pinned at the CI workflow seam and the router's handling
+// of a stray edited event at its command line (CI-routing tests); this process
+// RISK requires those pins to execute and pass.
+test('RISK repository process: a pull request edit starts no CI run and executes no test group',()=>{
+ const pins=['workflow starts no run and no test group for a pull request edited event','a routed pull request edited event executes its own cohort instead of reusing the head producer','grouped routing of a pull request edited event executes its own cohort','routing continues past verified covered runs to the original full producer'];
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+pins.join('|')+')$','scripts/agent-tools/ci-routing.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The PR edit routing pins must pass: '+result.stdout+'\n'+result.stderr);
+ assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,pins.length,'every named PR edit pin must execute');
+ assert.match(result.stdout,/^# skipped 0$/m);
+ for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
+});
+
 // The nightly cross-engine move is pinned at the agreed seams (the CI workflow
 // files in the CI-routing tests, and test:group --aggregate in the test-group
 // tests); this process RISK requires those pins to execute and pass.
