@@ -28,7 +28,7 @@ import {
   LOCAL_BACKUPS_KEY, DEVICE_AUTHORITY_KEY, HOUR, sharedScannerStorage, loadCloudBackend,
   loadCloudBackendV2, cloudAdapterCryptoGate, releaseCloudAdapterCryptoAfterDeadline,
   decodeManualArchiveTypedValue, loadBackupFileFixtureApp, prepareBackupFileFixtureSource, syncTask,
-  syncState, saveEditorChoice, loadAppAtTime, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState,
+  syncState, saveEditorChoice, loadAppAtTime, loadAppPinnedAt, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState,
   CLOUD_CHAIN, cloudState, makeSyncHarness, decisionRecoveryApp146, mixedSharedOutcome146,
   recordMixedDecisionActions146, decisionMixedActionsApp146, syncSettle, PAST_DEBOUNCE, doneTitles,
   seedDuplicateCompletion, workedLog, MORNING, EVENING, DAY_BEFORE, seedWorkLog, moodRuntime, atNoon,
@@ -6640,13 +6640,16 @@ test('RISK DATE FORMAT: Settings saves a changed format immediately through clos
 });
 
 test('RISK DATE FORMAT: task chips history backups and diagnostics share the chosen date order',async()=>{
-  const {ctx,shim}=await loadApp();ctx.state.settings.dateFormat='dmy';
+  // #2232: the app clock is pinned before these 2027 dates, which otherwise turn
+  // the due chip into "overdue" once they pass.
+  const at=new Date(2026,10,2,12).getTime();
+  const {ctx,shim}=await loadAppPinnedAt(at);ctx.state.settings.dateFormat='dmy';
   const task=ctx.addTask('Schedule',false,[],{due:'2027-02-03',startsAt:'2027-01-04'});
   assert.match(ctx.chipHTML(task),/03\/02\/2027/);assert.match(ctx.chipHTML(task),/04\/01\/2027/);
   assert.match(ctx.fmtWhen(new Date(2025,1,3,12).getTime()),/03\/02\/2025/);
   await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));
   ctx.recordSyncError('pull','unavailable');ctx.openSettings();
-  const label=ctx.formatCalendarDate(new Date(),{year:true}),pane=shim.document.getElementById('modalRoot').innerHTML;
+  const label=ctx.formatCalendarDate(new Date(at),{year:true}),pane=shim.document.getElementById('modalRoot').innerHTML;
   assert.ok(pane.includes(label),'full-year backup labels follow the same preference');
   assert.ok(ctx.syncErrorLogHtml().includes(label),'diagnostic timestamps follow the same preference');
 });
@@ -13473,14 +13476,15 @@ test('RISK opening board presentation: shared markup retains released cards cont
  // #2194 CI (PR #2222): the candidate's due date was the literal 2026-10-29,
  // written as a date a few days ahead. Once it passed, both apps offered the
  // overdue Run WOOP control with its own random binding id, so the released
- // and current markup could never match again. Keep it a few days ahead.
- const dueSoon=(()=>{const day=new Date(Date.now()+3*86400000);return day.getFullYear()+'-'+String(day.getMonth()+1).padStart(2,'0')+'-'+String(day.getDate()).padStart(2,'0');})();
+ // and current markup could never match again. #2232: both apps run on a pinned
+ // clock three days before the due date, so the fixture passes on any real date.
+ const at=new Date(2026,10,2,12).getTime(),dueSoon='2026-11-05';
  const tasks=['first','bench','candidate'].map((id,i)=>({...syncTask(id,'Saved <'+id+'> & title'),mu:25+i,ctx:['home'],evergreen:i===2,due:i===2?dueSoon:null}));
  tasks.push({...syncTask('done','Finished <saved> task'),done:true,completedAt:1});
  const board=syncState({tasks,contexts:[{id:'home',name:'Home & <garden>',active:true}],chain:['first','bench'],candidateId:'candidate',listOpen:true,ctxOpen:true,histOpen:true,
   workLog:[{id:'work-log',taskId:'first',title:'Earlier <work>',kind:'worked',at:2}],settings:{...syncState().settings,dateFormat:'mdy'}}),raw=JSON.stringify(board);
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
- const old=await loadApp({...options,appSource:extractAppScript(baseline.stdout)}),current=await loadApp(options);
+ const old=await loadAppPinnedAt(at,{...options,appSource:extractAppScript(baseline.stdout)}),current=await loadAppPinnedAt(at,options);
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
  for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}

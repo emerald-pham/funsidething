@@ -2202,6 +2202,18 @@ async function saveEditorChoice(app,id,at,changes={}){
  return app.ctx.persist();
 }
 
+// #2232: pins the app realm's whole clock. new Date() and Date.now() both read
+// `at` (the app's "today" comes from new Date()), explicit dates are unchanged,
+// and the outer process's Date is untouched. A fixture whose dates sit "a few
+// days ahead" of a pinned clock passes on any real date.
+function pinAppClock(sandbox,at){
+ vm.runInContext(`(()=>{const RealDate=Date;globalThis.Date=class extends RealDate{constructor(...args){if(args.length)super(...args);else super(${Number(at)});}static now(){return ${Number(at)};}};})()`,sandbox);
+}
+async function loadAppPinnedAt(at,options={}){
+ const original=options.beforeStateReady;
+ return loadApp({...options,beforeStateReady(ctx,shim){pinAppClock(ctx,at);original?.(ctx,shim);}});
+}
+
 async function loadAppAtTime(at,options={}){
  const original=options.beforeStateReady;
  return loadApp({...options,beforeStateReady(ctx,shim){setFakeTime(ctx,at);original?.(ctx,shim);}});
@@ -3851,7 +3863,7 @@ export {
   DEVICE_AUTHORITY_KEY, HOUR, sharedScannerStorage, loadCloudBackend, loadCloudBackendV2,
   cloudAdapterCryptoGate, releaseCloudAdapterCryptoAfterDeadline, decodeManualArchiveTypedValue,
   backupFileFixtures, loadBackupFileFixtureApp, prepareBackupFileFixtureSource, syncTask, syncState,
-  saveEditorChoice, loadAppAtTime, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN,
+  saveEditorChoice, loadAppAtTime, loadAppPinnedAt, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN,
   cloudState, makeSyncHarness, decisionRecoveryApp146, mixedSharedOutcome146,
   recordMixedDecisionActions146, decisionMixedActionsApp146, syncSettle, PAST_DEBOUNCE, doneTitles,
   seedDuplicateCompletion, renamedCloud, titlesOf, workedLog, MORNING, EVENING, DAY_BEFORE,
