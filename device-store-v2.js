@@ -276,12 +276,15 @@
       // hash it carries, in the same transaction as the head row, instead of
       // reading every saved snapshot (each a whole board) to find it. Only when
       // that key holds no snapshot with that hash are all snapshots read, in
-      // the same transaction, and searched as before.
+      // the same transaction, and searched as before. Those later reads start
+      // inside the head read's own promise, so one that fails as it starts
+      // rejects that promise and readonlyResults records the failure once;
+      // readonlyRequest would record it a second time.
       const metaRequest=readonlyRequest(tx,"head",()=>tx.objectStore("meta").get("head"));
       const snapshotRequest=metaRequest.then(meta=>{
         if(typeof meta?.hash!=="string")return undefined;
-        return readonlyRequest(tx,"head",()=>tx.objectStore("snapshots").get(meta.hash)).then(row=>row?.hash===meta.hash?row:
-          readonlyRequest(tx,"head",()=>tx.objectStore("snapshots").getAll()).then(rows=>rows.find(item=>item?.hash===meta.hash)));
+        return requestResult(tx.objectStore("snapshots").get(meta.hash)).then(row=>row?.hash===meta.hash?row:
+          requestResult(tx.objectStore("snapshots").getAll()).then(rows=>rows.find(item=>item?.hash===meta.hash)));
       });
       const [meta,found]=await readonlyResults(tx,[metaRequest,snapshotRequest],"head");
       if(!meta) return null;
