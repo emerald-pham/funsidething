@@ -1418,8 +1418,8 @@ test('RISK repository process: changed-line review plan fails closed on large pa
   'disabling the device store compare-and-swap guard is a persistence change');
  // The device store is persistence code throughout, even where an edited line
  // and its neighbours carry no storage words, and its schema constant is a migration.
- const deviceStore=(compare,version)=>`(function(){\n  const SCHEMA_VERSION=${version};\n  function same(a,b){\n    return a===b${compare};\n  }\n})();\n`;
- assert.deepEqual(plan({'device-store-v2.js':deviceStore('','2')},{'device-store-v2.js':deviceStore('||true','2')}).specialistDomains,['memory-cloud-sync'],
+ const deviceStore=compare=>`(function(){\n  function same(a,b){\n    return a===b${compare};\n  }\n})();\n`;
+ assert.deepEqual(plan({'device-store-v2.js':deviceStore('')},{'device-store-v2.js':deviceStore('||true')}).specialistDomains,['memory-cloud-sync'],
   'any edit to the device store derives the persistence specialist');
  assert.deepEqual(plan({'landscape-mood.js':'const SCHEMA_VERSION=2;\n'},{'landscape-mood.js':'const SCHEMA_VERSION=3;\n'}).specialistDomains,['data-migration'],
   'changing a SCHEMA_VERSION constant is a data migration');
