@@ -8822,7 +8822,11 @@ test('RISK backup format browser: enlarged unreadable Settings keeps the Restore
    const page=await context.newPage(),response=await page.goto(process.env.LANDSCAPE_BROWSER_URL);assert.equal(await response.text(),html,'native geometry consumer serves this exact app shell');
    await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&window.ScannerDeviceStore);
    const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
-   assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
+   // The unreadable original no longer leaves the board unaccepted: it is
+   // protected and an empty new-work board opens (#2246 found this stale
+   // precondition). Either way this device has no accepted board to export.
+   const noBoard=()=>page.evaluate(()=>({accepted:liveBoardAccepted,emptyNewWork:emptyNewWorkWorkspace()}));
+   const opened=await noBoard();assert.ok(!opened.accepted||opened.emptyNewWork,'no accepted board to export '+JSON.stringify(opened));
    await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupRestoreSource')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
    const before=await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot());
    await page.addStyleTag({content:'#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
@@ -8835,7 +8839,7 @@ test('RISK backup format browser: enlarged unreadable Settings keeps the Restore
    for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.id+' must remain inside its real Settings row');assert.ok(r.nativeIntrinsicWidth<=r.width+1,r.id+' leaves room for its complete label and native arrow compared with an unconstrained native reference');assert.notEqual(r.appearance,'none');}
    const help=page.locator('#modalRoot p.kv').filter({hasText:'the file has none: it is marked partial and cannot be restored as a board.'});assert.equal(await help.isVisible(),true);
    assert.equal(await help.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
-   await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.equal(await page.evaluate(()=>liveBoardAccepted),false);
+   await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.deepEqual(await noBoard(),opened,'the device still has no accepted board to export');
   }finally{await context.close();}
  });}finally{await browser.close();}
 });
