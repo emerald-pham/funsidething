@@ -1592,11 +1592,13 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
 // with opening the same board locally in the same run on the same engine. The
 // #2227 margin (384 times the board) covers a run whose publication is
 // refused; this run also publishes, which reads the recovery archives back
-// exactly before each guarded step. Measured after #2239: 827-870 MiB over the
-// local opening in WebKit and 743-816 MiB in Chromium; 440 times the board
-// (about 1 GiB) leaves about 18% above the highest WebKit run. It bounds
-// regressions; it is not a phone limit (the start mark covers that, #2239).
-const LARGE_BOARD_AUTOMATIC_RECOVERY_BYTES_FACTOR=440;
+// exactly before each guarded step. Measured after #2239 over six runs:
+// 827-941 MiB over the local opening in WebKit and 743-816 MiB in Chromium
+// (before it, with the budget raised on the test page, the same run took about
+// 60 s and peaked 1592 MiB over in WebKit and 1826 MiB in Chromium). 460 times
+// the board (about 1.05 GiB) leaves about 14% above the highest WebKit run. It
+// bounds regressions; it is not a phone limit (the start mark covers that).
+const LARGE_BOARD_AUTOMATIC_RECOVERY_BYTES_FACTOR=460;
 test('RISK large board automatic recovery browser: the automatic recovery default rebuilds a large board onto an intact earlier generation and publishes it without waiting for Retry sync, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;

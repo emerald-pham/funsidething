@@ -21390,7 +21390,7 @@
   },
   {
     "baseCommit": "552c3eee6394edc93512df257ac4d4719ef7106c",
-    "testChangesSha256": "7781e54011b29114db67ffaa6c733ef83c1a1fff1954722cc3735c8c85964bde",
+    "testChangesSha256": "c4caa040d251b18c5354fbe485812ef106de07312fe109c74b2c5bdd9ee42711",
     "reason": "#2239 (spec #2224, story 3) raises the automatic recovery default's work budget from 2.5 MiB to 6 MiB so a board shaped like the owner's (the large-board fixture, about 4.6 MiB of work) recovers on its own. The gate needs no record for this diff: it only adds lines to existing tests. This record documents that two existing browser tests no longer exercise the product budget: the #2227 deliberate-run test and the #2228 wait test each add one line to their in-page fake cloud setting the test-page override window.CLOUD_RECOVERY_WORK_BUDGET_BYTES to 2.5 MiB, the budget #2228 shipped, so the same fixture is still over budget and still waits before Retry sync. Their assertions, margins and fixtures are unchanged.",
     "previousBehavior": "At 552c3ee the product budget was 2.5 MiB, so the large-board fixture waited ('recovery waiting') on its own; the #2227 test then ran recovery deliberately through Retry sync and the #2228 test asserted the wait, both against the product value.",
     "intendedBehavior": "The product budget admits the fixture, which now recovers and publishes on its own (new browser test). The #2227 and #2228 tests reach the same over-budget state through the test-page override that the visual wait test and the Node recovery wait tests already use, so the deliberate run's 384x margin and the wait's 64 MiB margin keep their exact meaning.",
