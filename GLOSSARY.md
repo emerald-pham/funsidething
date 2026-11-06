@@ -72,7 +72,9 @@ _Avoid_: Failed recovery, paused sync
 **Deliberate run**:
 A recovery the person starts on purpose, with Retry sync or by signing in again,
 that goes ahead even when the automatic recovery default would wait. Opening,
-returning to or reconnecting the app never starts one.
+returning to or reconnecting the app never starts one. A deliberate run that
+ends without adopting a board, on its deadline or an error, returns to the
+recovery wait.
 _Avoid_: Forced recovery, automatic retry
 
 **Lossless recovery**:

@@ -4161,7 +4161,7 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "root": "RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -4271,17 +4271,17 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable",
+      "root": "RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable",
       "group": "core",
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "root": "RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board",
       "group": "core",
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK backup help: expiry, protected-copy deletion, and archive limits remain complete",
+      "root": "RISK backup help: expiry, protected-copy deletion, the two downloads and archive limits remain complete",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -7836,12 +7836,17 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "root": "RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file",
       "group": "core",
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "root": "RISK MANUAL JSON EXPORT: unreadable, unsupported, changing and hydration-placeholder sources make a recovery file marked partial, never a complete one",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK MANUAL JSON EXPORT: a large recovery file with several saved copies downloads losslessly and Restore accepts it",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -9096,7 +9101,7 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "root": "RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -10481,7 +10486,7 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "root": "RISK support diagnostics: Settings names the board and recovery downloads for their contents",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -10991,7 +10996,7 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "root": "RISK unreadable device recovery: the recovery file excludes the placeholder and preserves exact device evidence",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -12506,6 +12511,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
@@ -12776,6 +12786,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK large board deliberate recovery guidance: mounted FAQ and changelog explain that a large board still waits for Retry sync, that recovery reads and checks each saved copy less often, and that a Retry sync run that stops waits again",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts",
       "group": "core",
       "file": "tests/core.test.js"
@@ -12816,17 +12831,47 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving",
+      "root": "RISK JSON COPY PASTE: Download board saves the exact board JSON without saving, and pasting it restores through the guarded preview",
       "group": "core",
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste",
+      "root": "RISK JSON COPY PASTE: Quick start explains Download board, copying the file and guarded paste",
       "group": "core",
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes",
+      "root": "RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact saved sources and repair metadata without writes",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DOWNLOADS: Settings offers exactly one board export and one recovery export, and both files round-trip through Restore",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DOWNLOADS: Restore still accepts every earlier export format: board JSON, compact and pretty recovery archives and repair exports",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DOWNLOADS: a board edit while the saved rows are read marks the recovery file partial",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DOWNLOADS: Download recovery file says it is preparing while it runs, and says so when a protected recovery action stops it",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DOWNLOADS: an unavailable Debug log is recorded as missing and keeps an otherwise complete recovery file complete and restorable",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK DATABASE REPAIR EXPORT: a large recovery file downloads losslessly without being shown, and Restore accepts that file",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -12836,7 +12881,12 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export",
+      "root": "RISK DATABASE REPAIR EXPORT: Settings offers the recovery file and the Debug log dialog exports only its metadata report",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK support diagnostics export: every export the Debug log offers copies or downloads only the bounded metadata report and reads no saved board or database copy",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -12851,7 +12901,7 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft",
+      "root": "RISK DATABASE REPAIR EXPORT: a running recovery file never replaces a newer pasted draft, and overlapping downloads save one file",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -12861,12 +12911,12 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits",
+      "root": "RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diagnostics and partial-report limits",
       "group": "core",
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed",
+      "root": "RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the recovery file for repairs",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -13166,6 +13216,36 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: a deliberate run that ends on its deadline without adopting returns to the remembered wait, and returning to the app reads neither generation again",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: a deliberate run that ends on its deadline while Settings is open returns to the wait and does not run again when Settings closes",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK earlier source check: listing verified recovery archives without their hashes refuses exactly the archive rows that hashing them refuses, including BigInt typed arrays",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery read-backs: a deliberate run reads each recovery archive back once after writing it, and publication and its push check archives by key rather than reading every archive again",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery device capture: a deliberate run reads the device sources in full once, and its later checks during the cloud read compare their fingerprint",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"
@@ -13241,12 +13321,42 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK BACKUP FILE RESTORE: a signed-in large board file asks a board with no account to sign in first instead of failing, and changes nothing",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK BACKUP FILE RESTORE: signed in to its account, a large board file restores with its tasks, decisions, History order, deletion and clear records and decision baseline",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board deliberate recovery browser: Retry sync rebuilds a large board whose automatic recovery waits onto an intact earlier generation and publishes it, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },
@@ -13440,7 +13550,27 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
+      "root": "RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board deliberate recovery browser: Retry sync rebuilds a large board whose automatic recovery waits onto an intact earlier generation and publishes it, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -13529,6 +13659,78 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "The user authorized automatic useful offline recovery. Preserve pre-hydration no-read/no-adoption, exact current-head repair, full raw originals, manual/protected copies and remote authority; replace obsolete unusable-placeholder expectations with the proven supported local workspace. Fresh cloud reads may follow verified local recovery; source-bound tests measure the actual ordering."
+    },
+    {
+      "baselineRoot": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "currentRoot": "RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable",
+      "currentRoot": "RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "currentRoot": "RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK backup help: expiry, protected-copy deletion, and archive limits remain complete",
+      "currentRoot": "RISK backup help: expiry, protected-copy deletion, the two downloads and archive limits remain complete",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "currentRoot": "RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "currentRoot": "RISK MANUAL JSON EXPORT: unreadable, unsupported, changing and hydration-placeholder sources make a recovery file marked partial, never a complete one",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "currentRoot": "RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "currentRoot": "RISK support diagnostics: Settings names the board and recovery downloads for their contents",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "currentRoot": "RISK unreadable device recovery: the recovery file excludes the placeholder and preserves exact device evidence",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }
