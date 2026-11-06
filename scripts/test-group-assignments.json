@@ -476,6 +476,26 @@
       "root": "RISK opening scenery hydration browser: a returning night reload never shows the board over the day-blue placeholder before the scenery boots in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board deliberate recovery browser: Retry sync rebuilds a large board whose automatic recovery waits onto an intact earlier generation and publishes it, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     }
   ],
   "processControls": [
@@ -542,6 +562,78 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "The user authorized automatic useful offline recovery. Preserve pre-hydration no-read/no-adoption, exact current-head repair, full raw originals, manual/protected copies and remote authority; replace obsolete unusable-placeholder expectations with the proven supported local workspace. Fresh cloud reads may follow verified local recovery; source-bound tests measure the actual ordering."
+    },
+    {
+      "baselineRoot": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
+      "currentRoot": "RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable",
+      "currentRoot": "RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK backup format safety: raw-source qualification remains outside the native selector",
+      "currentRoot": "RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK backup help: expiry, protected-copy deletion, and archive limits remain complete",
+      "currentRoot": "RISK backup help: expiry, protected-copy deletion, the two downloads and archive limits remain complete",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "currentRoot": "RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "currentRoot": "RISK MANUAL JSON EXPORT: unreadable, unsupported, changing and hydration-placeholder sources make a recovery file marked partial, never a complete one",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage",
+      "currentRoot": "RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK support diagnostics: Settings names the existing board export for its contents",
+      "currentRoot": "RISK support diagnostics: Settings names the board and recovery downloads for their contents",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence",
+      "currentRoot": "RISK unreadable device recovery: the recovery file excludes the placeholder and preserves exact device evidence",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2246 (owner decision 2026-11-06: one board export and one recovery export) renamed this root when Settings replaced the Backup format select, Full recovery archive, View / copy current board and the database repair export with Download board and Download recovery file; the renamed test keeps the same contract against the new controls, as recorded in the #2246/#2247 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }
