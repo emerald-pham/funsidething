@@ -12766,6 +12766,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK large board automatic recovery guidance: mounted FAQ and changelog explain that a large board now rebuilds from an older cloud copy on its own once, and that the next opening waits for Retry sync if the app closed during that rebuild",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13156,6 +13161,16 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK large recovery: a large automatic recovery default saves its start mark before any download and removes it when it ends, and an opening that finds the mark over the same generation waits until Retry sync runs it",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK large recovery: a large automatic recovery default publishes on its own, then neither it nor returning to the app checks the earlier incomplete generation again until Retry sync",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"
@@ -13232,6 +13247,11 @@
     },
     {
       "root": "RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board automatic recovery browser: the automatic recovery default rebuilds a large board onto an intact earlier generation and publishes it without waiting for Retry sync, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },
@@ -13426,6 +13446,11 @@
     },
     {
       "root": "RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board automatic recovery browser: the automatic recovery default rebuilds a large board onto an intact earlier generation and publishes it without waiting for Retry sync, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },

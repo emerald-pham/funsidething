@@ -1111,6 +1111,103 @@ test('RISK recovery wait: after a deliberate run confirmed with an earlier cloud
  assert.ok(reads.slice(at).some(path=>path.startsWith(activePath)),'Retry sync checks the earlier incomplete generation again');
 });
 
+// #2239 (spec #2224): the product budget now admits a board shaped like the
+// owner's, so a large recovery (within the budget, above 2.5 MiB of work, the
+// budget #2228 shipped) runs on its own, once per unreadable generation. Its
+// safeguards are the non-memory behaviour tested here; the large-board browser
+// test covers memory with the product values. The captured shape is about
+// 2 MB of work, so these tests lower the large threshold to 1 MiB through the
+// app's own test-page override and keep the product budget.
+const LARGE_RECOVERY_THRESHOLD_2239=1048576;
+// The page closing during a large run (on a phone, most likely because it ran
+// out of memory) must not repeat the run on the next opening. The run saves a
+// start mark naming the unreadable generation before it downloads anything,
+// and removes it when it ends with the page alive; a mark that survives makes
+// the next opening over that generation wait until Retry sync runs it.
+test('RISK large recovery: a large automatic recovery default saves its start mark before any download and removes it when it ends, and an opening that finds the mark over the same generation waits until Retry sync runs it',{timeout:300000},async t=>{
+ const KEY='fvp:chain-scanner:automatic-recovery-over-budget',PRIOR='Saved only in the intact prior generation';
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ await t.test('the mark is saved before the earlier generation is downloaded, and the run that ends removes it',{timeout:150000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub),{ctx,shim,backend,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+  ctx.window.CLOUD_RECOVERY_LARGE_WORK_BYTES=LARGE_RECOVERY_THRESHOLD_2239;
+  let entered=false,release;const held=new Promise(resolve=>{release=resolve;});
+  app.faults.serverRead=async path=>{if(path===priorPath+'/chunks'){entered=true;await held;}};
+  sub.after(()=>{release();delete app.faults.serverRead;});
+  // Publication is refused, so the recovered board stays on this device.
+  refuseNextRecoveryTransaction255(app.faults);
+  ctx.closeModal();await flush();const pull=ctx.cloudPull();
+  await fixtureDeadline(async wait=>{while(!entered)await wait(5);},'the large run reaches the earlier generation download');
+  const marked=JSON.parse(shim.localStorage.getItem(KEY)||'null');
+  assert.deepEqual(marked?.started,{rev:backend.docs.get('users/owner').rev,generationId:app.originalRoot.activeGeneration},
+   'the start mark names the unreadable revision and generation before anything is downloaded: '+JSON.stringify(marked));
+  assert.equal(await store.getRecoveryCloudHold(),null,'nothing is adopted yet');
+  release();await pull;await recoveryWaitSettle2228(ctx,'the large run settles');
+  assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'positive control: the large run rebuilt the board');
+  const after=JSON.parse(shim.localStorage.getItem(KEY)||'null');
+  assert.ok(after,'the record stays, so later automatic repeats wait for Retry sync');
+  assert.equal(after.started,undefined,'the run that ended removed its start mark');
+ });
+ await t.test('an opening that finds the mark over the same generation waits until Retry sync',{timeout:150000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub),{ctx,shim,backend,activePath}=app,store=ctx.window.ScannerDeviceStore;
+  ctx.window.CLOUD_RECOVERY_LARGE_WORK_BYTES=LARGE_RECOVERY_THRESHOLD_2239;
+  const reads=[];app.faults.serverRead=async path=>{reads.push(path);};sub.after(()=>{delete app.faults.serverRead;});
+  // What a page closed during the run leaves behind: its start mark over this
+  // same unreadable revision and generation, the unchanged board and no hold.
+  const mark={rev:backend.docs.get('users/owner').rev,generationId:app.originalRoot.activeGeneration};
+  shim.localStorage.setItem(KEY,JSON.stringify({v:1,account:'e@example.com',identity:'owner',budget:{generationKiB:1967,boardKiB:2,decisionKiB:0,estimateKiB:1968,budgetKiB:6144},started:mark}));
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),cloudBefore=JSON.stringify([...backend.docs]);
+  ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+  // Behaviour under test: the opening waits instead of repeating the run.
+  assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','the opening over a surviving start mark waits');
+  assert.equal(JSON.stringify(ctx.state),before,'the accepted board stays exactly as it was');
+  assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null,'no recovery is adopted');
+  assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published');
+  assert.deepEqual(reads.filter(path=>path.endsWith('/chunks')&&path!==activePath+'/chunks'),[],'it decides from the generation headers, downloading no earlier generation');
+  assert.deepEqual(JSON.parse(shim.localStorage.getItem(KEY)).started,mark,'the start mark stays until a deliberate run');
+  const [event]=recoveryBudgetEvents2228(ctx);assert.equal(event?.metadata.budgetOutcome,'deferred','the debug log records the wait');
+  // Retry sync runs it deliberately, and its finish removes the mark.
+  refuseNextRecoveryTransaction255(app.faults);
+  await ctx.onAction('sync-retry',{});await recoveryWaitSettle2228(ctx,'Retry sync settles');
+  assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'Retry sync rebuilds the board from the earlier generation');
+  assert.equal(JSON.parse(shim.localStorage.getItem(KEY)||'null')?.started,undefined,'the deliberate run that ended removed the start mark');
+ });
+});
+// After a large run the cloud has confirmed, the earlier unreadable generation
+// stays an unresolved, protected source. Checking it again repeats the run's
+// work, so neither the run itself nor returning to the app checks it; Retry
+// sync does, as after a deliberate run over the budget (#2228).
+test('RISK large recovery: a large automatic recovery default publishes on its own, then neither it nor returning to the app checks the earlier incomplete generation again until Retry sync',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,activePath}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_LARGE_WORK_BYTES=LARGE_RECOVERY_THRESHOLD_2239;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ const PRIOR='Saved only in the intact prior generation',rootBefore=backend.docs.get('users/owner').rev;
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ // Where the server reads stood when the recovered board was published.
+ let publishedAt=null;const push=ctx.window.CloudSync.push;
+ ctx.window.CloudSync.push=async function(...args){const result=await push.apply(this,args);if(result?.ok)publishedAt??=reads.length;return result;};
+ t.after(()=>{ctx.window.CloudSync.push=push;});
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitIdleAfter2228(ctx,'the large run and anything it starts settle');
+ // It ran on its own and the cloud confirmed it.
+ assert.notEqual(syncStatus2200(shim).text,'☁ recovery waiting','positive control: the large run did not wait');
+ assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'the board is rebuilt from the earlier generation');
+ assert.equal(await store.getRecoveryCloudHold(),null,'the cloud confirmed the recovered board');
+ assert.equal(backend.docs.get('users/owner').rev,rootBefore+1,'published once, at the next revision');
+ assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.state.syncRev,rootBefore+1);
+ // Behaviour under test: once the board is published, the unreadable
+ // generation is not read again by the run or anything it starts.
+ assert.ok(publishedAt!==null,'positive control: the publication went through the cloud push');
+ assert.deepEqual(reads.slice(publishedAt).filter(path=>path.startsWith(activePath)),[],'the run does not check the earlier incomplete generation again');
+ for(const type of ['focus','online']){
+  const at=reads.length;vm.runInContext('resumeCloudSync({type:'+JSON.stringify(type)+'})',ctx);
+  await recoveryWaitIdleAfter2228(ctx,'the '+type+' pull settles');
+  assert.ok(reads.slice(at).includes('users/owner'),type+' still reads the server root');
+  assert.deepEqual(reads.slice(at).filter(path=>path.startsWith(activePath)),[],type+' does not check the earlier incomplete generation again');
+ }
+ // Retry sync checks it deliberately.
+ const at=reads.length;await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
+ assert.ok(reads.slice(at).some(path=>path.startsWith(activePath)),'Retry sync checks the earlier incomplete generation again');
+});
+
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,
 // so it must not cost the completed refusal kept in device storage.

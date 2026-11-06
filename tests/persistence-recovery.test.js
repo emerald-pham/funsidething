@@ -1264,6 +1264,9 @@ test('RISK large board recovery browser: a deliberate run of the automatic recov
      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
      if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
      if(!withCloud)return;
+     // #2239: the product budget now admits this board, so the test page
+     // restores the 2.5 MiB budget #2228 shipped to keep the opening waiting.
+     window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=2.5*1048576;
      const log=window.__largeRecovery={log:[],pulls:0};
      let release;const answer=new Promise(resolve=>{release=resolve;});log.releasePull=()=>{setTimeout(release,0);};
      const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
@@ -1439,6 +1442,9 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
     if(!withCloud)return;
+    // #2239: the product budget now admits this board, so the test page
+    // restores the 2.5 MiB budget #2228 shipped to keep it over budget.
+    window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=2.5*1048576;
     const log=window.__recoveryWait={log:[],pulls:0};
     let release;const answer=new Promise(resolve=>{release=resolve;});log.releasePull=()=>{setTimeout(release,0);};
     const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
@@ -1567,6 +1573,229 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
   if(!summary.settings?.waiting)failures.push(`${engineName}: Settings does not say cloud recovery is waiting ${JSON.stringify(summary.settings)}`);
   for(const key of ['review','restore','debugLog'])if(!summary.settings?.[key]?.visible||summary.settings[key].disabled)failures.push(`${engineName}: Settings does not offer ${key} while recovery waits ${JSON.stringify(summary.settings)}`);
   if(!summary.cloudReview?.visible||summary.cloudReview.disabled)failures.push(`${engineName}: the cloud button does not offer Review cloud recovery while recovery waits ${JSON.stringify(summary.cloudReview)}`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2239 (spec #2224, user story 3): a board shaped like the owner's recovers
+// on its own. The same signed-in large-board fixture and in-page fake cloud as
+// the #2227 test: an unreadable current generation (every chunk missing) over
+// an intact earlier generation of similar size, a newer Add and scan decision
+// on the device and an unfinished draft in Add. This cloud accepts the
+// recovery's guarded publication, as the real store does once the earlier
+// sources are protected: it reads the device's protected originals back
+// before publishing, then serves the new generation to later reads. The
+// opening must rebuild the board and publish it without waiting for Retry
+// sync, keep every accepted decision, task, History entry, disposition and the
+// draft, and end with the cloud confirming the board. Peak web-process memory,
+// from the opening until the cloud confirms and the page settles, is compared
+// with opening the same board locally in the same run on the same engine. The
+// #2227 margin (384 times the board) covers a run whose publication is
+// refused; this run also publishes, which reads the recovery archives back
+// exactly before each guarded step. Measured after #2239: 827-870 MiB over the
+// local opening in WebKit and 743-816 MiB in Chromium; 440 times the board
+// (about 1 GiB) leaves about 18% above the highest WebKit run. It bounds
+// regressions; it is not a phone limit (the start mark covers that, #2239).
+const LARGE_BOARD_AUTOMATIC_RECOVERY_BYTES_FACTOR=440;
+test('RISK large board automatic recovery browser: the automatic recovery default rebuilds a large board onto an intact earlier generation and publishes it without waiting for Retry sync, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ const PRIOR_TITLE='Saved only in the intact earlier generation',NEWER_TITLE='Newer local edit before recovery',DRAFT='Unfinished draft kept through recovery';
+ const GENERATION_PATH='/__chain-2239/earlier-generation.json',HEADER_PATH='/__chain-2239/earlier-header.json';
+ const allowance=LARGE_BOARD_AUTOMATIC_RECOVERY_BYTES_FACTOR*stats.serializedBytes,SETTLE_MS=4000,RECOVERY_WAIT_MS=90000,observed=[],failures=[];
+ const taskCount=LARGE_BOARD_SHAPE.tasks+1,mib=bytes=>Math.round(bytes/1048576);
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  let earlier=null,earlierHeader=null;
+  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2239-'+engineName+'-'));
+  const launch=async(tag,seed,withCloud)=>{
+   const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+    env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
+   await context.route(origin+HEADER_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlierHeader}));
+   await context.addInitScript(({seed,withCloud,GENERATION_PATH,HEADER_PATH,ACCOUNT})=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
+    if(!withCloud)return;
+    const log=window.__automaticRecovery={log:[],pulls:0,statuses:[],published:null};
+    // Every label the cloud button shows, in order.
+    document.addEventListener('DOMContentLoaded',()=>{
+     const button=document.getElementById('syncBtn'),note=()=>{const text=button.textContent;if(log.statuses.at(-1)!==text)log.statuses.push(text);};
+     note();new MutationObserver(note).observe(button,{childList:true,characterData:true,subtree:true});
+    });
+    let release;const answer=new Promise(resolve=>{release=resolve;});log.releasePull=()=>{setTimeout(release,0);};
+    const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
+    const generations=new Map();
+    const header=async()=>(await fetch(HEADER_PATH,{cache:'no-store'})).json();
+    // The named generations only (active, previous, pending and any named
+    // earlier one), each read afresh as the network does.
+    const named=(pendingGenerationId,additionalGenerationIds=[])=>[...new Set([root.activeGeneration,root.previousGeneration,pendingGenerationId,...additionalGenerationIds]
+     .filter(id=>typeof id==='string'))];
+    const read=async(id,withChunks)=>{
+     if(id==='generation-intact-earlier'){
+      if(!withChunks){const e=await header();return {id,header:{schemaVersion:2,state:'published',encoding:'utf8',chunkCount:e.chunkCount,byteLength:e.byteLength,hash:e.hash,baseRev:5}};}
+      const encoded=await window.ChainStorageV2.encodeSnapshot(await (await fetch(GENERATION_PATH,{cache:'no-store'})).text());
+      return {id,header:{schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash:encoded.hash,baseRev:5},chunks:encoded.chunks};
+     }
+     if(id==='generation-unreadable'){const e=await header();
+      return {id,header:{schemaVersion:2,state:'published',encoding:'utf8',chunkCount:e.chunkCount,byteLength:e.byteLength,hash:'e'.repeat(64),baseRev:6},...(withChunks?{chunks:[]}:{})};}
+     const stored=generations.get(id);
+     return stored?{id,header:{...stored.header},...(withChunks?{chunks:stored.chunks.map(chunk=>({...chunk}))}:{})}:{id,unavailable:true};
+    };
+    const cloud={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+     signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+     async pull(){
+      if(++log.pulls===1)await answer;log.log.push('pull');
+      if(log.published){
+       Object.assign(cloud,{status:'ok',errorStage:null,errorCode:null,knownDamagedSource:false});window.dispatchEvent(new CustomEvent('cloudsync'));
+       const {payload,rev,updatedAt,serverUpdatedAt}=log.published;
+       return {payload,rev,updatedAt,serverUpdatedAt,schemaVersion:2,generationId:root.activeGeneration};
+      }
+      Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+      window.dispatchEvent(new CustomEvent('cloudsync'));
+      return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+     },
+     // A guarded publication: the device's protected originals are read back
+     // first, then the new generation replaces the root at the next revision.
+     async push(payload,updatedAt,baseRev,context){
+      log.log.push('push');
+      if(typeof context?.validateBeforePublish==='function'&&!await context.validateBeforePublish(context.recoveryPending))return {error:true,code:'recovery-source-changed'};
+      if(baseRev!==root.rev)return {conflict:true,rev:root.rev};
+      const encoded=await window.ChainStorageV2.encodeSnapshot(payload),id='generation-published-'+(root.rev+1);
+      generations.set(id,{header:{schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash:encoded.hash,baseRev},chunks:encoded.chunks});
+      Object.assign(root,{rev:root.rev+1,previousGeneration:root.activeGeneration,activeGeneration:id});
+      log.published={payload,rev:root.rev,updatedAt,serverUpdatedAt:Date.now()};log.log.push('published');
+      Object.assign(cloud,{status:'ok',errorStage:null,errorCode:null,knownDamagedSource:false});
+      return {ok:true,rev:root.rev,serverUpdatedAt:log.published.serverUpdatedAt};
+     },
+     async recoveryEvidence(){return {identity:'fixture-identity',epoch:1,pending:null};},
+     async readRecoverySource({pendingGenerationId,additionalGenerationIds}={}){
+      log.log.push('source-read');
+      const rows=[];for(const id of named(pendingGenerationId,additionalGenerationIds))rows.push(await read(id,true));
+      return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:rows};
+     },
+     // The root and the generation headers on their own: small documents.
+     async readRecoverySourceHeaders({pendingGenerationId,additionalGenerationIds}={}){
+      log.log.push('header-read');
+      const rows=[];for(const id of named(pendingGenerationId,additionalGenerationIds))rows.push(await read(id,false));
+      return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:rows};
+     },
+     async protectRecoverySources(){log.log.push('protect');return {ok:true};},
+    };
+    Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+    document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+   },{seed,withCloud,GENERATION_PATH,HEADER_PATH,ACCOUNT});
+   return context;
+  };
+  const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
+   &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
+  // What recovery must keep, computed in the page, as in the #2227 test.
+  const kept=page=>page.evaluate(async()=>{
+   const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value??null)))),b=>b.toString(16).padStart(2,'0')).join('');
+   const out={};for(const key of ['decisionEvents','decisionBaseline','chain','deletedTaskIds','clearedHistoryIds'])out[key]=await digest(state[key]);
+   out.tasks=await digest(state.tasks.filter(task=>task.id!=='large-board-earlier-only'));out.draft=document.getElementById('addInput').value;
+   out.history=(state.workLog||[]).map(entry=>JSON.stringify(entry));
+   out.dispositions=Object.fromEntries(['considered','cantAt','workedAt'].map(key=>[key,JSON.parse(JSON.stringify(state[key]??{}))]));
+   return out;});
+  const summary={engine:engineName};
+  let local=null,recovered=null,before=null,after=null,errors=[],crashed=false;
+  try{
+   const tag=`chain-2239-${engineName}-${process.pid}-${Date.now()}`;
+   let context=await launch(tag+'-seed',fixture.payload,false);
+   try{
+    const page=context.pages()[0]||await context.newPage();
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks)(page);
+    // The earlier generation: this device's accepted board before the newer edit.
+    const accepted=JSON.parse(await page.evaluate(()=>JSON.stringify(state)));
+    earlier=JSON.stringify({...accepted,tasks:[...accepted.tasks,{...syncTask('large-board-earlier-only',PRIOR_TITLE),ctx:['home']}]});
+    // The newer accepted edit through Add, and a newer scan decision through the real No button.
+    await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(taskCount)(page);
+    const decisions=await page.evaluate(()=>state.decisionEvents.length);
+    await page.locator('[data-act="no"]').first().click();
+    await page.waitForFunction(count=>state.decisionEvents.length>count&&Object.keys(state.considered).length>0,decisions,{timeout:30000});
+    await page.waitForFunction(()=>new Promise(resolve=>{const request=indexedDB.open('chain-scanner-v2');request.onerror=()=>resolve(false);
+     request.onsuccess=()=>{const db=request.result;try{const read=db.transaction('meta').objectStore('meta').get('head');
+      read.onsuccess=()=>{db.close();resolve(!!read.result);};read.onerror=()=>{db.close();resolve(false);};}catch{db.close();resolve(false);}};}),null,{timeout:30000});
+    await page.waitForTimeout(1500);
+   }finally{await context.close();}
+   const encodedEarlier=await loadStorageV2().encodeSnapshot(earlier);
+   earlierHeader=JSON.stringify({chunkCount:encodedEarlier.chunkCount,byteLength:encodedEarlier.byteLength,hash:encodedEarlier.hash});
+   // The same board opened locally, with no cloud, in the same run: the baseline.
+   context=await launch(tag+'-local',null,false);
+   try{
+    const page=context.pages()[0]||await context.newPage(),sampler=webProcessMemorySampler(tag+'-local');
+    try{
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+     await page.locator('#addInput').fill(DRAFT);await page.locator('#addInput').blur();await page.waitForTimeout(SETTLE_MS);
+    }finally{local=await sampler.stop();}
+   }finally{await context.close();}
+   context=await launch(tag,null,true);
+   try{
+    const page=context.pages()[0]||await context.newPage();page.on('pageerror',error=>errors.push(error.message));page.on('crash',()=>{crashed=true;});
+    const sampler=webProcessMemorySampler(tag);
+    try{
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+     // An unfinished draft left in Add, not focused, as a person leaves it.
+     await page.locator('#addInput').fill(DRAFT);await page.locator('#addInput').blur();
+     before=await kept(page);
+     const released=Date.now();await page.evaluate(()=>__automaticRecovery.releasePull());
+     // Settled: the cloud published the recovered board and the device took
+     // its confirmation, or the opening waited (which this test rejects).
+     summary.settled=await page.waitForFunction(()=>{const text=document.getElementById('syncBtn')?.textContent||'';
+      return text==='☁ recovery waiting'||!!__automaticRecovery.published&&state.syncDirty===false&&state.syncRev===__automaticRecovery.published.rev&&text==='☁ synced';},
+      null,{timeout:RECOVERY_WAIT_MS}).then(()=>true,()=>false);
+     summary.settleMs=Date.now()-released;
+     await page.waitForTimeout(SETTLE_MS);
+    }finally{recovered=await sampler.stop();}
+    after=await kept(page);
+    summary.titles=await page.$$eval('#listBody [data-row]',rows=>rows.map(row=>row.textContent));
+    Object.assign(summary,await page.evaluate(async()=>{
+     const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value??null)))),b=>b.toString(16).padStart(2,'0')).join('');
+     const el=document.getElementById('syncBtn'),published=__automaticRecovery.published,board=published&&JSON.parse(published.payload);
+     return {status:{text:el.textContent,title:el.title},statuses:__automaticRecovery.statuses.slice(),log:__automaticRecovery.log.slice(),
+      syncRev:state.syncRev,syncDirty:state.syncDirty,publishedRev:published?.rev??null,
+      publishedTitles:board?board.tasks.map(task=>task.title):[],
+      publishedMatches:board?{tasks:await digest(board.tasks)===await digest(state.tasks),decisionEvents:await digest(board.decisionEvents)===await digest(state.decisionEvents),
+       workLog:await digest(board.workLog)===await digest(state.workLog)}:null};
+    }));
+   }finally{await context.close();}
+  }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  const extra=recovered.peakBytes-local.peakBytes;
+  Object.assign(summary,{localPeakMiB:mib(local.peakBytes),recoveryPeakMiB:mib(recovered.peakBytes),extraMiB:mib(extra),allowanceMiB:mib(allowance),
+   processes:[local.processes,recovered.processes],samples:[local.samples,recovered.samples],crashed,errors});
+  const {titles,publishedTitles,...reported}=summary;observed.push(reported);t.diagnostic(JSON.stringify(reported));
+  // Measurement preconditions: the harness saw this browser's own web process.
+  assert.ok(local.processes>0&&recovered.processes>0&&local.samples>10&&recovered.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(reported)}`);
+  assert.equal(crashed,false,`${engineName}: the page did not crash`);
+  // Behavior under test: recovery runs and publishes on its own.
+  if(summary.statuses.includes('☁ recovery waiting'))failures.push(`${engineName}: the automatic recovery default waited for Retry sync instead of recovering ${JSON.stringify(reported)}`);
+  if(!summary.settled||summary.status.text!=='☁ synced'||summary.publishedRev===null){failures.push(`${engineName}: the recovered board was not published and confirmed ${JSON.stringify(reported)}`);continue;}
+  if(extra>allowance)failures.push(`${engineName}: recovering and publishing the large board peaked ${mib(extra)} MiB over opening it locally, above the ${mib(allowance)} MiB allowance`);
+  assert.deepEqual(errors,[],`${engineName}: no page errors`);
+  // Published through the guarded path, once, at the next revision.
+  assert.ok(summary.log.indexOf('protect')>=0&&summary.log.indexOf('protect')<summary.log.indexOf('push'),`${engineName}: the earlier sources were protected before publishing ${JSON.stringify(summary.log)}`);
+  assert.deepEqual(summary.log.filter(entry=>entry==='published'),['published'],`${engineName}: published once`);
+  assert.equal(summary.publishedRev,8,`${engineName}: published at the revision after the unreadable one`);
+  assert.equal(summary.syncRev,8);assert.equal(summary.syncDirty,false,`${engineName}: the device took the cloud's confirmation`);
+  assert.deepEqual(summary.publishedMatches,{tasks:true,decisionEvents:true,workLog:true},`${engineName}: the cloud holds exactly the recovered board`);
+  // Recovery ran on the intact earlier generation and the board uses it.
+  assert.ok(summary.titles.some(text=>text.includes(PRIOR_TITLE)),`${engineName}: the task saved only in the earlier generation is on the board`);
+  assert.ok(publishedTitles.includes(PRIOR_TITLE)&&publishedTitles.includes(NEWER_TITLE),`${engineName}: the cloud holds the earlier-only task and the newer edit`);
+  // Lossless: every accepted decision, the unfinished draft and the newer edit are kept.
+  for(const [index,id] of fixture.ids.entries())assert.ok(summary.titles.some(text=>new RegExp('Large board task '+index+'(?!\\d)').test(text)),`${engineName}: task ${id} is kept`);
+  assert.ok(summary.titles.some(text=>text.includes(NEWER_TITLE)),`${engineName}: the newer local edit is kept`);
+  const {dispositions:beforeDispositions,history:beforeHistory,...beforeKept}=before,{dispositions:afterDispositions,history:afterHistory,...afterKept}=after;
+  assert.deepEqual(afterKept,beforeKept,`${engineName}: every accepted decision, task and the unfinished draft survive recovery unchanged`);
+  const afterHistorySet=new Set(afterHistory);
+  assert.deepEqual(beforeHistory.filter(entry=>!afterHistorySet.has(entry)),[],`${engineName}: every accepted History entry survives recovery`);
+  const beforeHistorySet=new Set(beforeHistory);
+  assert.deepEqual(afterHistory.filter(entry=>beforeHistorySet.has(entry)),beforeHistory,`${engineName}: accepted History keeps its order`);
+  assert.ok(Object.keys(beforeDispositions.considered).length>0,`${engineName}: fixture precondition: the device holds a newer scan decision`);
+  for(const [key,entries] of Object.entries(beforeDispositions))for(const [id,value] of Object.entries(entries))
+   assert.deepEqual(afterDispositions[key]?.[id],value,`${engineName}: the accepted ${key} entry for ${id} survives recovery`);
+  assert.equal(after.draft,DRAFT);
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
