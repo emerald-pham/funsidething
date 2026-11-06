@@ -144,9 +144,11 @@ publishing its statuses.
 
 Run `npm run release:install-hook` once per clone. It installs one pre-push
 dispatcher in the shared Git directory, chains an existing default hook, and
-refuses to replace a custom `core.hooksPath`. Every outgoing non-deletion tip
-needs a valid exact-SHA receipt, and the current worktree must be clean. An
-older checkout without the validator fails closed.
+refuses to replace a custom `core.hooksPath`. A push to `main` needs a valid
+exact-SHA receipt for every outgoing non-deletion tip, and the current worktree
+must be clean. Pushes to other refs need neither, so a work branch and its PR
+can run CI before review.
+An older checkout without the validator fails closed.
 
 After recording a receipt, run `npm run release:publish -- <candidate-sha>`
 while authenticated with `gh`. Schema version 1 publishes the established

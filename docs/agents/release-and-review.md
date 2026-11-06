@@ -123,7 +123,8 @@ focused preservation test across the assessed domains. Install the shared pre-pu
 `npm run release:install-hook`, record evidence with `npm run release:record`,
 verify it with `npm run release:verify`, and publish statuses with
 `npm run release:publish` before merging. Re-review affected domains whenever
-the candidate SHA changes. The main ruleset must retain
+the candidate SHA changes, as [final-candidate timing](#final-candidate-timing)
+describes. The main ruleset must retain
 `funsidething/memory-audit` and `funsidething/independent-review`, add
 `funsidething/specialist-review`, and keep its other required checks. Schema
 version 1 receipts retain their original two-review policy and publish a
@@ -163,6 +164,24 @@ version 2) requires:
   (`requiresOwnerFaqCoverage`), the owner review records the extended-FAQ
   coverage result instead. Product behavior means an app runtime file or the
   Firestore rules; test, tooling and workflow changes never set it.
+
+When the committed AGENTS.md at both head and base also says "Review plans
+classify changed code, not prose." (spec #2230), content classification reads
+added and removed code lines, the code within three lines of each, and the
+function git names in each hunk header:
+
+- Persistence, session, auth and migration patterns read only code: script
+  files, inline scripts, and HTML or SVG lines that load or run script (script
+  tags, event handlers, `javascript:` URLs). Help and changelog prose, whole-line
+  comments and Node's synchronous file and process APIs such as `readFileSync`
+  don't count. Short revision names (`remote.rev`, `localRev`) do.
+- The changelog block, its app fingerprint and the worker `CACHE_NAME` line
+  never derive a specialist or the typography review, unless the diff moves a
+  changelog marker or a changelog line runs code.
+- Rewording HTML text while keeping every tag and attribute is copy, not
+  typography; new or changed markup, inline styles and CSS still derive it.
+- Path triggers and the fail-closed handling of ambiguous persistence code are
+  unchanged. Earlier candidates keep their earlier classification.
 
 Receipts stay schema version 2 and publish the `v=4` status binding on all
 three required contexts. See [RELEASE_GATES.md](../../RELEASE_GATES.md#scaled-review-policy-evidence).
@@ -256,11 +275,23 @@ coverage, follow the mandatory visual policy in [CLAUDE.md](../../CLAUDE.md#revi
 
 ## Final-candidate timing
 
-Before pushing, merging or deploying, classify the exact final commit under the
-risk-based plan above and record the rationale with release evidence. Fix all
-actionable findings and recheck changed areas before release. If the candidate
-changes after review, repeat the affected review on the new exact commit; an
-earlier draft review does not approve the final commit.
+Push the work branch, open its PR and let CI run first. Request reviews once the candidate is
+CI-green and its fingerprints are generated; before merging, classify the exact
+final commit under the risk-based plan above and record the rationale with
+release evidence.
+
+Reviewers tag each finding blocking (correctness, data safety, accessibility or
+a user-visible defect) or non-blocking. Fix blocking findings before release.
+After two review passes, file remaining non-blocking findings as follow-up
+issues instead of starting another pass.
+
+If the candidate changes after review, the affected reviewers re-review it on
+the new exact commit: incrementally, by the same reviewer, against their earlier
+report and the delta since the commit they approved (use `git range-diff`
+after a rebase, so upstream changes are not mistaken for the delta). Their receipt entry signs
+the new SHA with the usual fields, and its evidence says the review was
+incremental and cites the earlier report. An earlier draft review alone does not
+approve the final commit.
 
 ## Independent FAQ coverage release check
 
