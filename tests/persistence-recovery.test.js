@@ -1398,6 +1398,86 @@ test('RISK large board recovery browser: a deliberate run of the automatic recov
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2247: Restore refused the owner's own board file with "The replacement
+// could not be prepared safely". The file came from a board signed in to an
+// account: its decision baseline and every decision belong to that account,
+// and a board file carries no syncAccount. Restoring it on a board with no
+// account read those decisions as another account's
+// ("decision-account-mismatch") inside decision replacement and stopped. The
+// app's rule for account-bound decision history is to sign in before
+// restoring it (another signed-in account inherits it explicitly). So, with
+// a board shaped like the owner's (the large signed-in fixture, with a deleted
+// task and a cleared History entry made through the app):
+// - with no account, Restore previews the file and says to sign in first,
+//   changing nothing and keeping the file and current board protected;
+// - signed in to the file's account, Restore preview → confirm keeps its
+//   tasks, decisions, History order, deletion and clear records and baseline.
+async function signedInLargeBoardFile2247(){
+ const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT);
+ const source=await loadApp({seedStorage:{[SYNC_STORE_KEY]:fixture.payload}});
+ try{
+  assert.equal(source.ctx.state.tasks.length,LARGE_BOARD_SHAPE.tasks,'fixture: the signed-in board opens');
+  source.ctx.deleteTask(fixture.ids.at(-1));
+  assert.ok(source.ctx.state.workLog.length,'fixture: History has entries');
+  source.ctx.state.workLog.at(-1).kind='done';source.ctx.clearCompleted();
+  const file=source.ctx.currentBoardExportPayload(),exported=JSON.parse(file);
+  assert.equal(exported.syncAccount,undefined,'fixture: the board file carries no account, like the owner file');
+  assert.equal(exported.decisionBaseline.account,ACCOUNT,'fixture: its decisions belong to the account');
+  assert.ok(exported.decisionEvents.length>=LARGE_BOARD_SHAPE.decisionEvents&&Object.keys(exported.deletedTaskIds||{}).length>0&&Object.keys(exported.clearedHistoryIds||{}).length>0,'fixture: decisions, a deletion and a clear record');
+  return {ACCOUNT,file,exported};
+ }finally{await source.dispose();}
+}
+async function pasteIntoRestore2247(app,text){
+ app.ctx.openSettings();app.shim.document.getElementById('backupRestoreSource').value='paste';await app.ctx.onAction('restore-backup',{});
+ const box=app.shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;app.shim.document.dispatchEvent({type:'input',target:box});
+ return app.ctx.onAction('preview-pasted-recovery',{});
+}
+test('RISK BACKUP FILE RESTORE: a signed-in large board file asks a board with no account to sign in first instead of failing, and changes nothing',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),{file}=await signedInLargeBoardFile2247();
+ const target=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'signed-in-file-restore-2247-'+Date.now()});t.after(()=>target.dispose());
+ target.ctx.addTask('Board with no account before restore',false);await prepareBackupFileFixtureSource(target);
+ assert.equal(target.ctx.state.syncAccount??null,null,'fixture: the destination board has no account');
+ const before=JSON.stringify(target.ctx.state),store=target.ctx.window.ScannerDeviceStore,head=await store.readHead();
+ const previewed=await pasteIntoRestore2247(target,file),toast=target.shim.document.getElementById('toast').textContent;
+ assert.doesNotMatch(toast,/could not be prepared safely/,'the board file is not refused as unsafe');
+ assert.equal(previewed,true,'Restore previews the board file: '+toast);
+ const markup=target.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/decision history belongs to a signed-in account\. Sign in/,'the preview says to sign in first');
+ assert.equal(await target.ctx.onAction('confirm-file-restore',{}),false,'it cannot be confirmed without an account');
+ assert.equal(JSON.stringify(target.ctx.state),before,'the current board is unchanged');assert.equal((await store.readHead()).hash,head.hash);
+ assert.ok((await store.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===file),'the exact file stays protected');
+});
+test('RISK BACKUP FILE RESTORE: signed in to its account, a large board file restores with its tasks, decisions, History order, deletion and clear records and decision baseline',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),{ACCOUNT,file,exported}=await signedInLargeBoardFile2247();
+ const at=Date.now(),initial=syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:[{...syncTask('signed-in-target-2247','Signed-in board before restore'),ctx:['home']}],listOpen:true,seenQuickStart:true,syncAccount:ACCOUNT,syncRev:4,syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});let backend;
+ const cloudSyncFactory=()=>{backend=h.factory();backend.user=ACCOUNT;backend.ready=false;
+  backend.recoveryIdentity=()=>backend.user===ACCOUNT?'fixture-identity:'+ACCOUNT:null;
+  backend.recoveryEvidence=async()=>({identity:backend.recoveryIdentity(),epoch:1,pending:false});return backend;};
+ const target=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
+  indexedDBProvider:new IDBFactory(),deviceDbName:'signed-in-file-restore-2247-in-'+Date.now(),cloudSyncFactory});
+ t.after(async()=>{try{target.ctx.window.CloudSync.user=null;target.ctx.suspendCloudSync();}catch{}try{await target.ctx.window.ScannerDeviceStore?.close?.();}catch{}});
+ backend.ready=true;await target.ctx.cloudPull();await target.ctx.cloudPushNow();await settleSavedViewPublication(target,h,'signed-in target before the file');
+ assert.equal(await pasteIntoRestore2247(target,file),true,'Restore previews the board file: '+target.shim.document.getElementById('toast').textContent);
+ assert.equal(await target.ctx.onAction('confirm-file-restore',{}),true,'Restore applies it: '+target.shim.document.getElementById('toast').textContent);
+ const restored=JSON.parse(target.ctx.cloudPayload());
+ assert.deepEqual(restored.tasks.map(task=>task.id),exported.tasks.map(task=>task.id),'every task, in order');
+ // Replacing a board records restore bookkeeping (operation records on a task)
+ // and marks the replaced board's own tasks deleted; the file's data is kept.
+ const withoutOps=task=>Object.fromEntries(Object.entries(task).filter(([key])=>!/Ops$/.test(key)));
+ assert.equal(JSON.stringify(restored.tasks.map(withoutOps)),JSON.stringify(exported.tasks.map(withoutOps)),'tasks and their rating histories are unchanged');
+ assert.equal(JSON.stringify(restored.decisionEvents),JSON.stringify(exported.decisionEvents),'every decision, unchanged and in order');
+ assert.equal(JSON.stringify(restored.workLog),JSON.stringify(exported.workLog),'History keeps its entries and order');
+ for(const [id,value] of Object.entries(exported.deletedTaskIds))assert.deepEqual(restored.deletedTaskIds[id],value,`the deletion record for ${id} is kept`);
+ assert.equal(JSON.stringify(restored.clearedHistoryIds),JSON.stringify(exported.clearedHistoryIds),'the History clear records are kept');
+ const restoredLog=restored.deletionLog.map(row=>JSON.stringify(row));
+ assert.deepEqual(exported.deletionLog.map(row=>JSON.stringify(row)).filter(row=>!restoredLog.includes(row)),[],'every deletion log entry is kept');
+ const {replacement,...baseline}=restored.decisionBaseline,{replacement:sourceReplacement,...sourceBaseline}=exported.decisionBaseline;
+ assert.equal(JSON.stringify(baseline),JSON.stringify(sourceBaseline),'the decision baseline is kept');
+ assert.equal(target.ctx.state.syncAccount,ACCOUNT,'the board stays with the signed-in account');
+});
+
 // #2228 (spec #2224): the automatic recovery default over a board shaped like
 // the owner's waits instead of running. #2227 bounded that recovery, but it
 // still peaks about 780 MiB above the local opening in WebKit (about 330 bytes
