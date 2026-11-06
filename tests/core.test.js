@@ -5,6 +5,7 @@ import { inspect } from "node:util";
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
@@ -21867,7 +21868,94 @@ test('Settings changelog: every app asset change requires a current changelog en
   if(file==='sw.js')data=Buffer.from(data.toString().replace(/chain-scanner-shell-[a-f0-9]+/,'chain-scanner-shell-HASH'));
   hash.update(file+'\0');hash.update(data);hash.update('\0');
  }
- assert.ok(match[1].includes('data-app-fingerprint="'+hash.digest('hex')+'"'),'App changed: add a dated changelog entry describing the changes and refresh its app fingerprint');
+ const expected=hash.digest('hex');
+ // Name the value and the command that writes it (#2231). Routine animation
+ // tuning is exempt from the public changelog (AGENTS.md), never from the fingerprint.
+ assert.ok(match[1].includes('data-app-fingerprint="'+expected+'"'),'App shell changed: the current changelog entry needs data-app-fingerprint="'+expected+'". Run `npm run fingerprints -- --write`, and add a dated changelog entry for a user-facing change (routine animation-frequency tuning stays out of the changelog, per AGENTS.md).');
+});
+
+// Derives both shell identities for a checkout copy the way the changelog and
+// CACHE_NAME contracts above do, so the command's output is checked against an
+// independent computation rather than against itself (#2231).
+const expectedShellIdentities2231=dir=>{
+ const worker=fs.readFileSync(path.join(dir,'sw.js'),'utf8');
+ const {localPaths}=appShellContract(worker);
+ const app=createHash('sha256');
+ for(const file of [...localPaths,'sw.js'].sort()){
+  let data=fs.readFileSync(path.join(dir,file));
+  if(file==='index.html')data=Buffer.from(data.toString().replace(/<!-- changelog:start -->[\s\S]*?<!-- changelog:end -->/,'<!-- changelog -->'));
+  if(file==='sw.js')data=Buffer.from(data.toString().replace(/chain-scanner-shell-[a-f0-9]+/,'chain-scanner-shell-HASH'));
+  app.update(file+'\0');app.update(data);app.update('\0');
+ }
+ const shell=createHash('sha256');
+ for(const file of localPaths){shell.update(file);shell.update('\0');shell.update(fs.readFileSync(path.join(dir,file)));shell.update('\0');}
+ const page=fs.readFileSync(path.join(dir,'index.html'),'utf8');
+ return {
+  app:app.digest('hex'),cacheName:'chain-scanner-shell-'+shell.digest('hex'),
+  committedApp:page.match(/<template id="appChangelogCurrent"><div data-app-fingerprint="([a-f0-9]{64})"/)?.[1],
+  committedCacheName:worker.match(/const CACHE_NAME = "([^"]+)"/)?.[1],localPaths,
+ };
+};
+const runFingerprints2231=(...args)=>{
+ const run=spawnSync(process.execPath,[path.join(__dirname,'scripts','shell-fingerprints.mjs'),...args],{encoding:'utf8'});
+ let report=null;try{report=JSON.parse(run.stdout);}catch{}
+ return {status:run.status,report,stderr:run.stderr};
+};
+
+test('PWA cache contract: the fingerprints command reports the committed app fingerprint and shell cache key as current',()=>{
+ const expected=expectedShellIdentities2231(__dirname);
+ assert.equal(expected.committedApp,expected.app,'precondition: the committed app fingerprint is current');
+ assert.equal(expected.committedCacheName,expected.cacheName,'precondition: the committed shell cache key is current');
+ const {status,report}=runFingerprints2231('--root',__dirname);
+ assert.deepEqual(report,{
+  appFingerprint:{committed:expected.app,expected:expected.app},
+  cacheName:{committed:expected.cacheName,expected:expected.cacheName},
+  stale:false,written:false,
+ });
+ assert.equal(status,0,'an unchanged tree reports success');
+});
+
+test('RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current',()=>{
+ const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'shell-fingerprints-2231-'));
+ try{
+  const {localPaths}=appShellContract(serviceWorkerSource());
+  for(const file of [...localPaths,'sw.js']){
+   fs.mkdirSync(path.dirname(path.join(dir,file)),{recursive:true});
+   fs.copyFileSync(path.join(__dirname,file),path.join(dir,file));
+  }
+  const edited=localPaths.find(file=>file.endsWith('.js'));
+  assert.ok(edited,'precondition: the shell precaches a script asset');
+  fs.appendFileSync(path.join(dir,edited),'\n// edited by the #2231 fixture\n');
+  const before=expectedShellIdentities2231(dir);
+  assert.notEqual(before.committedApp,before.app,'precondition: the edit makes the app fingerprint stale');
+  const pageBefore=fs.readFileSync(path.join(dir,'index.html'),'utf8'),workerBefore=fs.readFileSync(path.join(dir,'sw.js'),'utf8');
+  const historyBefore=[...pageBefore.matchAll(/data-app-fingerprint="([a-f0-9]{64})"/g)].map(m=>m[1]).slice(1);
+
+  const stale=runFingerprints2231('--root',dir);
+  assert.equal(stale.status,1,'a stale tree fails without --write');
+  assert.equal(stale.report?.stale,true);assert.equal(stale.report?.written,false);
+  assert.equal(stale.report?.appFingerprint?.expected,before.app,'the report names the expected app fingerprint');
+  assert.equal(fs.readFileSync(path.join(dir,'index.html'),'utf8'),pageBefore,'reporting never writes');
+
+  const write=runFingerprints2231('--root',dir,'--write');
+  assert.equal(write.status,0,write.stderr);assert.equal(write.report?.written,true);
+  const after=expectedShellIdentities2231(dir);
+  assert.equal(after.committedApp,after.app,'the written app fingerprint matches the changelog contract');
+  assert.equal(after.committedCacheName,after.cacheName,'the written cache key matches the CACHE_NAME contract');
+  assert.notEqual(after.cacheName,before.committedCacheName,'the edit changes the shell cache key');
+  assert.deepEqual(write.report,{
+   appFingerprint:{committed:before.committedApp,expected:after.app},
+   cacheName:{committed:before.committedCacheName,expected:after.cacheName},
+   stale:true,written:true,
+  });
+  const pageAfter=fs.readFileSync(path.join(dir,'index.html'),'utf8'),workerAfter=fs.readFileSync(path.join(dir,'sw.js'),'utf8');
+  assert.deepEqual([...pageAfter.matchAll(/data-app-fingerprint="([a-f0-9]{64})"/g)].map(m=>m[1]).slice(1),historyBefore,'earlier changelog entries keep their fingerprints');
+  assert.equal(pageAfter.replace(after.app,before.committedApp),pageBefore,'only the current fingerprint changes in index.html');
+  assert.equal(workerAfter.replace(after.cacheName,before.committedCacheName),workerBefore,'only CACHE_NAME changes in sw.js');
+
+  const again=runFingerprints2231('--root',dir);
+  assert.equal(again.status,0);assert.equal(again.report?.stale,false,'a second run finds nothing to refresh');
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
 test('Ducks: seeded occasional takeoffs lift continuously from the water and leave in either direction',()=>{

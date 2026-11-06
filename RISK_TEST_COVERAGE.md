@@ -454,6 +454,7 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK PWA updates: a scanner gesture commits durably without an automatic session reload
 - RISK PWA updates: a gesture beginning during an update save preserves the ongoing session
 - RISK PWA updates: cancelled and released gestures preserve the used session
+- RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current
 - RISK PWA updates: the extended FAQ and changelog explain uninterrupted used sessions
 - RISK PWA module delivery: a fresh installed shell serves every production script while offline
 - RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload
