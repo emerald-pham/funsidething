@@ -405,6 +405,11 @@ function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled = fals
   // policy, short revision names (remote.rev, localRev) count too; the earlier
   // classification is left unchanged so its receipts still verify.
   if (changedLines && /(?:\.rev\b|\brevs?\b|[a-z]Rev\b)/.test(context)) domains.add('memory-cloud-sync');
+  // The device store is persistence code throughout, but it sits indented in an
+  // IIFE, so git names no enclosing function and many guard lines carry no
+  // storage word; the cloud store is already caught by its path (#2234 review).
+  if (changedLines && /(?:^|\/)device-store/.test(normalized)) domains.add('memory-cloud-sync');
+  if (changedLines && /schema_version/i.test(context)) domains.add('data-migration');
   if (/(?:session|sharedState|currentUser|userId|accountId|BroadcastChannel)/i.test(context)) domains.add('shared-session-state');
   if (/(?:auth|firebase|callable|onCall|onRequest|httpsCallable|https\.on(?:Call|Request)|signIn|signOut|token|credential|ownerUid|firestore\.rules|authorization|claims|permission|provider|login|\b(?:role|owner|admin|privilege)\w*\b)/i.test(context)) {
     domains.add('security-deployment');

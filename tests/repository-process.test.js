@@ -1416,6 +1416,13 @@ test('RISK repository process: changed-line review plan fails closed on large pa
  const cas=check=>`export async function writeHead(expectedHash, next){\n  const tx = begin();\n  const current = await read(tx);\n  if(${check}){ tx.abort(); return false; }\n  put(tx, next);\n  return true;\n}\n`;
  assert.deepEqual(plan({'device-store-v2.js':cas('current.hash!==expectedHash')},{'device-store-v2.js':cas('false')}).specialistDomains,['memory-cloud-sync'],
   'disabling the device store compare-and-swap guard is a persistence change');
+ // The device store is persistence code throughout, even where an edited line
+ // and its neighbours carry no storage words, and its schema constant is a migration.
+ const deviceStore=(compare,version)=>`(function(){\n  const SCHEMA_VERSION=${version};\n  function same(a,b){\n    return a===b${compare};\n  }\n})();\n`;
+ assert.deepEqual(plan({'device-store-v2.js':deviceStore('','2')},{'device-store-v2.js':deviceStore('||true','2')}).specialistDomains,['memory-cloud-sync'],
+  'any edit to the device store derives the persistence specialist');
+ assert.deepEqual(plan({'landscape-mood.js':'const SCHEMA_VERSION=2;\n'},{'landscape-mood.js':'const SCHEMA_VERSION=3;\n'}).specialistDomains,['data-migration'],
+  'changing a SCHEMA_VERSION constant is a data migration');
  // Changelog markup is injected into Settings, so code there still runs, and
  // moving a marker could hide script lines; SVG files can carry script too.
  const log=(entry,end='<!-- changelog:end -->')=>`<!doctype html>\n<body>\n<!-- changelog:start -->\n<template id="appChangelogCurrent"><div><ul>${entry}</ul></div></template>\n${end}\n<script>\nfunction boot(){ start(); }\n</script>\n</body>\n`;
