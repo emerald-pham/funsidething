@@ -1337,6 +1337,11 @@ test('RISK large board recovery browser: the automatic recovery default reconcil
       before=await kept(page);
       if(cloud){
        await page.evaluate(()=>__largeRecovery.releasePull());
+       // #2228: this board is over the automatic default's work budget, so the
+       // opening waits instead. Retry sync, from the cloud button, runs the
+       // same recovery deliberately, and that run is what this test bounds.
+       await page.waitForFunction(()=>document.getElementById('syncBtn')?.textContent==='☁ recovery waiting',null,{timeout:RECOVERY_WAIT_MS});
+       await page.locator('#syncBtn').click();await page.locator('#modalRoot [data-act="sync-retry"]').click();
        // Recovery has settled once its guarded publication was attempted. The
        // wait is longer than the app's own 60 s recovery budget.
        settled=await page.waitForFunction(()=>__largeRecovery.log.includes('protect')&&document.getElementById('syncBtn')?.textContent==='☁ older copy in use',null,{timeout:RECOVERY_WAIT_MS}).then(()=>true,()=>false);

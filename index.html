@@ -4141,7 +4141,8 @@ const SUPPORT_DIAGNOSTICS_EVENT_LIMIT=80;
 const SUPPORT_DIAGNOSTICS_EVENT_BYTES=512;
 const SUPPORT_DIAGNOSTICS_REPORT_BYTES=24*1024;
 const SUPPORT_DIAGNOSTICS_SOURCE_LIMIT=8;
-const SUPPORT_DIAGNOSTICS_STAGES=new Set(["save","persist","push","device-store","network-ready","aggregate","root","header","chunks","final-root","source-read","source-validation","worker","cache"]);
+const SUPPORT_DIAGNOSTICS_STAGES=new Set(["save","persist","push","device-store","network-ready","aggregate","root","header","chunks","final-root","source-read","source-validation","worker","cache","recovery-budget"]);
+const SUPPORT_DIAGNOSTICS_BUDGET_OUTCOMES=new Set(["within","deferred","deliberate"]);
 const SUPPORT_DIAGNOSTICS_STATUSES=new Set(["started","completed","pending","timed-out","late","stale","failed","cancelled","acknowledged","durable","unavailable","unobserved","observed","expired","truncated","unknown"]);
 const SUPPORT_DIAGNOSTICS_ROLES=new Set(["current","previous","pending","unknown","none","first","second","combined"]);
 const SUPPORT_DIAGNOSTICS_GENERATION_STATES=new Set(["staging","sealed","published","deleting","absent","empty","unknown"]);
@@ -4200,7 +4201,7 @@ function supportDiagnosticsIso(at){
 // proof of a browser crash. Reconstruct fixed fields even from local storage.
 const RESTART_DIAGNOSTICS_KEY="fvp:chain-scanner:restart-diagnostics:v1";
 const RESTART_DIAGNOSTICS_BYTES=8192,RESTART_DIAGNOSTICS_DOCUMENTS=4,RESTART_DIAGNOSTICS_EVENTS=8;
-const RESTART_DIAGNOSTICS_STAGES=new Set(["boot","action","save","persist","push","worker","cache","network-ready","aggregate","root","header","chunks","final-root","source-read","source-validation","review-start","review-sources","review-validation","review-render-start","review-rendered","review-finished","review-failed","review-cancelled","reload-requested","pagehide","pageshow","hidden","visible","error","unhandled-rejection"]);
+const RESTART_DIAGNOSTICS_STAGES=new Set(["boot","action","save","persist","push","worker","cache","network-ready","aggregate","root","header","chunks","final-root","source-read","source-validation","recovery-budget","review-start","review-sources","review-validation","review-render-start","review-rendered","review-finished","review-failed","review-cancelled","reload-requested","pagehide","pageshow","hidden","visible","error","unhandled-rejection"]);
 const RESTART_DIAGNOSTICS_ACTIONS=new Set("yes no cant cand-done cand-worked bench-done bench-cant postpone bench-postpone dislodge worked reveal continue-scan start-working resume-scan start-scan rescan clear-done new-pass toggle-list toggle-ctx toggle-hist toggle-add add add-ctx bulk-edit bulk-save edit save-edit done-task worked-task dot-task return-candidate delete-task restore cycle-theme settings save-settings help close-modal sync review-cloud-source-recovery choose-cloud-recovery-source apply-cloud-source-recovery review-decision-recovery apply-decision-recovery sync-retry sync-reload sync-signout undo view-support-diagnostics copy-support-diagnostics refresh-support-diagnostics".split(" "));
 const RESTART_DIAGNOSTICS_NAVIGATION=new Set(["navigate","reload","back_forward","prerender","unavailable"]);
 let restartDiagnosticsCurrent=null,restartDiagnosticsStorageStatus="unobserved",restartDiagnosticsWriteUnavailable=false,restartDiagnosticsCapacityReleased=false,restartDiagnosticsRenderSequence=0;
@@ -4360,7 +4361,7 @@ function supportDiagnosticsTrimEvents(){
     supportDiagnosticsEvents.shift();supportDiagnosticsDroppedEvents++;
   }
 }
-function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schemaVersion,revision,generationState,declaredChunks,receivedChunks,declaredBytes,receivedBytes,code,encoding,validation,completeness,deadlineMs,deviceDetails){
+function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schemaVersion,revision,generationState,declaredChunks,receivedChunks,declaredBytes,receivedBytes,code,encoding,validation,completeness,deadlineMs,deviceDetails,budgetDetails){
   try{
     const at=supportDiagnosticsNow();
     const event={at,stage:SUPPORT_DIAGNOSTICS_STAGES.has(stage)?stage:"unknown",
@@ -4386,6 +4387,11 @@ function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schema
       if(SUPPORT_DIAGNOSTICS_DEVICE_ERROR_REASONS.has(deviceErrorReason))metadata.deviceErrorReason=deviceErrorReason;
       if(Number.isSafeInteger(deviceConnection)&&deviceConnection>0&&deviceConnection<=999999)metadata.deviceConnection=deviceConnection;
     }
+    if(stage==="recovery-budget"&&budgetDetails&&typeof budgetDetails==="object"){
+      if(SUPPORT_DIAGNOSTICS_BUDGET_OUTCOMES.has(budgetDetails.budgetOutcome))metadata.budgetOutcome=budgetDetails.budgetOutcome;
+      for(const key of ["generationKiB","boardKiB","decisionKiB","estimateKiB","budgetKiB"])
+        if(Number.isSafeInteger(budgetDetails[key])&&budgetDetails[key]>=0)metadata[key]=budgetDetails[key];
+    }
     if(Object.keys(metadata).length)event.metadata=metadata;
     if(supportDiagnosticsBytes(JSON.stringify(event))>SUPPORT_DIAGNOSTICS_EVENT_BYTES){
       delete event.metadata;delete event.durationMs;event.status="truncated";
@@ -4396,6 +4402,17 @@ function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schema
   }catch{supportDiagnosticsDroppedEvents++;return false;}
 }
 window.__chainSupportDiagnosticsObserve=supportDiagnosticsObserve;
+// #2228 (spec #2224): one metadata-only event per work-budget evaluation of
+// the automatic recovery default: sizes rounded to KiB and the outcome. No
+// board text, titles or account identifiers.
+function supportDiagnosticsObserveRecoveryBudget(outcome,estimate,budget,operation){
+  try{
+    const kib=value=>Number.isFinite(value)&&value>=0?Math.round(value/1024):null;
+    return supportDiagnosticsObserve("recovery-budget",outcome==="deferred"?"pending":"observed","current",operation,null,null,null,null,null,null,null,null,"unknown",
+      null,null,null,null,null,{budgetOutcome:outcome,generationKiB:kib(estimate?.generationBytes),boardKiB:kib(estimate?.boardBytes),
+        decisionKiB:kib(estimate?.decisionBytes),estimateKiB:kib(estimate?.totalBytes),budgetKiB:kib(budget)});
+  }catch{return false;}
+}
 window.__chainSupportDiagnosticsSourceOperation=supportDiagnosticsSourceOperation;
 function supportDiagnosticsSourceOperation(){
   try{
@@ -4865,6 +4882,9 @@ let cloudPullRevalidate = false;
 // generation it waits on; the board, its saves and every source stay as they
 // are, and the completed refusal above holds cloud writes.
 let automaticRecoveryWaiting = null;
+// Retry sync and signing in again run a waiting recovery deliberately, over
+// its budget. Like cloudPullRevalidate, the request lives until a pull reads.
+let cloudRecoveryDeliberate = false;
 let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
 let cloudAdoptionHeld = false; // a newer read could not be safely adopted; prior read cannot authorize writes
 let adoptedSafety = null; // one exact locally saved union and the stable snapshot it was built from
@@ -4949,6 +4969,8 @@ document.addEventListener("click",()=>{
 window.addEventListener("blur",finishScannerGesture);
 let baseUpdatedAt = 0;     // loaded edit time, used only to explain a first-pull replacement to the user
 let observedCloudUser = null, observedCloudUid = null, observedCloudIdentity = false;
+// #2228: a resolved sign-out was observed and no account has signed in since.
+let observedCloudSignedOut = false;
 let cloudWriteFailure = null; // a successful read cannot acknowledge a rejected write
 
 function blockedCloudWrite(){
@@ -5018,6 +5040,8 @@ function observeCloudIdentity(){
     forgetUnreadableCloudSourceHold({keepDeviceRecord:true});
     cloudWriteFailure=null;
     cloudAdoptionHeld=false;adoptedSafety=null;deferredCloudPull=false;
+    // #2228: signing in again after a sign-out runs a waiting recovery deliberately.
+    if(user&&observedCloudSignedOut)cloudRecoveryDeliberate=true;
     if(cloudSourceRecoveryRead?.automaticHistoryResume||automaticCloudSourceResumeStatus.state!=="idle"){
       automaticCloudSourceResumeRequested=false;
       if(cloudSourceRecoveryRead?.automaticHistoryResume)cancelCloudSourceRecoveryRead({record:false});
@@ -5033,6 +5057,7 @@ function observeCloudIdentity(){
   // Signing out or another account ends a remembered conclusion. Before the
   // backend knows the restored session, its empty user is not a sign-out.
   if(window.CloudSync?.ready===true)forgetPersistedUnreadableCloudSourceUnless(identity,user);
+  observedCloudSignedOut=user?false:observedCloudSignedOut||window.CloudSync?.ready===true;
   observedCloudUser=user;observedCloudUid=identity;observedCloudIdentity=true;
 }
 function cloudAccountIdentity(){try{return window.CloudSync?.recoveryIdentity?.()??null;}catch{return null;}}
@@ -6161,13 +6186,17 @@ async function exactAcknowledgedCloudSource(failed,account){
 // account-change observation keeps the device record, which only a resolved
 // sign-out or another account clears (observeCloudIdentity).
 function forgetUnreadableCloudSourceHold({keepDeviceRecord=false}={}){
-  unrepairableCloudSource=null;automaticRecoveryWaiting=null;
+  unrepairableCloudSource=null;clearAutomaticRecoveryWaiting();
   if(keepDeviceRecord)provedUnreadableCloudSource=null;else forgetProvedUnreadableCloudSource();
+}
+function clearAutomaticRecoveryWaiting(){
+  if(!automaticRecoveryWaiting)return;
+  automaticRecoveryWaiting=null;try{renderSync();}catch{}
 }
 // The completed refusal no longer applies: forget it here and on the device.
 // A recovery waiting on it (#2228) is evaluated again by whatever reads next.
 function forgetProvedUnreadableCloudSource(){
-  provedUnreadableCloudSource=null;automaticRecoveryWaiting=null;
+  provedUnreadableCloudSource=null;clearAutomaticRecoveryWaiting();
   try{localStorage.removeItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);}catch{}
 }
 function readPersistedUnreadableCloudSource(){
@@ -6198,7 +6227,7 @@ async function rememberProvedUnreadableCloudSource(proved){
     if(provedUnreadableCloudSource!==proved)return;
     localStorage.setItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY,JSON.stringify({v:1,account:proved.account,identity:proved.identity,
       rev:proved.rev,generationId:proved.generationId,revision:hold.revision,baseId:hold.baseId??null,basePayloadHash,
-      hash:hold.hash??null,byteLength:hold.byteLength??null,
+      hash:hold.hash??null,byteLength:hold.byteLength??null,...(proved.waiting===true?{waiting:true}:{}),
       ...(hold.pendingPointer!==undefined?{pendingPointer:hold.pendingPointer,pendingLossy:hold.pendingLossy===true}:{})}));
   }catch{}
 }
@@ -6214,7 +6243,8 @@ async function restoreProvedUnreadableCloudSource(backend,account,identity,still
     Number.isSafeInteger(record.rev)&&record.rev>=1&&typeof record.generationId==="string"&&record.generationId.length>0&&record.generationId.length<=256&&
     record.revision===state.syncRev&&(record.baseId??null)===(base?.id??null)&&unreadableProofHash(record.basePayloadHash)&&
     unreadableProofHash(record.hash)&&(record.byteLength===null||Number.isSafeInteger(record.byteLength)&&record.byteLength>=0)&&
-    (record.pendingPointer===undefined||unreadableProofPointer(record.pendingPointer))&&liveBoardAccepted&&deviceStorageAuthority;
+    (record.pendingPointer===undefined||unreadableProofPointer(record.pendingPointer))&&(record.waiting===undefined||record.waiting===true)&&
+    liveBoardAccepted&&deviceStorageAuthority;
   if(!valid){if(stillCurrent())forgetProvedUnreadableCloudSource();return null;}
   let basePayloadHash;
   try{basePayloadHash=typeof base?.payload==="string"?await ChainStorageV2.hashPayload(base.payload):null;}catch{return null;}
@@ -6222,7 +6252,8 @@ async function restoreProvedUnreadableCloudSource(backend,account,identity,still
   if(basePayloadHash!==record.basePayloadHash){forgetProvedUnreadableCloudSource();return null;}
   const hold={backend,account,identity,revision:state.syncRev,baseId:base?.id,payload:base?.payload,hash:record.hash,byteLength:record.byteLength,
     ...(record.pendingPointer!==undefined?{pendingPointer:record.pendingPointer,pendingLossy:record.pendingLossy===true}:{})};
-  return provedUnreadableCloudSource={backend,account,identity,rev:record.rev,generationId:record.generationId,hold,persisted:true};
+  return provedUnreadableCloudSource={backend,account,identity,rev:record.rev,generationId:record.generationId,hold,persisted:true,
+    ...(record.waiting===true?{waiting:true}:{})};
 }
 // A freshly read unreadable root still matches the completed refusal: same
 // backend, account and identity, the same server revision and generation, and
@@ -6338,6 +6369,7 @@ async function cloudPull(){
   const pullStillCurrent=()=>cloudReady()&&window.CloudSync===pullBackend&&pullBackend.user===acct&&
     cloudAccountIdentity()===pullIdentity&&!cloudSuspended&&!cloudResumePending;
   const revalidate=cloudPullRevalidate;cloudPullRevalidate=false;
+  const deliberate=cloudRecoveryDeliberate;cloudRecoveryDeliberate=false;
   let priorUnreadable=revalidate?null:provedUnreadableCloudSource;
   if(revalidate)forgetProvedUnreadableCloudSource();
   unrepairableCloudSource=null;
@@ -6373,6 +6405,8 @@ async function cloudPull(){
       // write hold, never a board, so no stale copy can decide what is kept.
       if(priorUnreadable&&await provedUnreadableStillDecides(priorUnreadable,remote,pullStillCurrent)){
         unrepairableCloudSource=priorUnreadable.hold;
+        // #2228: a remembered wait over the same root still waits.
+        if(priorUnreadable.waiting===true)automaticRecoveryWaiting={backend:pullBackend,account:acct,identity:pullIdentity,rev:remote.rev,generationId:remote.generationId};
       }else{
         // #2226 (spec #2224): an unreadable generation starts recovery-source
         // reads and the automatic recovery default, which can be heavy on a
@@ -6394,14 +6428,14 @@ async function cloudPull(){
         if(exact){remote=exact;rebuildingCloudSource=true;rebuildContext=exact.automaticRecovery;}
         else{
           const outcome={};
-          if(await openAutomaticCloudSourceFallback(remote,{account:acct,backend:pullBackend,identity:pullIdentity,pullStillCurrent,outcome}))return;
+          if(await openAutomaticCloudSourceFallback(remote,{account:acct,backend:pullBackend,identity:pullIdentity,pullStillCurrent,outcome,deliberate}))return;
           // Remember only a completed refusal: a timeout, network or
           // permission failure is never a conclusion about the source.
           const hold=unrepairableCloudSource;
           if(hold&&remote.code==="corrupt-generation"&&Number.isSafeInteger(remote.rev)&&
             outcome.refused?.rev===remote.rev&&outcome.refused.generationId===remote.generationId&&pullStillCurrent())
             await rememberProvedUnreadableCloudSource(provedUnreadableCloudSource={backend:pullBackend,account:acct,identity:pullIdentity,
-              rev:remote.rev,generationId:remote.generationId,hold});
+              rev:remote.rev,generationId:remote.generationId,hold,...(outcome.waiting===true?{waiting:true}:{})});
         }
       }
     }
@@ -10237,7 +10271,7 @@ function renderSync(){
     const unsaved=!!lastDeviceSaveIssue;
     el.disabled=false;el.className=unsaved?"syncbtn err":"syncbtn busy";el.textContent=unsaved?"☁ save error":"☁ recovery waiting";
     el.title=(unsaved?"The latest edit is not saved on this device. Keep this tab open. ":"")+CLOUD_RECOVERY_WAITING_STATUS
-      +" Open Settings → Data and backups to review recovery.";mirrorSavedAppearanceSyncStatus(el);return;
+      +" Retry sync starts it now; Settings → Data and backups can review it.";mirrorSavedAppearanceSyncStatus(el);return;
   }
   if(s!=="error"&&(deviceRecoveryCloudHold||state&&!liveBoardAccepted)){
     el.disabled=false;el.className="syncbtn err";el.textContent="\u2601 recovery pending";
@@ -12220,7 +12254,7 @@ function automaticRecoveryWorkEstimate(generations,board){
   const boardBytes=length(board?.tasks)+length(board?.workLog),decisionBytes=length(board?.decisionEvents);
   return {generationBytes,boardBytes,decisionBytes,totalBytes:generationBytes+boardBytes+decisionBytes};
 }
-async function openAutomaticCloudSourceFallback(failed,{account,backend,identity,pullStillCurrent,outcome=null}={}){
+async function openAutomaticCloudSourceFallback(failed,{account,backend,identity,pullStillCurrent,outcome=null,deliberate=false}={}){
   const baseline=automaticCloudFallbackBootBaseline;
   const localIntent=failed?.code==="device-source-recovery"?deviceRecoveryCloudHold:null,localIntentDraft=localIntent?cloudSourceRecoveryDraft():null;
   if(localIntent&&!localWorkingRecoveryIntent(localIntent))return false;
@@ -12288,10 +12322,11 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       // reconciling or archiving anything. The board stays as it is, nothing
       // is written, and the caller remembers this as a completed refusal.
       if(failed?.code==="corrupt-generation"&&!backgroundResume&&!localIntent){
-        const estimate=automaticRecoveryWorkEstimate(p.source.generations,state);
-        if(estimate.totalBytes>automaticRecoveryWorkBudget()){
-          if(outcome)outcome.refused={rev:p.rev,generationId:activeId};
-          automaticRecoveryWaiting={backend,account,identity,rev:p.rev,generationId:activeId};
+      const estimate=automaticRecoveryWorkEstimate(p.source.generations,state),budget=automaticRecoveryWorkBudget(),over=estimate.totalBytes>budget;
+        supportDiagnosticsObserveRecoveryBudget(over?deliberate?"deliberate":"deferred":"within",estimate,budget,diagnosticOperation);
+        if(over&&!deliberate){
+          if(outcome){outcome.refused={rev:p.rev,generationId:activeId};outcome.waiting=true;}
+          automaticRecoveryWaiting={backend,account,identity,rev:p.rev,generationId:activeId};renderSync();
           return false;
         }
       }
@@ -15406,7 +15441,7 @@ function onAction(act, el){
     case "apply-decision-recovery": return applyDecisionRecovery();
     case "sync-retry":
       if(openingRecoveryHeld){window.location.reload();return;}
-      closeModal(); cloudWriteFailure=null; clearCloudRetry(); lastPushed="";cloudPullRevalidate=true;
+      closeModal(); cloudWriteFailure=null; clearCloudRetry(); lastPushed="";cloudPullRevalidate=true;cloudRecoveryDeliberate=true;
       window.checkForAppUpdate?.(); return cloudPull();
     case "sync-reload": if(openingRecoveryHeld){window.location.reload();return;}return reloadForCloudRecovery();
     case "sync-signout": closeModal(); window.CloudSync?.signOut(); break;
