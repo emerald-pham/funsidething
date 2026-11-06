@@ -1189,6 +1189,83 @@ test('RISK earlier source check: listing verified recovery archives without thei
   assert.equal(listed,hashed,name+': the listing without hashes does the same');
  }
 });
+// #2239 (decision recorded on #2239): each recovery archive is read back once,
+// exactly, when it is written. Archive rows are never replaced or deleted under
+// their key, so publication checks before every step that they are still
+// present by key, and a push reads only its own kind of archive, instead of
+// reading every archive (several times the board's size) again each time.
+// Counted here: the archive text the device store hands back from the deliberate
+// run's start until publication releases its hold, against the text written.
+const archiveTextRead2239=result=>{let bytes=0;
+ for(const row of Array.isArray(result)?result:result?.stores?.opaque?.values||[])if(typeof row?.raw==='string')bytes+=row.raw.length;return bytes;};
+const countArchiveTraffic2239=(t,store,phase)=>{
+ const traffic={written:0,read:{},calls:{}};
+ for(const name of ['readRawRows','listOpaqueArchives','readRawExportSnapshot']){
+  const original=store[name];
+  store[name]=async function(...args){const at=phase();traffic.calls[name+':'+at]=(traffic.calls[name+':'+at]||0)+1;
+   const result=await original.apply(this,args);traffic.read[at]=(traffic.read[at]||0)+archiveTextRead2239(result);return result;};
+  t.after(()=>{store[name]=original;});
+ }
+ const write=store.writeRecoveredSource,protect=store.protectRecoverySource;
+ store.writeRecoveredSource=async function(options){for(const row of options?.archives||[])traffic.written+=row.raw.length;return write.apply(this,arguments);};
+ store.protectRecoverySource=async function(options){traffic.written+=options?.raw?.length||0;return protect.apply(this,arguments);};
+ t.after(()=>{store.writeRecoveredSource=write;store.protectRecoverySource=protect;});
+ return traffic;
+};
+const deliberateRunWithPublication2239=async(t,app)=>{
+ const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ // The harness's timers do not hold the process open while retries wait.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ // Publication ends by releasing its hold; what follows is the run's check of earlier sources.
+ let released=false;const clear=store.clearRecoveryCloudHoldIfCurrent;
+ store.clearRecoveryCloudHoldIfCurrent=async function(...args){const result=await clear.apply(this,args);if(result)released=true;return result;};
+ t.after(()=>{store.clearRecoveryCloudHoldIfCurrent=clear;});
+ const phase=()=>released?'after':'run',traffic=countArchiveTraffic2239(t,store,phase),reads=[];
+ app.faults.serverRead=async path=>{reads.push({phase:phase(),path});};t.after(()=>{delete app.faults.serverRead;});
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'the deliberate run and its checks settle');
+ // Positive controls: Retry sync rebuilt, published and confirmed the board.
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'positive control: the deliberate run rebuilt the board');
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: publication released its hold');
+ assert.equal(released,true);assert.equal(syncStatus2200(shim).text,'☁ synced');
+ return {traffic,reads};
+};
+test('RISK recovery read-backs: a deliberate run reads each recovery archive back once after writing it, and publication and its push check archives by key rather than reading every archive again',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{traffic}=await deliberateRunWithPublication2239(t,app);
+ const read=traffic.read.run||0,ratio=read/traffic.written;
+ t.diagnostic(JSON.stringify({written:traffic.written,read,ratio:+ratio.toFixed(2),calls:traffic.calls}));
+ assert.ok(traffic.written>0,'positive control: the run wrote its recovery archives');
+ // The commit's one exact readback and publication's one list of archives:
+ // about twice what was written, where reading the archives again before
+ // every publication step and push read them many times over.
+ assert.ok(ratio<=2.5,'archive text read back until publication ends is at most 2.5 times what was written: '+ratio.toFixed(2));
+});
+// #2239: during one run the accepted device source is checked again at every
+// stage of the cloud read. It is read in full once; each later check reads its
+// fingerprint (the rows that can change under the same key, and the keys of the
+// hash-keyed snapshots and append-only archives) and reuses that capture when
+// it is unchanged. The commit still compares the full source inside its write.
+test('RISK recovery device capture: a deliberate run reads the device sources in full once, and its later checks during the cloud read compare their fingerprint',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{traffic}=await deliberateRunWithPublication2239(t,app);
+ t.diagnostic(JSON.stringify(traffic.calls));
+ assert.ok((traffic.calls['readRawExportSnapshot:run']||0)>=1,'positive control: the run read the device sources');
+ assert.ok((traffic.calls['readRawExportSnapshot:run']||0)<=2,'the device sources are read in full at most twice until publication ends: '+JSON.stringify(traffic.calls));
+});
+test('RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only that generation\'s header and chunks',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{activePath}=app,{traffic,reads}=await deliberateRunWithPublication2239(t,app);
+ const after=reads.filter(read=>read.phase==='after').map(read=>read.path);
+ t.diagnostic(JSON.stringify({after,calls:traffic.calls}));
+ const status=vm.runInContext('JSON.stringify(automaticCloudSourceResumeStatus)',app.ctx);
+ assert.match(status,/"unresolved":1/,'positive control: the unreadable generation is still an unresolved earlier source: '+status);
+ assert.ok(after.filter(path=>path===activePath+'/chunks').length>=2,'positive control: the run rechecked the incomplete generation more than once: '+JSON.stringify(after));
+ // Behaviour under test: each recheck reads that generation alone, and the
+ // device sources and archives are read once, for the history the rechecks share.
+ assert.deepEqual(after.filter(path=>path!==activePath&&path!==activePath+'/chunks'),[],'rechecks read nothing but the incomplete generation');
+ assert.ok((traffic.calls['readRawExportSnapshot:after']||0)<=1,'the device sources are read once after publication: '+JSON.stringify(traffic.calls));
+ assert.ok((traffic.calls['listOpaqueArchives:after']||0)<=1,'every archive is listed once after publication: '+JSON.stringify(traffic.calls));
+});
 
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,
