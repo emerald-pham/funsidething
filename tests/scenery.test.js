@@ -1303,6 +1303,48 @@ test('RISK recovery background check: after Retry sync publishes with an earlier
  assert.ok((traffic.calls['readRawExportSnapshot:after']||0)<=1,'the device sources are read once after publication: '+JSON.stringify(traffic.calls));
  assert.ok((traffic.calls['listOpaqueArchives:after']||0)<=1,'every archive is listed once after publication: '+JSON.stringify(traffic.calls));
 });
+// #2239 round 2 (direction b): the commit reads every archive it writes back
+// once, exactly, and publication lists the archives once, as recorded on
+// #2239. After that, the check of earlier sources needs only a few facts about
+// each recovery (its sources, generations and mode), not the device's raw
+// originals, so it reads the small summary each commit writes and reads back
+// with them, and checks the large archives by key. Counted here: device-store
+// reads from the start of publication until the run's checks of earlier
+// sources settle.
+test('RISK recovery summary: after publication lists the archives once, the check of earlier sources reads the recovery summaries and checks the large archives by key instead of reading them again',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ // Counting starts when publication starts, after the commit's own readback.
+ let committed=false,written=0,read=0;const calls={};
+ const write=store.writeRecoveredSource,publish=ctx.publishAutomaticCloudRecovery;
+ store.writeRecoveredSource=async function(options){const result=await write.apply(this,arguments);
+  if(result?.ok)for(const row of options?.archives||[])written+=row.raw.length;return result;};
+ ctx.publishAutomaticCloudRecovery=function(...args){if(written>0)committed=true;return publish.apply(this,args);};
+ t.after(()=>{store.writeRecoveredSource=write;ctx.publishAutomaticCloudRecovery=publish;});
+ for(const name of ['readRawRows','listOpaqueArchives','readRawExportSnapshot']){
+  const original=store[name];
+  store[name]=async function(...args){
+   const result=await original.apply(this,args);
+   if(committed){
+    const label=name+(name==='listOpaqueArchives'&&!args[0]?.prefix?':every':'');calls[label]=(calls[label]||0)+1;
+    for(const row of Array.isArray(result)?result:result?.stores?.opaque?.values||[])if(typeof row?.raw==='string')read+=row.raw.length;
+   }
+   return result;};
+  t.after(()=>{store[name]=original;});
+ }
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'the deliberate run and its checks settle');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'positive control: the deliberate run rebuilt the board');
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: publication released its hold');
+ assert.equal(syncStatus2200(shim).text,'☁ synced');
+ t.diagnostic(JSON.stringify({written,read,calls}));
+ assert.ok(written>0,'positive control: the commit wrote its archives');
+ assert.ok((calls['listOpaqueArchives:every']||0)<=1,'only publication lists every archive, once: '+JSON.stringify(calls));
+ assert.equal(calls.readRawExportSnapshot||0,0,'the check of earlier sources never reads the raw device source: '+JSON.stringify(calls));
+ assert.ok(read<=1.25*written,'archive text read from publication on is about what the commit wrote (its one list), not several times it: '+JSON.stringify({written,read}));
+});
 
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,

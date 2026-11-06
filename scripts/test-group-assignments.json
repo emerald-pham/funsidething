@@ -13196,6 +13196,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery summary: after publication lists the archives once, the check of earlier sources reads the recovery summaries and checks the large archives by key instead of reading them again",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"
