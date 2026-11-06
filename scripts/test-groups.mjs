@@ -707,10 +707,13 @@ function literalTestRegistrations(source) {
 
 // A root registered as a plain-string test(...) call at the start of a line
 // (column 0, the top level of an area file) is placed by its file's group
-// (#2232). Indented, environment-gated or computed registrations are not: they
-// keep explicit rows, and the core registration guard still rejects any that run
-// unclassified. Both checks must agree, so a quoted fixture that merely looks
-// like a registration never becomes a root.
+// (#2232), including a column-0 environment skip such as
+// test('…',{skip:!process.env.X},…). Titles this scanner cannot read keep
+// explicit rows: computed titles, indented registrations (for example inside an
+// if), titles with escapes, and registrations after a regular expression the
+// tokenizer reads as division. The core registration guard rejects any of those
+// that run without a row. Both checks must agree, so a quoted fixture that
+// merely looks like a registration never becomes a root.
 function fileDefaultRootTitles(source) {
   const code = literalTestRegistrations(source), titles = new Set();
   for (const line of source.split('\n')) {

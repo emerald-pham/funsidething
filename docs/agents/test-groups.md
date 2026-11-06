@@ -15,10 +15,16 @@ repository-process tooling tests: `core.test.js`, `scenery.test.js`,
 `tests/shared.js`; area files import what they use from it. Add a test to the
 file of its group: a plain-string `test('…', …)` registered at the start of a
 line takes that file's group from `fileGroups` in
-`scripts/test-group-assignments.json` (#2232). Add a `rootAssignments` row only
-to override that group, or for a computed (`registration: "dynamic"`) or
-indented title the runner cannot place by file. A file with no `fileGroups`
-entry places nothing, so its new roots still need rows. Tests
+`scripts/test-group-assignments.json` (#2232). Add a `rootAssignments` row to
+override that group, and for every title the runner's scanner cannot read: a
+computed title (`registration: "dynamic"`), a registration that does not start
+at column 0 (indented, for example inside an `if`), a title with an escape such
+as `\'` or written `\u2192` for `→`, or a registration after a regular
+expression literal the tokenizer reads as division (for example the one after
+the `/Couldn't…/` regex at `tests/core.test.js` 26028). Such a root without a
+row fails the core registration guard rather than running unclassified. A file
+with no `fileGroups` entry places nothing, so its new roots still need rows.
+Tests
 that read or spawn their own file use `fileURLToPath(import.meta.url)`.
 `npm test` runs two files at a time, because the long core file's 5 s fixture
 deadlines expire when every file runs at once.
@@ -40,7 +46,9 @@ runner), and the runner starts its test process, and so every per-file child,
 with that `--max-old-space-size` (#2232). Raise the group's heap rather than
 moving roots out of it. `scenery` and `persistence-recovery` run with 8192 MB:
 `persistence-recovery` ran out of Node's default heap on CI in PR #2222, which
-is why 19 heavy recovery roots were moved to `scenery`. Keep each output directory empty and unique, outside the
+is why 19 heavy recovery roots were moved to `scenery`, where they stay. The
+8192 MB figure is about twice the 4144 MB default observed locally and has not
+been measured against the groups' actual peak; check it on the first CI run. Keep each output directory empty and unique, outside the
 checkout, and allocate separate native ports or other shared resources when
 groups run concurrently.
 
