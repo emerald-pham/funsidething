@@ -925,7 +925,7 @@ function inputCoverage(fixture, group = 'core') {
   const inputs = {policy:'complete-ci-inputs-v1',repository:identity.repository,checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,
     runtime:{node:process.versions.node,platform:process.platform,arch:process.arch,imageOS:'ubuntu24',imageVersion:'20261022.1.0'}};
   const pass = {kind:'ci-input-pass-v1',inputs,gate:group,inputKey:createHash('sha256').update(JSON.stringify({...inputs,gate:group})).digest('hex'),
-    coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:'a'.repeat(40),checkoutSha:'b'.repeat(40),checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,resultSha256:'8'.repeat(64),artifactId:'901',artifactName:'regression-71-2-'+group,artifactSha256:'7'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z'}};
+    coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:'a'.repeat(40),checkoutSha:'b'.repeat(40),checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,resultSha256:'8'.repeat(64),artifactId:'901',artifactName:'regression-71-2-'+group,artifactSha256:'7'.repeat(64),artifactExpiresAt:new Date(Date.now()+90*86400000).toISOString() /* #2232: unexpired on any date */}};
   const proof = {decision:'full',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,inputContext:inputs,inputPasses:{[group]:pass}};
   const file = path.join(description.outputDir,'input-proof.json');writeJson(file,proof);
   return {file,proof};

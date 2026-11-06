@@ -128,6 +128,9 @@ function publishedInputPass(f, plan, gates = ['core']) {
   return github;
 }
 
+// #2232: the retained original artifact must be unexpired whatever today's
+// date is; a literal 2030 expiry made these reuse fixtures fail from 2030 on.
+const retainedArtifactExpiry=()=>new Date(Date.now()+90*86400000).toISOString();
 function attachInputArtifacts(f,github,jobs){
   const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
   for(const job of jobs)for(const marker of job.steps.filter(step=>step.name.startsWith('Completed CI gate '))){
@@ -143,7 +146,7 @@ function attachInputArtifacts(f,github,jobs){
     marker.name=marker.name.replace(/result [a-f0-9]{64}$/,`result ${hash(bytes)}`);
     const archive=directory+'.zip';const result=spawnSync('zip',['-qr',archive,'.'],{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);
     const content=readFileSync(archive);github.artifacts||=[];github.artifacts=github.artifacts.filter(a=>a.name!==name);
-    github.artifacts.push({id:900+github.artifacts.length,name,expired:false,created_at:'2026-10-27T10:00:45Z',expires_at:'2030-01-01T00:00:00Z',digest:'sha256:'+hash(content),size_in_bytes:content.length,workflow_run:{id:job.run_id,head_sha:job.head_sha},fixturePath:archive});
+    github.artifacts.push({id:900+github.artifacts.length,name,expired:false,created_at:'2026-10-27T10:00:45Z',expires_at:retainedArtifactExpiry(),digest:'sha256:'+hash(content),size_in_bytes:content.length,workflow_run:{id:job.run_id,head_sha:job.head_sha},fixturePath:archive});
   }
 }
 
