@@ -880,9 +880,12 @@ test('RISK recovery wait: a changed unreadable generation is evaluated afresh an
  backend.docs.set('users/owner/generations/'+unreadableId,{...header});
  backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:unreadableId,previousGeneration:originalRoot.previousGeneration});
  const at=reads.length;shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
- const priorChunks='users/owner/generations/'+originalRoot.previousGeneration+'/chunks';
- await fixtureDeadline(async wait=>{while(!reads.slice(at).includes(priorChunks)||!recoveryWaitIdle2228(ctx))await wait(10);},'the changed generation is evaluated',CAPTURED_RESULT_BUDGET_MS+20000);
+ // #2228 review: the changed generation is weighed from the headers, so its
+ // earlier generation's header is read again (not its chunks).
+ const priorHeader='users/owner/generations/'+originalRoot.previousGeneration;
+ await fixtureDeadline(async wait=>{while(!reads.slice(at).includes(priorHeader)||!recoveryWaitIdle2228(ctx))await wait(10);},'the changed generation is evaluated',CAPTURED_RESULT_BUDGET_MS+20000);
  assert.ok(reads.slice(at).includes('users/owner/generations/'+unreadableId+'/chunks'),'the changed generation is read afresh');
+ assert.deepEqual(recoveryBudgetEvents2228(ctx).map(event=>event.metadata.budgetOutcome),['deferred','deferred'],'the changed generation is weighed again');
  assert.equal(backend.CS.errorCode,'corrupt-generation');
  assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','it waits again, on the new generation');
  // A readable new generation ends the wait and ordinary sync resumes.
@@ -943,6 +946,29 @@ test('RISK recovery wait: a Retry sync that waits for Settings opened during its
   assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'closing Settings runs the recovery default deliberately');
   assert.equal(syncStatus2200(shim).text,'☁ older copy in use','the wait has ended');
  });
+});
+// #2228 review: the wait itself still cost about 140-215 MiB in WebKit,
+// because the budget was weighed only after the exact-copy check and the
+// recovery capture had downloaded both generations and read and encoded every
+// device source. The opening pull's own download of the unreadable current
+// generation is the only chunk read it needs: the estimate comes from each
+// generation's header and this device's serialized board.
+test('RISK recovery wait: an over-budget opening decides to wait from the generation headers, before downloading the earlier generation or reading the device sources',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ // Every full read of the device sources, which recovery archives exactly.
+ let deviceSourceReads=0;const readRaw=store.readRawExportSnapshot;
+ store.readRawExportSnapshot=function(...args){deviceSourceReads++;return readRaw.apply(this,args);};t.after(()=>{store.readRawExportSnapshot=readRaw;});
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ t.diagnostic(JSON.stringify({chunkReads:reads.filter(path=>path.endsWith('/chunks')).length,deviceSourceReads}));
+ assert.deepEqual(reads.filter(path=>path.endsWith('/chunks')),[activePath+'/chunks'],'only the opening pull downloads, and only the unreadable current generation');
+ assert.ok(reads.includes(priorPath),'the earlier generation is weighed from its header');
+ assert.equal(deviceSourceReads,0,'the device sources are not read or encoded to decide');
+ const [event]=recoveryBudgetEvents2228(ctx);
+ assert.equal(event?.metadata.budgetOutcome,'deferred');
+ assert.equal(event.metadata.generationKiB,Math.round(CAPTURED_UNREADABLE_GENERATION.prior.byteLength/1024),'the complete earlier generation is still counted, and the unreadable one is not');
 });
 
 // #2194 review M1: a pull that fails before any server root is read (offline,

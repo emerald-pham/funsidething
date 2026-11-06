@@ -1403,23 +1403,33 @@ test('RISK large board recovery browser: the automatic recovery default reconcil
 // accepted stays open and editable with nothing from the earlier generation
 // applied and nothing published, the cloud button and Settings say cloud
 // recovery is waiting, the page keeps answering, and Review cloud recovery and
-// Restore stay reachable. Memory is recorded for the report, not asserted:
-// desktop engines do not enforce a phone's limit.
+// Restore stay reachable.
+// #2228 review (story 20): the wait itself must stay cheap. The peak
+// web-process memory of the waiting opening is compared with opening the same
+// board locally, in the same run on the same engine. Before the review the
+// budget was weighed only after the exact-copy check and the recovery capture
+// had downloaded and encoded the earlier generation and every device source,
+// about 140-215 MiB over the local opening in WebKit. The fake cloud answers
+// the generation headers on their own, as the real store does.
+const RECOVERY_WAIT_MEMORY_MARGIN=64*1024*1024;
 test('RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
  assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
  const PRIOR_TITLE='Saved only in the intact earlier generation',NEWER_TITLE='Newer local edit before the wait',WAITING_TITLE='Added while cloud recovery waits';
  const GENERATION_PATH='/__chain-2228/earlier-generation.json',WAIT_MS=90000,observed=[],failures=[];
+ const HEADER_PATH='/__chain-2228/earlier-header.json',OPEN_SETTLE_MS=2000,mib=bytes=>Math.round(bytes/1048576);
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
   let earlier=null;
+  let earlierHeader=null;
   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2228-'+engineName+'-'));
   const launch=async(tag,seed,withCloud)=>{
    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
    await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
-   await context.addInitScript(({seed,withCloud,GENERATION_PATH,ACCOUNT})=>{
+   await context.route(origin+HEADER_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlierHeader}));
+   await context.addInitScript(({seed,withCloud,GENERATION_PATH,HEADER_PATH,ACCOUNT})=>{
     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
@@ -1445,16 +1455,25 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
        {id:root.activeGeneration,header:header('e'.repeat(64),6),chunks:[]},
        {id:root.previousGeneration,header:header(encoded.hash,5),chunks:encoded.chunks}]};
      },
+     // The root and the generation headers on their own: small documents.
+     async readRecoverySourceHeaders(){
+      log.log.push('header-read');
+      const earlier=await (await fetch(HEADER_PATH,{cache:'no-store'})).json();
+      const header=(hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:earlier.chunkCount,byteLength:earlier.byteLength,hash,baseRev});
+      return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+       {id:root.activeGeneration,header:header('e'.repeat(64),6)},{id:root.previousGeneration,header:header(earlier.hash,5)}]};
+     },
      async protectRecoverySources(){log.log.push('protect');return {error:true,code:'permission-denied'};},
     };
     Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
     document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
-   },{seed,withCloud,GENERATION_PATH,ACCOUNT});
+   },{seed,withCloud,GENERATION_PATH,HEADER_PATH,ACCOUNT});
    return context;
   };
   const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
    &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
   const summary={engine:engineName};
+  let localMemory=null,waitMemory=null;
   try{
    const tag=`chain-2228-${engineName}-${process.pid}-${Date.now()}`;
    let context=await launch(tag+'-seed',fixture.payload,false);
@@ -1466,6 +1485,16 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
     earlier=JSON.stringify({...accepted,tasks:[...accepted.tasks,{...syncTask('large-board-earlier-only',PRIOR_TITLE),ctx:['home']}]});
     await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(LARGE_BOARD_SHAPE.tasks+1)(page);
     await page.waitForTimeout(1500);
+   }finally{await context.close();}
+   // The earlier generation's header, as the cloud store keeps it beside its chunks.
+   const encodedEarlier=await loadStorageV2().encodeSnapshot(earlier);
+   earlierHeader=JSON.stringify({chunkCount:encodedEarlier.chunkCount,byteLength:encodedEarlier.byteLength,hash:encodedEarlier.hash});
+   // The same board opened locally, with no cloud, in the same run: the baseline.
+   context=await launch(tag+'-local',null,false);
+   try{
+    const page=context.pages()[0]||await context.newPage(),sampler=webProcessMemorySampler(tag+'-local');
+    try{await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks+1)(page);await page.waitForTimeout(OPEN_SETTLE_MS);}
+    finally{localMemory=await sampler.stop();}
    }finally{await context.close();}
    context=await launch(tag,null,true);
    try{
@@ -1481,6 +1510,8 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
       return text==='☁ recovery waiting'||__recoveryWait.log.includes('protect')||text==='☁ older copy in use';},null,{timeout:WAIT_MS}).then(()=>true,()=>false);
      summary.settleMs=Date.now()-released;
      await page.waitForTimeout(2000);
+     // The opening and its wait, measured like the local opening.
+     waitMemory=await sampler.stop();
      summary.status=await page.evaluate(()=>{const el=document.getElementById('syncBtn');return {text:el.textContent,title:el.title,className:el.className};});
      summary.log=await page.evaluate(()=>__recoveryWait.log.slice());
      // Responsive: a frame and a task still run promptly.
@@ -1509,9 +1540,16 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
     summary.peakMiB=Math.round(memory.peakBytes/1048576);summary.samples=memory.samples;summary.crashed=crashed;summary.errors=errors;
    }finally{await context.close();}
   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  if(localMemory&&waitMemory)Object.assign(summary,{localPeakMiB:mib(localMemory.peakBytes),waitPeakMiB:mib(waitMemory.peakBytes),
+   extraMiB:mib(waitMemory.peakBytes-localMemory.peakBytes),marginMiB:mib(RECOVERY_WAIT_MEMORY_MARGIN),samplesLocalWait:[localMemory.samples,waitMemory.samples]});
   const {titles,...reported}=summary;observed.push(reported);t.diagnostic(JSON.stringify(reported));
   assert.ok(summary.settled,`${engineName}: the opening settled within ${WAIT_MS/1000} s ${JSON.stringify(reported)}`);
   assert.equal(summary.crashed,false,`${engineName}: the page did not crash`);assert.deepEqual(summary.errors,[],`${engineName}: no page errors`);
+  // Measurement preconditions: the harness saw this browser's own web process.
+  assert.ok(localMemory.processes>0&&waitMemory.processes>0&&localMemory.samples>10&&waitMemory.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(reported)}`);
+  if(waitMemory.peakBytes-localMemory.peakBytes>RECOVERY_WAIT_MEMORY_MARGIN)
+   failures.push(`${engineName}: the waiting opening peaked ${summary.extraMiB} MiB over opening the board locally, above the ${summary.marginMiB} MiB margin`);
+  if(summary.log.includes('source-read'))failures.push(`${engineName}: the waiting opening downloaded a recovery source ${JSON.stringify(summary.log)}`);
   // Behavior under test: recovery waits instead of running.
   if(summary.status.text!=='☁ recovery waiting')failures.push(`${engineName}: the cloud button does not say cloud recovery is waiting ${JSON.stringify(summary.status)}`);
   if(!/cloud recovery is waiting/i.test(summary.status.title)||!/not confirmed/i.test(summary.status.title))failures.push(`${engineName}: the cloud button title does not explain the wait ${JSON.stringify(summary.status)}`);

@@ -13126,6 +13126,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: an over-budget opening decides to wait from the generation headers, before downloading the earlier generation or reading the device sources",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"
