@@ -896,6 +896,22 @@ test('RISK recovery wait: a changed unreadable generation is evaluated afresh an
  assert.ok(ctx.state.tasks.some(task=>task.title==='Newer local edit before reconciliation'),'the accepted board is kept');
  assert.notEqual(JSON.stringify([...backend.docs]),cloudBefore,'ordinary sync resumes');
 });
+// #2228 review: the work budget is a phone-safety limit, and these tests move
+// it through window.CLOUD_RECOVERY_WORK_BUDGET_BYTES. The deployed app must
+// ignore that value whatever a page script sets. The captured shape is within
+// the product budget, so on the deployed Stable page the recovery default runs
+// even though the override asks every recovery to wait.
+test('RISK recovery wait: the deployed app ignores a page script that sets the work-budget override, so a recovery within the product budget still runs',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app;
+ ctx.window.location=new URL('https://emerald-pham.github.io/funsidething/');
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=0;
+ // Publication is refused, so the recovery default's outcome stays visible.
+ refuseNextRecoveryTransaction255(app.faults);
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.notEqual(syncStatus2200(shim).text,'☁ recovery waiting','the override does not make the deployed app wait');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'the recovery default runs within the product budget');
+ assert.equal(syncStatus2200(shim).text,'☁ older copy in use');
+});
 
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,

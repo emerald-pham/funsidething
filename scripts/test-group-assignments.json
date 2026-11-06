@@ -13116,6 +13116,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: the deployed app ignores a page script that sets the work-budget override, so a recovery within the product budget still runs",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"
