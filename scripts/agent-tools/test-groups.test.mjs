@@ -820,6 +820,35 @@ test('test group roots without a row take their file group and rows override it'
   });
 });
 
+// #2232: heavy roots were hand-moved between groups to stay under Node's default
+// heap. A group may declare its heap instead; the runner passes it to the group's
+// Node test process, whose per-file children inherit it.
+const heapProbeRoot='fixture heap probe root';
+function heapFixture(t,heap){
+  const fixture=createFixture(t);
+  fs.appendFileSync(path.join(fixture.root,suiteFile),`\ntest(${JSON.stringify(heapProbeRoot)}, async () => { if (process.env.CHAIN_HEAP_PROBE) fs.writeFileSync(process.env.CHAIN_HEAP_PROBE, String((await import('node:v8')).default.getHeapStatistics().heap_size_limit)); });\n`);
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+  catalog.groups.find(group=>group.id==='scenery').nodeMaxOldSpaceSizeMb=heap;
+  catalog.rootAssignments.push({root:heapProbeRoot,group:'scenery',file:suiteFile});
+  writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','group heap');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group runs a group with its declared Node heap and rejects an invalid heap', async parent => {
+  await parent.test('declared heap reaches the test process',t=>{
+    const fixture=heapFixture(t,1536),probe=path.join(fixture.root,'heap-limit');
+    const result=invoke(fixture,{group:'scenery',env:{CHAIN_HEAP_PROBE:probe}});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    const limitMb=Number(fs.readFileSync(probe,'utf8'))/1048576;
+    assert.ok(Math.abs(limitMb-1536)<128,`the scenery test process must run with its declared 1536 MB old space, observed ${limitMb.toFixed(0)} MB heap limit`);
+    assert.equal(result.evidence.process.nodeMaxOldSpaceSizeMb,1536,'the result records the heap the group ran with');
+  });
+  for(const [name,heap] of [['too small',64],['not a whole number',2048.5],['larger than the runner',65536],['not a number','8192']])await parent.test('invalid heap: '+name,t=>{
+    const fixture=heapFixture(t,heap),result=invoke(fixture,{args:['--describe']});
+    assert.notEqual(result.status,0,'an invalid group heap must fail closed');
+    assert.match(result.stderr,/heap/i);
+  });
+});
+
 test('test group workflow scanner command rejects missing parallel group evidence', t => {
   const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
   t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));

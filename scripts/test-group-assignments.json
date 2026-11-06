@@ -17,7 +17,8 @@
       "resourcePolicy": "isolated-process",
       "withinGroupConcurrency": 1,
       "baselineRootCount": 36,
-      "baselineEstimatedDurationMs": 224876.526
+      "baselineEstimatedDurationMs": 224876.526,
+      "nodeMaxOldSpaceSizeMb": 8192
     },
     {
       "id": "persistence-recovery",
@@ -25,7 +26,8 @@
       "resourcePolicy": "isolated-process",
       "withinGroupConcurrency": 1,
       "baselineRootCount": 73,
-      "baselineEstimatedDurationMs": 344080.858
+      "baselineEstimatedDurationMs": 344080.858,
+      "nodeMaxOldSpaceSizeMb": 8192
     },
     {
       "id": "native-process",

@@ -10,6 +10,8 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 // Not a required group: the scheduled/dispatched nightly job runs it alone.
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
+const MIN_GROUP_HEAP_MB = 512;
+const MAX_GROUP_HEAP_MB = 12288;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // The one definition of a registered test file (#2213): a *.test.js file in the
@@ -195,6 +197,13 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
   for (const group of assignments.groups) {
     if (!group.description || group.resourcePolicy !== 'isolated-process' || group.withinGroupConcurrency !== 1) {
       fail(`Group ${group.id} must declare an isolated process and serial within-group execution.`);
+    }
+    // A group that outgrows Node's default heap declares its own (#2232) instead
+    // of having roots moved out of it. Each group runs alone in its own job on a
+    // 16 GB ubuntu-latest runner, so the old space stays well below that.
+    const heap = group.nodeMaxOldSpaceSizeMb;
+    if (heap !== undefined && (!Number.isSafeInteger(heap) || heap < MIN_GROUP_HEAP_MB || heap > MAX_GROUP_HEAP_MB)) {
+      fail(`Group ${group.id} nodeMaxOldSpaceSizeMb must be a whole number of MB from ${MIN_GROUP_HEAP_MB} to ${MAX_GROUP_HEAP_MB} (Node heap).`);
     }
   }
   const groupSet = new Set(groupIds);
@@ -1074,7 +1083,7 @@ async function unclassifiedRootGuard(files, assignments, outputDir) {
   return report;
 }
 
-async function runChild(files, roots, outputDir, options, source) {
+async function runChild(files, roots, outputDir, options, source, heapMb) {
   const runtimeTmp = path.join(outputDir, 'runtime-tmp');
   const nativeDir = path.join(outputDir, 'native');
   const recoveryDir = path.join(outputDir, 'recovery-ui');
@@ -1099,7 +1108,9 @@ async function runChild(files, roots, outputDir, options, source) {
     CHAIN_NATIVE_CANDIDATE_TREE: source.tree,
     CHAIN_RECOVERY_UI_OUTPUT: recoveryDir,
   };
-  const child = spawn(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
+  // The test runner passes this flag on to every per-file child process.
+  const heapArguments = heapMb === undefined ? [] : [`--max-old-space-size=${heapMb}`];
+  const child = spawn(process.execPath, [...heapArguments, '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.pipe(tap);
@@ -1254,7 +1265,8 @@ async function main() {
     }));
 
     if (options.group === 'core') result.unclassifiedRootGuard = await unclassifiedRootGuard(files,assignmentIndex,outputDir);
-    const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source);
+    const heapMb = nightly ? undefined : assignments.groups.find(group => group.id === options.group)?.nodeMaxOldSpaceSizeMb;
+    const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source, heapMb);
     nativeDir = childResult.nativeDir;
     result.process = {
       exitCode: childResult.exit.code,
@@ -1263,6 +1275,7 @@ async function main() {
       stdout: { path: path.basename(childResult.tapPath), sha256: childResult.tapSha256 },
       stderr: { path: path.basename(childResult.stderrPath), sha256: childResult.stderrSha256 },
       selection: childResult.selection,
+      ...(heapMb === undefined ? {} : { nodeMaxOldSpaceSizeMb: heapMb }),
     };
     result.cases = childResult.cases.map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
     result.artifacts = [...artifactInventory(nativeDir), ...artifactInventory(childResult.recoveryDir)];

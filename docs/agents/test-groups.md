@@ -34,7 +34,13 @@ runner no longer run it.
 The additional `test:group` entry point runs one explicitly classified group in
 its own Node process. Group identifiers are stable: `core`, `scenery`,
 `persistence-recovery`, and `native-process`. Each process runs its selected
-roots serially. Keep each output directory empty and unique, outside the
+roots serially. A group that needs more than Node's default heap declares
+`nodeMaxOldSpaceSizeMb` (512 to 12288 MB; each group runs alone on a 16 GB
+runner), and the runner starts its test process, and so every per-file child,
+with that `--max-old-space-size` (#2232). Raise the group's heap rather than
+moving roots out of it. `scenery` and `persistence-recovery` run with 8192 MB:
+`persistence-recovery` ran out of Node's default heap on CI in PR #2222, which
+is why 19 heavy recovery roots were moved to `scenery`. Keep each output directory empty and unique, outside the
 checkout, and allocate separate native ports or other shared resources when
 groups run concurrently.
 

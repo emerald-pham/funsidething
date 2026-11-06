@@ -965,6 +965,22 @@ test('RISK repository process: a test root without a group row runs in its file 
  for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
 });
 
+// #2232: heavy roots were moved between groups to stay under Node's default
+// heap. The per-group heap is pinned at the group runner's command line with a
+// fixture cohort; this process RISK requires that pin to execute and pass and
+// keeps every declared heap within a 16 GB ubuntu-latest runner.
+test('RISK repository process: a group runs with its declared Node heap instead of moving roots out of it',()=>{
+ const pins=['test group runs a group with its declared Node heap and rejects an invalid heap'];
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+pins.join('|')+')$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:300000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The group heap pins must pass: '+result.stdout+'\n'+result.stderr);
+ assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,pins.length,'every named group heap pin must execute');
+ assert.match(result.stdout,/^# skipped 0$/m);
+ for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
+ const groups=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-assignments.json'),'utf8')).groups;
+ for(const group of groups)if(group.nodeMaxOldSpaceSizeMb!==undefined)assert.ok(group.nodeMaxOldSpaceSizeMb<=12288,'each group runs alone on a 16 GB runner: '+group.id);
+});
+
 // The nightly cross-engine move is pinned at the agreed seams (the CI workflow
 // files in the CI-routing tests, and test:group --aggregate in the test-group
 // tests); this process RISK requires those pins to execute and pass.
