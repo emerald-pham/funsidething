@@ -1090,25 +1090,34 @@ test('test group covered aggregate requires four honest references and fresh ori
   });
 });
 
+// The runner's --describe output for this repository: the effective required
+// cohort, with each root placed by its row or its file (#2232).
+function describeRepository() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-required-cohort-')), output = path.join(directory, 'describe');
+  try {
+    const head = git(repository, 'rev-parse', 'HEAD'), env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(process.execPath, [runner, '--describe', '--group', 'core', '--output-dir', output, '--repository', 'local/describe', '--event-policy', 'local',
+      '--run-id', '1', '--run-attempt', '1', '--source-sha', head, '--comparison-base', head], { cwd: repository, env, encoding: 'utf8', timeout: 60_000 });
+    assert.equal(result.status, 0, 'the real required cohort must describe: ' + result.stdout + result.stderr);
+    return JSON.parse(fs.readFileSync(path.join(output, 'descriptor.json'), 'utf8'));
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+}
+
 test('test group catalog routes real declarations despite matching quoted fixture text', t => {
   const fixture = createFixture(t);
   const titles = [
     'Landscape location: visible default-sky copy does not name Orlando',
     'RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections',
   ];
-  const candidateCatalog = JSON.parse(fs.readFileSync(path.join(repository, 'scripts/test-group-assignments.json'), 'utf8'));
+  const realCohort = describeRepository();
   const selected = titles.map(title => {
-    // Rows now hold only overrides (#2232): with no row, a real case takes the
-    // group of the area file that registers it.
-    const rows = candidateCatalog.rootAssignments.filter(row => row.root === title);
-    assert.ok(rows.length <= 1, 'each known real case has at most one catalog row');
-    const realFile = 'tests/native-process.test.js';
-    assert.ok(fs.readFileSync(path.join(repository, realFile), 'utf8').split('\n').some(line => line.startsWith(`test(${JSON.stringify(title)}`) || line.startsWith(`test('${title}'`)), 'the real case is declared in its area file');
-    const placement = rows[0] || { root: title, group: candidateCatalog.fileGroups?.[realFile], file: realFile };
-    assert.equal(placement.group, 'native-process', 'retain the historical group membership');
+    // Rows now hold only overrides (#2232): the runner's descriptor of the real
+    // repository is the effective placement, by row or by the case's file.
+    const placement = realCohort.groups.filter(group => group.roots.includes(title)).map(group => group.id);
+    assert.deepEqual(placement, ['native-process'], 'retain the historical group membership');
     // The real case lives in its own area file (#2213); this fixture appends
     // the declarations below to its one suite file.
-    return { root: title, group: placement.group, file: suiteFile };
+    return { root: title, group: 'native-process', file: suiteFile };
   });
   const journal = path.join(fixture.root, 'real-case-executions.jsonl');
   const declarations = titles.map(title => `test(${JSON.stringify(title)}, () => { fs.appendFileSync(process.env.CHAIN_REAL_CASE_JOURNAL, ${JSON.stringify(title + '\n')}); });`).join('\n');

@@ -2209,15 +2209,17 @@ async function saveEditorChoice(app,id,at,changes={}){
 function pinAppClock(sandbox,at){
  vm.runInContext(`(()=>{const RealDate=Date;globalThis.Date=class extends RealDate{constructor(...args){if(args.length)super(...args);else super(${Number(at)});}static now(){return ${Number(at)};}};})()`,sandbox);
 }
-async function loadAppPinnedAt(at,options={}){
+// Both clock loaders install their pin after the app script runs and before its
+// state is ready. loadAppAtTime pins Date.now() only (new Date() still reads the
+// real clock); loadAppPinningNewDate also pins new Date(), which the app's
+// "today" reads.
+function loadAppWithClock(pin,at,options={}){
  const original=options.beforeStateReady;
- return loadApp({...options,beforeStateReady(ctx,shim){pinAppClock(ctx,at);original?.(ctx,shim);}});
+ return loadApp({...options,beforeStateReady(ctx,shim){pin(ctx,at);original?.(ctx,shim);}});
 }
+function loadAppPinningNewDate(at,options={}){ return loadAppWithClock(pinAppClock,at,options); }
 
-async function loadAppAtTime(at,options={}){
- const original=options.beforeStateReady;
- return loadApp({...options,beforeStateReady(ctx,shim){setFakeTime(ctx,at);original?.(ctx,shim);}});
-}
+function loadAppAtTime(at,options={}){ return loadAppWithClock(setFakeTime,at,options); }
 
 function hydrateUnchangedEditorDraft(app,id){
  const task=app.ctx.state.tasks.find(row=>row.id===id);
@@ -3863,7 +3865,7 @@ export {
   DEVICE_AUTHORITY_KEY, HOUR, sharedScannerStorage, loadCloudBackend, loadCloudBackendV2,
   cloudAdapterCryptoGate, releaseCloudAdapterCryptoAfterDeadline, decodeManualArchiveTypedValue,
   backupFileFixtures, loadBackupFileFixtureApp, prepareBackupFileFixtureSource, syncTask, syncState,
-  saveEditorChoice, loadAppAtTime, loadAppPinnedAt, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN,
+  saveEditorChoice, loadAppAtTime, loadAppPinningNewDate, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState, CLOUD_CHAIN,
   cloudState, makeSyncHarness, decisionRecoveryApp146, mixedSharedOutcome146,
   recordMixedDecisionActions146, decisionMixedActionsApp146, syncSettle, PAST_DEBOUNCE, doneTitles,
   seedDuplicateCompletion, renamedCloud, titlesOf, workedLog, MORNING, EVENING, DAY_BEFORE,

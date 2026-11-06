@@ -28,7 +28,7 @@ import {
   LOCAL_BACKUPS_KEY, DEVICE_AUTHORITY_KEY, HOUR, sharedScannerStorage, loadCloudBackend,
   loadCloudBackendV2, cloudAdapterCryptoGate, releaseCloudAdapterCryptoAfterDeadline,
   decodeManualArchiveTypedValue, loadBackupFileFixtureApp, prepareBackupFileFixtureSource, syncTask,
-  syncState, saveEditorChoice, loadAppAtTime, loadAppPinnedAt, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState,
+  syncState, saveEditorChoice, loadAppAtTime, loadAppPinningNewDate, hydrateUnchangedEditorDraft, STALE_CHAIN, staleState,
   CLOUD_CHAIN, cloudState, makeSyncHarness, decisionRecoveryApp146, mixedSharedOutcome146,
   recordMixedDecisionActions146, decisionMixedActionsApp146, syncSettle, PAST_DEBOUNCE, doneTitles,
   seedDuplicateCompletion, workedLog, MORNING, EVENING, DAY_BEFORE, seedWorkLog, moodRuntime, atNoon,
@@ -6643,7 +6643,7 @@ test('RISK DATE FORMAT: task chips history backups and diagnostics share the cho
   // #2232: the app clock is pinned before these 2027 dates, which otherwise turn
   // the due chip into "overdue" once they pass.
   const at=new Date(2026,10,2,12).getTime();
-  const {ctx,shim}=await loadAppPinnedAt(at);ctx.state.settings.dateFormat='dmy';
+  const {ctx,shim}=await loadAppPinningNewDate(at);ctx.state.settings.dateFormat='dmy';
   const task=ctx.addTask('Schedule',false,[],{due:'2027-02-03',startsAt:'2027-01-04'});
   assert.match(ctx.chipHTML(task),/03\/02\/2027/);assert.match(ctx.chipHTML(task),/04\/01\/2027/);
   assert.match(ctx.fmtWhen(new Date(2025,1,3,12).getTime()),/03\/02\/2025/);
@@ -13484,7 +13484,7 @@ test('RISK opening board presentation: shared markup retains released cards cont
  const board=syncState({tasks,contexts:[{id:'home',name:'Home & <garden>',active:true}],chain:['first','bench'],candidateId:'candidate',listOpen:true,ctxOpen:true,histOpen:true,
   workLog:[{id:'work-log',taskId:'first',title:'Earlier <work>',kind:'worked',at:2}],settings:{...syncState().settings,dateFormat:'mdy'}}),raw=JSON.stringify(board);
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
- const old=await loadAppPinnedAt(at,{...options,appSource:extractAppScript(baseline.stdout)}),current=await loadAppPinnedAt(at,options);
+ const old=await loadAppPinningNewDate(at,{...options,appSource:extractAppScript(baseline.stdout)}),current=await loadAppPinningNewDate(at,options);
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
  for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
