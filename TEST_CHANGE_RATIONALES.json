@@ -21387,5 +21387,28 @@
       "command": "node --test --test-name-pattern='RISK recovery wait: an over-budget automatic recovery default waits without publishing|RISK recovery wait: the saved restart record' tests/scenery.test.js (2026-11-06T04:59:36Z, ac48b6b plus the test changes); node --test --test-name-pattern='RISK recovery wait: an over-budget opening decides' tests/scenery.test.js (2026-11-06T04:38:39Z, c90402f); LANDSCAPE_BROWSER_URL=http://127.0.0.1:18963/ node --test --test-name-pattern='RISK large board recovery wait browser' tests/persistence-recovery.test.js (c90402f)",
       "failure": "Cold launch: AssertionError 'a cold launch over the remembered wait records it once' (actual 0, expected 1). Header-first: AssertionError 'only the opening pull downloads, and only the unreadable current generation' (5 chunk reads, 10 full device-source reads). Browser: Chromium +123 MiB and WebKit +121 MiB over the local open, above the 64 MiB margin. The title, motion and fixture-parameter changes are not behavioural; the normal-motion test's negative control against the pre-#2225 base 9d2592d failed (WebKit +194 MiB over the empty board, allowance 171 MiB)."
     }
+  },
+  {
+    "baseCommit": "552c3eee6394edc93512df257ac4d4719ef7106c",
+    "testChangesSha256": "ed27256e35fb34fbe2bdbe2b3a801c653c7c53e44e84e10b1758386ecc943be7",
+    "reason": "#2246 (owner redirect 2026-11-06): exporting support diagnostics must be metadata-only and bounded so it cannot hit the iPhone memory limit with a large board while cloud recovery waits. The Debug log dialog's only export was Database repair export, which serializes the whole board and every saved device copy (16 MB for the 2.4 MB large-board fixture; 0.9-1.3 GiB over the open Debug log and a 28 s WebKit stall). Two #283 tests pinned that routing: the Debug log dialog linked to the repair export and offered no standalone Copy or Download, and the reload help pointed only to the repair export. Both are renamed and changed to the new routing.",
+    "previousBehavior": "The Debug log dialog offered Select all, View / copy database for repair and Refresh log; it had no Copy debug log or Download debug log. Help 'Why did the app reload?' told the person to use View / copy database for repair, then Copy JSON, and no FAQ mentioned Copy debug log or Download debug log.",
+    "intendedBehavior": "The Debug log dialog offers Copy debug log, Download debug log, Select all and Refresh log, and no longer links to the repair export; Settings itself still has View / copy database for repair and still no standalone Debug log exporters. Help 'Why did the app reload?' routes to View debug log, then Copy debug log or Download debug log (metadata only), and still names Database repair export and its partial labelling for repairs.",
+    "replacementTests": [
+      "RISK DATABASE REPAIR EXPORT: Settings keeps the combined repair export and the Debug log dialog exports only its metadata report",
+      "RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the repair export for repairs",
+      "RISK support diagnostics export: every export the Debug log offers copies or downloads only the bounded metadata report and reads no saved board or database copy",
+      "RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit"
+    ],
+    "preservedCoverage": [
+      "Settings still offers View / copy database for repair and has no standalone copy-support-diagnostics or download-support-diagnostics control (same assertions kept).",
+      "The Debug log dialog stays manually selectable (select-support-diagnostics assertion kept).",
+      "Every other DATABASE REPAIR EXPORT test (exact sources, partial package, readonly capture, worker identities, cancelled capture, damaged source, FAQ) is unchanged and passes.",
+      "The reload help still names the repair export and its partial or unreadable labelling."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK support diagnostics export: every export' tests/core.test.js (2026-11-06T12:06:48Z, base 552c3ee plus the new test); LANDSCAPE_BROWSER_URL=http://127.0.0.1:47311/ node --test --test-name-pattern='RISK large board diagnostics export browser' tests/persistence-recovery.test.js (2026-11-06T12:13:48Z, base app); retrospective: node --test --test-name-pattern='RISK DATABASE REPAIR EXPORT: (Settings keeps the combined|reload help routes users to the metadata-only)' tests/core.test.js against base index.html",
+      "failure": "Node: AssertionError 'view-database-repair: the export contains no board content' (the copied text was the chain-scanner.recovery-archive with the board's task title). Browser: view-database-repair exported a 16,113,290-byte chain-scanner.recovery-archive with board content; Chromium +1269 MiB over the open Debug log with a 1657 ms stall, WebKit +938 MiB with a 28508 ms stall, above the 64 MiB margin and 1000 ms limit. Retrospective (written after the fix, run against the base app, so it cannot restore chronology): 'the Debug log dialog no longer links to the board-sized repair export' and the reload help did not match /View debug log, then Copy debug log or Download debug log/."
+    }
   }
 ]
