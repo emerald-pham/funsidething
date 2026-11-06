@@ -1737,20 +1737,18 @@ test('RISK large board diagnostics export browser: while cloud recovery waits, e
  }
 }));
 
-// The owner must be able to export the recovery itself, from either place:
-// Settings → Data and backups → View / copy database for repair, finished with
-// the dialog's download (or, before #2246, its Copy JSON), and Download backup
-// with Full recovery archive. The archive is lossless (the open board and
-// every saved device row, exactly as the page reads them afterwards) and saved
-// as a file, and building it holds about one saved source at a time, so its
-// cost does not grow with the number of saved copies: each export is measured
-// again after nine more full-board copies are saved on the device. Before
-// #2246 the repair export peaked 1.05-1.16 GiB over the open Settings (28 s
-// stall in WebKit), and the Full recovery archive 178-239 MiB with nine more
-// copies (a 41 MB file). After, both peak 25-63 MiB for a 14 MB file and
-// 64-122 MiB for 39 MB: what is retained is about one saved copy, and the rest
-// is per-row garbage the engines collect lazily, which still grows a little
-// with the number of rows. 160 MiB sits above that and below every earlier run.
+// The owner must be able to export the recovery itself: Settings → Data and
+// backups → Download recovery file. The file is lossless (the open board and
+// every saved device row, exactly as the page reads them afterwards), and
+// building it holds about one saved source at a time, so its cost does not
+// grow with the number of saved copies: it is measured again after nine more
+// distinct full-board copies are saved on the device. Before #2246 the repair
+// export peaked 1.05-1.16 GiB over the open Settings (28 s stall in WebKit),
+// and the Full recovery archive 178-239 MiB with nine more copies (a 41 MB
+// file). After, 25-63 MiB for a 14 MB file and 41-122 MiB for 39 MB: what is
+// retained is about one saved copy, and the rest is per-row garbage the
+// engines collect lazily, which still grows a little with the number of rows.
+// 160 MiB sits above that and below every earlier run.
 const REPAIR_EXPORT_MEMORY_MARGIN=160*1024*1024,ARCHIVE_EXTRA_COPIES=9;
 // Saves count more distinct full-board copies on the device, as manual
 // backups. Each differs, so the store keeps each as its own saved snapshot.
@@ -1805,52 +1803,41 @@ const archiveExportExercise=(kind,{open,start,finish})=>async({t,engineName,page
   if(result.stallMs>LARGE_BOARD_EXPORT_STALL_MS)failures.push(`${where}: the export stalled the page ${result.stallMs} ms`);
  }
 };
-test('RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'repair',archiveExportExercise('repair',{
- open:page=>openSettingsSectionFor(page,'view-database-repair'),
- start:page=>page.locator('#modalRoot [data-act="view-database-repair"]').click({timeout:120000}),
- finish:async(page,state)=>{
-  const save=page.locator('#modalRoot button:text-is("Download file")'),copy=page.locator('#modalRoot button[data-act="copy-database-repair"]');
-  if(!state.pressed&&await save.count()){state.pressed=true;await save.first().click({timeout:120000});}
-  else if(!state.pressed&&await copy.count()){state.pressed=true;await copy.first().click({timeout:120000});}
-  return false;}})));
-test('RISK large board recovery archive browser: while cloud recovery waits, Download backup with Full recovery archive saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'archive',archiveExportExercise('archive',{
- open:async page=>{await openSettingsSectionFor(page,'download-backup');await page.locator('#backupDownloadFormat').selectOption('recovery-archive');},
- start:page=>page.locator('#modalRoot [data-act="download-backup"]').click({timeout:120000}),
+test('RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'recovery-file',archiveExportExercise('recovery-file',{
+ open:page=>openSettingsSectionFor(page,'download-recovery-file'),
+ start:page=>page.locator('#modalRoot [data-act="download-recovery-file"]').click({timeout:120000}),
  finish:async()=>false})));
 
-// #2246: an actual visual test for the repair export's new Download repair
-// file control, measured beside its established neighbours in the same
-// dialog's button row: Back to Settings always, and Copy JSON when a small
-// export is still shown. A small board, and a board whose saved unknown task
-// data makes the export larger than the dialog shows (only Download and Back
-// to Settings remain). Day and night themes (attribute, computed color scheme
-// and paint checked), phone, the enlarged 260 px phone and desktop, ordinary
-// and 150% dialog text, native keyboard focus, Chromium and WebKit.
-// Screenshots go to REPAIR_EXPORT_VISUAL_DIR when it is set.
-test('RISK database repair export visual browser: Download file renders like Back to Settings and Copy JSON beside it in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+// #2246: an actual visual test for the two downloads that replace the format
+// choice and the view/copy dialogs, Download board and Download recovery file,
+// measured beside their established neighbour in the same Data and backups
+// pane: the Restore button. Day and night themes (attribute, computed color
+// scheme and paint checked), phone, the enlarged 260 px phone and desktop,
+// ordinary and 150% Settings text, native keyboard focus, Chromium and WebKit.
+// Screenshots go to DOWNLOADS_VISUAL_DIR when it is set.
+test('RISK downloads visual browser: Download board and Download recovery file render like the Restore button beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
- const output=process.env.REPAIR_EXPORT_VISUAL_DIR?path.resolve(process.env.REPAIR_EXPORT_VISUAL_DIR):null;
+ const output=process.env.DOWNLOADS_VISUAL_DIR?path.resolve(process.env.DOWNLOADS_VISUAL_DIR):null;
  if(output)fs.mkdirSync(output,{recursive:true});
  const ROWS=12,boards=new Map();
- for(const theme of ['light','dark'])for(const size of ['small','large']){
-  const tasks=Array.from({length:ROWS},(_,i)=>({...syncTask('visual-repair-'+i,'Visual repair task '+i),ctx:['home']}));
-  // About 1.5 MB of supported unknown task data makes the export too large to show.
-  if(size==='large')tasks[0].futureRepairField={keep:'large repair field '.repeat(90000)};
-  const seed=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,settings:{...syncState().settings,theme},tasks}));
+ for(const theme of ['light','dark']){
+  const seed=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,settings:{...syncState().settings,theme},
+   tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('visual-download-'+i,'Visual download task '+i),ctx:['home']}))}));
   const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:seed}});
-  try{boards.set(theme+'/'+size,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
+  try{boards.set(theme,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
  }
  const viewports=[['phone',390,844],['phone-enlarged',260,563],['desktop',1280,800]];
  const ENLARGED='#modalRoot .modal{font-size:150%} #modalRoot .modal :is(p,button,label,summary,select,input){font-size:1em}';
+ const STYLE_KEYS=['fontFamily','fontSize','fontWeight','color','borderColor','backgroundColor','height','paddingLeft','borderRadius'];
  const failures=[],observed=[];
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   // WebKit on macOS moves keyboard focus between buttons with Alt+Tab.
   const forward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',backward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
   try{
-   for(const theme of ['light','dark'])for(const size of ['small','large'])for(const [viewName,width,height] of viewports){
-    const where=`${engineName}/${theme}/${size}/${viewName}`;
+   for(const theme of ['light','dark'])for(const [viewName,width,height] of viewports){
+    const where=`${engineName}/${theme}/${viewName}`;
     const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});
     try{
      await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
@@ -1859,62 +1846,66 @@ test('RISK database repair export visual browser: Download file renders like Bac
       Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
       localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
       if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
-     },boards.get(theme+'/'+size));
+     },boards.get(theme));
      const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
      await page.waitForFunction(rows=>document.documentElement.dataset.appReady==='true'&&document.querySelectorAll('#listBody [data-row]').length===rows,ROWS,{timeout:60000});
      await page.evaluate(()=>document.fonts.ready);
-     await openSettingsSectionFor(page,'view-database-repair');
-     await page.locator('#modalRoot [data-act="view-database-repair"]').click();
-     const download=page.locator('#modalRoot button[data-act="download-database-repair"]');
-     if(!await download.waitFor({timeout:30000}).then(()=>true,()=>false)){failures.push(`${where}: the repair export offers no Download file`);continue;}
      await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),null,{timeout:15000}).catch(()=>{});
+     await openSettingsSectionFor(page,'download-recovery-file');
      const state={theme:await page.evaluate(()=>({attribute:document.documentElement.getAttribute('data-theme'),scheme:getComputedStyle(document.documentElement).colorScheme,
-      paint:getComputedStyle(document.querySelector('#modalRoot .modal')).backgroundColor,textarea:!!document.getElementById('databaseRepairData')})),scale:{}};
+      paint:getComputedStyle(document.querySelector('#modalRoot .modal')).backgroundColor})),scale:{}};
      for(const scale of [1,1.5]){
       const enlarged=scale>1?await page.addStyleTag({content:ENLARGED}):null;
-      await download.scrollIntoViewIfNeeded();
+      await page.locator('#modalRoot [data-act="download-recovery-file"]').scrollIntoViewIfNeeded();
       state.scale[scale]=await page.evaluate(()=>{
        const modal=document.querySelector('#modalRoot .modal'),pane=modal.getBoundingClientRect(),paneStyle=getComputedStyle(modal);
        const read=button=>{if(!button)return null;const style=getComputedStyle(button),rect=button.getBoundingClientRect(),hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
         return {text:button.textContent,fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,borderColor:style.borderTopColor,backgroundColor:style.backgroundColor,
-         height:Math.round(rect.height),clipped:button.scrollWidth>button.clientWidth+1,
+         height:Math.round(rect.height),paddingLeft:style.paddingLeft,borderRadius:style.borderTopLeftRadius,clipped:button.scrollWidth>button.clientWidth+1,
          inside:rect.left>=pane.left+parseFloat(paneStyle.paddingLeft)-1&&rect.right<=pane.right-parseFloat(paneStyle.paddingRight)+1,unobscured:hit===button||button.contains(hit)};};
-       return {download:read(modal.querySelector('[data-act="download-database-repair"]')),back:read(modal.querySelector('.mbtns [data-act="settings"]')),copy:read(modal.querySelector('[data-act="copy-database-repair"]')),
+       const board=modal.querySelector('[data-act="download-current-board"]'),recovery=modal.querySelector('[data-act="download-recovery-file"]');
+       return {board:read(board),recovery:read(recovery),restore:read(modal.querySelector('[data-act="restore-backup"]')),sameGroup:!!board&&board.parentElement===recovery?.parentElement,
         overflow:modal.scrollWidth>modal.clientWidth+1,pageOverflow:document.documentElement.scrollWidth>innerWidth};
       });
-      if(output)await page.screenshot({path:path.join(output,`${engineName}-${theme}-${size}-${viewName}-${scale}.png`)});
+      if(output)await page.screenshot({path:path.join(output,`${engineName}-${theme}-${viewName}-${scale}.png`)});
       if(enlarged)await enlarged.evaluate(element=>element.remove());
      }
-     // Native keyboard focus: from Download to its neighbour and back.
-     const focusOf=async locator=>{await locator.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+     // Native keyboard focus: from each control to its neighbour and back.
+     const focusOf=async act=>{const locator=page.locator('#modalRoot [data-act="'+act+'"]');await locator.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
       return locator.evaluate(button=>{const style=getComputedStyle(button);return {active:document.activeElement===button,visible:button.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor};});};
-     state.focus={download:await focusOf(download),back:await focusOf(page.locator('#modalRoot .mbtns [data-act="settings"]'))};
+     state.focus={board:await focusOf('download-current-board'),recovery:await focusOf('download-recovery-file'),restore:await focusOf('restore-backup')};
      state.errors=errors;observed.push({where,...state});
      if(state.theme.attribute!==theme||!String(state.theme.scheme).split(/\s+/).includes(theme))failures.push(`${where}: theme not applied ${JSON.stringify(state.theme)}`);
-     if(state.theme.textarea!==(size==='small'))failures.push(`${where}: the export text is ${state.theme.textarea?'':'not '}shown for a ${size} export`);
      for(const scale of [1,1.5]){
       const row=state.scale[scale];
-      if(!row.download||row.download.text!=='Download file')failures.push(`${where}/${scale}: Download file label ${JSON.stringify(row.download)}`);
-      if(row.download?.clipped||!row.download?.inside||!row.download?.unobscured)failures.push(`${where}/${scale}: Download file is clipped, outside the pane insets or covered ${JSON.stringify(row.download)}`);
-      if(row.overflow||row.pageOverflow)failures.push(`${where}/${scale}: the dialog scrolls sideways`);
-      for(const [name,neighbour] of [['Back to Settings',row.back],...(size==='small'?[['Copy JSON',row.copy]]:[])]){
-       if(!neighbour){failures.push(`${where}/${scale}: no ${name} beside Download`);continue;}
-       for(const key of ['fontFamily','fontSize','fontWeight','color','borderColor','backgroundColor','height'])
-        if(row.download?.[key]!==neighbour[key])failures.push(`${where}/${scale}: Download ${key} differs from ${name}: ${row.download?.[key]} / ${neighbour[key]}`);
+      if(row.board?.text!=='Download board'||row.recovery?.text!=='Download recovery file')failures.push(`${where}/${scale}: labels ${row.board?.text} / ${row.recovery?.text}`);
+      if(!row.sameGroup)failures.push(`${where}/${scale}: the two downloads are not one group`);
+      for(const [name,control] of [['Download board',row.board],['Download recovery file',row.recovery]]){
+       if(!control)continue;
+       if(control.clipped||!control.inside||!control.unobscured)failures.push(`${where}/${scale}: ${name} is clipped, outside the pane insets or covered ${JSON.stringify(control)}`);
+       // At the enlarged 260 px width the longer labels wrap onto a second
+       // line (59 px for one wrapped line at ordinary text); everything else
+       // still matches Restore, and a wrapped label stays whole inside its button.
+       const wraps=viewName==='phone-enlarged'&&control.height>row.restore.height;
+       for(const key of STYLE_KEYS)if(!(wraps&&key==='height')&&control[key]!==row.restore?.[key])failures.push(`${where}/${scale}: ${name} ${key} differs from Restore: ${control[key]} / ${row.restore?.[key]}`);
+       if(wraps&&control.height>2*row.restore.height)failures.push(`${where}/${scale}: ${name} wraps onto more than two lines (${control.height} px)`);
       }
+      if(row.overflow||row.pageOverflow)failures.push(`${where}/${scale}: the Settings pane scrolls sideways`);
      }
-     if(!(parseFloat(state.scale[1.5].download?.fontSize)>parseFloat(state.scale[1].download?.fontSize)))failures.push(`${where}: enlarged dialog text is not larger`);
-     const {download:focus,back}=state.focus;
-     if(!focus.active||!focus.visible||focus.outlineStyle==='none'||parseFloat(focus.outlineWidth)<2)failures.push(`${where}: Download keyboard focus is not shown ${JSON.stringify(focus)}`);
-     for(const key of ['outlineStyle','outlineWidth','outlineColor'])if(focus[key]!==back[key])failures.push(`${where}: Download focus ${key} differs from Back to Settings: ${focus[key]} / ${back[key]}`);
+     if(!(parseFloat(state.scale[1.5].recovery?.fontSize)>parseFloat(state.scale[1].recovery?.fontSize)))failures.push(`${where}: enlarged Settings text is not larger`);
+     for(const name of ['board','recovery']){
+      const focus=state.focus[name];
+      if(!focus.active||!focus.visible||focus.outlineStyle==='none'||parseFloat(focus.outlineWidth)<2)failures.push(`${where}: ${name} keyboard focus is not shown ${JSON.stringify(focus)}`);
+      for(const key of ['outlineStyle','outlineWidth','outlineColor'])if(focus[key]!==state.focus.restore[key])failures.push(`${where}: ${name} focus ${key} differs from Restore: ${focus[key]} / ${state.focus.restore[key]}`);
+     }
      if(errors.length)failures.push(`${where}: page errors ${JSON.stringify(errors)}`);
     }finally{await context.close();}
    }
   }finally{await browser.close();}
  }
  t.diagnostic(JSON.stringify(observed.map(({where,theme,focus})=>({where,theme,focus}))));
- assert.ok(observed.length===24,`every engine, theme, size and viewport was measured (${observed.length})`);
+ assert.equal(observed.length,12,'every engine, theme and viewport was measured');
  assert.deepEqual(failures,[],JSON.stringify(observed.slice(0,2)));
 });
 
