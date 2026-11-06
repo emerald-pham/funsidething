@@ -5456,3 +5456,29 @@ test('RISK independent cloud boot authority: source-only preflight waits for bou
  assert.equal(JSON.stringify(ctx.state),local);assert.equal(shim.document.getElementById('addInput').value,'Draft after unavailable boot');assert.equal(ctx.state.syncDirty,true);
  assert.equal(JSON.parse(remote.payload).tasks.some(row=>row.title==='Accepted after bounded unavailable boot'),false,'server-only repair never uploads unobserved accepted local work');
 });
+
+// Independent review of the #2246/#2239 integration (S1): a push lists only
+// this account's manual recovery archives (#2239). The full listing it used
+// before skips a corrupt archive row that an exact lossless original keeps, but
+// those originals sit outside the push's range, so the range listing refused
+// the row and with it every push. The range listing must skip that row exactly
+// as the full listing does, still refuse a corrupt row in its range that
+// nothing keeps, and still ignore corrupt rows outside its range.
+test('RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='range-protected-'+Math.random(),helper=await loadApp();t.after(()=>helper.dispose());
+ const encode=helper.ctx.encodeManualArchiveValue,prefix='cloud-generation-recovery:'+encodeURIComponent('owner@example.com')+':';
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName,encodeRecoveryValue:encode});await store.open();t.after(()=>store.close());
+ const kept=prefix+'kept-corrupt',keptValue='not an archive row',originalKey='device-recovery-original:range-review';
+ const original={format:'chain-scanner.device-recovery-source',formatVersion:1,reason:'device-source-recovery',indexedDB:{opaque:[{key:encode(kept,'opaque key'),value:encode(keptValue,'opaque value')}]}};
+ const readable={key:prefix+'readable',raw:JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,identity:'owner@example.com'}),order:2};
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{const opaque=tx.objectStore('opaque');
+  opaque.put({key:originalKey,raw:JSON.stringify(original),order:1},originalKey);opaque.put(readable,readable.key);opaque.put(keptValue,kept);});
+ const full=await store.listOpaqueArchives();
+ assert.deepEqual(full.map(row=>row.key),[originalKey,readable.key],'the full listing skips the kept corrupt row');
+ const ranged=await store.listOpaqueArchives({prefix});
+ assert.deepEqual(ranged,full.filter(row=>row.key.startsWith(prefix)),'the range listing skips the kept corrupt row as the full listing does');
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('opaque').put('corrupt and outside the range','automatic-recovery-ack:outside'));
+ assert.deepEqual((await store.listOpaqueArchives({prefix})).map(row=>row.key),[readable.key],'a corrupt row outside the range does not stop the range listing');
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('opaque').put('corrupt and kept by nothing',prefix+'unkept'));
+ await assert.rejects(store.listOpaqueArchives({prefix}),/corrupt or unprotected/,'a corrupt row in the range that nothing keeps is refused');
+});

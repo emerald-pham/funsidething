@@ -12501,6 +12501,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

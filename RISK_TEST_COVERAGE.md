@@ -2354,6 +2354,7 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 
 - RISK large board deliberate recovery browser: Retry sync rebuilds a large board whose automatic recovery waits onto an intact earlier generation and publishes it, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
 - RISK recovery read-backs: a deliberate run reads each recovery archive back once after writing it, and publication and its push check archives by key rather than reading every archive again
+- RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused
 - RISK recovery device capture: a deliberate run reads the device sources in full once, and its later checks during the cloud read compare their fingerprint
 - RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation
 

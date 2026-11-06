@@ -393,13 +393,22 @@
     async function listOpaqueArchives({prefix=null}={}){
       ensureOpen();
       const tx=await beginTransaction("opaque","readonly"),done=transactionDone(tx),store=tx.objectStore("opaque");
-      let rows,keys;
+      let rows,keys,originalKeys=null,originals=null;
       if(typeof prefix==="string"&&prefix){
-        keys=(await requestResult(store.getAllKeys())).filter(key=>typeof key==="string"&&key.startsWith(prefix));
+        const allKeys=await requestResult(store.getAllKeys());
+        keys=allKeys.filter(key=>typeof key==="string"&&key.startsWith(prefix));
         rows=await Promise.all(keys.map(key=>requestResult(store.get(key))));
+        // Release review of #2246/#2239: the exact originals that keep a
+        // corrupt row lie outside the range, so they are read too, and only
+        // when the range has such a row, to skip it as the full listing does
+        // rather than refuse every push.
+        if(rows.some(row=>!(row&&Object.prototype.toString.call(row)==="[object Object]"))){
+          originalKeys=allKeys.filter(key=>typeof key==="string"&&key.startsWith("device-recovery-original:"));
+          originals=await Promise.all(originalKeys.map(key=>requestResult(store.get(key))));
+        }
       }else [rows,keys]=await Promise.all([requestResult(store.getAll()),requestResult(store.getAllKeys())]);
       await done;
-      const protectedRaw=protectedRawRowReader(keys,rows),readable=rows.filter((row,index)=>{
+      const protectedRaw=protectedRawRowReader(originalKeys??keys,originals??rows),readable=rows.filter((row,index)=>{
         if(row&&Object.prototype.toString.call(row)==="[object Object]")return true;
         if(protectedRaw("opaque",keys[index],row))return false;
         throw new Error("Durable opaque recovery row is corrupt or unprotected");
