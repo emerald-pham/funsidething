@@ -166,14 +166,18 @@ version 2) requires:
   Firestore rules; test, tooling and workflow changes never set it.
 
 When the committed AGENTS.md at both head and base also says "Review plans
-classify only changed code lines." (spec #2230), content classification reads
-only added and removed lines:
+classify changed code, not prose." (spec #2230), content classification reads
+added and removed code lines, the code within three lines of each, and the
+function git names in each hunk header:
 
-- Persistence, session, auth and migration patterns read only script code
-  (script files and inline scripts), not Help or changelog prose, comments, or
-  Node's synchronous file and process APIs such as `readFileSync`.
+- Persistence, session, auth and migration patterns read only code: script
+  files, inline scripts, and HTML or SVG lines that load or run script (script
+  tags, event handlers, `javascript:` URLs). Help and changelog prose, whole-line
+  comments and Node's synchronous file and process APIs such as `readFileSync`
+  don't count. Short revision names (`remote.rev`, `localRev`) do.
 - The changelog block, its app fingerprint and the worker `CACHE_NAME` line
-  never derive a specialist or the typography review.
+  never derive a specialist or the typography review, unless the diff moves a
+  changelog marker or a changelog line runs code.
 - Rewording HTML text while keeping every tag and attribute is copy, not
   typography; new or changed markup, inline styles and CSS still derive it.
 - Path triggers and the fail-closed handling of ambiguous persistence code are
@@ -283,7 +287,8 @@ issues instead of starting another pass.
 
 If the candidate changes after review, the affected reviewers re-review it on
 the new exact commit: incrementally, by the same reviewer, against their earlier
-report and the delta since the commit they approved. Their receipt entry signs
+report and the delta since the commit they approved (use `git range-diff`
+after a rebase, so upstream changes are not mistaken for the delta). Their receipt entry signs
 the new SHA with the usual fields, and its evidence says the review was
 incremental and cites the earlier report. An earlier draft review alone does not
 approve the final commit.

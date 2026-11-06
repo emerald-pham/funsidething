@@ -1295,25 +1295,30 @@ test('RISK repository process: scaled review plan pins ordinary code to owner pl
 // Spec #2230 / #2234: the changed-line review policy is switched on by this
 // committed AGENTS.md sentence at both base and head, like the scaled policy, so
 // receipts recorded under the earlier classification keep verifying.
-const CHANGED_LINE_POLICY_TEXT_2234='Release reviews scale to the exact diff. The release validator derives the\nplan, and the owner review records FAQ coverage for every product release.\nReview plans classify only changed code lines.\n';
+const CHANGED_LINE_POLICY_TEXT_2234='Release reviews scale to the exact diff. The release validator derives the\nplan, and the owner review records FAQ coverage for every product release.\nReview plans classify changed code, not prose.\n';
 const changedLinePlan2234=(base,candidate,policy=true)=>{
  const options={base,candidate};
  if(policy)Object.assign(options,{agentsBase:CHANGED_LINE_POLICY_TEXT_2234,agentsHead:CHANGED_LINE_POLICY_TEXT_2234});
  return options;
 };
 
-test('RISK repository process: changed-line review plan ignores persistence code in unchanged context lines',async()=>{
+test('RISK repository process: changed-line review plan reads nearby code but not distant storage code',async()=>{
  const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
- const base='function remember(board){\n  localStorage.setItem("board", JSON.stringify(board));\n}\nconst hue = 30;\n';
- const candidate='function remember(board){\n  localStorage.setItem("board", JSON.stringify(board));\n}\nconst hue = 32;\n';
- const current=makeScaledReviewFixture(changedLinePlan2234({'landscape-mood.js':base},{'landscape-mood.js':candidate}));
- const earlier=makeScaledReviewFixture(changedLinePlan2234({'landscape-mood.js':base},{'landscape-mood.js':candidate},false));
- try{
-  assert.deepEqual(deriveReleaseReviewPlan(current.repo,current.candidateSha,current.baseSha).specialistDomains,[],
-   'a hue change beside unchanged storage code is not a persistence change');
-  assert.deepEqual(deriveReleaseReviewPlan(earlier.repo,earlier.candidateSha,earlier.baseSha).specialistDomains,['memory-cloud-sync'],
-   'a candidate whose base predates the policy keeps its earlier classification');
- }finally{cleanupReleaseGateFixture(current);cleanupReleaseGateFixture(earlier);}
+ // A guard edit is persistence code because of the storage calls beside it,
+ // but an unrelated edit far from storage code is not (#2234 review).
+ const filler='const a = 1;\nconst b = 2;\nconst c = 3;\nconst d = 4;\nconst e = 5;\n';
+ const near=hue=>`function remember(board){\n  localStorage.setItem("board", JSON.stringify(board));\n  return ${hue};\n}\n`;
+ const far=hue=>`function remember(board){\n  localStorage.setItem("board", JSON.stringify(board));\n}\n${filler}const hue = ${hue};\n`;
+ const plan=(base,candidate,policy=true)=>{
+  const f=makeScaledReviewFixture(changedLinePlan2234({'landscape-mood.js':base},{'landscape-mood.js':candidate},policy));
+  try{return deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha).specialistDomains;}finally{cleanupReleaseGateFixture(f);}
+ };
+ assert.deepEqual(plan(near(30),near(32)),['memory-cloud-sync'],'a change beside a storage call is reviewed as persistence code');
+ assert.deepEqual(plan(far(30),far(32)),[],'a change several lines away from storage code is not a persistence change');
+ const commented=hue=>`// Remember the board in local storage before syncing.\nconst hue = ${hue};\n`;
+ assert.deepEqual(plan(commented(30),commented(32)),[],'a comment beside the change is prose, not storage code');
+ assert.deepEqual(plan(commented(30),commented(32),false),['memory-cloud-sync'],
+  'a candidate whose base predates the policy keeps its earlier classification');
 });
 
 test('RISK repository process: changed-line review plan treats a changelog entry and refreshed fingerprints as an ordinary change',async()=>{
@@ -1363,6 +1368,52 @@ test('RISK repository process: changed-line review plan reads persistence only f
   assert.deepEqual(domains({'landscape-mood.js':'const hue = 30;\n'},{'landscape-mood.js':'const hue = 30;\n'+line+'\n'}),['memory-cloud-sync'],
    `code sharing a line with a comment marker is still code: ${line}`);
  }
+});
+
+test('RISK repository process: changed-line review plan fails closed on large pages, revision edits and HTML that loads or runs script',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const plan=(base,candidate)=>{
+  const f=makeScaledReviewFixture(changedLinePlan2234(base,candidate));
+  try{return deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);}finally{cleanupReleaseGateFixture(f);}
+ };
+ // The real index.html is over 1 MiB; reading it must not silently fail open.
+ const padding='<p>Board help text.</p>\n'.repeat(60000);
+ const page=(code,entry)=>`<!doctype html>\n<body>\n${padding}<script>\nfunction boot(){ ${code} }\n</script>\n<!-- changelog:start -->\n<template id="appChangelogCurrent"><div data-app-fingerprint="${entry}"><ul><li>Note.</li></ul></div></template>\n<!-- changelog:end -->\n</body>\n`;
+ assert.ok(page('start();','a'.repeat(64)).length>1024*1024,'precondition: the fixture page is larger than 1 MiB');
+ assert.deepEqual(plan({'index.html':page('start();','a'.repeat(64))},{'index.html':page('localStorage.setItem("board", "{}"); start();','a'.repeat(64))}).specialistDomains,['memory-cloud-sync'],
+  'storage code in a large page still derives the persistence specialist');
+ const fingerprintOnly=plan({'index.html':page('start();','a'.repeat(64))},{'index.html':page('start();','b'.repeat(64))});
+ assert.deepEqual([fingerprintOnly.specialistDomains,fingerprintOnly.requiresTypographyReview],[[],false],
+  'a fingerprint refresh in a large page is still recognized as changelog bookkeeping');
+ // Revision ordering lives in functions such as cloudPull; edits there are sync changes.
+ const pull=check=>`<script>\nasync function cloudPull(){\n  const remote = await fetchRemote();\n  if(${check}) apply(remote);\n}\nfunction chooseBase(rr, localRev){\n  return localRev;\n}\n</script>\n`;
+ assert.deepEqual(plan({'index.html':pull('remote.rev>=0')},{'index.html':pull('remote.rev>0')}).specialistDomains,['memory-cloud-sync'],
+  'an edit inside cloudPull is a sync change');
+ assert.deepEqual(plan({'index.html':pull('ok')},{'index.html':pull('ok').replace('return localRev;','return impossibleLocalBase ? rr : localRev;')}).specialistDomains,['memory-cloud-sync'],
+  'choosing between revisions is revision ordering');
+ // HTML that loads or runs code is code, even outside an inline script body.
+ const shell=tag=>`<!doctype html>\n<body>\n${tag}\n</body>\n`;
+ assert.deepEqual(plan({'index.html':shell('<script src="device-store-v2.js"></script>')},{'index.html':shell('<script defer src="device-store-v2.js"></script>')}).specialistDomains,['memory-cloud-sync'],
+  'deferring the device store script changes when storage code loads');
+ assert.deepEqual(plan({'index.html':shell('<button>Save</button>')},{'index.html':shell('<button onclick="localStorage.clear()">Save</button>')}).specialistDomains,['memory-cloud-sync'],
+  'an inline event handler that clears storage is persistence code');
+ // Real-shaped guard edits from the specialist review: a transaction's
+ // existing-generation guard and the device store's compare-and-swap.
+ const generation=guard=>`<script>\nconst cloud = {\n  async beginGeneration(uid,id,header){\n    return F.runTransaction(db,async tx=>{\n      const ref=generationRef(uid,id),existing=snapshotData(await tx.get(ref));\n${guard}      tx.set(ref,{...header});return header;\n    });\n  }\n};\n</script>\n`;
+ assert.deepEqual(plan({'index.html':generation('      if(existing)return existing;\n')},{'index.html':generation('')}).specialistDomains,['memory-cloud-sync'],
+  'dropping the existing-generation guard in a cloud transaction is a persistence change');
+ const cas=check=>`export async function writeHead(expectedHash, next){\n  const tx = begin();\n  const current = await read(tx);\n  if(${check}){ tx.abort(); return false; }\n  put(tx, next);\n  return true;\n}\n`;
+ assert.deepEqual(plan({'device-store-v2.js':cas('current.hash!==expectedHash')},{'device-store-v2.js':cas('false')}).specialistDomains,['memory-cloud-sync'],
+  'disabling the device store compare-and-swap guard is a persistence change');
+ // Changelog markup is injected into Settings, so code there still runs, and
+ // moving a marker could hide script lines; SVG files can carry script too.
+ const log=(entry,end='<!-- changelog:end -->')=>`<!doctype html>\n<body>\n<!-- changelog:start -->\n<template id="appChangelogCurrent"><div><ul>${entry}</ul></div></template>\n${end}\n<script>\nfunction boot(){ start(); }\n</script>\n</body>\n`;
+ assert.deepEqual(plan({'index.html':log('<li>Note.</li>')},{'index.html':log('<li onclick="localStorage.clear()">Note.</li>')}).specialistDomains,['memory-cloud-sync'],
+  'an event handler inside the changelog block is code');
+ assert.notDeepEqual(plan({'index.html':log('<li>Note.</li>')},{'index.html':log('<li>Note.</li>','').replace('</body>','<!-- changelog:end -->\n</body>').replace('start();','localStorage.clear(); start();')}).specialistDomains,[],
+  'moving the changelog end marker over a script edit cannot hide it');
+ assert.deepEqual(plan({'icon.svg':'<svg><script>start()</script></svg>\n'},{'icon.svg':'<svg><script>localStorage.clear()</script></svg>\n'}).specialistDomains,['memory-cloud-sync'],
+  'script inside an SVG is code');
 });
 
 test('RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements',async()=>{

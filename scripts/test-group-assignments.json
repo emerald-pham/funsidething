@@ -9321,7 +9321,12 @@
       "file": "tests/repository-process.test.js"
     },
     {
-      "root": "RISK repository process: changed-line review plan ignores persistence code in unchanged context lines",
+      "root": "RISK repository process: changed-line review plan reads nearby code but not distant storage code",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK repository process: changed-line review plan fails closed on large pages, revision edits and HTML that loads or runs script",
       "group": "native-process",
       "file": "tests/repository-process.test.js"
     },
