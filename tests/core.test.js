@@ -304,6 +304,8 @@ test('RISK large board recovery wait guidance: mounted FAQ and changelog explain
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(markup,/<dt>Why does the cloud button say “recovery waiting”\?<\/dt><dd>/);
  assert.match(markup,/stays open and saves on this device/);assert.match(markup,/Review cloud recovery/);assert.match(markup,/Retry sync/);assert.match(markup,/signing in again/i);
+ const answer=markup.match(/<dt>Why does the cloud button say “recovery waiting”\?<\/dt><dd>(.*?)<\/dd>/)[1];
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help length every answer keeps');
  assert.match(markup,/<li>When rebuilding a large board from an older cloud copy could need more memory than a phone allows, cloud recovery now waits/,'the mounted changelog includes the released behavior');
 });
 
