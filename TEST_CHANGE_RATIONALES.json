@@ -21387,27 +21387,5 @@
       "command": "node --test --test-name-pattern='RISK recovery wait: an over-budget automatic recovery default waits without publishing|RISK recovery wait: the saved restart record' tests/scenery.test.js (2026-11-06T04:59:36Z, ac48b6b plus the test changes); node --test --test-name-pattern='RISK recovery wait: an over-budget opening decides' tests/scenery.test.js (2026-11-06T04:38:39Z, c90402f); LANDSCAPE_BROWSER_URL=http://127.0.0.1:18963/ node --test --test-name-pattern='RISK large board recovery wait browser' tests/persistence-recovery.test.js (c90402f)",
       "failure": "Cold launch: AssertionError 'a cold launch over the remembered wait records it once' (actual 0, expected 1). Header-first: AssertionError 'only the opening pull downloads, and only the unreadable current generation' (5 chunk reads, 10 full device-source reads). Browser: Chromium +123 MiB and WebKit +121 MiB over the local open, above the 64 MiB margin. The title, motion and fixture-parameter changes are not behavioural; the normal-motion test's negative control against the pre-#2225 base 9d2592d failed (WebKit +194 MiB over the empty board, allowance 171 MiB)."
     }
-  },
-  {
-    "baseCommit": "552c3eee6394edc93512df257ac4d4719ef7106c",
-    "testChangesSha256": "c4caa040d251b18c5354fbe485812ef106de07312fe109c74b2c5bdd9ee42711",
-    "reason": "#2239 (spec #2224, story 3) raises the automatic recovery default's work budget from 2.5 MiB to 6 MiB so a board shaped like the owner's (the large-board fixture, about 4.6 MiB of work) recovers on its own. The gate needs no record for this diff: it only adds lines to existing tests. This record documents that two existing browser tests no longer exercise the product budget: the #2227 deliberate-run test and the #2228 wait test each add one line to their in-page fake cloud setting the test-page override window.CLOUD_RECOVERY_WORK_BUDGET_BYTES to 2.5 MiB, the budget #2228 shipped, so the same fixture is still over budget and still waits before Retry sync. Their assertions, margins and fixtures are unchanged.",
-    "previousBehavior": "At 552c3ee the product budget was 2.5 MiB, so the large-board fixture waited ('recovery waiting') on its own; the #2227 test then ran recovery deliberately through Retry sync and the #2228 test asserted the wait, both against the product value.",
-    "intendedBehavior": "The product budget admits the fixture, which now recovers and publishes on its own (new browser test). The #2227 and #2228 tests reach the same over-budget state through the test-page override that the visual wait test and the Node recovery wait tests already use, so the deliberate run's 384x margin and the wait's 64 MiB margin keep their exact meaning.",
-    "replacementTests": [
-      "RISK large board automatic recovery browser: the automatic recovery default rebuilds a large board onto an intact earlier generation and publishes it without waiting for Retry sync, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
-      "RISK large recovery: a large automatic recovery default saves its start mark before any download and removes it when it ends, and an opening that finds the mark over the same generation waits until Retry sync runs it",
-      "RISK large recovery: a large automatic recovery default publishes on its own, then neither it nor returning to the app checks the earlier incomplete generation again until Retry sync"
-    ],
-    "preservedCoverage": [
-      "RISK large board recovery browser keeps its fixture, Retry sync flow, lossless checks and 384x allowance; only the budget that makes the opening wait comes from the test page.",
-      "RISK large board recovery wait browser keeps every waiting, editing, Settings, Review cloud recovery, Restore and 64 MiB memory assertion; only the budget that makes it wait comes from the test page.",
-      "The deployed app still ignores a page script that sets the budget override (RISK recovery wait: the deployed app ignores a page script that sets the work-budget override, unchanged).",
-      "RISK cloud generation recovery and RISK corrupt cloud work budget Node tests pass unchanged."
-    ],
-    "redEvidence": {
-      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8939/index.html LANDSCAPE_PLAYWRIGHT=<playwright index.mjs> node --test --test-name-pattern='^RISK large board automatic recovery browser' tests/persistence-recovery.test.js (preimplementation, 552c3ee app, recorded 2026-11-06T13:07:08Z)",
-      "failure": "Chromium and WebKit: 'the automatic recovery default waited for Retry sync instead of recovering' and 'the recovered board was not published and confirmed' (cloud button '☁ recovery waiting', log [pull, header-read, header-read], nothing published). The two added override lines are setup, not assertions; with the raised product budget and no override, the #2227 test's wait for 'recovery waiting' would time out."
-    }
   }
 ]

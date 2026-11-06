@@ -335,23 +335,29 @@ test('RISK large board recovery wait guidance: mounted FAQ and changelog explain
  assert.match(release,/After Retry sync rebuilds a large board, opening or returning to the app does not repeat its cloud save or recheck earlier incomplete copies; Retry sync does\./);
 });
 
-// #2239 (spec #2224): a large board now rebuilds on its own once, and an
-// opening after the app closed during that rebuild waits for Retry sync.
-test('RISK large board automatic recovery guidance: mounted FAQ and changelog explain that a large board now rebuilds from an older cloud copy on its own once, and that the next opening waits for Retry sync if the app closed during that rebuild',async t=>{
+// #2239 review (owner decision of 2026-11-06): a large board's recovery still
+// waits for Retry sync, which now reads and checks each saved copy less often;
+// a Retry sync run that stops before it finishes waits again instead of
+// starting over when the app is opened or returned to. Nothing may say a
+// large board recovers on its own.
+test('RISK large board deliberate recovery guidance: mounted FAQ and changelog explain that a large board still waits for Retry sync, that recovery reads and checks each saved copy less often, and that a Retry sync run that stops waits again',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answer=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
  const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  const close=answer('Why could cloud recovery of a large board close the app?');
- assert.match(close,/a large board now rebuilds on its own, once/);
- assert.match(close,/If the app closes during that rebuild, the next opening waits until you tap Retry sync/);
+ assert.match(close,/reads and checks each one less often/);
+ assert.match(close,/A large board still waits until you tap Retry sync\./);
+ const waiting=answer('Why does the cloud button say “recovery waiting”?');
+ assert.match(waiting,/If that run stops early or this device’s storage is too full to note it, it keeps waiting\./);
  const after=answer('Why does a large board wait for Retry sync after recovery?');
- assert.match(after,/After a large board is rebuilt from an older cloud copy, on its own or by Retry sync,/);
- for(const [name,text] of [['close',close],['after',after]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
+ assert.match(after,/^After Retry sync rebuilds a large board from an older cloud copy,/);
+ for(const [name,text] of [['close',close],['waiting',waiting],['after',after]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
+ assert.doesNotMatch(markup,/on its own, once|rebuilds on its own|recovers on its own/,'nothing says a large board recovers on its own');
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
- assert.match(release,/<li>A large board whose current cloud save cannot be read now rebuilds from an older complete cloud copy on its own, once, and saves the result to the cloud/,'the mounted changelog includes the released behavior');
- assert.match(release,/If the app closes during that rebuild, the next opening waits until you tap Retry sync/);
+ assert.match(release,/<li>Cloud recovery of a large board reads, encodes and checks each saved copy less often, so Retry sync rebuilds it with less memory\. A large board still waits for Retry sync\./,'the mounted changelog includes the released behavior');
+ assert.match(release,/If a Retry sync run stops before it finishes, cloud recovery waits again; opening or returning to the app does not start it over\./);
 });
 
 // #2226 (spec #2224) review: the board shows and takes input before cloud
