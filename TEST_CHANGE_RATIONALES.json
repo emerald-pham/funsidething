@@ -21390,6 +21390,26 @@
   },
   {
     "baseCommit": "552c3eee6394edc93512df257ac4d4719ef7106c",
+    "testChangesSha256": "403ce8edf509bcf3cc1049c35eb0a9bf77783caf753be97af3e3157639d61916",
+    "reason": "#2231 rewrites the failure message of the existing Settings changelog fingerprint assertion. The old message named no value, so after every shell edit the fingerprint had to be computed by hand, and it said every app change needs a dated changelog entry, which contradicts the AGENTS.md exemption for routine animation-frequency tuning. The assertion itself, its hash rules and the test name are unchanged; the digest moves into a named constant so the same value can appear in the message.",
+    "previousBehavior": "On a stale shell the test failed with \"App changed: add a dated changelog entry describing the changes and refresh its app fingerprint\", without the expected value or any way to produce it.",
+    "intendedBehavior": "On a stale shell the same assertion fails with the exact expected data-app-fingerprint, points to `npm run fingerprints -- --write`, and asks for a dated changelog entry for a user-facing change while noting the AGENTS.md animation-tuning exemption. A current shell still passes, and the fingerprint is still required for every shell byte change.",
+    "preservedCoverage": [
+      "Settings changelog: the current changelog entry must carry the app fingerprint of every shell asset and the worker, with the changelog block and cache key normalized exactly as before.",
+      "PWA cache contract: CACHE_NAME stays mechanically tied to every local app-shell byte (test unchanged).",
+      "The changelog still must mention Sunrise / Sunset, seasons and the cyclist (assertions unchanged)."
+    ],
+    "replacementTests": [
+      "PWA cache contract: the fingerprints command reports the committed app fingerprint and shell cache key as current",
+      "RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='fingerprints command reports|fingerprints --write after' tests/core.test.js (against the stub command), then node --test --test-name-pattern='Settings changelog: every app asset' tests/core.test.js with app-release.js appended to make the fingerprint stale",
+      "failure": "Against the stub the new tests failed: the report was {appFingerprint:{},cacheName:{},stale:null} instead of the committed cdf1b3ec... / chain-scanner-shell-6ce4124f... values, and a stale tree exited 0 instead of 1. With the stale probe the changelog test failed with the old message \"App changed: add a dated changelog entry describing the changes and refresh its app fingerprint\", which names no expected value; after the change the same probe names data-app-fingerprint=\"49c78fbe...\" matching the command."
+    }
+  },
+  {
+    "baseCommit": "552c3eee6394edc93512df257ac4d4719ef7106c",
     "testChangesSha256": "149eeef42164fe6f387b0ef840b92bbd4ea9f4d6e5207a176ebcb1f0f2f73b44",
     "reason": "#2232 (run CI once per push and fail only for real reasons), one record for the whole tests/ diff against main 552c3ee. (1) Date-dependent fixtures: 'RISK DATE FORMAT: task chips history backups and diagnostics share the chosen date order' gave its 2027-02-03 due date to an app on the real clock, so the chip turns into \"overdue · Wed\" once that date passes (observed under a 120- and 400-day clock shift); 'RISK opening board presentation: shared markup retains released cards contexts task rows and history' only stayed green by computing dueSoon from Date.now(). Both now load through the new shared loadAppPinningNewDate, which pins new Date() and Date.now() in the app realm (it shares one loader with loadAppAtTime, which pins Date.now() only, so loadAppAtTime's body line changes too), and use literal dates three days after the pinned 2026-11-02 clock; the backup/diagnostic label reads the same pinned instant. The core import line gains loadAppPinningNewDate and the shared export line exports it. (2) Default group by file: 'RISK test inventory: every added environment-gated root is declared with the variable its registration skips on' asserted that every declared environment-skip root has a rootAssignments row; rows now hold only overrides, so it now reads the group runner's --describe descriptor and requires each declared root to be in a required group, whether placed by a row or by its file (the runner itself also refuses an environment skip whose root has no effective assignment). The same change migrated three agent-tool tests outside tests/ (not covered by this fingerprint): ci-routing's nightly workflow test and the quoted-fixture catalog test read the runner's --describe descriptor, and three metadata-edit router tests became edited-event execution tests because the workflow no longer fires on PR edits.",
     "previousBehavior": "On main the date format fixture ran on the real clock with a 2027-02-03 due date and failed whenever today passed that date; the opening board fixture derived its due date from the real clock; the environment-skip inventory test required an explicit rootAssignments row for every declared environment-skip root because every root had a row.",

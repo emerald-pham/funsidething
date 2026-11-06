@@ -34,7 +34,8 @@ undo, import or restore, deletion, and cross-device reconciliation when those
 paths touch the change. For a visual or motion change, cover the numerical
 geometry or paint contract, reduced motion, and relevant phone, tablet, and
 short-landscape viewports. For offline changes, check the asset fingerprint and
-offline reload. A text or styling fix needs a direct UI assertion that would
+offline reload. After any app-shell edit, `npm run fingerprints -- --write`
+refreshes the changelog app fingerprint and the worker `CACHE_NAME` together. A text or styling fix needs a direct UI assertion that would
 have failed before the edit. Run the focused tests and affected regression
 cohort; broaden to the full suite when risk or a required release gate warrants
 it. Inspect the rendered result when pixels or controls changed. Record test, browser,
