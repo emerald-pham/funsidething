@@ -21390,7 +21390,7 @@
   },
   {
     "baseCommit": "552c3eee6394edc93512df257ac4d4719ef7106c",
-    "testChangesSha256": "ed27256e35fb34fbe2bdbe2b3a801c653c7c53e44e84e10b1758386ecc943be7",
+    "testChangesSha256": "981b37e0deedae78df8d9de81024c80abc71bb1daa87e9dc3b7af0f8de087b0d",
     "reason": "#2246 (owner redirect 2026-11-06): exporting support diagnostics must be metadata-only and bounded so it cannot hit the iPhone memory limit with a large board while cloud recovery waits. The Debug log dialog's only export was Database repair export, which serializes the whole board and every saved device copy (16 MB for the 2.4 MB large-board fixture; 0.9-1.3 GiB over the open Debug log and a 28 s WebKit stall). Two #283 tests pinned that routing: the Debug log dialog linked to the repair export and offered no standalone Copy or Download, and the reload help pointed only to the repair export. Both are renamed and changed to the new routing.",
     "previousBehavior": "The Debug log dialog offered Select all, View / copy database for repair and Refresh log; it had no Copy debug log or Download debug log. Help 'Why did the app reload?' told the person to use View / copy database for repair, then Copy JSON, and no FAQ mentioned Copy debug log or Download debug log.",
     "intendedBehavior": "The Debug log dialog offers Copy debug log, Download debug log, Select all and Refresh log, and no longer links to the repair export; Settings itself still has View / copy database for repair and still no standalone Debug log exporters. Help 'Why did the app reload?' routes to View debug log, then Copy debug log or Download debug log (metadata only), and still names Database repair export and its partial labelling for repairs.",
