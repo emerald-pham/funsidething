@@ -1160,6 +1160,42 @@ test('RISK recovery wait: a deliberate run that ends on its deadline without ado
  await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'the second Retry sync settles');
  assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'Retry sync still runs it deliberately');
 });
+// #2239 re-review: what decides the replay is what ended the run, not what is
+// open when it ends. A deliberate run that ends on its deadline while Settings
+// happens to be open returns to the wait like any other deadline, so closing
+// Settings does not run it again; only Retry sync or signing in again does.
+test('RISK recovery wait: a deliberate run that ends on its deadline while Settings is open returns to the wait and does not run again when Settings closes',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,priorPath}=app;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ t.after(faithfulModalQuery2194(shim));
+ // The harness's timers do not hold the process open while the run waits.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const PRIOR='Saved only in the intact prior generation',HOLD_MS=2500;
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ // Settings opens while the deliberate run downloads the earlier generation,
+ // and that download outlasts the run's read deadline.
+ const reads=[];let slow=true,opened=false;
+ app.faults.serverRead=async path=>{reads.push(path);
+  if(slow&&path===priorPath+'/chunks'){if(!opened){opened=true;ctx.openSettings();}await new Promise(resolve=>setTimeout(resolve,HOLD_MS));}};
+ t.after(()=>{delete app.faults.serverRead;});
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=1500;
+ const before=JSON.stringify(ctx.state);
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
+ await fixtureDeadline(async wait=>{await wait(HOLD_MS+500);while(!recoveryWaitIdle2228(ctx))await wait(10);},'the abandoned download drains',CAPTURED_RESULT_BUDGET_MS+20000);
+ // Positive controls: Settings was open when the deliberate run hit its deadline, and nothing was adopted.
+ assert.equal(opened,true,'Settings opened during the deliberate run');
+ assert.equal(vm.runInContext('hasActiveEditor()',ctx),true,'Settings is still open');
+ assert.deepEqual(recoveryBudgetEvents2228(ctx).map(event=>event.metadata.budgetOutcome),['deferred','deliberate']);
+ assert.equal(JSON.stringify(ctx.state),before,'nothing was adopted');
+ // Behaviour under test: closing Settings does not run the recovery again.
+ slow=false;ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=60000;
+ const at=reads.length;ctx.closeModal();await flush();await recoveryWaitIdleAfter2228(ctx,'closing Settings settles');
+ assert.deepEqual(reads.slice(at).filter(path=>path.startsWith(priorPath)),[],'closing Settings does not download the earlier generation again');
+ assert.equal(ctx.state.tasks.some(task=>task.title===PRIOR),false,'the recovery did not run again');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','the cloud button says recovery is waiting');
+ assert.equal(vm.runInContext('cloudRecoveryDeliberate',ctx),false,'no deliberate request is left to replay');
+});
 // #2239 review: the check of earlier sources lists the verified recovery
 // archives without hashing them. Hashing serializes each archive row, and the
 // serializer refuses a row that holds a BigInt it reaches (a plain BigInt, or
@@ -1244,9 +1280,10 @@ test('RISK recovery read-backs: a deliberate run reads each recovery archive bac
 });
 // #2239: during one run the accepted device source is checked again at every
 // stage of the cloud read. It is read in full once; each later check reads its
-// fingerprint (the rows that can change under the same key, and the keys of the
-// hash-keyed snapshots and append-only archives) and reuses that capture when
-// it is unchanged. The commit still compares the full source inside its write.
+// fingerprint (the meta and backup rows in full, and the keys of the snapshots
+// and archives) and reuses that capture when it is unchanged. A fingerprint
+// does not see a snapshot rewritten under its key, so the commit's full
+// comparison inside its write is what decides adoption.
 test('RISK recovery device capture: a deliberate run reads the device sources in full once, and its later checks during the cloud read compare their fingerprint',{timeout:300000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t),{traffic}=await deliberateRunWithPublication2239(t,app);
  t.diagnostic(JSON.stringify(traffic.calls));

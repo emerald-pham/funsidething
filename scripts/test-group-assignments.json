@@ -13166,6 +13166,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: a deliberate run that ends on its deadline while Settings is open returns to the wait and does not run again when Settings closes",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK earlier source check: listing verified recovery archives without their hashes refuses exactly the archive rows that hashing them refuses, including BigInt typed arrays",
       "group": "scenery",
       "file": "tests/scenery.test.js"

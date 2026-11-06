@@ -241,12 +241,15 @@
       }
     }
 
-    // #2239: the rows that can change under the same key (meta and backups) in
-    // full, and only the keys of the snapshots, keyed by their payload's hash,
-    // and of the opaque archives, which no writer replaces or deletes. Shaped
-    // like readRawExportSnapshot() with those two stores' values left empty, so
-    // a recovery attempt can tell the source it already read is unchanged
-    // without reading every saved board and archive again.
+    // #2239: the meta and backup rows in full, and only the keys of the
+    // snapshots and opaque archives. Shaped like readRawExportSnapshot() with
+    // those two stores' values left empty, so a recovery attempt can check the
+    // source it already read without reading every saved board and archive
+    // again. It is not a full comparison: a snapshot can change under its key
+    // (repairHeadSnapshot rewrites one under its hash; commitHead and
+    // putBackup drop extra fields from one they write again). The full
+    // comparison of the source inside writeRecoveredSource's transaction is
+    // what catches that.
     async function readRawFingerprint(){
       ensureOpen();
       const tx=await beginTransaction(storeNames,"readonly"),done=transactionDone(tx);
