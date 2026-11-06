@@ -1253,7 +1253,7 @@ test('RISK recovery device capture: a deliberate run reads the device sources in
  assert.ok((traffic.calls['readRawExportSnapshot:run']||0)>=1,'positive control: the run read the device sources');
  assert.ok((traffic.calls['readRawExportSnapshot:run']||0)<=2,'the device sources are read in full at most twice until publication ends: '+JSON.stringify(traffic.calls));
 });
-test('RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only that generation\'s header and chunks',{timeout:300000},async t=>{
+test('RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation',{timeout:300000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t),{activePath}=app,{traffic,reads}=await deliberateRunWithPublication2239(t,app);
  const after=reads.filter(read=>read.phase==='after').map(read=>read.path);
  t.diagnostic(JSON.stringify({after,calls:traffic.calls}));

@@ -13181,7 +13181,7 @@
       "file": "tests/scenery.test.js"
     },
     {
-      "root": "RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only that generation's header and chunks",
+      "root": "RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation",
       "group": "scenery",
       "file": "tests/scenery.test.js"
     },
