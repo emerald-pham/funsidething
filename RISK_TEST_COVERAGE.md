@@ -25,8 +25,8 @@ The named-contract test in tests/repository-process.test.js checks that every to
 
 ## Task state, eligibility, and scanner controls
 
-- RISK backup format safety: raw-source qualification remains outside the native selector
-- RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable
+- RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board
+- RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable
 
 - RISK resilient sync recovery: identity changes after durable source capture cannot bind an old response to a new account
 
@@ -39,7 +39,7 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving
 - RISK unreadable device recovery: native Paste previews and restores a supported board while preserving unreadable originals
 - RISK unreadable device recovery: raw startup preserves sources and supports native File restore
-- RISK unreadable device recovery: raw source export excludes the placeholder and preserves exact device evidence
+- RISK unreadable device recovery: the recovery file excludes the placeholder and preserves exact device evidence
 - RISK unreadable device recovery: locally restored work stays durable and visibly pending across sign-in and reopen
 - RISK unreadable device recovery: workspace backups retain original evidence and unsupported selected decisions stay evidence
 - RISK unreadable device recovery: preservation refusals transaction failures and late identity changes never accept a source
@@ -199,19 +199,27 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
-- RISK JSON COPY PASTE: the current-board viewer copies its exact displayed JSON without saving
-- RISK JSON COPY PASTE: Quick start explains the copy button, manual fallback and guarded paste
-- RISK DATABASE REPAIR EXPORT: the Settings copy includes exact saved sources and repair metadata without writes
+- RISK JSON COPY PASTE: Download board saves the exact board JSON without saving, and pasting it restores through the guarded preview
+- RISK JSON COPY PASTE: Quick start explains Download board, copying the file and guarded paste
+- RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact saved sources and repair metadata without writes
+- RISK DOWNLOADS: Settings offers exactly one board export and one recovery export, and both files round-trip through Restore
+- RISK DOWNLOADS: Restore still accepts every earlier export format: board JSON, compact and pretty recovery archives and repair exports
+- RISK DOWNLOADS: a board edit while the saved rows are read marks the recovery file partial
+- RISK DOWNLOADS: Download recovery file says it is preparing while it runs, and says so when a protected recovery action stops it
+- RISK DOWNLOADS: an unavailable Debug log is recorded as missing and keeps an otherwise complete recovery file complete and restorable
+- RISK DATABASE REPAIR EXPORT: a large recovery file downloads losslessly without being shown, and Restore accepts that file
 - RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics
-- RISK DATABASE REPAIR EXPORT: visible Debug log controls use the combined repair export
+- RISK DATABASE REPAIR EXPORT: Settings offers the recovery file and the Debug log dialog exports only its metadata report
+- RISK support diagnostics export: every export the Debug log offers copies or downloads only the bounded metadata report and reads no saved board or database copy
 - RISK DATABASE REPAIR EXPORT: readonly capture keeps original diagnostic storage even when old entries expire
 - RISK DATABASE REPAIR EXPORT: available worker and cache identities are captured without diagnostic writes
-- RISK DATABASE REPAIR EXPORT: a cancelled capture cannot replace a newer pasted draft
+- RISK DATABASE REPAIR EXPORT: a running recovery file never replaces a newer pasted draft, and overlapping downloads save one file
 - RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board
-- RISK DATABASE REPAIR EXPORT: FAQ explains the included database, diagnostics and partial-report limits
-- RISK DATABASE REPAIR EXPORT: reload help routes users to the combined export after standalone log exporters are removed
-- RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive
-- RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file
+- RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diagnostics and partial-report limits
+- RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the recovery file for repairs
+- RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file
+- RISK MANUAL JSON EXPORT: unreadable, unsupported, changing and hydration-placeholder sources make a recovery file marked partial, never a complete one
+- RISK MANUAL JSON EXPORT: a large recovery file with several saved copies downloads losslessly and Restore accepts it
 - RISK BACKUP FILE RESTORE: the actual Settings file selection protects exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exact sources before explicit local adoption
 - RISK BACKUP FILE RESTORE: compact settings and unknown board fields stay inside the actual preview
@@ -299,7 +307,7 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK SCALABLE QUOTA: optional IndexedDB history cannot block a primary board that fits
 - RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read
 - RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser
-- RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage
+- RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage
 - RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device save gate
 - RISK CLOUD BACKUP: an exact stable recovery copy satisfies adoption when duplicate writes hit quota
 - RISK CLOUD BACKUP: an unreadable backup row is never discarded to make room
@@ -535,9 +543,9 @@ The editor hook blocks app or enforcement edits while no file under tests/ has a
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK backup and Restore consolidation: Settings keeps one guarded action with all formats
+- RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore
 
-The Settings board-data area exposes one Download backup action with current-board JSON, complete recovery archive, and source-only raw export formats as applicable, plus one Restore action that routes File or Paste into the existing protected preview. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. Current-board view/copy and Support diagnostics remain separate; lower local/app backup controls are outside this consolidation.
+The Settings board-data area exposes Download board (ordinary board JSON, only with an accepted board) and Download recovery file (the board when accepted, every readable saved source, build details and the Debug log, marked partial when a source cannot be captured), plus one Restore action that routes File or Paste into the existing protected preview. View and Download raw backup data remain only while an older backup list exists. The unreadable-startup empty state routes through that shared Settings chooser instead of opening a second paste route. The actual download, file restore, pasted recovery, and unreadable-device consumers retain their exact-source, unsaved-edit, cancellation, and readback checks. The Debug log remains separate; lower local/app backup controls are outside this consolidation.
 
 ## Returning-user first upload
 
@@ -601,7 +609,7 @@ The Settings board-data area exposes one Download backup action with current-boa
 - RISK support diagnostics: source operations report the effective bounded SDK deadline
 - RISK support diagnostics: recovery-copy checks are explicit, passive, and preserve unmatched pending work
 - RISK support diagnostics: real device retries count attempts while unexplained churn remains refused
-- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: Settings names the board and recovery downloads for their contents
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
 
@@ -855,7 +863,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK backup mirror storage failure: quota rejection and IndexedDB abort preserve recoverability and allow an explicit retry
 - RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference
 - RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue
-- RISK backup help: expiry, protected-copy deletion, and archive limits remain complete
+- RISK backup help: expiry, protected-copy deletion, the two downloads and archive limits remain complete
 
 - `RISK fireworks pair delay: seeded second launches span zero to three hundred milliseconds without shifting first shells or finale` — deterministic per-pair stagger and responsive ignition preservation.
 - `RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement` — repeat frequency reduction and midnight reservations.
@@ -1925,7 +1933,7 @@ The full-app control pauses the real startup raw-store capture, then lets authen
 
 ## Incident support diagnostics
 
-- RISK support diagnostics: Settings names the existing board export for its contents
+- RISK support diagnostics: Settings names the board and recovery downloads for their contents
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK support diagnostics: a held local save and cloud acknowledgement stay visibly pending
 - RISK support diagnostics: a held snapshot does not claim durability for a later accepted action
@@ -2336,6 +2344,8 @@ The generated large-board fixture (447 tasks, long rating histories, 368 decisio
 ## Large board recovery memory
 
 - RISK large board recovery browser: a deliberate run of the automatic recovery default from Retry sync reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
+- RISK BACKUP FILE RESTORE: a signed-in large board file asks a board with no account to sign in first instead of failing, and changes nothing
+- RISK BACKUP FILE RESTORE: signed in to its account, a large board file restores with its tasks, decisions, History order, deletion and clear records and decision baseline
 - RISK large board recovery guidance: mounted FAQ and changelog explain that recovering a large board onto an older complete cloud copy finishes in seconds with less memory and keeps every saved source
 
 The signed-in large-board fixture opens on a served build with the cloud faked in the page: an unreadable current generation over an intact earlier generation of similar size, with a newer Add, a newer scan decision and an unfinished draft on the device. The automatic recovery default must reach the older complete copy, keep every accepted decision, task, History entry, disposition and the draft, refuse publication and say the older copy is in use, while peak web-process memory stays within 384 times the board's serialized size of opening the same board locally in the same run on the same engine (#2227, spec #2224). The existing Node "RISK cloud generation recovery" and "RISK corrupt cloud work budget" tests keep the lossless rules.
@@ -2343,6 +2353,9 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 ## Large board recovery wait
 
 - RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit
+- RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit
+- RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit
+- RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation
 - RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately

@@ -212,6 +212,44 @@
       }
     }
 
+    // #2246: every row of the named stores, in key order, in one readonly
+    // transaction, like readRawExportSnapshot(), but handed to visit.row one
+    // at a time and synchronously (so the transaction stays active). The
+    // repair export writes each row out and lets it go, holding about one
+    // saved copy instead of every saved copy at once, which exceeded a phone's
+    // memory with a large board. visit.store(name) precedes each store's rows
+    // and visit.end(name,count) follows them. A visitor error aborts the read.
+    async function readRawExportRows(names,visit){
+      ensureOpen();
+      if(!Array.isArray(names)||names.some(name=>!storeNames.includes(name)))throw new Error("Unknown device store");
+      const tx=await beginTransaction(names,"readonly"),done=transactionDone(tx);
+      let visitorFailed=false;
+      const read=new Promise((resolve,reject)=>{
+        const call=(fn,...args)=>{try{fn?.(...args);return true;}catch(error){visitorFailed=true;reject(error);return false;}};
+        const next=index=>{
+          if(index>=names.length){resolve();return;}
+          const name=names[index];let count=0;
+          if(!call(visit.store,name))return;
+          const request=tx.objectStore(name).openCursor();
+          request.onerror=()=>reject(request.error);
+          request.onsuccess=()=>{
+            const cursor=request.result;
+            if(!cursor){if(call(visit.end,name,count))next(index+1);return;}
+            if(!call(visit.row,name,cursor.primaryKey,cursor.value))return;
+            count++;cursor.continue();
+          };
+        };
+        try{next(0);}catch(error){reject(error);}
+      });
+      try{await read;await done;}
+      catch(error){
+        try{tx.abort();}catch(e){}
+        try{await done;}catch(e){}
+        if(!visitorFailed)observeRecovery("failed",error,"raw-snapshot",tx.db);
+        throw error;
+      }
+    }
+
     // #2227 (spec #2224): only the named rows, in one readonly transaction,
     // shaped like readRawExportSnapshot() restricted to the rows present. A
     // recovery check that compares a few rows no longer reads every saved
@@ -692,7 +730,7 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint};
     return api;
   }
