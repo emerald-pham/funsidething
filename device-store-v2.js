@@ -272,14 +272,22 @@
     async function readHead(){
       ensureOpen();
       const tx=await beginTransaction(["meta","snapshots"],"readonly");
-      const [meta,snapshots]=await readonlyResults(tx,[
-        readonlyRequest(tx,"head",()=>tx.objectStore("meta").get("head")),
-        readonlyRequest(tx,"head",()=>tx.objectStore("snapshots").getAll()),
-      ],"head");
+      // #2239 round 2: the head's snapshot is read by its key, which is the
+      // hash it carries, in the same transaction as the head row, instead of
+      // reading every saved snapshot (each a whole board) to find it. Only when
+      // that key holds no snapshot with that hash are all snapshots read, in
+      // the same transaction, and searched as before.
+      const metaRequest=readonlyRequest(tx,"head",()=>tx.objectStore("meta").get("head"));
+      const snapshotRequest=metaRequest.then(meta=>{
+        if(typeof meta?.hash!=="string")return undefined;
+        return readonlyRequest(tx,"head",()=>tx.objectStore("snapshots").get(meta.hash)).then(row=>row?.hash===meta.hash?row:
+          readonlyRequest(tx,"head",()=>tx.objectStore("snapshots").getAll()).then(rows=>rows.find(item=>item?.hash===meta.hash)));
+      });
+      const [meta,found]=await readonlyResults(tx,[metaRequest,snapshotRequest],"head");
       if(!meta) return null;
       if(typeof meta!=="object"||meta.schemaVersion!==SCHEMA_VERSION||typeof meta.hash!=="string"||!/^[0-9a-f]{64}$/.test(meta.hash))
         throw new Error("Durable device head format is unsupported");
-      const snapshot=snapshots.find(row=>row?.hash===meta.hash);
+      const snapshot=found;
       if(!snapshot||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==meta.hash)
         throw new Error("Durable device head is corrupt");
       return {...meta,payload:snapshot.payload};

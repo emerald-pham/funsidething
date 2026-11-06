@@ -25415,6 +25415,39 @@ test('RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips throu
  await assert.rejects(storageV2.decodeSnapshot(encoded,tampered),/hash|length|corrupt/i,'a damaged generation never becomes a board');
 });
 
+// #2239 round 2: a recovery reads the saved head many times, and each read
+// fetched every saved snapshot (the head and each backup, each a whole board)
+// to find the head's own. The head's snapshot is stored under its hash, so it
+// is read by that key; a snapshot kept under any other key is still found by
+// searching them all, in the same transaction, as before.
+test('RISK DEVICE STORAGE V2: reading the saved head reads its own snapshot by key, and still finds one kept under another key',async t=>{
+ const {indexedDB,IDBObjectStore}=await import('fake-indexeddb');
+ const storageV2=loadStorageV2({indexedDB}),dbName='chain-scanner-head-read-'+Date.now()+'-'+Math.random();
+ const store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName});await store.open();t.after(()=>store.close());
+ const board=label=>JSON.stringify({tasks:[{id:label,title:'Board '+label+' '+'x'.repeat(5000)}]});
+ assert.equal((await store.migrateLegacy({headPayload:board('first'),backups:[{id:'daily-a',day:'2026-11-01',at:1,kind:'daily',payload:board('backup-a')},
+  {id:'daily-b',day:'2026-11-02',at:2,kind:'daily',payload:board('backup-b')}]})).ok,true);
+ const latest=board('latest'),prior=await store.readHead();
+ assert.equal((await store.commitHead({expectedHash:prior.hash,payload:latest,account:null})).ok,true);
+ // Count whole-store snapshot reads while the head is read.
+ const getAll=IDBObjectStore.prototype.getAll;let snapshotScans=0;
+ IDBObjectStore.prototype.getAll=function(...args){if(this.name==='snapshots')snapshotScans++;return getAll.apply(this,args);};
+ t.after(()=>{IDBObjectStore.prototype.getAll=getAll;});
+ const head=await store.readHead();
+ IDBObjectStore.prototype.getAll=getAll;
+ assert.equal(head.payload,latest,'the saved head reads back exactly');
+ assert.equal(snapshotScans,0,'the head is read without reading every saved snapshot');
+ // A head snapshot kept under another key (no writer stores one that way) is
+ // still found, exactly, by the search over every snapshot.
+ const moved=await new Promise((resolve,reject)=>{const request=indexedDB.open(dbName);request.onerror=()=>reject(request.error);request.onsuccess=()=>{
+  const db=request.result,tx=db.transaction('snapshots','readwrite'),snapshots=tx.objectStore('snapshots');
+  snapshots.delete(head.hash);snapshots.put({hash:head.hash,payload:latest},'moved-'+head.hash);
+  tx.oncomplete=()=>{db.close();resolve(true);};tx.onerror=()=>reject(tx.error);};});
+ assert.equal(moved,true);
+ const found=await store.readHead();
+ assert.equal(found.payload,latest,'a head snapshot under another key is still found');assert.equal(found.hash,head.hash);
+});
+
 test('RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes',async()=>{
  const {indexedDB}=await import('fake-indexeddb');
  const storageV2=loadStorageV2({indexedDB});

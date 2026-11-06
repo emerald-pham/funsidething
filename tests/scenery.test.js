@@ -1345,6 +1345,32 @@ test('RISK recovery summary: after publication lists the archives once, the chec
  assert.equal(calls.readRawExportSnapshot||0,0,'the check of earlier sources never reads the raw device source: '+JSON.stringify(calls));
  assert.ok(read<=1.25*written,'archive text read from publication on is about what the commit wrote (its one list), not several times it: '+JSON.stringify({written,read}));
 });
+// #2239 round 2: a recovery guard compares the live board's text with the
+// board it captured. The attempt's own guard, the commit's check and the
+// device-authority check each serialized the live board again for the same
+// comparison within one synchronous check, where nothing can change it, three
+// times per commit check. Counted here: whole-board serializations of the
+// live board from Retry sync until the run and its checks settle (191 with
+// three per commit check, 177 with one; most of the rest are the cloud read's
+// own currency checks, publication's guard and the status text).
+const LIVE_BOARD_SERIALIZATIONS_2239=184;
+test('RISK recovery guard checks: a deliberate run serializes the live board once for each guard check rather than once per comparison inside it',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ const counter=vm.runInContext(`(()=>{const original=JSON.stringify,count={live:0};
+  JSON.stringify=function(...args){if(args[0]===state)count.live++;return Reflect.apply(original,this,args);};
+  return {count,restore(){JSON.stringify=original;}};})()`,ctx);
+ t.after(()=>counter.restore());
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'the deliberate run and its checks settle');
+ counter.restore();
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'positive control: the deliberate run rebuilt the board');
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: publication released its hold');
+ t.diagnostic(JSON.stringify({liveBoardSerializations:counter.count.live}));
+ assert.ok(counter.count.live<=LIVE_BOARD_SERIALIZATIONS_2239,'whole-board serializations of the live board during the run: '+counter.count.live);
+});
 
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,

@@ -6271,6 +6271,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK DEVICE STORAGE V2: reading the saved head reads its own snapshot by key, and still finds one kept under another key",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13202,6 +13207,11 @@
     },
     {
       "root": "RISK recovery summary: after publication lists the archives once, the check of earlier sources reads the recovery summaries and checks the large archives by key instead of reading them again",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery guard checks: a deliberate run serializes the live board once for each guard check rather than once per comparison inside it",
       "group": "scenery",
       "file": "tests/scenery.test.js"
     },
