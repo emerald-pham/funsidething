@@ -13146,6 +13146,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: a deliberate run whose over-budget record cannot be saved on this device keeps waiting instead of running",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK recovery wait: after a deliberate run confirmed with an earlier cloud copy still incomplete, returning to the app does not check it again until Retry sync",
       "group": "scenery",
       "file": "tests/scenery.test.js"

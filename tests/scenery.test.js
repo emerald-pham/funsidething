@@ -1056,6 +1056,37 @@ test('RISK recovery wait: after a deliberate run that the cloud has not confirme
  assert.notEqual(JSON.stringify([...backend.docs]),cloudBefore,'Retry sync publishes it');
  assert.ok(cold.ctx.state.tasks.some(task=>task.title===PRIOR));
 });
+// Release review of spec #2224 (B1): the over-budget record is the only thing
+// that keeps a deliberate run's heavy publication from repeating on every
+// open. If this device cannot save it (storage full), a deliberate run must
+// keep waiting rather than run unremembered.
+test('RISK recovery wait: a deliberate run whose over-budget record cannot be saved on this device keeps waiting instead of running',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ const PRIOR='Saved only in the intact prior generation',KEY='fvp:chain-scanner:automatic-recovery-over-budget';
+ // The harness's timers do not hold the process open while the runs settle.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ const storage=shim.localStorage,setItem=storage.setItem;
+ storage.setItem=function(key,value){if(key===KEY)throw Object.assign(new Error('The quota has been exceeded.'),{name:'QuotaExceededError'});return setItem.call(this,key,value);};
+ t.after(()=>{storage.setItem=setItem;});
+ storage.removeItem(KEY);
+ const before=JSON.stringify(ctx.state.tasks),cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ await ctx.onAction('sync-retry',{});await recoveryWaitSettle2228(ctx,'Retry sync settles');
+ assert.equal(storage.getItem(KEY),null,'the over-budget record could not be saved');
+ assert.ok(!ctx.state.tasks.some(task=>task.title===PRIOR),'the deliberate run did not rebuild the board unremembered');
+ assert.equal(JSON.stringify(ctx.state.tasks),before,'the board is unchanged');
+ assert.equal(await store.getRecoveryCloudHold(),null,'no recovered board is left pending cloud confirmation');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published');assert.equal(backend.writes.length,writes);
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','the cloud button still says recovery is waiting');
+ // Once the record can be saved, Retry sync runs it deliberately.
+ storage.setItem=setItem;
+ refuseNextRecoveryTransaction255(app.faults);
+ await ctx.onAction('sync-retry',{});await recoveryWaitSettle2228(ctx,'the second Retry sync settles');
+ assert.ok(storage.getItem(KEY),'positive control: the record is saved');
+ assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'positive control: the deliberate run ran');
+});
 test('RISK recovery wait: after a deliberate run confirmed with an earlier cloud copy still incomplete, returning to the app does not check it again until Retry sync',{timeout:300000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,activePath}=app;
  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;ctx.window.CLOUD_RETRY_DELAY_MS=0;
