@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { parseTap } from '../test-groups.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runner = path.join(repository, 'scripts/test-groups.mjs');
@@ -770,6 +771,26 @@ test('test group describe and nightly preflight fail when a declared required or
 // its file's group from fileGroups; rows remain for overrides, dynamic titles and
 // nightly roots. The cohort still binds every root, and a file with no default
 // still rejects an unrowed root.
+// Rewrites one collected group's TAP and keeps its hash and case report in
+// step, as a consistent forgery would.
+function rewriteGroupTap(root,group,edit){
+  const resultFile=path.join(root,group,'result.json'),record=JSON.parse(fs.readFileSync(resultFile,'utf8'));
+  const tapFile=path.join(root,group,record.process.stdout.path),tap=edit(fs.readFileSync(tapFile,'utf8'));
+  fs.writeFileSync(tapFile,tap);
+  record.process.stdout.sha256=createHash('sha256').update(tap).digest('hex');
+  record.cases=parseTap(tap).map(({id,root:caseRoot,status,skipReason})=>({id,root:caseRoot,status,skipReason}));
+  writeJson(resultFile,record);
+}
+function rootBlock(tap,title){
+  const lines=tap.split('\n'),start=lines.indexOf('# Subtest: '+title);
+  const result=lines.findIndex((line,index)=>index>start&&/^(?:not )?ok \d+ - /.test(line)&&line.endsWith(' - '+title));
+  assert.ok(start>=0&&result>start,'the fixture TAP holds the root '+title);
+  const end=lines[result+1]==='  ---'?lines.indexOf('  ...',result):result;
+  return {lines,start,result,end};
+}
+const removeRootBlock=(tap,title)=>{const {lines,start,end}=rootBlock(tap,title);lines.splice(start,end-start+1);return lines.join('\n');};
+const duplicateRootBlock=(tap,title)=>{const {lines,start,end}=rootBlock(tap,title);lines.splice(end+1,0,...lines.slice(start,end+1));return lines.join('\n');};
+const editRootResult=(tap,title,edit)=>{const {lines,result}=rootBlock(tap,title);lines[result]=edit(lines[result]);return lines.join('\n');};
 const defaultRoot='fixture root placed by its file',overrideRoot='fixture root overriding its file group';
 function defaultByFileFixture(t,{fileGroups={[suiteFile]:'core','scripts/agent-tools/*.test.mjs':'native-process'}}={}){
   const fixture=createFixture(t,{nativeTitle:installedClientRoot,nativeReports:true});
@@ -796,13 +817,22 @@ test('test group roots without a row take their file group and rows override it'
     assert.ok(readEvidence(fixture.originals.get('scenery')).cases.some(item=>item.id===overrideRoot&&item.status==='passed'),'the override executes in its row group');
     const aggregate=aggregateCopy(t,fixture);
     assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);
-    for(const [name,mutate] of [
-      ['missing defaulted case',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases=x.cases.filter(item=>item.id!==defaultRoot);writeJson(f,x);}],
-      ['skipped defaulted case',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases.find(item=>item.id===defaultRoot).status='skipped';writeJson(f,x);}],
-      ['failed override case',root=>{const f=path.join(root,'scenery/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases.find(item=>item.id===overrideRoot).status='failed';writeJson(f,x);}],
-      ['duplicate group',root=>fs.cpSync(path.join(root,'core'),path.join(root,'core-copy'),{recursive:true})],
-      ['missing installed-client report',root=>fs.rmSync(path.join(root,'native-process/native/signed-out.json'))],
-    ])assert.notEqual(aggregateCopy(t,fixture,mutate).status,0,'aggregate must reject '+name);
+    // Each forgery keeps the group's TAP, its hash and its case report
+    // consistent, so the aggregate must reject it at the named check rather than
+    // at an earlier report/TAP mismatch.
+    const label=title=>JSON.stringify(title).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    for(const [name,mutate,message] of [
+      ['missing defaulted case',root=>rewriteGroupTap(root,'core',tap=>removeRootBlock(tap,defaultRoot)),new RegExp(`Assigned root ${label(defaultRoot)} did not execute`)],
+      ['skipped defaulted case',root=>rewriteGroupTap(root,'core',tap=>editRootResult(tap,defaultRoot,line=>line+' # SKIP forged')),new RegExp(`unexpectedly skipped: ${defaultRoot}`)],
+      ['failed override case',root=>rewriteGroupTap(root,'scenery',tap=>editRootResult(tap,overrideRoot,line=>'not '+line)),new RegExp(`Test case failed: ${overrideRoot}`)],
+      ['duplicate defaulted case',root=>rewriteGroupTap(root,'core',tap=>duplicateRootBlock(tap,defaultRoot)),new RegExp(`Root ${label(defaultRoot)} executed more than once`)],
+      ['missing installed-client report',root=>{const f=path.join(root,'native-process/result.json'),x=JSON.parse(fs.readFileSync(f,'utf8'));fs.rmSync(path.join(root,'native-process/native/signed-out.json'));x.artifacts=x.artifacts.filter(item=>item.path!=='native/signed-out.json');writeJson(f,x);},/Both required distinct native reports must be present/],
+    ]){
+      const rejected=aggregateCopy(t,fixture,mutate);
+      assert.notEqual(rejected.status,0,'aggregate must reject '+name);
+      assert.match(rejected.stderr,message,'aggregate must reject '+name+' at its own check');
+      assert.doesNotMatch(rejected.stderr,/case report differs from actual TAP|Artifact missing or wrong size/,'the forgery for '+name+' must stay internally consistent');
+    }
   });
   await parent.test('a root in a file without a default group still needs a row',t=>{
     const fixture=defaultByFileFixture(t,{fileGroups:{[suiteFile]:'core'}});
