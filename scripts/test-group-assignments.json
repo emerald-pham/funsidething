@@ -5226,6 +5226,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK cloud source recovery automatic union: an intact earlier generation byte-identical to the acknowledged copy is reconciled once, as that copy, and stays archived and resolved",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13281,6 +13286,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within 200 MiB of opening it locally, publishing it and keeping every decision, draft and newer edit, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
@@ -13476,6 +13486,11 @@
     },
     {
       "root": "RISK large board deliberate recovery browser: Retry sync rebuilds a large board whose automatic recovery waits onto an intact earlier generation and publishes it, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within 200 MiB of opening it locally, publishing it and keeping every decision, draft and newer edit, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },

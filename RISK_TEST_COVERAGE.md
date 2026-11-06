@@ -1902,6 +1902,7 @@ This path opens one complete, validated previous cloud generation only on a veri
 
 - RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive
 - RISK cloud source recovery automatic union: a valid nonmatching acknowledged copy contributes supported work
+- RISK cloud source recovery automatic union: an intact earlier generation byte-identical to the acknowledged copy is reconciled once, as that copy, and stays archived and resolved
 - RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers
 - RISK cloud source recovery automatic union: a supported durable device head contributes work absent from accepted live state
 - RISK cloud source recovery automatic union: disjoint settings and opaque fields survive across accepted device and previous cloud sources
@@ -2343,6 +2344,7 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 ## Large board deliberate recovery
 
 - RISK large board deliberate recovery browser: Retry sync rebuilds a large board whose automatic recovery waits onto an intact earlier generation and publishes it, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
+- RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within 200 MiB of opening it locally, publishing it and keeping every decision, draft and newer edit, in Chromium and WebKit
 - RISK recovery read-backs: a deliberate run reads each recovery archive back once after writing it, and publication and its push check archives by key rather than reading every archive again
 - RISK recovery device capture: a deliberate run reads the device sources in full once, and its later checks during the cloud read compare their fingerprint
 - RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation

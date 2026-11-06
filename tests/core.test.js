@@ -51,6 +51,7 @@ import {
   settleRecovery188, recoveryReleasedArtifacts188, settleRecoveryOperations188,
   retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
 } from "./shared.js";
+import { rewriteGenerationFixture } from "./shared.js";
 
 test('RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text',async t=>{
  const cases=[
@@ -1202,6 +1203,56 @@ test('RISK cloud source recovery automatic union: a valid nonmatching acknowledg
  assert.ok(sourceArchive.alternativesToPreserve.some(row=>row.key==='cloud-acknowledged:'+base.id),
   'the adopted result keeps the acknowledged source in its protected alternatives');
  assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'local recovery does not claim cloud acknowledgement');
+});
+
+// #2239 round 2 (direction d): the owner's device acknowledged the intact
+// earlier generation, so that generation's bytes are exactly the acknowledged
+// copy the device already carries. Recovery reconciles the acknowledged copy
+// once, with its shared base, instead of parsing, checking and comparing the
+// same board a second time as a cloud generation; the generation stays
+// archived byte for byte and is resolved by the cloud's confirmation like any
+// reconciled source.
+test('RISK cloud source recovery automatic union: an intact earlier generation byte-identical to the acknowledged copy is reconciled once, as that copy, and stays archived and resolved',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+ const base=ctx.state.decisionBase,acknowledged=base.payload;
+ assert.equal(ctx.validDecisionBase(base,ctx.state.syncAccount,ctx.state.syncRev),true,'fixture: the device keeps a verified acknowledged copy');
+ // The intact earlier generation holds exactly the bytes this device
+ // acknowledged, and the unreadable current generation declares some other
+ // source, so the acknowledged copy cannot simply repair it.
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,activePath='users/owner/generations/'+originalRoot.activeGeneration;
+ await rewriteGenerationFixture(backend,previousPath,codec,()=>acknowledged);
+ const other=JSON.parse(acknowledged);other.futureUnreadableActiveFixture={opaque:'unreadable current source'};
+ const otherEncoded=await codec.encodeSnapshot(JSON.stringify(other));
+ backend.docs.set(activePath,{...backend.docs.get(activePath),hash:otherEncoded.hash,byteLength:otherEncoded.byteLength,chunkCount:otherEncoded.chunkCount});
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation','fixture: the current generation is unreadable');
+ shim.document.getElementById('addInput').value='Newer local edit before reconciliation';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const before=JSON.parse(JSON.stringify(ctx.state));
+ const validate=ctx.cloudSourceRecoveryBoard;let acknowledgedChecks=0;
+ ctx.cloudSourceRecoveryBoard=function(raw,...rest){if(raw===acknowledged)acknowledgedChecks++;return validate.call(this,raw,...rest);};
+ t.after(()=>{ctx.cloudSourceRecoveryBoard=validate;});
+ refuseNextRecoveryTransaction255(app.faults);
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ ctx.cloudSourceRecoveryBoard=validate;
+ const hold=await store.getRecoveryCloudHold();
+ assert.equal(hold?.automaticRecovery,true,'positive control: the automatic recovery default adopted a board');
+ for(const task of before.tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task,'every accepted task, including the newer edit, survives unchanged');
+ for(const key of ['decisionEvents','decisionBaseline','workLog','chain','deletedTaskIds','clearedHistoryIds'])
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.state[key]??null)),before[key]??null,'every accepted board decision survives: '+key);
+ // Behaviour under test: the acknowledged bytes are checked as a board once.
+ assert.equal(acknowledgedChecks,1,'the earlier generation byte-identical to the acknowledged copy is reconciled once, as that copy');
+ const archives=await store.listOpaqueArchives(),envelope=JSON.parse(archives.find(row=>row.key===hold.originalKey).raw);
+ const source=JSON.parse(archives.find(row=>row.key===envelope.sourceArchiveKeys[0]).raw);
+ const previousRef=source.candidateSources.find(row=>row.key==='cloud-generation:'+originalRoot.previousGeneration);
+ assert.equal(previousRef?.sameAs,'cloud-acknowledged:'+base.id,'the archive records that the generation was reconciled as the acknowledged copy');
+ assert.ok(source.candidateSources.some(row=>row.key==='cloud-acknowledged:'+base.id),'the acknowledged copy itself is a reconciled source');
+ const archivedPrevious=source.generations.find(row=>row.id===originalRoot.previousGeneration);
+ assert.equal(await codec.decodeSnapshot(archivedPrevious.header,archivedPrevious.chunks),acknowledged,'the earlier generation stays archived byte for byte');
+ assert.equal(source.acceptedDeviceBoard,JSON.stringify(before),'the accepted device board stays archived byte for byte');
+ // The cloud's confirmation resolves the generation like any reconciled source.
+ await ctx.sendPush();
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: publication released the hold');
+ const acks=(await store.listOpaqueArchives()).filter(row=>row.key.startsWith('automatic-recovery-ack:')).map(row=>JSON.parse(row.raw));
+ assert.ok(acks.some(ack=>ack.resolvedGenerationIds.includes(originalRoot.previousGeneration)),'the acknowledgement resolves the earlier generation');
 });
 
 test('RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers',async t=>{
