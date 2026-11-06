@@ -1063,6 +1063,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK repository process: changed-line review plan reads persistence only from script code, not prose, comments or Node sync APIs
 - RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements
 - RISK repository process: pre-push lets branch pushes run CI before review and still guards main
+- RISK repository process: pre-push command accepts a branch push and says no receipt was checked
 - RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes
 - RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence
 - RISK repository process: scaled review plan sets typography only for markup or stylesheet content

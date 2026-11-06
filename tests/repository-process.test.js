@@ -799,6 +799,17 @@ test('RISK repository process: pre-push lets branch pushes run CI before review 
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: pre-push command accepts a branch push and says no receipt was checked',()=>{
+ const fixture=makeReleaseGateFixture();
+ try{
+  // The real hook runs this command; a crash here blocks every push.
+  const line=`refs/heads/fix/2234 ${fixture.candidateSha} refs/heads/fix/2234 ${'0'.repeat(40)}\n`;
+  const run=spawnSync(process.execPath,[path.join(__dirname,'scripts','release-evidence.mjs'),'pre-push'],{cwd:fixture.repo,input:line,encoding:'utf8'});
+  assert.equal(run.status,0,run.stderr);
+  assert.match(run.stdout,/No push to refs\/heads\/main; no release receipt checked/);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: status publication needs a valid exact-SHA receipt',async()=>{
  const {recordReleaseEvidence,publishReleaseStatuses}=await import('../scripts/release-evidence.mjs');
  const fixture=makeReleaseGateFixture();

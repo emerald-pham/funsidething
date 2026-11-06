@@ -1355,7 +1355,8 @@ async function main() {
   }
   if (command === 'pre-push') {
     const input = fs.readFileSync(0, 'utf8');
-    const errors = validatePrePushUpdates(repoRoot, parsePrePushUpdates(input));
+    const updates = parsePrePushUpdates(input);
+    const errors = validatePrePushUpdates(repoRoot, updates);
     if (errors.length) throw new Error(errors.join('\n'));
     process.stdout.write(updates.some(update => update?.remoteRef === 'refs/heads/main' && update.localSha !== '0'.repeat(40))
       ? 'Every commit pushed to main has valid exact-SHA release evidence.\n'

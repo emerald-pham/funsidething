@@ -9351,6 +9351,11 @@
       "file": "tests/repository-process.test.js"
     },
     {
+      "root": "RISK repository process: pre-push command accepts a branch push and says no receipt was checked",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
       "root": "RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes",
       "group": "native-process",
       "file": "tests/repository-process.test.js"
