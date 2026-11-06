@@ -297,6 +297,16 @@ test('RISK large board recovery guidance: mounted FAQ and changelog explain that
  assert.match(markup,/<li>Cloud recovery of a large board onto an older complete copy finishes in seconds with less memory/,'the mounted changelog includes the released behavior');
 });
 
+// #2228 (spec #2224): a recovery over its work budget waits, and says so.
+test('RISK large board recovery wait guidance: mounted FAQ and changelog explain that cloud recovery of a large board waits, what stays protected, and that Retry sync or signing in again runs it',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<dt>Why does the cloud button say “recovery waiting”\?<\/dt><dd>/);
+ assert.match(markup,/stays open and saves on this device/);assert.match(markup,/Review cloud recovery/);assert.match(markup,/Retry sync/);assert.match(markup,/signing in again/i);
+ assert.match(markup,/<li>When rebuilding a large board from an older cloud copy could need more memory than a phone allows, cloud recovery now waits/,'the mounted changelog includes the released behavior');
+});
+
 test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
  const app=await loadApp();app.ctx.openHelp();
  const markup=app.shim.document.getElementById('modalRoot').innerHTML;

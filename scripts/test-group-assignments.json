@@ -12756,6 +12756,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK large board recovery wait guidance: mounted FAQ and changelog explain that cloud recovery of a large board waits, what stays protected, and that Retry sync or signing in again runs it",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
@@ -13087,6 +13092,21 @@
     },
     {
       "root": "RISK corrupt cloud work budget: a cold launch over an unchanged unreadable generation keeps its completed refusal without downloading it again",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: a changed unreadable generation is evaluated afresh and a readable one ends the wait",
       "group": "scenery",
       "file": "tests/scenery.test.js"
     },

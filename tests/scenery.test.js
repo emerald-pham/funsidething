@@ -769,6 +769,134 @@ test('RISK corrupt cloud work budget: a cold launch over an unchanged unreadable
  assert.ok(again.ctx.state.tasks.some(task=>task.title==='Local work after a cold launch'));
 });
 
+// #2228 (spec #2224): the non-memory behaviour of an automatic recovery
+// default that waits because it is over its work budget. The captured shape
+// (#2195) is about 2 MB of work, under the product budget, so these tests lower
+// the budget to 1 MiB through the app's own override; the large-board browser
+// test covers the product budget itself. The wait is a completed refusal over
+// the unchanged root: it publishes nothing, grants no cloud acknowledgement and
+// is not evaluated again by resuming, reconnecting or a cold launch, while
+// Retry sync and signing in again run recovery deliberately and a changed
+// generation is evaluated afresh.
+const RECOVERY_WAIT_BUDGET_2228=1048576;
+const recoveryWaitIdle2228=ctx=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy||saveTimer!==null||supportDiagnosticsActivePersistCalls>0',ctx);
+const recoveryWaitSettle2228=(ctx,message)=>fixtureDeadline(async wait=>{await wait(5);while(!recoveryWaitIdle2228(ctx))await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+const recoveryBudgetEvents2228=ctx=>JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='recovery-budget');
+test('RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ const generationReads=(list,since)=>list.slice(since).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath));
+ const PRIOR='Saved only in the intact prior generation',before=JSON.stringify(ctx.state),head=await store.readHead();
+ const cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length,base=JSON.stringify(ctx.state.decisionBase);
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ // It waits: the accepted board, its durable head and every source are unchanged.
+ assert.equal(backend.CS.errorCode,'corrupt-generation');
+ assert.equal(JSON.stringify(ctx.state),before,'the accepted board stays exactly as it was');
+ assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null,'no recovery default was adopted');
+ assert.equal(ctx.state.tasks.some(task=>task.title===PRIOR),false,'nothing from the earlier generation is applied');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published');assert.equal(backend.writes.length,writes);
+ assert.equal(ctx.state.syncDirty,true,'no cloud acknowledgement');assert.equal(JSON.stringify(ctx.state.decisionBase),base);
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting');assert.match(syncStatus2200(shim).title,/Cloud recovery is waiting/);
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;ctx.closeModal();
+ assert.match(settings,/Cloud recovery is waiting\./);assert.match(settings,/data-act="review-cloud-source-recovery"/);assert.match(settings,/data-act="restore-backup"/);
+ // Metadata only: the stage, sizes rounded to KiB and the budget outcome.
+ const events=recoveryBudgetEvents2228(ctx);
+ assert.equal(events.length,1,'one budget evaluation is recorded');
+ const {metadata}=events[0];
+ assert.equal(metadata.budgetOutcome,'deferred');assert.equal(metadata.budgetKiB,1024);
+ assert.equal(metadata.generationKiB,Math.round(CAPTURED_UNREADABLE_GENERATION.prior.byteLength/1024),'the complete earlier generation is counted from its header');
+ for(const key of ['boardKiB','decisionKiB','estimateKiB'])assert.ok(Number.isSafeInteger(metadata[key])&&metadata[key]>=0,key);
+ assert.equal(metadata.estimateKiB>metadata.budgetKiB,true);
+ assert.doesNotMatch(ctx.supportDiagnosticsText(),/Newer local edit before reconciliation|Acknowledged before source damage|owner@|e@example/,'no board text or account in the debug log');
+ // An ordinary edit saves on this device and publishes nothing.
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;const beforeEdit=reads.length;
+ shim.document.getElementById('addInput').value='Local work while recovery waits';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await recoveryWaitSettle2228(ctx,'the ordinary edit settles');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the edit is durable on this device');
+ assert.deepEqual(generationReads(reads,beforeEdit),[],'an edit does not start recovery');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published after an edit');assert.equal(backend.writes.length,writes);
+ assert.equal(ctx.state.syncDirty,true);assert.equal(syncStatus2200(shim).text,'☁ recovery waiting');
+ // Resuming and reconnecting over the unchanged root do not evaluate it again.
+ for(const type of ['visibilitychange','online']){
+  if(type==='visibilitychange'){shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;}
+  const at=reads.length;vm.runInContext('resumeCloudSync({type:'+JSON.stringify(type)+'})',ctx);
+  await fixtureDeadline(async wait=>{while(reads.length===at||!recoveryWaitIdle2228(ctx))await wait(10);},'the '+type+' read settles',CAPTURED_RESULT_BUDGET_MS+20000);
+  assert.deepEqual(generationReads(reads,at),[],type+' over the unchanged root downloads neither generation again');
+  assert.ok(reads.slice(at).includes('users/owner'),type+' still reads the server root');
+  assert.equal(syncStatus2200(shim).text,'☁ recovery waiting',type+' keeps the waiting status');
+ }
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore);assert.equal(backend.writes.length,writes);
+ // A cold launch over the unchanged root does not evaluate it again either.
+ const edited=JSON.stringify(ctx.state);await closeLegacyApp173(app);backend.CS.suspend();
+ const coldReads=[],cold=await coldRelaunch2198(t,app,coldReads,{signIn:false});
+ cold.ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ cold.backend.emitAuth({uid:'owner',email:'e@example.com'});cold.ctx.closeModal();await flush();await cold.ctx.cloudPull();await cold.settle('the cold launch settles');
+ assert.equal(cold.backend.CS.errorCode,'corrupt-generation');assert.ok(coldReads.includes('users/owner'));
+ assert.deepEqual(coldReads.filter(path=>path.startsWith(activePath)||path.startsWith(priorPath)),[],'a cold launch over the unchanged root downloads neither generation again');
+ assert.equal(JSON.stringify(cold.ctx.state),edited,'the cold launch opens the same accepted board');
+ assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null);
+ assert.equal(syncStatus2200(cold.shim).text,'☁ recovery waiting','a cold launch still says cloud recovery is waiting');
+ assert.equal(recoveryBudgetEvents2228(cold.ctx).length,0,'a cold launch did not evaluate the budget again');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore);
+});
+test('RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately',{timeout:300000},async t=>{
+ for(const route of ['Retry sync','signing in again'])await t.test(route,{timeout:150000},async sub=>{
+  const app=await capturedGenerationAcceptedApp2198(sub),{ctx,shim,backend}=app;
+  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+  const PRIOR='Saved only in the intact prior generation';
+  ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+  assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+  assert.equal(ctx.state.tasks.some(task=>task.title===PRIOR),false);
+  ctx.window.CLOUD_PUSH_DELAY_MS=0;
+  shim.document.getElementById('addInput').value='Local work while recovery waits';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  await recoveryWaitSettle2228(ctx,'the ordinary edit settles');
+  // Publication is refused, so the deliberate run's outcome stays visible
+  // before any cloud acknowledgement, as in the #2198 recovery tests.
+  refuseNextRecoveryTransaction255(app.faults);
+  if(route==='Retry sync'){await ctx.onAction('sync-retry',{});}
+  else{
+   backend.emitAuth(null);await flush();await recoveryWaitSettle2228(ctx,'sign-out settles');
+   assert.equal(ctx.state.tasks.some(task=>task.title===PRIOR),false,'signing out alone runs nothing');
+   backend.emitAuth({uid:'owner',email:'e@example.com'});await flush();await ctx.cloudPull();
+  }
+  await recoveryWaitSettle2228(ctx,route+' settles');
+  assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),route+' runs the recovery default onto the earlier generation');
+  assert.ok(ctx.state.tasks.some(task=>task.title==='Local work while recovery waits'),'the edit made while waiting is kept');
+  assert.ok(ctx.state.tasks.some(task=>task.title==='Newer local edit before reconciliation'),'the newer accepted edit is kept');
+  assert.equal((await ctx.window.ScannerDeviceStore.getRecoveryCloudHold())?.automaticRecovery,true,'the recovery default is pending its guarded publication');
+  assert.equal(syncStatus2200(shim).text,'☁ older copy in use','the wait has ended');
+ });
+});
+test('RISK recovery wait: a changed unreadable generation is evaluated afresh and a readable one ends the wait',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,originalRoot,activePath}=app;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ const cloudBefore=JSON.stringify([...backend.docs]);
+ // Another device publishes a new root over a different unreadable generation.
+ const unreadableId='another-unreadable-generation',header=backend.docs.get(activePath);
+ backend.docs.set('users/owner/generations/'+unreadableId,{...header});
+ backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+1,activeGeneration:unreadableId,previousGeneration:originalRoot.previousGeneration});
+ const at=reads.length;shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+1}}));
+ const priorChunks='users/owner/generations/'+originalRoot.previousGeneration+'/chunks';
+ await fixtureDeadline(async wait=>{while(!reads.slice(at).includes(priorChunks)||!recoveryWaitIdle2228(ctx))await wait(10);},'the changed generation is evaluated',CAPTURED_RESULT_BUDGET_MS+20000);
+ assert.ok(reads.slice(at).includes('users/owner/generations/'+unreadableId+'/chunks'),'the changed generation is read afresh');
+ assert.equal(backend.CS.errorCode,'corrupt-generation');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','it waits again, on the new generation');
+ // A readable new generation ends the wait and ordinary sync resumes.
+ const healthyPayload=ctx.cloudPayload(),healthy=await ctx.window.ChainStorageV2.encodeSnapshot(healthyPayload),healthyId='healthy-peer-after-wait';
+ backend.docs.set('users/owner/generations/'+healthyId,{...healthy,state:'published',baseRev:originalRoot.rev+1});
+ for(const chunk of healthy.chunks)backend.docs.set('users/owner/generations/'+healthyId+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ backend.docs.set('users/owner',{...originalRoot,rev:originalRoot.rev+2,activeGeneration:healthyId,previousGeneration:unreadableId});
+ shim.window.dispatchEvent(new ctx.CustomEvent('cloudboardchange',{detail:{user:backend.CS.user,rev:originalRoot.rev+2}}));
+ await fixtureDeadline(async wait=>{while(ctx.state.syncRev<originalRoot.rev+2||ctx.state.syncDirty)await wait(10);},'the readable generation ends the wait');
+ assert.notEqual(syncStatus2200(shim).text,'☁ recovery waiting');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Newer local edit before reconciliation'),'the accepted board is kept');
+ assert.notEqual(JSON.stringify([...backend.docs]),cloudBefore,'ordinary sync resumes');
+});
+
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,
 // so it must not cost the completed refusal kept in device storage.
