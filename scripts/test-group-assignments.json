@@ -9216,6 +9216,16 @@
       "file": "tests/repository-process.test.js"
     },
     {
+      "root": "RISK test-first gate: a scenery change with refreshed fingerprints needs only a direct test, end to end",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK regression gate: any covering record that validates approves the diff, and suppressors must be listed",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
       "root": "RISK test-first gate: a new RISK test is required only where saved data, the offline shell or enforcement can break",
       "group": "core",
       "file": "tests/repository-process.test.js"

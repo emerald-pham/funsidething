@@ -33,15 +33,21 @@ const isAppFile=file=>{
 // and the rules. Scenery, location and other modules still need a direct test;
 // requiring RISK for every runtime file made the label meaningless and made
 // most commits hand-edit the RISK map.
-const highRiskAppFile=/(?:^|\/)(?:[^/]+\.html?|sw\.js|[^/]+\.webmanifest|device-store[^/]*\.m?js|cloud-store[^/]*\.m?js|app-release\.js)$/i;
-const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&highRiskAppFile.test(file);
+const highRiskAppFile=/(?:^|\/)(?:[^/]+\.html?|sw\.js|[^/]+\.webmanifest|app-release\.js)$/i;
+// Data modules by the release validator's path vocabulary, plus the lz-string
+// codec that encodes backup archives (#2233 review).
+const highRiskDataPath=/(?:store|cloud|sync|storage|persist|backup|recovery|auth|session|firestore|account|indexeddb|migrat|lz-string)/i;
+const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&(highRiskAppFile.test(file)||highRiskDataPath.test(file));
 const hasAddedRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK\b/.test(line));
 const hasAddedProcessRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK (?:test-first gate|regression gate|test inventory|repository process)\b/.test(line));
 
 // deletedFiles lets the split itself through: against a base from before
 // #2213, the diff deletes tests.js, and those deleted lines stay protected by
 // the rationale check below. Adding or editing a root tests.js is rejected.
-export function validateTestFirst(changedFiles,addedTestLines,deletedFiles=[]){
+// bookkeepingOnly names shell files whose diff only adds changelog text and
+// refreshes the app fingerprint or CACHE_NAME. Every app change does that, so it
+// must not make a scenery fix high-risk (#2233 review).
+export function validateTestFirst(changedFiles,addedTestLines,deletedFiles=[],bookkeepingOnly=[]){
   const errors=[];
   if(changedFiles.includes(LEGACY_TEST_FILE)&&!deletedFiles.includes(LEGACY_TEST_FILE))
     errors.push('A root tests.js was added or changed, but tests now live in the per-area files under tests/ and nothing runs tests.js. Move the change into the area file of its group as the porting note in docs/agents/test-groups.md describes.');
@@ -52,7 +58,7 @@ export function validateTestFirst(changedFiles,addedTestLines,deletedFiles=[]){
     if(edited.length)errors.push(`App files changed (${edited.join(', ')}) without a tests/ file in the diff.`);
     if(enforcementEdits.length)errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without tests/ process coverage in the diff.`);
   }
-  const highRisk=[...edited.filter(isHighRiskAppFile),...enforcementEdits];
+  const highRisk=[...edited.filter(file=>isHighRiskAppFile(file)&&!bookkeepingOnly.includes(file)),...enforcementEdits];
   if(highRisk.length&&!hasAddedRiskTest(addedTestLines))
     errors.push(`A high-risk app or enforcement file changed (${highRisk.join(', ')}) without a new RISK test in the test files.`);
   if(enforcementEdits.length&&!hasAddedProcessRiskTest(addedTestLines))
@@ -124,9 +130,16 @@ export function validateRegressionChanges(lines,records){
   if(!weakensExistingTests(lines))return [];
   const weakened=weakenedTestLines(lines);
   // Records written before #2233 keep matching the exact whole-diff fingerprint.
-  const record=Array.isArray(records)&&(records.find(entry=>coversWeakening(entry,weakened))||
-    records.find(entry=>entry?.testChangesSha256===protectedTestFingerprint(lines)));
-  if(!record)return ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'];
+  // Any covering record that fully validates approves the diff: the ledger is
+  // append-only, so an older record listing the same generic line must not
+  // shadow this diff's own record (#2233 review).
+  const candidates=Array.isArray(records)?[...records.filter(entry=>coversWeakening(entry,weakened)),
+    ...records.filter(entry=>entry?.testChangesSha256===protectedTestFingerprint(lines))]:[];
+  if(!candidates.length)return ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'];
+  const results=candidates.map(entry=>recordErrors(entry,lines));
+  return results.find(errors=>!errors.length)||results[0];
+}
+function recordErrors(record,lines){
   const errors=[],substantive=value=>typeof value==='string'&&value.trim().length>=20;
   for(const field of ['reason','previousBehavior','intendedBehavior'])
     if(!substantive(record[field]))errors.push(`Regression rationale needs a specific ${field}.`);
@@ -139,6 +152,30 @@ export function validateRegressionChanges(lines,records){
     typeof name==='string'&&name.length>10&&(added.includes("test('"+name+"'")||added.includes('test("'+name+'"'))))
     errors.push('Regression rationale must name replacement tests added or updated in this diff.');
   return errors;
+}
+
+// True when every changed line of the file lies inside the changelog block or is
+// the worker CACHE_NAME line. A moved changelog marker or an unreadable side
+// counts as real change (fail closed).
+function onlyReleaseBookkeeping(base,file){
+  const show=ref=>{try{return execFileSync('git',['show',`${ref}:${file}`],{encoding:'utf8',maxBuffer:64*1024*1024});}catch{return null;}};
+  const sides={'-':show(base),'+':show('HEAD')};
+  if(sides['-']===null||sides['+']===null)return false;
+  const changelog=text=>{const inside=new Set();let open=false;text.split(/\r?\n/).forEach((line,index)=>{
+    if(line.includes('<!-- changelog:start -->'))open=true;if(open)inside.add(index+1);if(line.includes('<!-- changelog:end -->'))open=false;});return inside;};
+  const blocks={'-':changelog(sides['-']),'+':changelog(sides['+'])};
+  const patch=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--',file],{encoding:'utf8',maxBuffer:64*1024*1024});
+  let oldLine=0,newLine=0,inHunk=false;
+  for(const line of patch.split('\n')){
+    const hunk=line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if(hunk){inHunk=true;oldLine=Number(hunk[1]);newLine=Number(hunk[2]);continue;}
+    const side=line[0];if(!inHunk||(side!=='+'&&side!=='-'))continue;
+    const number=side==='+'?newLine++:oldLine++,text=line.slice(1);
+    if(/<!-- changelog:(?:start|end) -->/.test(text))return false;
+    if(/^\s*const\s+CACHE_NAME\s*=\s*["']chain-scanner-shell-[a-f0-9]+["'];?\s*$/.test(text))continue;
+    if(!blocks[side].has(number))return false;
+  }
+  return true;
 }
 
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
@@ -156,7 +193,8 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
       // split still has it: deleting its tests must need a record like any other.
       const testDiff=execFileSync('git',['diff','--unified=0',`${base}...HEAD`,'--',LEGACY_TEST_FILE,'tests'],{encoding:'utf8',maxBuffer:256*1024*1024}).split('\n');
       const records=fs.existsSync('TEST_CHANGE_RATIONALES.json')?JSON.parse(fs.readFileSync('TEST_CHANGE_RATIONALES.json','utf8')):[];
-      const errors=[...validateTestFirst(changed,testDiff,deleted),...validateRegressionChanges(testDiff,records)];
+      const bookkeeping=changed.filter(file=>/(?:^|\/)(?:[^/]+\.html?|sw\.js)$/i.test(file)&&!deleted.includes(file)&&onlyReleaseBookkeeping(base,file));
+      const errors=[...validateTestFirst(changed,testDiff,deleted,bookkeeping),...validateRegressionChanges(testDiff,records)];
       if(errors.length){process.stderr.write(errors.join('\n')+'\n');process.exitCode=1;}
       else process.stdout.write('Test-first diff gate passed.\n');
     }catch(error){process.stderr.write(`Could not compare ${base} to HEAD: ${error.message}\n`);process.exitCode=2;}

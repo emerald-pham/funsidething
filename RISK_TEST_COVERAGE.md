@@ -1506,6 +1506,8 @@ its RISK test; the map follows.
 - RISK regression gate: a rationale is required only for removed or weakened tests
 - RISK regression gate: a rationale record bound to its weakened lines survives later test edits and merges
 - RISK test-first gate: a new RISK test is required only where saved data, the offline shell or enforcement can break
+- RISK test-first gate: a scenery change with refreshed fingerprints needs only a direct test, end to end
+- RISK regression gate: any covering record that validates approves the diff, and suppressors must be listed
 - RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files
 - RISK test-first gate: an app change paired with an edit to any split test file is accepted
 - RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected

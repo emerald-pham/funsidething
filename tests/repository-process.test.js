@@ -143,9 +143,49 @@ test('RISK test-first gate: a new RISK test is required only where saved data, t
  const ordinary=['+test("scan: ordinary direct test",()=>{})'];
  for(const file of ['landscape.js','landscape-mood.js','location.js','stars.js'])
   assert.deepEqual(validateTestFirst([file,'tests/scenery.test.js'],ordinary),[],`${file}: scenery and location code needs a direct test, not a new RISK test`);
- for(const file of ['index.html','sw.js','manifest.webmanifest','device-store-v2.js','cloud-store-v2.js','app-release.js','firestore.rules'])
+ for(const file of ['index.html','sw.js','manifest.webmanifest','device-store-v2.js','cloud-store-v2.js','app-release.js','firestore.rules','vendor/lz-string-1.5.0.min.js','sync-queue.js','auth-session.js','backup-archive.js'])
   assert.match(validateTestFirst([file,'tests/core.test.js'],ordinary).join(' '),/RISK/,`${file}: persistence, offline-shell and rules changes still need a new RISK test`);
  assert.match(validateTestFirst(['location.js'],[]).join(' '),/without a tests\/ file/,'every app change still needs a test');
+});
+
+test('RISK test-first gate: a scenery change with refreshed fingerprints needs only a direct test, end to end',()=>{
+ const repo=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'gate-2233-'));
+ try{
+  const git=(...args)=>spawnSync('git',['-C',repo,...args],{encoding:'utf8'});
+  git('init','-q','-b','main');git('config','user.email','t@example.com');git('config','user.name','t');
+  const page=(fingerprint,entry,extra='')=>`<!doctype html>\n<body>\n${extra}<!-- changelog:start -->\n<template id="appChangelogCurrent"><div data-app-fingerprint="${fingerprint}"><ul>${entry}</ul></div></template>\n<!-- changelog:end -->\n</body>\n`;
+  const worker=key=>`const CACHE_NAME = "chain-scanner-shell-${key}";\nself.addEventListener("install", () => {});\n`;
+  const write=files=>{for(const [name,text] of Object.entries(files)){fs.mkdirSync(path.dirname(path.join(repo,name)),{recursive:true});fs.writeFileSync(path.join(repo,name),text);}};
+  write({'index.html':page('a'.repeat(64),'<li>Old.</li>'),'sw.js':worker('1'.repeat(64)),'landscape.js':'const hue = 30;\n','tests/scenery.test.js':"test('sky: hue',()=>{});\n"});
+  git('add','-A');git('commit','-qm','base');const base=git('rev-parse','HEAD').stdout.trim();
+  const gate=()=>spawnSync(process.execPath,[path.join(__dirname,'scripts','test-first-gate.mjs'),base],{cwd:repo,encoding:'utf8'});
+  // The scenery fix, its direct test, a changelog entry and both refreshed fingerprints.
+  write({'landscape.js':'const hue = 32;\n','tests/scenery.test.js':"test('sky: hue',()=>{});\ntest('sky: dawn hue is 32',()=>{});\n",
+   'index.html':page('b'.repeat(64),'<li>Warmer dawn.</li><li>Old.</li>'),'sw.js':worker('2'.repeat(64))});
+  git('add','-A');git('commit','-qm','scenery');
+  const scenery=gate();
+  assert.equal(scenery.status,0,'changelog and fingerprint bookkeeping does not make a scenery fix high-risk: '+scenery.stderr);
+  // Real page code still needs a new RISK test.
+  write({'index.html':page('c'.repeat(64),'<li>Warmer dawn.</li><li>Old.</li>','<script>\nlocalStorage.clear();\n</script>\n')});
+  git('add','-A');git('commit','-qm','page code');
+  const pageCode=gate();
+  assert.equal(pageCode.status,1,'a page code change still needs a new RISK test');
+  assert.match(pageCode.stderr,/RISK/);
+ }finally{fs.rmSync(repo,{recursive:true,force:true});}
+});
+
+test('RISK regression gate: any covering record that validates approves the diff, and suppressors must be listed',async()=>{
+ const {validateRegressionChanges}=await import('../scripts/test-first-gate.mjs');
+ const file=['--- a/tests/core.test.js','+++ b/tests/core.test.js'];
+ const diff=[...file,'@@ -12 +12 @@','- assert.ok(result);','+ assert.ok(result!==undefined);','@@ -40,0 +41 @@',"+test('scan: result shape stays defined',()=>{});"];
+ const full={weakenedTestLines:['tests/core.test.js:-assert.ok(result);'],reason:'Result may now be a falsy empty array for an empty board.',previousBehavior:'Result was always a non-empty array.',
+  intendedBehavior:'Result is defined, and may be empty for an empty board.',replacementTests:['scan: result shape stays defined'],preservedCoverage:['Ranking of non-empty boards is still asserted.'],
+  redEvidence:{command:"node --test --test-name-pattern='result shape' tests/core.test.js",failure:'AssertionError: empty board returned [] and failed assert.ok.'}};
+ const older={...full,replacementTests:['an older replacement test from a merged PR']};
+ assert.deepEqual(validateRegressionChanges(diff,[older,full]),[],'an older record listing the same generic line does not shadow this diff\'s complete record');
+ const suppressed=[...file,'@@ -12,0 +13 @@','+ return;','@@ -40,0 +41 @@',"+test('scan: result shape stays defined',()=>{});"];
+ assert.match(validateRegressionChanges(suppressed,[full]).join(' '),/rationale/i,'an inserted return must itself be listed');
+ assert.deepEqual(validateRegressionChanges(suppressed,[{...full,weakenedTestLines:['tests/core.test.js:+return;']}]),[],'a record listing the inserted return approves it');
 });
 
 test('RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files',async()=>{
