@@ -2343,6 +2343,7 @@ The signed-in large-board fixture opens on a served build with the cloud faked i
 ## Large board recovery wait
 
 - RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit
+- RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation
 - RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately
 - RISK recovery wait: a changed unreadable generation is evaluated afresh and a readable one ends the wait

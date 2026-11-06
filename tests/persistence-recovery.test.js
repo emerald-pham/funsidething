@@ -1571,6 +1571,200 @@ test('RISK large board recovery wait browser: an over-budget automatic recovery 
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 
+// #2228 review: an actual visual test for the "☁ recovery waiting" cloud
+// button and the Settings waiting notice, measured beside their established
+// neighbours in the same places: the "☁ older copy in use" button in the same
+// header, and the Settings pending notice ("Cloud recovery is pending" with an
+// older complete copy in use) at the top of the same Settings pane. A small
+// signed-in board opens with the cloud faked in the page: an unreadable
+// current generation over an intact earlier one. For the waiting state the
+// test page lowers the work budget, so the automatic recovery default waits;
+// for the neighbour it runs, and its cloud confirmation is refused so the
+// older copy stays in use. Day and night themes, the phone, the phone at the
+// enlarged 260 px width and desktop, ordinary and 150% Settings text, native
+// keyboard focus, and Chromium and WebKit. Screenshots go to
+// RECOVERY_WAIT_VISUAL_DIR when it is set; the assertions do not need them.
+test('RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const output=process.env.RECOVERY_WAIT_VISUAL_DIR?path.resolve(process.env.RECOVERY_WAIT_VISUAL_DIR):null;
+ if(output)fs.mkdirSync(output,{recursive:true});
+ const ACCOUNT='owner@example.test',ROWS=18,EARLIER_TITLE='Saved only in the earlier cloud copy';
+ // A signed-in board as the app saves it: a raw older-format seed is not a
+ // supported recovery source until the app has opened and saved it once.
+ const boards=new Map();
+ for(const theme of ['light','dark']){
+  const seed=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,syncAccount:ACCOUNT,
+   settings:{...syncState().settings,theme},tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('visual-wait-'+i,'Visual recovery task '+i),ctx:['home']}))}));
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:seed}});
+  try{boards.set(theme,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
+ }
+ const boardFor=theme=>boards.get(theme);
+ const earlierTask={...syncTask('visual-earlier-only',EARLIER_TITLE),ctx:['home']};
+ const viewports=[['phone',390,844],['phone-enlarged',260,563],['desktop',1280,800]];
+ const ENLARGED_SETTINGS='#modalRoot .modal{font-size:150%} #modalRoot .modal :is(p,button,label,summary,select,input){font-size:1em}';
+ const failures=[],observed=[],artifacts=[],neighbourOverflow=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  // WebKit on macOS moves keyboard focus between buttons with Alt+Tab.
+  const forward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',backward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
+  try{
+   for(const theme of ['light','dark'])for(const [viewName,width,height] of viewports){
+    const states={};
+    for(const scenario of ['waiting','older']){
+     const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});
+     try{
+      await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+       return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+      await context.addInitScript(({board,scenario,ACCOUNT,earlierTask})=>{
+       Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+       localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+       if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+       // The test page's own budget override: any recovery is over it.
+       if(scenario==='waiting')window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1;
+       const log=window.__visualWait={log:[]};
+       const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
+       let earlier=null;
+       const encodeEarlier=async()=>{
+        if(earlier)return earlier;
+        const accepted=JSON.parse(JSON.stringify(state));
+        return earlier=await window.ChainStorageV2.encodeSnapshot(JSON.stringify({...accepted,tasks:[...accepted.tasks,earlierTask]}));
+       };
+       const header=(encoded,hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash,baseRev});
+       const cloud={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+        signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+        async pull(){
+         log.log.push('pull');
+         Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+         window.dispatchEvent(new CustomEvent('cloudsync'));
+         return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+        },
+        async push(){log.log.push('push');return {error:true,code:'permission-denied'};},
+        async recoveryEvidence(){return {identity:'fixture-identity',epoch:1,pending:null};},
+        async readRecoverySourceHeaders(){
+         const encoded=await encodeEarlier();
+         return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+          {id:root.activeGeneration,header:header(encoded,'e'.repeat(64),6)},{id:root.previousGeneration,header:header(encoded,encoded.hash,5)}]};
+        },
+        async readRecoverySource(){
+         log.log.push('source-read');const encoded=await encodeEarlier();
+         return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+          {id:root.activeGeneration,header:header(encoded,'e'.repeat(64),6),chunks:[]},
+          {id:root.previousGeneration,header:header(encoded,encoded.hash,5),chunks:encoded.chunks}]};
+        },
+        // The neighbour's cloud confirmation is refused, so the older copy stays in use.
+        async protectRecoverySources(){log.log.push('protect');return {error:true,code:'permission-denied'};},
+       };
+       Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+       document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+      },{board:boardFor(theme),scenario,ACCOUNT,earlierTask});
+      const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+      const label=scenario==='waiting'?'☁ recovery waiting':'☁ older copy in use';
+      const settled=await page.waitForFunction(label=>document.getElementById('syncBtn')?.textContent===label&&!pulling&&!cloudSourceRecoveryBusy,label,{timeout:60000}).then(()=>true,()=>false);
+      const where=`${engineName}/${theme}/${viewName}/${scenario}`;
+      if(!settled){failures.push(`${where}: the cloud button never said ${label}: `+await page.evaluate(()=>document.getElementById('syncBtn')?.textContent));continue;}
+      await page.evaluate(()=>document.fonts.ready);
+      await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),null,{timeout:15000}).catch(()=>{});
+      const paint=await page.evaluate(()=>{
+       const root=document.documentElement,button=document.getElementById('syncBtn'),style=getComputedStyle(button),rect=button.getBoundingClientRect();
+       const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+       return {theme:root.getAttribute('data-theme'),scheme:getComputedStyle(root).colorScheme,background:getComputedStyle(document.body).backgroundColor,
+        text:button.textContent,className:button.className,fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,
+        borderColor:style.borderTopColor,backgroundColor:style.backgroundColor,height:Math.round(rect.height),width:Math.round(rect.width),
+        clipped:button.scrollWidth>button.clientWidth+1,inside:rect.left>=0&&rect.right<=innerWidth+0.5&&rect.top>=0,unobscured:hit===button||button.contains(hit),
+        earlierApplied:state.tasks.some(task=>task.id==='visual-earlier-only')};
+      });
+      // Native keyboard focus on the cloud button: forward to its neighbour, then back.
+      await page.locator('#syncBtn').focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+      paint.focus=await page.evaluate(()=>{const button=document.getElementById('syncBtn'),style=getComputedStyle(button);
+       return {active:document.activeElement===button,visible:button.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor};});
+      if(output){const file=path.join(output,`${engineName}-${theme}-${viewName}-${scenario}-header.png`);
+       await page.screenshot({path:file,clip:{x:0,y:0,width,height:Math.min(height,180)}});artifacts.push(file);}
+      // The Settings notice at the top of the Settings pane, ordinary and enlarged.
+      await page.locator('#appHeader [data-act="settings"]').click();await page.waitForSelector('#modalRoot .modal');
+      const heading=scenario==='waiting'?'Cloud recovery is waiting.':'Cloud recovery is pending.';
+      paint.notice={};
+      for(const scale of [1,1.5]){
+       const enlarged=scale>1?await page.addStyleTag({content:ENLARGED_SETTINGS}):null;
+       const notice=page.locator('#modalRoot [role="status"]').filter({hasText:heading}).first();
+       await notice.scrollIntoViewIfNeeded();
+       paint.notice[scale]=await notice.evaluate(element=>{
+        const modal=element.closest('.modal'),style=getComputedStyle(element),bold=getComputedStyle(element.querySelector('b')),rect=element.getBoundingClientRect(),pane=modal.getBoundingClientRect();
+        const paneStyle=getComputedStyle(modal),review=element.nextElementSibling?.querySelector('[data-act="review-cloud-source-recovery"]'),reviewStyle=review&&getComputedStyle(review);
+        // Anything in the pane wider than the pane, named so a failure says what.
+        const wide=[element,modal,...modal.querySelectorAll('*')].filter(node=>node.getBoundingClientRect().right>pane.right+1||
+         node.scrollWidth>node.clientWidth+1&&getComputedStyle(node).overflowX!=='visible').slice(0,4)
+         .map(node=>node.tagName+(node.dataset?.act?'['+node.dataset.act+']':'')+' '+node.scrollWidth+'/'+node.clientWidth);
+        return {text:element.textContent,fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight,color:style.color,boldColor:bold.color,
+         left:Math.round(rect.left-pane.left-parseFloat(paneStyle.paddingLeft)),right:Math.round(pane.right-parseFloat(paneStyle.paddingRight)-rect.right),
+         overflow:element.scrollWidth>element.clientWidth+1||modal.scrollWidth>modal.clientWidth+1,wide,height:Math.round(rect.height),
+         review:review?{fontFamily:reviewStyle.fontFamily,fontSize:reviewStyle.fontSize,color:reviewStyle.color,height:Math.round(review.getBoundingClientRect().height)}:null};
+       });
+       if(output){const file=path.join(output,`${engineName}-${theme}-${viewName}-${scenario}-settings-${scale}.png`);await page.screenshot({path:file});artifacts.push(file);}
+       if(enlarged)await enlarged.evaluate(element=>element.remove());
+      }
+      // Native keyboard focus on the notice's Review cloud recovery.
+      const review=page.locator('#modalRoot [role="status"]').filter({hasText:heading}).first().locator('xpath=following-sibling::div[1]//button[@data-act="review-cloud-source-recovery"]');
+      await review.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+      paint.reviewFocus=await review.evaluate(button=>{const style=getComputedStyle(button);
+       return {active:document.activeElement===button,visible:button.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor};});
+      paint.errors=errors;paint.log=await page.evaluate(()=>__visualWait.log.slice());
+      states[scenario]=paint;
+     }finally{await context.close();}
+    }
+    const {waiting,older}=states,where=`${engineName}/${theme}/${viewName}`;
+    if(!waiting||!older)continue;
+    observed.push({engine:engineName,theme,view:viewName,waiting,older});
+    for(const [name,state] of Object.entries(states)){
+     // The applied theme: attribute, computed color scheme and paint.
+     if(state.theme!==theme)failures.push(`${where}/${name}: data-theme is ${state.theme}`);
+     if(!String(state.scheme).split(/\s+/).includes(theme))failures.push(`${where}/${name}: computed color-scheme is ${state.scheme}`);
+     if(state.className!=='syncbtn busy')failures.push(`${where}/${name}: cloud button class ${state.className}`);
+     if(state.clipped||!state.inside||!state.unobscured)failures.push(`${where}/${name}: the cloud button is clipped, outside the viewport or covered ${JSON.stringify(state)}`);
+     for(const [control,focus] of [['cloud button',state.focus],['Review cloud recovery',state.reviewFocus]])
+      if(!focus.active||!focus.visible||focus.outlineStyle==='none'||parseFloat(focus.outlineWidth)<2)failures.push(`${where}/${name}: ${control} keyboard focus is not shown ${JSON.stringify(focus)}`);
+     for(const scale of [1,1.5]){
+      const notice=state.notice[scale];
+      if(!notice||notice.left<0||notice.right<0)failures.push(`${where}/${name}/${scale}: the Settings notice leaves its pane insets ${JSON.stringify(notice)}`);
+      // The changed notice must fit its pane; the established neighbour's
+      // fit is reported with the evidence, not asserted here.
+      if(notice?.overflow)(name==='waiting'?failures:neighbourOverflow).push(`${where}/${name}/${scale}: the Settings pane scrolls sideways ${JSON.stringify(notice.wide)}`);
+      if(!notice?.review)failures.push(`${where}/${name}/${scale}: the notice has no Review cloud recovery`);
+     }
+     if(!(parseFloat(state.notice[1.5].fontSize)>parseFloat(state.notice[1].fontSize)))failures.push(`${where}/${name}: enlarged Settings text is not larger`);
+     if(state.errors.length)failures.push(`${where}/${name}: page errors ${JSON.stringify(state.errors)}`);
+    }
+    if(waiting.text!=='☁ recovery waiting'||older.text!=='☁ older copy in use')failures.push(`${where}: labels ${waiting.text} / ${older.text}`);
+    if(waiting.earlierApplied||!older.earlierApplied)failures.push(`${where}: the waiting board applied the earlier copy, or the neighbour did not`);
+    if(waiting.log.includes('source-read')||waiting.log.includes('protect'))failures.push(`${where}: the waiting state read or protected recovery sources ${JSON.stringify(waiting.log)}`);
+    // The waiting button and notice render like their neighbours.
+    for(const key of ['fontFamily','fontSize','fontWeight','color','borderColor','backgroundColor','height'])
+     if(waiting[key]!==older[key])failures.push(`${where}: the cloud button ${key} differs: ${waiting[key]} / ${older[key]}`);
+    for(const key of ['outlineStyle','outlineWidth','outlineColor'])
+     if(waiting.focus[key]!==older.focus[key])failures.push(`${where}: the cloud button focus ${key} differs: ${waiting.focus[key]} / ${older.focus[key]}`);
+    for(const scale of [1,1.5])for(const key of ['fontFamily','fontSize','lineHeight','color','boldColor','left','right']){
+     if(waiting.notice[scale][key]!==older.notice[scale][key])failures.push(`${where}/${scale}: the Settings notice ${key} differs: ${waiting.notice[scale][key]} / ${older.notice[scale][key]}`);
+    }
+    for(const scale of [1,1.5])for(const key of ['fontFamily','fontSize','color','height'])
+     if(waiting.notice[scale].review?.[key]!==older.notice[scale].review?.[key])failures.push(`${where}/${scale}: Review cloud recovery ${key} differs`);
+   }
+   // Day and night paint the changed controls differently on each engine.
+   for(const [viewName] of viewports){
+    const pick=theme=>observed.find(row=>row.engine===engineName&&row.theme===theme&&row.view===viewName)?.waiting;
+    const day=pick('light'),night=pick('dark');
+    if(day&&night&&(day.backgroundColor===night.backgroundColor||day.notice[1].color===night.notice[1].color))
+     failures.push(`${engineName}/${viewName}: day and night paint the waiting button or notice alike ${JSON.stringify([day.backgroundColor,night.backgroundColor,day.notice[1].color,night.notice[1].color])}`);
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify({artifacts:artifacts.length?artifacts:'set RECOVERY_WAIT_VISUAL_DIR to save screenshots',neighbourOverflow,observed:observed.map(row=>({engine:row.engine,theme:row.theme,view:row.view,
+  button:[row.waiting.width,row.older.width,row.waiting.height],notice:[row.waiting.notice[1].fontSize,row.waiting.notice[1.5].fontSize,row.waiting.notice[1].height,row.older.notice[1].height],
+  scheme:row.waiting.scheme,buttonPaint:row.waiting.backgroundColor,noticeColor:row.waiting.notice[1].color,focus:row.waiting.focus,reviewFocus:row.waiting.reviewFocus}))}));
+ assert.ok(observed.length===12,'every engine, theme and view was measured: '+observed.length);
+ assert.deepEqual(failures,[],JSON.stringify(failures));
+});
+
 test('RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='broken-board-hydration-'+Date.now()+'-'+Math.random(),broken='{broken saved device board',
   board=syncState({tasks:[syncTask('recovered-phone-board','Saved iPhone board')],futureSaved:{keep:['exact',31]}}),raw=JSON.stringify(board),
