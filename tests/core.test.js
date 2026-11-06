@@ -287,6 +287,16 @@ test('RISK large board opening guidance: mounted FAQ and changelog explain that 
  assert.match(markup,/<li>A large saved board opens from this device with less memory/,'the mounted changelog includes the released behavior');
 });
 
+// #2227 (spec #2224): recovering a large board onto an older complete cloud copy.
+test('RISK large board recovery guidance: mounted FAQ and changelog explain that recovering a large board onto an older complete cloud copy finishes in seconds with less memory and keeps every saved source',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<dt>Why could cloud recovery of a large board close the app\?<\/dt><dd>/);
+ assert.match(markup,/compares each saved copy once/);
+ assert.match(markup,/<li>Cloud recovery of a large board onto an older complete copy finishes in seconds with less memory/,'the mounted changelog includes the released behavior');
+});
+
 test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
  const app=await loadApp();app.ctx.openHelp();
  const markup=app.shim.document.getElementById('modalRoot').innerHTML;

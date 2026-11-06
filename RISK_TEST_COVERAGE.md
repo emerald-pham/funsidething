@@ -2334,5 +2334,6 @@ The generated large-board fixture (447 tasks, long rating histories, 368 decisio
 ## Large board recovery memory
 
 - RISK large board recovery browser: the automatic recovery default reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
+- RISK large board recovery guidance: mounted FAQ and changelog explain that recovering a large board onto an older complete cloud copy finishes in seconds with less memory and keeps every saved source
 
 The signed-in large-board fixture opens on a served build with the cloud faked in the page: an unreadable current generation over an intact earlier generation of similar size, with a newer Add, a newer scan decision and an unfinished draft on the device. The automatic recovery default must reach the older complete copy, keep every accepted decision, task, History entry, disposition and the draft, refuse publication and say the older copy is in use, while peak web-process memory stays within 384 times the board's serialized size of opening the same board locally in the same run on the same engine (#2227, spec #2224). The existing Node "RISK cloud generation recovery" and "RISK corrupt cloud work budget" tests keep the lossless rules.

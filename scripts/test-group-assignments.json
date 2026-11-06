@@ -12751,6 +12751,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK large board recovery guidance: mounted FAQ and changelog explain that recovering a large board onto an older complete cloud copy finishes in seconds with less memory and keeps every saved source",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
