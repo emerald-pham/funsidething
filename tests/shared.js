@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { createServer } from "node:http";
 
 // Shared fixtures and helpers for the per-area test files. They moved here
@@ -2838,6 +2839,124 @@ function cloudV2Adapter(){
  return api;
 }
 
+// #2225 (spec #2224): a board shaped like the owner's large board, generated
+// with no real data. The measured board had 447 tasks, rating histories
+// averaging about 2.4 KB per task and reaching about 58 KB, 368 decision events
+// averaging about 0.75 KB and reaching about 78 KB, about 2.4 MB serialized.
+// The fixture is at least that large on every measure. Its baseline, pass and
+// event shapes come from the real app's own scan actions, so the app accepts
+// its decision evidence as coherent and opens it on the ordinary path instead
+// of a recovery one; the bulk is then filled to size from those real shapes.
+// #2227 and #2228 reuse largeBoardFixture() for the recovery memory tests.
+const LARGE_BOARD_SHAPE=Object.freeze({tasks:447,decisionEvents:368,historyMeanBytes:2400,historyMaxBytes:58000,
+ eventMeanBytes:750,eventMaxBytes:78000,serializedBytes:2400000});
+let largeBoardFixturePromise=null;
+function largeBoardFixture(){return largeBoardFixturePromise||=buildLargeBoardFixture();}
+// #2227: the same board with every decision made while signed in to account,
+// as on the owner's phone. Decisions record their account and the baseline's
+// identity derives from it, so it is built signed in rather than relabelled.
+const largeSignedInBoardFixtures=new Map();
+function largeSignedInBoardFixture(account){
+ if(!largeSignedInBoardFixtures.has(account))largeSignedInBoardFixtures.set(account,buildLargeBoardFixture({account}));
+ return largeSignedInBoardFixtures.get(account);
+}
+async function buildLargeBoardFixture({account:signedInAccount=null}={}){
+ const shape=LARGE_BOARD_SHAPE,start=Date.parse('2026-06-01T12:00:00Z'),rand=mulberry32(2225);
+ const ids=Array.from({length:shape.tasks},(_,i)=>'large-board-task-'+String(i).padStart(3,'0'));
+ const seeded=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:ids.map((id,i)=>({...syncTask(id,'Large board task '+i),ctx:['home'],createdAt:start-(shape.tasks-i)*3600000}))});
+ // #2227: largeSignedInBoardFixture passes {account}; the scan below then
+ // records every decision for that account, exactly as a signed-in app does.
+ if(signedInAccount!==null)seeded.syncAccount=signedInAccount;
+ const app=await loadApp({seed:2225,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}});
+ try{
+  const {ctx}=app;let now=start;const at=()=>{now+=60000;setFakeTime(ctx,now);return now;};setFakeTime(ctx,now);
+  const control=()=>({dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});
+  // Real scan decisions across two passes: a scan mode per pass carrying a
+  // weight for every task (the large events), comparisons, ratings applied
+  // to the ratings, and a worked disposition.
+  ctx.onAction('start-scan',{});
+  for(const answer of ['no','yes','no','no','yes','no']){at();assert.ok(ctx.state.candidateId,'large-board fixture: the pass offers a candidate');ctx.onAction(answer,control());}
+  at();ctx.onAction('worked',{dataset:{benchmark:ctx.state.chain.at(-1)}});
+  at();ctx.onAction('start-scan',{});
+  for(const answer of ['no','no']){at();assert.ok(ctx.state.candidateId,'large-board fixture: the restarted pass offers a candidate');ctx.onAction(answer,control());}
+  const board=JSON.parse(JSON.stringify(ctx.state));
+  // More benchmark-preferred decisions in the current pass, each a distinct
+  // action observing the one before, cloned from the last real No, about a
+  // task not yet considered. They are recorded without a rating update and
+  // each marks its candidate considered, so the saved board stays exactly
+  // what its decisions imply when the app replays them.
+  const template=board.decisionEvents.findLast(event=>event.kind==='no');
+  assert.ok(template,'large-board fixture: a real No decision exists');
+  const offered=ids.filter(id=>!board.chain.includes(id)&&!Object.hasOwn(board.considered,id)&&id!==board.candidateId);
+  assert.ok(offered.length>=shape.decisionEvents-board.decisionEvents.length,'large-board fixture: enough unconsidered tasks');
+  for(let n=0;board.decisionEvents.length<shape.decisionEvents;n++){
+   const previous=board.decisionEvents.at(-1).id,candidateId=offered[n];
+   board.decisionEvents.push({...JSON.parse(JSON.stringify(template)),id:'large-board-decision-'+n,actionId:'large-board-action-'+n,
+    at:at(),observedActionIds:[previous],candidateId,ratingApplied:false});
+   board.considered[candidateId]='no';
+  }
+  // Older observational rating rows: rankings moved, the rating did not.
+  // A heavy-tailed spread with one long history, as on the measured board.
+  const rowTemplate=board.tasks.flatMap(task=>task.ratingHistory||[]).find(row=>row.kind==='no');
+  assert.ok(rowTemplate,'large-board fixture: a real rating history row exists');
+  const historyBytes=task=>Buffer.byteLength(JSON.stringify(task.ratingHistory||[]),'utf8');
+  const weights=board.tasks.map(()=>-Math.log(1-rand()*0.98));
+  const restTotal=shape.historyMeanBytes*shape.tasks-shape.historyMaxBytes,weightTotal=weights.slice(1).reduce((sum,w)=>sum+w,0);
+  board.tasks.forEach((task,index)=>{
+   const target=index===0?shape.historyMaxBytes:Math.ceil(restTotal*weights[index]/weightTotal),older=[];
+   const real=task.ratingHistory||[];let k=0;
+   while(historyBytes({ratingHistory:[...older,...real]})<target){
+    const topK=1+Math.floor(rand()*shape.tasks),likelihood=Number((rand()/shape.tasks).toFixed(12));
+    const values={...rowTemplate.after,mu:25,sigma:25/3,topK,n:shape.tasks,likelihood};
+    older.push({v:1,id:`large-board-history-${index}-${k}`,at:start-(k+1)*86400000-index*1000,kind:'no',change:'relative',
+     after:values,basis:rowTemplate.basis,before:{...values,topK:Math.min(shape.tasks,topK+1),likelihood:Number((likelihood*0.9).toFixed(12))}});
+    k++;
+   }
+   older.reverse();task.ratingHistory=[...older,...real];
+  });
+  // A long History brings the whole board to the measured serialized size.
+  for(let n=0;Buffer.byteLength(JSON.stringify(board),'utf8')<shape.serializedBytes;n++){
+   const batch=Array.from({length:500},(_,i)=>{const task=board.tasks[(n*500+i)%shape.tasks];
+    return {id:`large-board-work-${n*500+i}`,taskId:task.id,title:task.title,kind:'worked',at:start-(n*500+i)*600000};});
+   board.workLog.push(...batch);
+  }
+  const payload=JSON.stringify(board);
+  const issue=vm.runInContext('decisionEvidenceIssue',ctx)(JSON.parse(payload),board.syncAccount??null);
+  assert.equal(issue,null,'large-board fixture: the app accepts its decision evidence');
+  const eventSizes=board.decisionEvents.map(event=>Buffer.byteLength(JSON.stringify(event),'utf8'));
+  const histories=board.tasks.map(historyBytes);
+  const stats={tasks:board.tasks.length,serializedBytes:Buffer.byteLength(payload,'utf8'),
+   decisionEvents:{count:eventSizes.length,meanBytes:Math.round(eventSizes.reduce((a,b)=>a+b,0)/eventSizes.length),maxBytes:Math.max(...eventSizes)},
+   ratingHistory:{meanBytes:Math.round(histories.reduce((a,b)=>a+b,0)/histories.length),maxBytes:Math.max(...histories)},
+   workLog:board.workLog.length};
+  return Object.freeze({payload,ids:Object.freeze(ids.slice()),stats:Object.freeze(stats)});
+ }finally{await app.dispose();}
+}
+// Peak resident memory of the web content processes a browser launched with
+// webProcessMemoryEnv(tag) owns, read by the harness from the operating system
+// (never from page code). Chromium renderers and Linux WebKit web processes
+// inherit the tag; macOS WebKit web processes are XPC services that launchd
+// starts, which receive __XPC_-prefixed variables without the prefix.
+const WEB_PROCESS_COMMAND=/--type=renderer|WebKit\.WebContent|WebKitWebProcess/;
+function webProcessMemoryEnv(tag){return {...process.env,CHAIN_MEMORY_PROBE:tag,__XPC_CHAIN_MEMORY_PROBE:tag};}
+function webProcessMemorySampler(tag,intervalMs=40){
+ const run=args=>new Promise(resolve=>execFile('ps',args,{maxBuffer:64*1024*1024},(error,stdout)=>resolve(error?'':stdout)));
+ const owned=new Map(),peaks=new Map();let stopped=false,samples=0;
+ const sample=async()=>{
+  const rows=(await run(['-axww','-o','pid=,rss=,command='])).split('\n').map(line=>line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/)).filter(Boolean);
+  for(const [,pid,rss,command] of rows){
+   if(!WEB_PROCESS_COMMAND.test(command))continue;
+   if(!owned.has(pid))owned.set(pid,(await run(['eww','-o','command=','-p',pid])).includes('CHAIN_MEMORY_PROBE='+tag));
+   if(owned.get(pid))peaks.set(pid,Math.max(peaks.get(pid)||0,Number(rss)*1024));
+  }
+  samples++;
+ };
+ const loop=(async()=>{while(!stopped){await sample();await new Promise(resolve=>setTimeout(resolve,intervalMs));}})();
+ return {async stop(){stopped=true;await loop;await sample();
+  return {peakBytes:Math.max(0,...peaks.values()),processes:peaks.size,samples};}};
+}
+
 // #2195: the shape a real diagnostics export captured (spec #2194), rebuilt from
 // isolated synthetic data only. Recovery (#2198) and read-cost (#2201) tickets
 // reuse capturedUnreadableGenerationFixture() instead of inventing a failure.
@@ -2915,6 +3034,9 @@ async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_R
  // The runner retains finished hooks and, through them, each app realm. Its
  // in-memory database keeps every transaction's multi-megabyte rollback log,
  // so release the sources themselves or the full suite exhausts its heap.
+ // #2227: a debounced save from the test's last edit can still be writing
+ // when the test ends (recovery now finishes sooner); let it settle first.
+ t.after(async()=>{for(let i=0;i<500;i++){let active=0;try{active=vm.runInContext('supportDiagnosticsActivePersistCalls+(saveTimer?1:0)',ctx);}catch{}if(!active)break;await new Promise(resolve=>setTimeout(resolve,10));}});
  t.after(async()=>{try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
   backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
   await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
@@ -3743,6 +3865,8 @@ export {
   recoveringCloudStatusHarness, recentDeletionAt, deletionEvidence, repeatedDeletionBoard,
   loadStorageV2, loadCloudV2, cloudV2Payload, cloudV2Adapter, CAPTURED_UNREADABLE_GENERATION,
   syntheticBoardOfBytes, capturedUnreadableGenerationFixture, CAPTURED_RECOVERY_BUDGET_MS,
+  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
+  largeSignedInBoardFixture,
   CAPTURED_RESULT_BUDGET_MS, largeSerializedBytes2198, CAPTURED_PHONE_SERIALIZATION_BYTES,
   exactPaddedBoard, capturedGenerationAcceptedApp2198, RECORDED_HEALTHY_STATUS_8CD524A,
   RECORDED_HEALTHY_READS_8CD524A, faithfulModalQuery2194, declineButton2194,

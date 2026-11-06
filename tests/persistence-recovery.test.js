@@ -3,6 +3,7 @@ import { createHash, webcrypto } from "node:crypto";
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
@@ -20,6 +21,8 @@ import {
   deletionEvidence, loadStorageV2, exerciseCompletionEditorBoundaries, liveScanSyncClients,
   liveDoneDeliverySnapshot, ordinaryEditDebounceControl, settleRecovery188,
   settleRecoveryOperations188, divergentCloudSourceApp187, replaceIndependentServerPayload263,
+  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
+  largeSignedInBoardFixture,
 } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
@@ -1009,6 +1012,757 @@ test('RISK cloud generation recovery browser: a real click on Use my board from 
   }finally{await browser.close();}
  }
  t.diagnostic(JSON.stringify(observed));
+});
+
+// #2225 (spec #2224): opening a large board from this device's storage, with
+// no cloud, held several full parsed copies of the board and its decisions at
+// once: about 500 MB over an empty board in WebKit for a board shaped like the
+// owner's. Each scenario seeds a fresh browser profile through the app's own
+// first open (which moves the saved board into device storage, as on a real
+// device), then measures a cold open of a fresh browser on that profile. Peak
+// web-process memory is read by the harness from the operating system and is
+// compared only with the empty board in the same run on the same engine,
+// never with an absolute byte count. The fixed margin covers showing this many
+// tasks at all: in WebKit the same 447 tasks with no history or decisions
+// opened about 75 MiB over an empty board. The per-byte cost bounds the work on
+// the saved histories and decisions; before #2225 it was about 60-65 bytes of
+// memory per serialized byte in WebKit (218-236 MiB over empty for this board).
+const LARGE_BOARD_OPEN_FIXED_MARGIN=96*1024*1024,LARGE_BOARD_OPEN_BYTES_FACTOR=32;
+async function largeBoardOpeningWithinMargin(t,motion){
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),{stats}=fixture;
+ // The fixture is at least as large as the measured board on every measure.
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.decisionEvents.count>=LARGE_BOARD_SHAPE.decisionEvents);
+ assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ assert.ok(stats.decisionEvents.meanBytes>=LARGE_BOARD_SHAPE.eventMeanBytes&&stats.decisionEvents.maxBytes>=LARGE_BOARD_SHAPE.eventMaxBytes);
+ assert.ok(stats.ratingHistory.meanBytes>=LARGE_BOARD_SHAPE.historyMeanBytes&&stats.ratingHistory.maxBytes>=LARGE_BOARD_SHAPE.historyMaxBytes);
+ const emptyBoard=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true}));
+ const allowance=LARGE_BOARD_OPEN_FIXED_MARGIN+LARGE_BOARD_OPEN_BYTES_FACTOR*stats.serializedBytes;
+ const SETTLE_MS=4000,observed=[],failures=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const open=async(scenario,payload,taskCount)=>{
+   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2225-'+engineName+'-'+motion+'-'+scenario+'-'));
+   const launch=async(tag,seed)=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:motion==='reduced'?'reduce':'no-preference',
+     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({seed,motion})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:motion,savedAt:Date.now()}));
+     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);},{seed,motion});
+    return context;
+   };
+   const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
+    &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
+   try{
+    const tag=`chain-2225-${engineName}-${motion}-${scenario}-${process.pid}-${Date.now()}`;
+    let context=await launch(tag+'-seed',payload);
+    try{
+     const page=context.pages()[0]||await context.newPage();
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+     // Fixture precondition: the board is saved in device storage before the measured open.
+     await page.waitForFunction(()=>new Promise(resolve=>{const request=indexedDB.open('chain-scanner-v2');request.onerror=()=>resolve(false);
+      request.onsuccess=()=>{const names=[...request.result.objectStoreNames];request.result.close();resolve(names.length>0);};}),null,{timeout:30000});
+     await page.waitForTimeout(1000);
+    }finally{await context.close();}
+    context=await launch(tag,null);
+    let result;
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const sampler=webProcessMemorySampler(tag);
+     let memory;
+     try{
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+      await page.waitForTimeout(SETTLE_MS);
+     }finally{memory=await sampler.stop();}
+     // Visible and editable: every saved task is listed and a new one is accepted and kept.
+     const titles=await page.$$eval('#listBody [data-row]',rows=>rows.map(row=>row.textContent));
+     await page.locator('#addInput').fill('Added after opening '+scenario);await page.locator('#addInput').press('Enter');
+     await shown(taskCount+1)(page);
+     result={memory,titles,errors};
+    }finally{await context.close();}
+    return result;
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const empty=await open('empty',emptyBoard,0),large=await open('large',fixture.payload,LARGE_BOARD_SHAPE.tasks);
+  const extra=large.memory.peakBytes-empty.memory.peakBytes,mib=bytes=>Math.round(bytes/1048576);
+  const summary={engine:engineName,motion,emptyPeakMiB:mib(empty.memory.peakBytes),largePeakMiB:mib(large.memory.peakBytes),extraMiB:mib(extra),allowanceMiB:mib(allowance),
+   processes:[empty.memory.processes,large.memory.processes],samples:[empty.memory.samples,large.memory.samples]};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  // Measurement preconditions: the harness saw this browser's own web process.
+  assert.ok(empty.memory.processes>0&&large.memory.processes>0&&empty.memory.samples>10&&large.memory.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
+  for(const [index,id] of fixture.ids.entries())assert.ok(large.titles.some(text=>new RegExp('Large board task '+index+'(?!\\d)').test(text)),`${engineName}: task ${id} is listed after opening`);
+  assert.deepEqual([empty.errors,large.errors],[[],[]],`${engineName}: no page errors`);
+  if(extra>allowance)failures.push(`${engineName}: opening the large board peaked ${mib(extra)} MiB over the empty board, above the ${mib(allowance)} MiB allowance`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+}
+test('RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'reduced'));
+// #2228 review (story 19): the same opening guarantee with normal motion,
+// where the scenery animates. Both scenarios share the motion choice, so the
+// margin over the empty board stays the same.
+test('RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'normal'));
+
+// #2226 (spec #2224): the accepted device board appears and takes input before
+// any automatic recovery default work starts, extending #2194's board before
+// scenery ordering to cloud recovery. The cloud is faked in the page, as in the
+// #2194 browser test above: signed in, the current generation reads as
+// unreadable (corrupt-generation) and known damaged, and its root names an
+// intact earlier generation. The fake answers the opening pull only when the
+// test releases it, then busy-holds the main thread briefly so a trusted tap on
+// Add and keys are certainly pending when the answer lands, as on a slow phone.
+// The recovery-source read is held open, so recovery is still running when
+// Settings, the debug log, Review cloud recovery and Restore are checked. Only
+// ordering is asserted, never elapsed time.
+test('RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ROWS=30,HOLD_MS=600,KEYS=3;
+ const board=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('recovery-opening-'+i,'Recovery opening task '+i),ctx:['home']})),listOpen:true,seenQuickStart:true}));
+ const failures=[],observed=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce'});
+   try{
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    let answerHeld=false;await context.exposeBinding('__cloudAnswerHeld',()=>{answerHeld=true;});
+    await context.addInitScript(({board,ROWS,HOLD_MS})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     // A valid saved choice, so the first-run motion prompt cannot confound the opening.
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     const opening=window.__recoveryOpening={log:[],pulls:0};
+     opening.boardShown=()=>{
+      const panel=document.getElementById('addPanel'),body=document.getElementById('addBody'),input=document.getElementById('addInput');
+      return !!(panel&&body&&input)&&document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&!panel.closest('[hidden],[inert]')&&
+       !body.hidden&&!input.disabled&&input.getClientRects().length>0&&getComputedStyle(input).visibility==='visible'&&document.querySelectorAll('#listBody [data-row]').length===ROWS;
+     };
+     for(const type of ['pointerdown','keydown'])document.addEventListener(type,event=>{if(event.isTrusted)opening.log.push({kind:'input',type,board:opening.boardShown(),target:event.target?.id||''});},true);
+     let release;const answer=new Promise(resolve=>{release=resolve;});opening.releasePull=()=>{setTimeout(release,0);};
+     const root={rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier'};
+     const cloud={configured:true,ready:true,user:'owner@example.test',status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+      signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+      async pull(){
+       const first=++opening.pulls===1;opening.log.push({kind:'pull',board:opening.boardShown()});
+       if(first){await answer;window.__cloudAnswerHeld();const until=performance.now()+HOLD_MS;while(performance.now()<until){}}
+       Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+       window.dispatchEvent(new CustomEvent('cloudsync'));
+       return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+      },
+      async push(){opening.log.push({kind:'push'});return {error:true};},
+      async recoveryEvidence(){opening.log.push({kind:'source-read',read:'evidence',board:opening.boardShown()});return {identity:'fixture-identity',epoch:1,pending:null};},
+      // Held open: automatic recovery is still running for the rest of the test.
+      readRecoverySource(){opening.log.push({kind:'source-read',read:'source',board:opening.boardShown()});return new Promise(()=>{});},
+     };
+     // The page's own backend module stays unconfigured; this signed-in fake is the cloud.
+     Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+     // Auth restoration finishing early, as a signed-in phone does on a cold open.
+     document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+    },{board,ROWS,HOLD_MS});
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>__recoveryOpening.boardShown()&&__recoveryOpening.log.some(entry=>entry.kind==='pull'),null,{timeout:20000});
+    const add=await page.locator('#addInput').boundingBox();
+    await page.evaluate(()=>__recoveryOpening.releasePull());
+    const deadline=Date.now()+10000;while(!answerHeld&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,1));
+    assert.ok(answerHeld,`${engineName}: the unreadable cloud answer arrives`);
+    // Dispatched while the answer holds the main thread, so both are pending.
+    await page.mouse.click(add.x+add.width/2,add.y+add.height/2);
+    for(let i=0;i<KEYS;i++)await page.keyboard.press('KeyQ');
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0))));
+    const first=await page.evaluate(()=>({log:__recoveryOpening.log.slice(),value:document.getElementById('addInput').value,focused:document.activeElement?.id||''}));
+    const log=first.log,firstInput=log.findIndex(entry=>entry.kind==='input'),firstKey=log.findIndex(entry=>entry.kind==='input'&&entry.type==='keydown'),
+     firstRead=log.findIndex(entry=>entry.kind==='source-read');
+    const summary={engine:engineName,firstInput,firstKey,firstRead,value:first.value,focused:first.focused,log:log.map(entry=>entry.kind+(entry.type?':'+entry.type:'')+(entry.read?':'+entry.read:''))};
+    // Fixture preconditions: the board was showing, a tap and keys were dispatched, and the keys reached Add.
+    assert.ok(firstInput>=0&&firstKey>=0,`${engineName}: trusted input was observed ${JSON.stringify(summary)}`);
+    assert.equal(first.value,'q'.repeat(KEYS),`${engineName}: every trusted key reached Add ${JSON.stringify(summary)}`);
+    // Behavior under test: ordering only.
+    if(log.some((entry,index)=>entry.kind==='source-read'&&!entry.board))failures.push(`${engineName}: a recovery-source read started before the board was showing ${JSON.stringify(summary)}`);
+    if(!log[firstInput].board)failures.push(`${engineName}: the board was not showing when the first trusted input was handled ${JSON.stringify(summary)}`);
+    if(firstRead>=0&&firstRead<firstKey)failures.push(`${engineName}: a recovery-source read started before a trusted key reached Add ${JSON.stringify(summary)}`);
+    // Recovery still runs once the person leaves Add; it is never skipped.
+    await page.locator('#addInput').blur();
+    await page.waitForFunction(()=>__recoveryOpening.log.some(entry=>entry.kind==='source-read'),null,{timeout:15000});
+    // Reachable while the recovery-source read is still held open.
+    await page.locator('#appHeader [data-act="settings"]').click();
+    for(const act of ['view-support-diagnostics','restore-backup']){
+     const section=page.locator('#modalRoot details.settings-section:has([data-act="'+act+'"])');
+     if(await section.count()&&!await section.evaluate(el=>el.open))await section.locator(':scope > summary').click();
+    }
+    const settings=await page.evaluate(()=>{const read=act=>{const el=document.querySelector('#modalRoot [data-act="'+act+'"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;};
+     return {debugLog:read('view-support-diagnostics'),restore:read('restore-backup')};});
+    summary.settings=settings;
+    if(!settings.debugLog?.visible||settings.debugLog.disabled)failures.push(`${engineName}: Settings does not offer the debug log while recovery runs ${JSON.stringify(settings)}`);
+    if(!settings.restore?.visible||settings.restore.disabled)failures.push(`${engineName}: Settings does not offer Restore while recovery runs ${JSON.stringify(settings)}`);
+    if(settings.debugLog?.visible&&!settings.debugLog.disabled){
+     await page.locator('#modalRoot [data-act="view-support-diagnostics"]').click();
+     summary.debugLogOpened=await page.waitForFunction(()=>/debug log/i.test(document.querySelector('#modalRoot')?.textContent||'')&&!!document.querySelector('#modalRoot pre,#modalRoot textarea'),null,{timeout:5000}).then(()=>true,()=>false);
+     if(!summary.debugLogOpened)failures.push(`${engineName}: the debug log did not open while recovery runs`);
+    }
+    await page.keyboard.press('Escape');await page.evaluate(()=>closeModal());
+    await page.locator('#syncBtn').click();
+    const review=await page.evaluate(()=>{const el=document.querySelector('#modalRoot [data-act="review-cloud-source-recovery"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;});
+    summary.review=review;
+    if(!review?.visible||review.disabled)failures.push(`${engineName}: the cloud button does not offer Review cloud recovery while recovery runs ${JSON.stringify(review)}`);
+    summary.stillHeld=await page.evaluate(()=>__recoveryOpening.log.filter(entry=>entry.kind==='source-read'&&entry.read==='source').length);
+    assert.ok(summary.stillHeld>=1,`${engineName}: the recovery-source read is held open, so recovery is still running`);
+    observed.push(summary);
+    assert.deepEqual(errors,[],`${engineName}: no page errors`);
+   }finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2227 (spec #2224): the automatic recovery default over the large-board
+// fixture stays within a memory margin of opening the same board locally, and
+// stays lossless. Both scenarios seed a fresh profile through the app's own
+// first open (the board moves into device storage) and add one newer task
+// through Add, then measure a cold open of a fresh browser on that profile with
+// an unfinished draft left in Add. The local scenario has no cloud. The
+// recovery scenario fakes the signed-in cloud in the page as the #2194 and
+// #2226 browser tests do: the current generation reads as unreadable
+// (corrupt-generation, every chunk missing) and its root names an intact
+// earlier generation of similar size: the board this device accepted before
+// its newer edit, as it would have published it, plus one task saved
+// only there. Every source read downloads and encodes that generation afresh,
+// as the network does. Publication is refused, so the board stays on the older
+// complete copy without a cloud acknowledgement. Peak web-process memory is
+// read by the harness from the operating system, compared only with the local
+// opening in the same run on the same engine. The margin is a multiple of the
+// board's serialized size, as the spec's recovery budget is. Before #2227 the
+// reconciliation compared unchanged sources again for every resolved field and
+// never finished inside the app's 60 s recovery budget (WebKit passed 1.1 GiB
+// over the local opening while still running). After it, recovery finishes in
+// a few seconds at 525-540 MiB over the local opening in Chromium and 727-787
+// MiB in WebKit, about 300-340 bytes per serialized byte. What remains is
+// mostly writing the lossless recovery archives (about 13 times the board) and
+// reading them back exactly before publication. 384 leaves about 15% above
+// the highest WebKit run; WebKit is the engine closest to the phone.
+const LARGE_BOARD_RECOVERY_BYTES_FACTOR=384;
+test('RISK large board recovery browser: a deliberate run of the automatic recovery default from Retry sync reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ // Signed in, as the owner's phone is: its decisions belong to the account.
+ const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ const PRIOR_TITLE='Saved only in the intact earlier generation',NEWER_TITLE='Newer local edit before recovery',DRAFT='Unfinished draft kept through recovery';
+ const GENERATION_PATH='/__chain-2227/earlier-generation.json';
+ const allowance=LARGE_BOARD_RECOVERY_BYTES_FACTOR*stats.serializedBytes,SETTLE_MS=4000,RECOVERY_WAIT_MS=90000,observed=[],failures=[];
+ const taskCount=LARGE_BOARD_SHAPE.tasks+1;
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const open=async(scenario,cloud)=>{
+   let earlier=null;
+   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2227-'+engineName+'-'+scenario+'-'));
+   const launch=async(tag,seed,withCloud)=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
+    await context.addInitScript(({seed,withCloud,GENERATION_PATH,ACCOUNT})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
+     if(!withCloud)return;
+     const log=window.__largeRecovery={log:[],pulls:0};
+     let release;const answer=new Promise(resolve=>{release=resolve;});log.releasePull=()=>{setTimeout(release,0);};
+     const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
+     const cloud={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+      signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+      async pull(){
+       if(++log.pulls===1)await answer;log.log.push('pull');
+       Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+       window.dispatchEvent(new CustomEvent('cloudsync'));
+       return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+      },
+      async push(){log.log.push('push');return {error:true,code:'permission-denied'};},
+      async recoveryEvidence(){return {identity:'fixture-identity',epoch:1,pending:null};},
+      // Each read downloads and encodes the earlier generation afresh, as the network does.
+      async readRecoverySource(){
+       log.log.push('source-read');
+       const payload=await (await fetch(GENERATION_PATH,{cache:'no-store'})).text(),encoded=await window.ChainStorageV2.encodeSnapshot(payload);
+       const header=(hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash,baseRev});
+       return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+        {id:root.activeGeneration,header:header('e'.repeat(64),6),chunks:[]},
+        {id:root.previousGeneration,header:header(encoded.hash,5),chunks:encoded.chunks}]};
+      },
+      // Publication is refused: the board stays on the older copy without an acknowledgement.
+      async protectRecoverySources(){log.log.push('protect');return {error:true,code:'permission-denied'};},
+     };
+     Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+     document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+    },{seed,withCloud,GENERATION_PATH,ACCOUNT});
+    return context;
+   };
+   const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
+    &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
+   // What recovery must keep, computed in the page: compact digests of the
+   // accepted decisions and tasks, and the History entries and scan
+   // dispositions themselves. Recovery keeps the union of its sources, so an
+   // entry only an older source still holds (a History entry this device's
+   // History limit already dropped, a disposition its new day cleared) may be
+   // added back; every accepted one must survive.
+   const kept=page=>page.evaluate(async()=>{
+    const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value??null)))),b=>b.toString(16).padStart(2,'0')).join('');
+    const out={};for(const key of ['decisionEvents','decisionBaseline','chain','deletedTaskIds','clearedHistoryIds'])out[key]=await digest(state[key]);
+    out.tasks=await digest(state.tasks.filter(task=>task.id!=='large-board-earlier-only'));out.draft=document.getElementById('addInput').value;
+    out.history=(state.workLog||[]).map(entry=>JSON.stringify(entry));
+    out.dispositions=Object.fromEntries(['considered','cantAt','workedAt'].map(key=>[key,JSON.parse(JSON.stringify(state[key]??{}))]));
+    return out;});
+   try{
+    const tag=`chain-2227-${engineName}-${scenario}-${process.pid}-${Date.now()}`;
+    let context=await launch(tag+'-seed',fixture.payload,false);
+    try{
+     const page=context.pages()[0]||await context.newPage();
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks)(page);
+     // The earlier generation: this device's accepted board before the newer edit.
+     const accepted=JSON.parse(await page.evaluate(()=>JSON.stringify(state)));
+     earlier=JSON.stringify({...accepted,tasks:[...accepted.tasks,{...syncTask('large-board-earlier-only',PRIOR_TITLE),ctx:['home']}]});
+     // The newer accepted edit, made through Add and saved to device storage.
+     await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(taskCount)(page);
+     // And a newer accepted scan decision, made with the real No button.
+     const decisions=await page.evaluate(()=>state.decisionEvents.length);
+     await page.locator('[data-act="no"]').first().click();
+     await page.waitForFunction(count=>state.decisionEvents.length>count&&Object.keys(state.considered).length>0,decisions,{timeout:30000});
+     await page.waitForFunction(()=>new Promise(resolve=>{const request=indexedDB.open('chain-scanner-v2');request.onerror=()=>resolve(false);
+      request.onsuccess=()=>{const db=request.result;try{const read=db.transaction('meta').objectStore('meta').get('head');
+       read.onsuccess=()=>{db.close();resolve(!!read.result);};read.onerror=()=>{db.close();resolve(false);};}catch{db.close();resolve(false);}};}),null,{timeout:30000});
+     await page.waitForTimeout(1500);
+    }finally{await context.close();}
+    context=await launch(tag,null,cloud);
+    let result;
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const sampler=webProcessMemorySampler(tag);
+     let memory,before,after,status=null,log=null,settled=true;
+     try{
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+      // An unfinished draft left in Add, not focused, as a person leaves it.
+      await page.locator('#addInput').fill(DRAFT);await page.locator('#addInput').blur();
+      before=await kept(page);
+      if(cloud){
+       await page.evaluate(()=>__largeRecovery.releasePull());
+       // #2228: this board is over the automatic default's work budget, so the
+       // opening waits instead. Retry sync, from the cloud button, runs the
+       // same recovery deliberately, and that run is what this test bounds.
+       await page.waitForFunction(()=>document.getElementById('syncBtn')?.textContent==='☁ recovery waiting',null,{timeout:RECOVERY_WAIT_MS});
+       await page.locator('#syncBtn').click();await page.locator('#modalRoot [data-act="sync-retry"]').click();
+       // Recovery has settled once its guarded publication was attempted. The
+       // wait is longer than the app's own 60 s recovery budget.
+       settled=await page.waitForFunction(()=>__largeRecovery.log.includes('protect')&&document.getElementById('syncBtn')?.textContent==='☁ older copy in use',null,{timeout:RECOVERY_WAIT_MS}).then(()=>true,()=>false);
+      }
+      await page.waitForTimeout(SETTLE_MS);
+     }finally{memory=await sampler.stop();}
+     after=await kept(page);
+     const titles=await page.$$eval('#listBody [data-row]',rows=>rows.map(row=>row.textContent));
+     if(cloud){status=await page.evaluate(()=>{const el=document.getElementById('syncBtn');return {text:el.textContent,title:el.title,className:el.className};});
+      log=await page.evaluate(()=>__largeRecovery.log.slice());}
+     result={memory,before,after,titles,status,log,errors,settled};
+    }finally{await context.close();}
+    return result;
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const local=await open('local',false),recovered=await open('recovery',true);
+  const extra=recovered.memory.peakBytes-local.memory.peakBytes,mib=bytes=>Math.round(bytes/1048576);
+  const summary={engine:engineName,localPeakMiB:mib(local.memory.peakBytes),recoveryPeakMiB:mib(recovered.memory.peakBytes),extraMiB:mib(extra),allowanceMiB:mib(allowance),
+   processes:[local.memory.processes,recovered.memory.processes],samples:[local.memory.samples,recovered.memory.samples],settled:recovered.settled,
+   status:recovered.status?.text,log:recovered.log};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  // Measurement preconditions: the harness saw this browser's own web process.
+  assert.ok(local.memory.processes>0&&recovered.memory.processes>0&&local.memory.samples>10&&recovered.memory.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
+  if(extra>allowance)failures.push(`${engineName}: recovering the large board peaked ${mib(extra)} MiB over opening it locally, above the ${mib(allowance)} MiB allowance`);
+  if(!recovered.settled){failures.push(`${engineName}: the automatic recovery default did not reach the older complete copy within ${RECOVERY_WAIT_MS/1000} s ${JSON.stringify(summary)}`);continue;}
+  assert.deepEqual([local.errors,recovered.errors],[[],[]],`${engineName}: no page errors`);
+  // Recovery ran on the intact earlier generation and the board uses it.
+  assert.ok(recovered.log.filter(entry=>entry==='source-read').length>=1,`${engineName}: the earlier generation was read`);
+  assert.ok(recovered.titles.some(text=>text.includes(PRIOR_TITLE)),`${engineName}: the task saved only in the earlier generation is on the board`);
+  // Lossless: every accepted decision, the unfinished draft and the newer edit are kept.
+  for(const [index,id] of fixture.ids.entries())assert.ok(recovered.titles.some(text=>new RegExp('Large board task '+index+'(?!\\d)').test(text)),`${engineName}: task ${id} is kept`);
+  assert.ok(recovered.titles.some(text=>text.includes(NEWER_TITLE)),`${engineName}: the newer local edit is kept`);
+  const {dispositions:beforeDispositions,history:beforeHistory,...beforeKept}=recovered.before,{dispositions:afterDispositions,history:afterHistory,...afterKept}=recovered.after;
+  assert.deepEqual(afterKept,beforeKept,`${engineName}: every accepted decision, task and the unfinished draft survive recovery unchanged`);
+  // Every accepted History entry survives, unchanged and in the same order.
+  const afterHistorySet=new Set(afterHistory);
+  assert.deepEqual(beforeHistory.filter(entry=>!afterHistorySet.has(entry)),[],`${engineName}: every accepted History entry survives recovery`);
+  const beforeHistorySet=new Set(beforeHistory);
+  assert.deepEqual(afterHistory.filter(entry=>beforeHistorySet.has(entry)),beforeHistory,`${engineName}: accepted History keeps its order`);
+  assert.ok(Object.keys(beforeDispositions.considered).length>0,`${engineName}: fixture precondition: the device holds a newer scan decision`);
+  for(const [key,entries] of Object.entries(beforeDispositions))for(const [id,value] of Object.entries(entries))
+   assert.deepEqual(afterDispositions[key]?.[id],value,`${engineName}: the accepted ${key} entry for ${id} survives recovery`);
+  assert.equal(recovered.after.draft,DRAFT);
+  // The status says the older copy is in use until a cloud acknowledgement.
+  assert.equal(recovered.status.text,'☁ older copy in use',`${engineName}: ${JSON.stringify(recovered.status)}`);
+  assert.match(recovered.status.title,/older complete copy of your board is in use/i);assert.match(recovered.status.title,/cloud saving is not confirmed/i);
+  assert.ok(!recovered.log.includes('push'),`${engineName}: nothing was published without the guarded recovery publication`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2228 (spec #2224): the automatic recovery default over a board shaped like
+// the owner's waits instead of running. #2227 bounded that recovery, but it
+// still peaks about 780 MiB above the local opening in WebKit (about 330 bytes
+// per serialized byte), which a phone may not allow. The same signed-in
+// large-board fixture and in-page fake cloud as the #2227 test: an unreadable
+// current generation over an intact earlier generation of similar size, and a
+// newer Add on the device. Recovery must not run: the board this device
+// accepted stays open and editable with nothing from the earlier generation
+// applied and nothing published, the cloud button and Settings say cloud
+// recovery is waiting, the page keeps answering, and Review cloud recovery and
+// Restore stay reachable.
+// #2228 review (story 20): the wait itself must stay cheap. The peak
+// web-process memory of the waiting opening is compared with opening the same
+// board locally, in the same run on the same engine. Before the review the
+// budget was weighed only after the exact-copy check and the recovery capture
+// had downloaded and encoded the earlier generation and every device source,
+// about 140-215 MiB over the local opening in WebKit. The fake cloud answers
+// the generation headers on their own, as the real store does.
+const RECOVERY_WAIT_MEMORY_MARGIN=64*1024*1024;
+test('RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ const PRIOR_TITLE='Saved only in the intact earlier generation',NEWER_TITLE='Newer local edit before the wait',WAITING_TITLE='Added while cloud recovery waits';
+ const GENERATION_PATH='/__chain-2228/earlier-generation.json',WAIT_MS=90000,observed=[],failures=[];
+ const HEADER_PATH='/__chain-2228/earlier-header.json',OPEN_SETTLE_MS=2000,mib=bytes=>Math.round(bytes/1048576);
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  let earlier=null;
+  let earlierHeader=null;
+  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2228-'+engineName+'-'));
+  const launch=async(tag,seed,withCloud)=>{
+   const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+    env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
+   await context.route(origin+HEADER_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlierHeader}));
+   await context.addInitScript(({seed,withCloud,GENERATION_PATH,HEADER_PATH,ACCOUNT})=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
+    if(!withCloud)return;
+    const log=window.__recoveryWait={log:[],pulls:0};
+    let release;const answer=new Promise(resolve=>{release=resolve;});log.releasePull=()=>{setTimeout(release,0);};
+    const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
+    const cloud={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+     signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+     async pull(){
+      if(++log.pulls===1)await answer;log.log.push('pull');
+      Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+      window.dispatchEvent(new CustomEvent('cloudsync'));
+      return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+     },
+     async push(){log.log.push('push');return {error:true,code:'permission-denied'};},
+     async recoveryEvidence(){return {identity:'fixture-identity',epoch:1,pending:null};},
+     async readRecoverySource(){
+      log.log.push('source-read');
+      const payload=await (await fetch(GENERATION_PATH,{cache:'no-store'})).text(),encoded=await window.ChainStorageV2.encodeSnapshot(payload);
+      const header=(hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash,baseRev});
+      return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+       {id:root.activeGeneration,header:header('e'.repeat(64),6),chunks:[]},
+       {id:root.previousGeneration,header:header(encoded.hash,5),chunks:encoded.chunks}]};
+     },
+     // The root and the generation headers on their own: small documents.
+     async readRecoverySourceHeaders(){
+      log.log.push('header-read');
+      const earlier=await (await fetch(HEADER_PATH,{cache:'no-store'})).json();
+      const header=(hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:earlier.chunkCount,byteLength:earlier.byteLength,hash,baseRev});
+      return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+       {id:root.activeGeneration,header:header('e'.repeat(64),6)},{id:root.previousGeneration,header:header(earlier.hash,5)}]};
+     },
+     async protectRecoverySources(){log.log.push('protect');return {error:true,code:'permission-denied'};},
+    };
+    Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+    document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+   },{seed,withCloud,GENERATION_PATH,HEADER_PATH,ACCOUNT});
+   return context;
+  };
+  const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
+   &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
+  const summary={engine:engineName};
+  let localMemory=null,waitMemory=null;
+  try{
+   const tag=`chain-2228-${engineName}-${process.pid}-${Date.now()}`;
+   let context=await launch(tag+'-seed',fixture.payload,false);
+   try{
+    const page=context.pages()[0]||await context.newPage();
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks)(page);
+    // The earlier generation: this device's accepted board before the newer edit.
+    const accepted=JSON.parse(await page.evaluate(()=>JSON.stringify(state)));
+    earlier=JSON.stringify({...accepted,tasks:[...accepted.tasks,{...syncTask('large-board-earlier-only',PRIOR_TITLE),ctx:['home']}]});
+    await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(LARGE_BOARD_SHAPE.tasks+1)(page);
+    await page.waitForTimeout(1500);
+   }finally{await context.close();}
+   // The earlier generation's header, as the cloud store keeps it beside its chunks.
+   const encodedEarlier=await loadStorageV2().encodeSnapshot(earlier);
+   earlierHeader=JSON.stringify({chunkCount:encodedEarlier.chunkCount,byteLength:encodedEarlier.byteLength,hash:encodedEarlier.hash});
+   // The same board opened locally, with no cloud, in the same run: the baseline.
+   context=await launch(tag+'-local',null,false);
+   try{
+    const page=context.pages()[0]||await context.newPage(),sampler=webProcessMemorySampler(tag+'-local');
+    try{await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks+1)(page);await page.waitForTimeout(OPEN_SETTLE_MS);}
+    finally{localMemory=await sampler.stop();}
+   }finally{await context.close();}
+   context=await launch(tag,null,true);
+   try{
+    const page=context.pages()[0]||await context.newPage(),errors=[];let crashed=false;
+    page.on('pageerror',error=>errors.push(error.message));page.on('crash',()=>{crashed=true;});
+    const sampler=webProcessMemorySampler(tag);let memory;
+    try{
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks+1)(page);
+     const released=Date.now();await page.evaluate(()=>__recoveryWait.releasePull());
+     // Settled: either the waiting state, or recovery ran far enough to try
+     // its guarded publication (which a waiting recovery never reaches).
+     summary.settled=await page.waitForFunction(()=>{const text=document.getElementById('syncBtn')?.textContent||'';
+      return text==='☁ recovery waiting'||__recoveryWait.log.includes('protect')||text==='☁ older copy in use';},null,{timeout:WAIT_MS}).then(()=>true,()=>false);
+     summary.settleMs=Date.now()-released;
+     await page.waitForTimeout(2000);
+     // The opening and its wait, measured like the local opening.
+     waitMemory=await sampler.stop();
+     summary.status=await page.evaluate(()=>{const el=document.getElementById('syncBtn');return {text:el.textContent,title:el.title,className:el.className};});
+     summary.log=await page.evaluate(()=>__recoveryWait.log.slice());
+     // Responsive: a frame and a task still run promptly.
+     summary.frameMs=await page.evaluate(()=>new Promise(resolve=>{const started=performance.now();requestAnimationFrame(()=>setTimeout(()=>resolve(Math.round(performance.now()-started)),0));}));
+     summary.titles=await page.$$eval('#listBody [data-row]',rows=>rows.map(row=>row.textContent));
+     // Editable: an ordinary Add still works while recovery waits.
+     await page.locator('#addInput').fill(WAITING_TITLE);await page.locator('#addInput').press('Enter');
+     summary.editable=await shown(LARGE_BOARD_SHAPE.tasks+2)(page).then(()=>true,()=>false);
+     await page.waitForTimeout(1000);
+     summary.statusAfterEdit=await page.evaluate(()=>document.getElementById('syncBtn').textContent);
+     summary.logAfterEdit=await page.evaluate(()=>__recoveryWait.log.slice());
+     // Settings says so, and keeps Review cloud recovery, the debug log and Restore.
+     await page.locator('#appHeader [data-act="settings"]').click();
+     for(const act of ['view-support-diagnostics','restore-backup','review-cloud-source-recovery']){
+      const section=page.locator('#modalRoot details.settings-section:has([data-act="'+act+'"])');
+      if(await section.count()&&!await section.first().evaluate(el=>el.open))await section.first().locator(':scope > summary').click();
+     }
+     summary.settings=await page.evaluate(()=>{const read=act=>{const el=document.querySelector('#modalRoot [data-act="'+act+'"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;};
+      return {waiting:/Cloud recovery is waiting\./.test(document.getElementById('modalRoot').textContent),review:read('review-cloud-source-recovery'),restore:read('restore-backup'),debugLog:read('view-support-diagnostics')};});
+     await page.keyboard.press('Escape');await page.evaluate(()=>closeModal());
+     // The cloud button keeps Review cloud recovery.
+     await page.locator('#syncBtn').click();
+     summary.cloudReview=await page.evaluate(()=>{const el=document.querySelector('#modalRoot [data-act="review-cloud-source-recovery"]');return el?{visible:el.getClientRects().length>0,disabled:el.disabled}:null;});
+     await page.evaluate(()=>closeModal());
+    }finally{memory=await sampler.stop();}
+    summary.peakMiB=Math.round(memory.peakBytes/1048576);summary.samples=memory.samples;summary.crashed=crashed;summary.errors=errors;
+   }finally{await context.close();}
+  }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  if(localMemory&&waitMemory)Object.assign(summary,{localPeakMiB:mib(localMemory.peakBytes),waitPeakMiB:mib(waitMemory.peakBytes),
+   extraMiB:mib(waitMemory.peakBytes-localMemory.peakBytes),marginMiB:mib(RECOVERY_WAIT_MEMORY_MARGIN),samplesLocalWait:[localMemory.samples,waitMemory.samples]});
+  const {titles,...reported}=summary;observed.push(reported);t.diagnostic(JSON.stringify(reported));
+  assert.ok(summary.settled,`${engineName}: the opening settled within ${WAIT_MS/1000} s ${JSON.stringify(reported)}`);
+  assert.equal(summary.crashed,false,`${engineName}: the page did not crash`);assert.deepEqual(summary.errors,[],`${engineName}: no page errors`);
+  // Measurement preconditions: the harness saw this browser's own web process.
+  assert.ok(localMemory.processes>0&&waitMemory.processes>0&&localMemory.samples>10&&waitMemory.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(reported)}`);
+  if(waitMemory.peakBytes-localMemory.peakBytes>RECOVERY_WAIT_MEMORY_MARGIN)
+   failures.push(`${engineName}: the waiting opening peaked ${summary.extraMiB} MiB over opening the board locally, above the ${summary.marginMiB} MiB margin`);
+  if(summary.log.includes('source-read'))failures.push(`${engineName}: the waiting opening downloaded a recovery source ${JSON.stringify(summary.log)}`);
+  // Behavior under test: recovery waits instead of running.
+  if(summary.status.text!=='☁ recovery waiting')failures.push(`${engineName}: the cloud button does not say cloud recovery is waiting ${JSON.stringify(summary.status)}`);
+  if(!/cloud recovery is waiting/i.test(summary.status.title)||!/not confirmed/i.test(summary.status.title))failures.push(`${engineName}: the cloud button title does not explain the wait ${JSON.stringify(summary.status)}`);
+  if(summary.logAfterEdit.includes('protect')||summary.logAfterEdit.includes('push'))failures.push(`${engineName}: recovery ran or published while waiting ${JSON.stringify(summary.logAfterEdit)}`);
+  if(titles.some(text=>text.includes(PRIOR_TITLE)))failures.push(`${engineName}: the earlier generation was applied instead of waiting`);
+  if(!titles.some(text=>text.includes(NEWER_TITLE)))failures.push(`${engineName}: the accepted newer edit is missing`);
+  if(summary.frameMs>1000)failures.push(`${engineName}: the page stalled ${summary.frameMs} ms after the wait`);
+  if(!summary.editable)failures.push(`${engineName}: the board was not editable while recovery waits`);
+  if(summary.statusAfterEdit!=='☁ recovery waiting')failures.push(`${engineName}: an edit ended the waiting status ${summary.statusAfterEdit}`);
+  if(!summary.settings?.waiting)failures.push(`${engineName}: Settings does not say cloud recovery is waiting ${JSON.stringify(summary.settings)}`);
+  for(const key of ['review','restore','debugLog'])if(!summary.settings?.[key]?.visible||summary.settings[key].disabled)failures.push(`${engineName}: Settings does not offer ${key} while recovery waits ${JSON.stringify(summary.settings)}`);
+  if(!summary.cloudReview?.visible||summary.cloudReview.disabled)failures.push(`${engineName}: the cloud button does not offer Review cloud recovery while recovery waits ${JSON.stringify(summary.cloudReview)}`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2228 review: an actual visual test for the "☁ recovery waiting" cloud
+// button and the Settings waiting notice, measured beside their established
+// neighbours in the same places: the "☁ older copy in use" button in the same
+// header, and the Settings pending notice ("Cloud recovery is pending" with an
+// older complete copy in use) at the top of the same Settings pane. A small
+// signed-in board opens with the cloud faked in the page: an unreadable
+// current generation over an intact earlier one. For the waiting state the
+// test page lowers the work budget, so the automatic recovery default waits;
+// for the neighbour it runs, and its cloud confirmation is refused so the
+// older copy stays in use. Day and night themes, the phone, the phone at the
+// enlarged 260 px width and desktop, ordinary and 150% Settings text, native
+// keyboard focus, and Chromium and WebKit. Screenshots go to
+// RECOVERY_WAIT_VISUAL_DIR when it is set; the assertions do not need them.
+test('RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const output=process.env.RECOVERY_WAIT_VISUAL_DIR?path.resolve(process.env.RECOVERY_WAIT_VISUAL_DIR):null;
+ if(output)fs.mkdirSync(output,{recursive:true});
+ const ACCOUNT='owner@example.test',ROWS=18,EARLIER_TITLE='Saved only in the earlier cloud copy';
+ // A signed-in board as the app saves it: a raw older-format seed is not a
+ // supported recovery source until the app has opened and saved it once.
+ const boards=new Map();
+ for(const theme of ['light','dark']){
+  const seed=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,syncAccount:ACCOUNT,
+   settings:{...syncState().settings,theme},tasks:Array.from({length:ROWS},(_,i)=>({...syncTask('visual-wait-'+i,'Visual recovery task '+i),ctx:['home']}))}));
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:seed}});
+  try{boards.set(theme,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
+ }
+ const boardFor=theme=>boards.get(theme);
+ const earlierTask={...syncTask('visual-earlier-only',EARLIER_TITLE),ctx:['home']};
+ const viewports=[['phone',390,844],['phone-enlarged',260,563],['desktop',1280,800]];
+ const ENLARGED_SETTINGS='#modalRoot .modal{font-size:150%} #modalRoot .modal :is(p,button,label,summary,select,input){font-size:1em}';
+ const failures=[],observed=[],artifacts=[],neighbourOverflow=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  // WebKit on macOS moves keyboard focus between buttons with Alt+Tab.
+  const forward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',backward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
+  try{
+   for(const theme of ['light','dark'])for(const [viewName,width,height] of viewports){
+    const states={};
+    for(const scenario of ['waiting','older']){
+     const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});
+     try{
+      await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+       return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+      await context.addInitScript(({board,scenario,ACCOUNT,earlierTask})=>{
+       Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+       localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+       if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+       // The test page's own budget override: any recovery is over it.
+       if(scenario==='waiting')window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1;
+       const log=window.__visualWait={log:[]};
+       const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
+       let earlier=null;
+       const encodeEarlier=async()=>{
+        if(earlier)return earlier;
+        const accepted=JSON.parse(JSON.stringify(state));
+        return earlier=await window.ChainStorageV2.encodeSnapshot(JSON.stringify({...accepted,tasks:[...accepted.tasks,earlierTask]}));
+       };
+       const header=(encoded,hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash,baseRev});
+       const cloud={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+        signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+        async pull(){
+         log.log.push('pull');
+         Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+         window.dispatchEvent(new CustomEvent('cloudsync'));
+         return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+        },
+        async push(){log.log.push('push');return {error:true,code:'permission-denied'};},
+        async recoveryEvidence(){return {identity:'fixture-identity',epoch:1,pending:null};},
+        async readRecoverySourceHeaders(){
+         const encoded=await encodeEarlier();
+         return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+          {id:root.activeGeneration,header:header(encoded,'e'.repeat(64),6)},{id:root.previousGeneration,header:header(encoded,encoded.hash,5)}]};
+        },
+        async readRecoverySource(){
+         log.log.push('source-read');const encoded=await encodeEarlier();
+         return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+          {id:root.activeGeneration,header:header(encoded,'e'.repeat(64),6),chunks:[]},
+          {id:root.previousGeneration,header:header(encoded,encoded.hash,5),chunks:encoded.chunks}]};
+        },
+        // The neighbour's cloud confirmation is refused, so the older copy stays in use.
+        async protectRecoverySources(){log.log.push('protect');return {error:true,code:'permission-denied'};},
+       };
+       Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+       document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+      },{board:boardFor(theme),scenario,ACCOUNT,earlierTask});
+      const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+      const label=scenario==='waiting'?'☁ recovery waiting':'☁ older copy in use';
+      const settled=await page.waitForFunction(label=>document.getElementById('syncBtn')?.textContent===label&&!pulling&&!cloudSourceRecoveryBusy,label,{timeout:60000}).then(()=>true,()=>false);
+      const where=`${engineName}/${theme}/${viewName}/${scenario}`;
+      if(!settled){failures.push(`${where}: the cloud button never said ${label}: `+await page.evaluate(()=>document.getElementById('syncBtn')?.textContent));continue;}
+      await page.evaluate(()=>document.fonts.ready);
+      await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),null,{timeout:15000}).catch(()=>{});
+      const paint=await page.evaluate(()=>{
+       const root=document.documentElement,button=document.getElementById('syncBtn'),style=getComputedStyle(button),rect=button.getBoundingClientRect();
+       const hit=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+       return {theme:root.getAttribute('data-theme'),scheme:getComputedStyle(root).colorScheme,background:getComputedStyle(document.body).backgroundColor,
+        text:button.textContent,className:button.className,fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,
+        borderColor:style.borderTopColor,backgroundColor:style.backgroundColor,height:Math.round(rect.height),width:Math.round(rect.width),
+        clipped:button.scrollWidth>button.clientWidth+1,inside:rect.left>=0&&rect.right<=innerWidth+0.5&&rect.top>=0,unobscured:hit===button||button.contains(hit),
+        earlierApplied:state.tasks.some(task=>task.id==='visual-earlier-only')};
+      });
+      // Native keyboard focus on the cloud button: forward to its neighbour, then back.
+      await page.locator('#syncBtn').focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+      paint.focus=await page.evaluate(()=>{const button=document.getElementById('syncBtn'),style=getComputedStyle(button);
+       return {active:document.activeElement===button,visible:button.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor};});
+      if(output){const file=path.join(output,`${engineName}-${theme}-${viewName}-${scenario}-header.png`);
+       await page.screenshot({path:file,clip:{x:0,y:0,width,height:Math.min(height,180)}});artifacts.push(file);}
+      // The Settings notice at the top of the Settings pane, ordinary and enlarged.
+      await page.locator('#appHeader [data-act="settings"]').click();await page.waitForSelector('#modalRoot .modal');
+      const heading=scenario==='waiting'?'Cloud recovery is waiting.':'Cloud recovery is pending.';
+      paint.notice={};
+      for(const scale of [1,1.5]){
+       const enlarged=scale>1?await page.addStyleTag({content:ENLARGED_SETTINGS}):null;
+       const notice=page.locator('#modalRoot [role="status"]').filter({hasText:heading}).first();
+       await notice.scrollIntoViewIfNeeded();
+       paint.notice[scale]=await notice.evaluate(element=>{
+        const modal=element.closest('.modal'),style=getComputedStyle(element),bold=getComputedStyle(element.querySelector('b')),rect=element.getBoundingClientRect(),pane=modal.getBoundingClientRect();
+        const paneStyle=getComputedStyle(modal),review=element.nextElementSibling?.querySelector('[data-act="review-cloud-source-recovery"]'),reviewStyle=review&&getComputedStyle(review);
+        // Anything in the pane wider than the pane, named so a failure says what.
+        const wide=[element,modal,...modal.querySelectorAll('*')].filter(node=>node.getBoundingClientRect().right>pane.right+1||
+         node.scrollWidth>node.clientWidth+1&&getComputedStyle(node).overflowX!=='visible').slice(0,4)
+         .map(node=>node.tagName+(node.dataset?.act?'['+node.dataset.act+']':'')+' '+node.scrollWidth+'/'+node.clientWidth);
+        return {text:element.textContent,fontFamily:style.fontFamily,fontSize:style.fontSize,lineHeight:style.lineHeight,color:style.color,boldColor:bold.color,
+         left:Math.round(rect.left-pane.left-parseFloat(paneStyle.paddingLeft)),right:Math.round(pane.right-parseFloat(paneStyle.paddingRight)-rect.right),
+         overflow:element.scrollWidth>element.clientWidth+1||modal.scrollWidth>modal.clientWidth+1,wide,height:Math.round(rect.height),
+         review:review?{fontFamily:reviewStyle.fontFamily,fontSize:reviewStyle.fontSize,color:reviewStyle.color,height:Math.round(review.getBoundingClientRect().height)}:null};
+       });
+       if(output){const file=path.join(output,`${engineName}-${theme}-${viewName}-${scenario}-settings-${scale}.png`);await page.screenshot({path:file});artifacts.push(file);}
+       if(enlarged)await enlarged.evaluate(element=>element.remove());
+      }
+      // Native keyboard focus on the notice's Review cloud recovery.
+      const review=page.locator('#modalRoot [role="status"]').filter({hasText:heading}).first().locator('xpath=following-sibling::div[1]//button[@data-act="review-cloud-source-recovery"]');
+      await review.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+      paint.reviewFocus=await review.evaluate(button=>{const style=getComputedStyle(button);
+       return {active:document.activeElement===button,visible:button.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor};});
+      paint.errors=errors;paint.log=await page.evaluate(()=>__visualWait.log.slice());
+      states[scenario]=paint;
+     }finally{await context.close();}
+    }
+    const {waiting,older}=states,where=`${engineName}/${theme}/${viewName}`;
+    if(!waiting||!older)continue;
+    observed.push({engine:engineName,theme,view:viewName,waiting,older});
+    for(const [name,state] of Object.entries(states)){
+     // The applied theme: attribute, computed color scheme and paint.
+     if(state.theme!==theme)failures.push(`${where}/${name}: data-theme is ${state.theme}`);
+     if(!String(state.scheme).split(/\s+/).includes(theme))failures.push(`${where}/${name}: computed color-scheme is ${state.scheme}`);
+     if(state.className!=='syncbtn busy')failures.push(`${where}/${name}: cloud button class ${state.className}`);
+     if(state.clipped||!state.inside||!state.unobscured)failures.push(`${where}/${name}: the cloud button is clipped, outside the viewport or covered ${JSON.stringify(state)}`);
+     for(const [control,focus] of [['cloud button',state.focus],['Review cloud recovery',state.reviewFocus]])
+      if(!focus.active||!focus.visible||focus.outlineStyle==='none'||parseFloat(focus.outlineWidth)<2)failures.push(`${where}/${name}: ${control} keyboard focus is not shown ${JSON.stringify(focus)}`);
+     for(const scale of [1,1.5]){
+      const notice=state.notice[scale];
+      if(!notice||notice.left<0||notice.right<0)failures.push(`${where}/${name}/${scale}: the Settings notice leaves its pane insets ${JSON.stringify(notice)}`);
+      // The changed notice must fit its pane; the established neighbour's
+      // fit is reported with the evidence, not asserted here.
+      if(notice?.overflow)(name==='waiting'?failures:neighbourOverflow).push(`${where}/${name}/${scale}: the Settings pane scrolls sideways ${JSON.stringify(notice.wide)}`);
+      if(!notice?.review)failures.push(`${where}/${name}/${scale}: the notice has no Review cloud recovery`);
+     }
+     if(!(parseFloat(state.notice[1.5].fontSize)>parseFloat(state.notice[1].fontSize)))failures.push(`${where}/${name}: enlarged Settings text is not larger`);
+     if(state.errors.length)failures.push(`${where}/${name}: page errors ${JSON.stringify(state.errors)}`);
+    }
+    if(waiting.text!=='☁ recovery waiting'||older.text!=='☁ older copy in use')failures.push(`${where}: labels ${waiting.text} / ${older.text}`);
+    if(waiting.earlierApplied||!older.earlierApplied)failures.push(`${where}: the waiting board applied the earlier copy, or the neighbour did not`);
+    if(waiting.log.includes('source-read')||waiting.log.includes('protect'))failures.push(`${where}: the waiting state read or protected recovery sources ${JSON.stringify(waiting.log)}`);
+    // The waiting button and notice render like their neighbours.
+    for(const key of ['fontFamily','fontSize','fontWeight','color','borderColor','backgroundColor','height'])
+     if(waiting[key]!==older[key])failures.push(`${where}: the cloud button ${key} differs: ${waiting[key]} / ${older[key]}`);
+    for(const key of ['outlineStyle','outlineWidth','outlineColor'])
+     if(waiting.focus[key]!==older.focus[key])failures.push(`${where}: the cloud button focus ${key} differs: ${waiting.focus[key]} / ${older.focus[key]}`);
+    for(const scale of [1,1.5])for(const key of ['fontFamily','fontSize','lineHeight','color','boldColor','left','right']){
+     if(waiting.notice[scale][key]!==older.notice[scale][key])failures.push(`${where}/${scale}: the Settings notice ${key} differs: ${waiting.notice[scale][key]} / ${older.notice[scale][key]}`);
+    }
+    for(const scale of [1,1.5])for(const key of ['fontFamily','fontSize','color','height'])
+     if(waiting.notice[scale].review?.[key]!==older.notice[scale].review?.[key])failures.push(`${where}/${scale}: Review cloud recovery ${key} differs`);
+   }
+   // Day and night paint the changed controls differently on each engine.
+   for(const [viewName] of viewports){
+    const pick=theme=>observed.find(row=>row.engine===engineName&&row.theme===theme&&row.view===viewName)?.waiting;
+    const day=pick('light'),night=pick('dark');
+    if(day&&night&&(day.backgroundColor===night.backgroundColor||day.notice[1].color===night.notice[1].color))
+     failures.push(`${engineName}/${viewName}: day and night paint the waiting button or notice alike ${JSON.stringify([day.backgroundColor,night.backgroundColor,day.notice[1].color,night.notice[1].color])}`);
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify({artifacts:artifacts.length?artifacts:'set RECOVERY_WAIT_VISUAL_DIR to save screenshots',neighbourOverflow,observed:observed.map(row=>({engine:row.engine,theme:row.theme,view:row.view,
+  button:[row.waiting.width,row.older.width,row.waiting.height],notice:[row.waiting.notice[1].fontSize,row.waiting.notice[1.5].fontSize,row.waiting.notice[1].height,row.older.notice[1].height],
+  scheme:row.waiting.scheme,buttonPaint:row.waiting.backgroundColor,noticeColor:row.waiting.notice[1].color,focus:row.waiting.focus,reviewFocus:row.waiting.reviewFocus}))}));
+ assert.ok(observed.length===12,'every engine, theme and view was measured: '+observed.length);
+ assert.deepEqual(failures,[],JSON.stringify(failures));
 });
 
 test('RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible',async t=>{

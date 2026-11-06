@@ -278,6 +278,84 @@ test('RISK cloud recovery device read guidance: mounted FAQ and changelog explai
  assert.match(markup,/<li>Cloud recovery retries a temporary device database failure without changing saved sources/,'the mounted changelog includes the released behavior');
 });
 
+// #2225 (spec #2224): opening a large board from this device uses less memory.
+test('RISK large board opening guidance: mounted FAQ and changelog explain that a large board opens from this device with less memory',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<dt>Why could a large board fail to open\?<\/dt><dd>/);
+ assert.match(markup,/checks its saved decisions without repeating work for every earlier decision/);
+ assert.match(markup,/<li>A large saved board opens from this device with less memory/,'the mounted changelog includes the released behavior');
+});
+
+// #2227 (spec #2224): recovering a large board onto an older complete cloud copy.
+test('RISK large board recovery guidance: mounted FAQ and changelog explain that recovering a large board onto an older complete cloud copy finishes in seconds with less memory and keeps every saved source',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<dt>Why could cloud recovery of a large board close the app\?<\/dt><dd>/);
+ assert.match(markup,/compares each saved copy once/);
+ assert.match(markup,/<li>Cloud recovery of a large board onto an older complete copy finishes in seconds with less memory/,'the mounted changelog includes the released behavior');
+});
+
+// #2228 (spec #2224): a recovery over its work budget waits, and says so.
+test('RISK large board recovery wait guidance: mounted FAQ and changelog explain that cloud recovery of a large board waits, what stays protected, and that Retry sync or signing in again runs it',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<dt>Why does the cloud button say “recovery waiting”\?<\/dt><dd>/);
+ assert.match(markup,/stays open and saves on this device/);assert.match(markup,/Review cloud recovery/);assert.match(markup,/Retry sync/);assert.match(markup,/signing in again/i);
+ const answer=markup.match(/<dt>Why does the cloud button say “recovery waiting”\?<\/dt><dd>(.*?)<\/dd>/)[1];
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help length every answer keeps');
+ // Release review of spec #2224 (B1): a deliberate run this device cannot remember keeps waiting.
+ assert.match(answer,/storage is too full[^.]*keeps waiting/,'the answer says a full device keeps the recovery waiting');
+ assert.match(markup,/<li>When rebuilding a large board from an older cloud copy could need more memory than a phone allows, cloud recovery now waits/,'the mounted changelog includes the released behavior');
+});
+
+// #2228 review: after Retry sync rebuilds a large board, its cloud save and the
+// recheck of earlier incomplete copies wait for Retry sync too, so opening,
+// returning or editing never repeats that work.
+test('RISK large board recovery wait guidance: mounted FAQ and changelog explain that after Retry sync a large board saves to the cloud and rechecks earlier copies only when Retry sync runs again',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ const after=answer('Why does a large board wait for Retry sync after recovery?');
+ assert.ok(after,'Help answers why a large board waits for Retry sync after recovery');
+ assert.match(after,/opening the app, returning to it, reconnecting or editing does not try again/);
+ assert.match(after,/Retry sync or signing in again does/);
+ assert.match(after,/checking earlier incomplete cloud copies again/);
+ const incomplete=answer('What happens when an incomplete cloud copy becomes readable?');
+ assert.match(incomplete,/After Retry sync rebuilds a large board, only Retry sync checks it again/);
+ // The answer that names every cloud button label names this one too.
+ const labels=answer('What do the cloud button labels mean?');
+ assert.match(labels,/<b>recovery waiting<\/b>: /,'Help explains the recovery waiting label');
+ for(const [name,text] of [['after',after],['incomplete',incomplete],['labels',labels]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/After Retry sync rebuilds a large board, opening or returning to the app does not repeat its cloud save or recheck earlier incomplete copies; Retry sync does\./);
+});
+
+// #2226 (spec #2224) review: the board shows and takes input before cloud
+// recovery starts. Its Help answer and changelog line had no direct check, and
+// the line had landed under September 21, the oldest date in the current
+// changelog, instead of the November 4 release it ships in.
+test('RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=markup.split('<dt>Can I use my board while cloud recovery starts?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.ok(answer,'Help answers whether the board can be used while cloud recovery starts');
+ assert.match(answer,/the board shows and takes typing and taps before cloud recovery starts reading cloud copies/);
+ assert.match(answer,/While you type in a field, recovery waits until you leave it/);
+ assert.match(answer,/Settings, the debug log, Review cloud recovery and Restore stay available while recovery runs/);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help length every answer keeps');
+ const notes=markup.split('data-changelog-notes>')[1]||'',line=/<li>When the current cloud save cannot be read, the board now shows and takes your typing and taps before cloud recovery starts reading the cloud copies\./;
+ const november=notes.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(november,line,'the November 4 release note includes the ordering');
+ assert.doesNotMatch(notes.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>').slice(1).join('</ul>')||'',line,'no older release lists it');
+});
+
 test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
  const app=await loadApp();app.ctx.openHelp();
  const markup=app.shim.document.getElementById('modalRoot').innerHTML;

@@ -12756,6 +12756,31 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK large board opening guidance: mounted FAQ and changelog explain that a large board opens from this device with less memory",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK large board recovery guidance: mounted FAQ and changelog explain that recovering a large board onto an older complete cloud copy finishes in seconds with less memory and keeps every saved source",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK large board recovery wait guidance: mounted FAQ and changelog explain that cloud recovery of a large board waits, what stays protected, and that Retry sync or signing in again runs it",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK large board recovery wait guidance: mounted FAQ and changelog explain that after Retry sync a large board saves to the cloud and rechecks earlier copies only when Retry sync runs again",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
@@ -13091,6 +13116,56 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK recovery wait: an over-budget automatic recovery default waits without publishing and is not repeated by resuming, reconnecting or a cold launch over the unchanged generation",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: Retry sync and signing in again run a waiting recovery deliberately",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: a changed unreadable generation is evaluated afresh and a readable one ends the wait",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: the deployed app ignores a page script that sets the work-budget override, so a recovery within the product budget still runs",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: a Retry sync that waits for Settings opened during its read or the board frame still runs recovery deliberately when Settings closes",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: an over-budget opening decides to wait from the generation headers, before downloading the earlier generation or reading the device sources",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: the saved restart record tells a recovery that waited, ran within its budget or ran deliberately apart",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: after a deliberate run that the cloud has not confirmed, resuming or a cold launch does not publish it again until Retry sync",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: a deliberate run whose over-budget record cannot be saved on this device keeps waiting instead of running",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: after a deliberate run confirmed with an earlier cloud copy still incomplete, returning to the app does not check it again until Retry sync",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing",
       "group": "scenery",
       "file": "tests/scenery.test.js"
@@ -13147,6 +13222,36 @@
     },
     {
       "root": "RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board recovery browser: a deliberate run of the automatic recovery default from Retry sync reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },
@@ -13311,6 +13416,36 @@
     },
     {
       "root": "RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board recovery browser: a deliberate run of the automatic recovery default from Retry sync reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board recovery wait browser: an over-budget automatic recovery default waits instead of running, keeping the large board open and editable, saying cloud recovery is waiting, and leaving Review cloud recovery and Restore reachable, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
