@@ -951,6 +951,20 @@ test('RISK repository process: a declared required or nightly root that resolves
  for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
 });
 
+// #2232: every new test root needed a hand-written group row. Default-by-file
+// placement and the cohort's fail-closed aggregation are pinned at the group
+// runner's command line with fixture cohorts; this process RISK requires those
+// pins to execute and pass.
+test('RISK repository process: a test root without a group row runs in its file group and the cohort still fails closed',()=>{
+ const pins=['test group roots without a row take their file group and rows override it','test group aggregate with nightly roots still fails closed on missing duplicate skipped failed groups and installed-client reports'];
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+pins.join('|')+')$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:300000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The default-by-file pins must pass: '+result.stdout+'\n'+result.stderr);
+ assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,pins.length,'every named default-by-file pin must execute');
+ assert.match(result.stdout,/^# skipped 0$/m);
+ for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
+});
+
 // The nightly cross-engine move is pinned at the agreed seams (the CI workflow
 // files in the CI-routing tests, and test:group --aggregate in the test-group
 // tests); this process RISK requires those pins to execute and pass.
@@ -1139,7 +1153,10 @@ test('RISK test inventory: every added environment-gated root is declared with t
  for(const root of declared.keys()){
   assert.ok(gated.has(root),'every declaration names an environment-gated root in the test directory: '+root);
   assert.equal(baselineSkips.has(root),false,'baseline skips stay in the independent inventory, not in declarations: '+root);
-  assert.ok(assignments.rootAssignments.some(entry=>entry.root===root),'every declared root keeps its group assignment: '+root);
+  // #2232: rows hold only overrides; a root with no row takes its file's group.
+  const file=fs.readdirSync(path.join(__dirname,'tests')).filter(name=>name.endsWith('.test.js')).map(name=>'tests/'+name)
+   .find(name=>fs.readFileSync(path.join(__dirname,name),'utf8').split('\n').some(line=>line.startsWith('test('+JSON.stringify(root).slice(0,-1))||line.startsWith("test('"+root)));
+  assert.ok(assignments.rootAssignments.some(entry=>entry.root===root)||Boolean(file&&assignments.fileGroups?.[file]),'every declared root keeps its group assignment, by row or by its file: '+root);
  }
 });
 

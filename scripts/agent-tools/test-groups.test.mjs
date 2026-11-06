@@ -766,6 +766,60 @@ test('test group describe and nightly preflight fail when a declared required or
   });
 });
 
+// #2232: every new root needed a hand-written row. A root with no row now takes
+// its file's group from fileGroups; rows remain for overrides, dynamic titles and
+// nightly roots. The cohort still binds every root, and a file with no default
+// still rejects an unrowed root.
+const defaultRoot='fixture root placed by its file',overrideRoot='fixture root overriding its file group';
+function defaultByFileFixture(t,{fileGroups={[suiteFile]:'core','scripts/agent-tools/*.test.mjs':'native-process'}}={}){
+  const fixture=createFixture(t,{nativeTitle:installedClientRoot,nativeReports:true});
+  fs.appendFileSync(path.join(fixture.root,suiteFile),`\ntest(${JSON.stringify(defaultRoot)}, () => {});\ntest(${JSON.stringify(overrideRoot)}, () => {});\n`);
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+  catalog.fileGroups=fileGroups;
+  catalog.rootAssignments=catalog.rootAssignments.filter(entry=>entry.root!==fixtureRoots.core&&entry.root!==fixtureScriptRoot);
+  catalog.rootAssignments.push({root:overrideRoot,group:'scenery',file:suiteFile});
+  writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','default roots by file');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group roots without a row take their file group and rows override it', async parent => {
+  await parent.test('describe groups and aggregate',t=>{
+    const fixture=defaultByFileFixture(t);
+    const description=invoke(fixture,{args:['--describe']});
+    assert.equal(description.status,0,'unrowed roots must be classified by their file: '+description.stdout+description.stderr);
+    const descriptor=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'),'utf8')),roots=id=>descriptor.groups.find(group=>group.id===id).roots;
+    assert.deepEqual(roots('core'),[defaultRoot,fixtureRoots.core].sort(),'a root with no row takes its file group');
+    assert.ok(roots('scenery').includes(overrideRoot)&&!roots('core').includes(overrideRoot),'a row overrides the file group');
+    assert.ok(roots('native-process').includes(fixtureScriptRoot),'a file matched by a pattern takes that group');
+    fixture.originals=new Map();
+    for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,group+': '+result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+    assert.ok(readEvidence(fixture.originals.get('core')).cases.some(item=>item.id===defaultRoot&&item.status==='passed'),'the defaulted root executes in its file group');
+    assert.ok(readEvidence(fixture.originals.get('scenery')).cases.some(item=>item.id===overrideRoot&&item.status==='passed'),'the override executes in its row group');
+    const aggregate=aggregateCopy(t,fixture);
+    assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);
+    for(const [name,mutate] of [
+      ['missing defaulted case',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases=x.cases.filter(item=>item.id!==defaultRoot);writeJson(f,x);}],
+      ['skipped defaulted case',root=>{const f=path.join(root,'core/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases.find(item=>item.id===defaultRoot).status='skipped';writeJson(f,x);}],
+      ['failed override case',root=>{const f=path.join(root,'scenery/result.json'),x=JSON.parse(fs.readFileSync(f));x.cases.find(item=>item.id===overrideRoot).status='failed';writeJson(f,x);}],
+      ['duplicate group',root=>fs.cpSync(path.join(root,'core'),path.join(root,'core-copy'),{recursive:true})],
+      ['missing installed-client report',root=>fs.rmSync(path.join(root,'native-process/native/signed-out.json'))],
+    ])assert.notEqual(aggregateCopy(t,fixture,mutate).status,0,'aggregate must reject '+name);
+  });
+  await parent.test('a root in a file without a default group still needs a row',t=>{
+    const fixture=defaultByFileFixture(t,{fileGroups:{[suiteFile]:'core'}});
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'a file without a default group cannot place its roots');
+    assert.match(description.stderr,/fixture agent-tools baseline root/);
+  });
+  await parent.test('an unrowed dynamic title in a defaulted file still fails the registration guard',t=>{
+    const fixture=defaultByFileFixture(t),file=path.join(fixture.root,suiteFile);
+    fs.appendFileSync(file,'\nfor(const title of ["fixture unrowed dynamic root"])test(title,()=>{});\n');
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','dynamic root without a row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const result=invoke(fixture);
+    assert.notEqual(result.status,0,'a computed title cannot be placed by its file and must not run unclassified');
+    assert.match(result.stderr,/fixture unrowed dynamic root/);
+  });
+});
+
 test('test group workflow scanner command rejects missing parallel group evidence', t => {
   const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
   t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));
@@ -985,12 +1039,17 @@ test('test group catalog routes real declarations despite matching quoted fixtur
   ];
   const candidateCatalog = JSON.parse(fs.readFileSync(path.join(repository, 'scripts/test-group-assignments.json'), 'utf8'));
   const selected = titles.map(title => {
+    // Rows now hold only overrides (#2232): with no row, a real case takes the
+    // group of the area file that registers it.
     const rows = candidateCatalog.rootAssignments.filter(row => row.root === title);
-    assert.equal(rows.length, 1, 'each known real case needs exactly one catalog row');
-    assert.equal(rows[0].group, 'native-process', 'retain the historical group membership');
-    // The real rows name their own area file (#2213); this fixture appends the
-    // declarations below to its one suite file.
-    return { ...rows[0], file: suiteFile };
+    assert.ok(rows.length <= 1, 'each known real case has at most one catalog row');
+    const realFile = 'tests/native-process.test.js';
+    assert.ok(fs.readFileSync(path.join(repository, realFile), 'utf8').split('\n').some(line => line.startsWith(`test(${JSON.stringify(title)}`) || line.startsWith(`test('${title}'`)), 'the real case is declared in its area file');
+    const placement = rows[0] || { root: title, group: candidateCatalog.fileGroups?.[realFile], file: realFile };
+    assert.equal(placement.group, 'native-process', 'retain the historical group membership');
+    // The real case lives in its own area file (#2213); this fixture appends
+    // the declarations below to its one suite file.
+    return { root: title, group: placement.group, file: suiteFile };
   });
   const journal = path.join(fixture.root, 'real-case-executions.jsonl');
   const declarations = titles.map(title => `test(${JSON.stringify(title)}, () => { fs.appendFileSync(process.env.CHAIN_REAL_CASE_JOURNAL, ${JSON.stringify(title + '\n')}); });`).join('\n');

@@ -13,7 +13,12 @@ repository-process tooling tests: `core.test.js`, `scenery.test.js`,
 `persistence-recovery.test.js`, `native-process.test.js` and
 `repository-process.test.js`. Shared fixtures and helpers live in
 `tests/shared.js`; area files import what they use from it. Add a test to the
-file of its group and give it a `rootAssignments` row naming that file. Tests
+file of its group: a plain-string `test('…', …)` registered at the start of a
+line takes that file's group from `fileGroups` in
+`scripts/test-group-assignments.json` (#2232). Add a `rootAssignments` row only
+to override that group, or for a computed (`registration: "dynamic"`) or
+indented title the runner cannot place by file. A file with no `fileGroups`
+entry places nothing, so its new roots still need rows. Tests
 that read or spawn their own file use `fileURLToPath(import.meta.url)`.
 `npm test` runs two files at a time, because the long core file's 5 s fixture
 deadlines expire when every file runs at once.
@@ -118,8 +123,9 @@ group: `--describe`, the four group runs, the unclassified-root guard and
 `--aggregate` neither run nor require them. A nightly root cannot also be a
 required root or process control, and the Chromium installed-client cases
 (the owner root and its signed-out and reconcile-held children) can never be
-declared nightly. To move a case to nightly, remove its `rootAssignments` row
-and add a `nightlyRoots` row; a baseline root cannot move because the baseline
+declared nightly. To move a case to nightly, add a `nightlyRoots` row (and
+remove any `rootAssignments` override); a nightly root never takes its file's
+group; a baseline root cannot move because the baseline
 must stay fully assigned.
 
 The `Nightly` workflow runs them with Chromium and WebKit installed:

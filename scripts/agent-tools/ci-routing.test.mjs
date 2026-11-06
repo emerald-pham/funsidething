@@ -761,6 +761,17 @@ function workflowsRunningNightlyCohort(context) {
   return running;
 }
 
+function requiredCohortDescriptor() {
+  const output = path.join(mkdtempSync(path.join(os.tmpdir(), 'chain-required-cohort-')), 'describe');
+  try {
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
+    const result = spawnSync(process.execPath, ['scripts/test-groups.mjs', '--describe', '--group', 'core', '--output-dir', output, '--repository', 'local/describe',
+      '--event-policy', 'local', '--run-id', '1', '--run-attempt', '1', '--source-sha', head, '--comparison-base', head], { cwd: repo, encoding: 'utf8', timeout: 60000 });
+    assert.equal(result.status, 0, 'the required cohort must describe: ' + result.stdout + result.stderr);
+    return JSON.parse(readFileSync(path.join(output, 'descriptor.json'), 'utf8'));
+  } finally { rmSync(path.dirname(output), { recursive: true, force: true }); }
+}
+
 test('workflow runs the cross-engine native checks nightly and on dispatch outside the required cohort', () => {
   const scheduled = workflowsRunningNightlyCohort(workflowContext('schedule', 'refs/heads/main'));
   assert.equal(scheduled.length, 1, 'a scheduled run on main must execute the nightly cross-engine cohort exactly once');
@@ -780,11 +791,14 @@ test('workflow runs the cross-engine native checks nightly and on dispatch outsi
   const catalog = JSON.parse(readFileSync(path.join(repo, 'scripts/test-group-assignments.json'), 'utf8'));
   const crossEngine = ['RISK repository process: required native button actions execute in Chromium and WebKit', 'RISK repository process: native button gate detects errors raised by a real click'];
   const nightlyRoots = (catalog.nightlyRoots || []).map(entry => entry.root);
+  // Rows now hold only overrides (#2232): a root with no row takes its file's
+  // group. The runner's own descriptor is the effective required cohort.
+  const groups = requiredCohortDescriptor().groups, groupOf = root => groups.filter(group => group.roots.includes(root)).map(group => group.id);
   for (const root of crossEngine) {
     assert.ok(nightlyRoots.includes(root), `cross-engine case must be declared nightly: ${root}`);
-    assert.equal(catalog.rootAssignments.some(entry => entry.root === root), false, `cross-engine case must be absent from the required groups: ${root}`);
+    assert.deepEqual(groupOf(root), [], `cross-engine case must be absent from the required groups: ${root}`);
   }
-  assert.equal(catalog.rootAssignments.find(entry => entry.root === 'RISK repository process: required installed-client native outcomes and artifacts execute exactly once')?.group, 'native-process', 'the Chromium installed-client cases stay in the required native group');
+  assert.deepEqual(groupOf('RISK repository process: required installed-client native outcomes and artifacts execute exactly once'), ['native-process'], 'the Chromium installed-client cases stay in the required native group');
 });
 
 // #2216: the live main ruleset is GitHub-side state the repository cannot pin by

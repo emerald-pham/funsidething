@@ -225,6 +225,7 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     if (assignmentsByRoot.has(entry.root)) fail(`Root ${JSON.stringify(entry.root)} has overlapping group assignments.`);
     assignmentsByRoot.set(entry.root, entry);
   }
+  addFileDefaultAssignments(assignments, assignmentsByRoot, groupSet, files);
   const assignedRootIds = new Set(assignmentsByRoot.keys());
   for (const root of inventoryIndex.roots) {
     const replacement = replacementByBaseline.get(root);
@@ -316,6 +317,46 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
   }
   const nightlyRoots = validateNightlyRoots(assignments, fileSet, assignmentsByRoot);
   return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup, environmentSkips, nightlyRoots };
+}
+
+// fileGroups maps a full-suite file, or a pattern with one * inside a file name,
+// to the group its unrowed roots join (#2232). An exact file wins over a
+// pattern. A row overrides the file default; a file with no default places
+// nothing, so its new roots still need rows.
+function fileGroupResolver(assignments, groupSet, files) {
+  const entries = assignments.fileGroups === undefined ? {} : assignments.fileGroups;
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) fail('fileGroups must map files to groups when present.');
+  const exact = new Map(), patterns = [];
+  for (const [key, group] of Object.entries(entries)) {
+    if (!groupSet.has(group)) fail(`fileGroups ${JSON.stringify(key)} names unknown group ${JSON.stringify(group)}.`);
+    const stars = key.split('*').length - 1;
+    if (stars === 0) {
+      if (!files.includes(key)) fail(`fileGroups ${JSON.stringify(key)} is not a full-suite file.`);
+      exact.set(key, group);
+    } else {
+      if (stars !== 1 || key.slice(key.indexOf('*')).includes('/')) fail(`fileGroups pattern ${JSON.stringify(key)} may hold one * inside the file name only.`);
+      const [prefix, suffix] = key.split('*'), matcher = file => file.startsWith(prefix) && file.endsWith(suffix) && !file.slice(prefix.length, file.length - suffix.length).includes('/');
+      if (!files.some(matcher)) fail(`fileGroups pattern ${JSON.stringify(key)} matches no full-suite file.`);
+      patterns.push([matcher, group]);
+    }
+  }
+  return file => exact.get(file) ?? patterns.find(([matcher]) => matcher(file))?.[1];
+}
+
+function addFileDefaultAssignments(assignments, assignmentsByRoot, groupSet, files) {
+  const groupFor = fileGroupResolver(assignments, groupSet, files);
+  const controlled = new Set(assignments.processControls.map(control => control?.id));
+  const nightly = new Set((Array.isArray(assignments.nightlyRoots) ? assignments.nightlyRoots : []).map(entry => entry?.root));
+  for (const file of files) {
+    const group = groupFor(file);
+    if (!group) continue;
+    for (const title of fileDefaultRootTitles(fs.readFileSync(path.join(ROOT, file), 'utf8'))) {
+      // Rows and catalog roots are TAP identities (# is escaped as \#).
+      const root = title.replace(/[\\#]/g, '\\$&');
+      if (assignmentsByRoot.has(root) || controlled.has(title) || nightly.has(title)) continue;
+      assignmentsByRoot.set(root, { root, group, file, registration: 'file-default' });
+    }
+  }
 }
 
 // Cross-engine native checks run in the scheduled/dispatched nightly job, not
@@ -490,8 +531,15 @@ function normalizeTapIdentity(value) {
   return normalized;
 }
 
+// One pass collects every direct test(<plain string>, ...) title with its count;
+// counting a single title reads from it, so many lookups stay linear.
+const literalRegistrationCache = new Map();
 function countTestRegistrations(source, testName) {
-  let count = 0;
+  return literalTestRegistrations(source).get(testName) || 0;
+}
+function literalTestRegistrations(source) {
+  if (literalRegistrationCache.has(source)) return literalRegistrationCache.get(source);
+  const titles = new Map();
   let index = 0;
   let pendingTestCall = false;
   let awaitingTitle = false;
@@ -603,7 +651,7 @@ function countTestRegistrations(source, testName) {
     }
     if (character === "'" || character === '"') {
       const literal = readQuoted(index, character);
-      if (awaitingTitle && !literal.escaped && literal.value === testName) count++;
+      if (awaitingTitle && !literal.escaped) titles.set(literal.value, (titles.get(literal.value) || 0) + 1);
       awaitingTitle = false;
       pendingTestCall = false;
       previousToken = 'string';
@@ -644,7 +692,23 @@ function countTestRegistrations(source, testName) {
     previousToken = token;
     index += token.length;
   }
-  return count;
+  literalRegistrationCache.set(source, titles);
+  return titles;
+}
+
+// A root registered as a plain-string test(...) call at the start of a line
+// (column 0, the top level of an area file) is placed by its file's group
+// (#2232). Indented, environment-gated or computed registrations are not: they
+// keep explicit rows, and the core registration guard still rejects any that run
+// unclassified. Both checks must agree, so a quoted fixture that merely looks
+// like a registration never becomes a root.
+function fileDefaultRootTitles(source) {
+  const code = literalTestRegistrations(source), titles = new Set();
+  for (const line of source.split('\n')) {
+    const match = line.match(/^test\s*\(\s*(['"])((?:\\.|(?!\1)[^\\])*)\1\s*[,)]/);
+    if (match && !/\\/.test(match[2]) && code.has(match[2])) titles.add(match[2]);
+  }
+  return titles;
 }
 
 function testNamePatternArguments(roots) {
