@@ -271,7 +271,7 @@ coverage, follow the mandatory visual policy in [CLAUDE.md](../../CLAUDE.md#revi
 
 ## Final-candidate timing
 
-Push work branches and let CI run first. Request reviews once the candidate is
+Push the work branch, open its PR and let CI run first. Request reviews once the candidate is
 CI-green and its fingerprints are generated; before merging, classify the exact
 final commit under the risk-based plan above and record the rationale with
 release evidence.

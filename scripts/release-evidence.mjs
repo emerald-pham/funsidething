@@ -333,7 +333,10 @@ function releaseBookkeepingFilter(repoRoot, baseSha, commitSha, file) {
 // such as renderSync are not Node APIs and still count.
 const scriptFilePattern = /\.(?:js|mjs|cjs|jsx|ts|tsx)$/i;
 const nodeSyncApi = /\b(?:readFile|writeFile|appendFile|copyFile|exists|mkdir|mkdtemp|readdir|rm|rmdir|unlink|rename|stat|lstat|fstat|realpath|access|chmod|chown|symlink|readlink|cp|open|close|read|write|fsync|fdatasync|truncate|ftruncate|utimes|opendir|spawn|exec|execFile)Sync\b/g;
-const commentOnlyLine = /^\s*(?:\/\/|\/\*|\*\/?(?:\s|$)|<!--)/;
+// Only a line that is wholly a comment is skipped. A line that merely starts
+// with a comment marker, or a '*' continuation, may still carry code, so it
+// stays classified (fail closed).
+const commentOnlyLine = /^\s*(?:\/\/.*|\/\*(?:(?!\*\/).)*\*\/\s*|<!--(?:(?!-->).)*-->\s*)$/;
 function scriptCodeFilter(repoRoot, baseSha, commitSha, file) {
   const html = /\.html?$/i.test(file);
   if (!html && !scriptFilePattern.test(file)) return () => false;

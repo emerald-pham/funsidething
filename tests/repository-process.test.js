@@ -1358,6 +1358,11 @@ test('RISK repository process: changed-line review plan reads persistence only f
   'an app identifier such as renderSync still derives the persistence specialist');
  assert.deepEqual(domains({'index.html':help('Help.')},{'index.html':help('Help.').replace('start();','localStorage.setItem("board", "{}"); start();')}),['memory-cloud-sync'],
   'storage code inside an inline script still derives the persistence specialist');
+ // Only whole-line comments are ignored: code after or around a comment still counts.
+ for(const line of ['/* legacy */ localStorage.clear();','*/ localStorage.removeItem("board");','  * localStorage.length']){
+  assert.deepEqual(domains({'landscape-mood.js':'const hue = 30;\n'},{'landscape-mood.js':'const hue = 30;\n'+line+'\n'}),['memory-cloud-sync'],
+   `code sharing a line with a comment marker is still code: ${line}`);
+ }
 });
 
 test('RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements',async()=>{
