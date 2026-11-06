@@ -20,7 +20,8 @@ Routine animation-frequency tuning stays out of public patch notes/changelog by
 user preference; keep internal evidence truthful and the extended FAQ accurate.
 This exception does not suppress bugs, safety/accessibility changes or limits.
 
-Release reviews scale to the exact diff. Before release, read
+Release reviews scale to the exact diff. Review plans classify changed code,
+not prose. Before release, read
 [release and review](docs/agents/release-and-review.md), the single authority
 for the review plan the release validator derives, review identities and the
 exact-candidate regression, compatibility, receipt, CI and live verification

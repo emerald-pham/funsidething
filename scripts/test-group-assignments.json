@@ -254,6 +254,41 @@
       "file": "tests/repository-process.test.js"
     },
     {
+      "root": "RISK repository process: changed-line review plan reads nearby code but not distant storage code",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK repository process: changed-line review plan fails closed on large pages, revision edits and HTML that loads or runs script",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK repository process: changed-line review plan treats a changelog entry and refreshed fingerprints as an ordinary change",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK repository process: changed-line review plan reads persistence only from script code, not prose, comments or Node sync APIs",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK repository process: pre-push lets branch pushes run CI before review and still guards main",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK repository process: pre-push command accepts a branch push and says no receipt was checked",
+      "group": "native-process",
+      "file": "tests/repository-process.test.js"
+    },
+    {
       "root": "RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes",
       "group": "native-process",
       "file": "tests/repository-process.test.js"

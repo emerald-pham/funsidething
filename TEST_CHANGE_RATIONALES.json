@@ -21444,6 +21444,26 @@
   },
   {
     "baseCommit": "bd7ae9f94ba903adec80c16288249d9c789c015d",
+    "testChangesSha256": "8200a39dd5553ce4271bfe53476e41dc53bc1a5e3298903567ecda56ac64583a",
+    "reason": "#2234 limits the pre-push receipt check to pushes to main, so work branches can run CI before reviews. The existing pre-push test pushed its candidate to refs/heads/release; that push target changes to refs/heads/main so the test still exercises the guarded path. Every assertion (deletions pass, a dirty worktree is refused, each distinct outgoing tip needs its own receipt) is unchanged.",
+    "previousBehavior": "validatePrePushUpdates required a valid exact-SHA receipt and a clean worktree for every outgoing non-deletion tip on any branch, so the test could use refs/heads/release as its remote ref.",
+    "intendedBehavior": "validatePrePushUpdates checks only outgoing updates whose remote ref is refs/heads/main: those still need a clean worktree and an exact-SHA receipt per tip. Updates to other refs pass without a receipt. The existing test pushes to main and keeps all its assertions; the new test pins that a work-branch push needs neither.",
+    "preservedCoverage": [
+      "A push to main is refused while the worktree is dirty.",
+      "Each distinct outgoing commit tip pushed to main needs its own exact-SHA receipt.",
+      "Branch deletions never need a receipt.",
+      "The main ruleset statuses and the Pages deployment verifier still bind the exact reviewed head (their tests are unchanged)."
+    ],
+    "replacementTests": [
+      "RISK repository process: pre-push lets branch pushes run CI before review and still guards main"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='pre-push lets branch pushes' tests/repository-process.test.js (2026-11-06T17:56:44Z, before the validator change)",
+      "failure": "AssertionError 'a work branch can be pushed for CI before its reviews exist (#2234)': validatePrePushUpdates returned the dirty-worktree and missing-receipt errors for a refs/heads/fix/2234 push instead of []. After the validator change the old test failed with 'local changes cannot be confused with the reviewed immutable commit' until its push target became refs/heads/main."
+    }
+  },
+  {
+    "baseCommit": "bd7ae9f94ba903adec80c16288249d9c789c015d",
     "testChangesSha256": "54336cab0302e44641f073b98c3d1a1e3c8581bf3807853152b6d856b992de9d",
     "reason": "#2232 (run CI once per push and fail only for real reasons), one record for the whole tests/ diff against main bd7ae9f94ba903adec80c16288249d9c789c015d (rebound after merging #2238 and #2250, which changed no #2232 test line). (1) Date-dependent fixtures: 'RISK DATE FORMAT: task chips history backups and diagnostics share the chosen date order' gave its 2027-02-03 due date to an app on the real clock, so the chip turns into \"overdue · Wed\" once that date passes (observed under a 120- and 400-day clock shift); 'RISK opening board presentation: shared markup retains released cards contexts task rows and history' only stayed green by computing dueSoon from Date.now(). Both now load through the new shared loadAppPinningNewDate, which pins new Date() and Date.now() in the app realm (it shares one loader with loadAppAtTime, which pins Date.now() only, so loadAppAtTime's body line changes too), and use literal dates three days after the pinned 2026-11-02 clock; the backup/diagnostic label reads the same pinned instant. The core import line gains loadAppPinningNewDate and the shared export line exports it. (2) Default group by file: 'RISK test inventory: every added environment-gated root is declared with the variable its registration skips on' asserted that every declared environment-skip root has a rootAssignments row; rows now hold only overrides, so it now reads the group runner's --describe descriptor and requires each declared root to be in a required group, whether placed by a row or by its file (the runner itself also refuses an environment skip whose root has no effective assignment). The same change migrated three agent-tool tests outside tests/ (not covered by this fingerprint): ci-routing's nightly workflow test and the quoted-fixture catalog test read the runner's --describe descriptor, and three metadata-edit router tests became edited-event execution tests because the workflow no longer fires on PR edits.",
     "previousBehavior": "On main the date format fixture ran on the real clock with a 2027-02-03 due date and failed whenever today passed that date; the opening board fixture derived its due date from the real clock; the environment-skip inventory test required an explicit rootAssignments row for every declared environment-skip root because every root had a row.",
