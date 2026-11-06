@@ -361,6 +361,26 @@ test('RISK large board deliberate recovery guidance: mounted FAQ and changelog e
  assert.match(release,/<li>Cloud recovery of a large board reads, encodes and checks each saved copy less often, so Retry sync rebuilds it with less memory\. A large board still waits for Retry sync\./,'the mounted changelog includes the released behavior');
  assert.match(release,/If a Retry sync run stops before it finishes, cloud recovery waits again; opening or returning to the app does not start it over\./);
 });
+// #2254 (owner decision): when the copy before the unreadable cloud copy is the
+// one this device last confirmed, the app publishes this board by itself. Help
+// says so, says what stays protected, says a large board otherwise waits, and
+// never sends anyone to another device to recover.
+test('RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the copy before the unreadable one is the one it last confirmed, and that a large board otherwise waits',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=markup.split('<dt>Does the app fix an unreadable cloud copy by itself?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const words=answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ assert.match(answer,/the copy before it is exactly the one this device last confirmed/);
+ assert.match(answer,/saves this device’s board as the new cloud copy by itself/);
+ assert.match(answer,/even while it says “recovery waiting”/);
+ assert.match(answer,/The unreadable copy stays protected in the cloud/);
+ assert.match(answer,/a large board still waits for Retry sync/);
+ assert.ok(words<=130,'the answer stays within the 130-word limit: '+words);
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/<li>When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app now saves this device’s board as the new cloud copy by itself/);
+ for(const text of [answer,release])assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i,'recovery never depends on another device');
+});
 // #2239 round 2 (owner decision): a large board can wait for Retry sync, so no
 // changelog item or FAQ answer may describe a large board recovering from an
 // older or earlier cloud copy without saying that it can wait.
