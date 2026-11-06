@@ -309,6 +309,26 @@ test('RISK large board recovery wait guidance: mounted FAQ and changelog explain
  assert.match(markup,/<li>When rebuilding a large board from an older cloud copy could need more memory than a phone allows, cloud recovery now waits/,'the mounted changelog includes the released behavior');
 });
 
+// #2226 (spec #2224) review: the board shows and takes input before cloud
+// recovery starts. Its Help answer and changelog line had no direct check, and
+// the line had landed under September 21, the oldest date in the current
+// changelog, instead of the November 4 release it ships in.
+test('RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=markup.split('<dt>Can I use my board while cloud recovery starts?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.ok(answer,'Help answers whether the board can be used while cloud recovery starts');
+ assert.match(answer,/the board shows and takes typing and taps before cloud recovery starts reading cloud copies/);
+ assert.match(answer,/While you type in a field, recovery waits until you leave it/);
+ assert.match(answer,/Settings, the debug log, Review cloud recovery and Restore stay available while recovery runs/);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help length every answer keeps');
+ const notes=markup.split('data-changelog-notes>')[1]||'',line=/<li>When the current cloud save cannot be read, the board now shows and takes your typing and taps before cloud recovery starts reading the cloud copies\./;
+ const november=notes.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(november,line,'the November 4 release note includes the ordering');
+ assert.doesNotMatch(notes.split('<h3>November 4, 2026</h3>')[1]?.split('</ul>').slice(1).join('</ul>')||'',line,'no older release lists it');
+});
+
 test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
  const app=await loadApp();app.ctx.openHelp();
  const markup=app.shim.document.getElementById('modalRoot').innerHTML;
