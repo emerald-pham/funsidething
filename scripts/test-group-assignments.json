@@ -11431,6 +11431,16 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "PWA cache contract: the fingerprints command reports the committed app fingerprint and shell cache key as current",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "SETTINGS: manual local backups replace visible JSON import and export controls",
       "group": "core",
       "file": "tests/core.test.js"

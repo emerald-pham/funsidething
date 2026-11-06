@@ -21387,5 +21387,25 @@
       "command": "node --test --test-name-pattern='RISK recovery wait: an over-budget automatic recovery default waits without publishing|RISK recovery wait: the saved restart record' tests/scenery.test.js (2026-11-06T04:59:36Z, ac48b6b plus the test changes); node --test --test-name-pattern='RISK recovery wait: an over-budget opening decides' tests/scenery.test.js (2026-11-06T04:38:39Z, c90402f); LANDSCAPE_BROWSER_URL=http://127.0.0.1:18963/ node --test --test-name-pattern='RISK large board recovery wait browser' tests/persistence-recovery.test.js (c90402f)",
       "failure": "Cold launch: AssertionError 'a cold launch over the remembered wait records it once' (actual 0, expected 1). Header-first: AssertionError 'only the opening pull downloads, and only the unreadable current generation' (5 chunk reads, 10 full device-source reads). Browser: Chromium +123 MiB and WebKit +121 MiB over the local open, above the 64 MiB margin. The title, motion and fixture-parameter changes are not behavioural; the normal-motion test's negative control against the pre-#2225 base 9d2592d failed (WebKit +194 MiB over the empty board, allowance 171 MiB)."
     }
+  },
+  {
+    "baseCommit": "552c3eee6394edc93512df257ac4d4719ef7106c",
+    "testChangesSha256": "403ce8edf509bcf3cc1049c35eb0a9bf77783caf753be97af3e3157639d61916",
+    "reason": "#2231 rewrites the failure message of the existing Settings changelog fingerprint assertion. The old message named no value, so after every shell edit the fingerprint had to be computed by hand, and it said every app change needs a dated changelog entry, which contradicts the AGENTS.md exemption for routine animation-frequency tuning. The assertion itself, its hash rules and the test name are unchanged; the digest moves into a named constant so the same value can appear in the message.",
+    "previousBehavior": "On a stale shell the test failed with \"App changed: add a dated changelog entry describing the changes and refresh its app fingerprint\", without the expected value or any way to produce it.",
+    "intendedBehavior": "On a stale shell the same assertion fails with the exact expected data-app-fingerprint, points to `npm run fingerprints -- --write`, and asks for a dated changelog entry for a user-facing change while noting the AGENTS.md animation-tuning exemption. A current shell still passes, and the fingerprint is still required for every shell byte change.",
+    "preservedCoverage": [
+      "Settings changelog: the current changelog entry must carry the app fingerprint of every shell asset and the worker, with the changelog block and cache key normalized exactly as before.",
+      "PWA cache contract: CACHE_NAME stays mechanically tied to every local app-shell byte (test unchanged).",
+      "The changelog still must mention Sunrise / Sunset, seasons and the cyclist (assertions unchanged)."
+    ],
+    "replacementTests": [
+      "PWA cache contract: the fingerprints command reports the committed app fingerprint and shell cache key as current",
+      "RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='fingerprints command reports|fingerprints --write after' tests/core.test.js (against the stub command), then node --test --test-name-pattern='Settings changelog: every app asset' tests/core.test.js with app-release.js appended to make the fingerprint stale",
+      "failure": "Against the stub the new tests failed: the report was {appFingerprint:{},cacheName:{},stale:null} instead of the committed cdf1b3ec... / chain-scanner-shell-6ce4124f... values, and a stale tree exited 0 instead of 1. With the stale probe the changelog test failed with the old message \"App changed: add a dated changelog entry describing the changes and refresh its app fingerprint\", which names no expected value; after the change the same probe names data-app-fingerprint=\"49c78fbe...\" matching the command."
+    }
   }
 ]
