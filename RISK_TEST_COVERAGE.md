@@ -2330,3 +2330,9 @@ The real Sync → Review action and Copy debug log consumer distinguish failed p
 - RISK large board opening guidance: mounted FAQ and changelog explain that a large board opens from this device with less memory
 
 The generated large-board fixture (447 tasks, long rating histories, 368 decision events, about 2.4 MB) opens from device storage on a served build. Peak web-process memory is sampled by the harness from the operating system and compared only with an empty board in the same run on the same engine (#2225, spec #2224).
+
+## Large board recovery memory
+
+- RISK large board recovery browser: the automatic recovery default reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
+
+The signed-in large-board fixture opens on a served build with the cloud faked in the page: an unreadable current generation over an intact earlier generation of similar size, with a newer Add, a newer scan decision and an unfinished draft on the device. The automatic recovery default must reach the older complete copy, keep every accepted decision, task, History entry, disposition and the draft, refuse publication and say the older copy is in use, while peak web-process memory stays within 384 times the board's serialized size of opening the same board locally in the same run on the same engine (#2227, spec #2224). The existing Node "RISK cloud generation recovery" and "RISK corrupt cloud work budget" tests keep the lossless rules.

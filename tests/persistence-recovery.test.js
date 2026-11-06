@@ -22,6 +22,7 @@ import {
   liveDoneDeliverySnapshot, ordinaryEditDebounceControl, settleRecovery188,
   settleRecoveryOperations188, divergentCloudSourceApp187, replaceIndependentServerPayload263,
   LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
+  largeSignedInBoardFixture,
 } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
@@ -1206,6 +1207,184 @@ test('RISK cloud generation recovery browser: the board renders and a trusted ke
   }finally{await browser.close();}
  }
  t.diagnostic(JSON.stringify(observed));
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
+// #2227 (spec #2224): the automatic recovery default over the large-board
+// fixture stays within a memory margin of opening the same board locally, and
+// stays lossless. Both scenarios seed a fresh profile through the app's own
+// first open (the board moves into device storage) and add one newer task
+// through Add, then measure a cold open of a fresh browser on that profile with
+// an unfinished draft left in Add. The local scenario has no cloud. The
+// recovery scenario fakes the signed-in cloud in the page as the #2194 and
+// #2226 browser tests do: the current generation reads as unreadable
+// (corrupt-generation, every chunk missing) and its root names an intact
+// earlier generation of similar size: the board this device accepted before
+// its newer edit, as it would have published it, plus one task saved
+// only there. Every source read downloads and encodes that generation afresh,
+// as the network does. Publication is refused, so the board stays on the older
+// complete copy without a cloud acknowledgement. Peak web-process memory is
+// read by the harness from the operating system, compared only with the local
+// opening in the same run on the same engine. The margin is a multiple of the
+// board's serialized size, as the spec's recovery budget is. Before #2227 the
+// reconciliation compared unchanged sources again for every resolved field and
+// never finished inside the app's 60 s recovery budget (WebKit passed 1.1 GiB
+// over the local opening while still running). After it, recovery finishes in
+// a few seconds at 525-540 MiB over the local opening in Chromium and 727-787
+// MiB in WebKit, about 300-340 bytes per serialized byte. What remains is
+// mostly writing the lossless recovery archives (about 13 times the board) and
+// reading them back exactly before publication. 384 leaves about 15% above
+// the highest WebKit run; WebKit is the engine closest to the phone.
+const LARGE_BOARD_RECOVERY_BYTES_FACTOR=384;
+test('RISK large board recovery browser: the automatic recovery default reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ // Signed in, as the owner's phone is: its decisions belong to the account.
+ const ACCOUNT='owner@example.test',fixture=await largeSignedInBoardFixture(ACCOUNT),{stats}=fixture;
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ const PRIOR_TITLE='Saved only in the intact earlier generation',NEWER_TITLE='Newer local edit before recovery',DRAFT='Unfinished draft kept through recovery';
+ const GENERATION_PATH='/__chain-2227/earlier-generation.json';
+ const allowance=LARGE_BOARD_RECOVERY_BYTES_FACTOR*stats.serializedBytes,SETTLE_MS=4000,RECOVERY_WAIT_MS=90000,observed=[],failures=[];
+ const taskCount=LARGE_BOARD_SHAPE.tasks+1;
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const open=async(scenario,cloud)=>{
+   let earlier=null;
+   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2227-'+engineName+'-'+scenario+'-'));
+   const launch=async(tag,seed,withCloud)=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
+    await context.addInitScript(({seed,withCloud,GENERATION_PATH,ACCOUNT})=>{
+     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
+     if(!withCloud)return;
+     const log=window.__largeRecovery={log:[],pulls:0};
+     let release;const answer=new Promise(resolve=>{release=resolve;});log.releasePull=()=>{setTimeout(release,0);};
+     const root={schemaVersion:2,rev:7,activeGeneration:'generation-unreadable',previousGeneration:'generation-intact-earlier',updatedAt:1,serverUpdatedAt:null};
+     const cloud={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+      signIn(){},signOut(){},recoveryIdentity:()=>'fixture-identity',
+      async pull(){
+       if(++log.pulls===1)await answer;log.log.push('pull');
+       Object.assign(cloud,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});
+       window.dispatchEvent(new CustomEvent('cloudsync'));
+       return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+      },
+      async push(){log.log.push('push');return {error:true,code:'permission-denied'};},
+      async recoveryEvidence(){return {identity:'fixture-identity',epoch:1,pending:null};},
+      // Each read downloads and encodes the earlier generation afresh, as the network does.
+      async readRecoverySource(){
+       log.log.push('source-read');
+       const payload=await (await fetch(GENERATION_PATH,{cache:'no-store'})).text(),encoded=await window.ChainStorageV2.encodeSnapshot(payload);
+       const header=(hash,baseRev)=>({schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash,baseRev});
+       return {identity:'fixture-identity',epoch:1,manifest:{...root},generations:[
+        {id:root.activeGeneration,header:header('e'.repeat(64),6),chunks:[]},
+        {id:root.previousGeneration,header:header(encoded.hash,5),chunks:encoded.chunks}]};
+      },
+      // Publication is refused: the board stays on the older copy without an acknowledgement.
+      async protectRecoverySources(){log.log.push('protect');return {error:true,code:'permission-denied'};},
+     };
+     Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloud,set(){}});
+     document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+    },{seed,withCloud,GENERATION_PATH,ACCOUNT});
+    return context;
+   };
+   const shown=count=>page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')
+    &&document.getElementById('listCount')?.textContent==='('+count+')'&&document.querySelectorAll('#listBody [data-row]').length===count,count,{timeout:60000});
+   // What recovery must keep, computed in the page: compact digests of the
+   // accepted decisions and tasks, and the History entries and scan
+   // dispositions themselves. Recovery keeps the union of its sources, so an
+   // entry only an older source still holds (a History entry this device's
+   // History limit already dropped, a disposition its new day cleared) may be
+   // added back; every accepted one must survive.
+   const kept=page=>page.evaluate(async()=>{
+    const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value??null)))),b=>b.toString(16).padStart(2,'0')).join('');
+    const out={};for(const key of ['decisionEvents','decisionBaseline','chain','deletedTaskIds','clearedHistoryIds'])out[key]=await digest(state[key]);
+    out.tasks=await digest(state.tasks.filter(task=>task.id!=='large-board-earlier-only'));out.draft=document.getElementById('addInput').value;
+    out.history=(state.workLog||[]).map(entry=>JSON.stringify(entry));
+    out.dispositions=Object.fromEntries(['considered','cantAt','workedAt'].map(key=>[key,JSON.parse(JSON.stringify(state[key]??{}))]));
+    return out;});
+   try{
+    const tag=`chain-2227-${engineName}-${scenario}-${process.pid}-${Date.now()}`;
+    let context=await launch(tag+'-seed',fixture.payload,false);
+    try{
+     const page=context.pages()[0]||await context.newPage();
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks)(page);
+     // The earlier generation: this device's accepted board before the newer edit.
+     const accepted=JSON.parse(await page.evaluate(()=>JSON.stringify(state)));
+     earlier=JSON.stringify({...accepted,tasks:[...accepted.tasks,{...syncTask('large-board-earlier-only',PRIOR_TITLE),ctx:['home']}]});
+     // The newer accepted edit, made through Add and saved to device storage.
+     await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(taskCount)(page);
+     // And a newer accepted scan decision, made with the real No button.
+     const decisions=await page.evaluate(()=>state.decisionEvents.length);
+     await page.locator('[data-act="no"]').first().click();
+     await page.waitForFunction(count=>state.decisionEvents.length>count&&Object.keys(state.considered).length>0,decisions,{timeout:30000});
+     await page.waitForFunction(()=>new Promise(resolve=>{const request=indexedDB.open('chain-scanner-v2');request.onerror=()=>resolve(false);
+      request.onsuccess=()=>{const db=request.result;try{const read=db.transaction('meta').objectStore('meta').get('head');
+       read.onsuccess=()=>{db.close();resolve(!!read.result);};read.onerror=()=>{db.close();resolve(false);};}catch{db.close();resolve(false);}};}),null,{timeout:30000});
+     await page.waitForTimeout(1500);
+    }finally{await context.close();}
+    context=await launch(tag,null,cloud);
+    let result;
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const sampler=webProcessMemorySampler(tag);
+     let memory,before,after,status=null,log=null,settled=true;
+     try{
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(taskCount)(page);
+      // An unfinished draft left in Add, not focused, as a person leaves it.
+      await page.locator('#addInput').fill(DRAFT);await page.locator('#addInput').blur();
+      before=await kept(page);
+      if(cloud){
+       await page.evaluate(()=>__largeRecovery.releasePull());
+       // Recovery has settled once its guarded publication was attempted. The
+       // wait is longer than the app's own 60 s recovery budget.
+       settled=await page.waitForFunction(()=>__largeRecovery.log.includes('protect')&&document.getElementById('syncBtn')?.textContent==='☁ older copy in use',null,{timeout:RECOVERY_WAIT_MS}).then(()=>true,()=>false);
+      }
+      await page.waitForTimeout(SETTLE_MS);
+     }finally{memory=await sampler.stop();}
+     after=await kept(page);
+     const titles=await page.$$eval('#listBody [data-row]',rows=>rows.map(row=>row.textContent));
+     if(cloud){status=await page.evaluate(()=>{const el=document.getElementById('syncBtn');return {text:el.textContent,title:el.title,className:el.className};});
+      log=await page.evaluate(()=>__largeRecovery.log.slice());}
+     result={memory,before,after,titles,status,log,errors,settled};
+    }finally{await context.close();}
+    return result;
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const local=await open('local',false),recovered=await open('recovery',true);
+  const extra=recovered.memory.peakBytes-local.memory.peakBytes,mib=bytes=>Math.round(bytes/1048576);
+  const summary={engine:engineName,localPeakMiB:mib(local.memory.peakBytes),recoveryPeakMiB:mib(recovered.memory.peakBytes),extraMiB:mib(extra),allowanceMiB:mib(allowance),
+   processes:[local.memory.processes,recovered.memory.processes],samples:[local.memory.samples,recovered.memory.samples],settled:recovered.settled,
+   status:recovered.status?.text,log:recovered.log};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  // Measurement preconditions: the harness saw this browser's own web process.
+  assert.ok(local.memory.processes>0&&recovered.memory.processes>0&&local.memory.samples>10&&recovered.memory.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
+  if(extra>allowance)failures.push(`${engineName}: recovering the large board peaked ${mib(extra)} MiB over opening it locally, above the ${mib(allowance)} MiB allowance`);
+  if(!recovered.settled){failures.push(`${engineName}: the automatic recovery default did not reach the older complete copy within ${RECOVERY_WAIT_MS/1000} s ${JSON.stringify(summary)}`);continue;}
+  assert.deepEqual([local.errors,recovered.errors],[[],[]],`${engineName}: no page errors`);
+  // Recovery ran on the intact earlier generation and the board uses it.
+  assert.ok(recovered.log.filter(entry=>entry==='source-read').length>=1,`${engineName}: the earlier generation was read`);
+  assert.ok(recovered.titles.some(text=>text.includes(PRIOR_TITLE)),`${engineName}: the task saved only in the earlier generation is on the board`);
+  // Lossless: every accepted decision, the unfinished draft and the newer edit are kept.
+  for(const [index,id] of fixture.ids.entries())assert.ok(recovered.titles.some(text=>new RegExp('Large board task '+index+'(?!\\d)').test(text)),`${engineName}: task ${id} is kept`);
+  assert.ok(recovered.titles.some(text=>text.includes(NEWER_TITLE)),`${engineName}: the newer local edit is kept`);
+  const {dispositions:beforeDispositions,history:beforeHistory,...beforeKept}=recovered.before,{dispositions:afterDispositions,history:afterHistory,...afterKept}=recovered.after;
+  assert.deepEqual(afterKept,beforeKept,`${engineName}: every accepted decision, task and the unfinished draft survive recovery unchanged`);
+  // Every accepted History entry survives, unchanged and in the same order.
+  const afterHistorySet=new Set(afterHistory);
+  assert.deepEqual(beforeHistory.filter(entry=>!afterHistorySet.has(entry)),[],`${engineName}: every accepted History entry survives recovery`);
+  const beforeHistorySet=new Set(beforeHistory);
+  assert.deepEqual(afterHistory.filter(entry=>beforeHistorySet.has(entry)),beforeHistory,`${engineName}: accepted History keeps its order`);
+  assert.ok(Object.keys(beforeDispositions.considered).length>0,`${engineName}: fixture precondition: the device holds a newer scan decision`);
+  for(const [key,entries] of Object.entries(beforeDispositions))for(const [id,value] of Object.entries(entries))
+   assert.deepEqual(afterDispositions[key]?.[id],value,`${engineName}: the accepted ${key} entry for ${id} survives recovery`);
+  assert.equal(recovered.after.draft,DRAFT);
+  // The status says the older copy is in use until a cloud acknowledgement.
+  assert.equal(recovered.status.text,'☁ older copy in use',`${engineName}: ${JSON.stringify(recovered.status)}`);
+  assert.match(recovered.status.title,/older complete copy of your board is in use/i);assert.match(recovered.status.title,/cloud saving is not confirmed/i);
+  assert.ok(!recovered.log.includes('push'),`${engineName}: nothing was published without the guarded recovery publication`);
+ }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
 

@@ -2852,11 +2852,23 @@ const LARGE_BOARD_SHAPE=Object.freeze({tasks:447,decisionEvents:368,historyMeanB
  eventMeanBytes:750,eventMaxBytes:78000,serializedBytes:2400000});
 let largeBoardFixturePromise=null;
 function largeBoardFixture(){return largeBoardFixturePromise||=buildLargeBoardFixture();}
+// #2227: the same board with every decision made while signed in to account,
+// as on the owner's phone. Decisions record their account and the baseline's
+// identity derives from it, so it is built signed in rather than relabelled.
+const largeSignedInBoardFixtures=new Map();
+function largeSignedInBoardFixture(account){
+ if(!largeSignedInBoardFixtures.has(account))largeSignedInBoardFixtures.set(account,buildLargeBoardFixture({account}));
+ return largeSignedInBoardFixtures.get(account);
+}
 async function buildLargeBoardFixture(){
  const shape=LARGE_BOARD_SHAPE,start=Date.parse('2026-06-01T12:00:00Z'),rand=mulberry32(2225);
  const ids=Array.from({length:shape.tasks},(_,i)=>'large-board-task-'+String(i).padStart(3,'0'));
  const seeded=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
   tasks:ids.map((id,i)=>({...syncTask(id,'Large board task '+i),ctx:['home'],createdAt:start-(shape.tasks-i)*3600000}))});
+ // #2227: largeSignedInBoardFixture passes {account}; the scan below then
+ // records every decision for that account, exactly as a signed-in app does.
+ const signedInAccount=arguments[0]?.account??null;
+ if(signedInAccount!==null)seeded.syncAccount=signedInAccount;
  const app=await loadApp({seed:2225,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}});
  try{
   const {ctx}=app;let now=start;const at=()=>{now+=60000;setFakeTime(ctx,now);return now;};setFakeTime(ctx,now);
@@ -3023,6 +3035,9 @@ async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_R
  // The runner retains finished hooks and, through them, each app realm. Its
  // in-memory database keeps every transaction's multi-megabyte rollback log,
  // so release the sources themselves or the full suite exhausts its heap.
+ // #2227: a debounced save from the test's last edit can still be writing
+ // when the test ends (recovery now finishes sooner); let it settle first.
+ t.after(async()=>{for(let i=0;i<500;i++){let active=0;try{active=vm.runInContext('supportDiagnosticsActivePersistCalls+(saveTimer?1:0)',ctx);}catch{}if(!active)break;await new Promise(resolve=>setTimeout(resolve,10));}});
  t.after(async()=>{try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
   backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
   await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
@@ -3852,6 +3867,7 @@ export {
   loadStorageV2, loadCloudV2, cloudV2Payload, cloudV2Adapter, CAPTURED_UNREADABLE_GENERATION,
   syntheticBoardOfBytes, capturedUnreadableGenerationFixture, CAPTURED_RECOVERY_BUDGET_MS,
   LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
+  largeSignedInBoardFixture,
   CAPTURED_RESULT_BUDGET_MS, largeSerializedBytes2198, CAPTURED_PHONE_SERIALIZATION_BYTES,
   exactPaddedBoard, capturedGenerationAcceptedApp2198, RECORDED_HEALTHY_STATUS_8CD524A,
   RECORDED_HEALTHY_READS_8CD524A, faithfulModalQuery2194, declineButton2194,
