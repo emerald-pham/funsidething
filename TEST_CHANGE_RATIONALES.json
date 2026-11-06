@@ -21362,5 +21362,25 @@
       "command": "node --test '--test-name-pattern=^RISK test-first gate: a root tests.js' tests/repository-process.test.js (review, 2026-11-05T03:41:08Z, ec32263 plus the new test); node --test '--test-name-pattern=^RISK test-first gate: the edit hook refuses a root tests.js' tests/repository-process.test.js (2026-11-05T03:43:10Z); #2208: node --test --test-name-pattern='a rationale is required only for removed or weakened tests' tests.js",
       "failure": "Review gate RED, before the gate change: AssertionError 'index.html, tests.js: the root tests.js edit is named' (actual '', expected /tests\\.js/). Review hook RED, before the hook change: AssertionError 'writing a root tests.js is refused: nothing runs it' (actual '', expected deny). #2208 RED: AssertionError 'an added test needs no rationale record' (actual ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'], expected []). The #2213 split is a move, so it has no behavioral RED; its negative control failed as expected, and each tooling slice had its own observed RED."
     }
+  },
+  {
+    "baseCommit": "9d2592d049bf5ed94074c11f7b6a7539ff718454",
+    "testChangesSha256": "be02043fa6bfac199f8c4ca76c251c0930f23e8a557f4e435c2fd8bd756b959d",
+    "reason": "#2231 rewrites the failure message of the existing Settings changelog fingerprint assertion. The old message named no value, so after every shell edit the fingerprint had to be computed by hand, and it said every app change needs a dated changelog entry, which contradicts the AGENTS.md exemption for routine animation-frequency tuning. The assertion itself, its hash rules and the test name are unchanged; the digest moves into a named constant so the same value can appear in the message.",
+    "previousBehavior": "On a stale shell the test failed with \"App changed: add a dated changelog entry describing the changes and refresh its app fingerprint\", without the expected value or any way to produce it.",
+    "intendedBehavior": "On a stale shell the same assertion fails with the exact expected data-app-fingerprint, points to `npm run fingerprints -- --write`, and asks for a dated changelog entry for a user-facing change while noting the AGENTS.md animation-tuning exemption. A current shell still passes, and the fingerprint is still required for every shell byte change.",
+    "preservedCoverage": [
+      "Settings changelog: the current changelog entry must carry the app fingerprint of every shell asset and the worker, with the changelog block and cache key normalized exactly as before.",
+      "PWA cache contract: CACHE_NAME stays mechanically tied to every local app-shell byte (test unchanged).",
+      "The changelog still must mention Sunrise / Sunset, seasons and the cyclist (assertions unchanged)."
+    ],
+    "replacementTests": [
+      "PWA cache contract: the fingerprints command reports the committed app fingerprint and shell cache key as current",
+      "RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='fingerprints command reports|fingerprints --write after' tests/core.test.js (against the stub command), then node --test --test-name-pattern='Settings changelog: every app asset' tests/core.test.js with app-release.js appended to make the fingerprint stale",
+      "failure": "Against the stub the new tests failed: the report was {appFingerprint:{},cacheName:{},stale:null} instead of the committed cdf1b3ec... / chain-scanner-shell-6ce4124f... values, and a stale tree exited 0 instead of 1. With the stale probe the changelog test failed with the old message \"App changed: add a dated changelog entry describing the changes and refresh its app fingerprint\", which names no expected value; after the change the same probe names data-app-fingerprint=\"49c78fbe...\" matching the command."
+    }
   }
 ]
