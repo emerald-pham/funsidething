@@ -254,17 +254,48 @@
     // shaped like readRawExportSnapshot() restricted to the rows present. A
     // recovery check that compares a few rows no longer reads every saved
     // archive (many times the board's size after a recovery) to find them.
-    async function readRawRows(request){
+    // #2239: {keysOnly} names stores whose rows are only looked up by key; each
+    // present row's value is then undefined, so a check that a row is still
+    // present does not read it (an archive is several times the board's size).
+    async function readRawRows(request,{keysOnly=[]}={}){
       ensureOpen();
       const names=storeNames.filter(name=>Array.isArray(request?.[name]));
       if(!names.length)return {stores:{}};
       const tx=await beginTransaction(names,"readonly"),done=transactionDone(tx);
       try{
         const entries=await Promise.all(names.map(async name=>{
-          const store=tx.objectStore(name),wanted=[...new Set(request[name])];
-          const rows=await Promise.all(wanted.map(key=>Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key))])));
+          const store=tx.objectStore(name),wanted=[...new Set(request[name])],keyOnly=Array.isArray(keysOnly)&&keysOnly.includes(name);
+          const rows=await Promise.all(wanted.map(key=>Promise.all([requestResult(store.getKey(key)),keyOnly?undefined:requestResult(store.get(key))])));
           const present=rows.filter(([key])=>key!==undefined);
           return [name,{keys:present.map(([key])=>key),values:present.map(([,value])=>value)}];
+        }));
+        await done;
+        return {stores:Object.fromEntries(entries)};
+      }catch(error){
+        try{tx.abort();}catch(e){}
+        try{await done;}catch(e){}
+        observeRecovery("failed",error,"raw-snapshot",tx.db);
+        throw error;
+      }
+    }
+
+    // #2239: the meta and backup rows in full, and only the keys of the
+    // snapshots and opaque archives. Shaped like readRawExportSnapshot() with
+    // those two stores' values left empty, so a recovery attempt can check the
+    // source it already read without reading every saved board and archive
+    // again. It is not a full comparison: a snapshot can change under its key
+    // (repairHeadSnapshot rewrites one under its hash; commitHead and
+    // putBackup drop extra fields from one they write again). The full
+    // comparison of the source inside writeRecoveredSource's transaction is
+    // what catches that.
+    async function readRawFingerprint(){
+      ensureOpen();
+      const tx=await beginTransaction(storeNames,"readonly"),done=transactionDone(tx);
+      try{
+        const entries=await Promise.all(storeNames.map(async name=>{
+          const store=tx.objectStore(name),keysOnly=name==="snapshots"||name==="opaque";
+          const [keys,values]=await Promise.all([requestResult(store.getAllKeys()),keysOnly?[]:requestResult(store.getAll())]);
+          return [name,{keys,values}];
         }));
         await done;
         return {stores:Object.fromEntries(entries)};
@@ -354,10 +385,19 @@
       return result.sort((a,b)=>(b.at||0)-(a.at||0)||String(a.id).localeCompare(String(b.id)));
     }
 
-    async function listOpaqueArchives(){
+    // #2239: {prefix} lists only the archives whose keys start with it, for a
+    // caller that looks for one kind (a push checks its manual recovery
+    // sources): it no longer reads every saved archive, several times the
+    // board's size after an automatic recovery. A corrupt row in that range is
+    // refused as an unprotected one is.
+    async function listOpaqueArchives({prefix=null}={}){
       ensureOpen();
       const tx=await beginTransaction("opaque","readonly"),done=transactionDone(tx),store=tx.objectStore("opaque");
-      const [rows,keys]=await Promise.all([requestResult(store.getAll()),requestResult(store.getAllKeys())]);
+      let rows,keys;
+      if(typeof prefix==="string"&&prefix){
+        keys=(await requestResult(store.getAllKeys())).filter(key=>typeof key==="string"&&key.startsWith(prefix));
+        rows=await Promise.all(keys.map(key=>requestResult(store.get(key))));
+      }else [rows,keys]=await Promise.all([requestResult(store.getAll()),requestResult(store.getAllKeys())]);
       await done;
       const protectedRaw=protectedRawRowReader(keys,rows),readable=rows.filter((row,index)=>{
         if(row&&Object.prototype.toString.call(row)==="[object Object]")return true;
@@ -387,7 +427,12 @@
       if(head?.hash!==expectedHash||existingKey!==undefined&&(existing?.key!==key||existing?.raw!==raw)){tx.abort();try{await done;}catch{}return false;}
       if(existingKey===undefined)store.put({key,raw,order:Date.now()},key);
       await done;
-      return (await listOpaqueArchives()).some(row=>row.key===key&&row.raw===raw);
+      // #2239: the protected row is read back once, alone, and compared exactly,
+      // rather than read with every saved archive (several times the board's
+      // size after a recovery).
+      const readback=await readRawRows({opaque:[key]}),at=readback.stores.opaque?.keys?.indexOf(key)??-1;
+      const saved=at<0?null:readback.stores.opaque.values[at];
+      return !!saved&&Object.prototype.toString.call(saved)==="[object Object]"&&saved.key===key&&saved.raw===raw;
     }
 
     async function rawTransactionSnapshot(tx){
@@ -730,7 +775,7 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint};
     return api;
   }

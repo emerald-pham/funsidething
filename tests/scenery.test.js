@@ -1110,6 +1110,199 @@ test('RISK recovery wait: after a deliberate run confirmed with an earlier cloud
  const at=reads.length;await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
  assert.ok(reads.slice(at).some(path=>path.startsWith(activePath)),'Retry sync checks the earlier incomplete generation again');
 });
+// #2239 review (S1): a deliberate run over the budget that ends without
+// adopting anything (here its read deadline; an error ends it the same way)
+// must not leave the unreadable generation unremembered, or returning to the
+// app weighs it again. It returns to the wait it started from, remembered in
+// this page and on this device, so returning to the app reads only the server
+// root and starts nothing; Retry sync still runs it deliberately.
+test('RISK recovery wait: a deliberate run that ends on its deadline without adopting returns to the remembered wait, and returning to the app reads neither generation again',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ // The harness's timers do not hold the process open while the run waits.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const PRIOR='Saved only in the intact prior generation',KEY='fvp:chain-scanner:proved-unreadable-cloud-source',HOLD_MS=2500;
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ // The deliberate run's download of the earlier generation outlasts its read deadline.
+ const reads=[];let slow=true;
+ app.faults.serverRead=async path=>{reads.push(path);if(slow&&path===priorPath+'/chunks')await new Promise(resolve=>setTimeout(resolve,HOLD_MS));};
+ t.after(()=>{delete app.faults.serverRead;});
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=1500;
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
+ // The abandoned download finishes before the app is returned to.
+ await fixtureDeadline(async wait=>{await wait(HOLD_MS+500);while(!recoveryWaitIdle2228(ctx))await wait(10);},'the abandoned download drains',CAPTURED_RESULT_BUDGET_MS+20000);
+ // Positive controls: Retry sync ran recovery deliberately until its deadline, adopting and publishing nothing.
+ assert.ok(reads.includes(priorPath+'/chunks'),'positive control: the deliberate run started downloading the earlier generation');
+ assert.deepEqual(recoveryBudgetEvents2228(ctx).map(event=>event.metadata.budgetOutcome),['deferred','deliberate'],'positive control: the opening waited and Retry sync ran deliberately');
+ assert.equal(JSON.stringify(ctx.state),before,'the accepted board stays exactly as it was');
+ assert.deepEqual(await store.readHead(),head);assert.equal(await store.getRecoveryCloudHold(),null,'nothing was adopted');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'nothing is published');assert.equal(backend.writes.length,writes);
+ // Behaviour under test: the wait is back, remembered in this page and on this device.
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','the cloud button says recovery is waiting again');
+ assert.equal(JSON.parse(shim.localStorage.getItem(KEY)||'null')?.waiting,true,'this device remembers the wait');
+ assert.equal(vm.runInContext('provedUnreadableCloudSource?.waiting===true',ctx),true,'this page remembers the wait');
+ // Returning to the app over the unchanged root reads neither generation and starts nothing.
+ slow=false;ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=60000;
+ for(const type of ['focus','visibilitychange','online']){
+  if(type==='visibilitychange'){shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;}
+  const at=reads.length;vm.runInContext('resumeCloudSync({type:'+JSON.stringify(type)+'})',ctx);
+  await fixtureDeadline(async wait=>{while(reads.length===at||!recoveryWaitIdle2228(ctx))await wait(10);},'the '+type+' read settles',CAPTURED_RESULT_BUDGET_MS+20000);
+  assert.deepEqual(reads.slice(at).filter(path=>path.startsWith(activePath)||path.startsWith(priorPath)),[],type+' reads neither generation again');
+  assert.ok(reads.slice(at).includes('users/owner'),type+' still reads the server root');
+  assert.equal(syncStatus2200(shim).text,'☁ recovery waiting',type+' keeps the waiting status');
+ }
+ assert.equal(ctx.state.tasks.some(task=>task.title===PRIOR),false,'nothing ran on its own');
+ assert.equal(recoveryBudgetEvents2228(ctx).length,2,'returning to the app weighs nothing again');
+ // Retry sync still runs it deliberately.
+ refuseNextRecoveryTransaction255(app.faults);
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'the second Retry sync settles');
+ assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR),'Retry sync still runs it deliberately');
+});
+// #2239 re-review: what decides the replay is what ended the run, not what is
+// open when it ends. A deliberate run that ends on its deadline while Settings
+// happens to be open returns to the wait like any other deadline, so closing
+// Settings does not run it again; only Retry sync or signing in again does.
+test('RISK recovery wait: a deliberate run that ends on its deadline while Settings is open returns to the wait and does not run again when Settings closes',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,priorPath}=app;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ t.after(faithfulModalQuery2194(shim));
+ // The harness's timers do not hold the process open while the run waits.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const PRIOR='Saved only in the intact prior generation',HOLD_MS=2500;
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ // Settings opens while the deliberate run downloads the earlier generation,
+ // and that download outlasts the run's read deadline.
+ const reads=[];let slow=true,opened=false;
+ app.faults.serverRead=async path=>{reads.push(path);
+  if(slow&&path===priorPath+'/chunks'){if(!opened){opened=true;ctx.openSettings();}await new Promise(resolve=>setTimeout(resolve,HOLD_MS));}};
+ t.after(()=>{delete app.faults.serverRead;});
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=1500;
+ const before=JSON.stringify(ctx.state);
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
+ await fixtureDeadline(async wait=>{await wait(HOLD_MS+500);while(!recoveryWaitIdle2228(ctx))await wait(10);},'the abandoned download drains',CAPTURED_RESULT_BUDGET_MS+20000);
+ // Positive controls: Settings was open when the deliberate run hit its deadline, and nothing was adopted.
+ assert.equal(opened,true,'Settings opened during the deliberate run');
+ assert.equal(vm.runInContext('hasActiveEditor()',ctx),true,'Settings is still open');
+ assert.deepEqual(recoveryBudgetEvents2228(ctx).map(event=>event.metadata.budgetOutcome),['deferred','deliberate']);
+ assert.equal(JSON.stringify(ctx.state),before,'nothing was adopted');
+ // Behaviour under test: closing Settings does not run the recovery again.
+ slow=false;ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=60000;
+ const at=reads.length;ctx.closeModal();await flush();await recoveryWaitIdleAfter2228(ctx,'closing Settings settles');
+ assert.deepEqual(reads.slice(at).filter(path=>path.startsWith(priorPath)),[],'closing Settings does not download the earlier generation again');
+ assert.equal(ctx.state.tasks.some(task=>task.title===PRIOR),false,'the recovery did not run again');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','the cloud button says recovery is waiting');
+ assert.equal(vm.runInContext('cloudRecoveryDeliberate',ctx),false,'no deliberate request is left to replay');
+});
+// #2239 review: the check of earlier sources lists the verified recovery
+// archives without hashing them. Hashing serializes each archive row, and the
+// serializer refuses a row that holds a BigInt it reaches (a plain BigInt, or
+// a BigInt64Array or BigUint64Array with elements; an empty one is {}, and Map
+// and Set contents are not serialized at all). The listing must refuse and
+// accept exactly the rows hashing does, so leaving the hashes out changes no
+// outcome of the check.
+test('RISK earlier source check: listing verified recovery archives without their hashes refuses exactly the archive rows that hashing them refuses, including BigInt typed arrays',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ // The storage module that hashes each row, as the device-backed app loads it.
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),ctx,{filename:'device-store-v2.js'});ctx.window.ChainStorageV2=ctx.ChainStorageV2;
+ const source=JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,automaticRecovery:true,identity:'owner',generations:[],candidateSources:[]});
+ // Each extra value beside the archive text, and whether hashing refuses the row.
+ const cases={none:['undefined',false],bigint:['1n',true],nestedBigint:['({a:[{b:2n}]})',true],
+  bigInt64:['new BigInt64Array([3n])',true],bigUint64:['new BigUint64Array([4n])',true],nestedBigUint64:['({a:[new BigUint64Array([5n])]})',true],
+  emptyBigInt64:['new BigInt64Array(0)',false],int8:['new Int8Array([1])',false],mapOfBigint:['new Map([[1,6n]])',false],
+  setOfBigInt64:['new Set([new BigInt64Array([7n])])',false]};
+ for(const [name,[expression,refused]] of Object.entries(cases)){
+  const snapshot=vm.runInContext('({stores:{opaque:{keys:["automatic-cloud-source:check"],values:[{raw:'+JSON.stringify(source)+',extra:'+expression+'}]}}})',ctx);
+  const outcome=async hashes=>{
+   try{return (await ctx.automaticRecoveryArchiveIndex(snapshot,'owner',null,{hashes})).map(row=>row.key).join(',');}
+   catch(error){return 'refused';}
+  };
+  const hashed=await outcome(true),listed=await outcome(false);
+  // Positive control: hashing refuses the rows that hold a BigInt it serializes, and lists the rest.
+  assert.equal(hashed,refused?'refused':'automatic-cloud-source:check',name+': hashing '+(refused?'refuses':'lists')+' the row');
+  assert.equal(listed,hashed,name+': the listing without hashes does the same');
+ }
+});
+// #2239 (decision recorded on #2239): each recovery archive is read back once,
+// exactly, when it is written. Archive rows are never replaced or deleted under
+// their key, so publication checks before every step that they are still
+// present by key, and a push reads only its own kind of archive, instead of
+// reading every archive (several times the board's size) again each time.
+// Counted here: the archive text the device store hands back from the deliberate
+// run's start until publication releases its hold, against the text written.
+const archiveTextRead2239=result=>{let bytes=0;
+ for(const row of Array.isArray(result)?result:result?.stores?.opaque?.values||[])if(typeof row?.raw==='string')bytes+=row.raw.length;return bytes;};
+const countArchiveTraffic2239=(t,store,phase)=>{
+ const traffic={written:0,read:{},calls:{}};
+ for(const name of ['readRawRows','listOpaqueArchives','readRawExportSnapshot']){
+  const original=store[name];
+  store[name]=async function(...args){const at=phase();traffic.calls[name+':'+at]=(traffic.calls[name+':'+at]||0)+1;
+   const result=await original.apply(this,args);traffic.read[at]=(traffic.read[at]||0)+archiveTextRead2239(result);return result;};
+  t.after(()=>{store[name]=original;});
+ }
+ const write=store.writeRecoveredSource,protect=store.protectRecoverySource;
+ store.writeRecoveredSource=async function(options){for(const row of options?.archives||[])traffic.written+=row.raw.length;return write.apply(this,arguments);};
+ store.protectRecoverySource=async function(options){traffic.written+=options?.raw?.length||0;return protect.apply(this,arguments);};
+ t.after(()=>{store.writeRecoveredSource=write;store.protectRecoverySource=protect;});
+ return traffic;
+};
+const deliberateRunWithPublication2239=async(t,app)=>{
+ const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ // The harness's timers do not hold the process open while retries wait.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ // Publication ends by releasing its hold; what follows is the run's check of earlier sources.
+ let released=false;const clear=store.clearRecoveryCloudHoldIfCurrent;
+ store.clearRecoveryCloudHoldIfCurrent=async function(...args){const result=await clear.apply(this,args);if(result)released=true;return result;};
+ t.after(()=>{store.clearRecoveryCloudHoldIfCurrent=clear;});
+ const phase=()=>released?'after':'run',traffic=countArchiveTraffic2239(t,store,phase),reads=[];
+ app.faults.serverRead=async path=>{reads.push({phase:phase(),path});};t.after(()=>{delete app.faults.serverRead;});
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'the deliberate run and its checks settle');
+ // Positive controls: Retry sync rebuilt, published and confirmed the board.
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved only in the intact prior generation'),'positive control: the deliberate run rebuilt the board');
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: publication released its hold');
+ assert.equal(released,true);assert.equal(syncStatus2200(shim).text,'☁ synced');
+ return {traffic,reads};
+};
+test('RISK recovery read-backs: a deliberate run reads each recovery archive back once after writing it, and publication and its push check archives by key rather than reading every archive again',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{traffic}=await deliberateRunWithPublication2239(t,app);
+ const read=traffic.read.run||0,ratio=read/traffic.written;
+ t.diagnostic(JSON.stringify({written:traffic.written,read,ratio:+ratio.toFixed(2),calls:traffic.calls}));
+ assert.ok(traffic.written>0,'positive control: the run wrote its recovery archives');
+ // The commit's one exact readback and publication's one list of archives:
+ // about twice what was written, where reading the archives again before
+ // every publication step and push read them many times over.
+ assert.ok(ratio<=2.5,'archive text read back until publication ends is at most 2.5 times what was written: '+ratio.toFixed(2));
+});
+// #2239: during one run the accepted device source is checked again at every
+// stage of the cloud read. It is read in full once; each later check reads its
+// fingerprint (the meta and backup rows in full, and the keys of the snapshots
+// and archives) and reuses that capture when it is unchanged. A fingerprint
+// does not see a snapshot rewritten under its key, so the commit's full
+// comparison inside its write is what decides adoption.
+test('RISK recovery device capture: a deliberate run reads the device sources in full once, and its later checks during the cloud read compare their fingerprint',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{traffic}=await deliberateRunWithPublication2239(t,app);
+ t.diagnostic(JSON.stringify(traffic.calls));
+ assert.ok((traffic.calls['readRawExportSnapshot:run']||0)>=1,'positive control: the run read the device sources');
+ assert.ok((traffic.calls['readRawExportSnapshot:run']||0)<=2,'the device sources are read in full at most twice until publication ends: '+JSON.stringify(traffic.calls));
+});
+test('RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{activePath}=app,{traffic,reads}=await deliberateRunWithPublication2239(t,app);
+ const after=reads.filter(read=>read.phase==='after').map(read=>read.path);
+ t.diagnostic(JSON.stringify({after,calls:traffic.calls}));
+ const status=vm.runInContext('JSON.stringify(automaticCloudSourceResumeStatus)',app.ctx);
+ assert.match(status,/"unresolved":1/,'positive control: the unreadable generation is still an unresolved earlier source: '+status);
+ assert.ok(after.filter(path=>path===activePath+'/chunks').length>=2,'positive control: the run rechecked the incomplete generation more than once: '+JSON.stringify(after));
+ // Behaviour under test: each recheck reads that generation alone, and the
+ // device sources and archives are read once, for the history the rechecks share.
+ assert.deepEqual(after.filter(path=>path!==activePath&&path!==activePath+'/chunks'),[],'rechecks read nothing but the incomplete generation');
+ assert.ok((traffic.calls['readRawExportSnapshot:after']||0)<=1,'the device sources are read once after publication: '+JSON.stringify(traffic.calls));
+ assert.ok((traffic.calls['listOpaqueArchives:after']||0)<=1,'every archive is listed once after publication: '+JSON.stringify(traffic.calls));
+});
 
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,
