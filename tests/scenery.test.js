@@ -1004,6 +1004,82 @@ test('RISK recovery wait: the saved restart record tells a recovery that waited,
  });
 });
 
+// #2228 review (stories 8 and 18): after a deliberate run over the budget,
+// two automatic paths could redo the same unbounded work on every open or
+// resume: publishing the recovered board under its pending cloud
+// confirmation, and checking earlier incomplete cloud copies again. Neither
+// runs automatically while the recovery is over its budget; Retry sync runs
+// them deliberately.
+const recoveryWaitIdleAfter2228=(ctx,message)=>fixtureDeadline(async wait=>{await wait(50);while(!recoveryWaitIdle2228(ctx))await wait(10);await wait(50);while(!recoveryWaitIdle2228(ctx))await wait(10);},message,CAPTURED_RESULT_BUDGET_MS+20000);
+test('RISK recovery wait: after a deliberate run that the cloud has not confirmed, resuming or a cold launch does not publish it again until Retry sync',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ const PRIOR='Saved only in the intact prior generation';
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ // The deliberate run's own cloud confirmation is refused once.
+ refuseNextRecoveryTransaction255(app.faults);
+ await ctx.onAction('sync-retry',{});await recoveryWaitSettle2228(ctx,'Retry sync settles');
+ assert.equal((await store.getRecoveryCloudHold())?.automaticRecovery,true,'positive control: the deliberate run is pending cloud confirmation');
+ assert.ok(ctx.state.tasks.some(task=>task.title===PRIOR));
+ const cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
+ // Publishing begins by reading every recovery archive back (many times the
+ // board's size): that is the work an automatic path must not repeat.
+ let archiveReads=0;const listArchives=store.listOpaqueArchives;
+ store.listOpaqueArchives=function(...args){archiveReads++;return listArchives.apply(this,args);};t.after(()=>{store.listOpaqueArchives=listArchives;});
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ // An ordinary edit on the recovered board saves on this device only.
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ shim.document.getElementById('addInput').value='Edit while cloud confirmation waits';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await recoveryWaitIdleAfter2228(ctx,'the edit settles');
+ assert.equal(archiveReads,0,'an edit does not start publishing the over-budget recovery');assert.deepEqual(reads,[],'an edit reads nothing from the cloud');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'an edit does not publish the over-budget recovery');assert.equal(backend.writes.length,writes);
+ const hold=await store.getRecoveryCloudHold();
+ assert.equal(hold?.automaticRecovery,true,'its cloud confirmation stays pending after the edit');
+ // Returning to the app.
+ shim.document.hidden=true;vm.runInContext('suspendCloudSync()',ctx);shim.document.hidden=false;
+ vm.runInContext('resumeCloudSync({type:"visibilitychange"})',ctx);await recoveryWaitIdleAfter2228(ctx,'the resumed pull settles');
+ assert.equal(archiveReads,0,'resuming does not start publishing it');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'resuming does not publish the over-budget recovery');assert.equal(backend.writes.length,writes);
+ assert.deepEqual(await store.getRecoveryCloudHold(),hold,'its cloud confirmation stays pending');
+ // A cold launch.
+ const edited=JSON.stringify(ctx.state);await closeLegacyApp173(app);backend.CS.suspend();
+ const coldReads=[],cold=await coldRelaunch2198(t,app,coldReads,{signIn:false});
+ cold.ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;
+ cold.backend.emitAuth({uid:'owner',email:'e@example.com'});cold.ctx.closeModal();await flush();await cold.ctx.cloudPull();await cold.settle('the cold launch settles');
+ assert.equal(JSON.stringify(cold.ctx.state),edited,'the cold launch opens the recovered board');
+ assert.equal(JSON.stringify([...backend.docs]),cloudBefore,'a cold launch does not publish it either');
+ assert.deepEqual(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),hold);
+ // Retry sync publishes it deliberately.
+ await cold.ctx.onAction('sync-retry',{});await cold.settle('Retry sync settles');
+ assert.equal(await cold.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,'Retry sync confirms the recovered board');
+ assert.notEqual(JSON.stringify([...backend.docs]),cloudBefore,'Retry sync publishes it');
+ assert.ok(cold.ctx.state.tasks.some(task=>task.title===PRIOR));
+});
+test('RISK recovery wait: after a deliberate run confirmed with an earlier cloud copy still incomplete, returning to the app does not check it again until Retry sync',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,activePath}=app;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ // The harness's timers do not hold the process open while retries wait.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();await ctx.cloudPull();await recoveryWaitSettle2228(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits');
+ await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'the deliberate run and its checks settle');
+ assert.equal(await ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,'positive control: the cloud confirmed the deliberate run');
+ const status=vm.runInContext('JSON.stringify(automaticCloudSourceResumeStatus)',ctx);
+ assert.match(status,/"unresolved":1/,'positive control: the unreadable generation is still an unresolved earlier source: '+status);
+ const reads=[];app.faults.serverRead=async path=>{reads.push(path);};t.after(()=>{delete app.faults.serverRead;});
+ // Returning to the app asks for the earlier sources to be checked again.
+ for(const type of ['focus','online']){
+  const at=reads.length;vm.runInContext('resumeCloudSync({type:'+JSON.stringify(type)+'})',ctx);
+  await recoveryWaitIdleAfter2228(ctx,'the '+type+' pull settles');
+  assert.ok(reads.slice(at).includes('users/owner'),type+' still reads the server root');
+  assert.deepEqual(reads.slice(at).filter(path=>path.startsWith(activePath)),[],type+' does not check the earlier incomplete generation again');
+ }
+ // Retry sync checks it deliberately.
+ const at=reads.length;await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
+ assert.ok(reads.slice(at).some(path=>path.startsWith(activePath)),'Retry sync checks the earlier incomplete generation again');
+});
+
 // #2194 review M1: a pull that fails before any server root is read (offline,
 // timeout, network, permission, interrupted) is no evidence about the source,
 // so it must not cost the completed refusal kept in device storage.

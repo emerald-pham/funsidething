@@ -12761,6 +12761,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK large board recovery wait guidance: mounted FAQ and changelog explain that after Retry sync a large board saves to the cloud and rechecks earlier copies only when Retry sync runs again",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13132,6 +13137,16 @@
     },
     {
       "root": "RISK recovery wait: the saved restart record tells a recovery that waited, ran within its budget or ran deliberately apart",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: after a deliberate run that the cloud has not confirmed, resuming or a cold launch does not publish it again until Retry sync",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
+      "root": "RISK recovery wait: after a deliberate run confirmed with an earlier cloud copy still incomplete, returning to the app does not check it again until Retry sync",
       "group": "scenery",
       "file": "tests/scenery.test.js"
     },

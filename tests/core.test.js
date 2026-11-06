@@ -309,6 +309,30 @@ test('RISK large board recovery wait guidance: mounted FAQ and changelog explain
  assert.match(markup,/<li>When rebuilding a large board from an older cloud copy could need more memory than a phone allows, cloud recovery now waits/,'the mounted changelog includes the released behavior');
 });
 
+// #2228 review: after Retry sync rebuilds a large board, its cloud save and the
+// recheck of earlier incomplete copies wait for Retry sync too, so opening,
+// returning or editing never repeats that work.
+test('RISK large board recovery wait guidance: mounted FAQ and changelog explain that after Retry sync a large board saves to the cloud and rechecks earlier copies only when Retry sync runs again',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ const after=answer('Why does a large board wait for Retry sync after recovery?');
+ assert.ok(after,'Help answers why a large board waits for Retry sync after recovery');
+ assert.match(after,/opening the app, returning to it, reconnecting or editing does not try again/);
+ assert.match(after,/Retry sync or signing in again does/);
+ assert.match(after,/checking earlier incomplete cloud copies again/);
+ const incomplete=answer('What happens when an incomplete cloud copy becomes readable?');
+ assert.match(incomplete,/After Retry sync rebuilds a large board, only Retry sync checks it again/);
+ // The answer that names every cloud button label names this one too.
+ const labels=answer('What do the cloud button labels mean?');
+ assert.match(labels,/<b>recovery waiting<\/b>: /,'Help explains the recovery waiting label');
+ for(const [name,text] of [['after',after],['incomplete',incomplete],['labels',labels]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 4, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/After Retry sync rebuilds a large board, opening or returning to the app does not repeat its cloud save or recheck earlier incomplete copies; Retry sync does\./);
+});
+
 // #2226 (spec #2224) review: the board shows and takes input before cloud
 // recovery starts. Its Help answer and changelog line had no direct check, and
 // the line had landed under September 21, the oldest date in the current
