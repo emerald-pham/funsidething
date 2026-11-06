@@ -1253,72 +1253,86 @@
     {
       "root": "contrast (dark): body text on a panel clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (dark): body text on the page clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (dark): candidate card text clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (dark): links and accents clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (dark): muted secondary text clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (dark): white ink, foot of chain card clears 3:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (dark): white ink, top of chain card clears 3:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (light): body text on a panel clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (light): body text on the page clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (light): candidate card text clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (light): links and accents clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (light): muted secondary text clears 4.5:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (light): white ink, foot of chain card clears 3:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast (light): white ink, top of chain card clears 3:1",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "contrast: the accent token is used for link text rather than the card-fill token",
@@ -2978,7 +2992,8 @@
     {
       "root": "native smoke cohort requires its actual local driver outcome and complete evidence",
       "group": "native-process",
-      "file": "scripts/agent-tools/native-task-smoke.test.mjs"
+      "file": "scripts/agent-tools/native-task-smoke.test.mjs",
+      "registration": "dynamic"
     },
     {
       "root": "native smoke keeps approved public origins separate from explicit local fixtures",
@@ -6623,12 +6638,14 @@
     {
       "root": "RISK fireworks twilight: actual festival painter keeps sunrise and sunset particles visible below daytime",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "RISK fireworks twilight: actual fireworks painter keeps sunrise and sunset particles visible below daytime",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime",
@@ -6638,22 +6655,26 @@
     {
       "root": "RISK fireworks twilight: legacy festival admits dawn and dusk while excluding full daytime",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "RISK fireworks twilight: legacy fireworks admits dawn and dusk while excluding full daytime",
       "group": "core",
-      "file": "tests/core.test.js"
+      "file": "tests/core.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "RISK fireworks twilight: UTC festival opportunities admit both twilight directions and reload exactly",
       "group": "scenery",
-      "file": "tests/scenery.test.js"
+      "file": "tests/scenery.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "RISK fireworks twilight: UTC fireworks opportunities admit both twilight directions and reload exactly",
       "group": "scenery",
-      "file": "tests/scenery.test.js"
+      "file": "tests/scenery.test.js",
+      "registration": "dynamic"
     },
     {
       "root": "RISK FIRST SIGN IN: a differing same-revision board is pending until its exact upload is acknowledged",
@@ -13367,6 +13388,16 @@
     },
     {
       "root": "RISK repository process: a pull request edit starts no CI run and executes no test group",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "test group describe and nightly preflight fail when a declared required or nightly root resolves to zero tests",
+      "group": "native-process",
+      "file": "scripts/agent-tools/test-groups.test.mjs"
+    },
+    {
+      "root": "RISK repository process: a declared required or nightly root that resolves to zero tests fails the group runner",
       "group": "core",
       "file": "tests/repository-process.test.js"
     }

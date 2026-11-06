@@ -735,6 +735,37 @@ test('test group nightly cohort runs only the declared cross-engine cases and fa
   });
 });
 
+// #2232: a declared root that resolves to zero tests must fail visibly. Describe
+// checks every required root against its file before any group runs; a declared
+// nightly root that resolves to nothing fails the nightly run's own preflight,
+// while describe (required CI) stays green, as on main until #2248 lands.
+test('test group describe and nightly preflight fail when a declared required or nightly root resolves to zero tests', async parent => {
+  const absentNightlyRoot='fixture absent cross-engine root';
+  await parent.test('required root removed from its file fails describe and its group run',t=>{
+    const fixture=createFixture(t),file=path.join(fixture.root,suiteFile),registration=`test(${JSON.stringify(fixtureRoots.scenery)}, () => {});`;
+    assert.ok(fs.readFileSync(file,'utf8').includes(registration),'fixture registers the scenery root');
+    fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace(registration,''));
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','drop a required registration');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'describe must not validate a required root that resolves to zero tests: '+description.stdout);
+    assert.match(description.stderr,/fixture scenery baseline root.*resolves to zero tests/);
+    const run=invoke(fixture,{group:'scenery'});
+    assert.notEqual(run.status,0,'the group run must fail when its declared root executes nothing');
+  });
+  await parent.test('only declared nightly root resolves to zero tests',t=>{
+    const fixture=nightlyFixture(t,{nightlyRoots:[{root:absentNightlyRoot,file:suiteFile,reason:'Declared but not registered on this branch.'}]});
+    const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+    catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:suiteFile});writeJson(file,catalog);
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','assign root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const description=invoke(fixture,{args:['--describe']});
+    assert.equal(description.status,0,'required CI must stay green while only a nightly root is unresolved: '+description.stdout+description.stderr);
+    const nightly=invoke(fixture,{group:'nightly-cross-engine'});
+    assert.notEqual(nightly.status,0,'the nightly run must fail when its declared root resolves to zero tests');
+    assert.notEqual(nightly.evidence?.status,'passed');
+    assert.match(nightly.stderr,/fixture absent cross-engine root.*registered 0 times/);
+  });
+});
+
 test('test group workflow scanner command rejects missing parallel group evidence', t => {
   const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
   t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));

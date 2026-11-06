@@ -92,7 +92,10 @@ process registrations. Case outcomes, accepted skips, native registration
 checks, artifact hashes, and process exit status are recorded in the same
 result. Missing required cases, unclassified roots, overlapping assignments,
 empty groups, unregistered native children, additional skips, or process
-failures return nonzero.
+failures return nonzero. Every mode, `--describe` included, also fails when a
+declared required root resolves to zero tests in its file; a
+`registration: "dynamic"` row has no literal title to find, so only its group
+run checks that it executes.
 
 The independently captured inventory is rooted at Data safety run
 `40150306422` (source and checkout `d224107e5e56e5455a16e670dad6bdbc951940b5`):
@@ -128,8 +131,9 @@ npm run test:group -- --group nightly-cross-engine --output-dir <new-empty-dir> 
 ```
 
 The run fails when no nightly root is declared, when a declared root is not
-registered exactly once in its file, or when any nightly case fails, is skipped
-or is missing. It writes `result.json` and TAP like a group run, but it is not
+registered exactly once in its file (resolves to zero tests), or when any
+nightly case fails, is skipped or is missing. `--describe` does not check
+nightly roots, so required CI stays green while only the nightly run is red. It writes `result.json` and TAP like a group run, but it is not
 a required group and cannot be described, covered or aggregated. When and how
 releases depend on it is in
 [release and review](release-and-review.md#nightly-cross-engine-native-checks).

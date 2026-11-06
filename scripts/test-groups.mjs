@@ -390,6 +390,24 @@ function registeredTitleCounts(sources) {
   return counts;
 }
 
+// A declared required root that its file never registers would only surface
+// when its group ran (#2232). Describe checks every literal row up front so a
+// dropped or renamed registration fails the whole cohort before any group runs.
+// Dynamic rows have no literal title to find; their group run still requires
+// them to execute. Nightly roots are checked by the nightly run's own preflight
+// (nightlySelection), so required CI does not depend on them.
+function validateDeclaredRootsResolve(assignmentIndex) {
+  const counts = new Map();
+  const registered = file => {
+    if (!counts.has(file)) counts.set(file, registeredTitleCounts([fs.readFileSync(path.join(ROOT, file), 'utf8')]));
+    return counts.get(file);
+  };
+  for (const entry of assignmentIndex.assignmentsByRoot.values()) {
+    if (entry.registration === 'dynamic') continue;
+    if (!registered(entry.file).get(normalizeTapIdentity(entry.root))) fail(`Required root ${JSON.stringify(entry.root)} resolves to zero tests in ${entry.file}.`);
+  }
+}
+
 function addedRootRegistrations(comparisonBase, files) {
   const current = registeredTitleCounts(files.map(file => fs.readFileSync(path.join(ROOT, file), 'utf8')));
   // A comparison base from before the split (main until #2205 lands) still
@@ -1107,6 +1125,7 @@ async function main() {
     };
     const inventoryIndex = validateInventory(inventory);
     const assignmentIndex = validateAssignments(assignments, inventory, inventoryIndex, files);
+    validateDeclaredRootsResolve(assignmentIndex);
     const registrationInfo = validateAddedRegistrations(assignments, inventoryIndex, assignmentIndex, files, inventory.baseline.sourceSha);
     result.resultIdentity.addedRootTitles = registrationInfo.addedRootTitles;
     result.resultIdentity.mappedBaselineRoots = registrationInfo.mappedBaselineRoots;

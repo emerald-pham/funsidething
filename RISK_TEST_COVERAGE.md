@@ -499,6 +499,7 @@ The named-contract test in tests/repository-process.test.js checks that every to
 - RISK repository process: CI runs once per pull request commit and never cancels main
 - RISK repository process: cross-engine native checks run nightly outside the required cohort
 - RISK repository process: a pull request edit starts no CI run and executes no test group
+- RISK repository process: a declared required or nightly root that resolves to zero tests fails the group runner
 - RISK repository process: nightly run fails when the live main ruleset drifts from the committed required checks
 - RISK repository process: nightly velocity report alerts on merge stalls and issue spikes
 - RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator

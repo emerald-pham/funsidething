@@ -936,6 +936,21 @@ test('RISK repository process: a pull request edit starts no CI run and executes
  for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
 });
 
+// #2232: the nightly root resolved to zero tests and nothing said so until the
+// nightly run. The zero-test guard is pinned at the group runner's command line
+// with fixture cohorts (test-group tests); this process RISK requires that pin to
+// execute and pass. It deliberately does not require main's live nightly roots
+// to resolve: they return with #2248.
+test('RISK repository process: a declared required or nightly root that resolves to zero tests fails the group runner',()=>{
+ const pins=['test group describe and nightly preflight fail when a declared required or nightly root resolves to zero tests'];
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+pins.join('|')+')$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:300000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The zero-test guard pins must pass: '+result.stdout+'\n'+result.stderr);
+ assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,pins.length,'every named zero-test guard pin must execute');
+ assert.match(result.stdout,/^# skipped 0$/m);
+ for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
+});
+
 // The nightly cross-engine move is pinned at the agreed seams (the CI workflow
 // files in the CI-routing tests, and test:group --aggregate in the test-group
 // tests); this process RISK requires those pins to execute and pass.
