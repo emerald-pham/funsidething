@@ -10,6 +10,8 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 // Not a required group: the scheduled/dispatched nightly job runs it alone.
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
+const MIN_GROUP_HEAP_MB = 512;
+const MAX_GROUP_HEAP_MB = 12288;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // The one definition of a registered test file (#2213): a *.test.js file in the
@@ -196,6 +198,13 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     if (!group.description || group.resourcePolicy !== 'isolated-process' || group.withinGroupConcurrency !== 1) {
       fail(`Group ${group.id} must declare an isolated process and serial within-group execution.`);
     }
+    // A group that outgrows Node's default heap declares its own (#2232) instead
+    // of having roots moved out of it. Each group runs alone in its own job on a
+    // 16 GB ubuntu-latest runner, so the old space stays well below that.
+    const heap = group.nodeMaxOldSpaceSizeMb;
+    if (heap !== undefined && (!Number.isSafeInteger(heap) || heap < MIN_GROUP_HEAP_MB || heap > MAX_GROUP_HEAP_MB)) {
+      fail(`Group ${group.id} nodeMaxOldSpaceSizeMb must be a whole number of MB from ${MIN_GROUP_HEAP_MB} to ${MAX_GROUP_HEAP_MB} (Node heap).`);
+    }
   }
   const groupSet = new Set(groupIds);
   const fileSet = new Set(files);
@@ -225,6 +234,7 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
     if (assignmentsByRoot.has(entry.root)) fail(`Root ${JSON.stringify(entry.root)} has overlapping group assignments.`);
     assignmentsByRoot.set(entry.root, entry);
   }
+  addFileDefaultAssignments(assignments, assignmentsByRoot, groupSet, files);
   const assignedRootIds = new Set(assignmentsByRoot.keys());
   for (const root of inventoryIndex.roots) {
     const replacement = replacementByBaseline.get(root);
@@ -318,6 +328,46 @@ function validateAssignments(assignments, inventory, inventoryIndex, files) {
   return { assignmentsByRoot, currentRootToBaseline, replacementByBaseline, replacementTargets, rootsPerGroup, environmentSkips, nightlyRoots };
 }
 
+// fileGroups maps a full-suite file, or a pattern with one * inside a file name,
+// to the group its unrowed roots join (#2232). An exact file wins over a
+// pattern. A row overrides the file default; a file with no default places
+// nothing, so its new roots still need rows.
+function fileGroupResolver(assignments, groupSet, files) {
+  const entries = assignments.fileGroups === undefined ? {} : assignments.fileGroups;
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) fail('fileGroups must map files to groups when present.');
+  const exact = new Map(), patterns = [];
+  for (const [key, group] of Object.entries(entries)) {
+    if (!groupSet.has(group)) fail(`fileGroups ${JSON.stringify(key)} names unknown group ${JSON.stringify(group)}.`);
+    const stars = key.split('*').length - 1;
+    if (stars === 0) {
+      if (!files.includes(key)) fail(`fileGroups ${JSON.stringify(key)} is not a full-suite file.`);
+      exact.set(key, group);
+    } else {
+      if (stars !== 1 || key.slice(key.indexOf('*')).includes('/')) fail(`fileGroups pattern ${JSON.stringify(key)} may hold one * inside the file name only.`);
+      const [prefix, suffix] = key.split('*'), matcher = file => file.startsWith(prefix) && file.endsWith(suffix) && !file.slice(prefix.length, file.length - suffix.length).includes('/');
+      if (!files.some(matcher)) fail(`fileGroups pattern ${JSON.stringify(key)} matches no full-suite file.`);
+      patterns.push([matcher, group]);
+    }
+  }
+  return file => exact.get(file) ?? patterns.find(([matcher]) => matcher(file))?.[1];
+}
+
+function addFileDefaultAssignments(assignments, assignmentsByRoot, groupSet, files) {
+  const groupFor = fileGroupResolver(assignments, groupSet, files);
+  const controlled = new Set(assignments.processControls.map(control => control?.id));
+  const nightly = new Set((Array.isArray(assignments.nightlyRoots) ? assignments.nightlyRoots : []).map(entry => entry?.root));
+  for (const file of files) {
+    const group = groupFor(file);
+    if (!group) continue;
+    for (const title of fileDefaultRootTitles(fs.readFileSync(path.join(ROOT, file), 'utf8'))) {
+      // Rows and catalog roots are TAP identities (# is escaped as \#).
+      const root = title.replace(/[\\#]/g, '\\$&');
+      if (assignmentsByRoot.has(root) || controlled.has(title) || nightly.has(title)) continue;
+      assignmentsByRoot.set(root, { root, group, file, registration: 'file-default' });
+    }
+  }
+}
+
 // Cross-engine native checks run in the scheduled/dispatched nightly job, not
 // the per-push required cohort (#2210): one flaky or engine-specific WebKit
 // failure blocked unrelated fixes for about an hour per run. Declared nightly
@@ -388,6 +438,24 @@ function registeredTitleCounts(sources) {
     counts.set(title, (counts.get(title) || 0) + 1);
   }
   return counts;
+}
+
+// A declared required root that its file never registers would only surface
+// when its group ran (#2232). Describe checks every literal row up front so a
+// dropped or renamed registration fails the whole cohort before any group runs.
+// Dynamic rows have no literal title to find; their group run still requires
+// them to execute. Nightly roots are checked by the nightly run's own preflight
+// (nightlySelection), so required CI does not depend on them.
+function validateDeclaredRootsResolve(assignmentIndex) {
+  const counts = new Map();
+  const registered = file => {
+    if (!counts.has(file)) counts.set(file, registeredTitleCounts([fs.readFileSync(path.join(ROOT, file), 'utf8')]));
+    return counts.get(file);
+  };
+  for (const entry of assignmentIndex.assignmentsByRoot.values()) {
+    if (entry.registration === 'dynamic') continue;
+    if (!registered(entry.file).get(normalizeTapIdentity(entry.root))) fail(`Required root ${JSON.stringify(entry.root)} resolves to zero tests in ${entry.file}.`);
+  }
 }
 
 function addedRootRegistrations(comparisonBase, files) {
@@ -472,8 +540,15 @@ function normalizeTapIdentity(value) {
   return normalized;
 }
 
+// One pass collects every direct test(<plain string>, ...) title with its count;
+// counting a single title reads from it, so many lookups stay linear.
+const literalRegistrationCache = new Map();
 function countTestRegistrations(source, testName) {
-  let count = 0;
+  return literalTestRegistrations(source).get(testName) || 0;
+}
+function literalTestRegistrations(source) {
+  if (literalRegistrationCache.has(source)) return literalRegistrationCache.get(source);
+  const titles = new Map();
   let index = 0;
   let pendingTestCall = false;
   let awaitingTitle = false;
@@ -585,7 +660,7 @@ function countTestRegistrations(source, testName) {
     }
     if (character === "'" || character === '"') {
       const literal = readQuoted(index, character);
-      if (awaitingTitle && !literal.escaped && literal.value === testName) count++;
+      if (awaitingTitle && !literal.escaped) titles.set(literal.value, (titles.get(literal.value) || 0) + 1);
       awaitingTitle = false;
       pendingTestCall = false;
       previousToken = 'string';
@@ -626,7 +701,26 @@ function countTestRegistrations(source, testName) {
     previousToken = token;
     index += token.length;
   }
-  return count;
+  literalRegistrationCache.set(source, titles);
+  return titles;
+}
+
+// A root registered as a plain-string test(...) call at the start of a line
+// (column 0, the top level of an area file) is placed by its file's group
+// (#2232), including a column-0 environment skip such as
+// test('…',{skip:!process.env.X},…). Titles this scanner cannot read keep
+// explicit rows: computed titles, indented registrations (for example inside an
+// if), titles with escapes, and registrations after a regular expression the
+// tokenizer reads as division. The core registration guard rejects any of those
+// that run without a row. Both checks must agree, so a quoted fixture that
+// merely looks like a registration never becomes a root.
+function fileDefaultRootTitles(source) {
+  const code = literalTestRegistrations(source), titles = new Set();
+  for (const line of source.split('\n')) {
+    const match = line.match(/^test\s*\(\s*(['"])((?:\\.|(?!\1)[^\\])*)\1\s*[,)]/);
+    if (match && !/\\/.test(match[2]) && code.has(match[2])) titles.add(match[2]);
+  }
+  return titles;
 }
 
 function testNamePatternArguments(roots) {
@@ -992,7 +1086,7 @@ async function unclassifiedRootGuard(files, assignments, outputDir) {
   return report;
 }
 
-async function runChild(files, roots, outputDir, options, source) {
+async function runChild(files, roots, outputDir, options, source, heapMb) {
   const runtimeTmp = path.join(outputDir, 'runtime-tmp');
   const nativeDir = path.join(outputDir, 'native');
   const recoveryDir = path.join(outputDir, 'recovery-ui');
@@ -1017,7 +1111,9 @@ async function runChild(files, roots, outputDir, options, source) {
     CHAIN_NATIVE_CANDIDATE_TREE: source.tree,
     CHAIN_RECOVERY_UI_OUTPUT: recoveryDir,
   };
-  const child = spawn(process.execPath, ['--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
+  // The test runner passes this flag on to every per-file child process.
+  const heapArguments = heapMb === undefined ? [] : [`--max-old-space-size=${heapMb}`];
+  const child = spawn(process.execPath, [...heapArguments, '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.pipe(tap);
@@ -1107,6 +1203,7 @@ async function main() {
     };
     const inventoryIndex = validateInventory(inventory);
     const assignmentIndex = validateAssignments(assignments, inventory, inventoryIndex, files);
+    validateDeclaredRootsResolve(assignmentIndex);
     const registrationInfo = validateAddedRegistrations(assignments, inventoryIndex, assignmentIndex, files, inventory.baseline.sourceSha);
     result.resultIdentity.addedRootTitles = registrationInfo.addedRootTitles;
     result.resultIdentity.mappedBaselineRoots = registrationInfo.mappedBaselineRoots;
@@ -1171,7 +1268,8 @@ async function main() {
     }));
 
     if (options.group === 'core') result.unclassifiedRootGuard = await unclassifiedRootGuard(files,assignmentIndex,outputDir);
-    const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source);
+    const heapMb = nightly ? undefined : assignments.groups.find(group => group.id === options.group)?.nodeMaxOldSpaceSizeMb;
+    const childResult = await runChild(selectedFiles, selectedRoots, outputDir, options, source, heapMb);
     nativeDir = childResult.nativeDir;
     result.process = {
       exitCode: childResult.exit.code,
@@ -1180,6 +1278,7 @@ async function main() {
       stdout: { path: path.basename(childResult.tapPath), sha256: childResult.tapSha256 },
       stderr: { path: path.basename(childResult.stderrPath), sha256: childResult.stderrSha256 },
       selection: childResult.selection,
+      ...(heapMb === undefined ? {} : { nodeMaxOldSpaceSizeMb: heapMb }),
     };
     result.cases = childResult.cases.map(({ id, root, status, skipReason }) => ({ id, root, status, skipReason }));
     result.artifacts = [...artifactInventory(nativeDir), ...artifactInventory(childResult.recoveryDir)];

@@ -6,16 +6,18 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    # No edited: nothing here reads the PR body, and the automated description
+    # update fired a second full run on the same SHA (#2232). A retargeted base
+    # therefore gets a fresh run with the next push, not on the edit itself.
+    types: [opened, synchronize, reopened]
 
 # A newer commit on a PR makes its earlier run worthless, so that run is
 # cancelled. Each main run gets its own group (run id) because a queued or
 # in-progress main run carries release evidence and the Pages deploy for its
-# commit and must never be cancelled or replaced. A metadata edit queues behind
-# the run it reuses instead of cancelling it.
+# commit and must never be cancelled or replaced.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.event.action != 'edited' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CHAIN_CI_TOPOLOGY: four-groups-v1

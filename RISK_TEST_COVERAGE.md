@@ -1544,6 +1544,10 @@ its RISK test; the map follows.
 - RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses
 - RISK repository process: CI makes verified release evidence a deployment prerequisite
 - RISK repository process: CI runs once per pull request commit and never cancels main
+- RISK repository process: a pull request edit starts no CI run and executes no test group
+- RISK repository process: a declared required or nightly root that resolves to zero tests fails the group runner
+- RISK repository process: a test root without a group row runs in its file group and the cohort still fails closed
+- RISK repository process: a group runs with its declared Node heap instead of moving roots out of it
 - RISK repository process: cross-engine native checks run nightly outside the required cohort
 - RISK repository process: nightly run fails when the live main ruleset drifts from the committed required checks
 - RISK repository process: nightly velocity report alerts on merge stalls and issue spikes
