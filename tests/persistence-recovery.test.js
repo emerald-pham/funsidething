@@ -1737,52 +1737,86 @@ test('RISK large board diagnostics export browser: while cloud recovery waits, e
  }
 }));
 
-// The owner must be able to export the recovery itself: Settings → Data and
-// backups → View / copy database for repair, finished with the dialog's
-// download (or, before #2246, its Copy JSON). The archive is lossless (the open
-// board and every saved device row, exactly as the page reads them afterwards)
-// and saved as a file, and building it holds about one saved source at a time,
-// so its cost does not grow with the number of saved copies. Before #2246 it
-// peaked 1.05-1.16 GiB over the open Settings (28 s stall in WebKit); after,
-// 38-43 MiB for a 14 MB file. 96 MiB leaves room for a larger saved copy.
-const REPAIR_EXPORT_MEMORY_MARGIN=96*1024*1024;
-test('RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'repair',async({t,engineName,page,tag,downloads,summary,failures})=>{
- await openSettingsSectionFor(page,'view-database-repair');
- const copiedBefore=await page.evaluate(()=>__diagnosticsCopied.length),downloadsBefore=downloads.length;
- const save=page.locator('#modalRoot button:text-is("Download file")'),copy=page.locator('#modalRoot button[data-act="copy-database-repair"]');let pressed=false;
- const result=await measureLargeBoardExport({page,tag,start:()=>page.locator('#modalRoot [data-act="view-database-repair"]').click({timeout:120000}),
-  finish:async()=>{
-   if(downloads.length>downloadsBefore||await page.evaluate(count=>__diagnosticsCopied.length>count,copiedBefore))return true;
-   if(!pressed&&await save.count()){pressed=true;await save.first().click({timeout:120000});}
-   else if(!pressed&&await copy.count()){pressed=true;await copy.first().click({timeout:120000});}
-   return false;}});
- const saved=downloads.slice(downloadsBefore);
- const row={finished:result.finished,file:saved.length>0,elapsedMs:result.elapsedMs,stallMs:result.stallMs,idlePeakMiB:mibOf(result.idle.peakBytes),exportPeakMiB:mibOf(result.memory.peakBytes),
-  extraMiB:mibOf(result.extraBytes),samples:[result.idle.samples,result.memory.samples]};
- // Lossless: compared with what the page reads afterwards, outside the measured window.
- let text=null;
- if(saved.length)text=fs.readFileSync(await saved[0].path(),'utf8');
- else row.copiedBytes=await page.evaluate(count=>__diagnosticsCopied.slice(count).map(text=>text.length),copiedBefore);
- if(text!==null){
-  const archive=JSON.parse(text);row.bytes=Buffer.byteLength(text,'utf8');
-  const expected=await page.evaluate(async()=>{const snapshot=await deviceStore.readRawExportSnapshot();
-   return {board:JSON.parse(cloudPayload()),stores:Object.fromEntries(Object.entries(snapshot.stores).map(([name,{keys,values}])=>[name,{keys:JSON.stringify(keys),values:values.map(value=>JSON.stringify(value))}]))};});
-  row.manifest=archive.manifest?.status;row.rows=Object.fromEntries(Object.entries(archive.appSources?.indexedDB?.stores||{}).map(([name,rows])=>[name,rows.length]));
-  if(archive.format!=='chain-scanner.recovery-archive'||archive.manifest?.status!=='complete')failures.push(`${engineName}: the repair file is not a complete recovery archive ${JSON.stringify(row)}`);
-  if(JSON.stringify(archive.currentBoard)!==JSON.stringify(expected.board))failures.push(`${engineName}: the repair file's board differs from the open board`);
-  for(const [name,{keys,values}] of Object.entries(expected.stores)){
-   const rows=archive.appSources?.indexedDB?.stores?.[name]||[];
-   if(JSON.stringify(rows.map(row=>decodeManualArchiveTypedValue(row.key)))!==keys)failures.push(`${engineName}: the repair file's ${name} keys differ`);
-   const decoded=rows.map(row=>JSON.stringify(decodeManualArchiveTypedValue(row.value)));
-   if(decoded.length!==values.length||decoded.some((value,index)=>value!==values[index]))failures.push(`${engineName}: the repair file's ${name} rows differ`);
-  }
+// The owner must be able to export the recovery itself, from either place:
+// Settings → Data and backups → View / copy database for repair, finished with
+// the dialog's download (or, before #2246, its Copy JSON), and Download backup
+// with Full recovery archive. The archive is lossless (the open board and
+// every saved device row, exactly as the page reads them afterwards) and saved
+// as a file, and building it holds about one saved source at a time, so its
+// cost does not grow with the number of saved copies: each export is measured
+// again after nine more full-board copies are saved on the device. Before
+// #2246 the repair export peaked 1.05-1.16 GiB over the open Settings (28 s
+// stall in WebKit), and the Full recovery archive 178-239 MiB with nine more
+// copies (a 41 MB file). After, both peak 25-63 MiB for a 14 MB file and
+// 64-122 MiB for 39 MB: what is retained is about one saved copy, and the rest
+// is per-row garbage the engines collect lazily, which still grows a little
+// with the number of rows. 160 MiB sits above that and below every earlier run.
+const REPAIR_EXPORT_MEMORY_MARGIN=160*1024*1024,ARCHIVE_EXTRA_COPIES=9;
+// Saves count more distinct full-board copies on the device, as manual
+// backups. Each differs, so the store keeps each as its own saved snapshot.
+const saveExtraBoardCopies=(page,count)=>page.evaluate(async count=>{
+ const head=await deviceStore.readHead();
+ for(let i=0;i<count;i++){const board=JSON.parse(cloudPayload());board.tasks[0].title+=' (saved copy '+i+')';
+  await deviceStore.putBackup({expectedHash:head.hash,backup:{id:'archive-extra-copy-'+i,kind:'manual',day:'2026-11-06',at:Date.now()+i,payload:JSON.stringify(board)}});}
+ const snapshot=await deviceStore.readRawExportSnapshot();
+ return {backups:snapshot.stores.backups.keys.length,snapshots:snapshot.stores.snapshots.keys.length};},count);
+// What a lossless archive must match, read from the page after the export.
+async function archiveLosslessFailures(page,text,where){
+ const failures=[],archive=JSON.parse(text);
+ const expected=await page.evaluate(async()=>{const snapshot=await deviceStore.readRawExportSnapshot();
+  return {board:JSON.parse(cloudPayload()),stores:Object.fromEntries(Object.entries(snapshot.stores).map(([name,{keys,values}])=>[name,{keys:JSON.stringify(keys),values:values.map(value=>JSON.stringify(value))}]))};});
+ if(archive.format!=='chain-scanner.recovery-archive'||archive.formatVersion!==1||archive.manifest?.status!=='complete')failures.push(`${where}: the file is not a complete recovery archive ${JSON.stringify(archive.manifest?.failures)}`);
+ if(JSON.stringify(archive.currentBoard)!==JSON.stringify(expected.board))failures.push(`${where}: the file's board differs from the open board`);
+ for(const [name,{keys,values}] of Object.entries(expected.stores)){
+  const rows=archive.appSources?.indexedDB?.stores?.[name]||[];
+  if(JSON.stringify(rows.map(row=>decodeManualArchiveTypedValue(row.key)))!==keys)failures.push(`${where}: the file's ${name} keys differ`);
+  const decoded=rows.map(row=>JSON.stringify(decodeManualArchiveTypedValue(row.value)));
+  if(decoded.length!==values.length||decoded.some((value,index)=>value!==values[index]))failures.push(`${where}: the file's ${name} rows differ`);
  }
- summary.exports.push(row);t.diagnostic(JSON.stringify({engine:engineName,...row}));
- if(!result.finished)failures.push(`${engineName}: the repair export did not finish ${JSON.stringify(row)}`);
- if(!saved.length)failures.push(`${engineName}: the repair export was not saved as a file ${JSON.stringify(row)}`);
- if(result.extraBytes>REPAIR_EXPORT_MEMORY_MARGIN)failures.push(`${engineName}: the repair export peaked ${row.extraMiB} MiB over the open Settings, above the ${mibOf(REPAIR_EXPORT_MEMORY_MARGIN)} MiB margin`);
- if(result.stallMs>LARGE_BOARD_EXPORT_STALL_MS)failures.push(`${engineName}: the repair export stalled the page ${result.stallMs} ms`);
-}));
+ return {failures,rows:Object.fromEntries(Object.entries(archive.appSources?.indexedDB?.stores||{}).map(([name,rows])=>[name,rows.length]))};
+}
+// One archive export, ordinary and again with more saved copies.
+const archiveExportExercise=(kind,{open,start,finish})=>async({t,engineName,page,tag,downloads,summary,failures})=>{
+ for(const extra of [0,ARCHIVE_EXTRA_COPIES]){
+  const where=`${engineName}/${kind}/${extra} extra copies`;
+  if(extra){
+   // Saved, then a fresh document over the same profile, so the copying
+   // itself is not in the measured page's memory.
+   summary.backups=await saveExtraBoardCopies(page,extra);
+   await page.reload({waitUntil:'domcontentloaded'});
+   await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&document.getElementById('syncBtn')?.textContent==='☁ recovery waiting',null,{timeout:90000});
+   await page.waitForTimeout(2000);
+  }
+  await open(page);
+  const copiedBefore=await page.evaluate(()=>__diagnosticsCopied.length),downloadsBefore=downloads.length,state={pressed:false};
+  const result=await measureLargeBoardExport({page,tag,start:()=>start(page),
+   finish:async()=>downloads.length>downloadsBefore||await page.evaluate(count=>__diagnosticsCopied.length>count,copiedBefore)||await finish(page,state)});
+  const saved=downloads.slice(downloadsBefore);
+  const row={kind,extra,finished:result.finished,file:saved.length>0,elapsedMs:result.elapsedMs,stallMs:result.stallMs,idlePeakMiB:mibOf(result.idle.peakBytes),
+   exportPeakMiB:mibOf(result.memory.peakBytes),extraMiB:mibOf(result.extraBytes),samples:[result.idle.samples,result.memory.samples]};
+  // Lossless: compared with what the page reads afterwards, outside the measured window.
+  if(saved.length){const text=fs.readFileSync(await saved[0].path(),'utf8');row.bytes=Buffer.byteLength(text,'utf8');
+   const checked=await archiveLosslessFailures(page,text,where);row.rows=checked.rows;failures.push(...checked.failures);}
+  else row.copiedBytes=await page.evaluate(count=>__diagnosticsCopied.slice(count).map(text=>text.length),copiedBefore);
+  summary.exports.push(row);t.diagnostic(JSON.stringify({engine:engineName,...row}));
+  if(!result.finished)failures.push(`${where}: the export did not finish ${JSON.stringify(row)}`);
+  if(!saved.length)failures.push(`${where}: the export was not saved as a file ${JSON.stringify(row)}`);
+  if(result.extraBytes>REPAIR_EXPORT_MEMORY_MARGIN)failures.push(`${where}: the export peaked ${row.extraMiB} MiB over the open Settings, above the ${mibOf(REPAIR_EXPORT_MEMORY_MARGIN)} MiB margin`);
+  if(result.stallMs>LARGE_BOARD_EXPORT_STALL_MS)failures.push(`${where}: the export stalled the page ${result.stallMs} ms`);
+ }
+};
+test('RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'repair',archiveExportExercise('repair',{
+ open:page=>openSettingsSectionFor(page,'view-database-repair'),
+ start:page=>page.locator('#modalRoot [data-act="view-database-repair"]').click({timeout:120000}),
+ finish:async(page,state)=>{
+  const save=page.locator('#modalRoot button:text-is("Download file")'),copy=page.locator('#modalRoot button[data-act="copy-database-repair"]');
+  if(!state.pressed&&await save.count()){state.pressed=true;await save.first().click({timeout:120000});}
+  else if(!state.pressed&&await copy.count()){state.pressed=true;await copy.first().click({timeout:120000});}
+  return false;}})));
+test('RISK large board recovery archive browser: while cloud recovery waits, Download backup with Full recovery archive saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardExportWhileRecoveryWaits(t,'archive',archiveExportExercise('archive',{
+ open:async page=>{await openSettingsSectionFor(page,'download-backup');await page.locator('#backupDownloadFormat').selectOption('recovery-archive');},
+ start:page=>page.locator('#modalRoot [data-act="download-backup"]').click({timeout:120000}),
+ finish:async()=>false})));
 
 // #2246: an actual visual test for the repair export's new Download repair
 // file control, measured beside its established neighbours in the same

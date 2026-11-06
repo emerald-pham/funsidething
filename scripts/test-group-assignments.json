@@ -7846,6 +7846,11 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK MANUAL JSON EXPORT: a large full recovery archive with several saved copies downloads losslessly and Restore accepts it",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13256,6 +13261,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK large board recovery archive browser: while cloud recovery waits, Download backup with Full recovery archive saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK database repair export visual browser: Download file renders like Back to Settings and Copy JSON beside it in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
@@ -13461,6 +13471,11 @@
     },
     {
       "root": "RISK large board repair export browser: while cloud recovery waits, the database repair export saves one lossless file within a memory margin of the open Settings without a long stall, in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK large board recovery archive browser: while cloud recovery waits, Download backup with Full recovery archive saves one lossless file within a memory margin of the open Settings without a long stall, also with many saved copies, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },

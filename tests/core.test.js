@@ -16827,6 +16827,45 @@ test('RISK DATABASE REPAIR EXPORT: a large repair export downloads one lossless 
   assert.equal(await target.window.ScannerDeviceStore.getPendingUpload(account),null,'restoring the current board never replays archived pending work');
 });
 
+// #2246: Download backup's Full recovery archive from a large board with
+// several saved copies is still one lossless file in the existing format, and
+// the existing Restore preview accepts it.
+test('RISK MANUAL JSON EXPORT: a large full recovery archive with several saved copies downloads losslessly and Restore accepts it',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),{resolveObjectURL}=await import('node:buffer');
+  const dbName='full-archive-large-'+Date.now(),app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:dbName}),{ctx,shim}=app;
+  t.after(()=>app.dispose());ctx.addTask('Large archive task',false);await prepareBackupFileFixtureSource(app);
+  ctx.state.tasks[0].futureArchiveField={keep:'large archive field 🌿 '.repeat(40000)};await ctx.persist();
+  const store=ctx.window.ScannerDeviceStore,head=await store.readHead();
+  for(let i=0;i<4;i++){const copy=JSON.parse(ctx.cloudPayload());copy.tasks[0].title+=' (saved copy '+i+')';
+   await store.putBackup({expectedHash:head.hash,backup:{id:'large-archive-copy-'+i,kind:'manual',day:'2026-11-06',at:i+1,payload:JSON.stringify(copy)}});}
+  const raw=await store.readRawExportSnapshot(),local=JSON.parse(JSON.stringify(ctx.readManualArchiveLocalSources())),board=JSON.parse(ctx.currentBoardExportPayload()),boardBefore=JSON.stringify(ctx.state);
+  assert.ok(raw.stores.snapshots.keys.length>=5,'fixture: several distinct saved copies');
+  ctx.Blob=Blob;let clicked=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{clicked={href:link.href,name:link.download};};
+  const createElement=shim.document.createElement;shim.document.createElement=tag=>tag==='a'?link:createElement.call(shim.document,tag);
+  ctx.openSettings();const selectedFormat=makeFakeElement();selectedFormat.value='recovery-archive';
+  const originalGet=shim.document.getElementById.bind(shim.document);shim.document.getElementById=id=>id==='backupDownloadFormat'?selectedFormat:originalGet(id);
+  await ctx.onAction('download-backup',{});for(let attempt=0;attempt<100&&!clicked;attempt++)await flush();
+  assert.equal(clicked?.name,'chain-scanner-recovery-archive.json');
+  const text=await resolveObjectURL(clicked.href).text(),exported=JSON.parse(text);
+  assert.equal(exported.format,'chain-scanner.recovery-archive');assert.equal(exported.formatVersion,1);
+  assert.equal(exported.manifest.status,'complete');assert.deepEqual(exported.manifest.failures,[]);assert.equal(exported.repairInfo,undefined);
+  assert.deepEqual(exported.currentBoard,board);assert.deepEqual(exported.appSources.localStorage,local);
+  for(const name of ['meta','snapshots','backups','opaque']){
+   const rows=exported.appSources.indexedDB.stores[name];
+   assert.equal(JSON.stringify(rows.map(row=>decodeManualArchiveTypedValue(row.key))),JSON.stringify(raw.stores[name].keys),`${name} keys are exact`);
+   assert.equal(JSON.stringify(rows.map(row=>decodeManualArchiveTypedValue(row.value))),JSON.stringify(raw.stores[name].values),`${name} values are exact`);
+   assert.deepEqual(exported.manifest.sources.indexedDB.stores[name],{status:'included',rowCount:raw.stores[name].keys.length});
+  }
+  assert.equal(JSON.stringify(ctx.state),boardBefore,'the archive download is read-only');
+  const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'full-archive-large-restore-'+Date.now()});
+  t.after(()=>destination.dispose());target.addTask('Before large archive restore',false);await prepareBackupFileFixtureSource(target);
+  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;dom.document.dispatchEvent({type:'input',target:box});
+  assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
+  assert.equal(await target.onAction('confirm-file-restore',{}),true);
+  assert.equal(target.state.tasks.find(task=>task.title==='Large archive task')?.futureArchiveField.keep,board.tasks[0].futureArchiveField.keep);
+});
+
 test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial package with available board and diagnostics',async t=>{
   const {IDBFactory,IDBDatabase}=await import('fake-indexeddb');
   for(const failure of ['no device database','database read failure','one local source unreadable'])await t.test(failure,async subtest=>{
@@ -17194,8 +17233,10 @@ test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder
   const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported'});
   const validStore=valid.ctx.window.ScannerDeviceStore;assert.ok(validStore);t.after(async()=>{await validStore.close();});
   const shownErrors=[];valid.ctx.toast=message=>shownErrors.push(String(message));
-  const rawSnapshot=validStore.readRawExportSnapshot.bind(validStore);
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('unsupported-export-fixture-190');snapshot.stores.opaque.values.push(/unsupported/);return snapshot;};
+  // #2246: the archive streams saved rows through readRawExportRows; each case adds its row to the opaque store there.
+  const rawRows=validStore.readRawExportRows.bind(validStore);
+  const withOpaqueRow=(key,value)=>(names,visit)=>rawRows(names,{...visit,end(name,count){if(name==='opaque'){visit.row(name,key,value);count++;}visit.end(name,count);}});
+  validStore.readRawExportRows=withOpaqueRow('unsupported-export-fixture-190',/unsupported/);
   const validDownloads=[],validLink=makeFakeElement();validLink.remove=()=>{};validLink.click=()=>validDownloads.push(validLink.download);
   valid.shim.document.createElement=tag=>tag==='a'?validLink:makeFakeElement();valid.ctx.Blob=ctx.Blob;valid.ctx.URL=ctx.URL;valid.ctx.openSettings();
   const validSettings=valid.shim.document.getElementById('modalRoot').innerHTML,validArchive=validSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
@@ -17207,23 +17248,23 @@ test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder
   assert.deepEqual(validDownloads,[],'a structured-clone type without a lossless representation stops the archive');
   assert.ok(shownErrors.some(message=>/IndexedDB opaque key.*unsupported RegExp/i.test(message)),'the failure names its exact app-owned source and unsupported type');
   const cycle={};cycle.self=cycle;
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('cycle-export-fixture-190');snapshot.stores.opaque.values.push(cycle);return snapshot;};
+  validStore.readRawExportRows=withOpaqueRow('cycle-export-fixture-190',cycle);
   await valid.ctx.onAction(validArchive[1],{});await flush();
   assert.deepEqual(validDownloads,[],'a cyclic raw source cannot become a falsely complete archive');
   assert.ok(shownErrors.some(message=>/cycle-export-fixture-190.*repeated reference or cycle/i.test(message)),'the cycle report identifies its source');
   const sharedNested={future:true},repeated={first:sharedNested,second:sharedNested};
-  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('repeated-export-fixture-190');snapshot.stores.opaque.values.push(repeated);return snapshot;};
+  validStore.readRawExportRows=withOpaqueRow('repeated-export-fixture-190',repeated);
   await valid.ctx.onAction(validArchive[1],{});await flush();
   assert.deepEqual(validDownloads,[],'repeated references that cannot be represented exactly stop the archive');
   assert.ok(shownErrors.some(message=>/repeated-export-fixture-190.*repeated reference or cycle/i.test(message)),'the repeated-reference report identifies its source');
   let releaseSnapshot,startedSnapshot;
   const snapshotStarted=new Promise(resolve=>{startedSnapshot=resolve;});
-  validStore.readRawExportSnapshot=async()=>{startedSnapshot();await new Promise(resolve=>{releaseSnapshot=resolve;});return rawSnapshot();};
+  validStore.readRawExportRows=async(...args)=>{startedSnapshot();await new Promise(resolve=>{releaseSnapshot=resolve;});return rawRows(...args);};
   const raced=valid.ctx.onAction(validArchive[1],{});await snapshotStarted;
   valid.shim.localStorage.setItem('fvp:chain-scanner:protected:v1','{"changedDuringExport":true}');releaseSnapshot();await raced;
   assert.deepEqual(validDownloads,[],'a changed app-owned local source aborts the whole archive');
   assert.ok(shownErrors.some(message=>/localStorage key fvp:chain-scanner:protected:v1 changed/i.test(message)),'a raced source is named for retry');
-  validStore.readRawExportSnapshot=async()=>{throw new Error('fixture readonly transaction aborted');};
+  validStore.readRawExportRows=async()=>{throw new Error('fixture readonly transaction aborted');};
   await valid.ctx.onAction(validArchive[1],{});await flush();
   assert.deepEqual(validDownloads,[],'an aborted readonly snapshot stops without a partial file');
 });
