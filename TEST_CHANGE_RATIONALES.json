@@ -21461,5 +21461,27 @@
       "command": "node --test --test-name-pattern='pre-push lets branch pushes' tests/repository-process.test.js (2026-11-06T17:56:44Z, before the validator change)",
       "failure": "AssertionError 'a work branch can be pushed for CI before its reviews exist (#2234)': validatePrePushUpdates returned the dirty-worktree and missing-receipt errors for a refs/heads/fix/2234 push instead of []. After the validator change the old test failed with 'local changes cannot be confused with the reviewed immutable commit' until its push target became refs/heads/main."
     }
+  },
+  {
+    "baseCommit": "384f3d00614c56bf656ddd5baca024cfc50427ff",
+    "weakenedTestLines": [
+      "tests/repository-process.test.js:-assert.match(validateTestFirst(['landscape.js','tests/core.test.js'],ordinary).join(' '),/RISK/,'a high-risk JS change without a new RISK test is rejected');",
+      "tests/repository-process.test.js:-const riskFiles=['index.html','location.js','stars.js','landscape.js','landscape-appearance.js','landscape-riders.js','landscape-seasonal.js','landscape-skywriter.js','landscape-winter.js','sw.js','manifest.webmanifest','firestore.rules','features/new-module.js'];"
+    ],
+    "reason": "#2233 narrows the new-RISK-test requirement to files where saved data, the offline shell or enforcement can break. Two existing gate tests pinned the earlier rule that every runtime JavaScript file needs a new RISK test: their scenery and location examples now pass with a direct test, so those examples are replaced with high-risk files that still require RISK.",
+    "previousBehavior": "validateTestFirst required a new RISK test for every browser/runtime JavaScript, HTML or manifest change, so landscape.js, location.js, stars.js and other scenery modules, and any new JS module, needed one.",
+    "intendedBehavior": "A new RISK test is required for HTML pages, sw.js, the web manifest, app-release.js, the device and cloud stores, Firestore rules and enforcement files. Scenery and location modules need a direct test. The two tests now assert RISK for index.html, sw.js, the manifest, firestore.rules, the device and cloud stores, app-release.js and a new HTML page, and the rejection example uses device-store-v2.js.",
+    "preservedCoverage": [
+      "Every app change still needs a tests/ file in the diff.",
+      "HTML, worker, manifest, rules, release-delivery and store changes still need a new RISK test.",
+      "Enforcement-file changes still need a new RISK process test."
+    ],
+    "replacementTests": [
+      "RISK test-first gate: a new RISK test is required only where saved data, the offline shell or enforcement can break"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='only where saved data' tests/repository-process.test.js (2026-11-06T20:49:59Z, before the gate change)",
+      "failure": "AssertionError 'landscape.js: scenery and location code needs a direct test, not a new RISK test': the gate returned 'A high-risk app or enforcement file changed (landscape.js) without a new RISK test'. After the gate change the two older tests failed on location.js and landscape.js until their examples were replaced."
+    }
   }
 ]

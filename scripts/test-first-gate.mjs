@@ -28,10 +28,13 @@ const isAppFile=file=>{
   if(file.split('/').some(segment=>nonAppDirectories.has(segment)))return false;
   return runtimeFilePattern.test(file);
 };
-// Browser code and the offline/security shell all carry state, eligibility,
-// layout, timing, or paint behavior. New runtime modules inherit the RISK bar
-// automatically instead of waiting for a hand-maintained filename list.
-const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&/\.(?:html|js|mjs|cjs|jsx|ts|tsx|webmanifest)$/i.test(file);
+// A new RISK test marks real risk (#2233): saved data and sync (the device and
+// cloud stores), the offline shell (pages, worker, manifest, release delivery),
+// and the rules. Scenery, location and other modules still need a direct test;
+// requiring RISK for every runtime file made the label meaningless and made
+// most commits hand-edit the RISK map.
+const highRiskAppFile=/(?:^|\/)(?:[^/]+\.html?|sw\.js|[^/]+\.webmanifest|device-store[^/]*\.m?js|cloud-store[^/]*\.m?js|app-release\.js)$/i;
+const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&highRiskAppFile.test(file);
 const hasAddedRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK\b/.test(line));
 const hasAddedProcessRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK (?:test-first gate|regression gate|test inventory|repository process)\b/.test(line));
 
@@ -97,9 +100,32 @@ const weakensExistingTests=lines=>protectedTestLines(lines).some(line=>{
   const change=line.slice(line.search(/:[-+]/)+1);
   return change.startsWith('-')||suppressesExistingTests(change.slice(1));
 });
+// The lines a diff weakens, by file and content but not line number (#2233):
+// removed meaningful lines and inserted suppressors. A record that names them
+// stays valid when later commits add or edit other tests or when merging main
+// shifts line numbers; the whole-diff fingerprint went stale on every such
+// change and cost a rebind commit each time.
+export function weakenedTestLines(lines){
+  const weakened=new Set();let file='';
+  for(const line of lines){
+    const header=line.match(/^(?:--- (?:a\/(.+)|\/dev\/null)|\+\+\+ (?:b\/(.+)|\/dev\/null))$/);
+    if(header){const name=header[1]||header[2];if(name)file=name;continue;}
+    if(line.startsWith('---')||line.startsWith('+++')||line.startsWith('@@'))continue;
+    const content=line.slice(1).trim();
+    if(!content||content.startsWith('//'))continue;
+    if(line.startsWith('-'))weakened.add(`${file}:-${content}`);
+    else if(line.startsWith('+')&&suppressesExistingTests(content))weakened.add(`${file}:+${content}`);
+  }
+  return [...weakened].sort();
+}
+const coversWeakening=(entry,weakened)=>Array.isArray(entry?.weakenedTestLines)&&
+  weakened.every(line=>entry.weakenedTestLines.includes(line));
 export function validateRegressionChanges(lines,records){
   if(!weakensExistingTests(lines))return [];
-  const record=Array.isArray(records)&&records.find(entry=>entry?.testChangesSha256===protectedTestFingerprint(lines));
+  const weakened=weakenedTestLines(lines);
+  // Records written before #2233 keep matching the exact whole-diff fingerprint.
+  const record=Array.isArray(records)&&(records.find(entry=>coversWeakening(entry,weakened))||
+    records.find(entry=>entry?.testChangesSha256===protectedTestFingerprint(lines)));
   if(!record)return ['Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json.'];
   const errors=[],substantive=value=>typeof value==='string'&&value.trim().length>=20;
   for(const field of ['reason','previousBehavior','intendedBehavior'])

@@ -5,6 +5,7 @@
     "test": "node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs",
     "test:agent-tools": "node --test scripts/agent-tools/*.test.mjs",
     "fingerprints": "node scripts/shell-fingerprints.mjs",
+    "risk-map": "node scripts/risk-map.mjs",
     "agent:rendered-evidence": "node scripts/agent-tools/rendered-evidence.mjs",
     "agent:record-test-run": "node scripts/agent-tools/record-run.mjs",
     "agent:checkpoint": "node scripts/agent-tools/checkpoint.mjs",

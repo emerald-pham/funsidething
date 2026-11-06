@@ -9211,6 +9211,21 @@
       "file": "tests/repository-process.test.js"
     },
     {
+      "root": "RISK regression gate: a rationale record bound to its weakened lines survives later test edits and merges",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK test-first gate: a new RISK test is required only where saved data, the offline shell or enforcement can break",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK test inventory: the RISK map is generated from RISK test names, one section per test file",
+      "group": "core",
+      "file": "tests/repository-process.test.js"
+    },
+    {
       "root": "RISK regression gate: changing existing tests requires a specific reason and replacement coverage",
       "group": "core",
       "file": "tests/repository-process.test.js"

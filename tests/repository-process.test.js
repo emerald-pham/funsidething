@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash, webcrypto } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
@@ -114,13 +115,46 @@ test('RISK regression gate: a rationale is required only for removed or weakened
   needsRecord(['@@ -12,0 +13 @@',line],`suite-suppressing insertion ${line} needs a record`);
 });
 
+test('RISK regression gate: a rationale record bound to its weakened lines survives later test edits and merges',async()=>{
+ const {validateRegressionChanges}=await import('../scripts/test-first-gate.mjs');
+ const file=['--- a/tests/core.test.js','+++ b/tests/core.test.js'];
+ const replacement=["@@ -40,0 +41 @@","+test('scan: second candidate keeps a title',()=>{ assert.ok(rank(board)[1].title); });"];
+ const weakened=line=>[`@@ -${line} +${line} @@`,"- assert.equal(second.title,'Dishes');",'+ assert.ok(second);'];
+ // The record names the weakened lines by file and content (#2233), not a hash
+ // of the whole test diff with line numbers.
+ const record={weakenedTestLines:["tests/core.test.js:-assert.equal(second.title,'Dishes');"],
+  reason:'Second-candidate titles now come from the saved view, not a fixed list.',previousBehavior:'The second candidate was always titled Dishes in the fixture.',
+  intendedBehavior:'The second candidate keeps whatever title the saved view gives it.',replacementTests:['scan: second candidate keeps a title'],
+  preservedCoverage:['Candidate ranking order and the first candidate title are still asserted.'],
+  redEvidence:{command:"node --test --test-name-pattern='second candidate' tests/core.test.js",failure:'AssertionError: expected Dishes, got Laundry before the change.'}};
+ assert.deepEqual(validateRegressionChanges([...file,...weakened(12),...replacement],[record]),[],'the record approves its own weakening');
+ assert.deepEqual(validateRegressionChanges([...file,...weakened(12),...replacement,'@@ -60,0 +62,2 @@',"+test('scan: empty board',()=>{","+});"],[record]),[],
+  'adding another test later does not invalidate the record');
+ assert.deepEqual(validateRegressionChanges([...file,...weakened(57),...replacement],[record]),[],
+  'merging main shifts line numbers without invalidating the record');
+ assert.match(validateRegressionChanges([...file,...weakened(12),...replacement,'@@ -80 +80 @@',"- assert.ok(rank(board).length);"],[record]).join(' '),/rationale/i,
+  'a new weakening the record does not name is still rejected');
+ assert.match(validateRegressionChanges([...file,...weakened(12),...replacement],[{...record,weakenedTestLines:["tests/scenery.test.js:-assert.equal(second.title,'Dishes');"]}]).join(' '),/rationale/i,
+  'a record for another file cannot approve this weakening');
+});
+
+test('RISK test-first gate: a new RISK test is required only where saved data, the offline shell or enforcement can break',async()=>{
+ const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
+ const ordinary=['+test("scan: ordinary direct test",()=>{})'];
+ for(const file of ['landscape.js','landscape-mood.js','location.js','stars.js'])
+  assert.deepEqual(validateTestFirst([file,'tests/scenery.test.js'],ordinary),[],`${file}: scenery and location code needs a direct test, not a new RISK test`);
+ for(const file of ['index.html','sw.js','manifest.webmanifest','device-store-v2.js','cloud-store-v2.js','app-release.js','firestore.rules'])
+  assert.match(validateTestFirst([file,'tests/core.test.js'],ordinary).join(' '),/RISK/,`${file}: persistence, offline-shell and rules changes still need a new RISK test`);
+ assert.match(validateTestFirst(['location.js'],[]).join(' '),/without a tests\/ file/,'every app change still needs a test');
+});
+
 test('RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files',async()=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
  const ordinary=['+test("scan: ordinary direct test",()=>{})'],processRisk=['+test("RISK test-first gate: process coverage",()=>{})'];
  assert.match(validateTestFirst(['location.js'],[]).join(' '),/without a tests\/ file/,'an app change without tests is rejected');
  assert.deepEqual(validateTestFirst(['landscape.css','tests/core.test.js'],ordinary),[],'a CSS-only change passes with a direct non-RISK test');
  assert.deepEqual(validateTestFirst(['icon-192.png','tests/core.test.js'],ordinary),[],'a static-asset change passes with a direct non-RISK test');
- assert.match(validateTestFirst(['landscape.js','tests/core.test.js'],ordinary).join(' '),/RISK/,'a high-risk JS change without a new RISK test is rejected');
+ assert.match(validateTestFirst(['device-store-v2.js','tests/core.test.js'],ordinary).join(' '),/RISK/,'a high-risk JS change without a new RISK test is rejected');
  assert.match(validateTestFirst(['scripts/test-first-gate.mjs','tests/core.test.js'],['+test("RISK landscape colors: dawn",()=>{})']).join(' '),/process/,
   'an enforcement change without process RISK coverage is rejected');
  assert.deepEqual(validateTestFirst(['scripts/test-first-gate.mjs','tests/core.test.js'],processRisk),[],'process RISK coverage satisfies an enforcement change');
@@ -239,7 +273,7 @@ test('RISK test-first gate: future runtime modules are detected without a filena
 
 test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case',async()=>{
  const {validateTestFirst}=await import('../scripts/test-first-gate.mjs');
- const riskFiles=['index.html','location.js','stars.js','landscape.js','landscape-appearance.js','landscape-riders.js','landscape-seasonal.js','landscape-skywriter.js','landscape-winter.js','sw.js','manifest.webmanifest','firestore.rules','features/new-module.js'];
+ const riskFiles=['index.html','sw.js','manifest.webmanifest','firestore.rules','device-store-v2.js','cloud-store-v2.js','app-release.js','features/new-page.html'];
  for(const file of riskFiles){
   const errors=validateTestFirst([file,'tests/core.test.js'],['+test("ordinary behavior test",()=>{})']).join(' ');
   assert.match(errors,/RISK/,`${file} must require a new high-risk contract`);
@@ -1142,6 +1176,32 @@ test('RISK test inventory: every added environment-gated root is declared with t
   assert.equal(baselineSkips.has(root),false,'baseline skips stay in the independent inventory, not in declarations: '+root);
   assert.ok(assignments.rootAssignments.some(entry=>entry.root===root),'every declared root keeps its group assignment: '+root);
  }
+});
+
+test('RISK test inventory: the RISK map is generated from RISK test names, one section per test file',()=>{
+ const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'risk-map-2233-'));
+ try{
+  fs.mkdirSync(path.join(dir,'tests'));
+  fs.writeFileSync(path.join(dir,'tests','core.test.js'),"test('RISK scan: b ranks second',()=>{});\ntest('scan: ordinary',()=>{});\ntest(\"RISK scan: a ranks first\",()=>{});\n");
+  fs.writeFileSync(path.join(dir,'tests','scenery.test.js'),"test('RISK sky: dawn stays warm',()=>{});\n");
+  fs.writeFileSync(path.join(dir,'tests','shared.js'),"// test('RISK helper: not a test file',()=>{});\n");
+  const run=(...args)=>spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs'),'--root',dir,...args],{encoding:'utf8'});
+  assert.equal(run('--check').status,1,'a missing map is out of date');
+  assert.equal(run('--write').status,0);
+  const map=fs.readFileSync(path.join(dir,'RISK_TEST_COVERAGE.md'),'utf8');
+  assert.deepEqual(map.split('\n').filter(line=>/^(?:## |- )/.test(line)),
+   ['## tests/core.test.js','- RISK scan: b ranks second','- RISK scan: a ranks first','## tests/scenery.test.js','- RISK sky: dawn stays warm'],
+   'each RISK test is listed once, in source order, under its test file');
+  assert.match(map,/npm run risk-map -- --write/,'the map says how it is regenerated');
+  assert.match(map,/new feature/i,'the map explains how new features add risk contracts');
+  assert.equal(run('--check').status,0,'a freshly written map is current');
+  fs.appendFileSync(path.join(dir,'tests','scenery.test.js'),"test('RISK sky: dusk fades',()=>{});\n");
+  const stale=run('--check');
+  assert.equal(stale.status,1,'adding a RISK test makes the map stale');
+  assert.match(stale.stderr,/npm run risk-map -- --write/,'the stale message names the command');
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+ assert.equal(spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs'),'--check'],{cwd:__dirname,encoding:'utf8'}).status,0,
+  'the committed RISK map matches the RISK tests');
 });
 
 test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{
