@@ -769,7 +769,7 @@ test('RISK repository process: pre-push checks every outgoing tip and rejects di
  try{
   recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
   const deletion={localRef:'refs/heads/old',localSha:'0'.repeat(40),remoteRef:'refs/heads/old',remoteSha:fixture.candidateSha};
-  const candidate={localRef:'refs/heads/release',localSha:fixture.candidateSha,remoteRef:'refs/heads/release',remoteSha:'0'.repeat(40)};
+  const candidate={localRef:'refs/heads/release',localSha:fixture.candidateSha,remoteRef:'refs/heads/main',remoteSha:'0'.repeat(40)};
   assert.deepEqual(validatePrePushUpdates(fixture.repo,[candidate,deletion]),[]);
   fs.writeFileSync(path.join(fixture.repo,'uncommitted-draft.txt'),'not in the reviewed tree');
   assert.match(validatePrePushUpdates(fixture.repo,[candidate]).join(' '),/clean/i,
@@ -780,6 +780,22 @@ test('RISK repository process: pre-push checks every outgoing tip and rejects di
   const newerTip=releaseGateGit(fixture.repo,['rev-parse','HEAD']);
   const errors=validatePrePushUpdates(fixture.repo,[candidate,{...candidate,localRef:'refs/heads/second',localSha:newerTip}]);
   assert.match(errors.join(' '),/receipt|exact|evidence/i,'each distinct outgoing commit tip needs its own receipt');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: pre-push lets branch pushes run CI before review and still guards main',async()=>{
+ const {validatePrePushUpdates}=await import('../scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  // No receipt exists for this commit and the worktree is dirty.
+  fs.writeFileSync(path.join(fixture.repo,'uncommitted-draft.txt'),'work in progress');
+  const branch={localRef:'refs/heads/fix/2234',localSha:fixture.candidateSha,remoteRef:'refs/heads/fix/2234',remoteSha:'0'.repeat(40)};
+  assert.deepEqual(validatePrePushUpdates(fixture.repo,[branch]),[],
+   'a work branch can be pushed for CI before its reviews exist (#2234)');
+  const main={...branch,remoteRef:'refs/heads/main'};
+  const errors=validatePrePushUpdates(fixture.repo,[branch,main]).join(' ');
+  assert.match(errors,/clean/i,'a push to main still requires a clean worktree');
+  assert.match(errors,/refs\/heads\/fix\/2234 at [0-9a-f]{40}: .*(receipt|evidence)/i,'a push to main still requires an exact-SHA receipt');
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
@@ -1274,6 +1290,92 @@ test('RISK repository process: scaled review plan pins ordinary code to owner pl
    scaledPlan({changedFiles:['README.md'],mode:'owner-self-review',requiresCodeReview:false,requiresOwnerFaqCoverage:false}),
    'a documentation-only diff needs only the owner review');
  }finally{cleanupReleaseGateFixture(ordinary);cleanupReleaseGateFixture(docs);}
+});
+
+// Spec #2230 / #2234: the changed-line review policy is switched on by this
+// committed AGENTS.md sentence at both base and head, like the scaled policy, so
+// receipts recorded under the earlier classification keep verifying.
+const CHANGED_LINE_POLICY_TEXT_2234='Release reviews scale to the exact diff. The release validator derives the\nplan, and the owner review records FAQ coverage for every product release.\nReview plans classify only changed code lines.\n';
+const changedLinePlan2234=(base,candidate,policy=true)=>{
+ const options={base,candidate};
+ if(policy)Object.assign(options,{agentsBase:CHANGED_LINE_POLICY_TEXT_2234,agentsHead:CHANGED_LINE_POLICY_TEXT_2234});
+ return options;
+};
+
+test('RISK repository process: changed-line review plan ignores persistence code in unchanged context lines',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const base='function remember(board){\n  localStorage.setItem("board", JSON.stringify(board));\n}\nconst hue = 30;\n';
+ const candidate='function remember(board){\n  localStorage.setItem("board", JSON.stringify(board));\n}\nconst hue = 32;\n';
+ const current=makeScaledReviewFixture(changedLinePlan2234({'landscape-mood.js':base},{'landscape-mood.js':candidate}));
+ const earlier=makeScaledReviewFixture(changedLinePlan2234({'landscape-mood.js':base},{'landscape-mood.js':candidate},false));
+ try{
+  assert.deepEqual(deriveReleaseReviewPlan(current.repo,current.candidateSha,current.baseSha).specialistDomains,[],
+   'a hue change beside unchanged storage code is not a persistence change');
+  assert.deepEqual(deriveReleaseReviewPlan(earlier.repo,earlier.candidateSha,earlier.baseSha).specialistDomains,['memory-cloud-sync'],
+   'a candidate whose base predates the policy keeps its earlier classification');
+ }finally{cleanupReleaseGateFixture(current);cleanupReleaseGateFixture(earlier);}
+});
+
+test('RISK repository process: changed-line review plan treats a changelog entry and refreshed fingerprints as an ordinary change',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ // Every app change must add a changelog entry and refresh both fingerprints,
+ // and the changelog talks about cloud recovery, sync and sessions in prose.
+ const page=(fingerprint,entries)=>'<!doctype html>\n<body>\n<script>\nfunction boot(){ start(); }\n</script>\n<!-- changelog:start -->\n'+
+  `<template id="appChangelogCurrent"><div data-app-fingerprint="${fingerprint}"><ul>${entries}</ul></div></template>\n<!-- changelog:end -->\n</body>\n`;
+ const worker=key=>`const CACHE_NAME = "chain-scanner-shell-${key}";\nself.addEventListener("install", () => {});\n`;
+ const older='<li>Cloud recovery keeps your saved board when a session sync fails.</li>';
+ const newer='<li>Restore now waits for a deliberate run; backups, migration and storage stay untouched.</li>';
+ const f=makeScaledReviewFixture(changedLinePlan2234(
+  {'index.html':page('a'.repeat(64),older),'sw.js':worker('1'.repeat(64))},
+  {'index.html':page('b'.repeat(64),newer+older),'sw.js':worker('2'.repeat(64))}));
+ try{
+  assert.deepEqual(deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha),scaledPlan({changedFiles:['index.html','sw.js']}),
+   'the changelog entry and refreshed fingerprints need the owner and one independent review, no specialist or typography review');
+ }finally{cleanupReleaseGateFixture(f);}
+});
+
+test('RISK repository process: changed-line review plan reads persistence only from script code, not prose, comments or Node sync APIs',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const domains=(base,candidate)=>{
+  const f=makeScaledReviewFixture(changedLinePlan2234(base,candidate));
+  try{return deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha).specialistDomains;}finally{cleanupReleaseGateFixture(f);}
+ };
+ const help=text=>`<!doctype html>\n<body>\n<dialog id="help"><p>${text}</p></dialog>\n<script>\nfunction boot(){ start(); }\n</script>\n</body>\n`;
+ assert.deepEqual(domains({'index.html':help('Cloud recovery keeps your saved board.')},
+  {'index.html':help('Cloud recovery waits for a deliberate run before it restores a backup from sync storage or a session.')}),[],
+  'Help prose about cloud recovery is not persistence code');
+ assert.deepEqual(domains({'scripts/report.mjs':'export const tool = 1;\n'},
+  {'scripts/report.mjs':"import fs from 'node:fs';\nimport { spawnSync } from 'node:child_process';\n// Sync the session cache and reload the stored board before saving.\nexport const read = file => fs.readFileSync(file, 'utf8');\nexport const run = args => spawnSync(process.execPath, args);\nfs.writeFileSync('out.txt', 'x');\n"}),[],
+  'Node synchronous file and process APIs and comments are not app persistence');
+ // The #2231 diff: a new scripts/ tool and its tests, with app shell unchanged.
+ const shellTool=fs.readFileSync(path.join(__dirname,'scripts','shell-fingerprints.mjs'),'utf8');
+ const core=fs.readFileSync(path.join(__dirname,'tests','core.test.js'),'utf8');
+ const shellTests=core.slice(core.indexOf('const expectedShellIdentities2231'),core.indexOf("test('Ducks: seeded occasional takeoffs"));
+ assert.ok(shellTool.includes('readFileSync')&&shellTests.includes('spawnSync'),'precondition: the #2231 fixture uses Node sync APIs');
+ assert.deepEqual(domains({'tests/core.test.js':"import fs from 'node:fs';\n"},{'scripts/shell-fingerprints.mjs':shellTool,'tests/core.test.js':"import fs from 'node:fs';\n"+shellTests}),[],
+  'the #2231 tooling diff derives no specialist domain');
+ assert.deepEqual(domains({'landscape-mood.js':'function save(board){ return board; }\n'},{'landscape-mood.js':'function save(board){ return renderSync(board); }\n'}),['memory-cloud-sync'],
+  'an app identifier such as renderSync still derives the persistence specialist');
+ assert.deepEqual(domains({'index.html':help('Help.')},{'index.html':help('Help.').replace('start();','localStorage.setItem("board", "{}"); start();')}),['memory-cloud-sync'],
+  'storage code inside an inline script still derives the persistence specialist');
+});
+
+test('RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const typography=(base,candidate)=>{
+  const f=makeScaledReviewFixture(changedLinePlan2234(base,candidate));
+  try{return deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha).requiresTypographyReview;}finally{cleanupReleaseGateFixture(f);}
+ };
+ const help=body=>`<!doctype html>\n<body>\n<dialog id="help">\n${body}\n</dialog>\n</body>\n`;
+ assert.equal(typography({'index.html':help('<p>Tap a row to <b>start</b> it.</p>')},{'index.html':help('<p>Tap a task to <b>begin</b> working on it.</p>')}),false,
+  'rewording Help inside the same elements needs no typography review');
+ assert.equal(typography({'index.html':help('<p>Tap a row.</p>')},{'index.html':help('<p>Tap a row.</p>\n<p class="note">New note.</p>')}),true,
+  'a new Help element is new rendered markup');
+ assert.equal(typography({'index.html':help('<p>Tap a row.</p>')},{'index.html':help('<p class="note">Tap a row.</p>')}),true,
+  'a changed class on an existing element changes rendering');
+ assert.equal(typography({'landscape.css':'a{color:red}\n'},{'landscape.css':'a{color:blue}\n'}),true,'stylesheet changes still need typography review');
+ assert.equal(typography({'index.html':help('<style>\n.note{color:red}\n</style>')},{'index.html':help('<style>\n.note{color:blue}\n</style>')}),true,
+  'an inline stylesheet rule has no tags but still changes rendering');
 });
 
 test('RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes',async()=>{

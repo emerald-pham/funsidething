@@ -21407,5 +21407,25 @@
       "command": "node --test --test-name-pattern='fingerprints command reports|fingerprints --write after' tests/core.test.js (against the stub command), then node --test --test-name-pattern='Settings changelog: every app asset' tests/core.test.js with app-release.js appended to make the fingerprint stale",
       "failure": "Against the stub the new tests failed: the report was {appFingerprint:{},cacheName:{},stale:null} instead of the committed cdf1b3ec... / chain-scanner-shell-6ce4124f... values, and a stale tree exited 0 instead of 1. With the stale probe the changelog test failed with the old message \"App changed: add a dated changelog entry describing the changes and refresh its app fingerprint\", which names no expected value; after the change the same probe names data-app-fingerprint=\"49c78fbe...\" matching the command."
     }
+  },
+  {
+    "baseCommit": "dae7ee0e8a06cb53a0e7bb0b097eac4e06c79ba4",
+    "testChangesSha256": "a18890e19d579fe5491b3a15353adefb6c3929bc5144e35dbe1f0ecdd14b157a",
+    "reason": "#2234 limits the pre-push receipt check to pushes to main, so work branches can run CI before reviews. The existing pre-push test pushed its candidate to refs/heads/release; that push target changes to refs/heads/main so the test still exercises the guarded path. Every assertion (deletions pass, a dirty worktree is refused, each distinct outgoing tip needs its own receipt) is unchanged.",
+    "previousBehavior": "validatePrePushUpdates required a valid exact-SHA receipt and a clean worktree for every outgoing non-deletion tip on any branch, so the test could use refs/heads/release as its remote ref.",
+    "intendedBehavior": "validatePrePushUpdates checks only outgoing updates whose remote ref is refs/heads/main: those still need a clean worktree and an exact-SHA receipt per tip. Updates to other refs pass without a receipt. The existing test pushes to main and keeps all its assertions; the new test pins that a work-branch push needs neither.",
+    "preservedCoverage": [
+      "A push to main is refused while the worktree is dirty.",
+      "Each distinct outgoing commit tip pushed to main needs its own exact-SHA receipt.",
+      "Branch deletions never need a receipt.",
+      "The main ruleset statuses and the Pages deployment verifier still bind the exact reviewed head (their tests are unchanged)."
+    ],
+    "replacementTests": [
+      "RISK repository process: pre-push lets branch pushes run CI before review and still guards main"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='pre-push lets branch pushes' tests/repository-process.test.js (2026-11-06T17:56:44Z, before the validator change)",
+      "failure": "AssertionError 'a work branch can be pushed for CI before its reviews exist (#2234)': validatePrePushUpdates returned the dirty-worktree and missing-receipt errors for a refs/heads/fix/2234 push instead of []. After the validator change the old test failed with 'local changes cannot be confused with the reviewed immutable commit' until its push target became refs/heads/main."
+    }
   }
 ]

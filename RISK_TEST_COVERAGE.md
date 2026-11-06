@@ -1057,6 +1057,11 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK repository process: FAQ policy rejects legacy verified receipts and old deployment descriptions
 - RISK repository process: Pages FAQ policy reads exact head and base from a full release-evidence checkout
 - RISK repository process: scaled review plan pins ordinary code to owner plus independent and docs to owner only
+- RISK repository process: changed-line review plan ignores persistence code in unchanged context lines
+- RISK repository process: changed-line review plan treats a changelog entry and refreshed fingerprints as an ordinary change
+- RISK repository process: changed-line review plan reads persistence only from script code, not prose, comments or Node sync APIs
+- RISK repository process: changed-line review plan skips typography for text-only edits inside existing elements
+- RISK repository process: pre-push lets branch pushes run CI before review and still guards main
 - RISK repository process: scaled review plan asks the owner for FAQ coverage only when product behavior changes
 - RISK repository process: scaled review plan keeps the specialist for sync, rules, auth, deployment and ambiguous persistence
 - RISK repository process: scaled review plan sets typography only for markup or stylesheet content
