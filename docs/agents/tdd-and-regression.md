@@ -8,10 +8,14 @@ keep the red output for the release record. The edit guard covers every app modu
 also rejects app changes without changed tests. A new `RISK` test is required in
 the same diff only where saved data, the offline shell or enforcement can break:
 HTML pages, the service worker, the web manifest, release delivery
-(`app-release.js`), the device and cloud stores, Firestore rules, and the
-test-first gate, hook or workflow. Other app changes, such as scenery, location
-and styling, need a direct test and use a `RISK` case when the failure cost
-warrants one.
+(`app-release.js`), data modules (any path naming a store, cloud, sync, storage,
+persistence, backup, recovery, auth, session, Firestore, account, IndexedDB or
+migration), the lz-string archive codec, Firestore rules, and the test-first
+gate, hook or workflow. An HTML or worker change that only adds changelog text
+and refreshes the app fingerprint or `CACHE_NAME` does not count, unless it moves
+a changelog marker or adds markup that loads or runs script. Other app changes,
+such as scenery, location and styling, need a direct test and use a `RISK` case
+when the failure cost warrants one.
 
 For behavior-changing controls, begin with the prior state and exercise the
 transition through the actual consumer: the change/click handler, command, or
@@ -118,7 +122,8 @@ existing one with more assertions needs no entry. The entry lists the weakened
 lines in `weakenedTestLines`, each as `file:-content` for a removed line or
 `file:+content` for an inserted suppressor, with no line numbers, so it stays
 valid when later commits add or edit other tests or when merging `main` shifts
-lines. One entry must cover every weakened line in the diff. Entries written
+lines. One entry must cover every weakened line in the diff, listing a repeated
+line once per weakening. Entries written
 before this rule match by their whole-diff `testChangesSha256`. The entry also
 carries the specific reason,
 previous and intended behavior, named replacement or new tests, remaining

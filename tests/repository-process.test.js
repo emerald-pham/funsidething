@@ -171,6 +171,19 @@ test('RISK test-first gate: a scenery change with refreshed fingerprints needs o
   const pageCode=gate();
   assert.equal(pageCode.status,1,'a page code change still needs a new RISK test');
   assert.match(pageCode.stderr,/RISK/);
+  // Changelog markup is injected into the page, so a handler there is code.
+  git('reset','-q','--hard','HEAD~1');
+  write({'index.html':page('d'.repeat(64),'<li>Warmer dawn.</li><li><img src=x onerror="localStorage.clear()">Old.</li>')});
+  git('add','-A');git('commit','-qm','changelog handler');
+  assert.equal(gate().status,1,'a changelog entry that runs code still needs a new RISK test');
+  // Line numbers come from the merge-base, so the base side must be read there too.
+  git('reset','-q','--hard','HEAD~1');
+  git('checkout','-q','-b','side',base);write({'index.html':'<!-- side note -->\n'.repeat(3)+fs.readFileSync(path.join(repo,'index.html'),'utf8')});git('add','-A');git('commit','-qm','side');const side=git('rev-parse','HEAD').stdout.trim();
+  git('checkout','-q','-b','diverged',base);
+  write({'index.html':fs.readFileSync(path.join(repo,'index.html'),'utf8').replace('</body>\n',''),'tests/scenery.test.js':"test('sky: hue',()=>{});\ntest('sky: page closes',()=>{});\n"});
+  git('add','-A');git('commit','-qm','markup removed after block');
+  const diverged=spawnSync(process.execPath,[path.join(__dirname,'scripts','test-first-gate.mjs'),side],{cwd:repo,encoding:'utf8'});
+  assert.equal(diverged.status,1,'markup outside the changelog block needs RISK even against a non-ancestor base');
  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
@@ -186,6 +199,11 @@ test('RISK regression gate: any covering record that validates approves the diff
  const suppressed=[...file,'@@ -12,0 +13 @@','+ return;','@@ -40,0 +41 @@',"+test('scan: result shape stays defined',()=>{});"];
  assert.match(validateRegressionChanges(suppressed,[full]).join(' '),/rationale/i,'an inserted return must itself be listed');
  assert.deepEqual(validateRegressionChanges(suppressed,[{...full,weakenedTestLines:['tests/core.test.js:+return;']}]),[],'a record listing the inserted return approves it');
+ // Each listed line covers one weakening: identical lines repeat across tests.
+ const twice=[...file,'@@ -12 +12 @@','- assert.ok(result);','+ assert.ok(result!==undefined);','@@ -90 +90 @@','- assert.ok(result);','+ assert.ok(result!==undefined);','@@ -140,0 +141 @@',"+test('scan: result shape stays defined',()=>{});"];
+ assert.match(validateRegressionChanges(twice,[full]).join(' '),/rationale/i,'a line listed once cannot approve removing it from a second test');
+ assert.deepEqual(validateRegressionChanges(twice,[{...full,weakenedTestLines:['tests/core.test.js:-assert.ok(result);','tests/core.test.js:-assert.ok(result);']}]),[],
+  'listing the line twice approves both removals');
 });
 
 test('RISK test-first gate: tests stay required for app changes and new RISK tests only for high-risk or enforcement files',async()=>{

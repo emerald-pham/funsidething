@@ -112,20 +112,25 @@ const weakensExistingTests=lines=>protectedTestLines(lines).some(line=>{
 // shifts line numbers; the whole-diff fingerprint went stale on every such
 // change and cost a rebind commit each time.
 export function weakenedTestLines(lines){
-  const weakened=new Set();let file='';
+  // Kept as a list, not a set: identical assertions repeat across tests, so
+  // each listed line covers exactly one weakening (#2233 review).
+  const weakened=[];let file='';
   for(const line of lines){
     const header=line.match(/^(?:--- (?:a\/(.+)|\/dev\/null)|\+\+\+ (?:b\/(.+)|\/dev\/null))$/);
     if(header){const name=header[1]||header[2];if(name)file=name;continue;}
     if(line.startsWith('---')||line.startsWith('+++')||line.startsWith('@@'))continue;
     const content=line.slice(1).trim();
     if(!content||content.startsWith('//'))continue;
-    if(line.startsWith('-'))weakened.add(`${file}:-${content}`);
-    else if(line.startsWith('+')&&suppressesExistingTests(content))weakened.add(`${file}:+${content}`);
+    if(line.startsWith('-'))weakened.push(`${file}:-${content}`);
+    else if(line.startsWith('+')&&suppressesExistingTests(content))weakened.push(`${file}:+${content}`);
   }
-  return [...weakened].sort();
+  return weakened.sort();
 }
-const coversWeakening=(entry,weakened)=>Array.isArray(entry?.weakenedTestLines)&&
-  weakened.every(line=>entry.weakenedTestLines.includes(line));
+const coversWeakening=(entry,weakened)=>{
+  if(!Array.isArray(entry?.weakenedTestLines))return false;
+  const listed=new Map();for(const line of entry.weakenedTestLines)listed.set(line,(listed.get(line)||0)+1);
+  return weakened.every(line=>{const left=listed.get(line)||0;listed.set(line,left-1);return left>0;});
+};
 export function validateRegressionChanges(lines,records){
   if(!weakensExistingTests(lines))return [];
   const weakened=weakenedTestLines(lines);
@@ -158,8 +163,11 @@ function recordErrors(record,lines){
 // the worker CACHE_NAME line. A moved changelog marker or an unreadable side
 // counts as real change (fail closed).
 function onlyReleaseBookkeeping(base,file){
-  const show=ref=>{try{return execFileSync('git',['show',`${ref}:${file}`],{encoding:'utf8',maxBuffer:64*1024*1024});}catch{return null;}};
-  const sides={'-':show(base),'+':show('HEAD')};
+  const show=ref=>{try{return execFileSync('git',['show',`${ref}:${file}`],{encoding:'utf8',maxBuffer:64*1024*1024,stdio:['ignore','pipe','ignore']});}catch{return null;}};
+  // The patch below is base...HEAD, numbered from the merge-base, so the old
+  // side is read there too (#2233 review).
+  let mergeBase;try{mergeBase=execFileSync('git',['merge-base',base,'HEAD'],{encoding:'utf8'}).trim();}catch{return false;}
+  const sides={'-':show(mergeBase),'+':show('HEAD')};
   if(sides['-']===null||sides['+']===null)return false;
   const changelog=text=>{const inside=new Set();let open=false;text.split(/\r?\n/).forEach((line,index)=>{
     if(line.includes('<!-- changelog:start -->'))open=true;if(open)inside.add(index+1);if(line.includes('<!-- changelog:end -->'))open=false;});return inside;};
@@ -172,6 +180,9 @@ function onlyReleaseBookkeeping(base,file){
     const side=line[0];if(!inHunk||(side!=='+'&&side!=='-'))continue;
     const number=side==='+'?newLine++:oldLine++,text=line.slice(1);
     if(/<!-- changelog:(?:start|end) -->/.test(text))return false;
+    // Changelog markup is injected into the page, so a line that loads or runs
+    // script is code, as the release review classifier treats it.
+    if(/<\/?script\b|\bon[a-z]+\s*=|javascript:/i.test(text))return false;
     if(/^\s*const\s+CACHE_NAME\s*=\s*["']chain-scanner-shell-[a-f0-9]+["'];?\s*$/.test(text))continue;
     if(!blocks[side].has(number))return false;
   }
