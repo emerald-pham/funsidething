@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash, webcrypto } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -949,6 +950,45 @@ test('RISK repository process: CI runs once per pull request commit and never ca
  for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
 });
 
+// #2232 process RISKs require their named seam tests to execute and pass, with
+// one top-level outcome per pin and no skips.
+function requirePinsPass(file,pins,label){
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^(?:'+pins.join('|')+')$',file],{cwd:__dirname,env,encoding:'utf8',timeout:300000,maxBuffer:8*1024*1024});
+ assert.equal(result.status,0,'The '+label+' pins must pass: '+result.stdout+'\n'+result.stderr);
+ assert.equal(result.stdout.split('\n').filter(line=>/^(?:not )?ok \d+ - /.test(line)).length,pins.length,'every named '+label+' pin must execute');
+ assert.match(result.stdout,/^# skipped 0$/m);
+ for(const pin of pins)assert.ok(result.stdout.split('\n').some(line=>/^ok \d+ - /.test(line)&&line.endsWith(' - '+pin)),'pin did not pass: '+pin);
+}
+
+// #2232: a PR description update started a second full run on the same SHA. The
+// edited trigger is pinned at the CI workflow seam (CI-routing tests).
+test('RISK repository process: a pull request edit starts no CI run and executes no test group',()=>{
+ requirePinsPass('scripts/agent-tools/ci-routing.test.mjs',['workflow starts no run and no test group for a pull request edited event'],'PR edit trigger');
+});
+
+// #2232: the nightly root resolved to zero tests and nothing said so until the
+// nightly run. The zero-test guard is pinned at the group runner's command line
+// with fixture cohorts (test-group tests). It deliberately does not require
+// main's live nightly roots to resolve: they return with #2248.
+test('RISK repository process: a declared required or nightly root that resolves to zero tests fails the group runner',()=>{
+ requirePinsPass('scripts/agent-tools/test-groups.test.mjs',['test group describe and nightly preflight fail when a declared required or nightly root resolves to zero tests'],'zero-test guard');
+});
+
+// #2232: every new test root needed a hand-written group row. Default-by-file
+// placement, overrides and fail-closed aggregation of placed roots are pinned at
+// the group runner's command line with fixture cohorts.
+test('RISK repository process: a test root without a group row runs in its file group and the cohort still fails closed',()=>{
+ requirePinsPass('scripts/agent-tools/test-groups.test.mjs',['test group roots without a row take their file group and rows override it'],'default-by-file');
+});
+
+// #2232: heavy roots were moved between groups to stay under Node's default
+// heap. The per-group heap, including its 512 to 12288 MB bounds, is pinned at
+// the group runner's command line with a fixture cohort.
+test('RISK repository process: a group runs with its declared Node heap instead of moving roots out of it',()=>{
+ requirePinsPass('scripts/agent-tools/test-groups.test.mjs',['test group runs a group with its declared Node heap and rejects an invalid heap'],'group heap');
+});
+
 // The nightly cross-engine move is pinned at the agreed seams (the CI workflow
 // files in the CI-routing tests, and test:group --aggregate in the test-group
 // tests); this process RISK requires those pins to execute and pass.
@@ -1119,6 +1159,18 @@ test('RISK test inventory: risk map and source checks read every file in the tes
 // under {skip:!process.env.LANDSCAPE_BROWSER_URL} failed CI as an unexpected
 // skip. An added root may skip only through an explicit environmentSkips
 // declaration naming the variable its registration is gated on.
+// The group runner's --describe output is the effective required cohort: a
+// root's group comes from its row or, with no row, from its file (#2232).
+function requiredCohortDescriptor(){
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'chain-required-cohort-')),output=path.join(directory,'describe');
+ try{
+  const head=spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
+  const result=spawnSync(process.execPath,['scripts/test-groups.mjs','--describe','--group','core','--output-dir',output,'--repository','local/describe','--event-policy','local','--run-id','1','--run-attempt','1','--source-sha',head,'--comparison-base',head],{cwd:__dirname,encoding:'utf8',timeout:60000});
+  assert.equal(result.status,0,'the required cohort must describe: '+result.stdout+result.stderr);
+  return JSON.parse(fs.readFileSync(path.join(output,'descriptor.json'),'utf8'));
+ }finally{fs.rmSync(directory,{recursive:true,force:true});}
+}
+
 test('RISK test inventory: every added environment-gated root is declared with the variable its registration skips on',()=>{
  const assignments=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-assignments.json'),'utf8'));
  const inventory=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-inventory.json'),'utf8'));
@@ -1131,7 +1183,7 @@ test('RISK test inventory: every added environment-gated root is declared with t
  for(const match of source.matchAll(/^test\(\s*(['"])(.*?)\1\s*,\s*\{\s*skip\s*:\s*!process\.env\.([A-Z][A-Z0-9_]*)\s*\}/gm))gated.set(match[2],match[3]);
  const added=[...gated].filter(([root])=>!baselineSkips.has(root));
  assert.ok(added.length>=10,'positive control: this branch adds environment-gated browser roots: '+added.length);
- const declared=new Map((assignments.environmentSkips||[]).map(entry=>[entry.root,entry]));
+ const declared=new Map((assignments.environmentSkips||[]).map(entry=>[entry.root,entry])),requiredGroups=requiredCohortDescriptor().groups;
  for(const [root,environment] of added){
   assert.ok(declared.has(root),'the added environment-gated root is declared: '+root);
   assert.equal(declared.get(root).environment,environment,'the declaration names the variable the registration skips on: '+root);
@@ -1140,7 +1192,9 @@ test('RISK test inventory: every added environment-gated root is declared with t
  for(const root of declared.keys()){
   assert.ok(gated.has(root),'every declaration names an environment-gated root in the test directory: '+root);
   assert.equal(baselineSkips.has(root),false,'baseline skips stay in the independent inventory, not in declarations: '+root);
-  assert.ok(assignments.rootAssignments.some(entry=>entry.root===root),'every declared root keeps its group assignment: '+root);
+  // #2232: rows hold only overrides; the runner's descriptor is the effective
+  // placement, whether by row or by the root's file.
+  assert.ok(requiredGroups.some(group=>group.roots.includes(root)),'every declared root keeps its group assignment: '+root);
  }
 });
 
