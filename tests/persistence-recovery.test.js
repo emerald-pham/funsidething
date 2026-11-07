@@ -6162,15 +6162,62 @@ test('RISK contained board adoption: the board’s next frame and queued input g
   }
   setTimeout(callback,0);return 1;
  };
+ // #2254 re-review: the save that input starts lands its head commit while
+ // adoption writes its headers-only record, which is guarded by the head the
+ // page knew before that commit. Hold the two so they always meet that way
+ // (it happened in about half of the runs by timing alone).
+ const store=ctx.window.ScannerDeviceStore,commit=store.commitHead,protect=store.protectRecoverySource,raced=[];
+ let recordCalled,typedLanded,typedHeld=false,recordHeld=false;
+ const recordCall=new Promise(resolve=>{recordCalled=resolve;}),typedCommit=new Promise(resolve=>{typedLanded=resolve;});
+ const bounded=promise=>Promise.race([promise,new Promise(resolve=>setTimeout(resolve,5000))]);
+ store.commitHead=async function(options,...rest){
+  if(!typedHeld&&typeof options?.payload==='string'&&options.payload.includes('Typed while the frame was drawn')){
+   typedHeld=true;await bounded(recordCall);
+   try{return await commit.call(this,options,...rest);}finally{raced.push('save-commit');typedLanded();}
+  }
+  return commit.call(this,options,...rest);
+ };
+ store.protectRecoverySource=async function(options,...rest){
+  if(!options?.key?.startsWith('unreadable-generation-record:'))return protect.call(this,options,...rest);
+  if(!recordHeld){recordHeld=true;raced.push('record-write');recordCalled();await bounded(typedCommit);}
+  const result=await protect.call(this,options,...rest);raced.push(result?'record-written':'record-refused');return result;
+ };
  const alive=setInterval(()=>{},20);
- t.after(()=>{clearInterval(alive);delete ctx.window.requestAnimationFrame;backend.CS.recoveryEvidence=evidence;backend.CS.readRecoverySourceHeaders=headers;});
+ t.after(()=>{clearInterval(alive);delete ctx.window.requestAnimationFrame;backend.CS.recoveryEvidence=evidence;backend.CS.readRecoverySourceHeaders=headers;
+  store.commitHead=commit;store.protectRecoverySource=protect;});
  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
- await fixtureDeadline(async wait=>{while(!pushes.length||!adoptionIdle2254(ctx))await wait(10);},'the board is adopted',30000);
+ assert.deepEqual(raced.slice(0,3),['record-write','save-commit','record-refused'],
+  'fixture: the save’s head commit lands while the record is written, so that write is refused '+JSON.stringify(raced));
+ await fixtureDeadline(async wait=>{while(!pushes.length||!adoptionIdle2254(ctx))await wait(10);},'the board is adopted in the same session '+JSON.stringify(raced),30000);
+ assert.equal(raced.at(-1),'record-written','after the save settles the record is written over the head this page saved '+JSON.stringify(raced));
  assert.equal(order[0],'frame','the board’s next frame goes before any adoption read '+JSON.stringify(order));
  assert.ok(order.includes('pending-upload-read')&&order.includes('header-read'),'positive control: adoption read the pending upload and the headers '+JSON.stringify(order));
  assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the board is then adopted once');
  assert.ok(JSON.parse(pushes[0].payload).tasks.some(task=>task.title==='Typed while the frame was drawn'),'the input handled in that frame is published with it');
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+// The retry above is only over the head this page saved. When another tab
+// moves the head while the record is written, the retry never writes over it.
+test('RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,revision,pushes}=app,store=ctx.window.ScannerDeviceStore;
+ await newerEditBeforeAdoption2254(app);
+ const commit=store.commitHead,protect=store.protectRecoverySource,writes=[];let otherTab=null;
+ store.protectRecoverySource=async function(options,...rest){
+  if(!options?.key?.startsWith('unreadable-generation-record:'))return protect.call(this,options,...rest);
+  if(!otherTab){
+   const head=await store.readHead(),board=JSON.parse(head.payload);board.otherTabFixture2254='saved in another tab';
+   otherTab=JSON.stringify(board);
+   assert.equal((await commit.call(store,{expectedHash:head.hash,payload:otherTab,account:head.account??null}))?.ok,true,'fixture: another tab saves a newer head');
+  }
+  const result=await protect.call(this,options,...rest);writes.push(result);return result;
+ };
+ t.after(()=>{store.protectRecoverySource=protect;});
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+ assert.ok(writes.length>=1&&writes.every(result=>result===false),'every record write over the other tab’s head is refused '+JSON.stringify(writes));
+ assert.equal((await store.readHead()).payload,otherTab,'the other tab’s newer head is kept');
+ assert.deepEqual(pushes,[],'nothing is published');
+ assert.equal(backend.docs.get('users/owner').rev,revision+1);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','the board waits as before');
 });
 
 // #2254 review (S4): Use my board from before recovery returns this device's
@@ -6194,13 +6241,15 @@ test('RISK contained board adoption: after the person chooses Use my board from 
  assert.equal(staged?.baseRev,revision+1,'fixture: its own staged upload is pending');
  const before=JSON.stringify(ctx.state);
  // The next read cannot save the adoption's record (device storage refuses it
- // once), so the automatic recovery default opens instead, with this
- // device's own complete staged upload, and its publication is refused.
- const protect=store.protectRecoverySource;let refusedRecord=false;
- store.protectRecoverySource=async function(...args){if(!refusedRecord&&args[0]?.key?.startsWith('unreadable-generation-record:')){refusedRecord=true;return false;}return protect.apply(this,args);};
+ // on every try of that read), so the automatic recovery default opens
+ // instead, with this device's own complete staged upload, and its
+ // publication is refused.
+ const protect=store.protectRecoverySource;let refusedRecord=0,refusing=true;
+ store.protectRecoverySource=async function(...args){if(refusing&&args[0]?.key?.startsWith('unreadable-generation-record:')){refusedRecord++;return false;}return protect.apply(this,args);};
  t.after(()=>{store.protectRecoverySource=protect;});
  const {idle}=await pendingAutomaticDefault2194(t,app);
- assert.equal(refusedRecord,true,'fixture: the adoption record was refused once');
+ refusing=false;
+ assert.ok(refusedRecord>=1,'fixture: the adoption record was refused');
  // The person chooses Use my board from before recovery in open Settings.
  t.after(faithfulModalQuery2194(shim));
  ctx.openSettings();shim.document.getElementById('toast').textContent='';

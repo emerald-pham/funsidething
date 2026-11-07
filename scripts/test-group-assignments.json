@@ -13526,6 +13526,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

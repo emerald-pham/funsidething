@@ -2395,6 +2395,7 @@ The signed-in large-board fixture opens on a served build with an in-page fake c
 - RISK contained board adoption: after adoption, showing, focusing or reconnecting the app reads no whole device store, and a remembered over-budget mark stays
 - RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
+- RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused
 - RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit
 - RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the copy before the unreadable one is the copy it last confirmed, whoever saved the unreadable copy, that work saved only there cannot be recovered, that a large board otherwise waits, and that the board from before recovery keeps cloud saving paused
