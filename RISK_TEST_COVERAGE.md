@@ -126,6 +126,12 @@ its RISK test; the map follows.
 - RISK cloud source review #2272: a committedAt-only head refresh on every capture neither stops the review nor spends the fresh recheck
 - RISK cloud source review #2272: a cloud push this device starts waits while the review reads, then resumes
 - RISK cloud source review #2272: the stale diagnostic names the differing fields and each capture readability, without board content
+- RISK cloud source review #2272: source shapes that differ outside the named parts still count as changed
+- RISK cloud source review #2272: a generation readable on the first capture and unreadable on the second stays Unknown and cannot be chosen
+- RISK cloud source review #2272: after a committedAt-only head refresh during the review, Apply publishes the chosen source and saves it on this device
+- RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write
+- RISK cloud source review #2272: a cloud push deferred by the review resumes after Cancel and after a failed review
+- RISK cloud source review #2272: a review that throws while it opens still ends, so a later review and cloud pushes run
 - RISK cloud source review #2272 guidance: mounted Help and the November 7 changelog say an unreadable or unchanged source is not a change
 - RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless
 - RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback
