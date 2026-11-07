@@ -30253,6 +30253,30 @@ test('RISK daily backup retention adoption copy: in browser storage, a large boa
  assert.equal(restorable(),true,'the earlier board is still restorable after a save on the same day');
 });
 
+// #2268 review (finding 10): a manual backup of the same board stood in for
+// the copy kept before taking a newer cloud board. The Settings reminder asks
+// people to delete manual backups they no longer need; deleting that one left
+// only the three-day daily backup, so the earlier board disappeared on the
+// fourth day instead of the seventh.
+test('RISK daily backup retention adoption copy: a manual backup of the same board does not stand in for the copy kept before taking a newer cloud board, so deleting it keeps the earlier board restorable for seven calendar days',async t=>{
+ const {ctx,at,prior,restorable}=await browserAdoptionDevice2268(t,{tasks:[syncTask('shared','Shared task')],beforePull:async ctx=>{
+  await ctx.onAction('make-manual-backup',{});await flush();await flush();ctx.closeModal();
+ }});
+ assert.ok(ctx.readLocalBackups().some(row=>row.kind==='manual'&&row.payload===prior),'fixture: a manual backup holds the earlier board');
+ for(let day=7;day<=12;day++){
+  setFakeTime(ctx,at(day));
+  if(day===7){
+   const manual=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===prior);
+   vm.runInContext('confirm=()=>true',ctx);ctx.openSettings();
+   await ctx.onAction('delete-local-backup',{dataset:{id:manual.id}});await flush();ctx.closeModal();
+   assert.equal(ctx.readLocalBackups().some(row=>row.kind==='manual'&&row.payload===prior),false,'fixture: the person deleted the manual backup');
+  }
+  ctx.addTask('Day '+day);assert.equal(await ctx.persist(),true,'day '+day+' saves');
+  // Behaviour under test: the copy kept before taking the cloud board outlives the deleted manual backup.
+  assert.equal(restorable(),true,'the earlier board is still restorable on the '+(day-5)+(day===7?'nd':day===8?'rd':'th')+' calendar day');
+ }
+});
+
 // #2254 (owner rule): Settings, Help and the November 6 changelog say what
 // the rule keeps. Every Help answer keeps the 130-word limit.
 test('RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{

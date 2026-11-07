@@ -2448,7 +2448,13 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     // before taking a newer cloud board is promised for seven. Opening saves
     // today's daily backup of the same unchanged board first, so reusing it
     // made the earlier board disappear four days early.
-    if(kind==="before-cloud-adoption" && rows.some(row=>row.kind!=="latest" && (row.kind!=="daily" || row.keptForCloudAdoption===true) && row.payload===payload)) return true;
+    // #2268 review: nor can a manual backup, which the Settings reminder asks
+    // people to delete when they no longer need it, or an automatic copy from
+    // an earlier day, which retires before a copy made today would. Only a
+    // copy kept at least as long as this one stands in: one the app keeps
+    // until it is deleted, or one from today that keeps seven days.
+    if(kind==="before-cloud-adoption" && rows.some(row=>row.payload===payload && row.kind!=="latest" && row.kind!=="manual" &&
+      (!automaticBackupKinds.has(row.kind) || row.day===day && (row.kind!=="daily" || row.keptForCloudAdoption===true)))) return true;
     // #2268 review: a second full copy of the same board instead counted twice
     // against the automatic budget below, and for a board of about 400,000
     // characters the copies it pushed out included the earlier board itself,
