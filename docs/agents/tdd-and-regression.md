@@ -5,12 +5,17 @@
 Before editing any scanner, landscape, location, or offline-shell behavior,
 write a discriminating test in the matching `tests/` area file, run it, and
 keep the red output for the release record. The edit guard covers every app module. The CI diff gate
-also rejects app changes without changed tests. Browser/runtime JavaScript,
-HTML, the web manifest, Firestore rules, and the test-first gate, hook, or
-workflow require a new `RISK` test in the same diff. Runtime paths are matched
-by file type, so a newly added module cannot avoid the gate by using a new
-filename. CSS and static image edits still need a direct test in the same diff;
-they use a `RISK` case when the failure cost warrants one.
+also rejects app changes without changed tests. A new `RISK` test is required in
+the same diff only where saved data, the offline shell or enforcement can break:
+HTML pages, the service worker, the web manifest, release delivery
+(`app-release.js`), data modules (any path naming a store, cloud, sync, storage,
+persistence, backup, recovery, auth, session, Firestore, account, IndexedDB or
+migration), the lz-string archive codec, Firestore rules, and the test-first
+gate, hook or workflow. An HTML or worker change that only adds changelog text
+and refreshes the app fingerprint or `CACHE_NAME` does not count, unless it moves
+a changelog marker or adds markup that loads or runs script. Other app changes,
+such as scenery, location and styling, need a direct test and use a `RISK` case
+when the failure cost warrants one.
 
 For behavior-changing controls, begin with the prior state and exercise the
 transition through the actual consumer: the change/click handler, command, or
@@ -48,9 +53,10 @@ A root `tests.js` is not a test file: nothing runs it, the hook refuses writing
 it, and the CI gate rejects a diff that adds or changes one. Port such edits as
 [test groups](test-groups.md#test-files) describes.
 
-`RISK_TEST_COVERAGE.md` maps the current high-cost feature contracts to their
-named tests. Add or rename its entry whenever a `RISK` test is added, removed,
-or renamed; a test in `tests/repository-process.test.js` checks that the map stays complete. Changes to
+`RISK_TEST_COVERAGE.md` lists the `RISK` tests by file and is generated from
+their names: run `npm run risk-map -- --write` after adding, renaming or
+removing one. A test in `tests/repository-process.test.js` checks that the
+committed map matches. Changes to
 the diff gate, edit hook, or CI workflow also need a new process-focused
 `RISK` test, named under the test-first gate, regression gate, test inventory,
 or repository process boundary. An unrelated feature risk test cannot satisfy
@@ -112,13 +118,18 @@ test diff (all changes under `tests/`, shared helpers included, plus the
 deletion of the old root `tests.js` when the base predates the split) removes
 or renames an existing test, or
 deletes, changes or weakens one of its lines. Adding a new test or extending an
-existing one with more assertions needs no entry. The entry carries the exact
-protected-test-change fingerprint of the whole test diff (each line bound to its
-file, so a record cannot move to another file), the specific reason,
+existing one with more assertions needs no entry. The entry lists the weakened
+lines in `weakenedTestLines`, each as `file:-content` for a removed line or
+`file:+content` for an inserted suppressor, with no line numbers, so it stays
+valid when later commits add or edit other tests or when merging `main` shifts
+lines. One entry must cover every weakened line in the diff, listing a repeated
+line once per weakening. Entries written
+before this rule match by their whole-diff `testChangesSha256`. The entry also
+carries the specific reason,
 previous and intended behavior, named replacement or new tests, remaining
 feature boundaries, and the command plus observed failure from the red run.
 Write and observe that failure before implementing the change. Keep unrelated
-protections intact. Update the entry if the test diff changes.
+protections intact. Update the entry only when the diff weakens another line.
 
 `scripts/test-first-gate.mjs` runs in required CI and rejects removed or
 weakened tests without this record, including test-only changes and deletion of
