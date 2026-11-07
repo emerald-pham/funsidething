@@ -6641,3 +6641,29 @@ test('RISK manual backup reminder visual browser: the reminder beside Make manua
  assert.ok(observed.length===12,'every engine, theme and view was measured: '+observed.length);
  assert.deepEqual(failures,[],JSON.stringify(failures));
 });
+
+// #2254 (owner decision of 2026-11-06): Help explains the manual backup
+// reminder within the 130-word answer limit, and the changelog announces it.
+// Neither sends anyone to another device: people have only their phone.
+test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
+ const answer=answerTo('Why does Settings remind me about manual backups?');
+ assert.match(answer,/Manual backups stay on this device until you delete them; they are never removed automatically\./);
+ assert.match(answer,/keeping more than two slows the app down/);
+ assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder beside Make manual backup\./);
+ assert.match(answer,/Delete older ones you don’t need/);
+ assert.match(answer,/Make manual backup still works, with no limit and no extra step\./);
+ assert.match(answer,/Only manual backups of the account you are using count\./);
+ assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(release,'positive control: the mounted changelog has the November 6 release');
+ assert.match(release,/<li>Settings → Data and backups now shows a reminder beside Make manual backup once this account has two or more manual backups: keeping more than two slows the app down, so delete older ones you don’t need\./);
+ assert.match(release,/Manual backups are never removed automatically, and Make manual backup still works with no extra step\.<\/li>/);
+ for(const [question,text] of [['manual backup answer',answer],['November 6 changelog',release]])
+  assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
+});
