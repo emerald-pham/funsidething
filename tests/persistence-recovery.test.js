@@ -7177,6 +7177,45 @@ test('RISK acknowledged recovery trim: a note the trim kept still lets the check
   'the next trim clears the merge’s own archives and the resolved note');
 });
 
+// #2254: showing the app asks for the check of earlier sources, and an
+// acknowledgement that arrives while that check is asked for leaves the trim
+// to it, since the check goes first. The trim waited for a later
+// acknowledged save instead: on a phone that waited over its work budget,
+// which leaves that check for a deliberate run, an adoption while the app
+// opened kept every recovery archive until the next edit.
+test('RISK acknowledged recovery trim: an adoption the cloud acknowledges while the app opens is trimmed without a further save, once the check of earlier sources has run or when a phone over its work budget leaves that check for a deliberate run',{timeout:300000},async t=>{
+ for(const variant of ['a phone that waited over its work budget','a device within its work budget'])await t.test(variant,async sub=>{
+  const app=await recoveredLeftoversApp2254(sub),{ctx,shim,backend,store,unreadableId}=app,OVER='fvp:chain-scanner:automatic-recovery-over-budget';
+  const waited=variant==='a phone that waited over its work budget';
+  if(waited)assert.ok(ctx.localStorage.getItem(OVER),'positive control: the over-budget wait is remembered');
+  else{ctx.localStorage.removeItem(OVER);ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1073741824;}
+  const mark=ctx.localStorage.getItem(OVER),earlier=await earlierSources2254(ctx);
+  assert.deepEqual(earlier.unresolved,[[unreadableId,'generation-incomplete']],'positive control: the unreadable generation is an unresolved earlier source');
+  vm.runInContext('globalThis.__checks2254=[];globalThis.__fallback2254=openAutomaticCloudSourceFallback;'+
+   'openAutomaticCloudSourceFallback=(failed,...rest)=>{__checks2254.push(failed?.code??null);return __fallback2254(failed,...rest);}',ctx);
+  const pushes=[],push=backend.CS.push;
+  backend.CS.push=async(payload,updatedAt,baseRev,context)=>{pushes.push(baseRev);return push(payload,updatedAt,baseRev,context);};
+  sub.after(()=>{backend.CS.push=push;});
+  await unreadableNextRevision2254(app,'opening');
+  // The app is shown: it pulls, adopts its board over the unreadable
+  // revision and the cloud acknowledges it, with the check asked for.
+  ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});
+  await trimSettle2254(ctx,'the opening, its adoption and what follows settle');
+  assert.deepEqual(pushes,[backend.docs.get('users/owner').rev-1],'positive control: the opening adopted the board once over the unreadable revision');
+  assert.equal(syncStatus2200(shim).text,'☁ synced','positive control: the cloud acknowledged the adopted board');
+  const checks=vm.runInContext('__checks2254.filter(code=>code==="automatic-source-resume").length',ctx);
+  if(waited)assert.equal(checks,0,'positive control: over its work budget the opening leaves the check of earlier sources for a deliberate run');
+  else assert.ok(checks>=1,'positive control: the opening ran the check of earlier sources');
+  // Behaviour under test.
+  const after=await deviceRows2254(store);
+  assert.deepEqual(after.opaque.filter(row=>trimLeftover2254(row.key)).map(row=>row.key),[],'the trim follows the adoption without a further save');
+  assert.deepEqual(after.meta.map(row=>row.key),['head'],'and finishes, leaving no unfinished trim');
+  assert.equal(pushes.length,1,'nothing more is published');
+  assert.equal(ctx.localStorage.getItem(OVER),mark,'the over-budget mark stays as it was');
+  assert.deepEqual(await earlierSources2254(ctx),earlier,'the check of earlier sources still reports the same unresolved generation');
+ });
+});
+
 test('RISK acknowledged recovery trim guidance: mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies by itself, what it keeps, and that until then every recovery copy stays',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];

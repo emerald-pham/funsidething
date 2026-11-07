@@ -13576,6 +13576,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK acknowledged recovery trim: an adoption the cloud acknowledges while the app opens is trimmed without a further save, once the check of earlier sources has run or when a phone over its work budget leaves that check for a deliberate run",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK acknowledged recovery trim guidance: mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies by itself, what it keeps, and that until then every recovery copy stays",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
