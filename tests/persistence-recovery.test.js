@@ -6367,25 +6367,25 @@ test('RISK contained board adoption: when one read or digest of a readable next 
    assert.equal(generationDocs2254(backend,elsewherePath),elsewhereBefore,'the unreadable revision stays untouched');
    assert.ok(backend.docs.get('users/owner/recoveryProtections/'+elsewhereId),'and protected in the cloud');
    assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
-   return;
-  }
-  // Behaviour under test: nothing is published over the other device's work.
-  for(const row of pushes)assert.ok(row.payload.includes(ELSEWHERE_TASK_2254),'every publication keeps the other device’s task');
-  assert.equal(seen.failed,failure.times??1,'fixture: the read or digest failed as intended');
-  const cloud=await currentCloudBoard2254(backend,codec);
-  assert.ok(cloud.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'the cloud keeps the other device’s task');
-  if(large){
-   assert.deepEqual(pushes,[],'a large board publishes nothing');
-   assert.deepEqual([root.rev,root.activeGeneration],[revision+1,elsewhereId],'the cloud stays at the other device’s revision');
-   assert.equal(generationDocs2254(backend,elsewherePath),elsewhereBefore,'which stays untouched');
-   assert.equal(JSON.stringify(ctx.state),before,'the board stays exactly as it was');
-   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','a large board waits, as before adoption existed');
   }else{
-   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the reconciled board is published once, over the other device’s revision');
-   assert.ok(cloud.tasks.some(row=>row.title==='Newer local edit before adoption'),'the cloud also holds this device’s newer edit');
-   assert.ok(ctx.state.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'this board takes the other device’s task');
-   assert.equal(ctx.state.syncDirty,false);
-   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+   // Behaviour under test: nothing is published over the other device's work.
+   for(const row of pushes)assert.ok(row.payload.includes(ELSEWHERE_TASK_2254),'every publication keeps the other device’s task');
+   assert.equal(seen.failed,failure.times??1,'fixture: the read or digest failed as intended');
+   const cloud=await currentCloudBoard2254(backend,codec);
+   assert.ok(cloud.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'the cloud keeps the other device’s task');
+   if(large){
+    assert.deepEqual(pushes,[],'a large board publishes nothing');
+    assert.deepEqual([root.rev,root.activeGeneration],[revision+1,elsewhereId],'the cloud stays at the other device’s revision');
+    assert.equal(generationDocs2254(backend,elsewherePath),elsewhereBefore,'which stays untouched');
+    assert.equal(JSON.stringify(ctx.state),before,'the board stays exactly as it was');
+    assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','a large board waits, as before adoption existed');
+   }else{
+    assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the reconciled board is published once, over the other device’s revision');
+    assert.ok(cloud.tasks.some(row=>row.title==='Newer local edit before adoption'),'the cloud also holds this device’s newer edit');
+    assert.ok(ctx.state.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'this board takes the other device’s task');
+    assert.equal(ctx.state.syncDirty,false);
+    assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+   }
   }
  });
 });
@@ -6433,17 +6433,17 @@ test('RISK contained board adoption: after a failed read of a readable next revi
    assert.equal(backend.docs.get('users/owner').previousGeneration,elsewhereId);
    assert.equal(pushes[0].payload,ctx.cloudPayload());
    assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
-   return;
+  }else{
+   // Retry sync reads afresh, finds the revision readable and keeps both devices' work.
+   await ctx.onAction('sync-retry',{});await adoptionSettle2254(ctx,'Retry sync settles');
+   assert.ok(downloads()>opened,'Retry sync downloads the cloud copy again');
+   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'Retry sync publishes once, over the other device’s revision');
+   const cloud=await currentCloudBoard2254(backend,ctx.window.ChainStorageV2);
+   for(const [what,match] of [['the other device’s task',row=>row.id===ELSEWHERE_TASK_2254],['this device’s newer edit',row=>row.title==='Newer local edit before adoption']]){
+    assert.ok(cloud.tasks.some(match),'the cloud holds '+what);assert.ok(ctx.state.tasks.some(match),'this board holds '+what);
+   }
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
   }
-  // Retry sync reads afresh, finds the revision readable and keeps both devices' work.
-  await ctx.onAction('sync-retry',{});await adoptionSettle2254(ctx,'Retry sync settles');
-  assert.ok(downloads()>opened,'Retry sync downloads the cloud copy again');
-  assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'Retry sync publishes once, over the other device’s revision');
-  const cloud=await currentCloudBoard2254(backend,ctx.window.ChainStorageV2);
-  for(const [what,match] of [['the other device’s task',row=>row.id===ELSEWHERE_TASK_2254],['this device’s newer edit',row=>row.title==='Newer local edit before adoption']]){
-   assert.ok(cloud.tasks.some(match),'the cloud holds '+what);assert.ok(ctx.state.tasks.some(match),'this board holds '+what);
-  }
-  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
  });
 });
 
