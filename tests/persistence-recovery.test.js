@@ -6189,17 +6189,17 @@ test('RISK contained board adoption: an upload of exactly this board that was cu
    assert.equal(d.ctx.cloudPayload(),boardBefore,'D’s board stays as it was');
    assert.equal(d.ctx.state.syncDirty,true,'D’s board is not confirmed');
    assert.notEqual(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D does not show synced');
-   return;
+  }else{
+   // Behaviour under test: D saves its board as the next revision, keeping the
+   // unreadable one as the previous generation.
+   assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
+   assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
+   assert.equal(await publishedPayload2266(d,root.activeGeneration),staged,'the cloud holds exactly D’s board, which is what the cut-off upload staged');
+   assert.equal(d.ctx.cloudPayload(),staged,'D’s board is unchanged');
+   assert.equal(d.ctx.state.syncRev,root.rev,'D confirmed it');
+   assert.equal(d.ctx.state.syncDirty,false);
+   assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
   }
-  // Behaviour under test: D saves its board as the next revision, keeping the
-  // unreadable one as the previous generation.
-  assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
-  assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
-  assert.equal(await publishedPayload2266(d,root.activeGeneration),staged,'the cloud holds exactly D’s board, which is what the cut-off upload staged');
-  assert.equal(d.ctx.cloudPayload(),staged,'D’s board is unchanged');
-  assert.equal(d.ctx.state.syncRev,root.rev,'D confirmed it');
-  assert.equal(d.ctx.state.syncDirty,false);
-  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
  });
 });
 
