@@ -13311,6 +13311,11 @@
       "file": "tests/scenery.test.js"
     },
     {
+      "root": "RISK automatic recovery summary: a committed recovery’s summary keeps generation ids, headers and chunk indexes without chunk text, the check of earlier sources still finds incomplete generations from it, and a summary saved with chunk text still reads the same",
+      "group": "scenery",
+      "file": "tests/scenery.test.js"
+    },
+    {
       "root": "RISK recovery guard checks: a deliberate run serializes the live board once for each guard check rather than once per comparison inside it",
       "group": "scenery",
       "file": "tests/scenery.test.js"

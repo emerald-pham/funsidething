@@ -14,6 +14,7 @@ import {
   syncStatus2200, pedestrianReservationPolicy, pedestrianDaytimeSpawnPolicy,
   assertPedestrianReservationBound, paintedMotionWorldXs,
 } from "./shared.js";
+import { editRawDevice187 } from "./shared.js";
 
 test('RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('../scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
@@ -1344,6 +1345,36 @@ test('RISK recovery summary: after publication lists the archives once, the chec
  assert.ok((calls['listOpaqueArchives:every']||0)<=1,'only publication lists every archive, once: '+JSON.stringify(calls));
  assert.equal(calls.readRawExportSnapshot||0,0,'the check of earlier sources never reads the raw device source: '+JSON.stringify(calls));
  assert.ok(read<=1.25*written,'archive text read from publication on is about what the commit wrote (its one list), not several times it: '+JSON.stringify({written,read}));
+});
+// #2254 review (S3): each summary repeated every generation's chunks, text
+// included (about 3.4 MB per recovery on a heavy store), though the check of
+// earlier sources reads only which chunk indexes arrived. A summary saved with
+// that text by the earlier version must keep reading the same way.
+test('RISK automatic recovery summary: a committed recovery’s summary keeps generation ids, headers and chunk indexes without chunk text, the check of earlier sources still finds incomplete generations from it, and a summary saved with chunk text still reads the same',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,activePath}=app,store=ctx.window.ScannerDeviceStore;
+ await deliberateRunWithPublication2239(t,app);
+ const unreadableId=activePath.split('/').at(-1);
+ const [summary]=await store.listOpaqueArchives({prefix:'automatic-recovery-summary:'});
+ const [archive]=await store.listOpaqueArchives({prefix:'automatic-cloud-source:'});
+ assert.ok(summary&&archive,'positive control: the committed recovery wrote its summary and source archive');
+ const value=JSON.parse(summary.raw),source=value.source,full=JSON.parse(archive.raw).generations;
+ assert.deepEqual(source.generations.map(row=>row.id),full.map(row=>row.id),'the summary names each of the recovery’s generations');
+ // Behaviour under test: ids, headers and chunk indexes, never chunk text.
+ for(const [index,row] of source.generations.entries()){
+  assert.deepEqual(row.header,full[index].header,'each generation keeps its exact header');
+  assert.deepEqual(row.chunks?.map(chunk=>Object.keys(chunk)),full[index].chunks?.map(()=>['index']),'each chunk keeps only its index');
+  assert.deepEqual(row.chunks?.map(chunk=>chunk.index),full[index].chunks?.map(chunk=>chunk.index),'and every index is kept');
+ }
+ assert.ok(summary.raw.length<archive.raw.length/20,'the summary is a small part of the source archive: '+summary.raw.length+' of '+archive.raw.length);
+ // The check of earlier sources still finds the incomplete generation from it.
+ const history=async()=>JSON.parse(await vm.runInContext('automaticCloudSourceHistoryFromSummaries().then(JSON.stringify)',ctx));
+ const fromIndexes=await history();
+ assert.deepEqual(fromIndexes.unresolved.map(row=>[row.id,row.reason]),[[unreadableId,'generation-incomplete']],'the unreadable generation is still an unresolved, incomplete earlier source');
+ // A summary the earlier version saved, with every chunk's text, reads the same.
+ const old=JSON.stringify({...value,source:{...source,generations:full}});
+ await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{const opaque=tx.objectStore('opaque');opaque.get(summary.key).onsuccess=event=>opaque.put({...event.target.result,raw:old},summary.key);});
+ assert.ok((await store.listOpaqueArchives({prefix:'automatic-recovery-summary:'}))[0].raw.includes('"text"'),'fixture: the saved summary carries chunk text');
+ assert.deepEqual(await history(),fromIndexes,'a summary saved with chunk text decides the same');
 });
 // #2239 round 2: a recovery guard compares the live board's text with the
 // board it captured. The attempt's own guard, the commit's check and the
