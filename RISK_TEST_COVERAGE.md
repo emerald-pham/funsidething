@@ -874,6 +874,7 @@ its RISK test; the map follows.
 - RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear
 - RISK daily backup retention: a successful save keeps this account’s daily backups for three calendar days and other automatic copies for seven, and never trims manual, promoted or pinned copies or a board copy another backup still uses
 - RISK daily backup retention scope: a save trims only this account’s daily backups to three calendar days, on this device and in the older backup list, while another account’s daily backups and those saved before daily backups named an account keep seven
+- RISK daily backup retention adoption copy: in browser storage, the board a device had before taking another device’s newer cloud board stays restorable for seven calendar days, even when that day’s daily backup already holds the same board
 - RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted
 - RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering
 - RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections
@@ -1519,6 +1520,7 @@ its RISK test; the map follows.
 - RISK contained board adoption: when one read or digest of a readable next revision another device published over the acknowledged copy fails, nothing is published over that device’s work: a large board waits, a board within budget keeps both devices’ work, and the same revision with a damaged or missing chunk still adopts
 - RISK contained board adoption: after a failed read of a readable next revision makes a large board wait, returning or reconnecting downloads no cloud copy again and Retry sync takes both devices’ work, while a damaged revision whose own check failed for another reason is checked again and adopted
 - RISK daily backup retention hold: while cloud recovery waits on an unreadable copy or holds an older copy, saves keep daily backups for seven calendar days, and once the cloud confirms a board the next save trims them to three
+- RISK daily backup retention hold sign-out: signing out while cloud recovery waits keeps this account’s daily backups for seven calendar days, and once the account signs back in and the cloud confirms a board the next save trims them to three
 - RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit
 - RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it
 - RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders
