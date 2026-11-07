@@ -6144,6 +6144,55 @@ test('RISK contained board adoption: an upload whose reply was lost and that a l
  });
 });
 
+// #2268 review (finding 12): a read that finds this device's own lost-reply
+// save clears only that save's pending record. The device keeps one pending
+// upload record per account, shared by its pages, so by the time the read
+// comes another page of this device may have staged its own upload, which may
+// hold work this page's board lacks. That record, or one naming the landed
+// generation with other bytes, must survive the read: when a later revision
+// cannot be read, it still keeps the device from publishing its board.
+test('RISK contained board adoption: a read that confirms this device’s lost-reply save keeps a pending upload record that is not that save, so a later unreadable revision still waits for it',{timeout:180000},async t=>{
+ for(const record of ['the landed save’s own record','another page staged its own upload','the landed generation with other bytes'])await t.test(record,async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'}),store=d.ctx.window.ScannerDeviceStore;
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  await d.add('Saved on D second');
+  let lost=false;
+  d.faults.afterTransaction=async docs=>{if(!lost&&docs.get('users/owner')?.rev===confirmed+1){lost=true;throw Object.assign(Error('reply lost'),{code:'unavailable'});}};
+  await d.save('D saves again');delete d.faults.afterTransaction;
+  const landed=sharedCloudRoot2266(d.backend),own=await store.getPendingUpload('owner');
+  assert.equal(lost,true,'fixture: the server committed and the reply was lost');
+  assert.deepEqual([own?.generationId,own?.baseRev],[landed.activeGeneration,confirmed],'fixture: the pending record is the landed save');
+  const otherBytes=await d.ctx.window.ChainStorageV2.hashPayload(JSON.stringify({staged:'by another page, with work this board lacks'}));
+  if(record==='another page staged its own upload')
+   assert.equal((await store.setPendingUpload('owner',{...own,generationId:'staged-by-another-page',payloadHash:otherBytes}))?.ok,true,'fixture: another page staged its upload');
+  else if(record==='the landed generation with other bytes')
+   assert.equal((await store.setPendingUpload('owner',{...own,payloadHash:otherBytes}))?.ok,true,'fixture: the record names the landed generation with other bytes');
+  await d.read('D reads its own save back');
+  assert.equal(d.ctx.state.syncRev,confirmed+1,'fixture: D confirmed its save');
+  // Device E saves the next revision, which loses its chunks.
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  await e.add('Saved on E');await e.save('E saves');
+  const damaged=sharedCloudRoot2266(d.backend);
+  assert.equal(damaged.rev,confirmed+2,'fixture: E saved the next revision');
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  const board=d.ctx.cloudPayload();
+  await d.read('D reads the unreadable revision');
+  const root=sharedCloudRoot2266(d.backend);
+  if(record==='the landed save’s own record'){
+   // Positive control: the confirmed save leaves nothing to wait for.
+   assert.equal(root.rev,damaged.rev+1,'positive control: D publishes its board over the unreadable revision');
+   assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  }else{
+   // Behaviour under test: a record that is not the landed save still stops D publishing.
+   assert.equal(root.rev,damaged.rev,'nothing is published');
+   assert.equal(root.activeGeneration,damaged.activeGeneration);
+   assert.equal(d.ctx.cloudPayload(),board,'D’s board stays as it was');
+   assert.notEqual(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D does not show synced');
+  }
+ });
+});
+
 // #2268 review (finding 3): this device's own upload published the next
 // revision but its reply was lost, and that revision's chunks were then lost
 // too. An adoption run another page left unfinished keeps contained adoption
