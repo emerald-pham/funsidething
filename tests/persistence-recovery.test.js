@@ -6669,6 +6669,37 @@ test('RISK exact acknowledged cloud source: after the person chooses Use my boar
  assert.ok(ctx.state.tasks.some(task=>task.title==='Kept on this device: another edit is saved'),'the edits stay on this device');
 });
 
+// #2268 review (finding 8): a launch whose cloud backend could not start (the
+// Firebase SDK cannot load offline) reports itself ready with no account. The
+// app read that as a completed sign-out and forgot the person's Use my board
+// from before recovery, so the next online launch rebuilt and published the
+// board over the declined unreadable root, as #2265 promised it would not.
+test('RISK exact acknowledged cloud source: a launch whose cloud backend could not start keeps the choice of Use my board from before recovery, so the next online launch still publishes nothing',async t=>{
+ const app=await declinedExactCopy2268(t),{backend,originalRoot}=app;
+ const declineKey='fvp:chain-scanner:declined-automatic-cloud-recovery';
+ assert.ok(app.shim.localStorage.getItem(declineKey),'fixture: the choice is remembered');
+ await closeLegacyApp173(app);backend.CS.suspend();
+ // An offline launch: the backend's start fails before it knows any account.
+ const offline=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});
+ if(!offline.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),offline.ctx,{filename:'device-store-v2.js'});offline.ctx.window.ChainStorageV2=offline.ctx.ChainStorageV2;}
+ await offline.ctx.__dataReady;
+ const failed=await loadCloudBackendV2({runtimeWindow:offline.ctx.window,sharedDocs:backend.docs,timeoutMs:5000,
+  firebaseSDK:{getFirestore(){throw Object.assign(Error('Firebase SDK unavailable offline'),{code:'unavailable'});}}});
+ await flush();await adoptionSettle2254(offline.ctx,'the offline launch settles');
+ assert.deepEqual([failed.CS.ready,failed.CS.user??null,failed.CS.errorStage],[true,null,'init'],'fixture: the backend could not start');
+ await closeLegacyApp173(offline);
+ // The next launch is online and signed in to the same account.
+ const online=await coldRelaunch2198(t,app,[],{signIn:false});
+ const pushes=[],push=online.backend.CS.push;online.backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};
+ online.backend.emitAuth({uid:'owner',email:'e@example.com'});online.ctx.closeModal();await flush();await online.ctx.cloudPull();await online.settle('the online launch settles');
+ await adoptionSettle2254(online.ctx,'the online launch’s saves settle');
+ // Behaviour under test: the choice outlives the failed start.
+ assert.deepEqual(pushes,[],'nothing is published');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the cloud stays at the unreadable revision');
+ assert.ok(online.shim.localStorage.getItem(declineKey),'the choice is still remembered');
+ assert.notEqual(online.shim.document.getElementById('syncBtn').textContent,'☁ synced','the status never says synced');
+});
+
 // #2254 release review (B1, specialist): the pull reports a decode that failed
 // without a code as an unreadable generation, so a digest the browser could
 // not compute once (a DOMException), a RangeError under memory pressure or a

@@ -5287,9 +5287,13 @@ function observeCloudIdentity(){
   }
   // Signing out or another account ends a remembered conclusion. Before the
   // backend knows the restored session, its empty user is not a sign-out.
-  if(window.CloudSync?.ready===true)forgetPersistedUnreadableCloudSourceUnless(identity,user);
+  // #2268 review: nor is the empty user of a backend whose start failed (the
+  // Firebase SDK can't load offline): it is ready but knows no account, and
+  // forgetting a decline there let the next online launch publish over it.
+  const identityKnown=window.CloudSync?.ready===true&&window.CloudSync.errorStage!=="init";
+  if(identityKnown)forgetPersistedUnreadableCloudSourceUnless(identity,user);
   if(dailyHoldAccount!==undefined&&!dailyBackupsHeldForRecovery())rememberDailyBackupRecoveryHold(dailyHoldAccount);
-  observedCloudSignedOut=user?false:observedCloudSignedOut||window.CloudSync?.ready===true;
+  observedCloudSignedOut=user?false:observedCloudSignedOut||identityKnown;
   observedCloudUser=user;observedCloudUid=identity;observedCloudIdentity=true;
 }
 function cloudAccountIdentity(){try{return window.CloudSync?.recoveryIdentity?.()??null;}catch{return null;}}
