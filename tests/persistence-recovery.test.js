@@ -7123,6 +7123,38 @@ test('RISK daily backup retention hold: when browser storage refuses the remembe
  });
 });
 
+// #2268 review (finding 11, boot race): the build before this one kept the
+// remembered unreadable copy (and a decline) for the account but no daily
+// backup hold record. When a relaunch hears "signed out" before the board is
+// loaded, those records are forgotten, and the hold checked at that moment
+// matched no board, so nothing kept it: the next save trimmed this account's
+// daily backups while the cloud had confirmed nothing.
+test('RISK daily backup retention hold sign-out: a relaunch that hears signed out before the board loads keeps this account’s daily backups for seven calendar days from the recovery records it forgets',async t=>{
+ const app=await waitingRecovery2268(t),{ctx,shim,backend,account}=app;
+ const provedKey='fvp:chain-scanner:proved-unreadable-cloud-source',holdKey='fvp:chain-scanner:daily-backup-recovery-hold';
+ assert.ok(shim.localStorage.getItem(provedKey),'fixture: the waiting recovery is remembered for the account');
+ // As the previous build left the device: no daily backup hold record.
+ shim.localStorage.removeItem(holdKey);
+ await closeLegacyApp173(app);backend.CS.suspend();
+ let early=null,boardAtSignOut;
+ const relaunch=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:shim.localStorage,beforeStateReady(c){
+  // The backend answers before the board loads, as a revoked session can.
+  early=loadCloudBackendV2({runtimeWindow:c.window,sharedDocs:backend.docs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000})
+   .then(b=>{boardAtSignOut=vm.runInContext('state',c);b.auth.currentUser=null;b.emitAuth(null);return b;});
+ }});
+ const cloud=await early;t.after(async()=>{cloud.CS.suspend();await closeLegacyApp173(relaunch);});
+ const {ctx:c2,shim:s2}=relaunch;
+ if(!c2.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),c2,{filename:'device-store-v2.js'});c2.window.ChainStorageV2=c2.ChainStorageV2;}
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',c2))await wait();},'the relaunch loads the board',30000);
+ await adoptionSettle2254(c2,'the relaunch settles');
+ assert.equal(boardAtSignOut,null,'fixture: the sign-out arrived before the board loaded');
+ assert.equal(s2.localStorage.getItem(provedKey),null,'fixture: the sign-out forgot the remembered unreadable copy');
+ assert.equal(c2.state.syncAccount??null,account,'fixture: the board still belongs to the same account');
+ // Behaviour under test: the forgotten records' account keeps its seven days.
+ assert.deepEqual(await dailyBackupsTrimmedBySave2268(c2,s2,account,'Saved after a signed-out relaunch'),[],
+  'daily backups keep seven calendar days');
+});
+
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
 // adoption has to cost no more there than an ordinary cloud save. The store is
 // built on a served build with the app's own writers: the large signed-in

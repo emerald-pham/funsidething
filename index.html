@@ -6783,12 +6783,18 @@ function forgetProvedUnreadableCloudSource(){
 function readPersistedUnreadableCloudSource(){
   try{const raw=localStorage.getItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);return raw&&raw.length<=8192?JSON.parse(raw):null;}catch{return null;}
 }
+// #2268 review: each record forgotten here keeps its account's daily backup
+// hold, which only the cloud confirming a board ends. The hold this sign-out
+// checks first (observeCloudIdentity) can't see them when the answer comes
+// before the board loads, and a build before this one kept no hold record.
 function forgetPersistedUnreadableCloudSourceUnless(identity,account){
+  const keepHold=record=>{if(typeof record?.account==="string"&&record.account)rememberDailyBackupRecoveryHold(record.account);};
   const record=readPersistedUnreadableCloudSource();
-  if(record&&(!identity||record.identity!==identity||record.account!==account))
-    try{localStorage.removeItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);}catch{}
+  if(record&&(!identity||record.identity!==identity||record.account!==account)){
+    keepHold(record);try{localStorage.removeItem(PROVED_UNREADABLE_CLOUD_SOURCE_KEY);}catch{}
+  }
   const declined=readDeclinedAutomaticCloudRecovery();
-  if(declined&&(!identity||declined.identity!==identity||declined.account!==account))forgetDeclinedAutomaticCloudRecovery();
+  if(declined&&(!identity||declined.identity!==identity||declined.account!==account)){keepHold(declined);forgetDeclinedAutomaticCloudRecovery();}
   forgetContainedAdoptionRun({unless:identity?{identity,account}:null,everyPage:!identity});
 }
 const unreadableProofHash=value=>value===null||typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
