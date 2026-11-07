@@ -116,10 +116,23 @@ its RISK test; the map follows.
 - RISK cloud source fresh check: late typed head changes cannot be hidden inside the fresh pair
 - RISK cloud source fresh check: partial captures retain typed pending and hold evidence
 - RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck
-- RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress
+- RISK cloud source fresh check: head metadata alone completes the first pair with visible cancellable progress
 - RISK cloud source fresh check: changed head ownership and unknown record facts cannot count as harmless metadata
 - RISK cloud source fresh check: structured-clone head facts cannot be erased by the metadata exception
 - RISK cloud source fresh check: continuing peer churn stops after four complete captures without choosing
+- RISK cloud source review #2272: unchanged documents read back in another field order complete the review with the unreadable source Unknown
+- RISK cloud source review #2272: a generation readable on one capture and unreadable on another, with the same manifest and header, stays Unknown and completes
+- RISK cloud source review #2272: changed readable or unreadable generation content still stops the review as changed
+- RISK cloud source review #2272: a committedAt-only head refresh on every capture neither stops the review nor spends the fresh recheck
+- RISK cloud source review #2272: a cloud push this device starts waits while the review reads, then resumes
+- RISK cloud source review #2272: the stale diagnostic names the differing fields and each capture readability, without board content
+- RISK cloud source review #2272: source shapes that differ outside the named parts still count as changed
+- RISK cloud source review #2272: a generation readable on the first capture and unreadable on the second stays Unknown and cannot be chosen
+- RISK cloud source review #2272: after a committedAt-only head refresh during the review, Apply publishes the chosen source and saves it on this device
+- RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write
+- RISK cloud source review #2272: a cloud push deferred by the review resumes after Cancel and after a failed review
+- RISK cloud source review #2272: a review that throws while it opens still ends, so a later review and cloud pushes run
+- RISK cloud source review #2272 guidance: mounted Help and the November 7 changelog say an unreadable or unchanged source is not a change
 - RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless
 - RISK cloud source fresh check: Cancel and reopen revoke a stalled fresh pair and its late callback
 - RISK cloud source fresh check: changed local authority and unsupported or failed reads never restart
