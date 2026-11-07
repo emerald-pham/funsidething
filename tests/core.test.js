@@ -15506,7 +15506,11 @@ test('LOCAL BACKUPS: seven local calendar days, latest save today, and pre-resto
   let entries = ctx.readLocalBackups();
   assert.deepEqual(Array.from(new Set(entries.map(entry => entry.day))).sort(),
     ['2026-09-02','2026-09-03','2026-09-04','2026-09-05','2026-09-06','2026-09-07','2026-09-08']);
-  const day3 = entries.find(entry => entry.day === '2026-09-03' && entry.kind === 'daily');
+  // #2254 (owner rule): daily backups cover three local calendar days; the
+  // other automatic copies, such as each day's latest save, keep seven.
+  assert.deepEqual(Array.from(new Set(entries.filter(entry => entry.kind === 'daily').map(entry => entry.day))).sort(),
+    ['2026-09-06','2026-09-07','2026-09-08']);
+  const day3 = entries.find(entry => entry.day === '2026-09-03' && entry.kind === 'latest');
   ctx.openSettings();
   assert.match(shim.document.getElementById('modalRoot').innerHTML, /Daily local backups/);
   assert.match(shim.document.getElementById('modalRoot').innerHTML, /seven calendar days/);
@@ -30028,6 +30032,110 @@ test('RISK legacy automatic expiry FAQ: save rotation permanently removes expire
  assert.match(help,/removed after a successful save, without Undo/);assert.match(help,/protected recovery copies remain until you delete/);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);assert.match(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
+});
+
+// #2254 (owner rule, 2026-11-06): "only 3 autosaves", which the owner
+// clarified meant the daily backups. A successful save keeps this account's
+// daily backups for today and the two calendar days before it, instead of
+// seven; every other automatic copy keeps seven, and manual, promoted and
+// pinned copies stay until they are deleted. Removing a daily backup's row
+// never removes a board copy another backup or the board still uses: the head
+// commit retires only snapshots nothing references.
+test('RISK daily backup retention: a successful save keeps this account’s daily backups for three calendar days and other automatic copies for seven, and never trims manual, promoted or pinned copies or a board copy another backup still uses',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-daily-retention-'+Date.now()+'-'+Math.random();
+ const raw=JSON.stringify(syncState({tasks:[syncTask('daily-retention','Daily retention board')]}));
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),at=day=>+new Date(2026,9,day,12);
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName,beforeStateReady:ctx=>setFakeTime(ctx,at(1))});
+ const store=shim.window.ScannerDeviceStore;
+ try{
+  assert.equal(ctx.deviceStorageActive(),true,'fixture: the device store holds the board');
+  const dailyOf=async day=>(await store.listBackups()).find(row=>row.kind==='daily'&&row.day===ctx.backupDay(at(day)));
+  const kept={};
+  for(let day=1;day<=8;day++){
+   setFakeTime(ctx,at(day));ctx.addTask('Day '+day);assert.equal(await ctx.persist(),true,'day '+day+' saves');
+   if(day===1){
+    // A manual backup and an automatic cloud-adoption copy of the same board
+    // share the daily backup's board copy.
+    kept.daily1=await dailyOf(1);
+    kept.manual=await ctx.saveDurableBackup('manual',kept.daily1.payload);
+    kept.adoption1=await ctx.saveDurableBackup('before-cloud-adoption',kept.daily1.payload);
+   }
+   if(day===2){
+    // The app's existing promotion keeps an automatic copy as a displaced-edit copy.
+    kept.promoted=await dailyOf(2);
+    assert.equal(await ctx.reclassifyDurableCloudRecoveryBackup(kept.promoted.id,kept.promoted.payload,'before-cloud-local-edit'),true,'fixture: the daily backup is promoted');
+    kept.adoption2=await ctx.saveDurableBackup('before-cloud-adoption',kept.promoted.payload);
+   }
+   if(day===3){
+    // The board pins this daily backup, as a cloud adoption pins its safety copy.
+    kept.pinned=await dailyOf(3);ctx.state.protectedBackupIds=[kept.pinned.id];
+   }
+  }
+  for(const name of ['daily1','manual','adoption1','promoted','adoption2','pinned'])assert.ok(kept[name]?.id,'fixture: '+name+' was saved');
+  assert.equal(kept.manual.payload,kept.daily1.payload,'fixture: the manual backup and the first daily backup share one board copy');
+  const rows=await store.listBackups(),ids=rows.map(row=>row.id);
+  const dailyDays=[...rows.filter(row=>row.kind==='daily'&&row.id!==kept.pinned.id).map(row=>row.day)].sort();
+  // Behaviour under test: this account's daily backups cover today and the two days before it.
+  assert.deepEqual(dailyDays,[6,7,8].map(day=>ctx.backupDay(at(day))),'daily backups cover three calendar days');
+  // Other automatic copies keep seven calendar days.
+  assert.equal(ids.includes(kept.adoption1.id),false,'positive control: an automatic copy from eight days ago is retired');
+  assert.equal(ids.includes(kept.adoption2.id),true,'an automatic copy from seven calendar days ago stays');
+  // Manual, promoted and pinned copies stay, and so does the board copy they share.
+  assert.equal(rows.find(row=>row.id===kept.manual.id)?.payload,kept.daily1.payload,'the manual backup stays restorable after the daily backup that shared its copy is trimmed');
+  assert.equal(ids.includes(kept.daily1.id),false,'positive control: the first daily backup is trimmed');
+  assert.equal(rows.find(row=>row.id===kept.promoted.id)?.kind,'before-cloud-local-edit','the promoted copy stays');
+  assert.equal(ids.includes(kept.pinned.id),true,'the pinned daily backup stays while the board pins it');
+  assert.deepEqual([...rows.filter(row=>row.kind==='latest').map(row=>row.day)],[ctx.backupDay(at(8))],'one latest copy, today');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the board itself is the saved head');
+ }finally{await store.close();}
+});
+
+// #2254 (owner rule): trimming stays with the account whose board a daily
+// backup copies, and never reads a board copy to find out. A daily backup
+// names that account when it is saved; one that names another account, or
+// was saved before daily backups named one, keeps the seven-day rule, on the
+// device and in the older backup list alike.
+test('RISK daily backup retention scope: a save trims only this account’s daily backups to three calendar days, on this device and in the older backup list, while another account’s daily backups and those saved before daily backups named an account keep seven',async()=>{
+ const f=await privateLegacyExpiryFixture({makeRows:row=>[
+  row('private-own-trimmed','daily','2026-10-04',{account:null}),row('private-own-kept','daily','2026-10-05',{account:null}),
+  row('private-other-account','daily','2026-10-04',{account:'another-account@example.test'}),row('private-unnamed','daily','2026-10-04'),
+  row('private-expired','daily',PRIVATE_EXPIRY_OLD)]});try{
+  assert.equal(f.ctx.state.syncAccount??null,null,'fixture: the board is signed out, so its daily backups name no account');
+  assert.equal(await privateExpirySave(f),true);
+  const legacy=privateExpiryLegacyRows(f).map(row=>row.id),durable=(await f.store.listBackups()).map(row=>row.id);
+  for(const [where,ids] of [['the older backup list',legacy],['this device',durable]]){
+   // Behaviour under test: this account's daily backup from three days before yesterday is trimmed.
+   assert.equal(ids.includes('private-own-trimmed'),false,where+': this account’s daily backup outside three calendar days is trimmed');
+   for(const id of ['private-own-kept','private-other-account','private-unnamed'])assert.equal(ids.includes(id),true,where+': '+id+' stays');
+   assert.equal(ids.includes('private-expired'),false,where+': positive control: the seven-day rule still retires older copies');
+  }
+  await privateExpiryAssertCurrentBoard(f);
+ }finally{await f.store.close();}
+});
+
+// #2254 (owner rule): Settings, Help and the November 6 changelog say what
+// the rule keeps. Every Help answer keeps the 130-word limit.
+test('RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
+ const section=settings.split('<h3>Daily local backups</h3>')[1]?.split('</p>')[0]||'';
+ assert.match(section,/Daily copies stay on this device for today and the two calendar days before it, so at most three; other automatic copies stay for up to seven calendar days/);
+ assert.match(section,/While cloud recovery waits or holds your board, before the cloud confirms it, daily copies keep the seven days\./);
+ assert.match(section,/Daily copies saved before this update, or holding another account’s board, also keep seven days\./);
+ assert.match(section,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
+ assert.doesNotMatch(section,/Automatic copies stay on this device for up to seven calendar days/);
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const backups=markup.split('<dt>How do backups and Restore work?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(backups,/Automatic backups cover today and the previous six local dates, daily backups only the previous two;/);
+ assert.match(backups,/Manual and protected recovery copies remain until you delete them\./);
+ const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
+ assert.deepEqual(answers.filter(row=>row.text.split(/\s+/).filter(Boolean).length>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/<li>Daily backups now cover today and the two calendar days before it, so at most three stay on this device instead of seven days of them\./);
+ assert.match(release,/Other automatic copies still stay up to seven days, and manual backups and every copy the app keeps until you delete it/);
+ assert.match(release,/While cloud recovery waits or holds your board, daily backups keep seven days until the cloud confirms it\./);
+ for(const text of [section,backups,release.replace(/<[^>]+>/g,' ')])assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i);
 });
 
 

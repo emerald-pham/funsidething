@@ -7356,6 +7356,21 @@
       "file": "tests/core.test.js"
     },
     {
+      "root": "RISK daily backup retention: a successful save keeps this account’s daily backups for three calendar days and other automatic copies for seven, and never trims manual, promoted or pinned copies or a board copy another backup still uses",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK daily backup retention scope: a save trims only this account’s daily backups to three calendar days, on this device and in the older backup list, while another account’s daily backups and those saved before daily backups named an account keep seven",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted",
+      "group": "core",
+      "file": "tests/core.test.js"
+    },
+    {
       "root": "RISK legacy automatic expiry guard: final transaction abort compensates only unchanged index bytes and never replaces a peer append",
       "group": "core",
       "file": "tests/core.test.js"
@@ -13482,6 +13497,11 @@
     },
     {
       "root": "RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK daily backup retention hold: while cloud recovery waits on an unreadable copy or holds an older copy, saves keep daily backups for seven calendar days, and once the cloud confirms a board the next save trims them to three",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },

@@ -6228,6 +6228,55 @@ test('RISK contained board adoption: after the person chooses Use my board from 
  assert.equal(toastText,'Your earlier board is back. Cloud saving stays paused.');
 });
 
+// #2254 (owner rule, 2026-11-06): daily backups cover three calendar days, but
+// during a recovery hold, before the cloud has acknowledged a board, nothing
+// recovery may need is trimmed. While cloud recovery waits on an unreadable
+// copy, or the older copy is in use under a recovery hold, saves keep this
+// account's daily backups for seven calendar days; once the cloud confirms a
+// board, the next save trims them to three.
+test('RISK daily backup retention hold: while cloud recovery waits on an unreadable copy or holds an older copy, saves keep daily backups for seven calendar days, and once the cloud confirms a board the next save trims them to three',async t=>{
+ for(const variant of ['recovery waits on an unreadable copy','an older copy is in use under a recovery hold'])await t.test(variant,async sub=>{
+  const app=await containedAdoptionApp2254(sub),{ctx,shim,backend,acknowledgedPath,pushes}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+  const base=JSON.stringify(ctx.state.decisionBase);
+  // The generation before the unreadable one is not yet this device's copy, so nothing is adopted.
+  await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not yet'};return JSON.stringify(board);});
+  await newerEditBeforeAdoption2254(app);
+  if(variant==='recovery waits on an unreadable copy'){
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the waiting opening settles');
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: cloud recovery waits');
+  }else{
+   ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=64*1048576;
+   await pendingAutomaticDefault2194(sub,app);
+   assert.equal(vm.runInContext('!!deviceRecoveryCloudHold',ctx),true,'positive control: a recovery hold keeps the older copy');
+  }
+  // Daily backups this account saved on the six days before today, as a phone that waited for days keeps them.
+  const dayBefore=days=>vm.runInContext('(()=>{const at=new Date(Date.now());at.setHours(12,0,0,0);at.setDate(at.getDate()-'+days+');return backupDay(+at);})()',ctx);
+  const head=await store.readHead(),account=ctx.state.syncAccount??null,earlier=[];
+  for(const days of [6,5,4,3]){
+   const backup={id:'daily:held-2254-'+days,day:dayBefore(days),at:Date.now()-days*86400000,kind:'daily',payload:head.payload,account};
+   assert.equal((await store.putBackup({expectedHash:head.hash,backup}))?.ok,true,'fixture: the daily backup from '+days+' days ago is saved');
+   earlier.push(backup.id);
+  }
+  await ctx.refreshDeviceBackupCache();
+  shim.document.getElementById('addInput').value='Saved while recovery holds';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  const held=(await store.listBackups()).map(row=>row.id);
+  // Behaviour under test: nothing recovery may need is trimmed while it waits or holds.
+  assert.deepEqual(earlier.filter(id=>!held.includes(id)),[],'daily backups keep seven calendar days while recovery waits or holds');
+  if(variant==='recovery waits on an unreadable copy'){
+   // The earlier generation is this device's copy again, so the reconnect adopts and the cloud confirms the board.
+   await rewriteGenerationFixture(backend,acknowledgedPath,codec,()=>JSON.parse(base).payload);
+   vm.runInContext('resumeCloudSync({type:"online"})',ctx);
+   await fixtureDeadline(async wait=>{while(!pushes.length||!adoptionIdle2254(ctx))await wait(10);},'the reconnect adopts',30000);
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','positive control: the cloud confirmed the board');
+   shim.document.getElementById('addInput').value='Saved after the cloud confirmed';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+   const after=await store.listBackups(),ids=after.map(row=>row.id);
+   assert.deepEqual(earlier.filter(id=>ids.includes(id)),[],'the first save after the cloud confirms trims daily backups to three calendar days');
+   assert.ok(after.some(row=>row.kind==='daily'&&row.day===dayBefore(0)),'today’s daily backup stays');
+   assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the board itself is the saved head');
+  }
+ });
+});
+
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
 // adoption has to cost no more there than an ordinary cloud save. The store is
 // built on a served build with the app's own writers: the large signed-in
