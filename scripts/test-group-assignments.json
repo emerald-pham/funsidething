@@ -13456,6 +13456,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK contained board adoption: after adoption, showing, focusing or reconnecting the app reads no whole device store, and a remembered over-budget mark stays",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

@@ -6010,3 +6010,44 @@ test('RISK contained board adoption: an adoption upload cut off inside the real 
   for(const id of [unreadableId,acknowledgedId])assert.ok(backend.docs.get('users/owner/recoveryProtections/'+id),'generation '+id+' stays protected');
  });
 });
+
+// #2254 review (B2): showing, focusing or reconnecting the app asks for the
+// check of earlier incomplete cloud sources. Adoption forgot the #2228 mark
+// that keeps that check for a deliberate run on a phone that waited over its
+// work budget, and on a device with no automatic recovery the check fell back
+// to reading every saved copy and archive, on every return to the app.
+test('RISK contained board adoption: after adoption, showing, focusing or reconnecting the app reads no whole device store, and a remembered over-budget mark stays',async t=>{
+ for(const variant of ['a device that never waited','a phone that waited over its work budget'])await t.test(variant,async sub=>{
+  const app=await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,acknowledgedPath,pushes}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+  const base=JSON.stringify(ctx.state.decisionBase),OVER='fvp:chain-scanner:automatic-recovery-over-budget';
+  await newerEditBeforeAdoption2254(app);
+  if(variant==='a phone that waited over its work budget'){
+   // It waited first: the earlier generation did not match yet.
+   await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not yet'};return JSON.stringify(board);});
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the waiting opening settles');
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: it waits');
+   assert.ok(ctx.localStorage.getItem(OVER),'positive control: the over-budget wait is remembered');
+   await rewriteGenerationFixture(backend,acknowledgedPath,codec,()=>JSON.parse(base).payload);
+  }
+  const mark=ctx.localStorage.getItem(OVER);
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the adoption settles');
+  await fixtureDeadline(async wait=>{while(vm.runInContext('cloudSourceRecoveryBusy',ctx))await wait(10);},'the adoption settles',30000);
+  assert.equal(pushes.length,1,'positive control: the board was adopted');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  assert.equal(ctx.localStorage.getItem(OVER),mark,'the over-budget mark is kept exactly as it was');
+  const counts={snapshots:0,listings:0};
+  const readRaw=store.readRawExportSnapshot,list=store.listOpaqueArchives;
+  store.readRawExportSnapshot=function(...args){counts.snapshots++;return readRaw.apply(this,args);};
+  store.listOpaqueArchives=function(...args){if(!args[0]?.prefix)counts.listings++;return list.apply(this,args);};
+  sub.after(()=>{store.readRawExportSnapshot=readRaw;store.listOpaqueArchives=list;});
+  for(const event of ['pageshow','focus','online','visibilitychange']){
+   if(event==='visibilitychange')shim.document.dispatchEvent({type:event});else shim.window.dispatchEvent({type:event});
+   await adoptionSettle2254(ctx,event+' settles');
+   await fixtureDeadline(async wait=>{await wait(20);while(vm.runInContext('cloudSourceRecoveryBusy',ctx))await wait(10);},event+' settles',30000);
+  }
+  assert.deepEqual(counts,{snapshots:0,listings:0},'no return to the app reads every saved copy or archive');
+  assert.equal(pushes.length,1,'nothing more is published');
+  assert.equal(ctx.localStorage.getItem(OVER),mark,'the over-budget mark is still kept');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ });
+});
