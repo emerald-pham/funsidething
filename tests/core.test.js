@@ -12,6 +12,7 @@ import {
   test, injectRecoveryDatabaseFailure187, editRawDevice187, deviceFaultProvider187,
   partialSavedBoard187, refuseNextRecoveryTransaction255, damagedAcknowledgedApp187,
   automaticDefaultApp251, recoveryReadClock187, settleSourceFixtureSave187, freshSourceCheckFixture187,
+  replaceIndependentServerPayload263,
   APOLOGY_NOTICE_ID, ORIGINAL_APOLOGY, channelReleaseEnvelope, LEGACY_COMPLETION_RELEASE,
   legacyCompletionSource173, closeLegacyApp173, upgradedLegacyApp173, releasedExpiryStartSource173,
   scopedUndoClients, woopFixture, woopStep, woopDislodgeTwice, ratingHistoryCopy, ratingHistoryTask,
@@ -2439,17 +2440,18 @@ test('RISK cloud source partial-read guidance: mounted Help explains the same bo
  assert.match(html,/A cloud change during a recovery read now gets the same safe recheck as a change between reads\./);
 });
 
-test('RISK cloud source fresh check: head metadata alone permits one fresh pair and visible cancellable progress',async t=>{
+test('RISK cloud source fresh check: head metadata alone completes the first pair with visible cancellable progress',async t=>{
  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store),gate=deferredSyncFixture();
  const before=JSON.stringify(ctx.state),head=await readHead(),pending=await store.getPendingUpload('owner'),raw=await store.readRawExportSnapshot(),cloud=JSON.stringify([...backend.docs]),writes=backend.writes.length;
  let heads=0,roots=0,review;store.readHead=async()=>{const value=await readHead();return ++heads>=3?{...value,committedAt:(value.committedAt||0)+1}:value;};
- app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===5)await gate.promise;};
+ app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===3)await gate.promise;};
  t.after(async()=>{gate.resolve();store.readHead=readHead;delete app.faults.serverRead;await review;});
  review=ctx.onAction('review-cloud-source-recovery',{});
- await fixtureDeadline(async wait=>{while(roots<5)await wait();},'the entirely fresh pair enters its real SDK root read');
+ await fixtureDeadline(async wait=>{while(roots<3)await wait();},'the second capture enters its real SDK root read');
  const progress=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(progress,/Checking fresh sources within the same one-minute limit/);assert.match(progress,/data-act="close-modal">Cancel/);assert.match(progress,/data-cloud-source-readonly/);assert.match(progress,/until the checks finish/,'the fresh check is actually running');
- gate.resolve();assert.equal(await review,true);assert.equal(roots,8);
+ assert.match(progress,/This review can take up to one minute/);assert.match(progress,/data-act="close-modal">Cancel/);assert.match(progress,/data-cloud-source-readonly/);assert.match(progress,/until the checks finish/,'the check is actually running');
+ gate.resolve();assert.equal(await review,true);assert.equal(roots,4,'#2272: a committedAt-only refresh no longer spends the one fresh recheck');
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Checking fresh sources/);
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
  assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal(backend.writes.length,writes);
 });
@@ -2484,7 +2486,7 @@ test('RISK cloud source fresh check: structured-clone head facts cannot be erase
   let roots=0;app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===2)await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>tx.objectStore('meta').put(nextHead,'head'));};
   sub.after(()=>{delete app.faults.serverRead;});
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),mayRefresh,'only unchanged typed authority can permit the committedAt-only fresh pair');
-  assert.equal(roots,mayRefresh?8:2,'changed typed authority stops within its original capture; unchanged authority still permits one fresh pair');
+  assert.equal(roots,mayRefresh?4:2,'changed typed authority stops within its original capture; unchanged authority completes the first pair (#2272)');
   const modal=shim.document.getElementById('modalRoot').innerHTML;
   if(mayRefresh){assert.match(modal,/data-act="choose-cloud-recovery-source"/);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/);}
   else{assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);assert.match(modal,/Checks have stopped/);}
@@ -2505,6 +2507,150 @@ test('RISK cloud source fresh check: continuing peer churn stops after four comp
  assert.doesNotMatch(modal,/until the checks finish|Keep this app open while the sources are checked/,'terminal refusal cannot imply a check is still running');assert.match(modal,/data-cloud-source-readonly/);
  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.deepEqual(await store.readRawExportSnapshot(),raw);
  assert.equal(JSON.stringify([...backend.docs]),expectedCloud);assert.equal(backend.writes.length,writes);
+});
+
+// #2272: the review's choice buttons, read from the rendered modal.
+function sourceChoice2272(modal,value){
+ const match=modal.match(new RegExp('<button[^>]*data-act="choose-cloud-recovery-source" data-value="'+value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"[^>]*>'));
+ return match?{disabled:/ disabled/.test(match[0])}:null;
+}
+// #2272 phone shape: one account and device, an active generation that is
+// published with every chunk missing, an intact previous generation. Each
+// server read returns the same unchanged documents; only their field order
+// differs, as Firestore map order is not part of a document's value.
+async function unreadableActiveReview2272(t){
+ const app=await freshSourceCheckFixture187(t),{backend,originalRoot}=app,active='users/owner/generations/'+originalRoot.activeGeneration;
+ for(const key of [...backend.docs.keys()])if(key.startsWith(active+'/chunks/'))backend.docs.delete(key);
+ return {...app,active,previous:'users/owner/generations/'+originalRoot.previousGeneration};
+}
+const reorderedDoc2272=value=>Object.fromEntries(Object.entries(value).reverse());
+
+test('RISK cloud source review #2272: unchanged documents read back in another field order complete the review with the unreadable source Unknown',async t=>{
+ const app=await unreadableActiveReview2272(t),{ctx,shim,backend,active,previous}=app,store=ctx.window.ScannerDeviceStore;
+ const before=JSON.stringify(ctx.state),head=await store.readHead(),pending=await store.getPendingUpload('owner'),writes=backend.writes.length;
+ let roots=0,reads=0;app.faults.serverRead=async(path,docs)=>{
+  if(path==='users/owner')roots++;
+  if(path===active||path===previous||path==='users/owner'){if(path===active)reads++;docs.set(path,reorderedDoc2272(docs.get(path)));}
+ };
+ t.after(()=>{delete app.faults.serverRead;});
+ const result=await ctx.onAction('review-cloud-source-recovery',{}),modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(modal,/The sources changed while they were read/,'unchanged sources are not reported as a change');
+ assert.equal(result,true,'the same unchanged sources complete the review');
+ assert.equal(roots,4,'one pair of captures is enough; unchanged documents do not spend the fresh recheck');assert.ok(reads>=2);
+ assert.deepEqual(sourceChoice2272(modal,'generation:'+app.originalRoot.activeGeneration),{disabled:true},'the unreadable current source is shown and cannot be chosen');
+ assert.match(modal,/Missing or damaged chunks, or an unsupported generation\. Missing data is unknown; it is never an empty board\./);
+ assert.deepEqual(sourceChoice2272(modal,'generation:'+app.originalRoot.previousGeneration),{disabled:false},'the intact previous source stays selectable');
+ assert.deepEqual(sourceChoice2272(modal,'device'),{disabled:false},'the device board stays selectable');
+ assert.match(modal,/data-act="apply-cloud-source-recovery"[^>]*disabled/,'nothing is chosen by default');
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+// Captures read the root first and last, so root reads 2k-1 and 2k are capture k.
+const captureOfRoot2272=roots=>Math.ceil(roots/2);
+// The fixture's active generation is published with its chunks missing. Give
+// it complete chunks for a valid board, returned so a test can withhold them.
+async function readableActiveHeader2272(app){
+ const {ctx,backend,originalRoot,active}=app,previous='users/owner/generations/'+originalRoot.previousGeneration;
+ const prior=await ctx.ChainStorageV2.decodeSnapshot(backend.docs.get(previous),[...backend.docs].filter(([key])=>key.startsWith(previous+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index));
+ await replaceIndependentServerPayload263(app,originalRoot.activeGeneration,JSON.stringify({...JSON.parse(prior),tasks:[...JSON.parse(prior).tasks,syncTask('active-2272','Readable active copy')]}));
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(active+'/chunks/'));assert.ok(chunks.length>0);
+ return chunks;
+}
+
+test('RISK cloud source review #2272: a generation readable on one capture and unreadable on another, with the same manifest and header, stays Unknown and completes',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ app.active='users/owner/generations/'+originalRoot.activeGeneration;
+ const chunks=await readableActiveHeader2272(app),before=JSON.stringify(ctx.state),head=await store.readHead(),writes=backend.writes.length;
+ let roots=0;app.faults.serverRead=async(path,docs)=>{
+  if(path==='users/owner')roots++;
+  // The active generation's chunks are missing on odd captures and present on
+  // even ones; its header and the manifest never change.
+  if(path===app.active+'/chunks'){for(const [key] of chunks)docs.delete(key);if(captureOfRoot2272(roots)%2===0)for(const [key,row] of chunks)docs.set(key,row);}
+ };
+ t.after(()=>{delete app.faults.serverRead;});
+ const result=await ctx.onAction('review-cloud-source-recovery',{}),modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(modal,/The sources changed while they were read/,'whether the same generation could be read is not a content change');
+ assert.equal(result,true);assert.equal(roots,4,'the readability difference does not spend the fresh recheck');
+ assert.deepEqual(sourceChoice2272(modal,'generation:'+originalRoot.activeGeneration),{disabled:true},'a generation one capture could not read stays Unknown and unselectable');
+ assert.deepEqual(sourceChoice2272(modal,'generation:'+originalRoot.previousGeneration),{disabled:false});assert.deepEqual(sourceChoice2272(modal,'device'),{disabled:false});
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source review #2272: changed readable or unreadable generation content still stops the review as changed',async t=>{
+ for(const kind of ['readable previous content','unreadable current header hash'])await t.test(kind,async sub=>{
+  const app=await unreadableActiveReview2272(sub),{ctx,shim,backend,originalRoot,active,previous}=app,store=ctx.window.ScannerDeviceStore;
+  const before=JSON.stringify(ctx.state),head=await store.readHead(),writes=backend.writes.length;
+  const prior=JSON.parse(await ctx.ChainStorageV2.decodeSnapshot(backend.docs.get(previous),[...backend.docs].filter(([key])=>key.startsWith(previous+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index)));
+  let roots=0,swaps=0;app.faults.serverRead=async(path,docs)=>{
+   if(path!=='users/owner'||![3,7].includes(++roots))return;swaps++;
+   // Each second capture of a pair sees different generation content under the
+   // same manifest revision and generation IDs.
+   if(kind==='readable previous content')await replaceIndependentServerPayload263(app,originalRoot.previousGeneration,JSON.stringify({...prior,tasks:[...prior.tasks,syncTask('changed-2272-'+swaps,'Changed under the same root')]}));
+   else docs.set(active,{...docs.get(active),hash:String(swaps).repeat(64)});
+  };
+  sub.after(()=>{delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);assert.equal(roots,8,'one fresh recheck, then the second change is reported');
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(modal,/The sources changed while they were read\. Review again before choosing\./);assert.doesNotMatch(modal,/data-act="choose-cloud-recovery-source"/);
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);assert.equal(backend.writes.length,writes);
+ });
+});
+
+test('RISK cloud source review #2272: a committedAt-only head refresh on every capture neither stops the review nor spends the fresh recheck',async t=>{
+ const app=await unreadableActiveReview2272(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,readHead=store.readHead.bind(store);
+ const before=JSON.stringify(ctx.state),head=await readHead(),pending=await store.getPendingUpload('owner'),writes=backend.writes.length;
+ let reads=0,roots=0,fresh=false;store.readHead=async()=>{const value=await readHead();return {...value,committedAt:(value.committedAt||0)+ ++reads};};
+ app.faults.serverRead=async path=>{if(path==='users/owner')roots++;if(/Checking fresh sources/.test(shim.document.getElementById('modalRoot').innerHTML))fresh=true;};
+ t.after(()=>{store.readHead=readHead;delete app.faults.serverRead;});
+ const result=await ctx.onAction('review-cloud-source-recovery',{}),modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(modal,/The sources changed while they were read/,'head metadata churn is not a source change');
+ assert.equal(result,true);assert.equal(roots,4);assert.equal(fresh,false,'no fresh recheck was needed');
+ assert.deepEqual(sourceChoice2272(modal,'generation:'+originalRoot.previousGeneration),{disabled:false});assert.deepEqual(sourceChoice2272(modal,'device'),{disabled:false});
+ assert.deepEqual(sourceChoice2272(modal,'generation:'+originalRoot.activeGeneration),{disabled:true});
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await readHead(),head);assert.deepEqual(await store.getPendingUpload('owner'),pending);assert.equal(backend.writes.length,writes);
+});
+
+test('RISK cloud source review #2272: a cloud push this device starts waits while the review reads, then resumes',async t=>{
+ const app=await unreadableActiveReview2272(t),{ctx,shim,backend,originalRoot}=app;
+ const writes=backend.writes.length,root=JSON.stringify(backend.docs.get('users/owner'));
+ let roots=0,pushed=false;app.faults.serverRead=async path=>{if(path==='users/owner'&&++roots===2&&!pushed){
+  // An immediate push this device starts by itself (a dot, a delete, a retry)
+  // while the first capture is still reading.
+  pushed=true;ctx.window.CLOUD_PUSH_DELAY_MS=0;ctx.cloudPushNow();for(let n=0;n<20;n++)await flush();
+ }};
+ t.after(()=>{delete app.faults.serverRead;});
+ const result=await ctx.onAction('review-cloud-source-recovery',{}),modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.equal(pushed,true);
+ assert.equal(backend.writes.length,writes,'no cloud write lands while the review reads');assert.equal(JSON.stringify(backend.docs.get('users/owner')),root);
+ assert.doesNotMatch(modal,/The sources changed while they were read|Cloud source changed/);assert.equal(result,true);assert.equal(roots,4);
+ assert.deepEqual(sourceChoice2272(modal,'generation:'+originalRoot.previousGeneration),{disabled:false});
+ delete app.faults.serverRead;
+ await fixtureDeadline(async wait=>{while(backend.writes.length===writes)await wait();},'the deferred push resumes once the review has read');
+});
+
+test('RISK cloud source review #2272: the stale diagnostic names the differing fields and each capture readability, without board content',async t=>{
+ const app=await unreadableActiveReview2272(t),{ctx,backend,originalRoot,previous}=app;
+ const prior=JSON.parse(await ctx.ChainStorageV2.decodeSnapshot(backend.docs.get(previous),[...backend.docs].filter(([key])=>key.startsWith(previous+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index)));
+ let roots=0;app.faults.serverRead=async path=>{if(path==='users/owner'&&[3,7].includes(++roots))
+  await replaceIndependentServerPayload263(app,originalRoot.previousGeneration,JSON.stringify({...prior,tasks:[...prior.tasks,syncTask('changed-2272-'+roots,'Changed previous title')]}));};
+ t.after(()=>{delete app.faults.serverRead;});
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),false);
+ const report=ctx.buildSupportDiagnosticsReport(),stale=report.sourceOperations.flatMap(operation=>operation.events).filter(event=>event.stage==='source-read'&&event.status==='stale');
+ assert.equal(stale.length,2,'each pair records its refusal');
+ for(const event of stale){
+  assert.deepEqual(structuredClone(event.metadata.changedFields),['source.previous'],'only the changed previous generation is named');
+  assert.deepEqual(structuredClone(event.metadata.readability),{first:{current:'unreadable',previous:'readable'},second:{current:'unreadable',previous:'readable'}});
+ }
+ const text=JSON.stringify(report);
+ assert.doesNotMatch(text,/Changed previous title|Fixture A|Device source only|owner|changed-2272/,'names and readability only; no titles, board content or account');
+ assert.equal(text.includes(originalRoot.previousGeneration)||text.includes(originalRoot.activeGeneration),false,'no generation identifiers');
+});
+
+test('RISK cloud source review #2272 guidance: mounted Help and the November 7 changelog say an unreadable or unchanged source is not a change',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Reading the same sources again is not a change: a cloud source one read could not read completely stays Unknown and cannot be chosen, and the review still finishes with the others\./);
+ assert.match(help,/This device’s own cloud saves wait until the sources have been read\./);
+ assert.match(html,/<h3>November 7, 2026<\/h3><ul><li>Review cloud recovery sources no longer says the sources changed while they were read when nothing changed\./);
 });
 
 test('RISK cloud source fresh check: the restart shares the original minute and late replies remain powerless',async t=>{
