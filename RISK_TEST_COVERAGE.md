@@ -875,6 +875,7 @@ its RISK test; the map follows.
 - RISK daily backup retention: a successful save keeps this account’s daily backups for three calendar days and other automatic copies for seven, and never trims manual, promoted or pinned copies or a board copy another backup still uses
 - RISK daily backup retention scope: a save trims only this account’s daily backups to three calendar days, on this device and in the older backup list, while another account’s daily backups and those saved before daily backups named an account keep seven
 - RISK daily backup retention adoption copy: in browser storage, the board a device had before taking another device’s newer cloud board stays restorable for seven calendar days, even when that day’s daily backup already holds the same board
+- RISK daily backup retention adoption copy: in browser storage, a large board a device had before taking another device’s newer cloud board stays restorable on that day
 - RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted
 - RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering
 - RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections

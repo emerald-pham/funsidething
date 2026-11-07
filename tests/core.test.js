@@ -30198,6 +30198,61 @@ test('RISK daily backup retention adoption copy: in browser storage, the board a
  assert.equal(restorable(),false,'positive control: after seven calendar days the automatic copy retires');
 });
 
+// #2268 review: the #2264 (A) scenario with a chosen board. A browser-storage
+// device acknowledges the account's board on day 1, another device publishes
+// the next revision, and on day 6 this device opens unchanged (opening saves
+// today's daily backup of that board), runs beforePull, then takes the newer
+// cloud board. Answers the device's app, its board from before taking the
+// cloud board, and whether that board is still restorable.
+async function browserAdoptionDevice2268(t,{tasks,beforePull=async()=>{}}){
+ const at=day=>+new Date(2026,10,day,12),storage=sharedScannerStorage({}),apps=[],backends=[];
+ t.after(async()=>{for(const backend of backends)backend.CS.suspend();for(const app of apps)await closeLegacyApp173(app);});
+ const open=async(day,docs)=>{
+  const app=await loadAppAtTime(at(day),{sharedStorage:storage});apps.push(app);
+  assert.equal(app.ctx.deviceStorageActive(),false,'fixture: the board lives in browser storage');
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),app.ctx,{filename:'device-store-v2.js'});app.ctx.window.ChainStorageV2=app.ctx.ChainStorageV2;
+  const backend=await loadCloudBackendV2({runtimeWindow:app.ctx.window,sharedDocs:docs,failures:{authPending:true},timeoutMs:5000});backends.push(backend);
+  backend.emitAuth({uid:'owner',email:'e@example.com'});app.ctx.closeModal();
+  return {app,backend};
+ };
+ const seed=await loadCloudBackendV2({timeoutMs:5000});backends.push(seed);
+ assert.equal((await seed.CS.push(JSON.stringify(syncState({tasks,syncAccount:'e@example.com',syncIdentity:'owner'})),at(1),0)).ok,true,'fixture: the account’s first board is in the cloud');
+ const first=await open(1,seed.docs);
+ await first.app.ctx.cloudPull();await settleRecoveryOperations188(first.app.ctx);
+ first.app.ctx.addTask('Task from this device');assert.equal(await first.app.ctx.persist(),true);
+ vm.runInContext('clearTimeout(cloudTimer);cloudTimer=null',first.app.ctx);await first.app.ctx.sendPush();await settleRecoveryOperations188(first.app.ctx);
+ assert.equal(first.app.ctx.state.syncDirty,false,'fixture: the cloud acknowledged this device’s board');
+ const acknowledged=first.backend.docs.get('users/owner').rev;
+ await closeLegacyApp173(first.app);first.backend.CS.suspend();
+ const other=await loadCloudBackendV2({sharedDocs:seed.docs,timeoutMs:5000});backends.push(other);
+ const otherBoard=JSON.stringify(syncState({tasks:[...tasks,syncTask('other-device','Board from the other device')],syncAccount:'e@example.com',syncIdentity:'owner'}));
+ assert.equal((await other.CS.push(otherBoard,at(2),acknowledged)).ok,true,'fixture: the other device publishes the next revision');
+ const {ctx}=(await open(6,seed.docs)).app;
+ await flush();
+ await beforePull(ctx);
+ const prior=JSON.stringify(ctx.state);
+ assert.equal(ctx.state.syncDirty,false,'fixture: this device has no unsynced edits');
+ assert.ok(ctx.readLocalBackups().some(row=>row.kind==='daily'&&row.day===ctx.backupDay(at(6))&&row.payload===prior),'fixture: opening saved today’s daily backup of the same board');
+ await ctx.cloudPull();await settleRecoveryOperations188(ctx);
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Board from the other device'),'positive control: this device took the newer cloud board');
+ return {ctx,at,prior,restorable:()=>ctx.readLocalBackups().some(row=>row.payload===prior)};
+}
+
+// #2268 review (finding 2): #2264 (A) stopped today's daily backup standing in
+// for the copy kept before taking a newer cloud board, so browser storage wrote
+// a second full copy of the same board. Automatic copies share a budget of
+// 1,000,000 units, so with a board of about 400,000 characters that duplicate
+// pushed the earlier board out on the very day the cloud board was taken.
+test('RISK daily backup retention adoption copy: in browser storage, a large board a device had before taking another device’s newer cloud board stays restorable on that day',async t=>{
+ const tasks=Array.from({length:340},(_,i)=>syncTask('pad-'+i,'Padded task '+i+' '+'w'.repeat(200)));
+ const {ctx,at,prior,restorable}=await browserAdoptionDevice2268(t,{tasks});
+ assert.ok(prior.length>=380000&&prior.length<=430000,'fixture: the board is about 400,000 characters ('+prior.length+')');
+ // Behaviour under test: the earlier board stays restorable through the adoption day's saves.
+ assert.equal(restorable(),true,'the earlier board is restorable right after taking the cloud board');
+ ctx.addTask('Later on the same day');assert.equal(await ctx.persist(),true,'a save on the same day');
+ assert.equal(restorable(),true,'the earlier board is still restorable after a save on the same day');
+});
+
 // #2254 (owner rule): Settings, Help and the November 6 changelog say what
 // the rule keeps. Every Help answer keeps the 130-word limit.
 test('RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{

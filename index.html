@@ -1900,7 +1900,9 @@ function forgetDailyBackupRecoveryHold(account){
 // or interrupted save trims nothing, and the next save trims again.
 function automaticBackupRetention(){
   const account=dailyBackupAccount(),oldest=oldestBackupDay(),daily=dailyBackupsHeldForRecovery()?oldest:oldestDailyBackupDay();
-  return row=>row?.kind==="daily"&&Object.hasOwn(row,"account")&&row.account===account?daily:oldest;
+  // #2268 review: a daily backup kept as the copy from before taking a newer
+  // cloud board (saveLocalBackup) keeps that copy's seven days.
+  return row=>row?.kind==="daily"&&Object.hasOwn(row,"account")&&row.account===account&&row.keptForCloudAdoption!==true?daily:oldest;
 }
 const automaticBackupKinds=new Set(["daily","latest","before-restore","before-cloud-adoption","cloud-merged"]);
 // A Restore may remain unsaved while a cloud timer, app update, or later edit
@@ -2422,7 +2424,18 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     // before taking a newer cloud board is promised for seven. Opening saves
     // today's daily backup of the same unchanged board first, so reusing it
     // made the earlier board disappear four days early.
-    if(kind==="before-cloud-adoption" && rows.some(row=>row.kind!=="latest" && row.kind!=="daily" && row.payload===payload)) return true;
+    if(kind==="before-cloud-adoption" && rows.some(row=>row.kind!=="latest" && (row.kind!=="daily" || row.keptForCloudAdoption===true) && row.payload===payload)) return true;
+    // #2268 review: a second full copy of the same board instead counted twice
+    // against the automatic budget below, and for a board of about 400,000
+    // characters the copies it pushed out included the earlier board itself,
+    // on the day the cloud board was taken. Today's daily backup of the same
+    // board is kept seven calendar days in place (automaticBackupRetention):
+    // it stays today's daily, so the next save adds no other full copy today.
+    let keptDaily=null;
+    if(kind==="before-cloud-adoption"){
+      const daily=rows.findIndex(row=>row.day===day && row.kind==="daily" && row.payload===payload);
+      if(daily>=0) rows[daily]=keptDaily=Object.assign({},rows[daily],{keptForCloudAdoption:true});
+    }
     const existing = rows.findIndex(row=>row.day===day && row.kind==="daily");
     if(kind==="daily" && onlyIfMissing && existing>=0) return true;
     // #2254: a daily backup names the account whose board it copies, so only
@@ -2440,7 +2453,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
         const current=Object.assign({},entry,{kind:"latest"});
         if(latest>=0) rows[latest]=current; else rows.push(current);
       }
-    }else rows.push(entry);
+    }else if(!keptDaily) rows.push(entry);
     // Bound ordinary full-board history before it reaches browser quota. The
     // new snapshot and active cloud-adoption proof remain; manual, displaced
     // local edits, unsynced account-switch, stale-tab, other-browser, and
@@ -2448,7 +2461,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     const retireOldest=()=>{
       const redundantLatest=rows.find(row=>row.kind==="latest" && row.id===entry.id &&
         rows.some(other=>other.kind==="daily" && other.id===row.id && other.payload===row.payload));
-      const old=redundantLatest || rows.filter(row=>automaticBackupKinds.has(row.kind) && row.id!==entry.id &&
+      const old=redundantLatest || rows.filter(row=>automaticBackupKinds.has(row.kind) && row.id!==entry.id && row!==keptDaily &&
         row.id!==preserveBackupId &&
         row.id!==adoptedSafety?.backupId && !protectedIds.has(row.id)).sort((a,b)=>a.at-b.at)[0];
       if(!old) return false;
