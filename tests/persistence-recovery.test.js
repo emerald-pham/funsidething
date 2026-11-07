@@ -6049,6 +6049,93 @@ test('RISK contained board adoption: an adoption upload cut off inside the real 
  });
 });
 
+// #2266 (found by the #2261 audit): a device with its own device store on a
+// cloud that another device, with its own device store, also saves to.
+async function sharedCloudDevice2266(t,{sharedDocs=null,name}){
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='shared-cloud-2266-'+name+'-'+Math.random();
+ const app=await loadAppAtTime(1792323060000,{indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(app));
+ const {ctx,shim}=app,faults={authPending:true};
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>backend.CS.suspend());
+ // Saves and retries happen only when this test asks for them. The recovery
+ // work budget is exhausted, so a device that is not allowed to adopt waits.
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;ctx.window.CLOUD_RETRY_DELAY_MS=600000;ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1;
+ backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',ctx))await wait();},name+' opens');
+ await ctx.cloudPull();await adoptionSettle2254(ctx,name+' reads the cloud');
+ const add=async title=>{shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);};
+ const save=async message=>{await ctx.sendPush();await adoptionSettle2254(ctx,message);};
+ const read=async message=>{await ctx.cloudPull();await adoptionSettle2254(ctx,message);};
+ return {...app,backend,faults,add,save,read};
+}
+const sharedCloudRoot2266=backend=>backend.docs.get('users/owner');
+const removeChunks2266=(backend,generationId)=>{for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+generationId+'/chunks/'))backend.docs.delete(key);};
+async function publishedPayload2266(device,generationId){
+ const path='users/owner/generations/'+generationId,header=device.backend.docs.get(path);
+ const chunks=[...device.backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ return device.ctx.window.ChainStorageV2.decodeSnapshot(header,chunks);
+}
+
+// #2266 scenario A. Device D's save commits the next revision, but its reply
+// is lost. D's next read finds that revision identical to its board and
+// records it as confirmed. Device E then saves a readable revision, which D
+// reads. Later a revision loses its chunks: either a newer one from E (D's
+// board is built on the copy before it, so D publishes its board over it) or
+// the one D read and holds exactly (D rebuilds it). The confirmed upload
+// leaves nothing that could hold work D's board lacks, so D does exactly what
+// a device whose reply arrived does.
+test('RISK contained board adoption: an upload whose reply was lost and that a later read confirmed does not stop the device publishing its board over a later unreadable revision or rebuilding one it holds exactly, as a device whose reply arrived does',{timeout:120000},async t=>{
+ for(const [reply,unreadable] of [['the reply arrived','a newer revision'],['the reply was lost','a newer revision'],
+  ['the reply arrived','the revision the device holds exactly'],['the reply was lost','the revision the device holds exactly']])
+  await t.test(reply+', then '+unreadable+' cannot be read',async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'});
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  await d.add('Saved on D second');
+  let lost=false;
+  if(reply==='the reply was lost')d.faults.afterTransaction=async docs=>{
+   if(!lost&&docs.get('users/owner')?.rev===confirmed+1){lost=true;throw Object.assign(Error('reply lost'),{code:'unavailable'});}};
+  await d.save('D saves again');delete d.faults.afterTransaction;
+  assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed+1,'fixture: the second save is the next revision');
+  if(reply==='the reply was lost'){
+   assert.equal(lost,true,'fixture: the server committed and the reply was lost');
+   assert.equal(d.ctx.state.syncRev,confirmed,'fixture: without the reply D is still based on the revision before');
+   await d.read('D reads its own save back');
+  }
+  assert.equal(d.ctx.state.syncRev,confirmed+1,'fixture: D has confirmed its second save');
+  assert.equal(d.ctx.state.syncDirty,false);
+  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','fixture: D shows synced');
+  // Device E reads the cloud and saves a readable revision, which D reads.
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  await e.add('Saved on E');await e.save('E saves');
+  const readable=sharedCloudRoot2266(d.backend);
+  assert.equal(readable.rev,confirmed+2,'fixture: E saved the next revision');
+  await d.read('D reads E’s save');
+  assert.equal(d.ctx.state.syncRev,confirmed+2,'fixture: D confirmed E’s revision');
+  assert.ok(d.ctx.state.tasks.some(task=>task.title==='Saved on E'),'fixture: D holds E’s work');
+  assert.equal(d.ctx.state.syncDirty,false);
+  const board=d.ctx.cloudPayload();
+  let damaged;
+  if(unreadable==='a newer revision'){
+   await e.add('Saved on E again');await e.save('E saves again');
+   damaged=sharedCloudRoot2266(d.backend);
+   assert.equal(damaged.rev,confirmed+3,'fixture: E saved a newer revision');
+  }else damaged=readable;
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  assert.equal((await d.backend.CS.pull()).code,'corrupt-generation','fixture: that revision cannot be read');
+  await d.read('D reads the unreadable revision');
+  // Behaviour under test: D saves its board as the next revision, keeping the
+  // unreadable one as the previous generation.
+  const root=sharedCloudRoot2266(d.backend);
+  assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
+  assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
+  assert.equal(await publishedPayload2266(d,root.activeGeneration),board,'the cloud holds exactly D’s board');
+  assert.equal(d.ctx.cloudPayload(),board,'D’s board is unchanged');
+  assert.equal(d.ctx.state.syncRev,root.rev,'D confirmed it');
+  assert.equal(d.ctx.state.syncDirty,false);
+  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
+ });
+});
+
 // #2254 review (B2): showing, focusing or reconnecting the app asks for the
 // check of earlier incomplete cloud sources. Adoption forgot the #2228 mark
 // that keeps that check for a deliberate run on a phone that waited over its
