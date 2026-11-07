@@ -6713,7 +6713,7 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
 
 // #2254 (owner decision of 2026-11-06): manual backups are never trimmed
 // automatically. From two of this account's manual backups, Settings shows a
-// short reminder beside Make manual backup that keeping more slows the app
+// short reminder below Make manual backup that keeping more slows the app
 // down. The button keeps working with no confirmation. The reminder is a
 // polite status only on the render where it first appears, so re-rendering
 // Settings does not announce it again.
@@ -7047,14 +7047,17 @@ test('RISK manual backup reminder guidance: mounted FAQ and changelog say that f
  const answer=answerTo('Why does Settings remind me about manual backups?');
  assert.match(answer,/Manual backups stay on this device until you delete them; they are never removed automatically\./);
  assert.match(answer,/keeping more than two slows the app down/);
- assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder beside Make manual backup\./);
+ // #2254 release review: the reminder renders below Make manual backup.
+ assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup\./);
  assert.match(answer,/Delete older ones you don’t need/);
  assert.match(answer,/Make manual backup still works, with no limit and no extra step\./);
  assert.match(answer,/Only manual backups of the account you are using count\./);
  assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.ok(release,'positive control: the mounted changelog has the November 6 release');
- assert.match(release,/<li>Settings → Data and backups now shows a reminder beside Make manual backup once this account has two or more manual backups: keeping more than two slows the app down, so delete older ones you don’t need\./);
+ assert.match(release,/<li>Settings → Data and backups now shows a reminder below Make manual backup once this account has two or more manual backups: keeping more than two slows the app down, so delete older ones you don’t need\./);
+ for(const [where,text] of [['manual backup answer',answer],['November 6 changelog',release]])
+  assert.doesNotMatch(text,/reminder beside Make manual backup/,where+': the reminder is not beside the button');
  assert.match(release,/Manual backups are never removed automatically, and Make manual backup still works with no extra step\.<\/li>/);
  for(const [question,text] of [['manual backup answer',answer],['November 6 changelog',release]])
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
@@ -7529,15 +7532,24 @@ test('RISK acknowledged recovery trim: an adoption the cloud acknowledges while 
  });
 });
 
-test('RISK acknowledged recovery trim guidance: mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies by itself, what it keeps, and that until then every recovery copy stays',async t=>{
+// #2254 release review (B3): the trim also clears the storage upgrade's copy
+// of the older backup list (an opaque "<n>:fvp:chain-scanner:daily-backups:v1"
+// row), as the owner authorized for "migrated legacy copies" on #2254
+// (2026-11-07). Settings, Help and the changelog say so in plain words.
+test('RISK acknowledged recovery trim guidance: Settings, mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
+ const section=settings.split('<h3>Daily local backups</h3>')[1]?.split('</p>')[0]||'';
+ assert.ok(section,'positive control: Settings has the Daily local backups notes');
+ assert.match(section,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
+ assert.doesNotMatch(section,/Separate recovery archives kept by a storage upgrade remain intact/,'Settings no longer says that copy stays');
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
  const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  assert.ok(answerTo('Does the app fix an unreadable cloud copy by itself?'),'positive control: the mounted Help has the adoption answer');
  const answer=answerTo('What happens to old recovery copies on this device?');
- assert.match(answer,/Once the cloud confirms your board, the app clears the copies earlier cloud recoveries kept by itself, so it stays fast and the recovery file stays small\./);
+ assert.match(answer,/Once the cloud confirms your board, the app clears the copies earlier cloud recoveries kept by itself, so it stays fast and the recovery file stays small\. It also clears the copy of the older backup list that a storage upgrade kept\./);
  assert.match(answer,/It keeps your board, the copy the cloud confirmed, every backup, and a short note naming any cloud copy it still could not read/);
  assert.match(answer,/those cloud copies stay protected in the cloud/);
  assert.match(answer,/Until the cloud confirms a board, every recovery copy stays on this device\./);
@@ -7545,7 +7557,7 @@ test('RISK acknowledged recovery trim guidance: mounted FAQ and changelog say th
  assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.ok(release,'positive control: the mounted changelog has the November 6 release');
- assert.match(release,/<li>Once the cloud confirms your board, the app now clears the copies earlier cloud recoveries kept on this device by itself\. This keeps the app fast and the recovery file small, and nothing needs your choice\./);
+ assert.match(release,/<li>Once the cloud confirms your board, the app now clears the copies earlier cloud recoveries kept on this device by itself\. It also clears the copy of the older backup list that a storage upgrade kept\. This keeps the app fast and the recovery file small, and nothing needs your choice\./);
  assert.match(release,/It keeps your board, the copy the cloud confirmed, every backup and a short note naming any cloud copy it still could not read\. Until the cloud confirms a board, every recovery copy stays\.<\/li>/);
  for(const [question,text] of [['old recovery copies answer',answer],['November 6 changelog',release]]){
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
