@@ -6144,6 +6144,31 @@ test('RISK contained board adoption: an upload whose reply was lost and that a l
  });
 });
 
+// #2268 review (finding 3): this device's own upload published the next
+// revision but its reply was lost, and that revision's chunks were then lost
+// too. An adoption run another page left unfinished keeps contained adoption
+// out of an ordinary opening, so the exact rebuild republishes the bytes this
+// device holds exactly, over the pending record it captured. The #2266 clear
+// of a confirmed pending upload ran for the rebuild's stand-in read as well,
+// so the rebuild's save was refused as a changed pending upload and the device
+// showed an error until another read.
+test('RISK exact acknowledged cloud source: the exact rebuild of this device’s own upload whose reply was lost publishes the board and shows synced',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,revision,unreadableId,pushes}=app;
+ ctx.localStorage.setItem('fvp:chain-scanner:contained-adoption-run',JSON.stringify({v:1,account:ctx.state.syncAccount,identity:'owner',rev:revision+1,generationId:unreadableId,page:'another-page'}));
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation','fixture: the upload’s revision cannot be read');
+ const board=ctx.cloudPayload();
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+ await fixtureDeadline(async wait=>{await wait(20);while(!adoptionIdle2254(ctx))await wait(10);},'the rebuild settles',30000);
+ assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'positive control: the rebuild saves over the unreadable revision');
+ // Behaviour under test: the rebuild's save lands and the device shows synced.
+ const root=backend.docs.get('users/owner');
+ assert.equal(root.rev,revision+2,'the board is published as the next revision');
+ assert.equal(await publishedPayload2266({ctx,backend},root.activeGeneration),board,'the cloud holds exactly this board');
+ assert.equal(ctx.state.syncRev,root.rev,'this device confirmed it');
+ assert.equal(ctx.state.syncDirty,false);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the device shows synced');
+});
+
 // #2266 scenario B. Device D, confirmed at a revision, saves an edit, and the
 // save is cut off after its upload was staged and before it was published.
 // Device E then saves the next revision, which loses its chunks. When D's

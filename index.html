@@ -7134,7 +7134,11 @@ async function cloudPull(){
         return;
       }
       // #2266: this read may be the verified outcome of this device's own save.
-      await forgetConfirmedPendingUpload(remote,pullIdentity,pullStillCurrent);
+      // #2268 review: not the exact rebuild's stand-in, which is no read of a
+      // landed save. Its publication is validated against the pending record
+      // it captured (recoveryPending), and clearing that record refused the
+      // rebuild's save; the save itself clears the record once it lands.
+      if(!rebuildingCloudSource)await forgetConfirmedPendingUpload(remote,pullIdentity,pullStillCurrent);
       reconciledAs=acct; lastKnownCloudPayload=remotePayload;lastKnownCloudAccount=acct;lastKnownCloudRevision=rr;
       deferredCloudPull=false; cloudAdoptionHeld=false;
       state.syncDirty=remoteDeletionLogRepaired || remotePayload!==cloudPayload();
