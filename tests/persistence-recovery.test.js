@@ -5951,9 +5951,11 @@ test('RISK contained board adoption: a device that remembers a recovery wait ado
 // newer work arrived, and never protects it, so it can be retired like any
 // other abandoned upload.
 test('RISK contained board adoption: an adoption upload cut off inside the real push by a network drop, the push deadline or an app switch resumes or replaces only its own staged upload on a later attempt, and publishes once over the unreadable revision',async t=>{
- for(const variant of ['network drop before staging','network drop after staging','push deadline','app switch','newer work after the cut'])await t.test(variant,async sub=>{
+ for(const variant of ['network drop before staging','network drop after staging','push deadline','app switch','newer work after the cut','Retry sync after the cut'])await t.test(variant,async sub=>{
   const app=await ownInterruptedUploadApp2254(sub,variant==='push deadline'?{timeoutMs:1500}:{}),{ctx,shim,backend,faults,revision,unreadableId,unreadablePath,acknowledgedId,pushes}=app;
   const store=ctx.window.ScannerDeviceStore,generations='users/owner/generations/';
+  // The harness's timers do not hold the process open while a deliberate run waits.
+  const alive=setInterval(()=>{},20);sub.after(()=>clearInterval(alive));
   await newerEditBeforeAdoption2254(app);
   const unreadableBefore=generationDocs2254(backend,unreadablePath);
   const stagedOf=async docs=>{
@@ -5966,7 +5968,9 @@ test('RISK contained board adoption: an adoption upload cut off inside the real 
   if(variant==='push deadline')faults.publishPending=new Promise(()=>{});
   else faults.beforeTransaction=async docs=>{
    if(cut)return;const staged=await stagedOf(docs);if(!staged)return;
-   if(variant==='network drop before staging'){cut=true;throw Object.assign(Error('offline mid-upload'),{code:'unavailable'});}
+   // Cut off before staging, the upload leaves nothing the full recovery of
+   // Retry sync could take instead (the reviewer's probe on #2254).
+   if(['network drop before staging','Retry sync after the cut'].includes(variant)){cut=true;throw Object.assign(Error('offline mid-upload'),{code:'unavailable'});}
    if(!staged.complete)return;
    cut=true;
    // Switching to another app hides the page, which suspends cloud work.
@@ -5986,8 +5990,11 @@ test('RISK contained board adoption: an adoption upload cut off inside the real 
   assert.equal(ctx.state.syncRev,revision,'a cut-off upload changes no revision');
   delete faults.publishPending;
   if(variant==='newer work after the cut'){shim.document.getElementById('addInput').value='Newer work after the cut';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);}
-  // The later attempt: an app switch returns through the page lifecycle, the others read again.
-  if(variant==='app switch'){shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});}else await ctx.cloudPull();
+  // The later attempt: an app switch returns through the page lifecycle, the
+  // person may press Retry sync (a deliberate read), the others read again.
+  if(variant==='app switch'){shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});}
+  else if(variant==='Retry sync after the cut')await ctx.onAction('sync-retry',{});
+  else await ctx.cloudPull();
   await fixtureDeadline(async wait=>{while(pushes.length<2||!adoptionIdle2254(ctx))await wait(10);},'the later attempt publishes',30000);
   await adoptionSettle2254(ctx,'the later attempt settles');
   const root=backend.docs.get('users/owner');
