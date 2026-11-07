@@ -6546,6 +6546,48 @@ test('RISK daily backup retention hold: while cloud recovery waits on an unreada
  });
 });
 
+// #2264 (B): signing out ends the recovery's own records (the remembered
+// unreadable copy, the decline and the waiting state), but the board on this
+// device still belongs to the same account and the cloud has confirmed
+// nothing. Its daily backups keep the seven days until the cloud confirms a
+// board for that account, as Settings and the November 6 changelog promise.
+test('RISK daily backup retention hold sign-out: signing out while cloud recovery waits keeps this account’s daily backups for seven calendar days, and once the account signs back in and the cloud confirms a board the next save trims them to three',async t=>{
+ const app=await containedAdoptionApp2254(t),{ctx,shim,backend,acknowledgedPath,pushes}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+ const base=JSON.stringify(ctx.state.decisionBase);
+ // The generation before the unreadable one is not yet this device's copy, so nothing is adopted and recovery waits.
+ await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not yet'};return JSON.stringify(board);});
+ await newerEditBeforeAdoption2254(app);
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the waiting opening settles');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: cloud recovery waits');
+ const account=ctx.state.syncAccount??null;
+ // The owner signs out while recovery waits.
+ backend.emitAuth(null);await flush();await adoptionSettle2254(ctx,'the sign-out settles');
+ assert.equal(ctx.state.syncAccount??null,account,'fixture: the board on this device still belongs to the same account');
+ // Daily backups this account saved on the six days before today.
+ const dayBefore=days=>vm.runInContext('(()=>{const at=new Date(Date.now());at.setHours(12,0,0,0);at.setDate(at.getDate()-'+days+');return backupDay(+at);})()',ctx);
+ const head=await store.readHead(),earlier=[];
+ for(const days of [6,5,4,3]){
+  const backup={id:'daily:signed-out-2264-'+days,day:dayBefore(days),at:Date.now()-days*86400000,kind:'daily',payload:head.payload,account};
+  assert.equal((await store.putBackup({expectedHash:head.hash,backup}))?.ok,true,'fixture: the daily backup from '+days+' days ago is saved');
+  earlier.push(backup.id);
+ }
+ await ctx.refreshDeviceBackupCache();
+ shim.document.getElementById('addInput').value='Saved while signed out';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const held=(await store.listBackups()).map(row=>row.id);
+ // Behaviour under test: signing out doesn't end the seven-day hold before the cloud confirms a board.
+ assert.deepEqual(earlier.filter(id=>!held.includes(id)),[],'daily backups keep seven calendar days after signing out while recovery waits');
+ // The earlier generation is this device's copy again; signing back in adopts and the cloud confirms the board.
+ await rewriteGenerationFixture(backend,acknowledgedPath,codec,()=>JSON.parse(base).payload);
+ backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{while(!pushes.length||!adoptionIdle2254(ctx))await wait(10);},'signing back in adopts',30000);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','positive control: the cloud confirmed the board');
+ shim.document.getElementById('addInput').value='Saved after the cloud confirmed';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const after=await store.listBackups(),ids=after.map(row=>row.id);
+ assert.deepEqual(earlier.filter(id=>ids.includes(id)),[],'the first save after the cloud confirms trims daily backups to three calendar days');
+ assert.ok(after.some(row=>row.kind==='daily'&&row.day===dayBefore(0)),'today’s daily backup stays');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the board itself is the saved head');
+});
+
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
 // adoption has to cost no more there than an ordinary cloud save. The store is
 // built on a served build with the app's own writers: the large signed-in
