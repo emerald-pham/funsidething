@@ -5277,6 +5277,12 @@ function bindConfirmedDeviceCloudOwner(){
   confirmedCloudDeviceOwner=cloudReady()&&reconciledAs===account&&lastKnownCloudAccount===account&&
     Number.isSafeInteger(lastKnownCloudRevision)&&typeof lastKnownCloudPayload==="string"
     ?{backend,account,identity:cloudAccountIdentity(),revision:lastKnownCloudRevision}:null;
+  // #2264, #2268 review: the cloud has confirmed a board for this account (a
+  // save's acknowledgement, a recovery's or restore's confirmed publication,
+  // or a read of a readable cloud board), which ends the daily backup hold
+  // (dailyBackupsHeldForRecovery). Recording the revision a board is based on
+  // is not that: the exact rebuild's stand-in records it before publishing.
+  if(confirmedCloudDeviceOwner)forgetDailyBackupRecoveryHold(account);
 }
 function reportCloudReconcileError(code){
   const CS=window.CloudSync;
@@ -5777,9 +5783,6 @@ function makeDecisionBase(account,revision,payload){
 function bindDecisionBase(account,revision,payload){
   const next=makeDecisionBase(account,revision,payload);
   if(!next)return false;
-  // #2264: the cloud has confirmed a board for this account, which ends a
-  // daily backup hold a sign-out kept (dailyBackupsHeldForRecovery).
-  forgetDailyBackupRecoveryHold(account);
   const identity=cloudAccountIdentity(),identityChanged=identity!==null&&state.syncIdentity!==identity;
   if(identity!==null)state.syncIdentity=identity;
   if(JSON.stringify(state.decisionBase)===JSON.stringify(next))return identityChanged;

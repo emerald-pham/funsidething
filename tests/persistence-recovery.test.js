@@ -6975,6 +6975,47 @@ test('RISK daily backup retention hold: a reported unreadable cloud copy keeps t
  });
 });
 
+// #2268 review (finding 6): the remembered daily backup hold ends when the
+// cloud confirms a board. It ended instead wherever the app recorded which
+// cloud revision the board is based on. That happens for the exact rebuild's
+// stand-in read before anything is published, so a rebuild whose save had not
+// landed lost the hold once the page was hidden; and it does not happen where
+// the automatic recovery default records its confirmed publication, so the
+// hold outlived that confirmation.
+test('RISK daily backup retention hold: the hold ends when the cloud confirms a board, not when the exact rebuild prepares its save, and the automatic recovery default’s confirmed publication ends it',async t=>{
+ for(const variant of ['the exact rebuild’s save has not landed','the automatic recovery default is confirmed'])await t.test(variant,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,faults,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+  const account=ctx.state.syncAccount??null;
+  if(variant==='the exact rebuild’s save has not landed'){
+   const refusal=Object.assign(Error('Controlled rebuild publication refusal'),{code:'permission-denied'});
+   Object.defineProperty(faults,'push',{configurable:true,get(){return refusal;}});sub.after(()=>{delete faults.push;});
+   const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};sub.after(()=>{backend.CS.push=push;});
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the rebuild settles');
+   assert.deepEqual(pushes,[originalRoot.rev],'positive control: the exact rebuild tried to save over the unreadable revision');
+   assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'fixture: the cloud confirmed nothing');
+   shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});sub.after(()=>{shim.document.hidden=false;});
+   // Behaviour under test: the rebuild has published nothing, so the seven days stay.
+   assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved before the rebuild landed'),[],
+    'daily backups keep seven calendar days while the rebuild’s save has not landed');
+  }else{
+   const protect=store.protectRecoverySource;let refusing=true;
+   store.protectRecoverySource=async function(...args){if(refusing&&args[0]?.key?.startsWith('cloud-generation-recovery:'))return false;return protect.apply(this,args);};
+   sub.after(()=>{store.protectRecoverySource=protect;});
+   await pendingAutomaticDefault2194(sub,app);
+   refusing=false;delete faults.push;
+   await ctx.sendPush();
+   await fixtureDeadline(async wait=>{await wait(5);while(backend.docs.get('users/owner').rev===originalRoot.rev||!adoptionIdle2254(ctx))await wait(10);},'the automatic default publishes',30000);
+   await adoptionSettle2254(ctx,'the publication settles');
+   assert.equal(vm.runInContext('!!deviceRecoveryCloudHold',ctx),false,'positive control: the cloud confirmed the automatic default’s board');
+   assert.equal(ctx.state.syncRev,backend.docs.get('users/owner').rev,'positive control: the board is based on the confirmed revision');
+   // Behaviour under test: the confirmation ends the hold, so the next save trims to three days.
+   assert.equal((await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved after the cloud confirmed')).length,4,
+    'the first save after the cloud confirms trims daily backups to three calendar days');
+  }
+ });
+});
+
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
 // adoption has to cost no more there than an ordinary cloud save. The store is
 // built on a served build with the app's own writers: the large signed-in
