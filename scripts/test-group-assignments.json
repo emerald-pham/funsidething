@@ -13451,6 +13451,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK contained board adoption: an adoption upload cut off inside the real push by a network drop, the push deadline or an app switch resumes or replaces only its own staged upload on a later attempt, and publishes once over the unreadable revision",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

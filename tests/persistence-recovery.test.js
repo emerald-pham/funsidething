@@ -5940,3 +5940,73 @@ test('RISK contained board adoption: a device that remembers a recovery wait ado
   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
  });
 });
+
+// #2254 review (B1): an adoption upload that a network drop, the push deadline
+// or an app switch cuts off inside the real push leaves its own staged upload
+// recorded as pending, at the unreadable revision. The ownership evidence the
+// first attempt used is then gone from the pending record, so the later
+// attempt finds it in the headers-only record the first attempt kept. It
+// resumes that staged upload when the board is unchanged, or replaces it when
+// newer work arrived, and never protects it, so it can be retired like any
+// other abandoned upload.
+test('RISK contained board adoption: an adoption upload cut off inside the real push by a network drop, the push deadline or an app switch resumes or replaces only its own staged upload on a later attempt, and publishes once over the unreadable revision',async t=>{
+ for(const variant of ['network drop before staging','network drop after staging','push deadline','app switch','newer work after the cut'])await t.test(variant,async sub=>{
+  const app=await ownInterruptedUploadApp2254(sub,variant==='push deadline'?{timeoutMs:1500}:{}),{ctx,shim,backend,faults,revision,unreadableId,unreadablePath,acknowledgedId,pushes}=app;
+  const store=ctx.window.ScannerDeviceStore,generations='users/owner/generations/';
+  await newerEditBeforeAdoption2254(app);
+  const unreadableBefore=generationDocs2254(backend,unreadablePath);
+  const stagedOf=async docs=>{
+   const pending=await store.getPendingUpload('owner');if(pending?.baseRev!==revision+1)return null;
+   const header=docs.get(generations+pending.generationId),chunks=[...docs.keys()].filter(key=>key.startsWith(generations+pending.generationId+'/chunks/')).length;
+   return {pending,header,complete:header?.state==='staging'&&chunks===header.chunkCount};
+  };
+  let cut=false;
+  sub.after(()=>{delete faults.beforeTransaction;delete faults.publishPending;shim.document.hidden=false;});
+  if(variant==='push deadline')faults.publishPending=new Promise(()=>{});
+  else faults.beforeTransaction=async docs=>{
+   if(cut)return;const staged=await stagedOf(docs);if(!staged)return;
+   if(variant==='network drop before staging'){cut=true;throw Object.assign(Error('offline mid-upload'),{code:'unavailable'});}
+   if(!staged.complete)return;
+   cut=true;
+   // Switching to another app hides the page, which suspends cloud work.
+   if(variant==='app switch'){shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});return;}
+   throw Object.assign(Error('offline mid-upload'),{code:'unavailable'});
+  };
+  ctx.closeModal();await flush();await ctx.cloudPull();
+  if(variant==='push deadline')await fixtureDeadline(async wait=>{while(!faults.publicationStarted)await wait(10);},'the publication starts',30000);
+  await adoptionSettle2254(ctx,'the cut-off attempt settles');
+  if(variant==='push deadline')cut=faults.publicationStarted===true;
+  assert.equal(cut,true,'positive control: the upload was cut off inside the push');
+  assert.equal(pushes.length,1,'positive control: one adoption upload was attempted');
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'the cloud did not move');
+  const left=await store.getPendingUpload('owner');
+  assert.equal(left?.baseRev,revision+1,'fixture: the cut-off upload is still pending, at the unreadable revision');
+  assert.notEqual(left.generationId,unreadableId);
+  assert.equal(ctx.state.syncRev,revision,'a cut-off upload changes no revision');
+  delete faults.publishPending;
+  if(variant==='newer work after the cut'){shim.document.getElementById('addInput').value='Newer work after the cut';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);}
+  // The later attempt: an app switch returns through the page lifecycle, the others read again.
+  if(variant==='app switch'){shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});}else await ctx.cloudPull();
+  await fixtureDeadline(async wait=>{while(pushes.length<2||!adoptionIdle2254(ctx))await wait(10);},'the later attempt publishes',30000);
+  await adoptionSettle2254(ctx,'the later attempt settles');
+  const root=backend.docs.get('users/owner');
+  assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1,revision+1],'both attempts write over the unreadable revision only');
+  assert.equal(root.rev,revision+2,'the board is published once, as the next revision');
+  assert.equal(root.previousGeneration,unreadableId,'the unreadable generation is the previous one');
+  if(variant==='newer work after the cut'){
+   assert.notEqual(root.activeGeneration,left.generationId,'newer work replaces the cut-off staged upload with a new one');
+   assert.notEqual(backend.docs.get(generations+left.generationId)?.state,'published','the replaced staged upload is never published');
+   assert.equal(backend.docs.has('users/owner/recoveryProtections/'+left.generationId),false,'nor protected, so the ordinary collector can retire it');
+  }else assert.equal(root.activeGeneration,left.generationId,'the unchanged board resumes its own staged upload');
+  const published=backend.docs.get(generations+root.activeGeneration);
+  const chunks=[...backend.docs].filter(([key])=>key.startsWith(generations+root.activeGeneration+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+  assert.equal(await ctx.window.ChainStorageV2.decodeSnapshot(published,chunks),ctx.cloudPayload(),'the cloud holds exactly this device’s board');
+  assert.equal(await store.getPendingUpload('owner'),null,'no upload stays pending');
+  assert.equal(ctx.state.syncRev,revision+2);assert.equal(ctx.state.syncDirty,false);
+  assert.ok(ctx.state.tasks.some(task=>task.title==='Newer local edit before adoption'),'the newer local edit is kept');
+  if(variant==='newer work after the cut')assert.ok(ctx.state.tasks.some(task=>task.title==='Newer work after the cut'),'and so is the work after the cut');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  assert.equal(generationDocs2254(backend,unreadablePath),unreadableBefore,'the unreadable generation is untouched');
+  for(const id of [unreadableId,acknowledgedId])assert.ok(backend.docs.get('users/owner/recoveryProtections/'+id),'generation '+id+' stays protected');
+ });
+});
