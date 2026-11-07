@@ -6382,6 +6382,63 @@ test('RISK contained board adoption: when one read or digest of a readable next 
  });
 });
 
+// #2254 release review (B1): once adoption has downloaded a revision and found
+// that it decodes, it can never publish over it, and a published generation's
+// bytes never change. While a large board then waits, returning or
+// reconnecting must not download both cloud copies again on every visit, as
+// a phone does on each app switch: before adoption existed (9dc3d77) a waiting
+// board downloaded nothing. Retry sync still reads afresh and takes both
+// devices' work. A damaged revision whose own check failed for a reason the
+// bytes do not show proved nothing either way, so the next return checks it
+// again and adopts.
+test('RISK contained board adoption: after a failed read of a readable next revision makes a large board wait, returning or reconnecting downloads no cloud copy again and Retry sync takes both devices’ work, while a damaged revision whose own check failed for another reason is checked again and adopted',async t=>{
+ for(const variant of ['readable revision','damaged revision'])await t.test(variant,async sub=>{
+  const damaged=variant==='damaged revision';
+  const app=await readableElsewhereApp2254(sub,{large:true,damage:damaged?'altered':null}),{ctx,shim,backend,elsewhereId,storedChunkText,pushes}=app,revision=ctx.state.syncRev;
+  await newerEditBeforeAdoption2254(app);
+  // Readable: the pull's digest fails once. Damaged: the pull finds the
+  // damage, then adoption's own check of the bytes it downloaded fails once.
+  const seen=failDigestOf2254(sub,storedChunkText,{times:1,skip:damaged?1:0,error:operationError2254});
+  const pulls={count:0},pull=backend.CS.pull;
+  backend.CS.pull=async(...args)=>{pulls.count++;return pull(...args);};
+  sub.after(()=>{backend.CS.pull=pull;});
+  const downloads=()=>backend.network.filter(entry=>entry.endsWith('/chunks')).length;
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+  assert.equal(seen.failed,1,'fixture: one digest failed');
+  assert.deepEqual(pushes,[],'positive control: nothing is published on opening');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: the large board waits');
+  const opened=downloads();
+  assert.ok(opened>0,'positive control: the opening downloaded the cloud copies');
+  for(const type of damaged?['focus']:['focus','online']){
+   const before=pulls.count;
+   vm.runInContext('resumeCloudSync({type:'+JSON.stringify(type)+'})',ctx);
+   await fixtureDeadline(async wait=>{while(pulls.count===before||!adoptionIdle2254(ctx))await wait(10);},type+' settles',30000);
+   if(damaged)break;
+   // Behaviour under test: the waiting board reads the root, never the copies again.
+   assert.equal(downloads(),opened,'returning or reconnecting ('+type+') downloads no cloud copy again');
+   assert.deepEqual(pushes,[],'nothing is published after '+type);
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','the large board still waits after '+type);
+  }
+  if(damaged){
+   // Positive control: bytes whose check proved nothing are checked again, and no client can read them.
+   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'returning adopts this board once, over the damaged revision');
+   assert.equal(backend.docs.get('users/owner').previousGeneration,elsewhereId);
+   assert.equal(pushes[0].payload,ctx.cloudPayload());
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+   return;
+  }
+  // Retry sync reads afresh, finds the revision readable and keeps both devices' work.
+  await ctx.onAction('sync-retry',{});await adoptionSettle2254(ctx,'Retry sync settles');
+  assert.ok(downloads()>opened,'Retry sync downloads the cloud copy again');
+  assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'Retry sync publishes once, over the other device’s revision');
+  const cloud=await currentCloudBoard2254(backend,ctx.window.ChainStorageV2);
+  for(const [what,match] of [['the other device’s task',row=>row.id===ELSEWHERE_TASK_2254],['this device’s newer edit',row=>row.title==='Newer local edit before adoption']]){
+   assert.ok(cloud.tasks.some(match),'the cloud holds '+what);assert.ok(ctx.state.tasks.some(match),'this board holds '+what);
+  }
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ });
+});
+
 // #2254 (owner rule, 2026-11-06): daily backups cover three calendar days, but
 // during a recovery hold, before the cloud has acknowledged a board, nothing
 // recovery may need is trimmed. While cloud recovery waits on an unreadable

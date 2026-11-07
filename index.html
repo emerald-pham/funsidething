@@ -6413,6 +6413,14 @@ async function downloadedGenerationCheck(row){
   try{await ChainStorageV2.decodeSnapshot(header,row.chunks);return "readable";}
   catch(error){return ChainStorageV2.isCorruptSnapshotError?.(error)===true?"unreadable":"unproved";}
 }
+// The root whose current generation this page downloaded during an adoption
+// check and found readable. A published generation's bytes never change, so
+// adoption can never publish over it, and opening, returning or reconnecting
+// does not download it again for that check while the board waits, as
+// nothing was downloaded while it waited before adoption existed. Retry sync
+// or signing in again checks again. Bytes that proved nothing either way are
+// checked again at the next opportunity.
+let containedAdoptionReadableRoot=null;
 // #2254 review (S2): the crash mark the owner asked for on #2239. An adoption
 // run is marked in device storage, and the mark read back, before its first
 // full source read. A run that reaches an outcome it can see (published,
@@ -6501,6 +6509,9 @@ async function containedDeviceBoardAdoption(failed,{account,backend,identity,pul
   // S2: an earlier page closed in the middle of this adoption. Wait as before
   // adoption existed; only a deliberate run starts it again.
   if(!deliberate&&containedAdoptionInterrupted(account,identity,failed))return null;
+  const readableRoot=containedAdoptionReadableRoot;
+  if(!deliberate&&readableRoot?.account===account&&readableRoot.identity===identity&&
+    readableRoot.rev===failed.rev&&readableRoot.generationId===failed.generationId)return null;
   // #2254 review (S4): the person chose Use my board from before recovery for
   // this unreadable root, which keeps cloud saving paused, as its toast and
   // Help say; Retry sync keeps that choice too. Nothing is published by itself.
@@ -6588,6 +6599,7 @@ async function containedDeviceBoardAdoption(failed,{account,backend,identity,pul
     // B1: the unreadable generation is proved again from the bytes just
     // downloaded, never from the pull's answer alone.
     const checked=await downloadedGenerationCheck(source.generations?.find?.(row=>row?.id===manifest.activeGeneration));
+    if(checked==="readable")containedAdoptionReadableRoot={account,identity,rev:manifest.rev,generationId:manifest.activeGeneration};
     if(checked!=="unreadable"||!current())return null;
     const protection=await backend.protectRecoverySources({source:{...source,epoch:evidence.epoch},expectedRevision:manifest.rev,stillCurrent:current});
     if(!protection?.ok||!current())return null;
