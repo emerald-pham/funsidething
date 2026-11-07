@@ -15087,6 +15087,21 @@ test('RESTORE INTENT: two tabs at the same clock tick mint distinct task and ope
   assert.notEqual(first.ctx.state.restoredTaskOps[a.id][0],second.ctx.state.restoredTaskOps[b.id][0]);
 });
 
+// #2254 review round: the adoption crash mark's page id was drawn from
+// crypto.getRandomValues while the script started, so a host without it could
+// not open the app at all. The id is drawn by the app's own id helper when a
+// run is first marked, and two such pages still tell their marks apart.
+test('RISK contained board adoption: the app opens in a host whose crypto lacks getRandomValues, and two such pages still tell an earlier page’s adoption mark from their own',async t=>{
+ const storage=sharedScannerStorage();
+ const first=await loadApp({seed:1,sharedStorage:storage,cryptoProvider:{randomUUID:()=>'33333333-3333-4333-8333-333333333333'}});t.after(()=>first.dispose());
+ const second=await loadApp({seed:1,sharedStorage:storage,cryptoProvider:{randomUUID:()=>'44444444-4444-4444-8444-444444444444'}});t.after(()=>second.dispose());
+ assert.ok(first.ctx.state&&second.ctx.state,'both pages open');
+ const failed={rev:7,generationId:'generation-unreadable'};
+ assert.equal(vm.runInContext('markContainedAdoptionRun',first.ctx)('e@example.com','owner',failed),true,'the first page marks its run and reads the mark back');
+ assert.equal(vm.runInContext('containedAdoptionInterrupted',first.ctx)('e@example.com','owner',failed),false,'its own mark does not hold the first page');
+ assert.equal(vm.runInContext('containedAdoptionInterrupted',second.ctx)('e@example.com','owner',failed),true,'the second page sees an earlier page’s run');
+});
+
 test('RESTORE INTENT: reopening a completed task survives a later unrelated cloud write', async () => {
   const {ctx}=await loadApp();
   const old=syncTask('same','Same'); old.done=true; old.completedAt=1000; old.lastDoneAt=1000;
