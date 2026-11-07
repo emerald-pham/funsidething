@@ -365,35 +365,40 @@ test('RISK large board deliberate recovery guidance: mounted FAQ and changelog e
 // last save, made on the copy it last confirmed, the app publishes this board
 // by itself. Help says so, says what stays protected, says a large board
 // otherwise waits, and never sends anyone to another device to recover.
-// #2254 review (S1): it does so only for this device's own save, never for one
-// another device may have made.
+// #2254 (owner decision, 2026-11-06, superseding review S1): "if the broken
+// parts of the save are unrecoverable, we need to cut our losses." The app
+// does so whoever saved the unreadable copy, and Help says plainly that work
+// saved only in that copy, from any device, cannot be recovered.
 // #2254 review (S4): choosing the board from before recovery keeps cloud saving
 // paused, adoption included, and the recovery-waiting answer names the
 // exception. Every Help answer keeps the 130-word limit, and none sends anyone
 // to a desktop or another computer: people have only their phone.
-test('RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the unreadable copy is this device’s own unconfirmed save on the copy it last confirmed, that a large board otherwise waits, and that the board from before recovery keeps cloud saving paused',async t=>{
+test('RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the copy before the unreadable one is the copy it last confirmed, whoever saved the unreadable copy, that work saved only there cannot be recovered, that a large board otherwise waits, and that the board from before recovery keeps cloud saving paused',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
  const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  const answer=answerTo('Does the app fix an unreadable cloud copy by itself?');
- assert.match(answer,/it may be this device’s own last save, made on the copy it last confirmed, whose confirmation never arrived/);
- assert.match(answer,/the app saves it as the new cloud copy by itself/);
+ assert.match(answer,/When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app saves this device’s board as the new cloud copy by itself/);
  assert.match(answer,/even while it says “recovery waiting”/);
- assert.match(answer,/The unreadable copy stays protected in the cloud, and this device keeps a note naming it/);
- assert.match(answer,/If another device may have saved it, or the copy before it differs from the one this device confirmed,[^.]*a large board waits for Retry sync/);
+ assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud, and this device keeps a note naming it\./);
+ assert.match(answer,/If the copy before it differs, or an unconfirmed save here may hold work the board lacks, a large board waits for Retry sync\./);
  assert.match(answer,/The app also waits after you choose Use my board from before recovery\./);
+ assert.doesNotMatch(answer,/own last save|confirmation never arrived|another device may have saved/,'adoption no longer depends on who saved the unreadable copy');
  const back=answerTo('Can I go back to my board from before recovery?');
  assert.match(back,/Afterwards your board saves on this device, cloud saving stays paused, both cloud copies stay protected and the app does not upload this board by itself\./);
  const waiting=answerTo('Why does the cloud button say “recovery waiting”?');
- assert.match(waiting,/If the unreadable copy is this device’s own unconfirmed save, the app saves your board by itself\./);
+ assert.match(waiting,/If the copy before the unreadable one is the one this device last confirmed, the app saves your board by itself\./);
+ assert.doesNotMatch(waiting,/own unconfirmed save/);
  const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
  assert.ok(answers.length>100,'positive control: the mounted Help has its answers');
  assert.deepEqual(answers.filter(row=>wordsOf(row.text)>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
- assert.match(release,/<li>When the newest cloud copy cannot be read but it is this device’s own last save, made on the copy it last confirmed, whose confirmation never arrived, the app now saves this device’s board as the new cloud copy by itself/);
- assert.match(release,/If another device may have saved that copy, a large board still waits for Retry sync\./);
+ assert.match(release,/<li>When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app now saves this device’s board as the new cloud copy by itself, at the cost of an ordinary save/);
+ assert.match(release,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud\./);
+ assert.match(release,/If the copy before it differs, a large board still waits for Retry sync\./);
+ assert.doesNotMatch(release,/own last save|another device may have saved/,'the changelog no longer says adoption needs this device’s own save');
  assert.match(release,/does this the next time it opens, returns or reconnects, unless you chose Use my board from before recovery\./);
  for(const {question,text} of [...answers,{question:'November 6 changelog',text:release.replace(/<[^>]+>/g,' ')}])
   assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');

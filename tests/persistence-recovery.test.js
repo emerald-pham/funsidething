@@ -5817,77 +5817,102 @@ async function publishElsewhere2254(backend,codec,payload){
  return id;
 }
 
-test('RISK contained board adoption: when the unreadable generation is this device’s own interrupted upload over its acknowledged copy, a large board publishes itself once as the next revision, keeping the unreadable generation protected, untouched and named by a headers-only device record after later saves',async t=>{
- const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,revision,unreadableId,acknowledgedId,unreadablePath,pushes}=app,store=ctx.window.ScannerDeviceStore;
- assert.equal(ctx.state.decisionBase.revision,revision,'fixture: the device acknowledged the generation before the unreadable one');
- assert.equal((await backend.CS.pull()).code,'corrupt-generation','fixture: the next revision cannot be read');
- // Work goes on after the lost reply, so the board is newer than the upload.
- await newerEditBeforeAdoption2254(app);
- const before=JSON.parse(JSON.stringify(ctx.state)),unreadableBefore=generationDocs2254(backend,unreadablePath);
- const archivesBefore=(await store.listOpaqueArchives()).map(row=>row.key).sort();
- ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
- // Behaviour under test: one publication over the unreadable revision it proved.
- assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the device board is published once, over the unreadable revision');
- const root=backend.docs.get('users/owner');
- assert.equal(root.rev,revision+2,'the device board is the next revision');
- assert.equal(root.previousGeneration,unreadableId,'the unreadable generation is the previous one, not replaced');
- const published=backend.docs.get('users/owner/generations/'+root.activeGeneration);
- const chunks=[...backend.docs].filter(([key])=>key.startsWith('users/owner/generations/'+root.activeGeneration+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
- assert.equal(await ctx.window.ChainStorageV2.decodeSnapshot(published,chunks),pushes[0].payload);
- assert.equal(pushes[0].payload,ctx.cloudPayload(),'the cloud holds exactly this device’s board');
- // Lossless: every accepted task and decision, including the newer edit.
- for(const task of before.tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task);
- for(const key of ['decisionEvents','decisionBaseline','workLog','chain','deletedTaskIds','clearedHistoryIds'])
-  assert.deepEqual(JSON.parse(JSON.stringify(ctx.state[key]??null)),before[key]??null,key);
- // Ordinary-save cost: no reconciliation and no recovery archive, only a
- // headers-only record that names the unreadable generation.
- const records=await unreadableRecords2254(store,unreadableId);
- assertHeadersOnlyRecord2254(records,{unreadableId,acknowledgedId},'after adoption');
- assert.deepEqual((await store.listOpaqueArchives()).map(row=>row.key).filter(key=>!records.some(row=>row.key===key)).sort(),archivesBefore,'no recovery archive is written');
- assert.equal(await store.getRecoveryCloudHold(),null);
- // The unreadable generation stays untouched and protected, as does the earlier one.
- assert.equal(generationDocs2254(backend,unreadablePath),unreadableBefore,'the unreadable generation is untouched');
- for(const id of [unreadableId,acknowledgedId])assert.ok(backend.docs.get('users/owner/recoveryProtections/'+id),'generation '+id+' is protected in the cloud');
- // The device took the cloud's confirmation; nothing waits.
- assert.equal(ctx.state.syncRev,revision+2);assert.equal(ctx.state.syncDirty,false);
- assert.equal(ctx.validDecisionBase(ctx.state.decisionBase,ctx.state.syncAccount,revision+2),true);
- assert.equal(ctx.state.decisionBase.payload,pushes[0].payload,'the new acknowledged copy is the published board');
- assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
- assert.equal(await store.getPendingUpload('owner'),null,'no upload stays pending');
- assert.equal(ctx.localStorage.getItem('fvp:chain-scanner:proved-unreadable-cloud-source'),null,'no refusal is remembered');
- // Two later ordinary saves rotate the unreadable generation out of both root slots.
- for(const title of ['First ordinary save after adoption','Second ordinary save after adoption']){
-  shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
-  await ctx.sendPush();await adoptionSettle2254(ctx,title+' settles');
- }
- const later=backend.docs.get('users/owner');
- assert.equal(later.rev,revision+4,'positive control: both later saves were published');
- assert.ok(![later.activeGeneration,later.previousGeneration].includes(unreadableId),'positive control: the root no longer names the unreadable generation');
- assertHeadersOnlyRecord2254(await unreadableRecords2254(store,unreadableId),{unreadableId,acknowledgedId},'after later saves');
- assert.ok(backend.docs.get('users/owner/recoveryProtections/'+unreadableId),'the unreadable generation stays protected in the cloud');
- assert.equal(generationDocs2254(backend,unreadablePath),unreadableBefore,'and untouched');
+// #2254 (owner decision, 2026-11-06, superseding review S1): "if the broken
+// parts of the save are unrecoverable, we need to cut our losses." No client
+// can read the unreadable generation, so who saved it no longer decides: once
+// the generation before it is proved to be this device's acknowledged copy,
+// the board is adopted whether another writer saved the unreadable one and
+// nothing is pending here, this device's own upload was interrupted, or a
+// later upload replaced and cleared this device's pending record.
+test('RISK contained board adoption: when the generation before the unreadable one is exactly this device’s acknowledged copy, a large board publishes itself once as the next revision whoever saved the unreadable generation, keeping it protected, untouched and named by a headers-only device record after later saves',async t=>{
+ for(const variant of ['another writer saved it and nothing is pending here','this device’s own interrupted upload','a later upload replaced and cleared the pending one'])await t.test(variant,async sub=>{
+  const elsewhere=variant==='another writer saved it and nothing is pending here',replaced=variant==='a later upload replaced and cleared the pending one';
+  const app=elsewhere?await containedAdoptionApp2254(sub):await ownInterruptedUploadApp2254(sub);
+  const {ctx,shim,backend,unreadableId,acknowledgedId,unreadablePath,pushes}=app,store=ctx.window.ScannerDeviceStore,revision=ctx.state.syncRev;
+  assert.equal(ctx.state.decisionBase.revision,revision,'fixture: the device acknowledged the generation before the unreadable one');
+  assert.equal((await backend.CS.pull()).code,'corrupt-generation','fixture: the next revision cannot be read');
+  if(elsewhere)assert.equal(await store.getPendingUpload('owner'),null,'fixture: this device has no upload of its own pending');
+  // Work goes on, so the board is newer than the unreadable generation's base.
+  await newerEditBeforeAdoption2254(app);
+  const before=JSON.parse(JSON.stringify(ctx.state)),unreadableBefore=generationDocs2254(backend,unreadablePath);
+  const archivesBefore=(await store.listOpaqueArchives()).map(row=>row.key).sort();
+  const results=[],recorded=backend.CS.push;
+  if(replaced){
+   // A later upload of the newer board, still based on the acknowledged copy,
+   // replaces the pending pointer, conflicts with the unreadable revision and
+   // clears it; the read that follows the conflict is the one that adopts.
+   backend.CS.push=async(...args)=>{const result=await recorded(...args);results.push(result);return result;};
+   sub.after(()=>{backend.CS.push=recorded;});
+   ctx.window.CLOUD_RETRY_DELAY_MS=600000;await ctx.sendPush();
+  }else{ctx.closeModal();await flush();await ctx.cloudPull();}
+  await adoptionSettle2254(ctx,'the opening settles');
+  if(replaced){
+   assert.deepEqual([pushes[0]?.baseRev,results[0]?.conflict],[revision,true],'fixture: the later upload, based on the acknowledged copy, conflicted with the unreadable revision');
+  }
+  const adopted=replaced?pushes.slice(1):pushes;
+  // Behaviour under test: one publication over the unreadable revision it proved.
+  assert.deepEqual(adopted.map(row=>row.baseRev),[revision+1],'the device board is published once, over the unreadable revision');
+  const root=backend.docs.get('users/owner');
+  assert.equal(root.rev,revision+2,'the device board is the next revision');
+  assert.equal(root.previousGeneration,unreadableId,'the unreadable generation is the previous one, not replaced');
+  const published=backend.docs.get('users/owner/generations/'+root.activeGeneration);
+  const chunks=[...backend.docs].filter(([key])=>key.startsWith('users/owner/generations/'+root.activeGeneration+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+  assert.equal(await ctx.window.ChainStorageV2.decodeSnapshot(published,chunks),adopted[0].payload);
+  assert.equal(adopted[0].payload,ctx.cloudPayload(),'the cloud holds exactly this device’s board');
+  // Lossless for this device: every accepted task and decision, including the newer edit.
+  for(const task of before.tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task);
+  for(const key of ['decisionEvents','decisionBaseline','workLog','chain','deletedTaskIds','clearedHistoryIds'])
+   assert.deepEqual(JSON.parse(JSON.stringify(ctx.state[key]??null)),before[key]??null,key);
+  // Ordinary-save cost: no reconciliation and no recovery archive, only a
+  // headers-only record that names the unreadable generation.
+  const records=await unreadableRecords2254(store,unreadableId);
+  assertHeadersOnlyRecord2254(records,{unreadableId,acknowledgedId},'after adoption');
+  assert.deepEqual((await store.listOpaqueArchives()).map(row=>row.key).filter(key=>!records.some(row=>row.key===key)).sort(),archivesBefore,'no recovery archive is written');
+  assert.equal(await store.getRecoveryCloudHold(),null);
+  // The unreadable generation stays untouched and protected, as does the earlier one.
+  assert.equal(generationDocs2254(backend,unreadablePath),unreadableBefore,'the unreadable generation is untouched');
+  for(const id of [unreadableId,acknowledgedId])assert.ok(backend.docs.get('users/owner/recoveryProtections/'+id),'generation '+id+' is protected in the cloud');
+  // The device took the cloud's confirmation; nothing waits.
+  assert.equal(ctx.state.syncRev,revision+2);assert.equal(ctx.state.syncDirty,false);
+  assert.equal(ctx.validDecisionBase(ctx.state.decisionBase,ctx.state.syncAccount,revision+2),true);
+  assert.equal(ctx.state.decisionBase.payload,adopted[0].payload,'the new acknowledged copy is the published board');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  assert.equal(await store.getPendingUpload('owner'),null,'no upload stays pending');
+  assert.equal(ctx.localStorage.getItem('fvp:chain-scanner:proved-unreadable-cloud-source'),null,'no refusal is remembered');
+  // Two later ordinary saves rotate the unreadable generation out of both root slots.
+  for(const title of ['First ordinary save after adoption','Second ordinary save after adoption']){
+   shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+   await ctx.sendPush();await adoptionSettle2254(ctx,title+' settles');
+  }
+  const later=backend.docs.get('users/owner');
+  assert.equal(later.rev,revision+4,'positive control: both later saves were published');
+  assert.ok(![later.activeGeneration,later.previousGeneration].includes(unreadableId),'positive control: the root no longer names the unreadable generation');
+  assertHeadersOnlyRecord2254(await unreadableRecords2254(store,unreadableId),{unreadableId,acknowledgedId},'after later saves');
+  assert.ok(backend.docs.get('users/owner/recoveryProtections/'+unreadableId),'the unreadable generation stays protected in the cloud');
+  assert.equal(generationDocs2254(backend,unreadablePath),unreadableBefore,'and untouched');
+ });
 });
 
-test('RISK contained board adoption: without proof that the unreadable generation is this device’s own upload over its acknowledged copy, nothing is published, a large board still waits, and a headers-only record names a generation another writer saved',async t=>{
- for(const variant of ['another writer saved the unreadable generation','earlier generation differs','acknowledged copy is older','pending upload is not that generation’s','a later upload replaced the pending one'])await t.test(variant,async sub=>{
-  const other=['another writer saved the unreadable generation','pending upload is not that generation’s'].includes(variant);
-  const app=other?await containedAdoptionApp2254(sub):await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,acknowledgedPath,pushes}=app,store=ctx.window.ScannerDeviceStore;
-  const revision=ctx.state.syncRev,codec=ctx.window.ChainStorageV2;
+// The proof that still decides (b9ad6f8): the generation before the unreadable
+// one is this device's acknowledged copy, and an upload this device left
+// pending is this board, that copy, the unreadable generation itself, or this
+// adoption's own staged upload. A pending upload that names a root generation
+// with another payload, an upload staged at the acknowledged revision that
+// never published, or one staged at the unreadable revision that no adoption
+// on this device recorded may hold work this board lacks, so the board waits.
+test('RISK contained board adoption: when the generation before the unreadable one is not proved to be this device’s acknowledged copy, or this device’s pending upload may hold work this board lacks, nothing is published, a large board still waits, and a proved earlier generation keeps the unreadable one named by a headers-only record',async t=>{
+ for(const variant of ['earlier generation differs','acknowledged copy is older','pending upload is not that generation’s','pending upload names neither root generation','a staged upload at the unreadable revision that no adoption here recorded'])await t.test(variant,async sub=>{
+  const pendingVariant=!['earlier generation differs','acknowledged copy is older'].includes(variant);
+  const app=pendingVariant?await containedAdoptionApp2254(sub):await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,acknowledgedPath,pushes}=app,store=ctx.window.ScannerDeviceStore;
+  const revision=ctx.state.syncRev,codec=ctx.window.ChainStorageV2,account=ctx.state.syncAccount;
   if(variant==='earlier generation differs')await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not this device’s copy'};return JSON.stringify(board);});
   if(variant==='acknowledged copy is older')backend.docs.set('users/owner',{...backend.docs.get('users/owner'),rev:revision+2});
-  if(variant==='pending upload is not that generation’s')await store.setPendingUpload('owner',{generationId:app.unreadableId,payloadHash:'f'.repeat(64),baseRev:revision,updatedAt:1,account:ctx.state.syncAccount});
+  // This device's pending upload record, as an interrupted push leaves one.
+  const pending={'pending upload is not that generation’s':{generationId:app.unreadableId,payloadHash:'f'.repeat(64),baseRev:revision},
+   'pending upload names neither root generation':{generationId:'generation-staged-2254',payloadHash:'a'.repeat(64),baseRev:revision},
+   'a staged upload at the unreadable revision that no adoption here recorded':{generationId:'generation-staged-unrecorded-2254',payloadHash:'b'.repeat(64),baseRev:revision+1}}[variant];
+  if(pending)await store.setPendingUpload('owner',{...pending,updatedAt:1,account});
   await newerEditBeforeAdoption2254(app);
-  if(variant==='a later upload replaced the pending one'){
-   // A later upload of the newer board, still based on the acknowledged copy,
-   // replaces the pending pointer, conflicts with the next revision and clears it.
-   const conflicts=[];backend.CS.push=async(payload,updatedAt,baseRev,context)=>{const result=await app.push(payload,updatedAt,baseRev,context);conflicts.push(result);return result;};
-   ctx.window.CLOUD_RETRY_DELAY_MS=600000;await ctx.sendPush();await adoptionSettle2254(ctx,'the later upload settles');
-   backend.CS.push=async(payload,updatedAt,baseRev,context)=>{pushes.push({payload,baseRev});return app.push(payload,updatedAt,baseRev,context);};
-   assert.equal(conflicts[0]?.conflict,true,'fixture: the later upload conflicted with the unreadable revision');
-   assert.equal(await store.getPendingUpload('owner'),null,'fixture: no pending upload names the unreadable generation any more');
-   assert.deepEqual(conflicts.slice(1),[],'the read that follows the conflict publishes nothing');
-   assert.equal(backend.docs.get('users/owner').rev,revision+1,'the cloud stays at the unreadable revision');
-  }
   const before=JSON.stringify(ctx.state),cloudBefore=[...backend.docs].filter(([key])=>!key.startsWith('users/owner/recoveryProtections/'));
   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
   assert.deepEqual(pushes,[],'nothing is published');
@@ -5895,17 +5920,20 @@ test('RISK contained board adoption: without proof that the unreadable generatio
   assert.equal(JSON.stringify(ctx.state),before,'the board stays exactly as it was');
   assert.equal(ctx.state.syncDirty,true);
   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','a large board still waits');
-  if(variant==='another writer saved the unreadable generation')
+  if(pending){
+   assert.deepEqual(await store.getPendingUpload('owner'),{...pending,updatedAt:1,account:'owner'},'the pending upload stays exactly as it was');
    assertHeadersOnlyRecord2254(await unreadableRecords2254(store,app.unreadableId),{unreadableId:app.unreadableId,acknowledgedId:app.acknowledgedId},'while it waits');
+  }
  });
 });
 
-test('RISK contained board adoption: a device that remembers a recovery wait adopts its own interrupted upload when it reconnects once containment is proven, and a conflicting write keeps the newer revision another device published',async t=>{
- for(const variant of ['reconnect after a remembered wait','another writer advances the cloud'])await t.test(variant,async sub=>{
-  const app=await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,acknowledgedPath,pushes,push}=app,codec=ctx.window.ChainStorageV2;
+test('RISK contained board adoption: a device that remembers a recovery wait adopts its board when it reconnects once containment is proven, whoever saved the unreadable generation, and a conflicting write keeps the newer revision another device published',async t=>{
+ for(const variant of ['reconnect after a remembered wait','reconnect after a remembered wait over another writer’s generation','another writer advances the cloud'])await t.test(variant,async sub=>{
+  const app=variant==='reconnect after a remembered wait over another writer’s generation'?await containedAdoptionApp2254(sub):await ownInterruptedUploadApp2254(sub);
+  const {ctx,shim,backend,acknowledgedPath,pushes,push}=app,codec=ctx.window.ChainStorageV2;
   const revision=ctx.state.syncRev,base=JSON.stringify(ctx.state.decisionBase);
   await newerEditBeforeAdoption2254(app);
-  if(variant==='reconnect after a remembered wait'){
+  if(variant.startsWith('reconnect after a remembered wait')){
    // First the earlier generation does not match, so the device waits and remembers it.
    await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not yet'};return JSON.stringify(board);});
    ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the waiting opening settles');
