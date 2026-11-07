@@ -2260,6 +2260,15 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - Exact-current hash reconstruction still retains compatible facts from every complete retained server source: `RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts`.
 
+## Manual backup reminder (#2254)
+
+- RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it
+- RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders
+- RISK manual backup reminder: only this account’s manual backups count toward the reminder
+- RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step
+
+The Node tests open Settings on an isolated board in browser storage and press Make manual backup through its action handler. A backup belongs to the account its saved board names, as Restore reads it before warning about a cross-account restore. The browser test serves the app with no cloud, seeds two manual backups, and measures the reminder and its neighbouring backup rows in the same Settings pane.
+
 ## Offline device database recovery
 
 - RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources

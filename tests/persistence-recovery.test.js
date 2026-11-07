@@ -6400,3 +6400,97 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
+
+// #2254 (owner decision of 2026-11-06): manual backups are never trimmed
+// automatically. From two of this account's manual backups, Settings shows a
+// short reminder beside Make manual backup that keeping more slows the app
+// down. The button keeps working with no confirmation. The reminder is a
+// polite status only on the render where it first appears, so re-rendering
+// Settings does not announce it again.
+const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups slows the app down. Delete older ones you don’t need.';
+const manualBackupReminderIn=markup=>{
+ const match=markup.match(/<p id="manualBackupReminder"([^>]*)>([\s\S]*?)<\/p>/);
+ return match?{text:match[2],status:/\brole="status"/.test(match[1]),beside:markup.includes('data-act="make-manual-backup">Make manual backup</button></div><p id="manualBackupReminder"')}:null;
+};
+const settingsMarkup=app=>app.shim.document.getElementById('modalRoot').innerHTML;
+const manualRows=ctx=>ctx.readLocalBackups().filter(row=>row.kind==='manual');
+async function makeManualBackup2254(app){
+ const before=manualRows(app.ctx).length;
+ app.ctx.onAction('make-manual-backup',{});
+ for(let attempt=0;attempt<50&&manualRows(app.ctx).length===before;attempt++)await flush();
+ await flush();
+}
+
+test('RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Reminder threshold task');await ctx.persist();
+ ctx.openSettings();
+ assert.match(settingsMarkup(app),/data-act="make-manual-backup">Make manual backup<\/button>/,'positive control: Settings lists the backup area');
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'no reminder with no manual backup');
+ // Other kinds are listed beside manual copies but are not manual backups.
+ assert.equal(ctx.saveLocalBackup('before-restore',JSON.stringify(ctx.state)),true);
+ assert.equal(ctx.saveLocalBackup('before-account-switch',JSON.stringify(ctx.state)),true);
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,1);
+ assert.match(settingsMarkup(app),/before restore/,'positive control: the other kinds are listed');
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'no reminder with one manual backup and other kinds');
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,2);
+ const reminder=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(reminder,'the second manual backup brings the reminder');
+ assert.equal(reminder.text,MANUAL_BACKUP_REMINDER);
+ assert.equal(reminder.beside,true,'the reminder sits right after Make manual backup');
+});
+
+test('RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Reminder status task');await ctx.persist();
+ await makeManualBackup2254(app);await makeManualBackup2254(app);
+ const first=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(first,'the reminder shows at two manual backups');
+ assert.equal(first.status,true,'the reminder is a status where it first appears');
+ assert.doesNotMatch(settingsMarkup(app),/id="manualBackupReminder"[^>]*aria-live="assertive"/,'the status is polite');
+ ctx.openSettings();
+ const again=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(again,'the reminder stays visible after Settings re-renders');
+ assert.equal(again.text,MANUAL_BACKUP_REMINDER);
+ assert.equal(again.status,false,'a re-render does not announce the reminder again');
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,3);
+ assert.deepEqual(manualBackupReminderIn(settingsMarkup(app)),{text:MANUAL_BACKUP_REMINDER,status:false,beside:true},'a third backup keeps the reminder without announcing it again');
+});
+
+test('RISK manual backup reminder: only this account’s manual backups count toward the reminder',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Account reminder task');ctx.state.syncAccount='me@example.test';await ctx.persist();
+ const other=JSON.stringify({...JSON.parse(JSON.stringify(ctx.state)),syncAccount:'other@example.test'});
+ const signedOut=JSON.parse(JSON.stringify(ctx.state));delete signedOut.syncAccount;
+ assert.equal(ctx.saveLocalBackup('manual',other),true);
+ assert.equal(ctx.saveLocalBackup('manual',other.replace('Account reminder task','Another account task')),true);
+ assert.equal(ctx.saveLocalBackup('manual',JSON.stringify(signedOut)),true);
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,4,'positive control: four manual backups are on this device');
+ assert.equal((settingsMarkup(app).match(/· manual<\/span>/g)||[]).length,4,'positive control: Settings lists all four');
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'one backup of this account does not bring the reminder');
+ await makeManualBackup2254(app);
+ const reminder=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(reminder,'two backups of this account bring the reminder');
+ assert.equal(reminder.text,MANUAL_BACKUP_REMINDER);
+});
+
+test('RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Third backup task');await ctx.persist();
+ await makeManualBackup2254(app);await makeManualBackup2254(app);
+ let confirms=0;ctx.confirm=()=>{confirms++;return false;};
+ assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder shows at two manual backups');
+ assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button stays enabled beside the reminder');
+ ctx.addTask('Only in the third backup');
+ await makeManualBackup2254(app);
+ assert.equal(confirms,0,'no confirmation is asked');
+ assert.equal(manualRows(ctx).length,3,'one press saves a third manual backup');
+ assert.ok(manualRows(ctx).some(row=>row.payload.includes('Only in the third backup')),'the third backup holds the current board');
+ assert.match(app.shim.document.getElementById('toast').textContent,/Manual backup saved on this device\./);
+ assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button is still enabled after the third');
+ assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder is still shown after the third');
+});
