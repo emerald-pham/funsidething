@@ -2289,11 +2289,18 @@ test('RISK downloads visual browser: Download board and Download recovery file r
 // working. Retry sync must recover such a board, publish it and take the
 // cloud's confirmation. The same signed-in large-board fixture and in-page
 // fake cloud as the deliberate test above, except that the earlier generation
-// is the device's own acknowledged board at revision 6, before a newer Add and
+// is byte for byte the device's own acknowledged board, before a newer Add and
 // scan decision; an unfinished draft stays in Add. Nothing the device
 // acknowledged may be lost: every task, decision, History entry, the newer
 // edit and the draft survive, and the cloud ends up holding exactly the
 // recovered board.
+// #2254 release review (B2): the device acknowledged that board at revision 5,
+// and the intact earlier generation is the same bytes published again at
+// revision 6 (as a save after Retry sync republishes an unchanged board), so
+// the unreadable revision 7 does not directly follow the acknowledged one.
+// Adoption (#2254) publishes by itself only over the revision just after the
+// acknowledged one, so here the opening still waits and Retry sync takes this
+// #2239 path, which recognises the acknowledged copy by its bytes.
 // Memory: the owner approved a target of 200 MiB over opening the same board
 // locally in WebKit (#2239). Round 2 did not reach it, so the target is
 // pending: each run reports its peak against the target and asserts a
@@ -2414,16 +2421,17 @@ test('RISK large board acknowledged recovery browser: Retry sync recovers a larg
    try{
     const page=context.pages()[0]||await context.newPage();
     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks)(page);
-    // The device's last cloud acknowledgement: its own board at revision 6.
+    // The device's last cloud acknowledgement: its own board at revision 5,
+    // whose bytes the cloud's intact earlier generation (revision 6) repeats.
     // One save first settles the older browser copy the fixture was seeded
     // from, so the acknowledgement written next is not merged away.
     await page.waitForFunction(()=>deviceStorageAuthority===true&&typeof deviceHeadHash==='string',null,{timeout:60000});
     earlier=await page.evaluate(async()=>{
      if(await persist()!==true)throw Error('fixture: the seeded board saves');
-     const payload=cloudPayload();state.syncRev=6;state.decisionBase=makeDecisionBase(state.syncAccount,6,payload);state.syncDirty=false;
+     const payload=cloudPayload();state.syncRev=5;state.decisionBase=makeDecisionBase(state.syncAccount,5,payload);state.syncDirty=false;
      if(await persist()!==true)throw Error('fixture: the acknowledgement saves');
      const saved=JSON.parse((await deviceStore.readHead()).payload);
-     if(!validDecisionBase(saved.decisionBase,saved.syncAccount,6)||saved.decisionBase.payload!==payload)throw Error('fixture: the saved board carries its acknowledged copy');
+     if(!validDecisionBase(saved.decisionBase,saved.syncAccount,5)||saved.decisionBase.payload!==payload)throw Error('fixture: the saved board carries its acknowledged copy');
      return payload;});
     // The newer accepted edit through Add, and a newer scan decision through the real No button.
     await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(taskCount)(page);
@@ -2432,7 +2440,7 @@ test('RISK large board acknowledged recovery browser: Retry sync recovers a larg
     await page.waitForFunction(count=>state.decisionEvents.length>count&&Object.keys(state.considered).length>0,decisions,{timeout:30000});
     await page.waitForFunction(()=>new Promise(resolve=>deviceStore.readHead().then(head=>{
      const saved=head&&JSON.parse(head.payload);resolve(!!saved&&saved.tasks.length===state.tasks.length&&saved.decisionEvents.length===state.decisionEvents.length&&
-      validDecisionBase(saved.decisionBase,saved.syncAccount,6));},()=>resolve(false))),null,{timeout:30000});
+      validDecisionBase(saved.decisionBase,saved.syncAccount,5));},()=>resolve(false))),null,{timeout:30000});
     summary.deviceBoardBytes=await page.evaluate(()=>JSON.stringify(state).length);
     await page.waitForTimeout(1500);
    }finally{await context.close();}
@@ -6475,6 +6483,166 @@ test('RISK exact acknowledged cloud source: after the person chooses Use my boar
  }
 });
 
+// #2254 release review (B1, specialist): the pull reports a decode that failed
+// without a code as an unreadable generation, so a digest the browser could
+// not compute once (a DOMException), a RangeError under memory pressure or a
+// chunk read that threw without a code all reach adoption as one. Here another
+// device publishes a readable next revision over this device's acknowledged
+// copy, so containment holds, and this device's first read or digest of it
+// fails. The owner accepted losing only work in a copy no client can read, so
+// adoption may publish only when the bytes it downloaded fail the codec's own
+// checks again. Otherwise the board recovers as it did before adoption existed
+// (9dc3d77): a large board waits, and a board within budget reconciles both
+// devices' work. The same revision with a damaged or missing chunk, which no
+// client can read, still adopts.
+const ELSEWHERE_TASK_2254='saved-on-another-device-2254';
+async function readableElsewhereApp2254(t,{large,damage=null}){
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,activeSource}=app,generations='users/owner/generations/';
+ // The generation this device acknowledged is complete again.
+ for(const chunk of activeSource.chunks)backend.docs.set(generations+activeSource.id+'/chunks/'+String(chunk.index).padStart(8,'0'),structuredClone(chunk));
+ // Another device publishes the next revision over that copy, with one more task.
+ const other=JSON.parse(ctx.state.decisionBase.payload);
+ other.tasks.push({...other.tasks[0],id:ELSEWHERE_TASK_2254,title:'Saved on another device'});
+ const elsewhereId=await publishElsewhere2254(backend,ctx.window.ChainStorageV2,JSON.stringify(other)),elsewherePath=generations+elsewhereId;
+ const chunkKey=elsewherePath+'/chunks/00000000';
+ assert.equal(backend.docs.get(elsewherePath).chunkCount,1,'fixture: the other device’s revision is one chunk');
+ if(damage==='altered'){const chunk=backend.docs.get(chunkKey);backend.docs.set(chunkKey,{...chunk,text:chunk.text.replace('Saved on another device','Saved on another devicX')});}
+ if(damage==='missing')backend.docs.delete(chunkKey);
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=large?1:64*1048576;
+ const pushes=[],push=backend.CS.push;
+ backend.CS.push=async(payload,updatedAt,baseRev,context)=>{pushes.push({payload,baseRev});return push(payload,updatedAt,baseRev,context);};
+ t.after(()=>{backend.CS.push=push;});
+ return {...app,elsewhereId,elsewherePath,storedChunkText:backend.docs.get(chunkKey)?.text??null,pushes};
+}
+// The browser cannot compute a digest of this text: after `skip` digests of it
+// go through, the next `times` throw.
+function failDigestOf2254(t,text,{times=1,skip=0,error}){
+ const subtle=webcrypto.subtle,own=Object.getOwnPropertyDescriptor(subtle,'digest'),digest=subtle.digest,seen={matched:0,failed:0};
+ subtle.digest=async function(algorithm,data,...rest){
+  if(data&&seen.failed<times&&new TextDecoder().decode(data)===text&&++seen.matched>skip){seen.failed++;throw error();}
+  return digest.call(this,algorithm,data,...rest);
+ };
+ t.after(()=>{if(own)Object.defineProperty(subtle,'digest',own);else delete subtle.digest;});
+ return seen;
+}
+async function currentCloudBoard2254(backend,codec){
+ const root=backend.docs.get('users/owner'),path='users/owner/generations/'+root.activeGeneration;
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ return JSON.parse(await codec.decodeSnapshot(backend.docs.get(path),chunks));
+}
+const operationError2254=()=>new DOMException('The operation failed for an operation-specific reason','OperationError');
+test('RISK contained board adoption: when one read or digest of a readable next revision another device published over the acknowledged copy fails, nothing is published over that device’s work: a large board waits, a board within budget keeps both devices’ work, and the same revision with a damaged or missing chunk still adopts',async t=>{
+ const failures={
+  'a digest the browser could not compute once':{times:1,error:operationError2254},
+  'a range error once while hashing':{times:1,error:()=>new RangeError('Array buffer allocation failed')},
+  'a chunk read that threw without a code once':{read:true},
+  'a digest that failed in the pull and again in adoption’s own check':{times:2,error:operationError2254},
+ };
+ const variants=[...Object.keys(failures).flatMap(kind=>[[kind,true],[kind,false]]),['a damaged chunk',true],['a missing chunk',true]];
+ for(const [kind,large] of variants)await t.test(kind+(large?', large board':', board within budget'),async sub=>{
+  const damage={'a damaged chunk':'altered','a missing chunk':'missing'}[kind]??null,failure=failures[kind]??null;
+  const app=await readableElsewhereApp2254(sub,{large,damage}),{ctx,shim,backend,faults,elsewhereId,elsewherePath,storedChunkText,pushes}=app;
+  const store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2,revision=ctx.state.syncRev;
+  await newerEditBeforeAdoption2254(app);
+  const before=JSON.stringify(ctx.state),elsewhereBefore=generationDocs2254(backend,elsewherePath);
+  let seen={failed:0};
+  if(failure?.read){
+   faults.serverRead=async readPath=>{if(!seen.failed&&readPath===elsewherePath+'/chunks'){seen.failed++;throw Error('read failed without a code');}};
+   sub.after(()=>{delete faults.serverRead;});
+  }else if(failure)seen=failDigestOf2254(sub,storedChunkText,failure);
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+  // Positive control: the opening reached adoption, which proved the
+  // generation before this revision is the acknowledged copy.
+  assertHeadersOnlyRecord2254(await unreadableRecords2254(store,elsewhereId),{unreadableId:elsewhereId,acknowledgedId:app.activeSource.id},'the opening');
+  const root=backend.docs.get('users/owner');
+  if(damage){
+   // Positive control: no client can read this revision, so this board is published once over it.
+   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'this board is published once, over the unreadable revision');
+   assert.deepEqual([root.rev,root.previousGeneration],[revision+2,elsewhereId],'the unreadable revision is the previous one, not replaced');
+   assert.equal(pushes[0].payload,ctx.cloudPayload(),'the cloud holds exactly this device’s board');
+   assert.equal(generationDocs2254(backend,elsewherePath),elsewhereBefore,'the unreadable revision stays untouched');
+   assert.ok(backend.docs.get('users/owner/recoveryProtections/'+elsewhereId),'and protected in the cloud');
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  }else{
+   // Behaviour under test: nothing is published over the other device's work.
+   for(const row of pushes)assert.ok(row.payload.includes(ELSEWHERE_TASK_2254),'every publication keeps the other device’s task');
+   assert.equal(seen.failed,failure.times??1,'fixture: the read or digest failed as intended');
+   const cloud=await currentCloudBoard2254(backend,codec);
+   assert.ok(cloud.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'the cloud keeps the other device’s task');
+   if(large){
+    assert.deepEqual(pushes,[],'a large board publishes nothing');
+    assert.deepEqual([root.rev,root.activeGeneration],[revision+1,elsewhereId],'the cloud stays at the other device’s revision');
+    assert.equal(generationDocs2254(backend,elsewherePath),elsewhereBefore,'which stays untouched');
+    assert.equal(JSON.stringify(ctx.state),before,'the board stays exactly as it was');
+    assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','a large board waits, as before adoption existed');
+   }else{
+    assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the reconciled board is published once, over the other device’s revision');
+    assert.ok(cloud.tasks.some(row=>row.title==='Newer local edit before adoption'),'the cloud also holds this device’s newer edit');
+    assert.ok(ctx.state.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'this board takes the other device’s task');
+    assert.equal(ctx.state.syncDirty,false);
+    assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+   }
+  }
+ });
+});
+
+// #2254 release review (B1): once adoption has downloaded a revision and found
+// that it decodes, it can never publish over it, and a published generation's
+// bytes never change. While a large board then waits, returning or
+// reconnecting must not download both cloud copies again on every visit, as
+// a phone does on each app switch: before adoption existed (9dc3d77) a waiting
+// board downloaded nothing. Retry sync still reads afresh and takes both
+// devices' work. A damaged revision whose own check failed for a reason the
+// bytes do not show proved nothing either way, so the next return checks it
+// again and adopts.
+test('RISK contained board adoption: after a failed read of a readable next revision makes a large board wait, returning or reconnecting downloads no cloud copy again and Retry sync takes both devices’ work, while a damaged revision whose own check failed for another reason is checked again and adopted',async t=>{
+ for(const variant of ['readable revision','damaged revision'])await t.test(variant,async sub=>{
+  const damaged=variant==='damaged revision';
+  const app=await readableElsewhereApp2254(sub,{large:true,damage:damaged?'altered':null}),{ctx,shim,backend,elsewhereId,storedChunkText,pushes}=app,revision=ctx.state.syncRev;
+  await newerEditBeforeAdoption2254(app);
+  // Readable: the pull's digest fails once. Damaged: the pull finds the
+  // damage, then adoption's own check of the bytes it downloaded fails once.
+  const seen=failDigestOf2254(sub,storedChunkText,{times:1,skip:damaged?1:0,error:operationError2254});
+  const pulls={count:0},pull=backend.CS.pull;
+  backend.CS.pull=async(...args)=>{pulls.count++;return pull(...args);};
+  sub.after(()=>{backend.CS.pull=pull;});
+  const downloads=()=>backend.network.filter(entry=>entry.endsWith('/chunks')).length;
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+  assert.equal(seen.failed,1,'fixture: one digest failed');
+  assert.deepEqual(pushes,[],'positive control: nothing is published on opening');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: the large board waits');
+  const opened=downloads();
+  assert.ok(opened>0,'positive control: the opening downloaded the cloud copies');
+  for(const type of damaged?['focus']:['focus','online']){
+   const before=pulls.count;
+   vm.runInContext('resumeCloudSync({type:'+JSON.stringify(type)+'})',ctx);
+   await fixtureDeadline(async wait=>{while(pulls.count===before||!adoptionIdle2254(ctx))await wait(10);},type+' settles',30000);
+   if(damaged)break;
+   // Behaviour under test: the waiting board reads the root, never the copies again.
+   assert.equal(downloads(),opened,'returning or reconnecting ('+type+') downloads no cloud copy again');
+   assert.deepEqual(pushes,[],'nothing is published after '+type);
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','the large board still waits after '+type);
+  }
+  if(damaged){
+   // Positive control: bytes whose check proved nothing are checked again, and no client can read them.
+   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'returning adopts this board once, over the damaged revision');
+   assert.equal(backend.docs.get('users/owner').previousGeneration,elsewhereId);
+   assert.equal(pushes[0].payload,ctx.cloudPayload());
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  }else{
+   // Retry sync reads afresh, finds the revision readable and keeps both devices' work.
+   await ctx.onAction('sync-retry',{});await adoptionSettle2254(ctx,'Retry sync settles');
+   assert.ok(downloads()>opened,'Retry sync downloads the cloud copy again');
+   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'Retry sync publishes once, over the other device’s revision');
+   const cloud=await currentCloudBoard2254(backend,ctx.window.ChainStorageV2);
+   for(const [what,match] of [['the other device’s task',row=>row.id===ELSEWHERE_TASK_2254],['this device’s newer edit',row=>row.title==='Newer local edit before adoption']]){
+    assert.ok(cloud.tasks.some(match),'the cloud holds '+what);assert.ok(ctx.state.tasks.some(match),'this board holds '+what);
+   }
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  }
+ });
+});
+
 // #2254 (owner rule, 2026-11-06): daily backups cover three calendar days, but
 // during a recovery hold, before the cloud has acknowledged a board, nothing
 // recovery may need is trimmed. While cloud recovery waits on an unreadable
@@ -6741,7 +6909,7 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
 
 // #2254 (owner decision of 2026-11-06): manual backups are never trimmed
 // automatically. From two of this account's manual backups, Settings shows a
-// short reminder beside Make manual backup that keeping more slows the app
+// short reminder below Make manual backup that keeping more slows the app
 // down. The button keeps working with no confirmation. The reminder is a
 // polite status only on the render where it first appears, so re-rendering
 // Settings does not announce it again.
@@ -7075,14 +7243,17 @@ test('RISK manual backup reminder guidance: mounted FAQ and changelog say that f
  const answer=answerTo('Why does Settings remind me about manual backups?');
  assert.match(answer,/Manual backups stay on this device until you delete them; they are never removed automatically\./);
  assert.match(answer,/keeping more than two slows the app down/);
- assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder beside Make manual backup\./);
+ // #2254 release review: the reminder renders below Make manual backup.
+ assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup\./);
  assert.match(answer,/Delete older ones you don’t need/);
  assert.match(answer,/Make manual backup still works, with no limit and no extra step\./);
  assert.match(answer,/Only manual backups of the account you are using count\./);
  assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.ok(release,'positive control: the mounted changelog has the November 6 release');
- assert.match(release,/<li>Settings → Data and backups now shows a reminder beside Make manual backup once this account has two or more manual backups: keeping more than two slows the app down, so delete older ones you don’t need\./);
+ assert.match(release,/<li>Settings → Data and backups now shows a reminder below Make manual backup once this account has two or more manual backups: keeping more than two slows the app down, so delete older ones you don’t need\./);
+ for(const [where,text] of [['manual backup answer',answer],['November 6 changelog',release]])
+  assert.doesNotMatch(text,/reminder beside Make manual backup/,where+': the reminder is not beside the button');
  assert.match(release,/Manual backups are never removed automatically, and Make manual backup still works with no extra step\.<\/li>/);
  for(const [question,text] of [['manual backup answer',answer],['November 6 changelog',release]])
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
@@ -7557,15 +7728,24 @@ test('RISK acknowledged recovery trim: an adoption the cloud acknowledges while 
  });
 });
 
-test('RISK acknowledged recovery trim guidance: mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies by itself, what it keeps, and that until then every recovery copy stays',async t=>{
+// #2254 release review (B3): the trim also clears the storage upgrade's copy
+// of the older backup list (an opaque "<n>:fvp:chain-scanner:daily-backups:v1"
+// row), as the owner authorized for "migrated legacy copies" on #2254
+// (2026-11-07). Settings, Help and the changelog say so in plain words.
+test('RISK acknowledged recovery trim guidance: Settings, mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
+ const section=settings.split('<h3>Daily local backups</h3>')[1]?.split('</p>')[0]||'';
+ assert.ok(section,'positive control: Settings has the Daily local backups notes');
+ assert.match(section,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
+ assert.doesNotMatch(section,/Separate recovery archives kept by a storage upgrade remain intact/,'Settings no longer says that copy stays');
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
  const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  assert.ok(answerTo('Does the app fix an unreadable cloud copy by itself?'),'positive control: the mounted Help has the adoption answer');
  const answer=answerTo('What happens to old recovery copies on this device?');
- assert.match(answer,/Once the cloud confirms your board, the app clears the copies earlier cloud recoveries kept by itself, so it stays fast and the recovery file stays small\./);
+ assert.match(answer,/Once the cloud confirms your board, the app clears the copies earlier cloud recoveries kept by itself, so it stays fast and the recovery file stays small\. It also clears the copy of the older backup list that a storage upgrade kept\./);
  assert.match(answer,/It keeps your board, the copy the cloud confirmed, every backup, and a short note naming any cloud copy it still could not read/);
  assert.match(answer,/those cloud copies stay protected in the cloud/);
  assert.match(answer,/Until the cloud confirms a board, every recovery copy stays on this device\./);
@@ -7573,7 +7753,7 @@ test('RISK acknowledged recovery trim guidance: mounted FAQ and changelog say th
  assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.ok(release,'positive control: the mounted changelog has the November 6 release');
- assert.match(release,/<li>Once the cloud confirms your board, the app now clears the copies earlier cloud recoveries kept on this device by itself\. This keeps the app fast and the recovery file small, and nothing needs your choice\./);
+ assert.match(release,/<li>Once the cloud confirms your board, the app now clears the copies earlier cloud recoveries kept on this device by itself\. It also clears the copy of the older backup list that a storage upgrade kept\. This keeps the app fast and the recovery file small, and nothing needs your choice\./);
  assert.match(release,/It keeps your board, the copy the cloud confirmed, every backup and a short note naming any cloud copy it still could not read\. Until the cloud confirms a board, every recovery copy stays\.<\/li>/);
  for(const [question,text] of [['old recovery copies answer',answer],['November 6 changelog',release]]){
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');

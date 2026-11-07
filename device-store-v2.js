@@ -19,6 +19,14 @@
   const hex=array=>Array.from(new Uint8Array(array),value=>value.toString(16).padStart(2,"0")).join("");
   const digest=async value=>hex(await root.crypto.subtle.digest("SHA-256",value instanceof Uint8Array?value:bytes(value)));
   const hashPayload=async payload=>digest(bytes(payload));
+  // #2254 release review (B1): the rejections decodeSnapshot raises because the
+  // chunks it was given do not match the header that describes them (a chunk
+  // missing, out of place or altered, or a length or hash that differs). Only
+  // these say something about the bytes. Anything else it can reject with,
+  // such as a digest the browser could not compute, says nothing about them.
+  const corruptSnapshots=new WeakSet();
+  const corruptSnapshot=message=>{const error=new Error(message);corruptSnapshots.add(error);return error;};
+  const isCorruptSnapshotError=error=>corruptSnapshots.has(error);
 
   async function encodeSnapshot(payload,{targetBytes=DEFAULT_TARGET_BYTES}={}){
     if(typeof payload!=="string") throw new TypeError("Snapshot payload must be a string");
@@ -45,17 +53,17 @@
   async function decodeSnapshot(header,providedChunks){
     if(!header||header.schemaVersion!==SCHEMA_VERSION||header.encoding!=="utf8") throw new Error("Unknown snapshot encoding");
     const chunks=Array.isArray(providedChunks)?providedChunks:[];
-    if(!Number.isSafeInteger(header.chunkCount)||header.chunkCount<1||chunks.length!==header.chunkCount)
-      throw new Error("Snapshot chunk count mismatch");
+    if(!Number.isSafeInteger(header.chunkCount)||header.chunkCount<1)throw new Error("Snapshot chunk count mismatch");
+    if(chunks.length!==header.chunkCount)throw corruptSnapshot("Snapshot chunk count mismatch");
     let payload="",total=0;
     for(let index=0;index<chunks.length;index++){
       const chunk=chunks[index];
-      if(!chunk||chunk.index!==index||typeof chunk.text!=="string") throw new Error("Snapshot chunk order is corrupt");
+      if(!chunk||chunk.index!==index||typeof chunk.text!=="string") throw corruptSnapshot("Snapshot chunk order is corrupt");
       const data=bytes(chunk.text),actualHash=await digest(data);
-      if(data.length!==chunk.byteLength||actualHash!==chunk.hash) throw new Error("Snapshot chunk hash or length mismatch");
+      if(data.length!==chunk.byteLength||actualHash!==chunk.hash) throw corruptSnapshot("Snapshot chunk hash or length mismatch");
       total+=data.length;payload+=chunk.text;
     }
-    if(total!==header.byteLength||await digest(bytes(payload))!==header.hash) throw new Error("Snapshot hash or length mismatch");
+    if(total!==header.byteLength||await digest(bytes(payload))!==header.hash) throw corruptSnapshot("Snapshot hash or length mismatch");
     return payload;
   }
 
@@ -875,5 +883,5 @@
     return api;
   }
 
-  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,createDeviceStore};
+  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore};
 })(globalThis);
