@@ -6309,16 +6309,8 @@ async function exactAcknowledgedCloudSource(failed,account){
   if(failed?.code!=="corrupt-generation"||!liveBoardAccepted||!deviceStorageAuthority||
     !deviceStore?.protectRecoverySource||typeof backend?.readRecoverySource!=="function"||
     state.syncAccount!=null&&state.syncAccount!==account)return null;
-  // #2265: the person chose Use my board from before recovery for this
-  // unreadable root. Its toast and Help say cloud saving stays paused and the
-  // app does not upload the board by itself, and Retry sync keeps the choice,
-  // as contained adoption and the automatic recovery default already do.
-  // Rebuilding here would publish it on an ordinary reconnect. The record is
-  // only read: a changed root, a healthy read or another account still forgets
-  // it where it did before.
-  const declined=readDeclinedAutomaticCloudRecovery();
-  if(declined?.v===1&&declined.account===account&&declined.identity===cloudAccountIdentity()&&
-    declined.rev===failed.rev&&declined.generationId===failed.generationId)return null;
+  // #2265: a root the person declined never reaches this rebuild; cloudPull's
+  // dispatch records it as a completed refusal first.
   supportDiagnosticsCheckIdentity();const diagnosticContext=supportDiagnosticsIdentityContext;
   const hasAcknowledgedCopy=validDecisionBase(base,account,state.syncRev);
   supportDiagnosticsObserveRecovery("exactAcknowledgedCopy","available",hasAcknowledgedCopy,"observed",backend,diagnosticContext);
@@ -6585,8 +6577,7 @@ async function containedDeviceBoardAdoption(failed,{account,backend,identity,pul
   // #2254 review (S4): the person chose Use my board from before recovery for
   // this unreadable root, which keeps cloud saving paused, as its toast and
   // Help say; Retry sync keeps that choice too. Nothing is published by itself.
-  const declined=readDeclinedAutomaticCloudRecovery();
-  if(declined?.v===1&&declined.account===account&&declined.identity===identity&&declined.rev===failed.rev&&declined.generationId===failed.generationId)return null;
+  if(automaticCloudRecoveryDeclinedFor(account,identity,failed))return null;
   // Still the same account, identity and acknowledged copy, with no recovery
   // or restore of this board under way. Newer local edits keep the proof: the
   // board is still built on the same acknowledged copy.
@@ -6954,7 +6945,13 @@ async function cloudPull(){
       // or refusal this device remembers. Whoever saved the unreadable
       // generation, no client can read it (the owner's decision of 2026-11-06:
       // cut our losses). Without that proof nothing changes here.
-      const adoption=remote.code==="corrupt-generation"?
+      // #2265, #2268 review: the person chose Use my board from before
+      // recovery for this exact unreadable root. Its toast and Help say cloud
+      // saving stays paused and nothing is uploaded by itself, so neither
+      // adoption nor the exact rebuild runs, and the choice is recorded below
+      // as the completed refusal it is.
+      const declined=remote.code==="corrupt-generation"&&automaticCloudRecoveryDeclinedFor(acct,pullIdentity,remote);
+      const adoption=remote.code==="corrupt-generation"&&!declined?
         await containedDeviceBoardAdoption(remote,{account:acct,backend:pullBackend,identity:pullIdentity,pullStillCurrent,deliberate}):null;
       if(!pullStillCurrent())return;
       if(adoption){
@@ -6988,9 +6985,22 @@ async function cloudPull(){
         // about the source, so the device record stays; the next pull still
         // re-checks it against a freshly read root and the held board.
         if(remote.code)forgetProvedUnreadableCloudSource();
-        const exact=await exactAcknowledgedCloudSource(remote,acct);
+        const exact=declined?null:await exactAcknowledgedCloudSource(remote,acct);
         if(exact){remote=exact;rebuildingCloudSource=true;rebuildContext=exact.automaticRecovery;}
-        else{
+        else if(declined){
+          // Without the write hold and the remembered refusal, every
+          // reconnect downloaded and decoded the whole unreadable generation
+          // again and every edit's save started another full read. The hold
+          // names no hash: no edit can make this board the declined source,
+          // so only a changed root, a healthy read or Retry sync reads it again.
+          const base=state?.decisionBase;
+          const hold=unrepairableCloudSource={backend:pullBackend,account:acct,identity:pullIdentity,
+            revision:state.syncRev,baseId:base?.id,payload:base?.payload,hash:null,byteLength:null};
+          recoveryOutcome={refused:{rev:remote.rev,generationId:remote.generationId}};
+          if(Number.isSafeInteger(remote.rev)&&pullStillCurrent())
+            await rememberProvedUnreadableCloudSource(provedUnreadableCloudSource={backend:pullBackend,account:acct,identity:pullIdentity,
+              rev:remote.rev,generationId:remote.generationId,hold});
+        }else{
           const outcome=recoveryOutcome={};
           if(await openAutomaticCloudSourceFallback(remote,{account:acct,backend:pullBackend,identity:pullIdentity,pullStillCurrent,outcome,deliberate}))return;
           // Remember only a completed refusal: a timeout, network or
@@ -13189,10 +13199,22 @@ function readDeclinedAutomaticCloudRecovery(){
   try{const raw=localStorage.getItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY);return raw&&raw.length<=2048?JSON.parse(raw):null;}catch{return null;}
 }
 function forgetDeclinedAutomaticCloudRecovery(){try{localStorage.removeItem(DECLINED_AUTOMATIC_CLOUD_RECOVERY_KEY);}catch{}}
+// The one match of a remembered decline against an unreadable root: the same
+// account, identity, server revision and generation. It only reads, so the
+// adoption check and cloudPull's dispatch can ask it without forgetting
+// anything; automaticCloudRecoveryDeclined below forgets a record that no
+// longer matches.
+function declinedAutomaticCloudRecoveryMatches(record,account,identity,failed){
+  return record?.v===1&&record.account===account&&record.identity===identity&&
+    record.rev===failed?.rev&&record.generationId===failed?.generationId;
+}
+function automaticCloudRecoveryDeclinedFor(account,identity,failed){
+  return declinedAutomaticCloudRecoveryMatches(readDeclinedAutomaticCloudRecovery(),account,identity,failed);
+}
 function automaticCloudRecoveryDeclined(account,identity,failed){
   const record=readDeclinedAutomaticCloudRecovery();
   if(!record)return false;
-  if(record.v===1&&record.account===account&&record.identity===identity&&record.rev===failed?.rev&&record.generationId===failed?.generationId)return true;
+  if(declinedAutomaticCloudRecoveryMatches(record,account,identity,failed))return true;
   // Another root or account: the earlier choice no longer describes it.
   forgetDeclinedAutomaticCloudRecovery();return false;
 }

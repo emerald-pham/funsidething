@@ -6483,6 +6483,59 @@ test('RISK exact acknowledged cloud source: after the person chooses Use my boar
  }
 });
 
+// #2268 review (finding 1): the same exact-copy device as the #2265 test,
+// after the person chose Use my board from before recovery. Answers the app,
+// its backend and the unreadable generation's chunk path, with cloud writes and
+// device storage working again and nothing read or published yet.
+async function declinedExactCopy2268(t){
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+ const protect=store.protectRecoverySource;let refusing=true;
+ store.protectRecoverySource=async function(...args){if(refusing&&args[0]?.key?.startsWith('cloud-generation-recovery:'))return false;return protect.apply(this,args);};
+ t.after(()=>{store.protectRecoverySource=protect;});
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ refusing=false;
+ t.after(faithfulModalQuery2194(shim));
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ const button=declineButton2194();
+ shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ assert.equal(shim.document.getElementById('toast').textContent,'Your earlier board is back. Cloud saving stays paused.','positive control: the decline succeeded');
+ delete app.faults.push;ctx.closeModal();
+ const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};
+ t.after(()=>{backend.CS.push=push;});
+ const settle=async message=>{await adoptionSettle2254(ctx,message);await fixtureDeadline(async wait=>{await wait(20);while(!idle())await wait(10);},message,30000);};
+ return {...app,idle,settle,pushes,unreadableChunks:'server:users/owner/generations/'+originalRoot.activeGeneration+'/chunks'};
+}
+
+// #2268 review (finding 1): #2265 kept the exact rebuild from publishing over
+// the person's Use my board from before recovery, but it returned before the
+// rebuild's completed check recorded the write hold, so the declined root was
+// never remembered as a completed refusal. Each reconnect then downloaded and
+// decoded the whole unreadable generation again, and each edit's save started
+// another full cloud read. Once one read has found the declined root again,
+// later reconnects and saves read only the root, as for any other refusal.
+test('RISK exact acknowledged cloud source: after the person chooses Use my board from before recovery, later saves and reconnects do not download the unreadable generation again and still publish nothing',async t=>{
+ const app=await declinedExactCopy2268(t),{ctx,shim,backend,originalRoot,pushes,settle,unreadableChunks}=app;
+ const downloads=()=>backend.network.filter(entry=>entry===unreadableChunks).length;
+ shim.window.dispatchEvent({type:'online'});await settle('the first reconnect after the decline settles');
+ const afterFirstRead=downloads();
+ assert.ok(afterFirstRead>=1,'positive control: the first read after the decline finds the unreadable generation again');
+ for(const step of ['an edit is saved','a reconnect','another edit is saved','another reconnect']){
+  if(step.endsWith('saved')){
+   shim.document.getElementById('addInput').value='Kept on this device: '+step;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+   vm.runInContext('clearTimeout(cloudTimer);cloudTimer=null',ctx);await ctx.sendPush();
+  }else shim.window.dispatchEvent({type:'online'});
+  await settle(step+' settles');
+  // Behaviour under test: the declined root is a completed refusal, so neither saves nor reconnects download it again.
+  assert.equal(downloads(),afterFirstRead,'the unreadable generation is not downloaded again after '+step);
+  assert.deepEqual(pushes,[],'nothing is published after '+step);
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the cloud stays at the unreadable revision after '+step);
+  assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ synced','the status never says synced after '+step);
+ }
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Kept on this device: another edit is saved'),'the edits stay on this device');
+});
+
 // #2254 release review (B1, specialist): the pull reports a decode that failed
 // without a code as an unreadable generation, so a digest the browser could
 // not compute once (a DOMException), a RangeError under memory pressure or a
