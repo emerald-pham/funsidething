@@ -6279,6 +6279,109 @@ test('RISK contained board adoption: after the person chooses Use my board from 
  assert.equal(toastText,'Your earlier board is back. Cloud saving stays paused.');
 });
 
+// #2254 release review (B1, specialist): the pull reports a decode that failed
+// without a code as an unreadable generation, so a digest the browser could
+// not compute once (a DOMException), a RangeError under memory pressure or a
+// chunk read that threw without a code all reach adoption as one. Here another
+// device publishes a readable next revision over this device's acknowledged
+// copy, so containment holds, and this device's first read or digest of it
+// fails. The owner accepted losing only work in a copy no client can read, so
+// adoption may publish only when the bytes it downloaded fail the codec's own
+// checks again. Otherwise the board recovers as it did before adoption existed
+// (9dc3d77): a large board waits, and a board within budget reconciles both
+// devices' work. The same revision with a damaged or missing chunk, which no
+// client can read, still adopts.
+const ELSEWHERE_TASK_2254='saved-on-another-device-2254';
+async function readableElsewhereApp2254(t,{large,damage=null}){
+ const app=await damagedAcknowledgedApp187(t),{ctx,backend,activeSource}=app,generations='users/owner/generations/';
+ // The generation this device acknowledged is complete again.
+ for(const chunk of activeSource.chunks)backend.docs.set(generations+activeSource.id+'/chunks/'+String(chunk.index).padStart(8,'0'),structuredClone(chunk));
+ // Another device publishes the next revision over that copy, with one more task.
+ const other=JSON.parse(ctx.state.decisionBase.payload);
+ other.tasks.push({...other.tasks[0],id:ELSEWHERE_TASK_2254,title:'Saved on another device'});
+ const elsewhereId=await publishElsewhere2254(backend,ctx.window.ChainStorageV2,JSON.stringify(other)),elsewherePath=generations+elsewhereId;
+ const chunkKey=elsewherePath+'/chunks/00000000';
+ assert.equal(backend.docs.get(elsewherePath).chunkCount,1,'fixture: the other device’s revision is one chunk');
+ if(damage==='altered'){const chunk=backend.docs.get(chunkKey);backend.docs.set(chunkKey,{...chunk,text:chunk.text.replace('Saved on another device','Saved on another devicX')});}
+ if(damage==='missing')backend.docs.delete(chunkKey);
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=large?1:64*1048576;
+ const pushes=[],push=backend.CS.push;
+ backend.CS.push=async(payload,updatedAt,baseRev,context)=>{pushes.push({payload,baseRev});return push(payload,updatedAt,baseRev,context);};
+ t.after(()=>{backend.CS.push=push;});
+ return {...app,elsewhereId,elsewherePath,storedChunkText:backend.docs.get(chunkKey)?.text??null,pushes};
+}
+// The browser cannot compute a digest of this text: after `skip` digests of it
+// go through, the next `times` throw.
+function failDigestOf2254(t,text,{times=1,skip=0,error}){
+ const subtle=webcrypto.subtle,own=Object.getOwnPropertyDescriptor(subtle,'digest'),digest=subtle.digest,seen={matched:0,failed:0};
+ subtle.digest=async function(algorithm,data,...rest){
+  if(data&&seen.failed<times&&new TextDecoder().decode(data)===text&&++seen.matched>skip){seen.failed++;throw error();}
+  return digest.call(this,algorithm,data,...rest);
+ };
+ t.after(()=>{if(own)Object.defineProperty(subtle,'digest',own);else delete subtle.digest;});
+ return seen;
+}
+async function currentCloudBoard2254(backend,codec){
+ const root=backend.docs.get('users/owner'),path='users/owner/generations/'+root.activeGeneration;
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ return JSON.parse(await codec.decodeSnapshot(backend.docs.get(path),chunks));
+}
+const operationError2254=()=>new DOMException('The operation failed for an operation-specific reason','OperationError');
+test('RISK contained board adoption: when one read or digest of a readable next revision another device published over the acknowledged copy fails, nothing is published over that device’s work: a large board waits, a board within budget keeps both devices’ work, and the same revision with a damaged or missing chunk still adopts',async t=>{
+ const failures={
+  'a digest the browser could not compute once':{times:1,error:operationError2254},
+  'a range error once while hashing':{times:1,error:()=>new RangeError('Array buffer allocation failed')},
+  'a chunk read that threw without a code once':{read:true},
+  'a digest that failed in the pull and again in adoption’s own check':{times:2,error:operationError2254},
+ };
+ const variants=[...Object.keys(failures).flatMap(kind=>[[kind,true],[kind,false]]),['a damaged chunk',true],['a missing chunk',true]];
+ for(const [kind,large] of variants)await t.test(kind+(large?', large board':', board within budget'),async sub=>{
+  const damage={'a damaged chunk':'altered','a missing chunk':'missing'}[kind]??null,failure=failures[kind]??null;
+  const app=await readableElsewhereApp2254(sub,{large,damage}),{ctx,shim,backend,faults,elsewhereId,elsewherePath,storedChunkText,pushes}=app;
+  const store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2,revision=ctx.state.syncRev;
+  await newerEditBeforeAdoption2254(app);
+  const before=JSON.stringify(ctx.state),elsewhereBefore=generationDocs2254(backend,elsewherePath);
+  let seen={failed:0};
+  if(failure?.read){
+   faults.serverRead=async readPath=>{if(!seen.failed&&readPath===elsewherePath+'/chunks'){seen.failed++;throw Error('read failed without a code');}};
+   sub.after(()=>{delete faults.serverRead;});
+  }else if(failure)seen=failDigestOf2254(sub,storedChunkText,failure);
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+  // Positive control: the opening reached adoption, which proved the
+  // generation before this revision is the acknowledged copy.
+  assertHeadersOnlyRecord2254(await unreadableRecords2254(store,elsewhereId),{unreadableId:elsewhereId,acknowledgedId:app.activeSource.id},'the opening');
+  const root=backend.docs.get('users/owner');
+  if(damage){
+   // Positive control: no client can read this revision, so this board is published once over it.
+   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'this board is published once, over the unreadable revision');
+   assert.deepEqual([root.rev,root.previousGeneration],[revision+2,elsewhereId],'the unreadable revision is the previous one, not replaced');
+   assert.equal(pushes[0].payload,ctx.cloudPayload(),'the cloud holds exactly this device’s board');
+   assert.equal(generationDocs2254(backend,elsewherePath),elsewhereBefore,'the unreadable revision stays untouched');
+   assert.ok(backend.docs.get('users/owner/recoveryProtections/'+elsewhereId),'and protected in the cloud');
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+   return;
+  }
+  // Behaviour under test: nothing is published over the other device's work.
+  for(const row of pushes)assert.ok(row.payload.includes(ELSEWHERE_TASK_2254),'every publication keeps the other device’s task');
+  assert.equal(seen.failed,failure.times??1,'fixture: the read or digest failed as intended');
+  const cloud=await currentCloudBoard2254(backend,codec);
+  assert.ok(cloud.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'the cloud keeps the other device’s task');
+  if(large){
+   assert.deepEqual(pushes,[],'a large board publishes nothing');
+   assert.deepEqual([root.rev,root.activeGeneration],[revision+1,elsewhereId],'the cloud stays at the other device’s revision');
+   assert.equal(generationDocs2254(backend,elsewherePath),elsewhereBefore,'which stays untouched');
+   assert.equal(JSON.stringify(ctx.state),before,'the board stays exactly as it was');
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','a large board waits, as before adoption existed');
+  }else{
+   assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the reconciled board is published once, over the other device’s revision');
+   assert.ok(cloud.tasks.some(row=>row.title==='Newer local edit before adoption'),'the cloud also holds this device’s newer edit');
+   assert.ok(ctx.state.tasks.some(row=>row.id===ELSEWHERE_TASK_2254),'this board takes the other device’s task');
+   assert.equal(ctx.state.syncDirty,false);
+   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  }
+ });
+});
+
 // #2254 (owner rule, 2026-11-06): daily backups cover three calendar days, but
 // during a recovery hold, before the cloud has acknowledged a board, nothing
 // recovery may need is trimmed. While cloud recovery waits on an unreadable

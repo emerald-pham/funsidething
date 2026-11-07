@@ -6395,6 +6395,24 @@ function generationContentHeader(header){
   return header&&typeof header==="object"?{schemaVersion:header.schemaVersion,encoding:header.encoding,chunkCount:header.chunkCount,
     byteLength:header.byteLength,hash:header.hash,baseRev:header.baseRev}:null;
 }
+// #2254 release review (B1): the pull reports any read or decode failure
+// without a code as an unreadable generation, so a digest the browser could
+// not compute once, memory pressure, or a chunk read that threw without a code
+// all reach adoption that way, even over another device's readable save. Adoption
+// replaces that generation, so it goes on only when the bytes it downloaded
+// itself are "unreadable": a supported, published header whose chunks the
+// codec finds missing, out of place or altered. Bytes that decode are
+// "readable"; anything else (another failure, an unsupported or unpublished
+// header) is "unproved". Either way the recovery that existed before adoption
+// decides: a large board waits, and one within budget reconciles what it reads.
+async function downloadedGenerationCheck(row){
+  const header=row?.header;
+  if(!header||header.schemaVersion!==2||header.encoding!=="utf8"||!["sealed","published"].includes(header.state)||
+    !Number.isSafeInteger(header.chunkCount)||header.chunkCount<1||!Number.isSafeInteger(header.byteLength)||header.byteLength<0||
+    !/^[a-f0-9]{64}$/.test(header.hash||"")||!Array.isArray(row.chunks))return "unproved";
+  try{await ChainStorageV2.decodeSnapshot(header,row.chunks);return "readable";}
+  catch(error){return ChainStorageV2.isCorruptSnapshotError?.(error)===true?"unreadable":"unproved";}
+}
 // #2254 review (S2): the crash mark the owner asked for on #2239. An adoption
 // run is marked in device storage, and the mark read back, before its first
 // full source read. A run that reaches an outcome it can see (published,
@@ -6567,6 +6585,10 @@ async function containedDeviceBoardAdoption(failed,{account,backend,identity,pul
     const source=await backend.readRecoverySource({});
     const sameRoot=["schemaVersion","rev","activeGeneration","previousGeneration"].every(key=>source?.manifest?.[key]===manifest[key]);
     if(!current()||source?.identity!==identity||source.epoch!==evidence.epoch||!sameRoot)return null;
+    // B1: the unreadable generation is proved again from the bytes just
+    // downloaded, never from the pull's answer alone.
+    const checked=await downloadedGenerationCheck(source.generations?.find?.(row=>row?.id===manifest.activeGeneration));
+    if(checked!=="unreadable"||!current())return null;
     const protection=await backend.protectRecoverySources({source:{...source,epoch:evidence.epoch},expectedRevision:manifest.rev,stillCurrent:current});
     if(!protection?.ok||!current())return null;
     // Checked again just before the root changes: the same account, identity
