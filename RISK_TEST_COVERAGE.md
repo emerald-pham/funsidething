@@ -26,6 +26,8 @@ its RISK test; the map follows.
 - RISK large board recovery wait guidance: mounted FAQ and changelog explain that cloud recovery of a large board waits, what stays protected, and that Retry sync or signing in again runs it
 - RISK large board recovery wait guidance: mounted FAQ and changelog explain that after Retry sync a large board saves to the cloud and rechecks earlier copies only when Retry sync runs again
 - RISK large board deliberate recovery guidance: mounted FAQ and changelog explain that a large board still waits for Retry sync, that recovery reads and checks each saved copy less often, and that a Retry sync run that stops waits again
+- RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the copy before the unreadable one is the copy it last confirmed, whoever saved the unreadable copy, that work saved only there cannot be recovered, that a large board otherwise waits, and that the board from before recovery keeps cloud saving paused
+- RISK large board recovery guidance: no mounted changelog item or FAQ answer says a large board recovers from an older cloud copy without saying it can wait for Retry sync
 - RISK cloud generation recovery guidance: mounted FAQ and the November 4 changelog explain that the board shows and takes input before cloud recovery starts
 - RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources
 - RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals
@@ -59,6 +61,8 @@ its RISK test; the map follows.
 - RISK cloud source recovery automatic fallback: one complete older source opens and stays local until cloud is confirmed
 - RISK cloud source recovery automatic union: accepted device and supported previous cloud additions both survive
 - RISK cloud source recovery automatic union: a valid nonmatching acknowledged copy contributes supported work
+- RISK cloud source recovery automatic union: an intact earlier generation byte-identical to the acknowledged copy is reconciled once, as that copy, and stays archived and resolved
+- RISK cloud source recovery automatic union: the cloud-source archive keeps the accepted board once when the saved head and the acknowledged copy are that board own, and the decline still restores it
 - RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers
 - RISK cloud source recovery automatic union: a supported durable device head contributes work absent from accepted live state
 - RISK cloud source recovery automatic union: disjoint settings and opaque fields survive across accepted device and previous cloud sources
@@ -413,6 +417,7 @@ its RISK test; the map follows.
 - RISK CLOUD ADOPTION: held newer read cannot release a pending write from an earlier reconcile
 - RISK CLOUD ADOPTION: a board-store quota failure restores both browser keys and holds the cloud
 - RISK CLOUD ADOPTION: failed write rollback preserves another tab newer browser bytes
+- RISK contained board adoption: the app opens in a host whose crypto lacks getRandomValues, and two such pages still tell an earlier page’s adoption mark from their own
 - RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable
 - RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately
 - RISK deletion authority: Undo of Clear history restores only its task and History row with original completion facts
@@ -680,6 +685,7 @@ its RISK test; the map follows.
 - RISK CLOUD LOOP: repeated revision conflicts cannot spin even when every read succeeds
 - RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture
 - RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks
+- RISK DEVICE STORAGE V2: reading the saved head reads its own snapshot by key, and still finds one kept under another key
 - RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
 - RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
@@ -866,6 +872,9 @@ its RISK test; the map follows.
 - RISK device current-head guard: stale heads non-synchronous approvals and queued peers cannot authorize legacy retirement
 - RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is saved and completion Undo manual restore and offline reload retain facts
 - RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear
+- RISK daily backup retention: a successful save keeps this account’s daily backups for three calendar days and other automatic copies for seven, and never trims manual, promoted or pinned copies or a board copy another backup still uses
+- RISK daily backup retention scope: a save trims only this account’s daily backups to three calendar days, on this device and in the older backup list, while another account’s daily backups and those saved before daily backups named an account keep seven
+- RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted
 - RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering
 - RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections
 - RISK fresh Halving default: new clients use Halving while legacy normalization and saved choices survive
@@ -1430,6 +1439,7 @@ its RISK test; the map follows.
 - RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit
 - RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit
 - RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
+- RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within a regression ceiling over opening it locally, publishing it and keeping every decision, draft and newer edit, and reports its peak against the pending 200 MiB target, in Chromium and WebKit
 - RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible
 - RISK recovery fixture shutdown: a failed real source observation stops its own polling and exits
@@ -1494,6 +1504,37 @@ its RISK test; the map follows.
 - RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair
 - RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes
 - RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused
+- RISK contained board adoption: when the generation before the unreadable one is exactly this device’s acknowledged copy, a large board publishes itself once as the next revision whoever saved the unreadable generation, keeping it protected, untouched and named by a headers-only device record after later saves
+- RISK contained board adoption: when the generation before the unreadable one is not proved to be this device’s acknowledged copy, or this device’s pending upload may hold work this board lacks, nothing is published, a large board still waits, and a proved earlier generation keeps the unreadable one named by a headers-only record
+- RISK contained board adoption: a device that remembers a recovery wait adopts its board when it reconnects once containment is proven, whoever saved the unreadable generation, and a conflicting write keeps the newer revision another device published
+- RISK contained board adoption: an adoption upload cut off inside the real push by a network drop, the push deadline or an app switch resumes or replaces only its own staged upload on a later attempt, and publishes once over the unreadable revision
+- RISK contained board adoption: after adoption, showing, focusing or reconnecting the app reads no whole device store, and a remembered over-budget mark stays
+- RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts
+- RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
+- RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
+- RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused
+- RISK contained board adoption: when one read or digest of a readable next revision another device published over the acknowledged copy fails, nothing is published over that device’s work: a large board waits, a board within budget keeps both devices’ work, and the same revision with a damaged or missing chunk still adopts
+- RISK contained board adoption: after a failed read of a readable next revision makes a large board wait, returning or reconnecting downloads no cloud copy again and Retry sync takes both devices’ work, while a damaged revision whose own check failed for another reason is checked again and adopted
+- RISK daily backup retention hold: while cloud recovery waits on an unreadable copy or holds an older copy, saves keep daily backups for seven calendar days, and once the cloud confirms a board the next save trims them to three
+- RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit
+- RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it
+- RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders
+- RISK manual backup reminder: only this account’s manual backups count toward the reminder
+- RISK manual backup reminder: the reminder counts this account’s manual backups without parsing their boards on any Settings render
+- RISK manual backup reminder: manual backups saved before they named an account are read at most once across Settings renders and still count only for their own account
+- RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step
+- RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit
+- RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works
+- RISK acknowledged recovery trim: nothing is trimmed while a later recovery waits on an unreadable copy, holds an older copy or saves without cloud confirmation, and the first acknowledged save after the cloud confirms trims
+- RISK acknowledged recovery trim: after an adoption the cloud confirms, the device clears the recovery archives and the migrated older backup list and keeps the board, the acknowledged copy, every backup, the older browser pair, headers-only records and a note naming what the earlier-source check still reports
+- RISK acknowledged recovery trim: the trim deletes by key in bounded batches without reading the whole store or a large archive, and a page closed mid-trim finishes on the next opening without the cloud
+- RISK acknowledged recovery trim: another account’s recovery archives, notes, records and receipts stay byte for byte while this account’s are cleared
+- RISK acknowledged recovery trim store guard: the device store deletes only the keys a saved plan names, by key and in bounded batches, never while a recovery hold exists, on another head or account, or a row the device keeps, and a recovery that commits drops an unfinished plan
+- RISK acknowledged recovery trim: after the trim the earlier-source check reads no whole store and answers from the note, and saving, sync, Restore and the saved-decisions review after a relaunch still work
+- RISK acknowledged recovery trim: the recovery file holds only what the device keeps after the trim
+- RISK acknowledged recovery trim: a note the trim kept still lets the check of earlier sources reconcile that generation once it can be read, and the trim after its acknowledgement clears the note
+- RISK acknowledged recovery trim: an adoption the cloud acknowledges while the app opens is trimmed without a further save, once the check of earlier sources has run or when a phone over its work budget leaves that check for a deliberate run
+- RISK acknowledged recovery trim guidance: Settings, mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays
 
 ## tests/repository-process.test.js
 
@@ -1641,6 +1682,9 @@ its RISK test; the map follows.
 - RISK recovery read-backs: a deliberate run reads each recovery archive back once after writing it, and publication and its push check archives by key rather than reading every archive again
 - RISK recovery device capture: a deliberate run reads the device sources in full once, and its later checks during the cloud read compare their fingerprint
 - RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation
+- RISK recovery summary: after publication lists the archives once, the check of earlier sources reads the recovery summaries and checks the large archives by key instead of reading them again
+- RISK automatic recovery summary: a committed recovery’s summary keeps generation ids, headers and chunk indexes without chunk text, the check of earlier sources still finds incomplete generations from it, and a summary saved with chunk text still reads the same
+- RISK recovery guard checks: a deliberate run serializes the live board once for each guard check rather than once per comparison inside it
 - RISK corrupt cloud work budget: a transient pull failure keeps the completed refusal and the next pull over the unchanged root downloads nothing
 - RISK corrupt cloud work budget: an interrupted recovery check is not remembered and the next opening checks again
 - RISK cloud generation recovery: an unfinished draft survives reconciliation and Undo reverses only the action undone

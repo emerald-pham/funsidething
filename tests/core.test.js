@@ -52,6 +52,7 @@ import {
   settleRecovery188, recoveryReleasedArtifacts188, settleRecoveryOperations188,
   retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
 } from "./shared.js";
+import { rewriteGenerationFixture } from "./shared.js";
 
 test('RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text',async t=>{
  const cases=[
@@ -359,6 +360,71 @@ test('RISK large board deliberate recovery guidance: mounted FAQ and changelog e
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(release,/<li>Cloud recovery of a large board reads, encodes and checks each saved copy less often, so Retry sync rebuilds it with less memory\. A large board still waits for Retry sync\./,'the mounted changelog includes the released behavior');
  assert.match(release,/If a Retry sync run stops before it finishes, cloud recovery waits again; opening or returning to the app does not start it over\./);
+});
+// #2254 (owner decision): when the unreadable cloud copy is this device's own
+// last save, made on the copy it last confirmed, the app publishes this board
+// by itself. Help says so, says what stays protected, says a large board
+// otherwise waits, and never sends anyone to another device to recover.
+// #2254 (owner decision, 2026-11-06, superseding review S1): "if the broken
+// parts of the save are unrecoverable, we need to cut our losses." The app
+// does so whoever saved the unreadable copy, and Help says plainly that work
+// saved only in that copy, from any device, cannot be recovered.
+// #2254 review (S4): choosing the board from before recovery keeps cloud saving
+// paused, adoption included, and the recovery-waiting answer names the
+// exception. Every Help answer keeps the 130-word limit, and none sends anyone
+// to a desktop or another computer: people have only their phone.
+test('RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the copy before the unreadable one is the copy it last confirmed, whoever saved the unreadable copy, that work saved only there cannot be recovered, that a large board otherwise waits, and that the board from before recovery keeps cloud saving paused',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ const answer=answerTo('Does the app fix an unreadable cloud copy by itself?');
+ assert.match(answer,/When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app saves this device’s board as the new cloud copy by itself/);
+ assert.match(answer,/even while it says “recovery waiting”/);
+ assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud, and this device keeps a note naming it\./);
+ assert.match(answer,/The app also waits after you choose Use my board from before recovery\./);
+ // #2254 re-review: a run the page did not finish leaves its mark, so the
+ // next opening waits until Retry sync instead of starting it again.
+ // #2254 release review: only a page that closed mid-run leaves that mark,
+ // and later openings then skip this, so a large board waits for Retry sync
+ // (a smaller one recovers as usual). A dropped connection, the push deadline
+ // or an app switch clears the mark, and the staged upload finishes at the
+ // next check.
+ assert.match(answer,/If the copy before it differs, an unconfirmed save here may hold work the board lacks, or the app closed during this, a large board waits for Retry sync\./,
+  'the answer says a large board waits for Retry sync after the app closed mid-run');
+ assert.match(answer,/Losing connection or switching apps only pauses this\./,'the answer says a dropped connection or an app switch only pauses it');
+ assert.doesNotMatch(answer,/If a run is interrupted, the next opening waits for Retry sync/,'no interruption makes every next opening wait');
+ assert.ok(wordsOf(answer)<=130,'the adoption answer stays within the 130-word limit: '+wordsOf(answer));
+ assert.doesNotMatch(answer,/own last save|confirmation never arrived|another device may have saved/,'adoption no longer depends on who saved the unreadable copy');
+ const back=answerTo('Can I go back to my board from before recovery?');
+ assert.match(back,/Afterwards your board saves on this device, cloud saving stays paused, both cloud copies stay protected and the app does not upload this board by itself\./);
+ const waiting=answerTo('Why does the cloud button say “recovery waiting”?');
+ assert.match(waiting,/If the copy before the unreadable one is the one this device last confirmed, the app saves your board by itself\./);
+ assert.doesNotMatch(waiting,/own unconfirmed save/);
+ const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
+ assert.ok(answers.length>100,'positive control: the mounted Help has its answers');
+ assert.deepEqual(answers.filter(row=>wordsOf(row.text)>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/<li>When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app now saves this device’s board as the new cloud copy by itself, at the cost of an ordinary save/);
+ assert.match(release,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud\./);
+ assert.match(release,/If the copy before it differs, a large board still waits for Retry sync\./);
+ assert.doesNotMatch(release,/own last save|another device may have saved/,'the changelog no longer says adoption needs this device’s own save');
+ assert.match(release,/does this the next time it opens, returns or reconnects, unless you chose Use my board from before recovery\./);
+ for(const {question,text} of [...answers,{question:'November 6 changelog',text:release.replace(/<[^>]+>/g,' ')}])
+  assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
+});
+// #2239 round 2 (owner decision): a large board can wait for Retry sync, so no
+// changelog item or FAQ answer may describe a large board recovering from an
+// older or earlier cloud copy without saying that it can wait.
+test('RISK large board recovery guidance: no mounted changelog item or FAQ answer says a large board recovers from an older cloud copy without saying it can wait for Retry sync',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const entries=[...markup.matchAll(/<li>([\s\S]*?)<\/li>|<dd>([\s\S]*?)<\/dd>/g)].map(match=>(match[1]??match[2]).replace(/<[^>]+>/g,''));
+ assert.ok(entries.some(text=>/large board/i.test(text)&&/older (complete )?(cloud )?copy/i.test(text)),'the mounted Help includes large-board recovery entries');
+ const promises=entries.filter(text=>/large (board|one)/i.test(text)&&/(older|earlier) (complete )?(cloud )?copy/i.test(text)&&!/Retry sync|wait/i.test(text));
+ assert.deepEqual(promises,[],'each mention of a large board recovering from an older cloud copy says it can wait for Retry sync');
 });
 
 // #2226 (spec #2224) review: the board shows and takes input before cloud
@@ -1202,6 +1268,91 @@ test('RISK cloud source recovery automatic union: a valid nonmatching acknowledg
  assert.ok(sourceArchive.alternativesToPreserve.some(row=>row.key==='cloud-acknowledged:'+base.id),
   'the adopted result keeps the acknowledged source in its protected alternatives');
  assert.equal(JSON.stringify(backend.docs.get('users/owner')),rootBefore,'local recovery does not claim cloud acknowledgement');
+});
+
+// #2239 round 2 (direction d): the owner's device acknowledged the intact
+// earlier generation, so that generation's bytes are exactly the acknowledged
+// copy the device already carries. Recovery reconciles the acknowledged copy
+// once, with its shared base, instead of parsing, checking and comparing the
+// same board a second time as a cloud generation; the generation stays
+// archived byte for byte and is resolved by the cloud's confirmation like any
+// reconciled source.
+test('RISK cloud source recovery automatic union: an intact earlier generation byte-identical to the acknowledged copy is reconciled once, as that copy, and stays archived and resolved',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+ const base=ctx.state.decisionBase,acknowledged=base.payload;
+ assert.equal(ctx.validDecisionBase(base,ctx.state.syncAccount,ctx.state.syncRev),true,'fixture: the device keeps a verified acknowledged copy');
+ // The intact earlier generation holds exactly the bytes this device
+ // acknowledged, and the unreadable current generation declares some other
+ // source, so the acknowledged copy cannot simply repair it.
+ const previousPath='users/owner/generations/'+originalRoot.previousGeneration,activePath='users/owner/generations/'+originalRoot.activeGeneration;
+ await rewriteGenerationFixture(backend,previousPath,codec,()=>acknowledged);
+ const other=JSON.parse(acknowledged);other.futureUnreadableActiveFixture={opaque:'unreadable current source'};
+ const otherEncoded=await codec.encodeSnapshot(JSON.stringify(other));
+ backend.docs.set(activePath,{...backend.docs.get(activePath),hash:otherEncoded.hash,byteLength:otherEncoded.byteLength,chunkCount:otherEncoded.chunkCount});
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation','fixture: the current generation is unreadable');
+ shim.document.getElementById('addInput').value='Newer local edit before reconciliation';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const before=JSON.parse(JSON.stringify(ctx.state));
+ const validate=ctx.cloudSourceRecoveryBoard;let acknowledgedChecks=0;
+ ctx.cloudSourceRecoveryBoard=function(raw,...rest){if(raw===acknowledged)acknowledgedChecks++;return validate.call(this,raw,...rest);};
+ t.after(()=>{ctx.cloudSourceRecoveryBoard=validate;});
+ refuseNextRecoveryTransaction255(app.faults);
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ ctx.cloudSourceRecoveryBoard=validate;
+ const hold=await store.getRecoveryCloudHold();
+ assert.equal(hold?.automaticRecovery,true,'positive control: the automatic recovery default adopted a board');
+ for(const task of before.tasks)assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.tasks.find(row=>row.id===task.id)??null)),task,'every accepted task, including the newer edit, survives unchanged');
+ for(const key of ['decisionEvents','decisionBaseline','workLog','chain','deletedTaskIds','clearedHistoryIds'])
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.state[key]??null)),before[key]??null,'every accepted board decision survives: '+key);
+ // Behaviour under test: the acknowledged bytes are checked as a board once.
+ assert.equal(acknowledgedChecks,1,'the earlier generation byte-identical to the acknowledged copy is reconciled once, as that copy');
+ const archives=await store.listOpaqueArchives(),envelope=JSON.parse(archives.find(row=>row.key===hold.originalKey).raw);
+ const source=JSON.parse(archives.find(row=>row.key===envelope.sourceArchiveKeys[0]).raw);
+ const previousRef=source.candidateSources.find(row=>row.key==='cloud-generation:'+originalRoot.previousGeneration);
+ assert.equal(previousRef?.sameAs,'cloud-acknowledged:'+base.id,'the archive records that the generation was reconciled as the acknowledged copy');
+ assert.ok(source.candidateSources.some(row=>row.key==='cloud-acknowledged:'+base.id),'the acknowledged copy itself is a reconciled source');
+ const archivedPrevious=source.generations.find(row=>row.id===originalRoot.previousGeneration);
+ assert.equal(await codec.decodeSnapshot(archivedPrevious.header,archivedPrevious.chunks),acknowledged,'the earlier generation stays archived byte for byte');
+ assert.equal(source.acceptedDeviceBoard,JSON.stringify(before),'the accepted device board stays archived byte for byte');
+ // The cloud's confirmation resolves the generation like any reconciled source.
+ await ctx.sendPush();
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: publication released the hold');
+ const acks=(await store.listOpaqueArchives()).filter(row=>row.key.startsWith('automatic-recovery-ack:')).map(row=>JSON.parse(row.raw));
+ assert.ok(acks.some(ack=>ack.resolvedGenerationIds.includes(originalRoot.previousGeneration)),'the acknowledgement resolves the earlier generation');
+});
+
+// #2239 round 2 (direction b): the cloud-source archive kept the accepted
+// board three more times when the saved head was that board (as the head, and
+// inside the head's record) and when the acknowledged copy was its own (that
+// copy sits inside the board). Each now names the field that holds the same
+// text, so the board is archived once; a different saved head is still kept in
+// full. Use my board from before recovery still restores the exact board.
+test('RISK cloud source recovery automatic union: the cloud-source archive keeps the accepted board once when the saved head and the acknowledged copy are that board own, and the decline still restores it',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+ const activePath='users/owner/generations/'+originalRoot.activeGeneration,other=JSON.parse(ctx.state.decisionBase.payload);
+ other.futureUnreadableActiveFixture={opaque:'unreadable current source'};
+ const otherEncoded=await codec.encodeSnapshot(JSON.stringify(other));
+ backend.docs.set(activePath,{...backend.docs.get(activePath),hash:otherEncoded.hash,byteLength:otherEncoded.byteLength,chunkCount:otherEncoded.chunkCount});
+ shim.document.getElementById('addInput').value='Newer local edit before reconciliation';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const before=JSON.stringify(ctx.state),savedHead=await store.readHead();
+ assert.equal(savedHead.payload,before,'fixture: the saved head is the accepted board');
+ refuseNextRecoveryTransaction255(app.faults);
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ const hold=await store.getRecoveryCloudHold();
+ assert.equal(hold?.automaticRecovery,true,'positive control: the automatic recovery default adopted a board');
+ const archives=await store.listOpaqueArchives(),envelope=JSON.parse(archives.find(row=>row.key===hold.originalKey).raw);
+ const source=JSON.parse(archives.find(row=>row.key===envelope.sourceArchiveKeys[0]).raw);
+ assert.equal(source.acceptedDeviceBoard,before,'the accepted board is archived byte for byte');
+ assert.deepEqual(source.deviceHead,{sameAs:'acceptedDeviceBoard'},'the saved head names the accepted board instead of repeating it');
+ assert.equal(source.deviceHeadRecord?.sameAs,'acceptedDeviceBoard','the saved head record names the accepted board for its payload');
+ const {payload:ignored,...headMeta}=savedHead;
+ assert.equal(JSON.stringify(source.deviceHeadRecord.record),JSON.stringify(ctx.encodeManualArchiveValue(headMeta,'device head authority')),'the rest of the saved head record stays exact');
+ assert.deepEqual(source.acknowledgedDecisionBase,{sameAs:'acceptedDeviceBoard.decisionBase',id:JSON.parse(before).decisionBase.id},'the acknowledged copy names the copy inside the accepted board');
+ const sourceRaw=archives.find(row=>row.key===envelope.sourceArchiveKeys[0]).raw,boardText=JSON.stringify(before);
+ assert.equal(sourceRaw.split(boardText).length-1,1,'the cloud-source archive holds the accepted board text once');
+ // The decline restores the exact accepted board from the archive.
+ ctx.openSettings();assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'Use my board from before recovery succeeds');
+ assert.equal(JSON.stringify(ctx.state),before,'the board from before recovery is restored exactly');
+ assert.equal((await store.readHead()).payload,before);
 });
 
 test('RISK cloud source recovery automatic union: a foreign-UID browser sibling is excluded while safe same-UID work recovers',async t=>{
@@ -14956,6 +15107,21 @@ test('RESTORE INTENT: two tabs at the same clock tick mint distinct task and ope
   assert.notEqual(first.ctx.state.restoredTaskOps[a.id][0],second.ctx.state.restoredTaskOps[b.id][0]);
 });
 
+// #2254 review round: the adoption crash mark's page id was drawn from
+// crypto.getRandomValues while the script started, so a host without it could
+// not open the app at all. The id is drawn by the app's own id helper when a
+// run is first marked, and two such pages still tell their marks apart.
+test('RISK contained board adoption: the app opens in a host whose crypto lacks getRandomValues, and two such pages still tell an earlier page’s adoption mark from their own',async t=>{
+ const storage=sharedScannerStorage();
+ const first=await loadApp({seed:1,sharedStorage:storage,cryptoProvider:{randomUUID:()=>'33333333-3333-4333-8333-333333333333'}});t.after(()=>first.dispose());
+ const second=await loadApp({seed:1,sharedStorage:storage,cryptoProvider:{randomUUID:()=>'44444444-4444-4444-8444-444444444444'}});t.after(()=>second.dispose());
+ assert.ok(first.ctx.state&&second.ctx.state,'both pages open');
+ const failed={rev:7,generationId:'generation-unreadable'};
+ assert.equal(vm.runInContext('markContainedAdoptionRun',first.ctx)('e@example.com','owner',failed),true,'the first page marks its run and reads the mark back');
+ assert.equal(vm.runInContext('containedAdoptionInterrupted',first.ctx)('e@example.com','owner',failed),false,'its own mark does not hold the first page');
+ assert.equal(vm.runInContext('containedAdoptionInterrupted',second.ctx)('e@example.com','owner',failed),true,'the second page sees an earlier page’s run');
+});
+
 test('RESTORE INTENT: reopening a completed task survives a later unrelated cloud write', async () => {
   const {ctx}=await loadApp();
   const old=syncTask('same','Same'); old.done=true; old.completedAt=1000; old.lastDoneAt=1000;
@@ -15355,7 +15521,11 @@ test('LOCAL BACKUPS: seven local calendar days, latest save today, and pre-resto
   let entries = ctx.readLocalBackups();
   assert.deepEqual(Array.from(new Set(entries.map(entry => entry.day))).sort(),
     ['2026-09-02','2026-09-03','2026-09-04','2026-09-05','2026-09-06','2026-09-07','2026-09-08']);
-  const day3 = entries.find(entry => entry.day === '2026-09-03' && entry.kind === 'daily');
+  // #2254 (owner rule): daily backups cover three local calendar days; the
+  // other automatic copies, such as each day's latest save, keep seven.
+  assert.deepEqual(Array.from(new Set(entries.filter(entry => entry.kind === 'daily').map(entry => entry.day))).sort(),
+    ['2026-09-06','2026-09-07','2026-09-08']);
+  const day3 = entries.find(entry => entry.day === '2026-09-03' && entry.kind === 'latest');
   ctx.openSettings();
   assert.match(shim.document.getElementById('modalRoot').innerHTML, /Daily local backups/);
   assert.match(shim.document.getElementById('modalRoot').innerHTML, /seven calendar days/);
@@ -25649,6 +25819,39 @@ test('RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips throu
  await assert.rejects(storageV2.decodeSnapshot(encoded,tampered),/hash|length|corrupt/i,'a damaged generation never becomes a board');
 });
 
+// #2239 round 2: a recovery reads the saved head many times, and each read
+// fetched every saved snapshot (the head and each backup, each a whole board)
+// to find the head's own. The head's snapshot is stored under its hash, so it
+// is read by that key; a snapshot kept under any other key is still found by
+// searching them all, in the same transaction, as before.
+test('RISK DEVICE STORAGE V2: reading the saved head reads its own snapshot by key, and still finds one kept under another key',async t=>{
+ const {indexedDB,IDBObjectStore}=await import('fake-indexeddb');
+ const storageV2=loadStorageV2({indexedDB}),dbName='chain-scanner-head-read-'+Date.now()+'-'+Math.random();
+ const store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName});await store.open();t.after(()=>store.close());
+ const board=label=>JSON.stringify({tasks:[{id:label,title:'Board '+label+' '+'x'.repeat(5000)}]});
+ assert.equal((await store.migrateLegacy({headPayload:board('first'),backups:[{id:'daily-a',day:'2026-11-01',at:1,kind:'daily',payload:board('backup-a')},
+  {id:'daily-b',day:'2026-11-02',at:2,kind:'daily',payload:board('backup-b')}]})).ok,true);
+ const latest=board('latest'),prior=await store.readHead();
+ assert.equal((await store.commitHead({expectedHash:prior.hash,payload:latest,account:null})).ok,true);
+ // Count whole-store snapshot reads while the head is read.
+ const getAll=IDBObjectStore.prototype.getAll;let snapshotScans=0;
+ IDBObjectStore.prototype.getAll=function(...args){if(this.name==='snapshots')snapshotScans++;return getAll.apply(this,args);};
+ t.after(()=>{IDBObjectStore.prototype.getAll=getAll;});
+ const head=await store.readHead();
+ IDBObjectStore.prototype.getAll=getAll;
+ assert.equal(head.payload,latest,'the saved head reads back exactly');
+ assert.equal(snapshotScans,0,'the head is read without reading every saved snapshot');
+ // A head snapshot kept under another key (no writer stores one that way) is
+ // still found, exactly, by the search over every snapshot.
+ const moved=await new Promise((resolve,reject)=>{const request=indexedDB.open(dbName);request.onerror=()=>reject(request.error);request.onsuccess=()=>{
+  const db=request.result,tx=db.transaction('snapshots','readwrite'),snapshots=tx.objectStore('snapshots');
+  snapshots.delete(head.hash);snapshots.put({hash:head.hash,payload:latest},'moved-'+head.hash);
+  tx.oncomplete=()=>{db.close();resolve(true);};tx.onerror=()=>reject(tx.error);};});
+ assert.equal(moved,true);
+ const found=await store.readHead();
+ assert.equal(found.payload,latest,'a head snapshot under another key is still found');assert.equal(found.hash,head.hash);
+});
+
 test('RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes',async()=>{
  const {indexedDB}=await import('fake-indexeddb');
  const storageV2=loadStorageV2({indexedDB});
@@ -29842,8 +30045,118 @@ test('RISK legacy automatic expiry FAQ: save rotation permanently removes expire
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Automatic backups cover today and the previous six local dates/);assert.match(help,/older automatic entries.*successful save/);assert.match(help,/Manual and protected recovery copies remain/i);assert.match(help,/opening Settings does not delete it/i);assert.match(help,/more than seven days old/);
  assert.match(help,/removed after a successful save, without Undo/);assert.match(help,/protected recovery copies remain until you delete/);
- ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);assert.match(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);
+ // #2254 release review (B3): the acknowledged trim (owner authorization on
+ // #2254, 2026-11-07, "migrated legacy copies") clears the storage upgrade's
+ // copy of the older backup list once the cloud confirms the board, so
+ // Settings no longer says that copy remains intact.
+ assert.match(settings,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
+ assert.doesNotMatch(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
+});
+
+// #2254 (owner rule, 2026-11-06): "only 3 autosaves", which the owner
+// clarified meant the daily backups. A successful save keeps this account's
+// daily backups for today and the two calendar days before it, instead of
+// seven; every other automatic copy keeps seven, and manual, promoted and
+// pinned copies stay until they are deleted. Removing a daily backup's row
+// never removes a board copy another backup or the board still uses: the head
+// commit retires only snapshots nothing references.
+test('RISK daily backup retention: a successful save keeps this account’s daily backups for three calendar days and other automatic copies for seven, and never trims manual, promoted or pinned copies or a board copy another backup still uses',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-daily-retention-'+Date.now()+'-'+Math.random();
+ const raw=JSON.stringify(syncState({tasks:[syncTask('daily-retention','Daily retention board')]}));
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),at=day=>+new Date(2026,9,day,12);
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName,beforeStateReady:ctx=>setFakeTime(ctx,at(1))});
+ const store=shim.window.ScannerDeviceStore;
+ try{
+  assert.equal(ctx.deviceStorageActive(),true,'fixture: the device store holds the board');
+  const dailyOf=async day=>(await store.listBackups()).find(row=>row.kind==='daily'&&row.day===ctx.backupDay(at(day)));
+  const kept={};
+  for(let day=1;day<=8;day++){
+   setFakeTime(ctx,at(day));ctx.addTask('Day '+day);assert.equal(await ctx.persist(),true,'day '+day+' saves');
+   if(day===1){
+    // A manual backup and an automatic cloud-adoption copy of the same board
+    // share the daily backup's board copy.
+    kept.daily1=await dailyOf(1);
+    kept.manual=await ctx.saveDurableBackup('manual',kept.daily1.payload);
+    kept.adoption1=await ctx.saveDurableBackup('before-cloud-adoption',kept.daily1.payload);
+   }
+   if(day===2){
+    // The app's existing promotion keeps an automatic copy as a displaced-edit copy.
+    kept.promoted=await dailyOf(2);
+    assert.equal(await ctx.reclassifyDurableCloudRecoveryBackup(kept.promoted.id,kept.promoted.payload,'before-cloud-local-edit'),true,'fixture: the daily backup is promoted');
+    kept.adoption2=await ctx.saveDurableBackup('before-cloud-adoption',kept.promoted.payload);
+   }
+   if(day===3){
+    // The board pins this daily backup, as a cloud adoption pins its safety copy.
+    kept.pinned=await dailyOf(3);ctx.state.protectedBackupIds=[kept.pinned.id];
+   }
+  }
+  for(const name of ['daily1','manual','adoption1','promoted','adoption2','pinned'])assert.ok(kept[name]?.id,'fixture: '+name+' was saved');
+  assert.equal(kept.manual.payload,kept.daily1.payload,'fixture: the manual backup and the first daily backup share one board copy');
+  const rows=await store.listBackups(),ids=rows.map(row=>row.id);
+  const dailyDays=[...rows.filter(row=>row.kind==='daily'&&row.id!==kept.pinned.id).map(row=>row.day)].sort();
+  // Behaviour under test: this account's daily backups cover today and the two days before it.
+  assert.deepEqual(dailyDays,[6,7,8].map(day=>ctx.backupDay(at(day))),'daily backups cover three calendar days');
+  // Other automatic copies keep seven calendar days.
+  assert.equal(ids.includes(kept.adoption1.id),false,'positive control: an automatic copy from eight days ago is retired');
+  assert.equal(ids.includes(kept.adoption2.id),true,'an automatic copy from seven calendar days ago stays');
+  // Manual, promoted and pinned copies stay, and so does the board copy they share.
+  assert.equal(rows.find(row=>row.id===kept.manual.id)?.payload,kept.daily1.payload,'the manual backup stays restorable after the daily backup that shared its copy is trimmed');
+  assert.equal(ids.includes(kept.daily1.id),false,'positive control: the first daily backup is trimmed');
+  assert.equal(rows.find(row=>row.id===kept.promoted.id)?.kind,'before-cloud-local-edit','the promoted copy stays');
+  assert.equal(ids.includes(kept.pinned.id),true,'the pinned daily backup stays while the board pins it');
+  assert.deepEqual([...rows.filter(row=>row.kind==='latest').map(row=>row.day)],[ctx.backupDay(at(8))],'one latest copy, today');
+  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the board itself is the saved head');
+ }finally{await store.close();}
+});
+
+// #2254 (owner rule): trimming stays with the account whose board a daily
+// backup copies, and never reads a board copy to find out. A daily backup
+// names that account when it is saved; one that names another account, or
+// was saved before daily backups named one, keeps the seven-day rule, on the
+// device and in the older backup list alike.
+test('RISK daily backup retention scope: a save trims only this account’s daily backups to three calendar days, on this device and in the older backup list, while another account’s daily backups and those saved before daily backups named an account keep seven',async()=>{
+ const f=await privateLegacyExpiryFixture({makeRows:row=>[
+  row('private-own-trimmed','daily','2026-10-04',{account:null}),row('private-own-kept','daily','2026-10-05',{account:null}),
+  row('private-other-account','daily','2026-10-04',{account:'another-account@example.test'}),row('private-unnamed','daily','2026-10-04'),
+  row('private-expired','daily',PRIVATE_EXPIRY_OLD)]});try{
+  assert.equal(f.ctx.state.syncAccount??null,null,'fixture: the board is signed out, so its daily backups name no account');
+  assert.equal(await privateExpirySave(f),true);
+  const legacy=privateExpiryLegacyRows(f).map(row=>row.id),durable=(await f.store.listBackups()).map(row=>row.id);
+  for(const [where,ids] of [['the older backup list',legacy],['this device',durable]]){
+   // Behaviour under test: this account's daily backup from three days before yesterday is trimmed.
+   assert.equal(ids.includes('private-own-trimmed'),false,where+': this account’s daily backup outside three calendar days is trimmed');
+   for(const id of ['private-own-kept','private-other-account','private-unnamed'])assert.equal(ids.includes(id),true,where+': '+id+' stays');
+   assert.equal(ids.includes('private-expired'),false,where+': positive control: the seven-day rule still retires older copies');
+  }
+  await privateExpiryAssertCurrentBoard(f);
+ }finally{await f.store.close();}
+});
+
+// #2254 (owner rule): Settings, Help and the November 6 changelog say what
+// the rule keeps. Every Help answer keeps the 130-word limit.
+test('RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
+ const section=settings.split('<h3>Daily local backups</h3>')[1]?.split('</p>')[0]||'';
+ assert.match(section,/Daily copies stay on this device for today and the two calendar days before it, so at most three; other automatic copies stay for up to seven calendar days/);
+ assert.match(section,/While cloud recovery waits or holds your board, before the cloud confirms it, daily copies keep the seven days\./);
+ assert.match(section,/Daily copies saved before this update, or holding another account’s board, also keep seven days\./);
+ assert.match(section,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
+ assert.doesNotMatch(section,/Automatic copies stay on this device for up to seven calendar days/);
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const backups=markup.split('<dt>How do backups and Restore work?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(backups,/Automatic backups cover today and the previous six local dates, daily backups only the previous two;/);
+ assert.match(backups,/Manual and protected recovery copies remain until you delete them\./);
+ const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
+ assert.deepEqual(answers.filter(row=>row.text.split(/\s+/).filter(Boolean).length>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(release,/<li>Daily backups now cover today and the two calendar days before it, so at most three stay on this device instead of seven days of them\./);
+ assert.match(release,/Other automatic copies still stay up to seven days, and manual backups and every copy the app keeps until you delete it/);
+ assert.match(release,/While cloud recovery waits or holds your board, daily backups keep seven days until the cloud confirms it\./);
+ for(const text of [section,backups,release.replace(/<[^>]+>/g,' ')])assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i);
 });
 
 
