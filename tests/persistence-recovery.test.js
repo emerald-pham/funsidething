@@ -6861,6 +6861,56 @@ test('RISK daily backup retention hold sign-out: signing out while cloud recover
  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the board itself is the saved head');
 });
 
+// #2268 review: a device whose cloud recovery waits on an unreadable
+// generation, as in the #2264 (B) test.
+async function waitingRecovery2268(t){
+ const app=await containedAdoptionApp2254(t),{ctx,shim,backend,acknowledgedPath}=app,codec=ctx.window.ChainStorageV2;
+ const base=JSON.stringify(ctx.state.decisionBase);
+ await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not yet'};return JSON.stringify(board);});
+ await newerEditBeforeAdoption2254(app);
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the waiting opening settles');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: cloud recovery waits');
+ // Makes the generation before the unreadable one this device's copy again.
+ const restoreEarlier=()=>rewriteGenerationFixture(backend,acknowledgedPath,codec,()=>JSON.parse(base).payload);
+ return {...app,account:ctx.state.syncAccount??null,restoreEarlier};
+}
+// Saves this account's daily backups from six to three days before today on
+// the device, then makes one ordinary save. Answers the ones that save removed.
+async function dailyBackupsTrimmedBySave2268(ctx,shim,account,title){
+ const store=ctx.window.ScannerDeviceStore;
+ const dayBefore=days=>vm.runInContext('(()=>{const at=new Date(Date.now());at.setHours(12,0,0,0);at.setDate(at.getDate()-'+days+');return backupDay(+at);})()',ctx);
+ const head=await store.readHead(),earlier=[];
+ for(const days of [6,5,4,3]){
+  const backup={id:'daily:held-2268-'+days+'-'+Math.random(),day:dayBefore(days),at:Date.now()-days*86400000,kind:'daily',payload:head.payload,account};
+  assert.equal((await store.putBackup({expectedHash:head.hash,backup}))?.ok,true,'fixture: the daily backup from '+days+' days ago is saved');
+  earlier.push(backup.id);
+ }
+ await ctx.refreshDeviceBackupCache();
+ shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true,'fixture: the save succeeds');
+ const kept=(await store.listBackups()).map(row=>row.id);
+ return earlier.filter(id=>!kept.includes(id));
+}
+
+// #2268 review (finding 13): the #2264 (B) test never reloaded between the
+// sign-out and the trimming save, so a hold kept only in memory passed it, and
+// it never read a hold record that cannot be parsed, which must still hold:
+// losing a daily backup cannot be undone. Here the app is relaunched signed
+// out before the save, with the record as saved and with it unreadable.
+test('RISK daily backup retention hold sign-out: after signing out while cloud recovery waits, the app relaunched signed out keeps this account’s daily backups for seven calendar days, also when the remembered hold cannot be read',async t=>{
+ for(const record of ['as saved','unreadable'])await t.test('the hold record '+record,async sub=>{
+  const app=await waitingRecovery2268(sub),{ctx,shim,backend,account}=app;
+  backend.emitAuth(null);await flush();await adoptionSettle2254(ctx,'the sign-out settles');
+  if(record==='unreadable')shim.localStorage.setItem('fvp:chain-scanner:daily-backup-recovery-hold','{"v":1,"account":');
+  await closeLegacyApp173(app);backend.CS.suspend();
+  const cold=await coldRelaunch2198(sub,app,[],{signIn:false});
+  cold.backend.emitAuth(null);await flush();await cold.settle('the signed-out relaunch settles');
+  assert.equal(cold.ctx.state.syncAccount??null,account,'fixture: the relaunched board still belongs to the same account');
+  // Behaviour under test: the relaunched app keeps the seven-day hold.
+  assert.deepEqual(await dailyBackupsTrimmedBySave2268(cold.ctx,cold.shim,account,'Saved after relaunching signed out'),[],
+   'daily backups keep seven calendar days after a signed-out relaunch');
+ });
+});
+
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
 // adoption has to cost no more there than an ordinary cloud save. The store is
 // built on a served build with the app's own writers: the large signed-in
