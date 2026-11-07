@@ -13576,6 +13576,11 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK acknowledged recovery trim guidance: mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies by itself, what it keeps, and that until then every recovery copy stays",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

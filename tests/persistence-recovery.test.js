@@ -7176,3 +7176,27 @@ test('RISK acknowledged recovery trim: a note the trim kept still lets the check
  assert.deepEqual(after.opaque.filter(row=>trimLeftover2254(row.key)||row.key.startsWith('automatic-recovery-note:')).map(row=>row.key),[],
   'the next trim clears the merge’s own archives and the resolved note');
 });
+
+test('RISK acknowledged recovery trim guidance: mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies by itself, what it keeps, and that until then every recovery copy stays',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ assert.ok(answerTo('Does the app fix an unreadable cloud copy by itself?'),'positive control: the mounted Help has the adoption answer');
+ const answer=answerTo('What happens to old recovery copies on this device?');
+ assert.match(answer,/Once the cloud confirms your board, the app clears the copies earlier cloud recoveries kept by itself, so it stays fast and the recovery file stays small\./);
+ assert.match(answer,/It keeps your board, the copy the cloud confirmed, every backup, and a short note naming any cloud copy it still could not read/);
+ assert.match(answer,/those cloud copies stay protected in the cloud/);
+ assert.match(answer,/Until the cloud confirms a board, every recovery copy stays on this device\./);
+ assert.match(answer,/Nothing needs your choice\./);
+ assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(release,'positive control: the mounted changelog has the November 6 release');
+ assert.match(release,/<li>Once the cloud confirms your board, the app now clears the copies earlier cloud recoveries kept on this device by itself\. This keeps the app fast and the recovery file small, and nothing needs your choice\./);
+ assert.match(release,/It keeps your board, the copy the cloud confirmed, every backup and a short note naming any cloud copy it still could not read\. Until the cloud confirms a board, every recovery copy stays\.<\/li>/);
+ for(const [question,text] of [['old recovery copies answer',answer],['November 6 changelog',release]]){
+  assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
+  assert.doesNotMatch(text,/recovers on its own|rebuilds on its own|on its own, once/,question+': no wording the guidance tests retired');
+ }
+});
