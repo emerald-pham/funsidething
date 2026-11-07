@@ -383,11 +383,18 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  assert.match(answer,/When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app saves this device’s board as the new cloud copy by itself/);
  assert.match(answer,/even while it says “recovery waiting”/);
  assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud, and this device keeps a note naming it\./);
- assert.match(answer,/If the copy before it differs, or an unconfirmed save here may hold work the board lacks, a large board waits for Retry sync\./);
  assert.match(answer,/The app also waits after you choose Use my board from before recovery\./);
  // #2254 re-review: a run the page did not finish leaves its mark, so the
  // next opening waits until Retry sync instead of starting it again.
- assert.match(answer,/If a run is interrupted, the next opening waits for Retry sync\./,'the answer says an interrupted run waits for Retry sync on the next opening');
+ // #2254 release review: only a page that closed mid-run leaves that mark,
+ // and later openings then skip this, so a large board waits for Retry sync
+ // (a smaller one recovers as usual). A dropped connection, the push deadline
+ // or an app switch clears the mark, and the staged upload finishes at the
+ // next check.
+ assert.match(answer,/If the copy before it differs, an unconfirmed save here may hold work the board lacks, or the app closed during this, a large board waits for Retry sync\./,
+  'the answer says a large board waits for Retry sync after the app closed mid-run');
+ assert.match(answer,/Losing connection or switching apps only pauses this\./,'the answer says a dropped connection or an app switch only pauses it');
+ assert.doesNotMatch(answer,/If a run is interrupted, the next opening waits for Retry sync/,'no interruption makes every next opening wait');
  assert.ok(wordsOf(answer)<=130,'the adoption answer stays within the 130-word limit: '+wordsOf(answer));
  assert.doesNotMatch(answer,/own last save|confirmation never arrived|another device may have saved/,'adoption no longer depends on who saved the unreadable copy');
  const back=answerTo('Can I go back to my board from before recovery?');
@@ -30038,7 +30045,13 @@ test('RISK legacy automatic expiry FAQ: save rotation permanently removes expire
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Automatic backups cover today and the previous six local dates/);assert.match(help,/older automatic entries.*successful save/);assert.match(help,/Manual and protected recovery copies remain/i);assert.match(help,/opening Settings does not delete it/i);assert.match(help,/more than seven days old/);
  assert.match(help,/removed after a successful save, without Undo/);assert.match(help,/protected recovery copies remain until you delete/);
- ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);assert.match(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);
+ // #2254 release review (B3): the acknowledged trim (owner authorization on
+ // #2254, 2026-11-07, "migrated legacy copies") clears the storage upgrade's
+ // copy of the older backup list once the cloud confirms the board, so
+ // Settings no longer says that copy remains intact.
+ assert.match(settings,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
+ assert.doesNotMatch(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
 });
 
