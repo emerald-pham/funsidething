@@ -1513,6 +1513,7 @@ its RISK test; the map follows.
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
 - RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused
+- RISK exact acknowledged cloud source: after the person chooses Use my board from before recovery, a reconnect or Retry sync does not rebuild and publish the exact copy by itself and cloud saving stays paused
 - RISK daily backup retention hold: while cloud recovery waits on an unreadable copy or holds an older copy, saves keep daily backups for seven calendar days, and once the cloud confirms a board the next save trims them to three
 - RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit
 - RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it

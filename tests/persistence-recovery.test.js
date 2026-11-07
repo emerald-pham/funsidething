@@ -6279,6 +6279,56 @@ test('RISK contained board adoption: after the person chooses Use my board from 
  assert.equal(toastText,'Your earlier board is back. Cloud saving stays paused.');
 });
 
+// #2265 (found by the #2261 audit): the exact-acknowledged-cloud-source path
+// republishes an unreadable generation whose bytes are this device's
+// acknowledged copy. Adoption and the automatic recovery default both keep the
+// person's Use my board from before recovery; this path must keep it too, or
+// an ordinary reconnect publishes the board and shows synced after a toast
+// that said cloud saving stays paused.
+test('RISK exact acknowledged cloud source: after the person chooses Use my board from before recovery, a reconnect or Retry sync does not rebuild and publish the exact copy by itself and cloud saving stays paused',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+ const declineKey='fvp:chain-scanner:declined-automatic-cloud-recovery';
+ assert.equal(ctx.state.syncRev,originalRoot.rev,'fixture: this device acknowledged the generation that is now unreadable');
+ // On this opening the exact path cannot archive its source (device storage
+ // refuses that write), so the same pull opens the automatic recovery
+ // default instead, and that default's publication is refused.
+ const protect=store.protectRecoverySource;let refusedExact=0,refusing=true;
+ store.protectRecoverySource=async function(...args){if(refusing&&args[0]?.key?.startsWith('cloud-generation-recovery:')){refusedExact++;return false;}return protect.apply(this,args);};
+ t.after(()=>{store.protectRecoverySource=protect;});
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ refusing=false;
+ assert.ok(refusedExact>=1,'fixture: the exact path’s archive write was refused on that opening');
+ // The person chooses Use my board from before recovery in open Settings.
+ t.after(faithfulModalQuery2194(shim));
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ const button=declineButton2194();
+ shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ assert.equal(shim.document.getElementById('toast').textContent,'Your earlier board is back. Cloud saving stays paused.','positive control: the decline succeeded');
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: the decline released the older copy');
+ assert.ok(ctx.localStorage.getItem(declineKey),'positive control: the choice is remembered');
+ const before=JSON.stringify(ctx.state);
+ // Cloud writes and device storage work again. Every condition the exact path
+ // needs now holds: the unreadable generation's bytes are this device's
+ // acknowledged copy.
+ delete app.faults.push;ctx.closeModal();
+ const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};
+ t.after(()=>{backend.CS.push=push;});
+ const cloudBefore=JSON.stringify([...backend.docs].filter(([key])=>!key.startsWith('users/owner/recoveryProtections/')));
+ for(const attempt of ['reconnect','Retry sync']){
+  if(attempt==='reconnect')shim.window.dispatchEvent({type:'online'});else await ctx.onAction('sync-retry',{});
+  await adoptionSettle2254(ctx,attempt+' settles');
+  await fixtureDeadline(async wait=>{await wait(20);while(!idle())await wait(10);},attempt+' settles',30000);
+  assert.deepEqual(pushes,[],'nothing is published after '+attempt);
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the cloud stays at the unreadable revision after '+attempt);
+  assert.equal(JSON.stringify([...backend.docs].filter(([key])=>!key.startsWith('users/owner/recoveryProtections/'))),cloudBefore,'no cloud generation changes after '+attempt);
+  assert.equal(JSON.stringify(ctx.state),before,'the board from before recovery stays after '+attempt);
+  assert.ok(ctx.localStorage.getItem(declineKey),'the choice is kept after '+attempt);
+  assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ synced','the status never says synced after '+attempt);
+ }
+});
+
 // #2254 (owner rule, 2026-11-06): daily backups cover three calendar days, but
 // during a recovery hold, before the cloud has acknowledged a board, nothing
 // recovery may need is trimmed. While cloud recovery waits on an unreadable
