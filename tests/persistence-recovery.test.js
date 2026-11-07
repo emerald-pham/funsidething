@@ -6136,6 +6136,65 @@ test('RISK contained board adoption: an upload whose reply was lost and that a l
  });
 });
 
+// #2266 scenario B. Device D, confirmed at a revision, saves an edit, and the
+// save is cut off after its upload was staged and before it was published.
+// Device E then saves the next revision, which loses its chunks. When D's
+// board is still exactly what that upload staged, publishing the board loses
+// nothing the upload held, so D publishes it over the unreadable revision.
+// When the board has changed since, the record's hash cannot say what the
+// staged upload holds, which may be work the board lacks, so D keeps waiting
+// and publishes nothing.
+test('RISK contained board adoption: an upload of exactly this board that was cut off before it published does not stop the device publishing its board over a later unreadable revision, and one that differs from the board still does',{timeout:120000},async t=>{
+ for(const board of ['the board is exactly what the upload staged','the board changed after the cut'])await t.test(board,async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'}),store=d.ctx.window.ScannerDeviceStore,generations='users/owner/generations/';
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  assert.equal(d.ctx.state.syncRev,confirmed,'fixture: D confirmed its first save');
+  await d.add('Saved on D, cut off');
+  const staged=d.ctx.cloudPayload();
+  let cut=false;
+  d.faults.beforeTransaction=async docs=>{
+   if(cut)return;const pending=await store.getPendingUpload('owner');
+   if(pending?.baseRev===confirmed&&docs.get(generations+pending.generationId)?.state==='sealed'){cut=true;throw Object.assign(Error('offline mid-upload'),{code:'unavailable'});}};
+  await d.save('D’s save is cut off');delete d.faults.beforeTransaction;
+  assert.equal(cut,true,'fixture: the upload was staged and cut off before publishing');
+  assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed,'fixture: the cut-off upload did not publish');
+  assert.equal(d.ctx.state.syncRev,confirmed,'fixture: D is still based on its confirmed revision');
+  if(board==='the board changed after the cut'){
+   await d.add('Saved on D after the cut');
+   assert.notEqual(d.ctx.cloudPayload(),staged,'fixture: the board no longer matches the staged upload');
+  }else assert.equal(d.ctx.cloudPayload(),staged,'fixture: the board is exactly what the upload staged');
+  // Device E reads the cloud and saves the next revision, which loses its chunks.
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  await e.add('Saved on E');await e.save('E saves');
+  const damaged=sharedCloudRoot2266(d.backend);
+  assert.equal(damaged.rev,confirmed+1,'fixture: E saved the next revision');
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  assert.equal((await d.backend.CS.pull()).code,'corrupt-generation','fixture: that revision cannot be read');
+  const boardBefore=d.ctx.cloudPayload();
+  await d.read('D reads the unreadable revision');
+  const root=sharedCloudRoot2266(d.backend);
+  if(board==='the board changed after the cut'){
+   // Behaviour kept: an upload that may hold work the board lacks still stops adoption.
+   assert.equal(root.rev,damaged.rev,'nothing is published');
+   assert.equal(root.activeGeneration,damaged.activeGeneration);
+   assert.equal(d.ctx.cloudPayload(),boardBefore,'D’s board stays as it was');
+   assert.equal(d.ctx.state.syncDirty,true,'D’s board is not confirmed');
+   assert.notEqual(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D does not show synced');
+   return;
+  }
+  // Behaviour under test: D saves its board as the next revision, keeping the
+  // unreadable one as the previous generation.
+  assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
+  assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
+  assert.equal(await publishedPayload2266(d,root.activeGeneration),staged,'the cloud holds exactly D’s board, which is what the cut-off upload staged');
+  assert.equal(d.ctx.cloudPayload(),staged,'D’s board is unchanged');
+  assert.equal(d.ctx.state.syncRev,root.rev,'D confirmed it');
+  assert.equal(d.ctx.state.syncDirty,false);
+  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
+ });
+});
+
 // #2254 review (B2): showing, focusing or reconnecting the app asks for the
 // check of earlier incomplete cloud sources. Adoption forgot the #2228 mark
 // that keeps that check for a deliberate run on a phone that waited over its

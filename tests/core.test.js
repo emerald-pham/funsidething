@@ -404,6 +404,13 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  assert.match(release,/If the copy before it differs, a large board still waits for Retry sync\./);
  assert.doesNotMatch(release,/own last save|another device may have saved/,'the changelog no longer says adoption needs this device’s own save');
  assert.match(release,/does this the next time it opens, returns or reconnects, unless you chose Use my board from before recovery\./);
+ // #2266: a save this device could not confirm at the time no longer keeps it
+ // waiting once a read shows it landed or it held exactly the current board.
+ const harmless=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 7, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(harmless,/<li>A device no longer keeps waiting in cloud recovery because of an earlier save it could not confirm at the time\./);
+ assert.match(harmless,/If a later read showed that save reached the cloud, or the unfinished save held exactly the current board, the app now saves the board by itself/);
+ assert.match(harmless,/A save that may hold work the board lacks still makes it wait\./);
+ assert.doesNotMatch(harmless.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,'November 7 changelog: Help never sends anyone to another device');
  for(const {question,text} of [...answers,{question:'November 6 changelog',text:release.replace(/<[^>]+>/g,' ')}])
   assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
 });
