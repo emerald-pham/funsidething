@@ -12846,7 +12846,7 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the unreadable copy is this device’s own unconfirmed save on the copy it last confirmed, and that a large board otherwise waits",
+      "root": "RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the unreadable copy is this device’s own unconfirmed save on the copy it last confirmed, that a large board otherwise waits, and that the board from before recovery keeps cloud saving paused",
       "group": "core",
       "file": "tests/core.test.js"
     },
@@ -13472,6 +13472,11 @@
     },
     {
       "root": "RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"
     },

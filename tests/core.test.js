@@ -367,22 +367,36 @@ test('RISK large board deliberate recovery guidance: mounted FAQ and changelog e
 // otherwise waits, and never sends anyone to another device to recover.
 // #2254 review (S1): it does so only for this device's own save, never for one
 // another device may have made.
-test('RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the unreadable copy is this device’s own unconfirmed save on the copy it last confirmed, and that a large board otherwise waits',async t=>{
+// #2254 review (S4): choosing the board from before recovery keeps cloud saving
+// paused, adoption included, and the recovery-waiting answer names the
+// exception. Every Help answer keeps the 130-word limit, and none sends anyone
+// to a desktop or another computer: people have only their phone.
+test('RISK contained board adoption guidance: mounted FAQ and changelog say the app saves this device’s board as the new cloud copy by itself when the unreadable copy is this device’s own unconfirmed save on the copy it last confirmed, that a large board otherwise waits, and that the board from before recovery keeps cloud saving paused',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
- const answer=markup.split('<dt>Does the app fix an unreadable cloud copy by itself?</dt><dd>')[1]?.split('</dd>')[0]||'';
- const words=answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ const answer=answerTo('Does the app fix an unreadable cloud copy by itself?');
  assert.match(answer,/it may be this device’s own last save, made on the copy it last confirmed, whose confirmation never arrived/);
  assert.match(answer,/the app saves it as the new cloud copy by itself/);
  assert.match(answer,/even while it says “recovery waiting”/);
  assert.match(answer,/The unreadable copy stays protected in the cloud, and this device keeps a note naming it/);
- assert.match(answer,/If another device may have saved it, or the copy before it differs from the one this device confirmed,[^.]*a large board still waits for Retry sync/);
- assert.ok(words<=130,'the answer stays within the 130-word limit: '+words);
+ assert.match(answer,/If another device may have saved it, or the copy before it differs from the one this device confirmed,[^.]*a large board waits for Retry sync/);
+ assert.match(answer,/The app also waits after you choose Use my board from before recovery\./);
+ const back=answerTo('Can I go back to my board from before recovery?');
+ assert.match(back,/Afterwards your board saves on this device, cloud saving stays paused, both cloud copies stay protected and the app does not upload this board by itself\./);
+ const waiting=answerTo('Why does the cloud button say “recovery waiting”?');
+ assert.match(waiting,/If the unreadable copy is this device’s own unconfirmed save, the app saves your board by itself\./);
+ const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
+ assert.ok(answers.length>100,'positive control: the mounted Help has its answers');
+ assert.deepEqual(answers.filter(row=>wordsOf(row.text)>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(release,/<li>When the newest cloud copy cannot be read but it is this device’s own last save, made on the copy it last confirmed, whose confirmation never arrived, the app now saves this device’s board as the new cloud copy by itself/);
  assert.match(release,/If another device may have saved that copy, a large board still waits for Retry sync\./);
- for(const text of [answer,release])assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i,'recovery never depends on another device');
+ assert.match(release,/does this the next time it opens, returns or reconnects, unless you chose Use my board from before recovery\./);
+ for(const {question,text} of [...answers,{question:'November 6 changelog',text:release.replace(/<[^>]+>/g,' ')}])
+  assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
 });
 // #2239 round 2 (owner decision): a large board can wait for Retry sync, so no
 // changelog item or FAQ answer may describe a large board recovering from an

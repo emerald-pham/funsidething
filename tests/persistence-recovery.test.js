@@ -25,6 +25,7 @@ import {
   largeSignedInBoardFixture,
 } from "./shared.js";
 import { rewriteGenerationFixture } from "./shared.js";
+import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -6133,4 +6134,61 @@ test('RISK contained board adoption: the board’s next frame and queued input g
  assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the board is then adopted once');
  assert.ok(JSON.parse(pushes[0].payload).tasks.some(task=>task.title==='Typed while the frame was drawn'),'the input handled in that frame is published with it');
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+// #2254 review (S4): Use my board from before recovery returns this device's
+// board and keeps cloud saving paused, as its toast and Help say. Adoption
+// would publish that board by itself, so it respects the choice instead:
+// nothing is published on reconnect or Retry sync while the choice holds.
+test('RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,faults,revision,pushes}=app,store=ctx.window.ScannerDeviceStore,generations='users/owner/generations/';
+ await newerEditBeforeAdoption2254(app);
+ // This small board is within the recovery work budget.
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=64*1048576;
+ // A first adoption stages its own upload, and the network drops just
+ // before that upload is published.
+ let cut=false;
+ faults.beforeTransaction=async docs=>{if(cut)return;const pending=await store.getPendingUpload('owner');
+  if(pending?.baseRev===revision+1&&docs.get(generations+pending.generationId)?.state==='sealed'){cut=true;throw Object.assign(Error('offline mid-upload'),{code:'unavailable'});}};
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the cut-off adoption settles');
+ delete faults.beforeTransaction;
+ assert.equal(cut,true,'positive control: the first adoption was cut off before publishing');
+ const staged=await store.getPendingUpload('owner');
+ assert.equal(staged?.baseRev,revision+1,'fixture: its own staged upload is pending');
+ const before=JSON.stringify(ctx.state);
+ // The next read cannot save the adoption's record (device storage refuses it
+ // once), so the automatic recovery default opens instead, with this
+ // device's own complete staged upload, and its publication is refused.
+ const protect=store.protectRecoverySource;let refusedRecord=false;
+ store.protectRecoverySource=async function(...args){if(!refusedRecord&&args[0]?.key?.startsWith('unreadable-generation-record:')){refusedRecord=true;return false;}return protect.apply(this,args);};
+ t.after(()=>{store.protectRecoverySource=protect;});
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ assert.equal(refusedRecord,true,'fixture: the adoption record was refused once');
+ // The person chooses Use my board from before recovery in open Settings.
+ t.after(faithfulModalQuery2194(shim));
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ const button=declineButton2194();
+ shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ const toastText=shim.document.getElementById('toast').textContent;
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: the decline released the older copy');
+ assert.equal(JSON.stringify(ctx.state),before,'positive control: the board from before recovery is back');
+ // Now everything adoption needs holds: cloud writes work again, the earlier
+ // generation is the acknowledged copy, and the record of the first attempt
+ // proves the unreadable generation is this device's own upload.
+ delete faults.push;ctx.closeModal();
+ assert.deepEqual(await store.getPendingUpload('owner'),staged,'fixture: the adoption’s own staged upload is still pending');
+ const published=pushes.length,cloudBefore=JSON.stringify([...backend.docs].filter(([key])=>!key.startsWith('users/owner/recoveryProtections/')));
+ for(const attempt of ['reconnect','Retry sync']){
+  if(attempt==='reconnect')shim.window.dispatchEvent({type:'online'});else await ctx.onAction('sync-retry',{});
+  await adoptionSettle2254(ctx,attempt+' settles');
+  await fixtureDeadline(async wait=>{await wait(20);while(!idle())await wait(10);},attempt+' settles',30000);
+  assert.equal(pushes.length,published,'nothing is published after '+attempt);
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'the cloud stays at the unreadable revision after '+attempt);
+  assert.equal(JSON.stringify([...backend.docs].filter(([key])=>!key.startsWith('users/owner/recoveryProtections/'))),cloudBefore,'no cloud generation changes after '+attempt);
+  assert.equal(JSON.stringify(ctx.state),before,'the board from before recovery stays after '+attempt);
+  assert.ok(ctx.localStorage.getItem('fvp:chain-scanner:declined-automatic-cloud-recovery'),'the choice is kept after '+attempt);
+ }
+ // So the toast that confirmed the choice told the truth.
+ assert.equal(toastText,'Your earlier board is back. Cloud saving stays paused.');
 });
