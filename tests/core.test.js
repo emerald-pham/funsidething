@@ -385,6 +385,10 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud, and this device keeps a note naming it\./);
  assert.match(answer,/If the copy before it differs, or an unconfirmed save here may hold work the board lacks, a large board waits for Retry sync\./);
  assert.match(answer,/The app also waits after you choose Use my board from before recovery\./);
+ // #2254 re-review: a run the page did not finish leaves its mark, so the
+ // next opening waits until Retry sync instead of starting it again.
+ assert.match(answer,/If a run is interrupted, the next opening waits for Retry sync\./,'the answer says an interrupted run waits for Retry sync on the next opening');
+ assert.ok(wordsOf(answer)<=130,'the adoption answer stays within the 130-word limit: '+wordsOf(answer));
  assert.doesNotMatch(answer,/own last save|confirmation never arrived|another device may have saved/,'adoption no longer depends on who saved the unreadable copy');
  const back=answerTo('Can I go back to my board from before recovery?');
  assert.match(back,/Afterwards your board saves on this device, cloud saving stays paused, both cloud copies stay protected and the app does not upload this board by itself\./);
