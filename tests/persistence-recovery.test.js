@@ -6477,3 +6477,270 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
+
+// #2254 (owner decision of 2026-11-06): manual backups are never trimmed
+// automatically. From two of this account's manual backups, Settings shows a
+// short reminder beside Make manual backup that keeping more slows the app
+// down. The button keeps working with no confirmation. The reminder is a
+// polite status only on the render where it first appears, so re-rendering
+// Settings does not announce it again.
+const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups slows the app down. Delete older ones you don’t need.';
+const manualBackupReminderIn=markup=>{
+ const match=markup.match(/<p id="manualBackupReminder"([^>]*)>([\s\S]*?)<\/p>/);
+ return match?{text:match[2],status:/\brole="status"/.test(match[1]),beside:markup.includes('data-act="make-manual-backup">Make manual backup</button></div><p id="manualBackupReminder"')}:null;
+};
+const settingsMarkup=app=>app.shim.document.getElementById('modalRoot').innerHTML;
+const manualRows=ctx=>ctx.readLocalBackups().filter(row=>row.kind==='manual');
+async function makeManualBackup2254(app){
+ const before=manualRows(app.ctx).length;
+ app.ctx.onAction('make-manual-backup',{});
+ for(let attempt=0;attempt<50&&manualRows(app.ctx).length===before;attempt++)await flush();
+ await flush();
+}
+
+test('RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Reminder threshold task');await ctx.persist();
+ ctx.openSettings();
+ assert.match(settingsMarkup(app),/data-act="make-manual-backup">Make manual backup<\/button>/,'positive control: Settings lists the backup area');
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'no reminder with no manual backup');
+ // Other kinds are listed beside manual copies but are not manual backups.
+ assert.equal(ctx.saveLocalBackup('before-restore',JSON.stringify(ctx.state)),true);
+ assert.equal(ctx.saveLocalBackup('before-account-switch',JSON.stringify(ctx.state)),true);
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,1);
+ assert.match(settingsMarkup(app),/before restore/,'positive control: the other kinds are listed');
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'no reminder with one manual backup and other kinds');
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,2);
+ const reminder=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(reminder,'the second manual backup brings the reminder');
+ assert.equal(reminder.text,MANUAL_BACKUP_REMINDER);
+ assert.equal(reminder.beside,true,'the reminder sits right after Make manual backup');
+});
+
+test('RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Reminder status task');await ctx.persist();
+ await makeManualBackup2254(app);await makeManualBackup2254(app);
+ const first=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(first,'the reminder shows at two manual backups');
+ assert.equal(first.status,true,'the reminder is a status where it first appears');
+ assert.doesNotMatch(settingsMarkup(app),/id="manualBackupReminder"[^>]*aria-live="assertive"/,'the status is polite');
+ ctx.openSettings();
+ const again=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(again,'the reminder stays visible after Settings re-renders');
+ assert.equal(again.text,MANUAL_BACKUP_REMINDER);
+ assert.equal(again.status,false,'a re-render does not announce the reminder again');
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,3);
+ assert.deepEqual(manualBackupReminderIn(settingsMarkup(app)),{text:MANUAL_BACKUP_REMINDER,status:false,beside:true},'a third backup keeps the reminder without announcing it again');
+});
+
+test('RISK manual backup reminder: only this account’s manual backups count toward the reminder',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Account reminder task');ctx.state.syncAccount='me@example.test';await ctx.persist();
+ const other=JSON.stringify({...JSON.parse(JSON.stringify(ctx.state)),syncAccount:'other@example.test'});
+ const signedOut=JSON.parse(JSON.stringify(ctx.state));delete signedOut.syncAccount;
+ assert.equal(ctx.saveLocalBackup('manual',other),true);
+ assert.equal(ctx.saveLocalBackup('manual',other.replace('Account reminder task','Another account task')),true);
+ assert.equal(ctx.saveLocalBackup('manual',JSON.stringify(signedOut)),true);
+ await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,4,'positive control: four manual backups are on this device');
+ assert.equal((settingsMarkup(app).match(/· manual<\/span>/g)||[]).length,4,'positive control: Settings lists all four');
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'one backup of this account does not bring the reminder');
+ await makeManualBackup2254(app);
+ const reminder=manualBackupReminderIn(settingsMarkup(app));
+ assert.ok(reminder,'two backups of this account bring the reminder');
+ assert.equal(reminder.text,MANUAL_BACKUP_REMINDER);
+});
+
+test('RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Third backup task');await ctx.persist();
+ await makeManualBackup2254(app);await makeManualBackup2254(app);
+ let confirms=0;ctx.confirm=()=>{confirms++;return false;};
+ assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder shows at two manual backups');
+ assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button stays enabled beside the reminder');
+ ctx.addTask('Only in the third backup');
+ await makeManualBackup2254(app);
+ assert.equal(confirms,0,'no confirmation is asked');
+ assert.equal(manualRows(ctx).length,3,'one press saves a third manual backup');
+ assert.ok(manualRows(ctx).some(row=>row.payload.includes('Only in the third backup')),'the third backup holds the current board');
+ assert.match(app.shim.document.getElementById('toast').textContent,/Manual backup saved on this device\./);
+ assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button is still enabled after the third');
+ assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder is still shown after the third');
+});
+
+// #2254: the reminder is new text in the Settings backup area, so its fit is
+// measured in a real served page beside the established neighbours in the same
+// pane: the Make manual backup button above it and the backup rows below it.
+// One manual backup is the before state (no reminder); the second brings it.
+test('RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
+ const output=process.env.MANUAL_BACKUP_VISUAL_DIR?path.resolve(process.env.MANUAL_BACKUP_VISUAL_DIR):null;
+ if(output)fs.mkdirSync(output,{recursive:true});
+ const boards=new Map();
+ for(const theme of ['light','dark']){
+  const seed=JSON.stringify(syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+   settings:{...syncState().settings,theme},tasks:Array.from({length:6},(_,i)=>({...syncTask('visual-backup-'+i,'Visual backup task '+i),ctx:['home']}))}));
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:seed}});
+  try{boards.set(theme,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
+ }
+ const viewports=[['phone',390,844],['narrow-260',260,563],['desktop',1280,800]];
+ const ENLARGED_SETTINGS='#modalRoot .modal{font-size:150%} #modalRoot .modal :is(p,button,label,summary,select,input){font-size:1em}';
+ const failures=[],observed=[],artifacts=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  // WebKit on macOS moves keyboard focus between buttons with Alt+Tab.
+  const forward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Tab':'Tab',backward=engineName==='webkit'&&process.platform==='darwin'?'Alt+Shift+Tab':'Shift+Tab';
+  try{
+   for(const theme of ['light','dark'])for(const [viewName,width,height] of viewports){
+    const where=`${engineName}/${theme}/${viewName}`;
+    const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});
+    try{
+     await context.route('**/*',route=>{const request=route.request(),url=new URL(request.url());
+      return url.origin===origin||request.url()===fontsUrl||(url.origin==='https://fonts.gstatic.com'&&request.resourceType()==='font')?route.continue():route.abort();});
+     await context.addInitScript(({board})=>{
+      Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+      localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+      if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+     },{board:boards.get(theme)});
+     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+     const ready=await page.waitForFunction(()=>typeof state==='object'&&liveBoardAccepted&&document.querySelector('#appHeader [data-act="settings"]'),null,{timeout:60000}).then(()=>true,()=>false);
+     if(!ready){failures.push(`${where}: the app never opened its board`);continue;}
+     await page.evaluate(()=>document.fonts.ready);
+     const button=page.locator('#modalRoot [data-act="make-manual-backup"]');
+     const openBackups=async()=>{
+      if(!await page.locator('#modalRoot .modal').count()){await page.locator('#appHeader [data-act="settings"]').click();await page.waitForSelector('#modalRoot .modal');}
+      const panel=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')}).first();
+      if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
+     };
+     const press=async count=>{
+      await openBackups();await button.click();
+      const saved=await page.waitForFunction(count=>readLocalBackups().filter(row=>row.kind==='manual').length===count&&[...document.querySelectorAll('#modalRoot .backup-row > .kv')].filter(label=>/ · manual$/.test(label.textContent)).length===count,count,{timeout:15000}).then(()=>true,()=>false);
+      if(!saved)failures.push(`${where}: Make manual backup did not save and list backup ${count}`);
+      await openBackups();
+     };
+     // Geometry of the button row, the reminder and the backup rows below.
+     const measure=()=>page.evaluate(()=>{
+      const root=document.documentElement,modal=document.querySelector('#modalRoot .modal'),pane=modal.getBoundingClientRect(),paneStyle=getComputedStyle(modal);
+      const button=modal.querySelector('[data-act="make-manual-backup"]'),buttonRow=button.closest('.mbtns'),reminder=modal.querySelector('#manualBackupReminder');
+      const rows=[...modal.querySelectorAll('.backup-row')],paragraph=buttonRow.previousElementSibling;
+      const box=node=>{const r=node.getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:Math.round(r.height)};};
+      const hitCheck=node=>{node.scrollIntoView({block:'center'});const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.left+Math.min(r.width/2,20),r.top+r.height/2);return hit===node||node.contains(hit);};
+      const paragraphStyle=getComputedStyle(paragraph),buttonStyle=getComputedStyle(button);
+      const wide=[modal,...modal.querySelectorAll('*')].filter(node=>node.getBoundingClientRect().right>pane.right+1||
+       node.scrollWidth>node.clientWidth+1&&getComputedStyle(node).overflowX!=='visible').slice(0,4)
+       .map(node=>node.tagName+(node.id?'#'+node.id:'')+(node.dataset?.act?'['+node.dataset.act+']':'')+' '+node.scrollWidth+'/'+node.clientWidth);
+      const out={theme:root.getAttribute('data-theme'),scheme:getComputedStyle(root).colorScheme,background:getComputedStyle(document.body).backgroundColor,
+       modalBackground:paneStyle.backgroundColor,sectionBackground:getComputedStyle(button.closest('.settings-section')).backgroundColor,paragraphFont:paragraphStyle.fontSize,paragraphColor:paragraphStyle.color,
+       button:{...box(button),font:buttonStyle.fontSize,disabled:button.disabled,unobscured:hitCheck(button)},
+       rows:rows.map(row=>({...box(row),manual:/ · manual$/.test(row.querySelector('.kv')?.textContent||''),unobscured:hitCheck(row)})),wide,overflow:modal.scrollWidth>modal.clientWidth+1,reminder:null};
+      if(reminder){
+       const unobscured=hitCheck(reminder),style=getComputedStyle(reminder),r=reminder.getBoundingClientRect(),rowBox=buttonRow.getBoundingClientRect();
+       out.reminder={height:Math.round(r.height),text:reminder.textContent,role:reminder.getAttribute('role'),fontSize:style.fontSize,lineHeight:style.lineHeight,color:style.color,
+        left:Math.round(r.left-pane.left-parseFloat(paneStyle.paddingLeft)),right:Math.round(pane.right-parseFloat(paneStyle.paddingRight)-r.right),
+        clipped:reminder.scrollWidth>reminder.clientWidth+1,unobscured,afterButtonRow:buttonRow.nextElementSibling===reminder,
+        gapAbove:Math.round(r.top-rowBox.bottom),gapBelow:rows.length?Math.round(rows[0].getBoundingClientRect().top-r.bottom):null};
+      }
+      return out;
+     });
+     await press(1);
+     const before=await measure();
+     await press(2);
+     // Measure once the save notice has gone, so it covers nothing in the captures.
+     await page.waitForFunction(()=>!document.getElementById('toast')?.classList.contains('show'),null,{timeout:15000}).catch(()=>{});
+     const shot={};
+     for(const scale of [1,1.5]){
+      const enlarged=scale>1?await page.addStyleTag({content:ENLARGED_SETTINGS}):null;
+      shot[scale]=await measure();
+      if(output){const file=path.join(output,`${engineName}-${theme}-${viewName}-${scale}.png`);
+       await page.locator('#modalRoot #manualBackupReminder').evaluate(element=>element.scrollIntoView({block:'center'})).catch(()=>{});await page.screenshot({path:file});artifacts.push(file);}
+      if(enlarged)await enlarged.evaluate(element=>element.remove());
+     }
+     // Native keyboard focus on Make manual backup: forward to its neighbour, then back.
+     await button.focus();await page.keyboard.press(forward);await page.keyboard.press(backward);
+     const focus=await button.evaluate(element=>{const style=getComputedStyle(element),reminder=document.getElementById('manualBackupReminder'),r=element.getBoundingClientRect(),m=reminder?.getBoundingClientRect();
+      return {active:document.activeElement===element,visible:element.matches(':focus-visible'),outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,outlineColor:style.outlineColor,
+       outlineOffset:style.outlineOffset,ringClear:!m?null:m.top>=r.bottom+Math.max(0,parseFloat(style.outlineOffset)||0)+parseFloat(style.outlineWidth)-0.5};});
+     if(output){const file=path.join(output,`${engineName}-${theme}-${viewName}-focus.png`);await page.screenshot({path:file});artifacts.push(file);}
+     observed.push({engine:engineName,theme,view:viewName,before,shot,focus,errors});
+     // The applied theme: attribute, computed color scheme and paint.
+     for(const [name,state] of [['before',before],['1',shot[1]],['1.5',shot[1.5]]]){
+      if(state.theme!==theme)failures.push(`${where}/${name}: data-theme is ${state.theme}`);
+      if(!String(state.scheme).split(/\s+/).includes(theme))failures.push(`${where}/${name}: computed color-scheme is ${state.scheme}`);
+      if(state.overflow||state.wide.length)failures.push(`${where}/${name}: the Settings pane scrolls sideways ${JSON.stringify(state.wide)}`);
+      if(state.button.disabled||!state.button.unobscured)failures.push(`${where}/${name}: Make manual backup is disabled or covered`);
+      if(state.rows.some(row=>!row.unobscured))failures.push(`${where}/${name}: a backup row is covered`);
+     }
+     if(before.reminder)failures.push(`${where}: a reminder shows with one manual backup`);
+     for(const scale of [1,1.5]){
+      const state=shot[scale],reminder=state.reminder;
+      if(!reminder){failures.push(`${where}/${scale}: no reminder with two manual backups`);continue;}
+      if(reminder.text!==MANUAL_BACKUP_REMINDER)failures.push(`${where}/${scale}: reminder text ${reminder.text}`);
+      if(!reminder.afterButtonRow)failures.push(`${where}/${scale}: the reminder is not right after Make manual backup`);
+      if(reminder.left<0||reminder.right<0)failures.push(`${where}/${scale}: the reminder leaves its pane insets ${JSON.stringify(reminder)}`);
+      if(reminder.clipped||!reminder.unobscured)failures.push(`${where}/${scale}: the reminder is clipped or covered`);
+      if(reminder.gapAbove<0||reminder.gapBelow===null||reminder.gapBelow<0)failures.push(`${where}/${scale}: the reminder overlaps the button row or the first backup row ${JSON.stringify([reminder.gapAbove,reminder.gapBelow])}`);
+      // A sensible height: at least one line, and no more than a short paragraph.
+      const line=parseFloat(reminder.lineHeight)||parseFloat(reminder.fontSize)*1.4;
+      if(reminder.height<line-1||reminder.height>line*(width<300?7:4)+1)failures.push(`${where}/${scale}: reminder height ${reminder.height} for line ${line}`);
+      // It reads like the retention paragraph above the button, its neighbour in the same pane.
+      if(reminder.fontSize!==state.paragraphFont||reminder.color!==state.paragraphColor)failures.push(`${where}/${scale}: the reminder ${reminder.fontSize} ${reminder.color} differs from the backup paragraph ${state.paragraphFont} ${state.paragraphColor}`);
+      if(state.rows.filter(row=>row.manual).length!==2)failures.push(`${where}/${scale}: ${state.rows.filter(row=>row.manual).length} manual backup rows listed`);
+     }
+     // Before and after: the reminder does not change the button or the backup rows.
+     if(shot[1].button.height!==before.button.height)failures.push(`${where}: Make manual backup height ${before.button.height} -> ${shot[1].button.height}`);
+     const manualHeight=before.rows.find(row=>row.manual)?.height;
+     if(!manualHeight||shot[1].rows.some(row=>row.manual&&row.height!==manualHeight))failures.push(`${where}: manual backup row height ${manualHeight} -> ${JSON.stringify(shot[1].rows.map(row=>row.height))}`);
+     if(!(parseFloat(shot[1.5].reminder?.fontSize)>parseFloat(shot[1].reminder?.fontSize)))failures.push(`${where}: enlarged Settings text is not larger`);
+     if(!focus.active||!focus.visible||focus.outlineStyle==='none'||parseFloat(focus.outlineWidth)<2)failures.push(`${where}: Make manual backup keyboard focus is not shown ${JSON.stringify(focus)}`);
+     if(focus.ringClear===false)failures.push(`${where}: the focus ring on Make manual backup overlaps the reminder ${JSON.stringify(focus)}`);
+     if(errors.length)failures.push(`${where}: page errors ${JSON.stringify(errors)}`);
+    }finally{await context.close();}
+   }
+   // Day and night paint the reminder, its section and the Settings pane differently
+   // on each engine. The page body is transparent over the scenery in both themes.
+   for(const [viewName] of viewports){
+    const pick=theme=>observed.find(row=>row.engine===engineName&&row.theme===theme&&row.view===viewName)?.shot[1];
+    const day=pick('light'),night=pick('dark');
+    if(day&&night&&(day.sectionBackground===night.sectionBackground||day.modalBackground===night.modalBackground||day.reminder?.color===night.reminder?.color))
+     failures.push(`${engineName}/${viewName}: day and night paint alike ${JSON.stringify([day.sectionBackground,night.sectionBackground,day.modalBackground,night.modalBackground,day.reminder?.color,night.reminder?.color])}`);
+   }
+  }finally{await browser.close();}
+ }
+ t.diagnostic(JSON.stringify({artifacts:artifacts.length?artifacts.length+' files in '+output:'set MANUAL_BACKUP_VISUAL_DIR to save screenshots',observed:observed.map(row=>({engine:row.engine,theme:row.theme,view:row.view,
+  scheme:row.shot[1].scheme,pane:row.shot[1].modalBackground,section:row.shot[1].sectionBackground,reminder:[row.shot[1].reminder?.fontSize,row.shot[1.5].reminder?.fontSize,row.shot[1].reminder?.height,row.shot[1.5].reminder?.height,row.shot[1].reminder?.color],
+  gaps:[row.shot[1].reminder?.gapAbove,row.shot[1].reminder?.gapBelow,row.shot[1.5].reminder?.gapAbove,row.shot[1.5].reminder?.gapBelow],button:[row.before.button.height,row.shot[1].button.height],rows:[row.before.rows.length,row.shot[1].rows.length,...row.shot[1].rows.map(r=>r.height)],focus:row.focus}))}));
+ assert.ok(observed.length===12,'every engine, theme and view was measured: '+observed.length);
+ assert.deepEqual(failures,[],JSON.stringify(failures));
+});
+
+// #2254 (owner decision of 2026-11-06): Help explains the manual backup
+// reminder within the 130-word answer limit, and the changelog announces it.
+// Neither sends anyone to another device: people have only their phone.
+test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
+ const answer=answerTo('Why does Settings remind me about manual backups?');
+ assert.match(answer,/Manual backups stay on this device until you delete them; they are never removed automatically\./);
+ assert.match(answer,/keeping more than two slows the app down/);
+ assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder beside Make manual backup\./);
+ assert.match(answer,/Delete older ones you don’t need/);
+ assert.match(answer,/Make manual backup still works, with no limit and no extra step\./);
+ assert.match(answer,/Only manual backups of the account you are using count\./);
+ assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(release,'positive control: the mounted changelog has the November 6 release');
+ assert.match(release,/<li>Settings → Data and backups now shows a reminder beside Make manual backup once this account has two or more manual backups: keeping more than two slows the app down, so delete older ones you don’t need\./);
+ assert.match(release,/Manual backups are never removed automatically, and Make manual backup still works with no extra step\.<\/li>/);
+ for(const [question,text] of [['manual backup answer',answer],['November 6 changelog',release]])
+  assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
+});

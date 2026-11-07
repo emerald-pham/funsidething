@@ -2260,6 +2260,17 @@ This boundary control holds a successful real provider reply, installs a later a
 
 - Exact-current hash reconstruction still retains compatible facts from every complete retained server source: `RISK independent cloud exact reconstruction: a matching retained hash cannot discard other complete server facts`.
 
+## Manual backup reminder (#2254)
+
+- RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it
+- RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders
+- RISK manual backup reminder: only this account’s manual backups count toward the reminder
+- RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step
+- RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit
+- RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works
+
+The Node tests open Settings on an isolated board in browser storage and press Make manual backup through its action handler. A backup belongs to the account its saved board names, as Restore reads it before warning about a cross-account restore. The browser test serves the app with no cloud, presses Make manual backup once (no reminder) and again (reminder), and measures the reminder, the button and the backup rows in the same Settings pane. It does not cover a signed-in account, Firefox, a real phone or screen-reader speech.
+
 ## Offline device database recovery
 
 - RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources
