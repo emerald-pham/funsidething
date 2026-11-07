@@ -411,12 +411,21 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  assert.match(release,/If the copy before it differs, a large board still waits for Retry sync\./);
  assert.doesNotMatch(release,/own last save|another device may have saved/,'the changelog no longer says adoption needs this device’s own save');
  assert.match(release,/does this the next time it opens, returns or reconnects, unless you chose Use my board from before recovery\./);
- // #2266: a save this device could not confirm at the time no longer keeps it
- // waiting once a read shows it landed or it held exactly the current board.
- const harmless=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 7, 2026</h3>')[1]?.split('</ul>')[0]||'';
- assert.match(harmless,/<li>A device no longer keeps waiting in cloud recovery because of an earlier save it could not confirm at the time\./);
- assert.match(harmless,/If a later read showed that save reached the cloud, or the unfinished save held exactly the current board, the app now saves the board by itself/);
- assert.match(harmless,/A save that may hold work the board lacks still makes it wait\./);
+ // #2268 review (finding 14): November 6 is live, so this release's notes are
+ // under November 7 and say only what changed from it. #2266 A lets a landed
+ // save stop neither adoption nor the exact rebuild; #2266 B changes only
+ // adoption, since the exact rebuild already accepted an unfinished save of
+ // exactly the current board. #2265 and #2264 have their own items.
+ const notes=markup.split('data-changelog-notes>')[1]||'';
+ const harmless=notes.split('<h3>November 7, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(notes.indexOf('<h3>November 7, 2026</h3>')>=0&&notes.indexOf('<h3>November 7, 2026</h3>')<notes.indexOf('<h3>November 6, 2026</h3>'),'November 7 is the newest heading');
+ assert.match(harmless,/<li>A device no longer keeps waiting in cloud recovery because of an earlier save whose reply never came but that reached the cloud\. Once a later read shows it there, even after another device saved on top of it, the app saves the board by itself when a newer cloud copy cannot be read, or rebuilds an unreadable copy it holds exactly, as it does when nothing is pending\. A save that may hold work the board lacks still makes it wait\.<\/li>/);
+ assert.match(harmless,/<li>An unfinished save that held exactly the current board no longer stops the app saving the board over a newer cloud copy that cannot be read\.<\/li>/);
+ assert.doesNotMatch(harmless,/unfinished save held exactly the current board, the app now saves the board by itself when a newer cloud copy cannot be read, or rebuilds/,'the exact rebuild already accepted an unfinished save of exactly the current board');
+ assert.match(harmless,/<li>After you choose Use my board from before recovery, cloud saving now stays paused even when the cloud copy that could not be read is exactly the copy this device last confirmed\. Before, reconnecting could save that board to the cloud by itself and show synced\. Retry sync keeps your choice too, and so does opening the app while cloud sync can’t start, such as offline\.<\/li>/);
+ assert.doesNotMatch(release,/Use my board from before recovery, cloud saving now stays paused/,'the #2265 item is not filed under the live November 6 release');
+ assert.match(harmless,/<li>When this device takes a newer board from the cloud, the board it had before now stays in Settings backups for seven calendar days, as promised, also when that day’s daily backup or a manual backup already holds the same board\. Deleting that manual backup no longer removes it early\.<\/li>/);
+ assert.match(harmless,/<li>While cloud recovery waits or holds your board, daily backups now keep seven days until the cloud confirms a board also after you sign out or reopen the app, switch apps, or when browser storage is full\.<\/li>/);
  assert.doesNotMatch(harmless.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,'November 7 changelog: Help never sends anyone to another device');
  for(const {question,text} of [...answers,{question:'November 6 changelog',text:release.replace(/<[^>]+>/g,' ')}])
   assert.doesNotMatch(text,/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
