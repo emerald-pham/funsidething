@@ -2289,11 +2289,18 @@ test('RISK downloads visual browser: Download board and Download recovery file r
 // working. Retry sync must recover such a board, publish it and take the
 // cloud's confirmation. The same signed-in large-board fixture and in-page
 // fake cloud as the deliberate test above, except that the earlier generation
-// is the device's own acknowledged board at revision 6, before a newer Add and
+// is byte for byte the device's own acknowledged board, before a newer Add and
 // scan decision; an unfinished draft stays in Add. Nothing the device
 // acknowledged may be lost: every task, decision, History entry, the newer
 // edit and the draft survive, and the cloud ends up holding exactly the
 // recovered board.
+// #2254 release review (B2): the device acknowledged that board at revision 5,
+// and the intact earlier generation is the same bytes published again at
+// revision 6 (as a save after Retry sync republishes an unchanged board), so
+// the unreadable revision 7 does not directly follow the acknowledged one.
+// Adoption (#2254) publishes by itself only over the revision just after the
+// acknowledged one, so here the opening still waits and Retry sync takes this
+// #2239 path, which recognises the acknowledged copy by its bytes.
 // Memory: the owner approved a target of 200 MiB over opening the same board
 // locally in WebKit (#2239). Round 2 did not reach it, so the target is
 // pending: each run reports its peak against the target and asserts a
@@ -2414,16 +2421,17 @@ test('RISK large board acknowledged recovery browser: Retry sync recovers a larg
    try{
     const page=context.pages()[0]||await context.newPage();
     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await shown(LARGE_BOARD_SHAPE.tasks)(page);
-    // The device's last cloud acknowledgement: its own board at revision 6.
+    // The device's last cloud acknowledgement: its own board at revision 5,
+    // whose bytes the cloud's intact earlier generation (revision 6) repeats.
     // One save first settles the older browser copy the fixture was seeded
     // from, so the acknowledgement written next is not merged away.
     await page.waitForFunction(()=>deviceStorageAuthority===true&&typeof deviceHeadHash==='string',null,{timeout:60000});
     earlier=await page.evaluate(async()=>{
      if(await persist()!==true)throw Error('fixture: the seeded board saves');
-     const payload=cloudPayload();state.syncRev=6;state.decisionBase=makeDecisionBase(state.syncAccount,6,payload);state.syncDirty=false;
+     const payload=cloudPayload();state.syncRev=5;state.decisionBase=makeDecisionBase(state.syncAccount,5,payload);state.syncDirty=false;
      if(await persist()!==true)throw Error('fixture: the acknowledgement saves');
      const saved=JSON.parse((await deviceStore.readHead()).payload);
-     if(!validDecisionBase(saved.decisionBase,saved.syncAccount,6)||saved.decisionBase.payload!==payload)throw Error('fixture: the saved board carries its acknowledged copy');
+     if(!validDecisionBase(saved.decisionBase,saved.syncAccount,5)||saved.decisionBase.payload!==payload)throw Error('fixture: the saved board carries its acknowledged copy');
      return payload;});
     // The newer accepted edit through Add, and a newer scan decision through the real No button.
     await page.locator('#addInput').fill(NEWER_TITLE);await page.locator('#addInput').press('Enter');await shown(taskCount)(page);
@@ -2432,7 +2440,7 @@ test('RISK large board acknowledged recovery browser: Retry sync recovers a larg
     await page.waitForFunction(count=>state.decisionEvents.length>count&&Object.keys(state.considered).length>0,decisions,{timeout:30000});
     await page.waitForFunction(()=>new Promise(resolve=>deviceStore.readHead().then(head=>{
      const saved=head&&JSON.parse(head.payload);resolve(!!saved&&saved.tasks.length===state.tasks.length&&saved.decisionEvents.length===state.decisionEvents.length&&
-      validDecisionBase(saved.decisionBase,saved.syncAccount,6));},()=>resolve(false))),null,{timeout:30000});
+      validDecisionBase(saved.decisionBase,saved.syncAccount,5));},()=>resolve(false))),null,{timeout:30000});
     summary.deviceBoardBytes=await page.evaluate(()=>JSON.stringify(state).length);
     await page.waitForTimeout(1500);
    }finally{await context.close();}
