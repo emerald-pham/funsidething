@@ -6057,6 +6057,285 @@ test('RISK contained board adoption: an adoption upload cut off inside the real 
  });
 });
 
+// #2266 (found by the #2261 audit): a device with its own device store on a
+// cloud that another device, with its own device store, also saves to.
+async function sharedCloudDevice2266(t,{sharedDocs=null,name}){
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='shared-cloud-2266-'+name+'-'+Math.random();
+ const app=await loadAppAtTime(1792323060000,{indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(app));
+ const {ctx,shim}=app,faults={authPending:true};
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>backend.CS.suspend());
+ // Saves and retries happen only when this test asks for them. The recovery
+ // work budget is exhausted, so a device that is not allowed to adopt waits.
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;ctx.window.CLOUD_RETRY_DELAY_MS=600000;ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1;
+ backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',ctx))await wait();},name+' opens');
+ await ctx.cloudPull();await adoptionSettle2254(ctx,name+' reads the cloud');
+ const add=async title=>{shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);};
+ const save=async message=>{await ctx.sendPush();await adoptionSettle2254(ctx,message);};
+ const read=async message=>{await ctx.cloudPull();await adoptionSettle2254(ctx,message);};
+ return {...app,backend,faults,add,save,read};
+}
+const sharedCloudRoot2266=backend=>backend.docs.get('users/owner');
+const removeChunks2266=(backend,generationId)=>{for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+generationId+'/chunks/'))backend.docs.delete(key);};
+async function publishedPayload2266(device,generationId){
+ const path='users/owner/generations/'+generationId,header=device.backend.docs.get(path);
+ const chunks=[...device.backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ return device.ctx.window.ChainStorageV2.decodeSnapshot(header,chunks);
+}
+
+// #2266 scenario A. Device D's save commits the next revision, but its reply
+// is lost. D's next read finds that revision identical to its board and
+// records it as confirmed. Device E then saves a readable revision, which D
+// reads. Later a revision loses its chunks: either a newer one from E (D's
+// board is built on the copy before it, so D publishes its board over it) or
+// the one D read and holds exactly (D rebuilds it). The confirmed upload
+// leaves nothing that could hold work D's board lacks, so D does exactly what
+// a device whose reply arrived does.
+test('RISK contained board adoption: an upload whose reply was lost and that a later read confirmed does not stop the device publishing its board over a later unreadable revision or rebuilding one it holds exactly, as a device whose reply arrived does',{timeout:120000},async t=>{
+ for(const [reply,unreadable] of [['the reply arrived','a newer revision'],['the reply was lost','a newer revision'],
+  ['the reply arrived','the revision the device holds exactly'],['the reply was lost','the revision the device holds exactly']])
+  await t.test(reply+', then '+unreadable+' cannot be read',async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'});
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  await d.add('Saved on D second');
+  let lost=false;
+  if(reply==='the reply was lost')d.faults.afterTransaction=async docs=>{
+   if(!lost&&docs.get('users/owner')?.rev===confirmed+1){lost=true;throw Object.assign(Error('reply lost'),{code:'unavailable'});}};
+  await d.save('D saves again');delete d.faults.afterTransaction;
+  assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed+1,'fixture: the second save is the next revision');
+  if(reply==='the reply was lost'){
+   assert.equal(lost,true,'fixture: the server committed and the reply was lost');
+   assert.equal(d.ctx.state.syncRev,confirmed,'fixture: without the reply D is still based on the revision before');
+   await d.read('D reads its own save back');
+  }
+  assert.equal(d.ctx.state.syncRev,confirmed+1,'fixture: D has confirmed its second save');
+  assert.equal(d.ctx.state.syncDirty,false);
+  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','fixture: D shows synced');
+  // Device E reads the cloud and saves a readable revision, which D reads.
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  await e.add('Saved on E');await e.save('E saves');
+  const readable=sharedCloudRoot2266(d.backend);
+  assert.equal(readable.rev,confirmed+2,'fixture: E saved the next revision');
+  await d.read('D reads E’s save');
+  assert.equal(d.ctx.state.syncRev,confirmed+2,'fixture: D confirmed E’s revision');
+  assert.ok(d.ctx.state.tasks.some(task=>task.title==='Saved on E'),'fixture: D holds E’s work');
+  assert.equal(d.ctx.state.syncDirty,false);
+  const board=d.ctx.cloudPayload();
+  let damaged;
+  if(unreadable==='a newer revision'){
+   await e.add('Saved on E again');await e.save('E saves again');
+   damaged=sharedCloudRoot2266(d.backend);
+   assert.equal(damaged.rev,confirmed+3,'fixture: E saved a newer revision');
+  }else damaged=readable;
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  assert.equal((await d.backend.CS.pull()).code,'corrupt-generation','fixture: that revision cannot be read');
+  await d.read('D reads the unreadable revision');
+  // Behaviour under test: D saves its board as the next revision, keeping the
+  // unreadable one as the previous generation.
+  const root=sharedCloudRoot2266(d.backend);
+  assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
+  assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
+  assert.equal(await publishedPayload2266(d,root.activeGeneration),board,'the cloud holds exactly D’s board');
+  assert.equal(d.ctx.cloudPayload(),board,'D’s board is unchanged');
+  assert.equal(d.ctx.state.syncRev,root.rev,'D confirmed it');
+  assert.equal(d.ctx.state.syncDirty,false);
+  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
+ });
+});
+
+// #2268 review (finding 9): #2266 cleared a lost-reply save's pending record
+// only on the first read that found that save, identical to the board, at a
+// new revision. Two ordinary paths skip that read: device E saves on top of
+// D's landed save before D reads, so D's next read takes E's newer board; or
+// the clear fails once (a storage error, a hidden page), and D's later reads
+// at that revision change nothing. Either way the landed save's record stayed,
+// and a later unreadable revision waited for it for good. A record the
+// previous build left is the second case.
+test('RISK contained board adoption: a lost-reply save that landed stops no later adoption, also when another device saved on top of it before this device read it or when clearing its record failed once',{timeout:180000},async t=>{
+ for(const path of ['another device saved on top of it first','clearing its record failed once'])await t.test(path,async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'}),store=d.ctx.window.ScannerDeviceStore;
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  await d.add('Saved on D second');
+  let lost=false;
+  d.faults.afterTransaction=async docs=>{if(!lost&&docs.get('users/owner')?.rev===confirmed+1){lost=true;throw Object.assign(Error('reply lost'),{code:'unavailable'});}};
+  await d.save('D saves again');delete d.faults.afterTransaction;
+  assert.equal(lost,true,'fixture: the server committed and the reply was lost');
+  assert.equal((await store.getPendingUpload('owner'))?.generationId,sharedCloudRoot2266(d.backend).activeGeneration,'fixture: the landed save is still pending on D');
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  if(path==='another device saved on top of it first'){
+   await e.add('Saved on E on top of D');await e.save('E saves');
+   assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed+2,'fixture: E saved the next revision before D read');
+   await d.read('D reads E’s save');
+   assert.equal(d.ctx.state.syncRev,confirmed+2,'fixture: D took E’s revision');
+  }else{
+   const clear=store.clearPendingUploadIfCurrent;let failed=0;
+   store.clearPendingUploadIfCurrent=async function(...args){if(!failed++)throw Object.assign(Error('storage busy'),{name:'UnknownError'});return clear.apply(this,args);};
+   sub.after(()=>{store.clearPendingUploadIfCurrent=clear;});
+   await d.read('D reads its own save back');
+   assert.equal(d.ctx.state.syncRev,confirmed+1,'fixture: D confirmed its save');
+   assert.equal(failed,1,'fixture: the first clear failed');
+   await d.read('D reads the same revision again');
+   // D is then away while E saves twice, so D's landed save is no longer named
+   // by the cloud's root and the cloud's cleanup removes it.
+   const landedId=sharedCloudRoot2266(d.backend).activeGeneration;
+   await e.read('E reads D’s save');
+   for(const title of ['Saved on E once','Saved on E twice']){await e.add(title);await e.save('E saves');}
+   assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed+3,'fixture: E saved two revisions');
+   assert.equal(d.backend.docs.has('users/owner/generations/'+landedId),false,'fixture: the cloud removed D’s landed save');
+   await d.read('D reads E’s saves');
+   assert.equal(d.ctx.state.syncRev,confirmed+3,'fixture: D took E’s revision');
+  }
+  assert.ok(d.ctx.state.tasks.some(task=>task.title==='Saved on D second'),'fixture: D’s board holds its landed save');
+  // E saves the next revision, which loses its chunks.
+  await e.add('Saved on E, then lost');await e.save('E saves again');
+  const damaged=sharedCloudRoot2266(d.backend);
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  const board=d.ctx.cloudPayload();
+  await d.read('D reads the unreadable revision');
+  // Behaviour under test: nothing D's landed save held is missing from its board, so D publishes it.
+  const root=sharedCloudRoot2266(d.backend);
+  assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
+  assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
+  assert.equal(await publishedPayload2266(d,root.activeGeneration),board,'the cloud holds exactly D’s board');
+  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
+ });
+});
+
+// #2268 review (finding 12): a read that finds this device's own lost-reply
+// save clears only that save's pending record. The device keeps one pending
+// upload record per account, shared by its pages, so by the time the read
+// comes another page of this device may have staged its own upload, which may
+// hold work this page's board lacks. That record, or one naming the landed
+// generation with other bytes, must survive the read: when a later revision
+// cannot be read, it still keeps the device from publishing its board.
+test('RISK contained board adoption: a read that confirms this device’s lost-reply save keeps a pending upload record that is not that save, so a later unreadable revision still waits for it',{timeout:180000},async t=>{
+ for(const record of ['the landed save’s own record','another page staged its own upload','the landed generation with other bytes'])await t.test(record,async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'}),store=d.ctx.window.ScannerDeviceStore;
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  await d.add('Saved on D second');
+  let lost=false;
+  d.faults.afterTransaction=async docs=>{if(!lost&&docs.get('users/owner')?.rev===confirmed+1){lost=true;throw Object.assign(Error('reply lost'),{code:'unavailable'});}};
+  await d.save('D saves again');delete d.faults.afterTransaction;
+  const landed=sharedCloudRoot2266(d.backend),own=await store.getPendingUpload('owner');
+  assert.equal(lost,true,'fixture: the server committed and the reply was lost');
+  assert.deepEqual([own?.generationId,own?.baseRev],[landed.activeGeneration,confirmed],'fixture: the pending record is the landed save');
+  const otherBytes=await d.ctx.window.ChainStorageV2.hashPayload(JSON.stringify({staged:'by another page, with work this board lacks'}));
+  if(record==='another page staged its own upload')
+   assert.equal((await store.setPendingUpload('owner',{...own,generationId:'staged-by-another-page',payloadHash:otherBytes}))?.ok,true,'fixture: another page staged its upload');
+  else if(record==='the landed generation with other bytes')
+   assert.equal((await store.setPendingUpload('owner',{...own,payloadHash:otherBytes}))?.ok,true,'fixture: the record names the landed generation with other bytes');
+  await d.read('D reads its own save back');
+  assert.equal(d.ctx.state.syncRev,confirmed+1,'fixture: D confirmed its save');
+  // Device E saves the next revision, which loses its chunks.
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  await e.add('Saved on E');await e.save('E saves');
+  const damaged=sharedCloudRoot2266(d.backend);
+  assert.equal(damaged.rev,confirmed+2,'fixture: E saved the next revision');
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  const board=d.ctx.cloudPayload();
+  await d.read('D reads the unreadable revision');
+  const root=sharedCloudRoot2266(d.backend);
+  if(record==='the landed save’s own record'){
+   // Positive control: the confirmed save leaves nothing to wait for.
+   assert.equal(root.rev,damaged.rev+1,'positive control: D publishes its board over the unreadable revision');
+   assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  }else{
+   // Behaviour under test: a record that is not the landed save still stops D publishing.
+   assert.equal(root.rev,damaged.rev,'nothing is published');
+   assert.equal(root.activeGeneration,damaged.activeGeneration);
+   assert.equal(d.ctx.cloudPayload(),board,'D’s board stays as it was');
+   assert.notEqual(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D does not show synced');
+  }
+ });
+});
+
+// #2268 review (finding 3): this device's own upload published the next
+// revision but its reply was lost, and that revision's chunks were then lost
+// too. An adoption run another page left unfinished keeps contained adoption
+// out of an ordinary opening, so the exact rebuild republishes the bytes this
+// device holds exactly, over the pending record it captured. The #2266 clear
+// of a confirmed pending upload ran for the rebuild's stand-in read as well,
+// so the rebuild's save was refused as a changed pending upload and the device
+// showed an error until another read.
+test('RISK exact acknowledged cloud source: the exact rebuild of this device’s own upload whose reply was lost publishes the board and shows synced',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,revision,unreadableId,pushes}=app;
+ ctx.localStorage.setItem('fvp:chain-scanner:contained-adoption-run',JSON.stringify({v:1,account:ctx.state.syncAccount,identity:'owner',rev:revision+1,generationId:unreadableId,page:'another-page'}));
+ assert.equal((await backend.CS.pull()).code,'corrupt-generation','fixture: the upload’s revision cannot be read');
+ const board=ctx.cloudPayload();
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+ await fixtureDeadline(async wait=>{await wait(20);while(!adoptionIdle2254(ctx))await wait(10);},'the rebuild settles',30000);
+ assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'positive control: the rebuild saves over the unreadable revision');
+ // Behaviour under test: the rebuild's save lands and the device shows synced.
+ const root=backend.docs.get('users/owner');
+ assert.equal(root.rev,revision+2,'the board is published as the next revision');
+ assert.equal(await publishedPayload2266({ctx,backend},root.activeGeneration),board,'the cloud holds exactly this board');
+ assert.equal(ctx.state.syncRev,root.rev,'this device confirmed it');
+ assert.equal(ctx.state.syncDirty,false);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the device shows synced');
+});
+
+// #2266 scenario B. Device D, confirmed at a revision, saves an edit, and the
+// save is cut off after its upload was staged and before it was published.
+// Device E then saves the next revision, which loses its chunks. When D's
+// board is still exactly what that upload staged, publishing the board loses
+// nothing the upload held, so D publishes it over the unreadable revision.
+// When the board has changed since, the record's hash cannot say what the
+// staged upload holds, which may be work the board lacks, so D keeps waiting
+// and publishes nothing.
+test('RISK contained board adoption: an upload of exactly this board that was cut off before it published does not stop the device publishing its board over a later unreadable revision, and one that differs from the board still does',{timeout:120000},async t=>{
+ for(const board of ['the board is exactly what the upload staged','the board changed after the cut'])await t.test(board,async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'}),store=d.ctx.window.ScannerDeviceStore,generations='users/owner/generations/';
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  assert.equal(d.ctx.state.syncRev,confirmed,'fixture: D confirmed its first save');
+  await d.add('Saved on D, cut off');
+  const staged=d.ctx.cloudPayload();
+  let cut=false;
+  d.faults.beforeTransaction=async docs=>{
+   if(cut)return;const pending=await store.getPendingUpload('owner');
+   if(pending?.baseRev===confirmed&&docs.get(generations+pending.generationId)?.state==='sealed'){cut=true;throw Object.assign(Error('offline mid-upload'),{code:'unavailable'});}};
+  await d.save('D’s save is cut off');delete d.faults.beforeTransaction;
+  assert.equal(cut,true,'fixture: the upload was staged and cut off before publishing');
+  assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed,'fixture: the cut-off upload did not publish');
+  assert.equal(d.ctx.state.syncRev,confirmed,'fixture: D is still based on its confirmed revision');
+  if(board==='the board changed after the cut'){
+   await d.add('Saved on D after the cut');
+   assert.notEqual(d.ctx.cloudPayload(),staged,'fixture: the board no longer matches the staged upload');
+  }else assert.equal(d.ctx.cloudPayload(),staged,'fixture: the board is exactly what the upload staged');
+  // Device E reads the cloud and saves the next revision, which loses its chunks.
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  await e.add('Saved on E');await e.save('E saves');
+  const damaged=sharedCloudRoot2266(d.backend);
+  assert.equal(damaged.rev,confirmed+1,'fixture: E saved the next revision');
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  assert.equal((await d.backend.CS.pull()).code,'corrupt-generation','fixture: that revision cannot be read');
+  const boardBefore=d.ctx.cloudPayload();
+  await d.read('D reads the unreadable revision');
+  const root=sharedCloudRoot2266(d.backend);
+  if(board==='the board changed after the cut'){
+   // Behaviour kept: an upload that may hold work the board lacks still stops adoption.
+   assert.equal(root.rev,damaged.rev,'nothing is published');
+   assert.equal(root.activeGeneration,damaged.activeGeneration);
+   assert.equal(d.ctx.cloudPayload(),boardBefore,'D’s board stays as it was');
+   assert.equal(d.ctx.state.syncDirty,true,'D’s board is not confirmed');
+   assert.notEqual(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D does not show synced');
+  }else{
+   // Behaviour under test: D saves its board as the next revision, keeping the
+   // unreadable one as the previous generation.
+   assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
+   assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
+   assert.equal(await publishedPayload2266(d,root.activeGeneration),staged,'the cloud holds exactly D’s board, which is what the cut-off upload staged');
+   assert.equal(d.ctx.cloudPayload(),staged,'D’s board is unchanged');
+   assert.equal(d.ctx.state.syncRev,root.rev,'D confirmed it');
+   assert.equal(d.ctx.state.syncDirty,false);
+   assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
+  }
+ });
+});
+
 // #2254 review (B2): showing, focusing or reconnecting the app asks for the
 // check of earlier incomplete cloud sources. Adoption forgot the #2228 mark
 // that keeps that check for a deliberate run on a phone that waited over its
@@ -6287,6 +6566,140 @@ test('RISK contained board adoption: after the person chooses Use my board from 
  assert.equal(toastText,'Your earlier board is back. Cloud saving stays paused.');
 });
 
+// #2265 (found by the #2261 audit): the exact-acknowledged-cloud-source path
+// republishes an unreadable generation whose bytes are this device's
+// acknowledged copy. Adoption and the automatic recovery default both keep the
+// person's Use my board from before recovery; this path must keep it too, or
+// an ordinary reconnect publishes the board and shows synced after a toast
+// that said cloud saving stays paused.
+test('RISK exact acknowledged cloud source: after the person chooses Use my board from before recovery, a reconnect or Retry sync does not rebuild and publish the exact copy by itself and cloud saving stays paused',async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+ const declineKey='fvp:chain-scanner:declined-automatic-cloud-recovery';
+ assert.equal(ctx.state.syncRev,originalRoot.rev,'fixture: this device acknowledged the generation that is now unreadable');
+ // On this opening the exact path cannot archive its source (device storage
+ // refuses that write), so the same pull opens the automatic recovery
+ // default instead, and that default's publication is refused.
+ const protect=store.protectRecoverySource;let refusedExact=0,refusing=true;
+ store.protectRecoverySource=async function(...args){if(refusing&&args[0]?.key?.startsWith('cloud-generation-recovery:')){refusedExact++;return false;}return protect.apply(this,args);};
+ t.after(()=>{store.protectRecoverySource=protect;});
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ refusing=false;
+ assert.ok(refusedExact>=1,'fixture: the exact path’s archive write was refused on that opening');
+ // The person chooses Use my board from before recovery in open Settings.
+ t.after(faithfulModalQuery2194(shim));
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ const button=declineButton2194();
+ shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ assert.equal(shim.document.getElementById('toast').textContent,'Your earlier board is back. Cloud saving stays paused.','positive control: the decline succeeded');
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: the decline released the older copy');
+ assert.ok(ctx.localStorage.getItem(declineKey),'positive control: the choice is remembered');
+ const before=JSON.stringify(ctx.state);
+ // Cloud writes and device storage work again. Every condition the exact path
+ // needs now holds: the unreadable generation's bytes are this device's
+ // acknowledged copy.
+ delete app.faults.push;ctx.closeModal();
+ const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};
+ t.after(()=>{backend.CS.push=push;});
+ const cloudBefore=JSON.stringify([...backend.docs].filter(([key])=>!key.startsWith('users/owner/recoveryProtections/')));
+ for(const attempt of ['reconnect','Retry sync']){
+  if(attempt==='reconnect')shim.window.dispatchEvent({type:'online'});else await ctx.onAction('sync-retry',{});
+  await adoptionSettle2254(ctx,attempt+' settles');
+  await fixtureDeadline(async wait=>{await wait(20);while(!idle())await wait(10);},attempt+' settles',30000);
+  assert.deepEqual(pushes,[],'nothing is published after '+attempt);
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the cloud stays at the unreadable revision after '+attempt);
+  assert.equal(JSON.stringify([...backend.docs].filter(([key])=>!key.startsWith('users/owner/recoveryProtections/'))),cloudBefore,'no cloud generation changes after '+attempt);
+  assert.equal(JSON.stringify(ctx.state),before,'the board from before recovery stays after '+attempt);
+  assert.ok(ctx.localStorage.getItem(declineKey),'the choice is kept after '+attempt);
+  assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ synced','the status never says synced after '+attempt);
+ }
+});
+
+// #2268 review (finding 1): the same exact-copy device as the #2265 test,
+// after the person chose Use my board from before recovery. Answers the app,
+// its backend and the unreadable generation's chunk path, with cloud writes and
+// device storage working again and nothing read or published yet.
+async function declinedExactCopy2268(t){
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+ const protect=store.protectRecoverySource;let refusing=true;
+ store.protectRecoverySource=async function(...args){if(refusing&&args[0]?.key?.startsWith('cloud-generation-recovery:'))return false;return protect.apply(this,args);};
+ t.after(()=>{store.protectRecoverySource=protect;});
+ const {idle}=await pendingAutomaticDefault2194(t,app);
+ refusing=false;
+ t.after(faithfulModalQuery2194(shim));
+ ctx.openSettings();shim.document.getElementById('toast').textContent='';
+ const button=declineButton2194();
+ shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ assert.equal(shim.document.getElementById('toast').textContent,'Your earlier board is back. Cloud saving stays paused.','positive control: the decline succeeded');
+ delete app.faults.push;ctx.closeModal();
+ const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};
+ t.after(()=>{backend.CS.push=push;});
+ const settle=async message=>{await adoptionSettle2254(ctx,message);await fixtureDeadline(async wait=>{await wait(20);while(!idle())await wait(10);},message,30000);};
+ return {...app,idle,settle,pushes,unreadableChunks:'server:users/owner/generations/'+originalRoot.activeGeneration+'/chunks'};
+}
+
+// #2268 review (finding 1): #2265 kept the exact rebuild from publishing over
+// the person's Use my board from before recovery, but it returned before the
+// rebuild's completed check recorded the write hold, so the declined root was
+// never remembered as a completed refusal. Each reconnect then downloaded and
+// decoded the whole unreadable generation again, and each edit's save started
+// another full cloud read. Once one read has found the declined root again,
+// later reconnects and saves read only the root, as for any other refusal.
+test('RISK exact acknowledged cloud source: after the person chooses Use my board from before recovery, later saves and reconnects do not download the unreadable generation again and still publish nothing',async t=>{
+ const app=await declinedExactCopy2268(t),{ctx,shim,backend,originalRoot,pushes,settle,unreadableChunks}=app;
+ const downloads=()=>backend.network.filter(entry=>entry===unreadableChunks).length;
+ shim.window.dispatchEvent({type:'online'});await settle('the first reconnect after the decline settles');
+ const afterFirstRead=downloads();
+ assert.ok(afterFirstRead>=1,'positive control: the first read after the decline finds the unreadable generation again');
+ for(const step of ['an edit is saved','a reconnect','another edit is saved','another reconnect']){
+  if(step.endsWith('saved')){
+   shim.document.getElementById('addInput').value='Kept on this device: '+step;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+   vm.runInContext('clearTimeout(cloudTimer);cloudTimer=null',ctx);await ctx.sendPush();
+  }else shim.window.dispatchEvent({type:'online'});
+  await settle(step+' settles');
+  // Behaviour under test: the declined root is a completed refusal, so neither saves nor reconnects download it again.
+  assert.equal(downloads(),afterFirstRead,'the unreadable generation is not downloaded again after '+step);
+  assert.deepEqual(pushes,[],'nothing is published after '+step);
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the cloud stays at the unreadable revision after '+step);
+  assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ synced','the status never says synced after '+step);
+ }
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Kept on this device: another edit is saved'),'the edits stay on this device');
+});
+
+// #2268 review (finding 8): a launch whose cloud backend could not start (the
+// Firebase SDK cannot load offline) reports itself ready with no account. The
+// app read that as a completed sign-out and forgot the person's Use my board
+// from before recovery, so the next online launch rebuilt and published the
+// board over the declined unreadable root, as #2265 promised it would not.
+test('RISK exact acknowledged cloud source: a launch whose cloud backend could not start keeps the choice of Use my board from before recovery, so the next online launch still publishes nothing',async t=>{
+ const app=await declinedExactCopy2268(t),{backend,originalRoot}=app;
+ const declineKey='fvp:chain-scanner:declined-automatic-cloud-recovery';
+ assert.ok(app.shim.localStorage.getItem(declineKey),'fixture: the choice is remembered');
+ await closeLegacyApp173(app);backend.CS.suspend();
+ // An offline launch: the backend's start fails before it knows any account.
+ const offline=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:app.shim.localStorage});
+ if(!offline.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),offline.ctx,{filename:'device-store-v2.js'});offline.ctx.window.ChainStorageV2=offline.ctx.ChainStorageV2;}
+ await offline.ctx.__dataReady;
+ const failed=await loadCloudBackendV2({runtimeWindow:offline.ctx.window,sharedDocs:backend.docs,timeoutMs:5000,
+  firebaseSDK:{getFirestore(){throw Object.assign(Error('Firebase SDK unavailable offline'),{code:'unavailable'});}}});
+ await flush();await adoptionSettle2254(offline.ctx,'the offline launch settles');
+ assert.deepEqual([failed.CS.ready,failed.CS.user??null,failed.CS.errorStage],[true,null,'init'],'fixture: the backend could not start');
+ await closeLegacyApp173(offline);
+ // The next launch is online and signed in to the same account.
+ const online=await coldRelaunch2198(t,app,[],{signIn:false});
+ const pushes=[],push=online.backend.CS.push;online.backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};
+ online.backend.emitAuth({uid:'owner',email:'e@example.com'});online.ctx.closeModal();await flush();await online.ctx.cloudPull();await online.settle('the online launch settles');
+ await adoptionSettle2254(online.ctx,'the online launch’s saves settle');
+ // Behaviour under test: the choice outlives the failed start.
+ assert.deepEqual(pushes,[],'nothing is published');
+ assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'the cloud stays at the unreadable revision');
+ assert.ok(online.shim.localStorage.getItem(declineKey),'the choice is still remembered');
+ assert.notEqual(online.shim.document.getElementById('syncBtn').textContent,'☁ synced','the status never says synced');
+});
+
 // #2254 release review (B1, specialist): the pull reports a decode that failed
 // without a code as an unreadable generation, so a digest the browser could
 // not compute once (a DOMException), a RangeError under memory pressure or a
@@ -6494,6 +6907,283 @@ test('RISK daily backup retention hold: while cloud recovery waits on an unreada
    assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the board itself is the saved head');
   }
  });
+});
+
+// #2264 (B): signing out ends the recovery's own records (the remembered
+// unreadable copy, the decline and the waiting state), but the board on this
+// device still belongs to the same account and the cloud has confirmed
+// nothing. Its daily backups keep the seven days until the cloud confirms a
+// board for that account, as Settings and the November 6 changelog promise.
+test('RISK daily backup retention hold sign-out: signing out while cloud recovery waits keeps this account’s daily backups for seven calendar days, and once the account signs back in and the cloud confirms a board the next save trims them to three',async t=>{
+ const app=await containedAdoptionApp2254(t),{ctx,shim,backend,acknowledgedPath,pushes}=app,store=ctx.window.ScannerDeviceStore,codec=ctx.window.ChainStorageV2;
+ const base=JSON.stringify(ctx.state.decisionBase);
+ // The generation before the unreadable one is not yet this device's copy, so nothing is adopted and recovery waits.
+ await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not yet'};return JSON.stringify(board);});
+ await newerEditBeforeAdoption2254(app);
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the waiting opening settles');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: cloud recovery waits');
+ const account=ctx.state.syncAccount??null;
+ // The owner signs out while recovery waits.
+ backend.emitAuth(null);await flush();await adoptionSettle2254(ctx,'the sign-out settles');
+ assert.equal(ctx.state.syncAccount??null,account,'fixture: the board on this device still belongs to the same account');
+ // Daily backups this account saved on the six days before today.
+ const dayBefore=days=>vm.runInContext('(()=>{const at=new Date(Date.now());at.setHours(12,0,0,0);at.setDate(at.getDate()-'+days+');return backupDay(+at);})()',ctx);
+ const head=await store.readHead(),earlier=[];
+ for(const days of [6,5,4,3]){
+  const backup={id:'daily:signed-out-2264-'+days,day:dayBefore(days),at:Date.now()-days*86400000,kind:'daily',payload:head.payload,account};
+  assert.equal((await store.putBackup({expectedHash:head.hash,backup}))?.ok,true,'fixture: the daily backup from '+days+' days ago is saved');
+  earlier.push(backup.id);
+ }
+ await ctx.refreshDeviceBackupCache();
+ shim.document.getElementById('addInput').value='Saved while signed out';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const held=(await store.listBackups()).map(row=>row.id);
+ // Behaviour under test: signing out doesn't end the seven-day hold before the cloud confirms a board.
+ assert.deepEqual(earlier.filter(id=>!held.includes(id)),[],'daily backups keep seven calendar days after signing out while recovery waits');
+ // The earlier generation is this device's copy again; signing back in adopts and the cloud confirms the board.
+ await rewriteGenerationFixture(backend,acknowledgedPath,codec,()=>JSON.parse(base).payload);
+ backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{while(!pushes.length||!adoptionIdle2254(ctx))await wait(10);},'signing back in adopts',30000);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','positive control: the cloud confirmed the board');
+ shim.document.getElementById('addInput').value='Saved after the cloud confirmed';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ const after=await store.listBackups(),ids=after.map(row=>row.id);
+ assert.deepEqual(earlier.filter(id=>ids.includes(id)),[],'the first save after the cloud confirms trims daily backups to three calendar days');
+ assert.ok(after.some(row=>row.kind==='daily'&&row.day===dayBefore(0)),'today’s daily backup stays');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the board itself is the saved head');
+});
+
+// #2268 review: a device whose cloud recovery waits on an unreadable
+// generation, as in the #2264 (B) test.
+async function waitingRecovery2268(t){
+ const app=await containedAdoptionApp2254(t),{ctx,shim,backend,acknowledgedPath}=app,codec=ctx.window.ChainStorageV2;
+ const base=JSON.stringify(ctx.state.decisionBase);
+ await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.futureEarlierFixture={opaque:'not yet'};return JSON.stringify(board);});
+ await newerEditBeforeAdoption2254(app);
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the waiting opening settles');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','positive control: cloud recovery waits');
+ // Makes the generation before the unreadable one this device's copy again.
+ const restoreEarlier=()=>rewriteGenerationFixture(backend,acknowledgedPath,codec,()=>JSON.parse(base).payload);
+ return {...app,account:ctx.state.syncAccount??null,restoreEarlier};
+}
+// Saves this account's daily backups from six to three days before today on
+// the device, then makes one ordinary save. Answers the ones that save removed.
+async function dailyBackupsTrimmedBySave2268(ctx,shim,account,title){
+ const store=ctx.window.ScannerDeviceStore;
+ const dayBefore=days=>vm.runInContext('(()=>{const at=new Date(Date.now());at.setHours(12,0,0,0);at.setDate(at.getDate()-'+days+');return backupDay(+at);})()',ctx);
+ const head=await store.readHead(),earlier=[];
+ for(const days of [6,5,4,3]){
+  const backup={id:'daily:held-2268-'+days+'-'+Math.random(),day:dayBefore(days),at:Date.now()-days*86400000,kind:'daily',payload:head.payload,account};
+  assert.equal((await store.putBackup({expectedHash:head.hash,backup}))?.ok,true,'fixture: the daily backup from '+days+' days ago is saved');
+  earlier.push(backup.id);
+ }
+ await ctx.refreshDeviceBackupCache();
+ shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true,'fixture: the save succeeds');
+ const kept=(await store.listBackups()).map(row=>row.id);
+ return earlier.filter(id=>!kept.includes(id));
+}
+
+// #2268 review (finding 13): the #2264 (B) test never reloaded between the
+// sign-out and the trimming save, so a hold kept only in memory passed it, and
+// it never read a hold record that cannot be parsed, which must still hold:
+// losing a daily backup cannot be undone. Here the app is relaunched signed
+// out before the save, with the record as saved and with it unreadable.
+test('RISK daily backup retention hold sign-out: after signing out while cloud recovery waits, the app relaunched signed out keeps this account’s daily backups for seven calendar days, also when the remembered hold cannot be read',async t=>{
+ for(const record of ['as saved','unreadable'])await t.test('the hold record '+record,async sub=>{
+  const app=await waitingRecovery2268(sub),{ctx,shim,backend,account}=app;
+  backend.emitAuth(null);await flush();await adoptionSettle2254(ctx,'the sign-out settles');
+  if(record==='unreadable')shim.localStorage.setItem('fvp:chain-scanner:daily-backup-recovery-hold','{"v":1,"account":');
+  await closeLegacyApp173(app);backend.CS.suspend();
+  const cold=await coldRelaunch2198(sub,app,[],{signIn:false});
+  cold.backend.emitAuth(null);await flush();await cold.settle('the signed-out relaunch settles');
+  assert.equal(cold.ctx.state.syncAccount??null,account,'fixture: the relaunched board still belongs to the same account');
+  // Behaviour under test: the relaunched app keeps the seven-day hold.
+  assert.deepEqual(await dailyBackupsTrimmedBySave2268(cold.ctx,cold.shim,account,'Saved after relaunching signed out'),[],
+   'daily backups keep seven calendar days after a signed-out relaunch');
+ });
+});
+
+// #2268 review (finding 4): while a contained adoption waits for the cloud to
+// confirm its publication, the root is still unreadable and nothing has been
+// confirmed. Hiding the page (an app switch) stops the adoption's upload and
+// clears what the app held in memory, and the adoption had already forgotten
+// the remembered unreadable copy, so a save made then trimmed this account's
+// daily backups to three days.
+test('RISK daily backup retention hold: an app switch that cuts off a contained adoption before the cloud confirms it keeps this account’s daily backups for seven calendar days',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,faults,revision,pushes}=app,store=ctx.window.ScannerDeviceStore;
+ await newerEditBeforeAdoption2254(app);
+ const account=ctx.state.syncAccount??null;
+ let hidden=false;
+ t.after(()=>{delete faults.beforeTransaction;shim.document.hidden=false;});
+ faults.beforeTransaction=async()=>{
+  if(hidden)return;const pending=await store.getPendingUpload('owner');if(pending?.baseRev!==revision+1)return;
+  hidden=true;shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});
+ };
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the cut-off adoption settles');
+ assert.equal(hidden,true,'fixture: the page was hidden inside the adoption’s upload');
+ assert.equal(pushes.length,1,'positive control: the adoption’s upload started');
+ assert.equal(backend.docs.get('users/owner').rev,revision+1,'fixture: the cloud did not confirm anything');
+ assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ synced','fixture: the board is not confirmed');
+ // Behaviour under test: a save while the page is hidden keeps the seven days.
+ assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved while the app is in the background'),[],
+  'daily backups keep seven calendar days while the adoption waits for the cloud');
+});
+
+// #2268 review (finding 5): a read that finds the cloud's copy unreadable
+// holds the daily backups through the error it reports. When the app never
+// handles that read (the account signs out as it returns, or an open editor
+// defers it), nothing else held them: the sign-out's own observation ran after
+// the backend had cleared the error, and the next read clears it as it starts,
+// so a save made then trimmed this account's daily backups to three days.
+test('RISK daily backup retention hold: a reported unreadable cloud copy keeps this account’s daily backups for seven calendar days through a sign-out as the read returns and through a stalled next read',async t=>{
+ for(const variant of ['sign-out as the read returns','an editor defers the read, then the next read stalls'])await t.test(variant,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,faults,originalRoot}=app;
+  ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+  const account=ctx.state.syncAccount??null,chunksPath='users/owner/generations/'+originalRoot.activeGeneration+'/chunks';
+  let reported=false;
+  if(variant==='sign-out as the read returns'){
+   ctx.window.addEventListener('cloudsync',()=>{
+    if(reported||backend.CS.errorCode!=='corrupt-generation')return;
+    reported=true;backend.emitAuth(null);
+   });
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the read and the sign-out settle');
+   assert.equal(backend.CS.user,null,'fixture: the account signed out');
+  }else{
+   faults.serverRead=async path=>{if(path===chunksPath&&!reported){reported=true;shim.document.activeElement={matches:selector=>selector.includes('input')};}};
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the deferred read settles');
+   assert.equal(backend.CS.errorCode,'corrupt-generation','fixture: the read reported the unreadable copy');
+   shim.document.activeElement=null;
+   const stalled=deferredSyncFixture();sub.after(()=>stalled.resolve());
+   let started=false;faults.serverRead=async()=>{started=true;await stalled.promise;};
+   ctx.cloudPull();
+   await fixtureDeadline(async wait=>{while(!started)await wait(5);},'the next read reaches the server',30000);
+   assert.equal(vm.runInContext('pulling',ctx),true,'fixture: the next read is under way');
+   assert.equal(backend.CS.errorCode,null,'fixture: the next read cleared the reported error as it started');
+  }
+  assert.equal(reported,true,'positive control: the unreadable copy was reported');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'fixture: the cloud confirmed nothing');
+  // Behaviour under test: the reported unreadable copy keeps the seven days.
+  assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved after the unreadable copy was reported'),[],
+   'daily backups keep seven calendar days');
+ });
+});
+
+// #2268 review (finding 6): the remembered daily backup hold ends when the
+// cloud confirms a board. It ended instead wherever the app recorded which
+// cloud revision the board is based on. That happens for the exact rebuild's
+// stand-in read before anything is published, so a rebuild whose save had not
+// landed lost the hold once the page was hidden; and it does not happen where
+// the automatic recovery default records its confirmed publication, so the
+// hold outlived that confirmation.
+test('RISK daily backup retention hold: the hold ends when the cloud confirms a board, not when the exact rebuild prepares its save, and the automatic recovery default’s confirmed publication ends it',async t=>{
+ for(const variant of ['the exact rebuild’s save has not landed','the automatic recovery default is confirmed'])await t.test(variant,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,faults,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+  const account=ctx.state.syncAccount??null;
+  if(variant==='the exact rebuild’s save has not landed'){
+   const refusal=Object.assign(Error('Controlled rebuild publication refusal'),{code:'permission-denied'});
+   Object.defineProperty(faults,'push',{configurable:true,get(){return refusal;}});sub.after(()=>{delete faults.push;});
+   const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};sub.after(()=>{backend.CS.push=push;});
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the rebuild settles');
+   assert.deepEqual(pushes,[originalRoot.rev],'positive control: the exact rebuild tried to save over the unreadable revision');
+   assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'fixture: the cloud confirmed nothing');
+   shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});sub.after(()=>{shim.document.hidden=false;});
+   // Behaviour under test: the rebuild has published nothing, so the seven days stay.
+   assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved before the rebuild landed'),[],
+    'daily backups keep seven calendar days while the rebuild’s save has not landed');
+  }else{
+   const protect=store.protectRecoverySource;let refusing=true;
+   store.protectRecoverySource=async function(...args){if(refusing&&args[0]?.key?.startsWith('cloud-generation-recovery:'))return false;return protect.apply(this,args);};
+   sub.after(()=>{store.protectRecoverySource=protect;});
+   await pendingAutomaticDefault2194(sub,app);
+   refusing=false;delete faults.push;
+   await ctx.sendPush();
+   await fixtureDeadline(async wait=>{await wait(5);while(backend.docs.get('users/owner').rev===originalRoot.rev||!adoptionIdle2254(ctx))await wait(10);},'the automatic default publishes',30000);
+   await adoptionSettle2254(ctx,'the publication settles');
+   assert.equal(vm.runInContext('!!deviceRecoveryCloudHold',ctx),false,'positive control: the cloud confirmed the automatic default’s board');
+   assert.equal(ctx.state.syncRev,backend.docs.get('users/owner').rev,'positive control: the board is based on the confirmed revision');
+   // Behaviour under test: the confirmation ends the hold, so the next save trims to three days.
+   assert.equal((await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved after the cloud confirmed')).length,4,
+    'the first save after the cloud confirms trims daily backups to three calendar days');
+  }
+ });
+});
+
+// #2268 review (finding 7): browser storage can refuse the remembered hold. It
+// was written once and any failure ignored: no room made by releasing the
+// app's own diagnostics, no read-back and nothing kept in memory, so with
+// storage full the next save trimmed this account's daily backups. The
+// adoption of the finding 4 test is cut off by an app switch while storage
+// refuses the record, either for good (the page itself still holds) or only
+// until the app's diagnostics give way (the record is saved, and a relaunch
+// still holds).
+test('RISK daily backup retention hold: when browser storage refuses the remembered hold, the page still keeps this account’s daily backups for seven calendar days, and room made from the app’s diagnostics saves it for a relaunch',async t=>{
+ for(const storage of ['refuses the record for good','is full until the app’s diagnostics give way'])await t.test('storage '+storage,async sub=>{
+  const app=await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,faults,revision}=app,store=ctx.window.ScannerDeviceStore;
+  const holdKey='fvp:chain-scanner:daily-backup-recovery-hold',diagnosticsKey='fvp:chain-scanner:restart-diagnostics:v1';
+  await newerEditBeforeAdoption2254(app);
+  const account=ctx.state.syncAccount??null;
+  shim.localStorage.setItem(diagnosticsKey,shim.localStorage.getItem(diagnosticsKey)??'{"v":1}');
+  const setItem=shim.localStorage.setItem;let refused=0;
+  shim.localStorage.setItem=function(key,value){
+   if(key===holdKey&&(storage==='refuses the record for good'||this.getItem(diagnosticsKey)!==null)){refused++;throw Object.assign(Error('storage full'),{name:'QuotaExceededError'});}
+   return setItem.call(this,key,value);
+  };
+  sub.after(()=>{shim.localStorage.setItem=setItem;});
+  let hidden=false;
+  sub.after(()=>{delete faults.beforeTransaction;shim.document.hidden=false;});
+  faults.beforeTransaction=async()=>{
+   if(hidden)return;const pending=await store.getPendingUpload('owner');if(pending?.baseRev!==revision+1)return;
+   hidden=true;shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});
+  };
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the cut-off adoption settles');
+  assert.equal(hidden,true,'fixture: the page was hidden inside the adoption’s upload');
+  assert.ok(refused>=1,'fixture: storage refused the remembered hold');
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'fixture: the cloud did not confirm anything');
+  if(storage==='refuses the record for good'){
+   // Behaviour under test: the page keeps the hold it could not save.
+   assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved while storage is full'),[],
+    'daily backups keep seven calendar days in this page');
+  }else{
+   shim.localStorage.setItem=setItem;
+   await closeLegacyApp173(app);backend.CS.suspend();
+   const cold=await coldRelaunch2198(sub,app,[],{signIn:false});
+   cold.backend.emitAuth(null);await flush();await cold.settle('the signed-out relaunch settles');
+   // Behaviour under test: the record saved once room was made still holds after a relaunch.
+   assert.deepEqual(await dailyBackupsTrimmedBySave2268(cold.ctx,cold.shim,account,'Saved after relaunching'),[],
+    'daily backups keep seven calendar days after a relaunch');
+  }
+ });
+});
+
+// #2268 review (finding 11, boot race): the build before this one kept the
+// remembered unreadable copy (and a decline) for the account but no daily
+// backup hold record. When a relaunch hears "signed out" before the board is
+// loaded, those records are forgotten, and the hold checked at that moment
+// matched no board, so nothing kept it: the next save trimmed this account's
+// daily backups while the cloud had confirmed nothing.
+test('RISK daily backup retention hold sign-out: a relaunch that hears signed out before the board loads keeps this account’s daily backups for seven calendar days from the recovery records it forgets',async t=>{
+ const app=await waitingRecovery2268(t),{ctx,shim,backend,account}=app;
+ const provedKey='fvp:chain-scanner:proved-unreadable-cloud-source',holdKey='fvp:chain-scanner:daily-backup-recovery-hold';
+ assert.ok(shim.localStorage.getItem(provedKey),'fixture: the waiting recovery is remembered for the account');
+ // As the previous build left the device: no daily backup hold record.
+ shim.localStorage.removeItem(holdKey);
+ await closeLegacyApp173(app);backend.CS.suspend();
+ let early=null,boardAtSignOut;
+ const relaunch=await loadAppAtTime(1792323000000,{indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName,sharedStorage:shim.localStorage,beforeStateReady(c){
+  // The backend answers before the board loads, as a revoked session can.
+  early=loadCloudBackendV2({runtimeWindow:c.window,sharedDocs:backend.docs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000})
+   .then(b=>{boardAtSignOut=vm.runInContext('state',c);b.auth.currentUser=null;b.emitAuth(null);return b;});
+ }});
+ const cloud=await early;t.after(async()=>{cloud.CS.suspend();await closeLegacyApp173(relaunch);});
+ const {ctx:c2,shim:s2}=relaunch;
+ if(!c2.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),c2,{filename:'device-store-v2.js'});c2.window.ChainStorageV2=c2.ChainStorageV2;}
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',c2))await wait();},'the relaunch loads the board',30000);
+ await adoptionSettle2254(c2,'the relaunch settles');
+ assert.equal(boardAtSignOut,null,'fixture: the sign-out arrived before the board loaded');
+ assert.equal(s2.localStorage.getItem(provedKey),null,'fixture: the sign-out forgot the remembered unreadable copy');
+ assert.equal(c2.state.syncAccount??null,account,'fixture: the board still belongs to the same account');
+ // Behaviour under test: the forgotten records' account keeps its seven days.
+ assert.deepEqual(await dailyBackupsTrimmedBySave2268(c2,s2,account,'Saved after a signed-out relaunch'),[],
+  'daily backups keep seven calendar days');
 });
 
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
