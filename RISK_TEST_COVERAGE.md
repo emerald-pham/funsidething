@@ -1527,6 +1527,7 @@ its RISK test; the map follows.
 - RISK daily backup retention hold sign-out: signing out while cloud recovery waits keeps this account’s daily backups for seven calendar days, and once the account signs back in and the cloud confirms a board the next save trims them to three
 - RISK daily backup retention hold sign-out: after signing out while cloud recovery waits, the app relaunched signed out keeps this account’s daily backups for seven calendar days, also when the remembered hold cannot be read
 - RISK daily backup retention hold: an app switch that cuts off a contained adoption before the cloud confirms it keeps this account’s daily backups for seven calendar days
+- RISK daily backup retention hold: a reported unreadable cloud copy keeps this account’s daily backups for seven calendar days through a sign-out as the read returns and through a stalled next read
 - RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit
 - RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it
 - RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders

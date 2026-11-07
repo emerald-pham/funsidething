@@ -5231,6 +5231,12 @@ function observeCloudIdentity(){
   const user=window.CloudSync?.user || null;
   const identity=cloudAccountIdentity();
   supportDiagnosticsObserveIdentity(window.CloudSync||null,user,identity);
+  // #2268 review: the backend reports an unreadable cloud copy here, before
+  // cloudPull sees its read, and clears the report at a sign-out or as the
+  // next read starts. A read cloudPull never handles (the account signed out
+  // as it returned, or an editor deferred it) left the hold on that report
+  // alone, so it is kept from the report itself.
+  if(state&&liveBoardAccepted&&window.CloudSync?.errorCode==="corrupt-generation")holdDailyBackupsForCloudRecovery();
   // #2264: what this observation forgets below can't end the daily backups'
   // seven-day hold; only the cloud confirming a board can.
   const dailyHoldAccount=dailyBackupsHeldForRecovery()?dailyBackupAccount():undefined;

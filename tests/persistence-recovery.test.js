@@ -6937,6 +6937,44 @@ test('RISK daily backup retention hold: an app switch that cuts off a contained 
   'daily backups keep seven calendar days while the adoption waits for the cloud');
 });
 
+// #2268 review (finding 5): a read that finds the cloud's copy unreadable
+// holds the daily backups through the error it reports. When the app never
+// handles that read (the account signs out as it returns, or an open editor
+// defers it), nothing else held them: the sign-out's own observation ran after
+// the backend had cleared the error, and the next read clears it as it starts,
+// so a save made then trimmed this account's daily backups to three days.
+test('RISK daily backup retention hold: a reported unreadable cloud copy keeps this account’s daily backups for seven calendar days through a sign-out as the read returns and through a stalled next read',async t=>{
+ for(const variant of ['sign-out as the read returns','an editor defers the read, then the next read stalls'])await t.test(variant,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,faults,originalRoot}=app;
+  ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+  const account=ctx.state.syncAccount??null,chunksPath='users/owner/generations/'+originalRoot.activeGeneration+'/chunks';
+  let reported=false;
+  if(variant==='sign-out as the read returns'){
+   ctx.window.addEventListener('cloudsync',()=>{
+    if(reported||backend.CS.errorCode!=='corrupt-generation')return;
+    reported=true;backend.emitAuth(null);
+   });
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the read and the sign-out settle');
+   assert.equal(backend.CS.user,null,'fixture: the account signed out');
+  }else{
+   faults.serverRead=async path=>{if(path===chunksPath&&!reported){reported=true;shim.document.activeElement={matches:selector=>selector.includes('input')};}};
+   ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the deferred read settles');
+   assert.equal(backend.CS.errorCode,'corrupt-generation','fixture: the read reported the unreadable copy');
+   shim.document.activeElement=null;
+   const stalled=deferredSyncFixture();sub.after(()=>stalled.resolve());
+   faults.serverRead=async()=>{await stalled.promise;};
+   ctx.cloudPull();await flush();
+   assert.equal(vm.runInContext('pulling',ctx),true,'fixture: the next read is under way');
+   assert.equal(backend.CS.errorCode,null,'fixture: the next read cleared the reported error as it started');
+  }
+  assert.equal(reported,true,'positive control: the unreadable copy was reported');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev,'fixture: the cloud confirmed nothing');
+  // Behaviour under test: the reported unreadable copy keeps the seven days.
+  assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved after the unreadable copy was reported'),[],
+   'daily backups keep seven calendar days');
+ });
+});
+
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
 // adoption has to cost no more there than an ordinary cloud save. The store is
 // built on a served build with the app's own writers: the large signed-in
