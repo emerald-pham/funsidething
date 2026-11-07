@@ -2648,8 +2648,10 @@ test('RISK cloud source review #2272: the stale diagnostic names the differing f
 
 test('RISK cloud source review #2272 guidance: mounted Help and the November 7 changelog say an unreadable or unchanged source is not a change',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Reading the same sources again is not a change: a cloud source one read could not read completely stays Unknown and cannot be chosen, and the review still finishes with the others\./);
- assert.match(help,/This device’s own cloud saves wait until the sources have been read\./);
+ const answer=(help.match(/<dt>Why does the review show a cloud source as Unknown\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
+ assert.match(answer,/Reading the same sources again is not a change: a cloud source one read could not read completely stays Unknown and cannot be chosen, and the review still finishes with the others\./);
+ assert.match(answer,/This device’s own cloud saves wait until the sources have been read\./);
+ assert.match(answer,/A new cloud save, an edit or another account still stops the review\./);
  assert.match(html,/<h3>November 7, 2026<\/h3><ul><li>Review cloud recovery sources no longer says the sources changed while they were read when nothing changed\./);
 });
 
