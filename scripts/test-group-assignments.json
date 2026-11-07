@@ -13476,6 +13476,16 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK manual backup reminder: the reminder counts this account’s manual backups without parsing their boards on any Settings render",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK manual backup reminder: manual backups saved before they named an account are read at most once across Settings renders and still count only for their own account",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

@@ -2265,6 +2265,8 @@ This boundary control holds a successful real provider reply, installs a later a
 - RISK manual backup reminder: Settings shows no reminder below two manual backups, other backup kinds do not count, and the second manual backup brings it
 - RISK manual backup reminder: from two manual backups the reminder is a polite status where it first appears and is not announced again when Settings re-renders
 - RISK manual backup reminder: only this account’s manual backups count toward the reminder
+- RISK manual backup reminder: the reminder counts this account’s manual backups without parsing their boards on any Settings render
+- RISK manual backup reminder: manual backups saved before they named an account are read at most once across Settings renders and still count only for their own account
 - RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step
 - RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit
 - RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works

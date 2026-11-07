@@ -6606,6 +6606,88 @@ test('RISK manual backup reminder: only this account’s manual backups count to
  assert.equal(reminder.text,MANUAL_BACKUP_REMINDER);
 });
 
+// #2254 re-review: each manual backup is a whole board, so the reminder must
+// not parse every one of them on each Settings render to count this
+// account's copies. The count is measured on the reminder Settings renders
+// from the listed manual rows (the backup list's own row checks are older and
+// counted separately). Counts JSON.parse calls on a backup's payload text.
+function countBackupParses2254(t,ctx,payloads){
+ const json=vm.runInContext('JSON',ctx),parse=json.parse,counted={calls:0};
+ json.parse=function(text,...rest){if(typeof text==='string'&&payloads.has(text))counted.calls++;return parse.call(this,text,...rest);};
+ t.after(()=>{json.parse=parse;});
+ return counted;
+}
+// The reminder Settings renders from the listed manual rows, and the parses it made.
+function reminderRender2254(ctx,parses){
+ const listed=manualRows(ctx),before=parses.calls,html=ctx.manualBackupReminderHtml(listed);
+ return {reminder:manualBackupReminderIn(html),parsed:parses.calls-before};
+}
+async function deviceBackedApp2254(t){
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='manual-reminder-2254-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'}});
+ t.after(()=>closeLegacyApp173(app));
+ return app;
+}
+test('RISK manual backup reminder: the reminder counts this account’s manual backups without parsing their boards on any Settings render',async t=>{
+ for(const where of ['the older backup list','device storage'])await t.test(where,async sub=>{
+ const app=where==='device storage'?await deviceBackedApp2254(sub):await loadApp();if(where!=='device storage')sub.after(()=>app.dispose());const {ctx}=app;
+ ctx.addTask('Reminder cost task');ctx.state.syncAccount='me@example.test';await ctx.persist();
+ const other=JSON.stringify({...JSON.parse(JSON.stringify(ctx.state)),syncAccount:'other@example.test'});
+ assert.equal(ctx.saveLocalBackup('manual',other),true);
+ await makeManualBackup2254(app);
+ ctx.openSettings();
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'one backup of this account does not bring the reminder');
+ await makeManualBackup2254(app);await makeManualBackup2254(app);
+ assert.equal(manualRows(ctx).length,4,'positive control: four manual backups are on this device');
+ const parses=countBackupParses2254(t,ctx,new Set(manualRows(ctx).map(row=>row.payload)));
+ for(let render=0;render<3;render++){
+  const rendered=reminderRender2254(ctx,parses);
+  assert.equal(rendered.reminder?.text,MANUAL_BACKUP_REMINDER,'this account’s backups bring the reminder on render '+render);
+  assert.equal(rendered.parsed,0,'the reminder parses no manual backup’s board on render '+render);
+ }
+ ctx.openSettings();
+ assert.equal(manualBackupReminderIn(settingsMarkup(app))?.text,MANUAL_BACKUP_REMINDER,'Settings shows the reminder');
+ // Positive control: the counter sees the app parse a backup's board.
+ assert.equal(ctx.saveLocalBackup('manual',other),true);
+ assert.ok(parses.calls>0,'positive control: the counter sees the app parse a backup board');
+ if(where==='device storage')assert.ok(ctx.window.ScannerDeviceStore&&vm.runInContext('deviceBackupCache',ctx).filter(row=>row.kind==='manual').length>=3,'positive control: Make manual backup saved in device storage');
+ });
+});
+// Manual backups saved before backups named their account carry no account,
+// so their board is read once, the first time the reminder needs it, and
+// later renders reuse that answer. A device backup's id never names other bytes.
+test('RISK manual backup reminder: manual backups saved before they named an account are read at most once across Settings renders and still count only for their own account',async t=>{
+ const app=await deviceBackedApp2254(t),{ctx}=app;
+ ctx.addTask('Older reminder task');ctx.state.syncAccount='me@example.test';await ctx.persist();
+ const store=ctx.window.ScannerDeviceStore;
+ assert.ok(store,'fixture: the board saves in device storage');
+ const mine=JSON.stringify(ctx.state),other=JSON.stringify({...JSON.parse(mine),syncAccount:'other@example.test'});
+ const older=[['older-mine-1',mine],['older-other-1',other],['older-other-2',other.replace('Older reminder task','Another account task')],['older-mine-2',mine.replace('Older reminder task','Older reminder task two')]];
+ for(const [id,payload] of older){
+  const head=await store.readHead();
+  assert.equal((await store.putBackup({expectedHash:head.hash,backup:{id,kind:'manual',at:Date.now(),day:'2026-11-01',payload}})).ok,true);
+ }
+ await ctx.refreshDeviceBackupCache();
+ const rows=manualRows(ctx).filter(row=>row.id.startsWith('older-'));
+ assert.equal(rows.length,4,'fixture: four older manual backups are listed');
+ assert.ok(rows.every(row=>!Object.hasOwn(row,'account')),'fixture: the older backups name no account');
+ const parses=countBackupParses2254(t,ctx,new Set(rows.map(row=>row.payload)));
+ const first=reminderRender2254(ctx,parses);
+ assert.equal(first.reminder?.text,MANUAL_BACKUP_REMINDER,'two older backups of this account bring the reminder');
+ assert.ok(first.parsed>=1&&first.parsed<=rows.length,'each older backup is read at most once on the first render ('+first.parsed+')');
+ ctx.openSettings();
+ assert.equal(manualBackupReminderIn(settingsMarkup(app))?.text,MANUAL_BACKUP_REMINDER,'Settings shows the reminder');
+ for(let render=0;render<3;render++){
+  const later=reminderRender2254(ctx,parses);
+  assert.equal(later.reminder?.text,MANUAL_BACKUP_REMINDER);
+  assert.equal(later.parsed,0,'later renders read no older backup again (render '+render+')');
+ }
+ // Only the other account's two older backups: no reminder for this account.
+ for(const id of ['older-mine-1','older-mine-2'])assert.equal((await ctx.window.ScannerDeviceStore.commitHead({expectedHash:(await store.readHead()).hash,payload:(await store.readHead()).payload,account:'me@example.test',removeBackupIds:[id]})).ok,true);
+ await ctx.refreshDeviceBackupCache();ctx.openSettings();
+ assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'another account’s older backups do not bring the reminder');
+});
+
 test('RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
  ctx.addTask('Third backup task');await ctx.persist();
