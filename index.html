@@ -1858,6 +1858,7 @@ function dailyBackupsHeldForRecovery(){
     if(deviceRecoveryCloudHold||automaticCloudRecovery||unrepairableCloudSource||provedUnreadableCloudSource||automaticRecoveryWaiting||
       window.CloudSync?.errorCode==="corrupt-generation")return true;
     const account=dailyBackupAccount();
+    if(dailyBackupRecoveryHoldInPage&&(dailyBackupRecoveryHoldInPage.account??null)===account)return true;
     return [readPersistedUnreadableCloudSource(),readDeclinedAutomaticCloudRecovery(),readDailyBackupRecoveryHold()]
       .some(record=>!!record&&(record.account??null)===account);
   }catch(e){return true;}
@@ -1878,8 +1879,21 @@ function readDailyBackupRecoveryHold(){
   try{const record=raw.length<=4096?JSON.parse(raw):null;if(record?.v===1)return record;}catch{}
   return {account:dailyBackupAccount()};
 }
+// #2268 review: the hold is kept in this page as well as in storage. A full
+// or failing storage used to drop it silently, and the next save trimmed the
+// daily backups. Like the backup list's own writes, the app's diagnostics
+// give way for room once, and the record counts as saved only once it reads
+// back.
+let dailyBackupRecoveryHoldInPage=null;
 function rememberDailyBackupRecoveryHold(account){
-  try{localStorage.setItem(DAILY_BACKUP_RECOVERY_HOLD_KEY,JSON.stringify({v:1,account}));}catch{}
+  dailyBackupRecoveryHoldInPage={v:1,account};
+  const raw=JSON.stringify(dailyBackupRecoveryHoldInPage);
+  const write=()=>{localStorage.setItem(DAILY_BACKUP_RECOVERY_HOLD_KEY,raw);return localStorage.getItem(DAILY_BACKUP_RECOVERY_HOLD_KEY)===raw;};
+  try{return write();}
+  catch(error){
+    if(!backupQuotaError(error)||!restartDiagnosticsYieldForCapacity())return false;
+    try{return write();}catch{return false;}
+  }
 }
 // #2268 review: cloudPull keeps the hold from the first read that finds the
 // cloud's copy unreadable, so it no longer depends on state a hidden page, a
@@ -1891,6 +1905,7 @@ function holdDailyBackupsForCloudRecovery(){
   }catch{}
 }
 function forgetDailyBackupRecoveryHold(account){
+  if((dailyBackupRecoveryHoldInPage?.account??null)===account)dailyBackupRecoveryHoldInPage=null;
   try{
     const raw=localStorage.getItem(DAILY_BACKUP_RECOVERY_HOLD_KEY);
     if(raw===null)return;

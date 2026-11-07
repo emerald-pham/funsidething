@@ -6962,8 +6962,9 @@ test('RISK daily backup retention hold: a reported unreadable cloud copy keeps t
    assert.equal(backend.CS.errorCode,'corrupt-generation','fixture: the read reported the unreadable copy');
    shim.document.activeElement=null;
    const stalled=deferredSyncFixture();sub.after(()=>stalled.resolve());
-   faults.serverRead=async()=>{await stalled.promise;};
-   ctx.cloudPull();await flush();
+   let started=false;faults.serverRead=async()=>{started=true;await stalled.promise;};
+   ctx.cloudPull();
+   await fixtureDeadline(async wait=>{while(!started)await wait(5);},'the next read reaches the server',30000);
    assert.equal(vm.runInContext('pulling',ctx),true,'fixture: the next read is under way');
    assert.equal(backend.CS.errorCode,null,'fixture: the next read cleared the reported error as it started');
   }
@@ -7012,6 +7013,53 @@ test('RISK daily backup retention hold: the hold ends when the cloud confirms a 
    // Behaviour under test: the confirmation ends the hold, so the next save trims to three days.
    assert.equal((await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved after the cloud confirmed')).length,4,
     'the first save after the cloud confirms trims daily backups to three calendar days');
+  }
+ });
+});
+
+// #2268 review (finding 7): browser storage can refuse the remembered hold. It
+// was written once and any failure ignored: no room made by releasing the
+// app's own diagnostics, no read-back and nothing kept in memory, so with
+// storage full the next save trimmed this account's daily backups. The
+// adoption of the finding 4 test is cut off by an app switch while storage
+// refuses the record, either for good (the page itself still holds) or only
+// until the app's diagnostics give way (the record is saved, and a relaunch
+// still holds).
+test('RISK daily backup retention hold: when browser storage refuses the remembered hold, the page still keeps this account’s daily backups for seven calendar days, and room made from the app’s diagnostics saves it for a relaunch',async t=>{
+ for(const storage of ['refuses the record for good','is full until the app’s diagnostics give way'])await t.test('storage '+storage,async sub=>{
+  const app=await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,faults,revision}=app,store=ctx.window.ScannerDeviceStore;
+  const holdKey='fvp:chain-scanner:daily-backup-recovery-hold',diagnosticsKey='fvp:chain-scanner:restart-diagnostics:v1';
+  await newerEditBeforeAdoption2254(app);
+  const account=ctx.state.syncAccount??null;
+  shim.localStorage.setItem(diagnosticsKey,shim.localStorage.getItem(diagnosticsKey)??'{"v":1}');
+  const setItem=shim.localStorage.setItem;let refused=0;
+  shim.localStorage.setItem=function(key,value){
+   if(key===holdKey&&(storage==='refuses the record for good'||this.getItem(diagnosticsKey)!==null)){refused++;throw Object.assign(Error('storage full'),{name:'QuotaExceededError'});}
+   return setItem.call(this,key,value);
+  };
+  sub.after(()=>{shim.localStorage.setItem=setItem;});
+  let hidden=false;
+  sub.after(()=>{delete faults.beforeTransaction;shim.document.hidden=false;});
+  faults.beforeTransaction=async()=>{
+   if(hidden)return;const pending=await store.getPendingUpload('owner');if(pending?.baseRev!==revision+1)return;
+   hidden=true;shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});
+  };
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the cut-off adoption settles');
+  assert.equal(hidden,true,'fixture: the page was hidden inside the adoption’s upload');
+  assert.ok(refused>=1,'fixture: storage refused the remembered hold');
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'fixture: the cloud did not confirm anything');
+  if(storage==='refuses the record for good'){
+   // Behaviour under test: the page keeps the hold it could not save.
+   assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved while storage is full'),[],
+    'daily backups keep seven calendar days in this page');
+  }else{
+   shim.localStorage.setItem=setItem;
+   await closeLegacyApp173(app);backend.CS.suspend();
+   const cold=await coldRelaunch2198(sub,app,[],{signIn:false});
+   cold.backend.emitAuth(null);await flush();await cold.settle('the signed-out relaunch settles');
+   // Behaviour under test: the record saved once room was made still holds after a relaunch.
+   assert.deepEqual(await dailyBackupsTrimmedBySave2268(cold.ctx,cold.shim,account,'Saved after relaunching'),[],
+    'daily backups keep seven calendar days after a relaunch');
   }
  });
 });
