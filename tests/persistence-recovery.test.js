@@ -6192,3 +6192,204 @@ test('RISK contained board adoption: after the person chooses Use my board from 
  // So the toast that confirmed the choice told the truth.
  assert.equal(toastText,'Your earlier board is back. Cloud saving stays paused.');
 });
+
+// #2254 review (S2): the owner's phone holds dozens of board copies, and
+// adoption has to cost no more there than an ordinary cloud save. The store is
+// built on a served build with the app's own writers: the large signed-in
+// board is acknowledged, five daily backups follow on earlier days, one
+// automatic recovery over an unreadable generation commits its archives and
+// publishes, a newer edit follows offline, and the device store records this
+// device's own upload whose reply never came, as an interrupted push leaves
+// it. Every run starts from a copy of that profile: opening it locally (the
+// baseline), adoption over the unreadable own upload, and an ordinary save of
+// the same board to a healthy cloud at the acknowledged revision. Peaks are
+// web-process memory over the local opening, in the same run on the same
+// engine. The store is scaled to one recovery so the test fits the suite
+// (about 120 MiB of saved rows; the owner-shaped harness store recorded on
+// #2254 is about 280 MiB).
+const CONTAINED_ADOPTION_HEADROOM_2254=200*1024*1024;
+test('RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const ACCOUNT='owner@example.test',IDENTITY='fixture-identity',fixture=await largeSignedInBoardFixture(ACCOUNT);
+ const GENERATION_PATH='/__chain-2254/earlier-generation.json',NEWER='Newer local edit before adoption',SETTLE_MS=4000,WAIT_MS=240000;
+ const mib=bytes=>Math.round(bytes/1048576),observed=[],failures=[],codec=loadStorageV2();
+ const headerOf=async payload=>{const encoded=await codec.encodeSnapshot(payload);return {chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash:encoded.hash};};
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const template=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2254-'+engineName+'-')),copies=[];
+  let earlier=null;
+  const launch=async(profile,tag,{seed=null,cloud=null,clock=false}={})=>{
+   const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+    env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
+   await context.addInitScript(({seed,cloud,GENERATION_PATH,ACCOUNT,IDENTITY,clock})=>{
+    // A page clock the store builder can move to earlier days.
+    if(clock){const real=Date.now.bind(Date);window.__clockOffset=0;Date.now=()=>real()+window.__clockOffset;}
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
+    const log=window.__adoption2254={pushes:[],published:null};
+    if(!cloud)return;
+    if(cloud.budget!=null)window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=cloud.budget;
+    if(cloud.retryDelay!=null)window.CLOUD_RETRY_DELAY_MS=cloud.retryDelay;
+    if(cloud.pushDelay!=null)window.CLOUD_PUSH_DELAY_MS=cloud.pushDelay;
+    // An in-page cloud with the real backend's answers. Damaged: the revision
+    // after the acknowledged one names an unreadable generation over the
+    // intact acknowledged copy. Healthy: the acknowledged copy is current.
+    const a=cloud.ackRev,damaged=cloud.shape==='damaged',INTACT='generation-intact-'+a,UNREADABLE='generation-unreadable-'+(a+1);
+    const root=damaged?{schemaVersion:2,rev:a+1,activeGeneration:UNREADABLE,previousGeneration:INTACT,updatedAt:1,serverUpdatedAt:null}
+     :{schemaVersion:2,rev:a,activeGeneration:INTACT,previousGeneration:null,updatedAt:1,serverUpdatedAt:null};
+    const generations=new Map(),body=async()=>(await fetch(GENERATION_PATH,{cache:'no-store'})).text();
+    const named=(pending,more=[])=>[...new Set([root.activeGeneration,root.previousGeneration,pending,...more].filter(id=>typeof id==='string'))];
+    const read=async(id,withChunks)=>{
+     if(id===INTACT){
+      const header={schemaVersion:2,state:'published',encoding:'utf8',...cloud.intact,baseRev:a-1};
+      if(!withChunks)return {id,header};
+      return {id,header,chunks:(await window.ChainStorageV2.encodeSnapshot(await body())).chunks};
+     }
+     if(id===UNREADABLE)return {id,header:{schemaVersion:2,state:'published',encoding:'utf8',...cloud.unreadable,baseRev:a},...(withChunks?{chunks:[]}:{})};
+     const stored=generations.get(id);return stored?{id,header:{...stored.header},...(withChunks?{chunks:stored.chunks}:{})}:{id,unavailable:true};
+    };
+    const ok=()=>Object.assign(cloudApi,{status:'ok',errorStage:null,errorCode:null,knownDamagedSource:false});
+    const cloudApi={configured:true,ready:true,user:ACCOUNT,status:'syncing',errorStage:null,errorCode:null,knownDamagedSource:false,recoveryRetentionPending:false,
+     signIn(){},signOut(){},recoveryIdentity:()=>IDENTITY,
+     async pull(){
+      if(log.published){ok();window.dispatchEvent(new CustomEvent('cloudsync'));const {payload,rev,updatedAt,serverUpdatedAt}=log.published;
+       return {payload,rev,updatedAt,serverUpdatedAt,schemaVersion:2,generationId:root.activeGeneration};}
+      if(!damaged){ok();window.dispatchEvent(new CustomEvent('cloudsync'));return {payload:await body(),rev:root.rev,updatedAt:1,serverUpdatedAt:1,schemaVersion:2,generationId:root.activeGeneration};}
+      Object.assign(cloudApi,{status:'error',errorStage:'pull',errorCode:'corrupt-generation',knownDamagedSource:true});window.dispatchEvent(new CustomEvent('cloudsync'));
+      return {error:true,code:'corrupt-generation',rev:root.rev,generationId:root.activeGeneration};
+     },
+     async push(payload,updatedAt,baseRev,context){
+      const entry={baseRev,result:null};log.pushes.push(entry);
+      if(typeof context?.validateBeforePublish==='function'&&!await context.validateBeforePublish(context.recoveryPending)){entry.result='source-changed';return {error:true,code:'recovery-source-changed'};}
+      if(baseRev!==root.rev){entry.result='conflict';return {conflict:true,rev:root.rev};}
+      const encoded=await window.ChainStorageV2.encodeSnapshot(payload),id='generation-published-'+(root.rev+1);
+      generations.set(id,{header:{schemaVersion:2,state:'published',encoding:'utf8',chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash:encoded.hash,baseRev},chunks:encoded.chunks});
+      Object.assign(root,{rev:root.rev+1,previousGeneration:root.activeGeneration,activeGeneration:id});
+      log.published={payload,rev:root.rev,updatedAt,serverUpdatedAt:Date.now()};entry.result='published';entry.rev=root.rev;
+      ok();return {ok:true,rev:root.rev,serverUpdatedAt:log.published.serverUpdatedAt};
+     },
+     // The device's own pending upload record, as the real backend reads it.
+     async recoveryEvidence(){return {identity:IDENTITY,epoch:1,pending:await window.ScannerDeviceStore.getPendingUpload(IDENTITY)};},
+     async readRecoverySource({pendingGenerationId,additionalGenerationIds}={}){const rows=[];for(const id of named(pendingGenerationId,additionalGenerationIds))rows.push(await read(id,true));
+      return {identity:IDENTITY,epoch:1,manifest:{...root},generations:rows};},
+     async readRecoverySourceHeaders({pendingGenerationId,additionalGenerationIds}={}){const rows=[];for(const id of named(pendingGenerationId,additionalGenerationIds))rows.push(await read(id,false));
+      return {identity:IDENTITY,epoch:1,manifest:{...root},generations:rows};},
+     async readRecoverySourceChunks({generationIds=[]}={}){const rows=[];for(const id of generationIds)rows.push(await read(id,true));return rows;},
+     async protectRecoverySources(){return {ok:true};},
+    };
+    Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloudApi,set(){}});
+    document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
+   },{seed,cloud,GENERATION_PATH,ACCOUNT,IDENTITY,clock});
+   return context;
+  };
+  const ready=page=>page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&
+   typeof state!=='undefined'&&document.querySelectorAll('#listBody [data-row]').length>0,null,{timeout:120000});
+  const headSaved=page=>page.waitForFunction(()=>new Promise(resolve=>deviceStore.readHead().then(head=>{const saved=head&&JSON.parse(head.payload);
+   resolve(!!saved&&saved.tasks.length===state.tasks.length&&saved.decisionEvents.length===state.decisionEvents.length);},()=>resolve(false))),null,{timeout:60000,polling:250});
+  const synced=(page,publications)=>page.waitForFunction(count=>__adoption2254.pushes.filter(push=>push.result==='published').length===count&&
+   state.syncDirty===false&&state.syncRev===__adoption2254.published?.rev&&document.getElementById('syncBtn')?.textContent==='☁ synced'&&
+   !pulling&&!cloudPushInFlight&&!cloudSourceRecoveryBusy&&!cloudSourceRecoveryRead,publications,{timeout:WAIT_MS,polling:100}).then(()=>true,()=>false);
+  const step=async(tag,options,work)=>{const context=await launch(template,tag,options);try{const page=context.pages()[0]||await context.newPage();
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);return await work(page);}finally{await context.close();}};
+  const summary={engine:engineName};
+  try{
+   const tag=`chain-2254-${engineName}-${process.pid}-${Date.now()}`;
+   // The board, acknowledged at revision 2.
+   earlier=await step(tag+'-seed',{seed:fixture.payload},async page=>{
+    await page.waitForFunction(()=>deviceStorageAuthority===true&&typeof deviceHeadHash==='string',null,{timeout:60000});
+    return page.evaluate(async()=>{if(await persist()!==true)throw Error('the seeded board saves');const payload=cloudPayload();
+     state.syncRev=2;state.decisionBase=makeDecisionBase(state.syncAccount,2,payload);state.syncDirty=false;
+     if(await persist()!==true)throw Error('the acknowledgement saves');return payload;});
+   });
+   // Daily backups of five earlier days through the ordinary save path, each
+   // a distinct board kept whole, as a phone that waited for days keeps them.
+   await step(tag+'-dailies',{clock:true},async page=>{
+    for(let day=5;day>=1;day--){
+     await page.evaluate(day=>{window.__clockOffset=-day*86400000;},day);
+     await page.locator('#addInput').fill('Daily variant '+day);await page.locator('#addInput').press('Enter');
+     await page.waitForFunction(title=>state.tasks.some(task=>task.title===title),'Daily variant '+day,{timeout:30000});await headSaved(page);
+    }
+    await page.evaluate(()=>{window.__clockOffset=0;});
+   });
+   // One automatic recovery over an unreadable revision 3 commits its archives
+   // and publishes revision 4, which this device acknowledges.
+   summary.recovery=await step(tag+'-recovery',{cloud:{shape:'damaged',ackRev:2,intact:await headerOf(earlier),
+    unreadable:{...await headerOf(earlier),hash:'e'.repeat(64)},budget:64*1048576,retryDelay:0}},async page=>{
+    const done=await synced(page,1);
+    return page.evaluate(done=>({done,rev:state.syncRev,published:__adoption2254.published?.rev??null,acknowledged:state.decisionBase?.payload===__adoption2254.published?.payload,
+     payload:__adoption2254.published?.payload??null}),done);
+   });
+   assert.deepEqual([summary.recovery.done,summary.recovery.rev,summary.recovery.acknowledged],[true,4,true],`${engineName}: fixture: the automatic recovery published and was acknowledged`);
+   earlier=summary.recovery.payload;delete summary.recovery.payload;
+   // A newer edit offline, then this device's own upload of it whose reply never
+   // came: the pending upload record names revision 5's generation.
+   const own=await step(tag+'-own',{},async page=>{
+    await page.locator('#addInput').fill(NEWER);await page.locator('#addInput').press('Enter');
+    await page.waitForFunction(title=>state.tasks.some(task=>task.title===title),NEWER,{timeout:30000});await headSaved(page);
+    return page.evaluate(async identity=>{
+     const payload=cloudPayload(),encoded=await ChainStorageV2.encodeSnapshot(payload);
+     await deviceStore.setPendingUpload(identity,{generationId:'generation-unreadable-5',payloadHash:encoded.hash,baseRev:4,updatedAt:Date.now()});
+     const sizes={};await deviceStore.readRawExportRows(['meta','snapshots','backups','opaque'],{store(){},end(){},row(store,key,value){
+      sizes[store]=(sizes[store]||0)+(JSON.stringify(value)?.length||0);}});
+     return {hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount,rev:state.decisionBase?.revision,sizes};
+    },IDENTITY);
+   });
+   assert.equal(own.rev,4,`${engineName}: fixture: the board stays based on its acknowledged revision 4`);
+   summary.storeMiB=mib(Object.values(own.sizes).reduce((sum,bytes)=>sum+bytes,0));summary.stores=Object.fromEntries(Object.entries(own.sizes).map(([name,bytes])=>[name,mib(bytes)]));
+   const intact=await headerOf(earlier);
+   // Each measured run starts from its own copy of that profile.
+   const measured=async(name,cloud,publications)=>{
+    const copy=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2254-'+engineName+'-'+name+'-'));copies.push(copy);fs.cpSync(template,copy,{recursive:true});
+    const runTag=tag+'-'+name,context=await launch(copy,runTag,{cloud});const errors=[];let crashed=false,memory=null,result={};
+    try{
+     const page=context.pages()[0]||await context.newPage();page.on('pageerror',error=>errors.push(error.message));page.on('crash',()=>{crashed=true;});
+     const sampler=webProcessMemorySampler(runTag);
+     try{
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);
+      if(cloud)result.settled=await synced(page,publications);
+      await page.waitForTimeout(SETTLE_MS);
+     }finally{memory=await sampler.stop();}
+     Object.assign(result,await page.evaluate(newer=>({pushes:__adoption2254.pushes.map(push=>push.baseRev+':'+push.result),status:document.getElementById('syncBtn')?.textContent,
+      syncRev:state.syncRev,newerKept:state.tasks.some(task=>task.title===newer),publishedIsBoard:__adoption2254.published?.payload===cloudPayload()}),NEWER));
+    }finally{await context.close();}
+    return {...result,peakBytes:memory.peakBytes,processes:memory.processes,samples:memory.samples,errors,crashed};
+   };
+   const local=await measured('local',null,0);
+   // The recovery's earlier unreadable generation is rechecked after each
+   // publication alike; its bounded retries run without waiting in both runs.
+   // Adoption publishes as soon as the opening read proves it, so the
+   // ordinary save is not held for its usual two-second pause either: both
+   // publications then overlap the opening alike (with the pause, Chromium
+   // collected the opening's garbage before the save and not before
+   // adoption, and adoption peaked about 250 MiB higher in some runs). Two of
+   // each, interleaved; the lower peak of each counts.
+   const runs={adoption:[],save:[]};
+   for(let round=1;round<=2;round++){
+    runs.adoption.push(await measured('adoption-'+round,{shape:'damaged',ackRev:4,intact,unreadable:{hash:own.hash,byteLength:own.byteLength,chunkCount:own.chunkCount},retryDelay:0,pushDelay:0},1));
+    runs.save.push(await measured('save-'+round,{shape:'healthy',ackRev:4,intact,retryDelay:0,pushDelay:0},1));
+   }
+   const extra=run=>run.peakBytes-local.peakBytes,lower=list=>Math.min(...list.map(extra));
+   const all=[local,...runs.adoption,...runs.save];
+   Object.assign(summary,{localPeakMiB:mib(local.peakBytes),adoptionExtraMiB:mib(lower(runs.adoption)),saveExtraMiB:mib(lower(runs.save)),
+    adoptionRunsMiB:runs.adoption.map(run=>mib(extra(run))),saveRunsMiB:runs.save.map(run=>mib(extra(run))),headroomMiB:mib(CONTAINED_ADOPTION_HEADROOM_2254),
+    adoption:runs.adoption.map(run=>({settled:run.settled,pushes:run.pushes,status:run.status,syncRev:run.syncRev,samples:run.samples})),
+    save:runs.save.map(run=>({settled:run.settled,pushes:run.pushes,status:run.status,syncRev:run.syncRev,samples:run.samples})),
+    errors:all.flatMap(run=>run.errors),crashed:all.some(run=>run.crashed)});
+   observed.push(summary);t.diagnostic(JSON.stringify(summary));
+   // Measurement preconditions: each run sampled this browser's own web process.
+   for(const run of all)assert.ok(run.processes>0&&run.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
+   assert.equal(summary.crashed,false,`${engineName}: no page crashed`);assert.deepEqual(summary.errors,[],`${engineName}: no page errors`);
+   assert.ok(summary.storeMiB>=100,`${engineName}: fixture: the device store is heavy ${JSON.stringify(summary)}`);
+   // Every run publishes the same board once: adoption over the unreadable
+   // revision 5, the ordinary save over the acknowledged revision 4.
+   for(const run of runs.adoption)assert.deepEqual([run.settled,run.pushes,run.status,run.syncRev,run.newerKept,run.publishedIsBoard],[true,['5:published'],'☁ synced',6,true,true],`${engineName}: adoption publishes the board once ${JSON.stringify(summary)}`);
+   for(const run of runs.save)assert.deepEqual([run.settled,run.pushes,run.status,run.syncRev,run.newerKept,run.publishedIsBoard],[true,['4:published'],'☁ synced',5,true,true],`${engineName}: the ordinary save publishes the board once ${JSON.stringify(summary)}`);
+   // Behaviour under test: adoption peaks no higher than the ordinary save, with headroom.
+   if(lower(runs.adoption)>lower(runs.save)+CONTAINED_ADOPTION_HEADROOM_2254)
+    failures.push(`${engineName}: adoption peaked ${mib(lower(runs.adoption))} MiB over opening the store locally, above the ordinary save's ${mib(lower(runs.save))} MiB plus ${mib(CONTAINED_ADOPTION_HEADROOM_2254)} MiB headroom`);
+  }finally{for(const dir of [template,...copies])fs.rmSync(dir,{recursive:true,force:true});}
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
