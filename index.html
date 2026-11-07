@@ -1881,6 +1881,15 @@ function readDailyBackupRecoveryHold(){
 function rememberDailyBackupRecoveryHold(account){
   try{localStorage.setItem(DAILY_BACKUP_RECOVERY_HOLD_KEY,JSON.stringify({v:1,account}));}catch{}
 }
+// #2268 review: cloudPull keeps the hold from the first read that finds the
+// cloud's copy unreadable, so it no longer depends on state a hidden page, a
+// sign-out or the next read clears. Written only when it isn't already kept.
+function holdDailyBackupsForCloudRecovery(){
+  try{
+    const account=dailyBackupAccount(),kept=readDailyBackupRecoveryHold();
+    if(!kept||(kept.account??null)!==account)rememberDailyBackupRecoveryHold(account);
+  }catch{}
+}
 function forgetDailyBackupRecoveryHold(account){
   try{
     const raw=localStorage.getItem(DAILY_BACKUP_RECOVERY_HOLD_KEY);
@@ -6948,6 +6957,11 @@ async function cloudPull(){
       // #2254 review (S2): before the adoption check too, which reads the
       // device's pending upload and the cloud's generation headers.
       if(remote.code==="corrupt-generation"){
+        // #2268 review: from the first unreadable read until the cloud
+        // confirms a board, this account's daily backups keep seven days. The
+        // adoption, rebuild or wait that follows held them only in memory,
+        // which hiding the page, a sign-out or the next read clears.
+        holdDailyBackupsForCloudRecovery();
         await boardBeforeCloudRecoveryWork();
         if(!pullStillCurrent())return;
         if(hasActiveEditor()||scannerGestureActive){deferPull();return;}

@@ -6911,6 +6911,32 @@ test('RISK daily backup retention hold sign-out: after signing out while cloud r
  });
 });
 
+// #2268 review (finding 4): while a contained adoption waits for the cloud to
+// confirm its publication, the root is still unreadable and nothing has been
+// confirmed. Hiding the page (an app switch) stops the adoption's upload and
+// clears what the app held in memory, and the adoption had already forgotten
+// the remembered unreadable copy, so a save made then trimmed this account's
+// daily backups to three days.
+test('RISK daily backup retention hold: an app switch that cuts off a contained adoption before the cloud confirms it keeps this account’s daily backups for seven calendar days',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,faults,revision,pushes}=app,store=ctx.window.ScannerDeviceStore;
+ await newerEditBeforeAdoption2254(app);
+ const account=ctx.state.syncAccount??null;
+ let hidden=false;
+ t.after(()=>{delete faults.beforeTransaction;shim.document.hidden=false;});
+ faults.beforeTransaction=async()=>{
+  if(hidden)return;const pending=await store.getPendingUpload('owner');if(pending?.baseRev!==revision+1)return;
+  hidden=true;shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});
+ };
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the cut-off adoption settles');
+ assert.equal(hidden,true,'fixture: the page was hidden inside the adoption’s upload');
+ assert.equal(pushes.length,1,'positive control: the adoption’s upload started');
+ assert.equal(backend.docs.get('users/owner').rev,revision+1,'fixture: the cloud did not confirm anything');
+ assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ synced','fixture: the board is not confirmed');
+ // Behaviour under test: a save while the page is hidden keeps the seven days.
+ assert.deepEqual(await dailyBackupsTrimmedBySave2268(ctx,shim,account,'Saved while the app is in the background'),[],
+  'daily backups keep seven calendar days while the adoption waits for the cloud');
+});
+
 // #2254 review (S2): the owner's phone holds dozens of board copies, and
 // adoption has to cost no more there than an ordinary cloud save. The store is
 // built on a served build with the app's own writers: the large signed-in
