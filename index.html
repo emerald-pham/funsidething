@@ -6595,13 +6595,35 @@ async function protectUnreadableGenerationRecord(record,stillCurrent){
 // exact rebuild treated it as an upload that might hold work the board lacks
 // and waited for good. Only that exact record is cleared, inside the device
 // store's transaction, so a newer upload staged meanwhile stays pending.
-async function forgetConfirmedPendingUpload(remote,identity,stillCurrent){
+//
+// #2268 review: every healthy read checks, not only the first identical read
+// at a new revision. A clear that failed once (a storage error, a hidden page)
+// is retried by the next read, and a record the previous build left is
+// cleared too. When another device saved on top of the upload before this
+// one read it, the read finds a later revision: the upload's own generation
+// header then says whether it was published at the revision after its base,
+// with the staged bytes. Every later revision was written on top of it, so it
+// holds nothing the cloud lacks. Its header is read once per record and
+// revision; a header the cloud has removed proves nothing, and the record stays.
+let pendingUploadLandedChecked=null;
+async function forgetConfirmedPendingUpload(remote,identity,stillCurrent,backend){
   try{
     if(typeof deviceStore?.getPendingUpload!=="function"||typeof deviceStore.clearPendingUploadIfCurrent!=="function"||
       typeof identity!=="string"||typeof remote?.payload!=="string"||typeof remote.generationId!=="string"||!Number.isSafeInteger(remote.rev))return;
     const pending=await deviceStore.getPendingUpload(identity);
-    if(!stillCurrent()||pending?.generationId!==remote.generationId||pending.baseRev+1!==remote.rev)return;
-    if(pending.payloadHash!==await ChainStorageV2.hashPayload(remote.payload)||!stillCurrent())return;
+    if(!stillCurrent()||!pending||typeof pending.generationId!=="string"||!Number.isSafeInteger(pending.baseRev))return;
+    let landed=false;
+    if(pending.generationId===remote.generationId){
+      landed=pending.baseRev+1===remote.rev&&pending.payloadHash===await ChainStorageV2.hashPayload(remote.payload);
+    }else if(remote.rev>pending.baseRev+1&&typeof backend?.readRecoverySourceHeaders==="function"){
+      const checked=identity+"\u0000"+pending.generationId+"\u0000"+remote.rev;
+      if(pendingUploadLandedChecked===checked)return;
+      pendingUploadLandedChecked=checked;
+      const headers=await backend.readRecoverySourceHeaders({pendingGenerationId:pending.generationId});
+      const header=headers?.identity===identity?headers.generations?.find(row=>row?.id===pending.generationId)?.header:null;
+      landed=header?.state==="published"&&header.baseRev===pending.baseRev&&header.hash===pending.payloadHash;
+    }
+    if(!landed||!stillCurrent())return;
     await deviceStore.clearPendingUploadIfCurrent(identity,pending,{guard:stillCurrent});
   }catch{}
 }
@@ -7072,6 +7094,13 @@ async function cloudPull(){
     const haveRemote = !!(remote && remote.payload);
     healthyCloudRead=(haveRemote||remote?.empty===true)&&!rebuildingCloudSource;
     if(healthyCloudRead){forgetProvedUnreadableCloudSource();forgetDeclinedAutomaticCloudRecovery();forgetContainedAdoptionRun({everyPage:true});}
+    // #2266, #2268 review: a readable cloud board may be the verified outcome
+    // of this device's own save whose reply never came. Not the exact
+    // rebuild's stand-in (healthyCloudRead excludes it), which is no read of a
+    // landed save: its publication is validated against the pending record it
+    // captured, and clearing that record refused the rebuild's save; that
+    // save clears the record once it lands.
+    if(healthyCloudRead&&haveRemote)await forgetConfirmedPendingUpload(remote,pullIdentity,pullStillCurrent,pullBackend);
     // #2228 review: a deliberate run also rechecks earlier sources of a
     // recovery over its budget, which returning or reconnecting does not.
     if(healthyCloudRead&&deliberate&&automaticRecoveryOverBudget(acct,pullIdentity)){automaticCloudSourceResumeRequested=true;automaticCloudSourceResumeDeliberate=true;}
@@ -7171,12 +7200,6 @@ async function cloudPull(){
         toast("Cloud copy held: the matching board's revision could not be saved on this device.", 7000);
         return;
       }
-      // #2266: this read may be the verified outcome of this device's own save.
-      // #2268 review: not the exact rebuild's stand-in, which is no read of a
-      // landed save. Its publication is validated against the pending record
-      // it captured (recoveryPending), and clearing that record refused the
-      // rebuild's save; the save itself clears the record once it lands.
-      if(!rebuildingCloudSource)await forgetConfirmedPendingUpload(remote,pullIdentity,pullStillCurrent);
       reconciledAs=acct; lastKnownCloudPayload=remotePayload;lastKnownCloudAccount=acct;lastKnownCloudRevision=rr;
       deferredCloudPull=false; cloudAdoptionHeld=false;
       state.syncDirty=remoteDeletionLogRepaired || remotePayload!==cloudPayload();

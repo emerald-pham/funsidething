@@ -6144,6 +6144,65 @@ test('RISK contained board adoption: an upload whose reply was lost and that a l
  });
 });
 
+// #2268 review (finding 9): #2266 cleared a lost-reply save's pending record
+// only on the first read that found that save, identical to the board, at a
+// new revision. Two ordinary paths skip that read: device E saves on top of
+// D's landed save before D reads, so D's next read takes E's newer board; or
+// the clear fails once (a storage error, a hidden page), and D's later reads
+// at that revision change nothing. Either way the landed save's record stayed,
+// and a later unreadable revision waited for it for good. A record the
+// previous build left is the second case.
+test('RISK contained board adoption: a lost-reply save that landed stops no later adoption, also when another device saved on top of it before this device read it or when clearing its record failed once',{timeout:180000},async t=>{
+ for(const path of ['another device saved on top of it first','clearing its record failed once'])await t.test(path,async sub=>{
+  const d=await sharedCloudDevice2266(sub,{name:'D'}),store=d.ctx.window.ScannerDeviceStore;
+  await d.add('Saved on D first');await d.save('D saves');
+  const confirmed=sharedCloudRoot2266(d.backend).rev;
+  await d.add('Saved on D second');
+  let lost=false;
+  d.faults.afterTransaction=async docs=>{if(!lost&&docs.get('users/owner')?.rev===confirmed+1){lost=true;throw Object.assign(Error('reply lost'),{code:'unavailable'});}};
+  await d.save('D saves again');delete d.faults.afterTransaction;
+  assert.equal(lost,true,'fixture: the server committed and the reply was lost');
+  assert.equal((await store.getPendingUpload('owner'))?.generationId,sharedCloudRoot2266(d.backend).activeGeneration,'fixture: the landed save is still pending on D');
+  const e=await sharedCloudDevice2266(sub,{sharedDocs:d.backend.docs,name:'E'});
+  if(path==='another device saved on top of it first'){
+   await e.add('Saved on E on top of D');await e.save('E saves');
+   assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed+2,'fixture: E saved the next revision before D read');
+   await d.read('D reads E’s save');
+   assert.equal(d.ctx.state.syncRev,confirmed+2,'fixture: D took E’s revision');
+  }else{
+   const clear=store.clearPendingUploadIfCurrent;let failed=0;
+   store.clearPendingUploadIfCurrent=async function(...args){if(!failed++)throw Object.assign(Error('storage busy'),{name:'UnknownError'});return clear.apply(this,args);};
+   sub.after(()=>{store.clearPendingUploadIfCurrent=clear;});
+   await d.read('D reads its own save back');
+   assert.equal(d.ctx.state.syncRev,confirmed+1,'fixture: D confirmed its save');
+   assert.equal(failed,1,'fixture: the first clear failed');
+   await d.read('D reads the same revision again');
+   // D is then away while E saves twice, so D's landed save is no longer named
+   // by the cloud's root and the cloud's cleanup removes it.
+   const landedId=sharedCloudRoot2266(d.backend).activeGeneration;
+   await e.read('E reads D’s save');
+   for(const title of ['Saved on E once','Saved on E twice']){await e.add(title);await e.save('E saves');}
+   assert.equal(sharedCloudRoot2266(d.backend).rev,confirmed+3,'fixture: E saved two revisions');
+   assert.equal(d.backend.docs.has('users/owner/generations/'+landedId),false,'fixture: the cloud removed D’s landed save');
+   await d.read('D reads E’s saves');
+   assert.equal(d.ctx.state.syncRev,confirmed+3,'fixture: D took E’s revision');
+  }
+  assert.ok(d.ctx.state.tasks.some(task=>task.title==='Saved on D second'),'fixture: D’s board holds its landed save');
+  // E saves the next revision, which loses its chunks.
+  await e.add('Saved on E, then lost');await e.save('E saves again');
+  const damaged=sharedCloudRoot2266(d.backend);
+  removeChunks2266(d.backend,damaged.activeGeneration);
+  const board=d.ctx.cloudPayload();
+  await d.read('D reads the unreadable revision');
+  // Behaviour under test: nothing D's landed save held is missing from its board, so D publishes it.
+  const root=sharedCloudRoot2266(d.backend);
+  assert.equal(root.rev,damaged.rev+1,'D saves the next revision over the unreadable one');
+  assert.equal(root.previousGeneration,damaged.activeGeneration,'the unreadable revision is the previous one, not replaced');
+  assert.equal(await publishedPayload2266(d,root.activeGeneration),board,'the cloud holds exactly D’s board');
+  assert.equal(d.shim.document.getElementById('syncBtn').textContent,'☁ synced','D shows synced');
+ });
+});
+
 // #2268 review (finding 12): a read that finds this device's own lost-reply
 // save clears only that save's pending record. The device keeps one pending
 // upload record per account, shared by its pages, so by the time the read
