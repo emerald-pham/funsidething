@@ -6,6 +6,10 @@
 
   const SCHEMA_VERSION=2;
   const DEFAULT_TARGET_BYTES=256*1024;
+  // #2254: the acknowledged recovery trim's plan (a meta row) and the rows it
+  // can never delete (see beginRecoveryTrim).
+  const RECOVERY_TRIM_KEY="recoveryTrim",RECOVERY_TRIM_MAX_KEYS=4096;
+  const RECOVERY_TRIM_KEPT_PREFIXES=Object.freeze(["unreadable-generation-record:","device-recovery-original:","device-recovery-file:","cloud-generation-recovery:"]);
   // Ephemeral aliases distinguish handles, including replacement store instances.
   let connectionSequence=0;
   const connectionNumbers=new WeakMap();
@@ -518,7 +522,9 @@
         if(payload!==undefined){
           tx.objectStore("snapshots").put({hash:nextHash,payload},nextHash);
           tx.objectStore("meta").put({hash:nextHash,account,sourceFingerprint,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()},"head");
-          if(hold)tx.objectStore("meta").put({...hold,headHash:nextHash},"recoveryCloudHold");
+          // #2254: a recovery that commits supersedes an unfinished trim; the
+          // trim after its own acknowledgement plans again from what is left.
+          if(hold){tx.objectStore("meta").put({...hold,headHash:nextHash},"recoveryCloudHold");tx.objectStore("meta").delete(RECOVERY_TRIM_KEY);}
           // Keep every unknown/orphan snapshot and pending record. The exact
           // overwritten metadata already lives in the immutable raw archive.
         }
@@ -550,6 +556,74 @@
         tx.abort();try{await done;}catch{}return false;
       }
       store.delete("recoveryCloudHold");await done;return true;
+    }
+
+    // #2254 (owner direction, 2026-11-06): the only opaque delete. Once the
+    // cloud has acknowledged a board, the app trims the archives its recoveries
+    // left. beginRecoveryTrim saves the plan, the exact keys to delete, and
+    // writes its notes in one transaction; continueRecoveryTrim then deletes a
+    // bounded batch of the planned keys per transaction, by key, reading no
+    // archive, so a page closed between batches leaves the rest planned for
+    // the next opening. Neither runs while a recovery hold exists (the current
+    // recovery may need any of its rows), on a head other than the caller's or
+    // of another account, or for a key outside the plan. The plan can never
+    // name the rows the device keeps: headers-only records of unreadable
+    // generations, the device recovery originals (listBackups and
+    // listOpaqueArchives rely on them to skip unreadable rows), exact file
+    // restore bytes and the cloud retention receipts each push re-verifies.
+    // writeRecoveredSource drops an unfinished plan when a recovery commits.
+    const trimKeptPrefix=key=>RECOVERY_TRIM_KEPT_PREFIXES.some(prefix=>key.startsWith(prefix));
+    function validRecoveryTrimPlan(plan){
+      return !!plan&&typeof plan==="object"&&!Array.isArray(plan)&&plan.v===1&&(plan.account===null||typeof plan.account==="string")&&
+        typeof plan.identity==="string"&&!!plan.identity&&Number.isSafeInteger(plan.revision)&&plan.revision>=0&&
+        Array.isArray(plan.remaining)&&plan.remaining.length<=RECOVERY_TRIM_MAX_KEYS&&new Set(plan.remaining).size===plan.remaining.length&&
+        plan.remaining.every(key=>typeof key==="string"&&!!key&&!trimKeptPrefix(key));
+    }
+    async function getRecoveryTrim(){
+      ensureOpen();const tx=await beginTransaction("meta","readonly");
+      const [plan]=await readonlyResults(tx,[readonlyRequest(tx,"recovery-trim",()=>tx.objectStore("meta").get(RECOVERY_TRIM_KEY))],"recovery-trim");
+      return plan??null;
+    }
+    async function recoveryTrimTransaction(expectedHeadHash,visit){
+      const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx),meta=tx.objectStore("meta");
+      try{
+        const [head,holdKey,plan]=await Promise.all([requestResult(meta.get("head")),requestResult(meta.getKey("recoveryCloudHold")),
+          requestResult(meta.get(RECOVERY_TRIM_KEY))]);
+        const result=holdKey!==undefined?{held:true}:head?.hash!==expectedHeadHash?{conflict:true}:
+          await visit({head,plan,meta,opaque:tx.objectStore("opaque")});
+        if(!result?.ok){tx.abort();try{await done;}catch{}return result;}
+        await done;return result;
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+    }
+    async function beginRecoveryTrim({expectedHeadHash,plan,notes=[]}={}){
+      ensureOpen();
+      const notePrefix=validRecoveryTrimPlan(plan)?"automatic-recovery-note:"+encodeURIComponent(plan.identity)+":":null;
+      if(typeof expectedHeadHash!=="string"||!notePrefix||!Array.isArray(notes)||notes.length>4||notes.some(row=>!row||
+        typeof row.key!=="string"||!row.key.startsWith(notePrefix)||typeof row.raw!=="string"||row.raw.length>1048576||plan.remaining.includes(row.key)))
+        return {error:true,code:"invalid-recovery-trim"};
+      return recoveryTrimTransaction(expectedHeadHash,async({head,meta,opaque})=>{
+        if((head.account??null)!==plan.account)return {conflict:true};
+        for(const row of notes){
+          const [key,existing]=await Promise.all([requestResult(opaque.getKey(row.key)),requestResult(opaque.get(row.key))]);
+          if(key!==undefined&&(existing?.key!==row.key||existing?.raw!==row.raw))return {error:true,code:"recovery-evidence-collision"};
+          if(key===undefined)opaque.put({key:row.key,raw:row.raw,order:Date.now()},row.key);
+        }
+        meta.put({v:1,account:plan.account,identity:plan.identity,revision:plan.revision,remaining:[...plan.remaining],startedAt:Date.now()},RECOVERY_TRIM_KEY);
+        return {ok:true};
+      });
+    }
+    async function continueRecoveryTrim({expectedHeadHash,limit=4}={}){
+      ensureOpen();
+      if(typeof expectedHeadHash!=="string"||!Number.isSafeInteger(limit)||limit<1||limit>64)return {error:true,code:"invalid-recovery-trim"};
+      return recoveryTrimTransaction(expectedHeadHash,async({head,plan,meta,opaque})=>{
+        if(plan===undefined)return {ok:true,done:true,deleted:[],remaining:0,noOp:true};
+        if(!validRecoveryTrimPlan(plan))return {error:true,code:"invalid-recovery-trim"};
+        if((head.account??null)!==plan.account)return {conflict:true};
+        const deleted=plan.remaining.slice(0,limit),remaining=plan.remaining.slice(deleted.length);
+        for(const key of deleted)opaque.delete(key);
+        if(remaining.length)meta.put({...plan,remaining},RECOVERY_TRIM_KEY);else meta.delete(RECOVERY_TRIM_KEY);
+        return {ok:true,done:!remaining.length,deleted,remaining:remaining.length};
+      });
     }
 
     async function migrateLegacy(legacy){
@@ -796,7 +870,8 @@
       if(db){db.close();db=null;}
     }
     const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
-      updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint};
+      updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
+      getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim};
     return api;
   }
 

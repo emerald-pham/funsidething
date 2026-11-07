@@ -13536,6 +13536,46 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK acknowledged recovery trim: nothing is trimmed while a later recovery waits on an unreadable copy, holds an older copy or saves without cloud confirmation, and the first acknowledged save after the cloud confirms trims",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK acknowledged recovery trim: after an adoption the cloud confirms, the device clears the recovery archives and the migrated older backup list and keeps the board, the acknowledged copy, every backup, the older browser pair, headers-only records and a note naming what the earlier-source check still reports",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK acknowledged recovery trim: the trim deletes by key in bounded batches without reading the whole store or a large archive, and a page closed mid-trim finishes on the next opening without the cloud",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK acknowledged recovery trim: another account’s recovery archives, notes, records and receipts stay byte for byte while this account’s are cleared",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK acknowledged recovery trim store guard: the device store deletes only the keys a saved plan names, by key and in bounded batches, never while a recovery hold exists, on another head or account, or a row the device keeps, and a recovery that commits drops an unfinished plan",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK acknowledged recovery trim: after the trim the earlier-source check reads no whole store and answers from the note, and saving, sync, Restore and the saved-decisions review after a relaunch still work",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK acknowledged recovery trim: the recovery file holds only what the device keeps after the trim",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK acknowledged recovery trim: a note the trim kept still lets the check of earlier sources reconcile that generation once it can be read, and the trim after its acknowledgement clears the note",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

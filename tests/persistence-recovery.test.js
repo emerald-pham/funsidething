@@ -26,6 +26,8 @@ import {
 } from "./shared.js";
 import { rewriteGenerationFixture } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
+import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDGET_MS, coldRelaunch2198, refuseNextRecoveryTransaction255,
+  exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -6743,4 +6745,434 @@ test('RISK manual backup reminder guidance: mounted FAQ and changelog say that f
  assert.match(release,/Manual backups are never removed automatically, and Make manual backup still works with no extra step\.<\/li>/);
  for(const [question,text] of [['manual backup answer',answer],['November 6 changelog',release]])
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
+});
+
+// #2254 (owner direction, 2026-11-06): "in functionality, we should be
+// trimming down the file down to just what we need." Once the cloud has
+// acknowledged a board, the device clears by itself the archives its automatic
+// recoveries left (raw originals, cloud sources, summaries, publication
+// intents and sources, acknowledgements) and the older browser copies it has
+// already migrated. It keeps the board and its saved head, the acknowledged
+// copy inside it, every backup, the headers-only records of unreadable
+// generations, and one small note naming what the check of earlier sources
+// still reports for the cleared recoveries. Until the cloud acknowledges a
+// board nothing is trimmed: those archives may be the only route back.
+// The fixture is the captured large-board shape: recovery waits, Retry sync
+// rebuilds the board from the intact earlier generation, commits its archives,
+// publishes, and the cloud confirms it, with the unreadable generation still an
+// incomplete earlier source.
+const TRIM_LEFTOVER_PREFIXES_2254=['automatic-device-recovery:','automatic-cloud-source:','automatic-recovery-summary:',
+ 'automatic-publication-intent:','automatic-publication-source:','automatic-recovery-ack:'];
+const trimLeftover2254=key=>typeof key==='string'&&TRIM_LEFTOVER_PREFIXES_2254.some(prefix=>key.startsWith(prefix));
+const trimIdle2254=ctx=>!vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy||saveTimer!==null||supportDiagnosticsActivePersistCalls>0||'+
+ '(typeof recoveryTrimBusy!=="undefined"&&recoveryTrimBusy)',ctx);
+const trimSettle2254=(ctx,message)=>fixtureDeadline(async wait=>{await wait(50);while(!trimIdle2254(ctx))await wait(10);await wait(50);while(!trimIdle2254(ctx))await wait(10);},
+ message,CAPTURED_RESULT_BUDGET_MS+20000);
+// Every saved row, read in full by the test itself.
+async function deviceRows2254(store){
+ const raw=await store.readRawExportSnapshot(),rows=name=>raw.stores[name].keys.map((key,index)=>({key,value:raw.stores[name].values[index]}));
+ return {meta:rows('meta'),snapshots:rows('snapshots'),backups:rows('backups'),opaque:rows('opaque')};
+}
+const earlierSources2254=async ctx=>{
+ const history=JSON.parse(await vm.runInContext('automaticCloudSourceHistory().then(JSON.stringify)',ctx));
+ return {error:history.error,unresolved:history.unresolved.map(row=>[row.id,row.reason]),permanent:history.permanent.map(row=>[row.id,row.reason])};
+};
+async function recoveredLeftoversApp2254(t){
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ // The unreadable generation declares this acknowledged copy, padded.
+ const acknowledgedBefore=ctx.state.decisionBase.payload;
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1048576;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ // The harness's timers do not hold the process open while retries wait.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();await ctx.cloudPull();await trimSettle2254(ctx,'the opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','fixture: the large board waits');
+ await ctx.onAction('sync-retry',{});await trimSettle2254(ctx,'the deliberate run and its checks settle');
+ assert.equal(syncStatus2200(shim).text,'☁ synced','fixture: Retry sync rebuilt the board and the cloud confirmed it');
+ const keys=(await deviceRows2254(store)).opaque.map(row=>row.key);
+ for(const prefix of ['automatic-device-recovery:','automatic-cloud-source:','automatic-recovery-summary:','automatic-publication-intent:','automatic-recovery-ack:'])
+  assert.ok(keys.some(key=>key.startsWith(prefix)),'fixture: the recovery left its '+prefix+' archive');
+ return {...app,store,acknowledgedBefore,unreadableId:app.activePath.split('/').at(-1)};
+}
+// An older installed shell writes its board to the older browser pair, as a
+// shell from before device storage does. This app reconciles those exact
+// bytes into its board and keeps them as an other-browser-copy backup before
+// its next push; after that they are a migrated copy.
+function olderShellWrite2254(app,title){
+ const {ctx,shim}=app,board=JSON.parse(JSON.stringify(ctx.state));
+ board.tasks.push(syncTask('older-shell-'+title.length,title));board.updatedAt=Date.now();
+ const raw=JSON.stringify(board);for(const key of [LOCAL_HEAD_KEY,SYNC_STORE_KEY])shim.localStorage.setItem(key,raw);
+ return {raw,taskId:'older-shell-'+title.length};
+}
+async function ordinaryAcknowledgedSave2254(app,title){
+ const {ctx,shim}=app;
+ shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await ctx.sendPush();await trimSettle2254(ctx,'the acknowledged save and what follows it settle');
+ assert.equal(syncStatus2200(shim).text,'☁ synced','positive control: the cloud acknowledged the board');
+ assert.equal(ctx.state.syncDirty,false);
+}
+// The next revision, saved by another writer, which cannot be read: its header
+// declares a board whose chunks never arrived. Over this device's acknowledged
+// revision it is the adoption case; over another revision recovery waits.
+async function unreadableNextRevision2254(app,label,{board=null}={}){
+ const {ctx,backend}=app,root=backend.docs.get('users/owner'),generations='users/owner/generations/',previous=backend.docs.get(generations+root.activeGeneration);
+ const id='generation-unreadable-'+label+'-'+(root.rev+1),payload=board??JSON.parse(ctx.state.decisionBase.payload);
+ if(!board)payload.futureUnreadableTrimFixture={opaque:label};
+ const encoded=await ctx.window.ChainStorageV2.encodeSnapshot(JSON.stringify(payload));
+ backend.docs.set(generations+id,{...previous,hash:encoded.hash,byteLength:encoded.byteLength,chunkCount:encoded.chunkCount,baseRev:root.rev});
+ backend.docs.set('users/owner',{...root,rev:root.rev+1,activeGeneration:id,previousGeneration:root.activeGeneration});
+ return {id,previousId:root.activeGeneration,chunks:encoded.chunks,path:generations+id};
+}
+async function adoptOverUnreadable2254(app){
+ const {ctx,shim,backend}=app,pushes=[],push=backend.CS.push;
+ backend.CS.push=async(payload,updatedAt,baseRev,context)=>{pushes.push(baseRev);return push(payload,updatedAt,baseRev,context);};
+ try{
+  const unreadable=await unreadableNextRevision2254(app,'adopted');
+  ctx.closeModal();await flush();await ctx.cloudPull();await trimSettle2254(ctx,'the adoption, its acknowledgement and what follows settle');
+  assert.deepEqual(pushes,[backend.docs.get('users/owner').rev-1],'positive control: the board was adopted once over the unreadable revision');
+  assert.equal(syncStatus2200(shim).text,'☁ synced','positive control: the cloud acknowledged the adopted board');
+  return unreadable;
+ }finally{backend.CS.push=push;}
+}
+function captureDownloads2254(app){
+ const files=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>files.push({href:link.href,name:link.download});
+ const createElement=app.shim.document.createElement;app.shim.document.createElement=tag=>tag==='a'?link:createElement.call(app.shim.document,tag);
+ app.ctx.Blob=Blob;return files;
+}
+async function downloadedRecoveryFile2254(app){
+ const files=captureDownloads2254(app);app.ctx.openSettings();
+ assert.equal(await app.ctx.onAction('download-recovery-file',{}),true,'the recovery file downloads');
+ const {resolveObjectURL}=await import('node:buffer'),text=await resolveObjectURL(files.at(-1).href).text();app.ctx.closeModal();
+ return {text,file:JSON.parse(text)};
+}
+
+test('RISK acknowledged recovery trim: nothing is trimmed while a later recovery waits on an unreadable copy, holds an older copy or saves without cloud confirmation, and the first acknowledged save after the cloud confirms trims',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,shim,backend,store}=app,codec=ctx.window.ChainStorageV2;
+ const leftovers=async()=>(await deviceRows2254(store)).opaque.filter(row=>trimLeftover2254(row.key));
+ const legacy=()=>[SYNC_STORE_KEY,LOCAL_HEAD_KEY].map(key=>shim.localStorage.getItem(key));
+ const unchanged=async(expected,message)=>{
+  assert.equal(JSON.stringify(await leftovers()),JSON.stringify(expected.rows),message+': every recovery archive stays exactly as it was');
+  assert.deepEqual(legacy(),expected.legacy,message+': the older browser pair stays');
+ };
+ // An older installed shell saved its board in the older browser pair.
+ const older=olderShellWrite2254(app,'Saved by an older installed shell before recovery');
+ let kept={rows:await leftovers(),legacy:legacy()};
+ assert.deepEqual(kept.legacy,[older.raw,older.raw],'fixture: the older shell’s copy is in the older browser pair');
+ // Another device publishes a readable revision and then an unreadable one
+ // over it. The copy before the unreadable one is not this device's, so the
+ // large board waits.
+ const elsewhere=JSON.parse(ctx.state.decisionBase.payload);elsewhere.tasks.push(syncTask('trim-elsewhere-2254','Saved on another device before the unreadable copy'));
+ await publishElsewhere2254(backend,codec,JSON.stringify(elsewhere));await unreadableNextRevision2254(app,'waiting',{board:elsewhere});
+ ctx.closeModal();await flush();await ctx.cloudPull();await trimSettle2254(ctx,'the waiting opening settles');
+ assert.equal(syncStatus2200(shim).text,'☁ recovery waiting','positive control: recovery waits on the unreadable copy');
+ shim.document.getElementById('addInput').value='Saved while recovery waits';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ vm.runInContext('resumeCloudSync({type:"online"})',ctx);await trimSettle2254(ctx,'the reconnect settles');
+ await unchanged(kept,'while recovery waits, after a save and a reconnect');
+ // Retry sync rebuilds the board, but the cloud refuses its confirmation once:
+ // a recovery hold keeps the older copy.
+ refuseNextRecoveryTransaction255(app.faults);
+ await ctx.onAction('sync-retry',{});await trimSettle2254(ctx,'the refused run settles');
+ assert.equal((await store.getRecoveryCloudHold())?.automaticRecovery,true,'positive control: a recovery hold awaits cloud confirmation');
+ kept={rows:await leftovers(),legacy:legacy()};
+ assert.equal(kept.rows.filter(row=>row.key.startsWith('automatic-device-recovery:')).length,2,'positive control: the second recovery left its archives too');
+ shim.document.getElementById('addInput').value='Saved under the hold';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await ctx.sendPush();await trimSettle2254(ctx,'a save under the hold settles');
+ await unchanged(kept,'while a recovery hold awaits cloud confirmation');
+ // Retry sync confirms the recovered board; the next acknowledged save trims.
+ await ctx.onAction('sync-retry',{});await trimSettle2254(ctx,'the confirmed run settles');
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: the cloud confirmed the recovered board');
+ await ordinaryAcknowledgedSave2254(app,'Saved after the cloud confirmed');
+ assert.deepEqual((await leftovers()).map(row=>row.key),[],'the first acknowledged save after the cloud confirms clears every recovery archive');
+ assert.ok(ctx.state.tasks.some(task=>task.id===older.taskId),'the older shell’s work is on the board');
+ assert.ok((await store.listBackups()).some(row=>row.kind==='other-browser-copy'&&row.payload===older.raw),'its exact bytes stay as a kept backup');
+ // An older installed shell opens its board from the older browser pair, and
+ // it is the exact original repairs rely on, so the trim keeps it.
+ assert.deepEqual(legacy(),[older.raw,older.raw],'the older browser pair stays');
+});
+
+test('RISK acknowledged recovery trim: after an adoption the cloud confirms, the device clears the recovery archives and the migrated older backup list and keeps the board, the acknowledged copy, every backup, the older browser pair, headers-only records and a note naming what the earlier-source check still reports',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,shim,store,unreadableId,indexedDB,deviceDbName}=app;
+ // Rows the device keeps whatever happens: a manual backup, a kept draft copy,
+ // a row of a kind this app does not know, and a migrated older backup list
+ // with an unreadable entry. The readable migrated list is a migrated copy.
+ await makeManualBackup2254(app);
+ const draft=await ctx.saveDurableBackup('stale-tab-draft',JSON.stringify(ctx.state));assert.ok(draft?.id,'fixture: a kept draft copy');
+ const olderList=shim.localStorage.getItem(LOCAL_BACKUPS_KEY);assert.ok(olderList,'fixture: the older backup list holds a daily copy');
+ const unknown={key:'future-kind:kept-2254',raw:JSON.stringify({format:'chain-scanner.future-kind',opaque:['keep',2254]}),order:1};
+ const migrated={key:'0:'+LOCAL_BACKUPS_KEY,raw:olderList,order:0},damagedList={key:'1:'+LOCAL_BACKUPS_KEY,raw:'[{"id":"daily:unreadable-2254"}]',order:0};
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{for(const row of [unknown,migrated,damagedList])tx.objectStore('opaque').put(row,row.key);});
+ const earlier=await earlierSources2254(ctx);
+ assert.deepEqual(earlier.unresolved,[[unreadableId,'generation-incomplete']],'positive control: the unreadable generation is an unresolved earlier source');
+ // An older installed shell saved its board in the older browser pair; the
+ // adoption's push reconciles it first, keeping its bytes as a backup.
+ const older=olderShellWrite2254(app,'Saved by an older installed shell before adoption');
+ const before=await deviceRows2254(store);
+ const adopted=await adoptOverUnreadable2254(app);
+ const after=await deviceRows2254(store),head=await store.readHead();
+ // Behaviour under test: what is cleared.
+ assert.deepEqual(after.opaque.filter(row=>trimLeftover2254(row.key)).map(row=>row.key),[],'every automatic recovery archive is cleared');
+ assert.equal(after.opaque.some(row=>row.key===migrated.key),false,'the migrated older backup list is cleared');
+ // What is kept.
+ assert.deepEqual([SYNC_STORE_KEY,LOCAL_HEAD_KEY].map(key=>shim.localStorage.getItem(key)),[older.raw,older.raw],'the older browser pair an older installed shell opens stays');
+ assert.ok(ctx.state.tasks.some(task=>task.id===older.taskId),'the older shell’s work is on the board');
+ assert.ok((await store.listBackups()).some(row=>row.kind==='other-browser-copy'&&row.payload===older.raw),'and its exact copy stays as a kept backup');
+ assert.equal(head.payload,JSON.stringify(ctx.state),'the board is the saved head');
+ assert.equal(JSON.parse(head.payload).decisionBase.payload,ctx.state.decisionBase.payload,'the acknowledged copy stays in the head');
+ assert.equal(ctx.state.decisionBase.revision,ctx.state.syncRev,'the board is based on the copy the cloud acknowledged');
+ assert.deepEqual(after.meta.map(row=>row.key),['head'],'no recovery hold, pending upload or unfinished trim remains');
+ for(const id of [draft.id,...ctx.readLocalBackups().filter(row=>row.kind==='manual').map(row=>row.id)])
+  assert.ok(after.backups.some(row=>row.key===id),'the kept backup '+id+' stays');
+ assert.deepEqual(after.snapshots.map(row=>row.key).sort(),[...new Set([head.hash,...after.backups.map(row=>row.value.payloadHash)])].sort(),
+  'the saved board copies are the head and those the backups use');
+ assert.deepEqual([...(await store.listBackups()).map(row=>row.id)].sort(),[...after.backups.map(row=>row.key)].sort(),'every backup still reads');
+ assert.equal(shim.localStorage.getItem(LOCAL_BACKUPS_KEY),olderList,'the older backup list itself stays');
+ assert.equal(shim.localStorage.getItem(DEVICE_AUTHORITY_KEY),'1');
+ for(const row of [unknown,damagedList])assert.equal(after.opaque.find(item=>item.key===row.key)?.value?.raw,row.raw,'kept: '+row.key);
+ for(const row of before.opaque.filter(row=>!trimLeftover2254(row.key)&&row.key!==migrated.key))
+  assert.deepEqual(after.opaque.find(item=>item.key===row.key)?.value,row.value,'kept unchanged: '+row.key);
+ assertHeadersOnlyRecord2254(after.opaque.filter(row=>row.key.startsWith('unreadable-generation-record:')&&row.value.raw.includes(adopted.id)).map(row=>row.value),
+  {unreadableId:adopted.id,acknowledgedId:adopted.previousId},'after the trim');
+ const added=after.opaque.filter(row=>!before.opaque.some(item=>item.key===row.key)&&!row.key.startsWith('unreadable-generation-record:'));
+ assert.equal(added.length,1,'one note replaces the cleared recoveries: '+JSON.stringify(added.map(row=>row.key)));
+ const note=added[0].value.raw;
+ assert.ok(note.includes(unreadableId),'the note names the unresolved earlier generation');
+ assert.ok(!note.includes('"text"')&&note.length<4096,'the note keeps no chunk and stays small ('+note.length+' characters)');
+ // The check of earlier sources answers as before, from the note.
+ assert.deepEqual(await earlierSources2254(ctx),earlier,'the check of earlier sources still reports the same unresolved generation');
+});
+
+test('RISK acknowledged recovery trim: the trim deletes by key in bounded batches without reading the whole store or a large archive, and a page closed mid-trim finishes on the next opening without the cloud',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,store,unreadableId}=app;
+ // Two keys per batch, so this recovery's archives take several batches.
+ ctx.window.CHAIN_RECOVERY_TRIM_BATCH_KEYS=2;
+ const before=await deviceRows2254(store),leftoverRows=before.opaque.filter(row=>trimLeftover2254(row.key));
+ const smallRows=leftoverRows.filter(row=>row.key.startsWith('automatic-recovery-ack:')||row.key.startsWith('automatic-recovery-summary:'));
+ const smallBytes=smallRows.reduce((total,row)=>total+row.value.raw.length,0),largeBytes=leftoverRows.reduce((total,row)=>total+row.value.raw.length,0)-smallBytes;
+ assert.ok(largeBytes>20*smallBytes,'fixture: the large archives dwarf the small ones ('+largeBytes+' against '+smallBytes+')');
+ // Every device request, by store, method and transaction, except the test's
+ // own reads; and a page that closes after the trim's first batch of
+ // deletions committed.
+ const {IDBDatabase}=await import('fake-indexeddb'),transaction=IDBDatabase.prototype.transaction,requests=[];
+ let deletingTransactions=0,closeAfter=1,probing=false;
+ IDBDatabase.prototype.transaction=function(names,mode,...rest){
+  const tx=transaction.call(this,names,mode,...rest);if(this.name!==app.deviceDbName||probing)return tx;
+  const stores=(typeof names==='string'?[names]:Array.from(names)).sort().join(','),objectStore=tx.objectStore.bind(tx);let deleting=false;
+  tx.objectStore=name=>{
+   const source=objectStore(name);
+   for(const method of ['get','getAll','getAllKeys','getKey','openCursor','openKeyCursor','count']){
+    const call=source[method].bind(source);source[method]=(...args)=>{const request=call(...args);requests.push({store:name,method,stores,mode,request});return request;};
+   }
+   if(name==='opaque'){const remove=source.delete.bind(source);source.delete=(...args)=>{
+    if(!deleting){deleting=true;deletingTransactions++;}
+    if(deletingTransactions>closeAfter){try{tx.abort();}catch{}throw Object.assign(Error('The page closed during the trim'),{name:'AbortError'});}
+    return remove(...args);};}
+   return source;
+  };
+  return tx;
+ };
+ t.after(()=>{IDBDatabase.prototype.transaction=transaction;});
+ const probe=async read=>{probing=true;try{return await read();}finally{probing=false;}};
+ const wholeReads=[],listBackups=store.listBackups,commitHead=store.commitHead;let lists=0,commits=0;
+ for(const name of ['readRawExportSnapshot','readRawExportRows','listOpaqueArchives']){const call=store[name];store[name]=function(...args){if(!probing&&(name!=='listOpaqueArchives'||!args[0]?.prefix))wholeReads.push(name);return call.apply(this,args);};t.after(()=>{store[name]=call;});}
+ store.listBackups=function(...args){lists++;return listBackups.apply(this,args);};store.commitHead=function(...args){commits++;return commitHead.apply(this,args);};
+ t.after(()=>{store.listBackups=listBackups;store.commitHead=commitHead;});
+ const mark=requests.length;
+ await ordinaryAcknowledgedSave2254(app,'Saved before the page closes in the middle of the trim');
+ const trimRequests=requests.slice(mark);
+ // Behaviour under test: the first batch committed, the originals first.
+ const middle=await probe(()=>deviceRows2254(store));
+ assert.equal(deletingTransactions,2,'the first batch committed and the page closed in the second');
+ assert.equal(middle.opaque.some(row=>row.key.startsWith('automatic-device-recovery:')),false,'the first batch clears the recovery original first');
+ assert.ok(middle.opaque.some(row=>trimLeftover2254(row.key)),'fixture: the page closed before the rest');
+ // Bounded: deletes by key, two per transaction, and no whole-store read; the
+ // only archive text read is the small acknowledgement and summary rows.
+ const wholeStore=list=>list.filter(row=>['getAll','openCursor'].includes(row.method)&&['opaque','snapshots'].includes(row.store)&&row.stores!=='backups,opaque,snapshots').map(row=>row.stores+':'+row.store+'.'+row.method);
+ const opaqueBytes=trimRequests.filter(row=>row.store==='opaque'&&row.method==='get').reduce((total,row)=>total+(typeof row.request.result?.raw==='string'?row.request.result.raw.length:0),0);
+ assert.deepEqual(wholeStore(trimRequests),[],'nothing but the save’s own backup list reads every archive or board copy');
+ assert.ok(lists<=commits,'the trim reads no backup list of its own ('+lists+' lists for '+commits+' saves)');
+ assert.deepEqual(wholeReads,[],'no whole-store read');
+ assert.ok(opaqueBytes<=smallBytes+8192,'the trim reads only the small rows: '+opaqueBytes+' archive characters against '+smallBytes+' small and '+largeBytes+' large');
+ // A missing archive is no damage: the earlier-source check still answers, from the note.
+ assert.deepEqual((await probe(()=>earlierSources2254(ctx))).unresolved,[[unreadableId,'generation-incomplete']],'mid-trim, the check of earlier sources still reports the unresolved generation');
+ // The next opening, without the cloud, finishes the trim.
+ closeAfter=Infinity;const mark2=requests.length;
+ const reopened=await coldRelaunch2198(t,app,[],{signIn:false}),reopenedStore=reopened.ctx.window.ScannerDeviceStore;
+ await fixtureDeadline(async wait=>{while((await probe(()=>deviceRows2254(reopenedStore))).opaque.some(row=>trimLeftover2254(row.key))||!trimIdle2254(reopened.ctx))await wait(50);},
+  'the next opening finishes the trim',30000);
+ const resumed=requests.slice(mark2),finished=await probe(()=>deviceRows2254(reopenedStore));
+ assert.deepEqual(finished.meta.map(row=>row.key),['head'],'the finished trim leaves no plan behind');
+ assert.equal((await probe(()=>reopenedStore.readHead())).payload,JSON.stringify(reopened.ctx.state),'the reopened board is the saved head');
+ assert.deepEqual(wholeStore(resumed),[],'the resumed trim reads no whole store');
+ const listsOnOpening=resumed.filter(row=>row.stores==='backups,opaque,snapshots'&&row.method==='getAll'&&row.store==='opaque').length;
+ const savesOnOpening=new Set(resumed.filter(row=>row.stores==='backups,meta,snapshots'&&row.mode==='readwrite').map(row=>row.request.transaction)).size;
+ assert.ok(listsOnOpening<=1+savesOnOpening,'only the opening’s and its saves’ own backup lists read the archives ('+listsOnOpening+' for '+savesOnOpening+' saves)');
+});
+
+test('RISK acknowledged recovery trim: another account’s recovery archives, notes, records and receipts stay byte for byte while this account’s are cleared',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,store,indexedDB,deviceDbName}=app;
+ const rows=(await deviceRows2254(store)).opaque,find=prefix=>rows.find(row=>row.key.startsWith(prefix));
+ const original=find('automatic-device-recovery:'),source=find('automatic-cloud-source:'),summary=find('automatic-recovery-summary:'),ack=find('automatic-recovery-ack:'),intent=find('automatic-publication-intent:');
+ const OTHER='other-owner-2254',other=raw=>{const value=JSON.parse(raw);for(const node of [value,value.source])if(node&&typeof node.identity==='string')node.identity=OTHER;return value;};
+ const swap=(text,pairs)=>pairs.reduce((out,[from,to])=>out.split(from).join(to),text);
+ // Another account's completed recovery with its summary and acknowledgement,
+ // one saved before recoveries had summaries, a publication source, a note,
+ // a headers-only record and a cloud receipt.
+ const bOriginal='automatic-device-recovery:other-account-2254',bSource='automatic-cloud-source:other-account-2254';
+ const pairs=[[original.key,bOriginal],[encodeURIComponent(original.key),encodeURIComponent(bOriginal)],[source.key,bSource]];
+ const bAck=other(swap(ack.value.raw,pairs)),bSummary=other(swap(summary.value.raw,pairs)),bIntent=other(swap(intent.value.raw,pairs));
+ const injected=[
+  {key:bOriginal,raw:swap(original.value.raw,pairs)},
+  {key:bSource,raw:JSON.stringify(other(source.value.raw))},
+  {key:'automatic-recovery-summary:'+encodeURIComponent(bOriginal),raw:JSON.stringify(bSummary)},
+  {key:swap(ack.key,pairs),raw:JSON.stringify(bAck)},
+  {key:swap(intent.key,pairs),raw:JSON.stringify(bIntent)},
+  {key:'automatic-device-recovery:other-account-old-2254',raw:swap(original.value.raw,[[source.key,'automatic-cloud-source:other-account-old-2254']])},
+  {key:'automatic-cloud-source:other-account-old-2254',raw:JSON.stringify(other(source.value.raw))},
+  {key:'automatic-publication-source:other-account-2254',raw:JSON.stringify({format:'chain-scanner.automatic-recovery-publication',version:1,identity:OTHER,originalKey:bOriginal,deviceSource:'{}',cloudSource:null,revision:3})},
+  {key:'automatic-recovery-note:'+encodeURIComponent(OTHER)+':'+'b'.repeat(64),raw:JSON.stringify({format:'chain-scanner.automatic-recovery-note',version:1,identity:OTHER,unresolved:[{id:'generation-other-2254',reason:'generation-incomplete'}],permanent:[]})},
+  {key:'unreadable-generation-record:'+encodeURIComponent(OTHER)+':4:generation-other-2254:'+'c'.repeat(64),raw:JSON.stringify({format:'chain-scanner.unreadable-generation-record',version:2,identity:OTHER})},
+  {key:'cloud-generation-recovery:'+encodeURIComponent(OTHER)+':4:generation-other-2254:'+'d'.repeat(64),raw:JSON.stringify({format:'chain-scanner.cloud-recovery-source',version:1,identity:OTHER,manifest:{schemaVersion:2,rev:4},generations:[]})},
+ ].map((row,index)=>({...row,order:index+1}));
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{for(const row of injected)tx.objectStore('opaque').put(row,row.key);});
+ await ordinaryAcknowledgedSave2254(app,'Saved after another account’s rows arrived');
+ const after=(await deviceRows2254(store)).opaque;
+ // Behaviour under test.
+ for(const row of injected)assert.deepEqual(after.find(item=>item.key===row.key)?.value,row,'another account’s row stays byte for byte: '+row.key);
+ assert.deepEqual(after.filter(row=>trimLeftover2254(row.key)&&!injected.some(item=>item.key===row.key)).map(row=>row.key),[],'this account’s recovery archives are cleared');
+ // The other account's recovery from before summaries sends the check of
+ // earlier sources to its full read, which reads this account's note too.
+ assert.equal(await vm.runInContext('automaticCloudSourceHistoryFromSummaries().then(JSON.stringify)',ctx),'null','positive control: the full read answers');
+ assert.deepEqual((await earlierSources2254(ctx)).unresolved,[[app.unreadableId,'generation-incomplete']],'the full read still reports this account’s unresolved generation from its note');
+});
+
+// #2254: the device store's only opaque delete, and its guards.
+test('RISK acknowledged recovery trim store guard: the device store deletes only the keys a saved plan names, by key and in bounded batches, never while a recovery hold exists, on another head or account, or a row the device keeps, and a recovery that commits drops an unfinished plan',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='trim-guard-2254-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName});t.after(()=>app.dispose());
+ app.ctx.addTask('Board before the trim',false);assert.equal(await app.ctx.persist(),true);
+ const store=app.ctx.window.ScannerDeviceStore,head=await store.readHead(),account=head.account??null;
+ const rows=[['automatic-device-recovery:guard-a','{"original":1}'],['automatic-cloud-source:guard-a','{"source":1}'],['automatic-recovery-ack:guard-a','{"ack":1}'],
+  ['unreadable-generation-record:owner:guard','{}'],['device-recovery-original:guard','{}'],['device-recovery-file:guard','{}'],['cloud-generation-recovery:owner:guard','{}'],
+  ['future-kind:guard','{}']].map(([key,raw],order)=>({key,raw,order}));
+ await editRawDevice187(indexedDB,deviceDbName,tx=>{for(const row of rows)tx.objectStore('opaque').put(row,row.key);});
+ const keys=async()=>[...(await store.readRawFingerprint()).stores.opaque.keys];
+ const all=await keys(),planned=['automatic-device-recovery:guard-a','automatic-cloud-source:guard-a','automatic-recovery-ack:guard-a'];
+ const plan=(extra={})=>({v:1,account,identity:'owner',revision:3,remaining:[...planned],...extra});
+ const hold={v:1,reason:'cloud-source-recovery',automaticRecovery:true,account,identity:'owner',epoch:1,originalKey:'automatic-device-recovery:guard-a',headHash:head.hash};
+ const setHold=value=>editRawDevice187(indexedDB,deviceDbName,tx=>{if(value)tx.objectStore('meta').put(value,'recoveryCloudHold');else tx.objectStore('meta').delete('recoveryCloudHold');});
+ // Behaviour under test: refusals change nothing.
+ for(const kept of ['unreadable-generation-record:owner:guard','device-recovery-original:guard','device-recovery-file:guard','cloud-generation-recovery:owner:guard'])
+  assert.equal((await store.beginRecoveryTrim({expectedHeadHash:head.hash,plan:plan({remaining:[...planned,kept]})})).error,true,'a plan cannot name a kept row: '+kept);
+ assert.equal((await store.beginRecoveryTrim({expectedHeadHash:'0'.repeat(64),plan:plan()})).conflict,true,'another head is refused');
+ assert.equal((await store.beginRecoveryTrim({expectedHeadHash:head.hash,plan:plan({account:'someone-else@example.com'})})).conflict,true,'another account is refused');
+ await setHold(hold);
+ assert.equal((await store.beginRecoveryTrim({expectedHeadHash:head.hash,plan:plan()})).held,true,'a recovery hold refuses a new plan');
+ assert.deepEqual(await keys(),all,'nothing changed');assert.equal(await store.getRecoveryTrim(),null);
+ await setHold(null);
+ assert.equal((await store.beginRecoveryTrim({expectedHeadHash:head.hash,plan:plan()})).ok,true,'positive control: a plan is saved');
+ assert.deepEqual([...(await store.getRecoveryTrim()).remaining],planned);
+ await setHold(hold);
+ assert.equal((await store.continueRecoveryTrim({expectedHeadHash:head.hash,limit:2})).held,true,'a recovery hold stops a saved plan');
+ assert.deepEqual(await keys(),all,'nothing was deleted under the hold');
+ await setHold(null);
+ // Two keys per batch, originals first, by key; the rest of the plan stays saved.
+ const first=await store.continueRecoveryTrim({expectedHeadHash:head.hash,limit:2});
+ assert.deepEqual([[...first.deleted],first.remaining,first.done],[planned.slice(0,2),1,false]);
+ assert.deepEqual([...(await store.getRecoveryTrim()).remaining],planned.slice(2),'the rest stays planned for the next batch or opening');
+ const second=await store.continueRecoveryTrim({expectedHeadHash:head.hash,limit:2});
+ assert.deepEqual([[...second.deleted],second.done],[planned.slice(2),true]);
+ assert.equal(await store.getRecoveryTrim(),null,'a finished plan is gone');
+ assert.deepEqual((await keys()).sort(),all.filter(key=>!planned.includes(key)).sort(),'exactly the planned keys are deleted; kept and unknown rows stay');
+ // A recovery that commits drops an unfinished plan.
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('opaque').put({key:'automatic-cloud-source:guard-b',raw:'{}',order:9},'automatic-cloud-source:guard-b'));
+ const now=await store.readHead();
+ assert.equal((await store.beginRecoveryTrim({expectedHeadHash:now.hash,plan:plan({remaining:['automatic-cloud-source:guard-b']})})).ok,true);
+ const committed=await store.writeRecoveredSource({expectedSource:'same',encodeSource:()=>'same',archives:[],payload:now.payload,account,hold:{...hold,originalKey:'automatic-device-recovery:guard-b'},guard:()=>true});
+ assert.equal(committed.ok,true,'positive control: the recovery committed');
+ assert.equal(await store.getRecoveryTrim(),null,'the recovery dropped the unfinished plan');
+ assert.equal((await store.continueRecoveryTrim({expectedHeadHash:committed.hash,limit:2})).held,true);
+ assert.ok((await keys()).includes('automatic-cloud-source:guard-b'),'and its rows stay');
+});
+
+test('RISK acknowledged recovery trim: after the trim the earlier-source check reads no whole store and answers from the note, and saving, sync, Restore and the saved-decisions review after a relaunch still work',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,shim,backend,store,unreadableId}=app;
+ const earlier=await earlierSources2254(ctx);
+ await adoptOverUnreadable2254(app);
+ assert.deepEqual((await deviceRows2254(store)).opaque.filter(row=>trimLeftover2254(row.key)).map(row=>row.key),[],'positive control: the adoption’s acknowledgement cleared the recovery archives');
+ // Behaviour under test: the readers.
+ const wholeReads=[];
+ for(const name of ['readRawExportSnapshot','readRawExportRows','listOpaqueArchives']){const call=store[name];store[name]=function(...args){if(name!=='listOpaqueArchives'||!args[0]?.prefix)wholeReads.push(name);return call.apply(this,args);};t.after(()=>{store[name]=call;});}
+ assert.deepEqual(JSON.parse(await vm.runInContext('automaticCloudSourceHistoryFromSummaries().then(JSON.stringify)',ctx)).unresolved.map(row=>[row.id,row.reason]),
+  [[unreadableId,'generation-incomplete']],'the check of earlier sources answers from the note');
+ assert.deepEqual(wholeReads,[],'and reads no whole store');
+ assert.deepEqual(await earlierSources2254(ctx),earlier,'both forms of the check answer as before the trim');
+ // The check itself, run deliberately on what the trim left: it rechecks the
+ // unreadable generation the note names and stops when its retries end.
+ const checkedBefore=vm.runInContext('automaticCloudSourceResumeStatus.checkedAt',ctx);setFakeTime(ctx,vm.runInContext('Date.now()',ctx)+1000);
+ vm.runInContext('automaticCloudSourceResumeRequested=true;automaticCloudSourceResumeDeliberate=true;maybeResumeAutomaticCloudSources()',ctx);
+ await trimSettle2254(ctx,'the check of earlier sources settles');
+ assert.notEqual(vm.runInContext('automaticCloudSourceResumeStatus.checkedAt',ctx),checkedBefore,'positive control: the check ran after the trim');
+ ctx.openSettings();const status=(shim.document.getElementById('modalRoot').innerHTML.match(/id="automaticCloudSourceResumeStatus"[^>]*>([^<]*)/)||[])[1];ctx.closeModal();
+ assert.equal(status,'An earlier cloud source remains unresolved and protected. Your current board remains saved on this device.',
+  'Settings reports the unresolved earlier source as before, never an archive it could not check');
+ // Saving and sync.
+ await ordinaryAcknowledgedSave2254(app,'Saved after the trim');
+ assert.equal((await backend.CS.pull()).payload,ctx.cloudPayload(),'the cloud holds the saved board');
+ // Restore: a backup still restores and the restored board saves and syncs.
+ const daily=(await store.listBackups()).find(row=>row.kind==='daily');assert.ok(daily,'positive control: a daily backup is listed');
+ ctx.openSettings();await ctx.restoreDurableBackupById(daily.id);await trimSettle2254(ctx,'the restore settles');
+ assert.ok((await store.listBackups()).some(row=>row.kind==='before-restore'),'Restore saved the current board first');
+ assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the restored board saved on this device');
+ await ctx.sendPush();await trimSettle2254(ctx,'the restored board’s save settles');
+ assert.equal(syncStatus2200(shim).text,'☁ synced','the restored board synced');
+ // The saved-decisions review after a relaunch reads its device and cloud
+ // sources from what the trim left.
+ const reopened=await coldRelaunch2198(t,app,[]);
+ assert.equal(await reopened.ctx.onAction('review-decision-recovery',{}),true,'the saved-decisions review reads its sources after a relaunch');
+ assert.doesNotMatch(reopened.shim.document.getElementById('modalRoot').innerHTML,/changed in another tab|could not be verified/,'it reports no changed or unverifiable source');
+});
+
+test('RISK acknowledged recovery trim: the recovery file holds only what the device keeps after the trim',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,shim,store,unreadableId}=app;
+ const beforeFile=await downloadedRecoveryFile2254(app),beforeRows=await deviceRows2254(store);
+ await adoptOverUnreadable2254(app);
+ const {text,file}=await downloadedRecoveryFile2254(app),kept=await deviceRows2254(store);
+ const keysOf=name=>(file.appSources.indexedDB.stores[name]||[]).map(row=>decodeManualArchiveTypedValue(row.key));
+ // Behaviour under test.
+ assert.equal(file.manifest.status,'complete','the trimmed file is complete');
+ assert.deepEqual(keysOf('opaque').sort(),kept.opaque.map(row=>row.key).sort(),'its archives are the kept rows');
+ assert.deepEqual(keysOf('opaque').filter(trimLeftover2254),[],'no recovery archive is in it');
+ assert.deepEqual(keysOf('snapshots').sort(),kept.snapshots.map(row=>row.key).sort(),'its board copies are the head and those the backups use');
+ assert.deepEqual(keysOf('backups').sort(),kept.backups.map(row=>row.key).sort(),'every backup is in it');
+ const local=new Map(file.appSources.localStorage.map(row=>[row.key,row.status]));
+ for(const key of [SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY])
+  assert.equal(local.get(key),shim.localStorage.getItem(key)===null?'absent':'present','its browser sources are the kept ones: '+key);
+ const notes=keysOf('opaque').filter(key=>!key.startsWith('unreadable-generation-record:'));
+ assert.equal(notes.length,1,'one note: '+JSON.stringify(notes));
+ assert.ok(JSON.stringify(file.appSources.indexedDB.stores.opaque).includes(unreadableId),'the note in it names the unresolved generation');
+ // The cleared archives' text is gone from the file.
+ const cleared=beforeRows.opaque.filter(row=>trimLeftover2254(row.key)).reduce((total,row)=>total+row.value.raw.length,0);
+ assert.ok(cleared>0&&text.length<beforeFile.text.length-0.9*cleared,'the file no longer carries the cleared archives: '+text.length+' against '+beforeFile.text.length+' before, '+cleared+' cleared');
+ assert.ok(file.currentBoard?.tasks?.length===ctx.state.tasks.length,'the file keeps the board');
+});
+
+test('RISK acknowledged recovery trim: a note the trim kept still lets the check of earlier sources reconcile that generation once it can be read, and the trim after its acknowledgement clears the note',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,backend,store,unreadableId,activePath}=app,codec=ctx.window.ChainStorageV2;
+ await ordinaryAcknowledgedSave2254(app,'Saved after the recovery');
+ assert.deepEqual((await deviceRows2254(store)).opaque.filter(row=>trimLeftover2254(row.key)).map(row=>row.key),[],'positive control: the trim cleared the recovery');
+ assert.deepEqual((await earlierSources2254(ctx)).unresolved,[[unreadableId,'generation-incomplete']],'positive control: the note names the unreadable generation');
+ // Behaviour under test: the generation's own bytes come back, and Retry sync
+ // merges it from the note.
+ const encoded=await codec.encodeSnapshot(exactPaddedBoard(JSON.parse(app.acknowledgedBefore),'futureUnreadableActiveFixture',CAPTURED_UNREADABLE_GENERATION.active.byteLength));
+ assert.equal(encoded.hash,backend.docs.get(activePath).hash,'fixture: these are the unreadable generation’s own bytes');
+ for(const chunk of encoded.chunks)backend.docs.set(activePath+'/chunks/'+String(chunk.index).padStart(8,'0'),structuredClone(chunk));
+ await ctx.onAction('sync-retry',{});await trimSettle2254(ctx,'the deliberate check of earlier sources settles');
+ const resolvedBy=(await deviceRows2254(store)).opaque.filter(row=>row.key.startsWith('automatic-recovery-ack:')).map(row=>JSON.parse(row.value.raw));
+ assert.ok(resolvedBy.some(ack=>ack.resolvedGenerationIds.includes(unreadableId)),'the generation the note names is reconciled once it can be read, and its acknowledgement resolves it');
+ assert.equal(vm.runInContext('automaticCloudSourceResumeStatus.state',ctx),'acknowledged','the check of earlier sources completes');
+ assert.equal((await backend.CS.pull()).payload,ctx.cloudPayload(),'and the cloud confirms the reconciled board');
+ await ordinaryAcknowledgedSave2254(app,'Saved after the merge');
+ const after=await deviceRows2254(store);
+ assert.deepEqual(await earlierSources2254(ctx),{error:null,unresolved:[],permanent:[]},'nothing earlier is left unresolved');
+ assert.deepEqual(after.opaque.filter(row=>trimLeftover2254(row.key)||row.key.startsWith('automatic-recovery-note:')).map(row=>row.key),[],
+  'the next trim clears the merge’s own archives and the resolved note');
 });
