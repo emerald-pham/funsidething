@@ -2769,8 +2769,13 @@ test('RISK cloud source review #2272: a review that throws while it opens still 
 
 test('RISK cloud source review #2272 guidance: mounted Help and the November 7 changelog say an unreadable or unchanged source is not a change',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- const answer=(help.match(/<dt>Why does the review show a cloud source as Unknown\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
- assert.match(answer,/Reading the same sources again is not a change: a cloud source one read could not read completely stays Unknown and cannot be chosen, and the review still finishes with the others\./);
+ // The finished review labels such a row "Unavailable:"; Help and the changelog use that word.
+ assert.match(html,/'<p role="status">Unavailable: '\+esc\(candidate\.issue\)/,'positive control: the review modal labels the row Unavailable');
+ const answer=(help.match(/<dt>Why does the review show a cloud source as Unavailable\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
+ assert.match(answer,/Reading the same sources again is not a change: a cloud source one read could not read completely is shown as Unavailable and cannot be chosen, and the review still finishes with the others\./);
+ assert.doesNotMatch(answer,/Unknown/,'the answer uses the word the review shows');
+ assert.match(html,/a cloud copy that one read could not read completely is shown as Unavailable, which cannot be chosen, instead of stopping the review/);
+ assert.doesNotMatch(help,/Why does the review show a cloud source as Unknown/);
  assert.match(answer,/Cloud saves from this tab wait until the sources have been read; another open tab of the app does not wait\./,'the wait is per tab');
  assert.doesNotMatch(help,/This device’s own cloud saves wait/,'no claim that every tab on the device waits');
  assert.match(html,/A cloud save this tab starts while the sources are read waits until the reading ends; another open tab of the app does not wait\./);
