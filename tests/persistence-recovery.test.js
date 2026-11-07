@@ -6340,8 +6340,13 @@ test('RISK daily backup retention hold: while cloud recovery waits on an unreada
 // the same board to a healthy cloud at the acknowledged revision. Peaks are
 // web-process memory over the local opening, in the same run on the same
 // engine. The store is scaled to one recovery so the test fits the suite
-// (about 120 MiB of saved rows; the owner-shaped harness store recorded on
-// #2254 is about 280 MiB).
+// (about 90 MiB of saved rows since daily backups keep three days, 3ad16c9;
+// the owner-shaped harness store recorded on #2254 is about 280 MiB).
+// Since the acknowledged trim (33d83ec), a recovery's archives are cleared once
+// the cloud confirms its board. The recovery is built as a build before the
+// trim left it (the owner's phone after this update): its archives stay until
+// the next acknowledged save. Adoption and the ordinary save are each such a
+// save, so the trim follows both measured publications alike.
 const CONTAINED_ADOPTION_HEADROOM_2254=200*1024*1024;
 test('RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
@@ -6352,14 +6357,17 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
   const template=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2254-'+engineName+'-')),copies=[];
   let earlier=null;
-  const launch=async(profile,tag,{seed=null,cloud=null,clock=false}={})=>{
+  const launch=async(profile,tag,{seed=null,cloud=null,clock=false,olderBuild=false}={})=>{
    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
    await context.route(origin+GENERATION_PATH,route=>route.fulfill({status:200,contentType:'application/json',body:earlier}));
-   await context.addInitScript(({seed,cloud,GENERATION_PATH,ACCOUNT,IDENTITY,clock})=>{
+   await context.addInitScript(({seed,cloud,GENERATION_PATH,ACCOUNT,IDENTITY,clock,olderBuild})=>{
     // A page clock the store builder can move to earlier days.
     if(clock){const real=Date.now.bind(Date);window.__clockOffset=0;Date.now=()=>real()+window.__clockOffset;}
+    // A build before the acknowledged trim: it never starts one.
+    if(olderBuild){let store=null;Object.defineProperty(window,'ScannerDeviceStore',{configurable:true,get:()=>store,
+     set(value){store=value;if(value&&typeof value.beginRecoveryTrim==='function')value.beginRecoveryTrim=async()=>({ok:false,code:'older-build-fixture'});}});}
     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);
@@ -6416,7 +6424,7 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
     };
     Object.defineProperty(window,'CloudSync',{configurable:false,get:()=>cloudApi,set(){}});
     document.addEventListener('DOMContentLoaded',()=>{window.dispatchEvent(new CustomEvent('cloudsync'));window.cloudPull?.();});
-   },{seed,cloud,GENERATION_PATH,ACCOUNT,IDENTITY,clock});
+   },{seed,cloud,GENERATION_PATH,ACCOUNT,IDENTITY,clock,olderBuild});
    return context;
   };
   const ready=page=>page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&
@@ -6449,9 +6457,15 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
     await page.evaluate(()=>{window.__clockOffset=0;});
    });
    // One automatic recovery over an unreadable revision 3 commits its archives
-   // and publishes revision 4, which this device acknowledges.
+   // and publishes revision 4, which this device acknowledges. The earlier
+   // generation holds a task saved on another device, so it is not this
+   // device's acknowledged copy and the board is recovered, not adopted
+   // (a698ee0 adopts over a copy before it that is the acknowledged one).
+   const acknowledged=earlier,elsewhere=JSON.parse(earlier);
+   elsewhere.tasks=[...elsewhere.tasks,{...elsewhere.tasks[0],id:'saved-elsewhere-2254',title:'Saved on another device before the unreadable copy'}];
+   earlier=JSON.stringify(elsewhere);
    summary.recovery=await step(tag+'-recovery',{cloud:{shape:'damaged',ackRev:2,intact:await headerOf(earlier),
-    unreadable:{...await headerOf(earlier),hash:'e'.repeat(64)},budget:64*1048576,retryDelay:0}},async page=>{
+    unreadable:{...await headerOf(acknowledged),hash:'e'.repeat(64)},budget:64*1048576,retryDelay:0},olderBuild:true},async page=>{
     const done=await synced(page,1);
     return page.evaluate(done=>({done,rev:state.syncRev,published:__adoption2254.published?.rev??null,acknowledged:state.decisionBase?.payload===__adoption2254.published?.payload,
      payload:__adoption2254.published?.payload??null}),done);
@@ -6516,7 +6530,7 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
    // Measurement preconditions: each run sampled this browser's own web process.
    for(const run of all)assert.ok(run.processes>0&&run.samples>10,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
    assert.equal(summary.crashed,false,`${engineName}: no page crashed`);assert.deepEqual(summary.errors,[],`${engineName}: no page errors`);
-   assert.ok(summary.storeMiB>=100,`${engineName}: fixture: the device store is heavy ${JSON.stringify(summary)}`);
+   assert.ok(summary.storeMiB>=80&&summary.stores.opaque>=50,`${engineName}: fixture: the device store is heavy, mostly the recovery's archives ${JSON.stringify(summary)}`);
    // Every run publishes the same board once: adoption over the unreadable
    // revision 5, the ordinary save over the acknowledged revision 4.
    for(const run of runs.adoption)assert.deepEqual([run.settled,run.pushes,run.status,run.syncRev,run.newerKept,run.publishedIsBoard],[true,['5:published'],'☁ synced',6,true,true],`${engineName}: adoption publishes the board once ${JSON.stringify(summary)}`);
