@@ -13461,6 +13461,16 @@
       "file": "tests/persistence-recovery.test.js"
     },
     {
+      "root": "RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
+      "root": "RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js"
+    },
+    {
       "root": "RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js"

@@ -6051,3 +6051,86 @@ test('RISK contained board adoption: after adoption, showing, focusing or reconn
   assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
  });
 });
+
+// #2254 review (S2), the crash mark the owner asked for on #2239: a page the
+// phone closes in the middle of an adoption must not start the same work again
+// at every opening. The run is marked in device storage, and the mark read
+// back, before its first full source read; a run that ends (published, failed
+// or stopped because the page was hidden) clears it. A mark an earlier page
+// left makes the next opening wait as it did before adoption existed, while
+// Retry sync still adopts deliberately.
+test('RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts',async t=>{
+ const MARK='fvp:chain-scanner:contained-adoption-run';
+ await t.test('the page closed mid-run',async sub=>{
+  const first=await ownInterruptedUploadApp2254(sub,{timeoutMs:60000}),{ctx,backend,faults,revision,unreadableId}=first;
+  await newerEditBeforeAdoption2254(first);
+  // The first page's adoption upload never returns: the phone closes the page mid-run.
+  faults.publishPending=new Promise(()=>{});
+  ctx.closeModal();await flush();ctx.cloudPull();
+  await fixtureDeadline(async wait=>{while(!faults.publicationStarted)await wait(10);},'the first page starts publishing',30000);
+  const left=JSON.parse(first.shim.localStorage.getItem(MARK)||'null');
+  // The next opening: a new page over the same device storage and cloud.
+  const next=await loadAppAtTime(1792323000000,{indexedDBProvider:first.indexedDB,deviceDbName:first.deviceDbName,sharedStorage:first.shim.localStorage});
+  sub.after(()=>closeLegacyApp173(next));
+  Object.assign(next.ctx.window,{CLOUD_RECOVERY_WORK_BUDGET_BYTES:1,CLOUD_RETRY_DELAY_MS:600000,CLOUD_PUSH_DELAY_MS:60000});
+  const cloud=await loadCloudBackendV2({runtimeWindow:next.ctx.window,sharedDocs:backend.docs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000});
+  sub.after(()=>cloud.CS.suspend());
+  const nextPushes=[],push=cloud.CS.push;cloud.CS.push=async(...args)=>{nextPushes.push({baseRev:args[2]});return push(...args);};
+  cloud.emitAuth({uid:'owner',email:'e@example.com'});next.ctx.closeModal();
+  await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',next.ctx))await wait(10);},'the next page opens',30000);
+  await next.ctx.cloudPull();await adoptionSettle2254(next.ctx,'the next opening settles');
+  assert.deepEqual(nextPushes,[],'the next opening does not adopt again');
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'nothing is published');
+  assert.equal(next.shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','it waits instead');
+  assert.deepEqual([left?.rev,left?.generationId],[revision+1,unreadableId],'the first page marked its run in device storage');
+  assert.deepEqual(JSON.parse(next.shim.localStorage.getItem(MARK)||'null'),left,'the mark stays for later openings too');
+  // Retry sync is deliberate, so it adopts.
+  await next.ctx.onAction('sync-retry',{});
+  await fixtureDeadline(async wait=>{while(!nextPushes.length||!adoptionIdle2254(next.ctx))await wait(10);},'Retry sync adopts',30000);
+  await adoptionSettle2254(next.ctx,'Retry sync settles');
+  assert.deepEqual(nextPushes.map(row=>row.baseRev),[revision+1],'Retry sync publishes once, over the unreadable revision');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2);
+  assert.ok(next.ctx.state.tasks.some(task=>task.title==='Newer local edit before adoption'),'the newer local edit is kept');
+  assert.equal(next.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  assert.equal(next.shim.localStorage.getItem(MARK),null,'the completed run clears the mark');
+ });
+ await t.test('device storage refuses the mark',async sub=>{
+  const app=await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,revision,pushes}=app;
+  await newerEditBeforeAdoption2254(app);
+  const setItem=shim.localStorage.setItem;
+  shim.localStorage.setItem=function(key,value){if(key===MARK)throw Object.assign(Error('storage full'),{name:'QuotaExceededError'});return setItem.call(this,key,value);};
+  sub.after(()=>{shim.localStorage.setItem=setItem;});
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+  assert.deepEqual(pushes,[],'adoption does not start without its saved mark');
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'nothing is published');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ recovery waiting','the board waits as before');
+ });
+});
+
+// #2254 review (S2): an unreadable generation lets the board's next frame and
+// any input queued behind it go first (#2226). Adoption reads the device's
+// pending upload and the cloud's generation headers, so it starts after that
+// frame too, and input handled in it is part of what adoption publishes.
+test('RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{ctx,shim,backend,revision,pushes}=app;
+ await newerEditBeforeAdoption2254(app);
+ const order=[],evidence=backend.CS.recoveryEvidence,headers=backend.CS.readRecoverySourceHeaders;
+ backend.CS.recoveryEvidence=async(...args)=>{order.push('pending-upload-read');return evidence(...args);};
+ backend.CS.readRecoverySourceHeaders=async(...args)=>{order.push('header-read');return headers(...args);};
+ // A frame the page draws; input queued behind it is handled in it.
+ ctx.window.requestAnimationFrame=callback=>{
+  if(vm.runInContext('pulling',ctx)&&!order.includes('frame')){
+   order.push('frame');shim.document.getElementById('addInput').value='Typed while the frame was drawn';ctx.onAction('add',{});
+  }
+  setTimeout(callback,0);return 1;
+ };
+ const alive=setInterval(()=>{},20);
+ t.after(()=>{clearInterval(alive);delete ctx.window.requestAnimationFrame;backend.CS.recoveryEvidence=evidence;backend.CS.readRecoverySourceHeaders=headers;});
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+ await fixtureDeadline(async wait=>{while(!pushes.length||!adoptionIdle2254(ctx))await wait(10);},'the board is adopted',30000);
+ assert.equal(order[0],'frame','the board’s next frame goes before any adoption read '+JSON.stringify(order));
+ assert.ok(order.includes('pending-upload-read')&&order.includes('header-read'),'positive control: adoption read the pending upload and the headers '+JSON.stringify(order));
+ assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'the board is then adopted once');
+ assert.ok(JSON.parse(pushes[0].payload).tasks.some(task=>task.title==='Typed while the frame was drawn'),'the input handled in that frame is published with it');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
