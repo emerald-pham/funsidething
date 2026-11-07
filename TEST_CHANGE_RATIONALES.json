@@ -21464,7 +21464,7 @@
   },
   {
     "baseCommit": "384f3d00614c56bf656ddd5baca024cfc50427ff",
-    "testChangesSha256": "7cf6552bb2f1fe83d3a629436362504fb3d316e4cbd7dfe8cd815b302cbcf00f",
+    "testChangesSha256": "55779c4c7838d05210558b75d0dbd9a0464fbf92df1f773e256affc78b7d3cf2",
     "reason": "#2254 owner rule (2026-11-06): \"only 3 autosaves\", which the owner clarified meant the daily backups, so this account's daily backups now cover three local calendar days instead of seven. The LOCAL BACKUPS seven-day test restored day 3's daily backup, which the new rule retires; it now restores day 3's latest copy, which the unchanged seven-day rule for the other automatic copies keeps, and it also asserts the three-day daily window. Every other assertion of the test is unchanged.",
     "previousBehavior": "Every automatic backup kind (daily, latest, before-restore, before-cloud-adoption, cloud-merged) stayed for today and the previous six local dates, on this device and in the older backup list, so after eight days of saves the day-3 daily backup was still there to restore.",
     "intendedBehavior": "A daily backup records the account whose board it copies. This account's daily backups cover today and the previous two local dates, so at most three stay; other automatic copies keep seven days; daily backups that name another account or were saved before daily backups named one keep seven; manual, promoted and pinned copies stay until deleted; and while a recovery holds or waits, before the cloud confirms a board, daily backups keep seven days. After eight days of saves the daily backups cover days 6 to 8, each day's latest copy still covers days 2 to 8, and restoring day 3's latest copy keeps later tasks and first makes the pre-restore safety copy.",
