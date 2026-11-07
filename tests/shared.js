@@ -176,6 +176,18 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  return {...app,faults,originalRoot,originalHeader,activeSource:{id:originalRoot.activeGeneration,header:originalHeader,chunks:activeChunks},acknowledgedTasks,previousSource};
 }
 
+// #2254 (owner direction, 2026-11-06): once the cloud acknowledges a board the
+// device trims an automatic recovery's archives and keeps a note naming what the
+// check of earlier sources still reports. An archive is never rewritten: each
+// is still byte for byte what was written, or the trim has cleared it, and then
+// a note names the unresolved generation.
+async function exactOrTrimmedArchives254(store,rows,unresolvedId,message){
+ const archives=await store.listOpaqueArchives();
+ for(const [key,raw] of rows){const saved=archives.find(row=>row.key===key);if(saved)assert.equal(saved.raw,raw,message+': '+key+' is never rewritten');}
+ if(rows.some(([key])=>!archives.some(row=>row.key===key)))
+  assert.ok(archives.some(row=>row.key.startsWith('automatic-recovery-note:')&&row.raw.includes(unresolvedId)),message+': once the trim clears it, a note names the unresolved generation');
+ return archives;
+}
 async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  const damaged=await damagedAcknowledgedApp187(t),{backend,originalRoot,activeSource,indexedDB,deviceDbName}=damaged;
  const targetPayload=await damaged.ctx.window.ChainStorageV2.decodeSnapshot(activeSource.header,activeSource.chunks);
@@ -223,10 +235,8 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
   'the unresolved newer source has rotated out of both current root slots');
  assert.ok(reader.docs.has('users/owner/recoveryProtections/'+activeSource.id),
   'shared retention protects the old generation even after root-slot rotation');
- assert.equal((await store.listOpaqueArchives()).find(row=>row.key===firstHold.originalKey)?.raw,
-  originalEnvelopeRaw,'the successful ACK retains the original partial envelope byte-for-byte');
- assert.equal((await store.listOpaqueArchives()).find(row=>row.key===originalSourceKey)?.raw,
-  originalSourceRaw,'the successful ACK retains the partial source capture byte-for-byte');
+ await exactOrTrimmedArchives254(store,[[firstHold.originalKey,originalEnvelopeRaw],[originalSourceKey,originalSourceRaw]],activeSource.id,
+  'the successful ACK retains the original partial envelope and source capture byte-for-byte');
 
  cold.shim.window.dispatchEvent({type:'pagehide'});
  cold.shim.document.getElementById('addInput').value='Accepted while offline';
@@ -249,10 +259,8 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
   'the unresolved reference remains discoverable outside the current root slots');
  assert.ok(resumed.docs.has('users/owner/recoveryProtections/'+activeSource.id),
   'the exact source remains protected while another local edit is reconciled');
- assert.equal((await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===firstHold.originalKey)?.raw,
-  originalEnvelopeRaw,'later publication does not rewrite prior automatic originals');
- assert.equal((await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===originalSourceKey)?.raw,
-  originalSourceRaw,'later publication does not rewrite the original partial source evidence');
+ await exactOrTrimmedArchives254(offline.ctx.window.ScannerDeviceStore,[[firstHold.originalKey,originalEnvelopeRaw],[originalSourceKey,originalSourceRaw]],activeSource.id,
+  'later publication does not rewrite prior automatic originals or the original partial source evidence');
  let retryFire=null;const retryTimerId='automatic-source-retry-254',priorSetTimeout=offline.ctx.setTimeout,priorClearTimeout=offline.ctx.clearTimeout;
  offline.ctx.setTimeout=(callback,delay,...args)=>{
   if(delay===60000){retryFire=()=>callback(...args);return retryTimerId;}
@@ -267,8 +275,8 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
   'the saved current board remains usable while older source bytes are still incomplete');
  assert.equal(offline.ctx.state.tasks.some(row=>row.id===targetTask.id),false,
   'an incomplete capture is not presented as recovered');
- assert.equal((await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===originalSourceKey)?.raw,
-  originalSourceRaw,'a transient retry preserves the exact old partial source capture');
+ await exactOrTrimmedArchives254(offline.ctx.window.ScannerDeviceStore,[[originalSourceKey,originalSourceRaw]],activeSource.id,
+  'a transient retry preserves the exact old partial source capture');
  for(const chunk of activeSource.chunks)resumed.docs.set('users/owner/generations/'+activeSource.id+'/chunks/'+chunk.index,structuredClone(chunk));
  assert.equal(resumed.docs.get('users/owner/generations/'+activeSource.id).hash,activeSource.header.hash,
   'the newly readable source uses its unchanged original header');
@@ -284,18 +292,18 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  assert.equal(acknowledged.payload,offline.ctx.cloudPayload(),'the later cloud ACK matches the exact recovered current board');
  assert.equal(await offline.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,
   'the publisher clears the new hold only after the later exact current-board ACK');
- const afterArchives=await offline.ctx.window.ScannerDeviceStore.listOpaqueArchives();
- assert.equal(afterArchives.find(row=>row.key===firstHold.originalKey)?.raw,originalEnvelopeRaw,'the first original envelope stays exact after later discovery');
- assert.equal(afterArchives.find(row=>row.key===originalSourceKey)?.raw,originalSourceRaw,'the first partial capture stays exact after later discovery');
+ const afterArchives=await exactOrTrimmedArchives254(offline.ctx.window.ScannerDeviceStore,[[firstHold.originalKey,originalEnvelopeRaw],[originalSourceKey,originalSourceRaw]],
+  activeSource.id,'the first original envelope and partial capture stay exact after later discovery');
  const latestEnvelope=afterArchives.filter(row=>row.key.startsWith('automatic-device-recovery:')&&row.key!==firstHold.originalKey).at(-1);
  assert.ok(latestEnvelope,'later source recovery records a distinct fresh guarded publication context');
  const latestEnvelopeValue=JSON.parse(latestEnvelope.raw),latestSourceKey=latestEnvelopeValue.sourceArchiveKeys[0],latestSourceRow=afterArchives.find(row=>row.key===latestSourceKey);
  assert.ok(latestSourceRow&&latestSourceKey!==originalSourceKey,'later discovery creates a distinct exact cloud-source capture');
  const latestSource=JSON.parse(latestSourceRow.raw).generations.find(row=>row.id===activeSource.id);
  assert.deepEqual(latestSource?.chunks,activeSource.chunks,'the fresh source archive stores the exact newly readable original chunks');
- assert.ok(latestEnvelopeValue.preservedAutomaticArchiveKeys.includes(firstHold.originalKey)&&
-  latestEnvelopeValue.preservedAutomaticArchiveKeys.includes(originalSourceKey),
-  'later originals reference prior automatic archives without rewriting them');
+ const priorStillSaved=[firstHold.originalKey,originalSourceKey].filter(key=>afterArchives.some(row=>row.key===key));
+ assert.ok(priorStillSaved.every(key=>latestEnvelopeValue.preservedAutomaticArchiveKeys.includes(key))&&
+  latestEnvelopeValue.preservedAutomaticArchiveKeys.every(key=>afterArchives.some(row=>row.key===key)),
+  'later originals reference prior automatic archives without rewriting them, and none the trim cleared');
  assert.ok(!latestEnvelopeValue.indexedDB.opaque.some(row=>row.key?.type==='string'&&
   latestEnvelopeValue.preservedAutomaticArchiveKeys.includes(row.key.value)),
   'later originals do not recursively copy prior automatic archive payloads');
