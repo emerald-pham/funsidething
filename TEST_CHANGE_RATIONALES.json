@@ -21638,7 +21638,6 @@
       "RISK cloud source recovery #2281: a confirmed choice also completes the earlier attempts’ archives of the same cloud evidence, so later saves do not re-check them",
       "RISK cloud source recovery #2281: while another saved copy cannot be read, Apply stops before any cloud write and changes no board",
       "RISK cloud source recovery #2281: a confirmed choice that names its archive still counts its originals as recovered once an older device collected them, and healthy edits save",
-      "RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused (extended to listOpaqueArchiveKeys and readOpaqueArchive)",
       "RISK backup listing reuse: a cached payload is kept only while the stored snapshot equals it, and a snapshot changed in place is still refused"
     ],
     "redEvidence": {
