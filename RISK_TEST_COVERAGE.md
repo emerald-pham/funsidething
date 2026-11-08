@@ -136,6 +136,11 @@ its RISK test; the map follows.
 - RISK cloud source recovery #2278: a failed Apply names why it could not save, and the step that stopped, in the modal and the debug log
 - RISK cloud source recovery #2278: a late reply after an upload timed out cannot publish, even once the delayed reply arrives
 - RISK cloud source recovery #2278 guidance: mounted Help and the November 7 changelog say recovery saves wait up to a minute per step and Apply selected source names why it could not save
+- RISK cloud source recovery #2281: Apply on the large phone board writes, and reads at once, about the same device storage however many earlier attempts failed, and then succeeds and is synced
+- RISK cloud source recovery #2281: when this device has no room to protect a new copy, Apply says storage is full and changes nothing
+- RISK cloud source recovery #2281: after failed attempts saved by the previous release, Apply names their prepared choices by exact hash, keeps every original exact and succeeds
+- RISK cloud source recovery #2281 guidance: mounted Help and the November 8 changelog say Apply no longer grows with earlier attempts and names a full device
+- RISK cloud source recovery #2281: a confirmed choice that names its archive still counts its originals as recovered once an older device collected them, and healthy edits save
 - RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write
 - RISK cloud source review #2272: a cloud push deferred by the review resumes after Cancel and after a failed review
 - RISK cloud source review #2272: a review that throws while it opens still ends, so a later review and cloud pushes run

@@ -269,6 +269,8 @@
     // #2239: {keysOnly} names stores whose rows are only looked up by key; each
     // present row's value is then undefined, so a check that a row is still
     // present does not read it (an archive is several times the board's size).
+    // #2281: {keysOnly} may instead map a store to the keys only looked up, so
+    // one transaction can read some rows of a store and only check others.
     async function readRawRows(request,{keysOnly=[]}={}){
       ensureOpen();
       const names=storeNames.filter(name=>Array.isArray(request?.[name]));
@@ -277,7 +279,8 @@
       try{
         const entries=await Promise.all(names.map(async name=>{
           const store=tx.objectStore(name),wanted=[...new Set(request[name])],keyOnly=Array.isArray(keysOnly)&&keysOnly.includes(name);
-          const rows=await Promise.all(wanted.map(key=>Promise.all([requestResult(store.getKey(key)),keyOnly?undefined:requestResult(store.get(key))])));
+          const keyOnlyKeys=keysOnly&&!Array.isArray(keysOnly)&&Array.isArray(keysOnly[name])?new Set(keysOnly[name]):null;
+          const rows=await Promise.all(wanted.map(key=>Promise.all([requestResult(store.getKey(key)),keyOnly||keyOnlyKeys?.has(key)?undefined:requestResult(store.get(key))])));
           const present=rows.filter(([key])=>key!==undefined);
           return [name,{keys:present.map(([key])=>key),values:present.map(([,value])=>value)}];
         }));
@@ -385,25 +388,78 @@
         }catch{return false;}
       };
     }
-    async function listBackups(){
+    // #2281: the exact device recovery originals that may keep an unreadable
+    // row, read only when a listing meets such a row. They are never trimmed
+    // or replaced (RECOVERY_TRIM_KEPT_PREFIXES), so reading them after the
+    // listing's own transaction sees the same originals it would have seen.
+    async function protectedRawReaderFromOriginals(opaqueKeys){
+      const keys=(opaqueKeys||[]).filter(key=>typeof key==="string"&&key.startsWith("device-recovery-original:"));
+      const read=keys.length?await readRawRows({opaque:keys}):{stores:{opaque:{keys:[],values:[]}}};
+      return protectedRawRowReader(read.stores.opaque?.keys??[],read.stores.opaque?.values??[]);
+    }
+    // #2281: each listed row's payload as this store verified it against its
+    // hash. A caller that passes earlier rows back ({reuse}) lets a listing
+    // keep that same payload text when the stored snapshot still equals it
+    // exactly, instead of holding a second copy of every saved board. On the
+    // phone each refresh held every prepared recovery choice twice.
+    const verifiedBackupPayloads=new WeakMap();
+    // #2281: the snapshots are read one at a time with a cursor in the same
+    // readonly transaction as the backup rows, and only the opaque keys are
+    // read: every saved archive (each several times the board's size after a
+    // recovery, and once many times more) was read on every listing only to
+    // find the rare unreadable row. {kinds} lists only the rows of those
+    // kinds, reading only their snapshots; a malformed row is still refused.
+    async function listBackups({kinds=null,reuse=null}={}){
       ensureOpen();
+      const wantedKind=Array.isArray(kinds)?new Set(kinds):null;
+      const reused=new Map();
+      for(const row of Array.isArray(reuse)?reuse:[]){
+        const verified=row&&typeof row==="object"?verifiedBackupPayloads.get(row):undefined;
+        if(verified)reused.set(verified.hash,verified.payload);
+      }
       const tx=await beginTransaction(["backups","snapshots","opaque"],"readonly"),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots"),opaqueStore=tx.objectStore("opaque");
       const done=transactionDone(tx);
-      const [rows,keys,snapshots,snapshotKeys,opaque,opaqueKeys]=await Promise.all([requestResult(backupStore.getAll()),requestResult(backupStore.getAllKeys()),
-        requestResult(snapshotStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(opaqueStore.getAll()),requestResult(opaqueStore.getAllKeys())]),result=[];
+      // Requests run in the order they are placed, so the backup rows arrive
+      // before the first snapshot does and name the snapshots worth keeping.
+      const rowsRequest=backupStore.getAll();let wanted=null;
+      rowsRequest.addEventListener("success",()=>{
+        const rows=rowsRequest.result;
+        if(Array.isArray(rows))wanted=new Set(rows.filter(row=>row&&typeof row==="object"&&(!wantedKind||wantedKind.has(row.kind))).map(row=>row.payloadHash));
+      });
+      const snapshots=new Map();
+      const snapshotsRead=new Promise((resolve,reject)=>{
+        const request=snapshotStore.openCursor();
+        request.onerror=()=>reject(request.error||new Error("IndexedDB request failed"));
+        request.onsuccess=()=>{
+          const cursor=request.result;
+          if(!cursor){resolve();return;}
+          const value=cursor.value,hash=value&&typeof value==="object"?value.hash:undefined;
+          // The first snapshot carrying a hash is the one a row names, as before.
+          if(typeof hash==="string"&&!snapshots.has(hash)&&(wanted===null||wanted.has(hash))){
+            const earlier=reused.get(hash);
+            snapshots.set(hash,earlier!==undefined&&value.payload===earlier?{key:cursor.primaryKey,payload:earlier,verified:true}:{key:cursor.primaryKey,value,payload:value.payload,verified:false});
+          }
+          cursor.continue();
+        };
+      });
+      const [rows,keys,,opaqueKeys]=await Promise.all([requestResult(rowsRequest),requestResult(backupStore.getAllKeys()),snapshotsRead,requestResult(opaqueStore.getAllKeys())]),result=[];
       await done;
-      const protectedRaw=protectedRawRowReader(opaqueKeys,opaque);
+      let protectedRaw=null;
+      const isProtected=async(...args)=>(protectedRaw??=await protectedRawReaderFromOriginals(opaqueKeys))(...args);
       for(const [index,row]of rows.entries()){
         if(!row||typeof row!=="object"||Array.isArray(row)||typeof row.id!=="string"||row.id!==keys[index]||typeof row.payloadHash!=="string"){
-          if(protectedRaw("backups",keys[index],row))continue;
+          if(await isProtected("backups",keys[index],row))continue;
           throw new Error("Durable recovery row is corrupt or unprotected");
         }
-        const at=snapshots.findIndex(candidate=>candidate?.hash===row.payloadHash),snapshot=snapshots[at];
-        if(!snapshot||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==row.payloadHash){
-          if(protectedRaw("backups",keys[index],row)&&(at<0||protectedRaw("snapshots",snapshotKeys[at],snapshot)))continue;
+        if(wantedKind&&!wantedKind.has(row.kind))continue;
+        const snapshot=snapshots.get(row.payloadHash);
+        if(!snapshot||typeof snapshot.payload!=="string"||!snapshot.verified&&await sha(snapshot.payload)!==row.payloadHash){
+          if(await isProtected("backups",keys[index],row)&&(!snapshot||await isProtected("snapshots",snapshot.key,snapshot.value)))continue;
           throw new Error("Durable recovery snapshot is corrupt");
         }
-        const {payloadHash,...visible}=row;result.push({...visible,payload:snapshot.payload});
+        snapshot.verified=true;delete snapshot.value;
+        const {payloadHash,...visible}=row,listed={...visible,payload:snapshot.payload};
+        verifiedBackupPayloads.set(listed,{hash:payloadHash,payload:snapshot.payload});result.push(listed);
       }
       return result.sort((a,b)=>(b.at||0)-(a.at||0)||String(a.id).localeCompare(String(b.id)));
     }
@@ -446,6 +502,32 @@
       const cloned=root.structuredClone(visible.map(row=>typeof row.raw==="string"?{...row,raw:""}:row));
       cloned.forEach((row,index)=>{if(typeof visible[index].raw==="string")row.raw=visible[index].raw;});
       return cloned;
+    }
+
+    // #2281: the keys of the archives that start with {prefix}, without
+    // reading any archive, and then one archive at a time by key. A push holds
+    // one saved archive at once instead of all of them; the phone held every
+    // earlier attempt's archive, each larger than the last. A malformed row is
+    // skipped when an exact device recovery original keeps it and refused
+    // otherwise, as listOpaqueArchives does.
+    async function listOpaqueArchiveKeys({prefix}={}){
+      ensureOpen();
+      if(typeof prefix!=="string"||!prefix)throw new Error("An archive key prefix is required");
+      const tx=await beginTransaction("opaque","readonly"),done=transactionDone(tx);
+      const keys=await requestResult(tx.objectStore("opaque").getAllKeys());await done;
+      return keys.filter(key=>typeof key==="string"&&key.startsWith(prefix));
+    }
+    async function readOpaqueArchive(key){
+      ensureOpen();
+      if(typeof key!=="string"||!key)return null;
+      const read=await readRawRows({opaque:[key]}),at=read.stores.opaque.keys.indexOf(key);
+      if(at<0)return null;
+      const row=read.stores.opaque.values[at];
+      if(row&&Object.prototype.toString.call(row)==="[object Object]"){const {order,...visible}=row;return visible;}
+      const tx=await beginTransaction("opaque","readonly"),done=transactionDone(tx);
+      const keys=await requestResult(tx.objectStore("opaque").getAllKeys());await done;
+      if((await protectedRawReaderFromOriginals(keys))("opaque",key,row))return null;
+      throw new Error("Durable opaque recovery row is corrupt or unprotected");
     }
 
     async function protectRecoverySource({expectedHash,key,raw}={}){
@@ -764,8 +846,15 @@
       snapshotStore.put({hash:payloadHash,payload:backup.payload},payloadHash);
       if(existingKey===undefined){const {payload,...saved}=backup;backupStore.put({...saved,payloadHash},saved.id);}
       await done;
-      const verified=(await listBackups()).find(row=>row.id===backup.id);
-      if(!verified||verified.payload!==backup.payload) throw new Error("Device recovery verification failed");
+      // #2281: the written row and its snapshot are read back by key and
+      // compared exactly, rather than with every saved copy and archive.
+      const readback=await readRawRows({backups:[backup.id],snapshots:[payloadHash]});
+      const savedRow=readback.stores.backups.values[readback.stores.backups.keys.indexOf(backup.id)];
+      const savedSnapshot=readback.stores.snapshots.values[readback.stores.snapshots.keys.indexOf(payloadHash)];
+      if(!savedRow||typeof savedRow!=="object"||savedRow.id!==backup.id||savedRow.payloadHash!==payloadHash||
+        savedSnapshot?.hash!==payloadHash||savedSnapshot.payload!==backup.payload) throw new Error("Device recovery verification failed");
+      const {payloadHash:savedHash,...visible}=savedRow,verified={...visible,payload:backup.payload};
+      verifiedBackupPayloads.set(verified,{hash:payloadHash,payload:backup.payload});
       return {ok:true,row:verified};
     }
 
@@ -877,7 +966,7 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
       getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim};
     return api;
