@@ -3968,6 +3968,33 @@ if(process.env.CHAIN_TEST_GROUP==='core'&&(process.env.GITHUB_ACTIONS==='true'||
   const pending=probe.timers.filter(row=>row.ran===null);
   line('never-ran '+pending.length+' '+pending.slice(0,12).map(row=>`#${row.n}:${row.k}${row.ms}@${fixed(row.at)} ${row.site.split(' < ').slice(0,2).join(' < ')}`).join(' | '));
  };
+ // The same test body again, 20 times at the same point of the run, each
+ // reduced to the gap from the durable save to the retry pull and the
+ // collections and CPU time in it. Each repetition's app is disposed after it.
+ const disposeNew=async(before)=>{const fixtures=appFixtureScope.getStore();if(!fixtures)return;
+  for(const fixture of [...fixtures])if(!before.has(fixture)){try{await fixture.dispose();}catch{}fixtures.delete(fixture);}};
+ const repeat=async(run,self,contextArgs)=>{
+  await disposeNew(new Set());const fixed=value=>Number(value).toFixed(1),rows=[];
+  for(let iteration=1;iteration<=20;iteration++){
+   const before=new Set(appFixtureScope.getStore()||[]);
+   Object.assign(probe,{marks:[],timers:[],gc:[],hooked:false,t0:performance.now(),armed:true});
+   let outcome='pass';
+   try{await run.apply(self,contextArgs);}catch(error){outcome='fail:'+String(error?.message||error).split('\n')[0].slice(0,40);}
+   await new Promise(resolve=>setTimeout(resolve,60));probe.armed=false;probe.draining=true;
+   await new Promise(resolve=>setImmediate(resolve));probe.draining=false;
+   const marks=probe.marks,failedAt=marks.findIndex(row=>row.label==='persist<false');
+   const startAt=marks.findIndex((row,index)=>index>failedAt&&row.label==='persist>'),durable=marks.find((row,index)=>index>failedAt&&row.label==='persist<true');
+   const retry=marks.filter(row=>row.label==='pull>')[1],settle=probe.timers.find(row=>row.ms===30&&row.ran!==null);
+   const gap=durable&&retry?retry.t-durable.t:NaN;
+   const gcs=probe.gc.filter(row=>durable&&row.t+row.d>=durable.t-2&&row.t<=(retry?.t??durable.t+60)+2).map(row=>`k${row.k}@${fixed(row.t-(durable?.t??0))}+${fixed(row.d)}`);
+   const all=probe.gc.map(row=>`k${row.k}@${fixed(row.t)}+${fixed(row.d)}`);
+   rows.push({iteration,outcome,gap});
+   console.log(`CI-PROBE-2281 iter ${iteration} ${outcome} gap ${fixed(gap)} persist2 ${fixed(durable&&startAt>=0?durable.t-marks[startAt].t:NaN)} settleLate ${fixed(settle&&durable?settle.ran-durable.t-30:NaN)} cpu ${fixed(durable&&retry?retry.cpu-durable.cpu:NaN)} inv ${durable&&retry?retry.inv-durable.inv:'?'} window-gc [${gcs.join(' ')}] all-gc [${all.join(' ')}]`);
+   await disposeNew(before);
+  }
+  const gaps=rows.map(row=>row.gap).filter(Number.isFinite).sort((a,b)=>a-b);
+  console.log(`CI-PROBE-2281 iterations fails ${rows.filter(row=>row.outcome!=='pass').length}/${rows.length} gap median ${fixed(gaps[gaps.length>>1])} max ${fixed(gaps.at(-1))} heap ${JSON.stringify(heapNow())}`);
+ };
  const plainTest=test;
  test=function(...args){
   if(args[0]!==probe2281Title||typeof args.at(-1)!=='function')return plainTest(...args);
@@ -3978,6 +4005,7 @@ if(process.env.CHAIN_TEST_GROUP==='core'&&(process.env.GITHUB_ACTIONS==='true'||
    finally{
     mark('end');await new Promise(resolve=>setTimeout(resolve,300));mark('drain');probe.armed=false;probe.draining=true;
     await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setTimeout(resolve,20));probe.draining=false;report(heap);
+    await repeat(run,this,contextArgs);
    }
   });
  };
