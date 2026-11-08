@@ -133,7 +133,7 @@ its RISK test; the map follows.
 - RISK cloud source recovery #2278: Apply from the phone state waiting on its work budget ends the wait, clears the refusal and any device hold it supersedes, and stays synced after a cold reload
 - RISK cloud source recovery #2278: a reason thrown inside a recovery push still lets the automatic recovery default retry instead of stopping
 - RISK cloud source recovery #2278: a protection read-back slower than an ordinary save waits gets the recovery limit too, and Apply succeeds
-- RISK cloud source recovery #2284: Apply finishes when each read of a source\
+- RISK cloud source recovery #2284: Apply finishes when each chunk read stalls for over half the recovery limit
 - RISK cloud source recovery #2284: Apply confirms a saved board when the read of the new cloud copy stalls past an ordinary wait
 - RISK cloud source recovery #2278: a failed Apply names why it could not save, and the step that stopped, in the modal and the debug log
 - RISK cloud source recovery #2278: a late reply after an upload timed out cannot publish, even once the delayed reply arrives

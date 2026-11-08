@@ -2906,7 +2906,7 @@ test('RISK cloud source recovery #2278: a protection read-back slower than an or
 // The phone's debug log: three sources read together, one of them an empty
 // collection, all returned after the same 30 s (29,966 to 30,059 ms), against
 // 1.8 s for the same reads a moment earlier. The wait is per read, not per byte.
-test('RISK cloud source recovery #2284: Apply finishes when each read of a source\'s chunks stalls for over half the recovery limit',async t=>{
+test('RISK cloud source recovery #2284: Apply finishes when each chunk read stalls for over half the recovery limit',async t=>{
  const app=await freshSourceCheckFixture187(t,{timeoutMs:500,recoveryTimeoutMs:5000}),{ctx,shim,backend,originalRoot}=app,base=backend.docs.get('users/owner').rev;
  for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
