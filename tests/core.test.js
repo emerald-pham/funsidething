@@ -2715,6 +2715,118 @@ test('RISK cloud source review #2272: after a committedAt-only head refresh duri
  assert.equal(ctx.state.syncRev,rev+1);
 });
 
+// #2278 phone shape after #2272: one account, a ~2 MB board in 8 chunks, the
+// current generation published with none of its chunks, the previous one
+// intact and no pending upload. The ordinary wait is short here so that a
+// publication slower than it, as on the phone (about 21 s against 20 s), is
+// reproduced in seconds; the review's one-minute limit stays longer.
+async function largeUnreadableActive2278(t){
+ const app=await freshSourceCheckFixture187(t,{sourcePadding:2000000,timeoutMs:2000,recoveryTimeoutMs:10000}),{backend,originalRoot}=app;
+ const active='users/owner/generations/'+originalRoot.activeGeneration,previous='users/owner/generations/'+originalRoot.previousGeneration;
+ assert.equal(backend.docs.get(active).chunkCount,8,'the current generation declares 8 chunks, as on the phone');
+ for(const key of [...backend.docs.keys()])if(key.startsWith(active+'/chunks/'))backend.docs.delete(key);
+ const chunks=[...backend.docs].filter(([key])=>key.startsWith(previous+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+ assert.equal(chunks.length,8,'the previous generation is complete');
+ const chosen=JSON.parse(await app.ctx.ChainStorageV2.decodeSnapshot(backend.docs.get(previous),chunks));
+ assert.ok(JSON.stringify(chosen).length>2000000,'a realistically large board');
+ return {...app,active,previous,chosen};
+}
+// The new generation's 2 MB transfers are the slow part of a recovery
+// publication on a phone. Delay the read that verifies its uploaded chunks.
+const slowNewGenerationChunks2278=(app,ms)=>{
+ const known=new Set([app.active,app.previous]);
+ app.faults.serverRead=async path=>{
+  const generation=path.match(/^(users\/owner\/generations\/[^/]+)\/chunks$/)?.[1];
+  if(generation&&!known.has(generation)){known.add(generation);await new Promise(resolve=>setTimeout(resolve,ms));}
+ };
+};
+const syncBadge2278=shim=>{const el=shim.document.getElementById('syncBtn');return {text:el.textContent,className:el.className};};
+
+test('RISK cloud source recovery #2278: Apply of the intact previous source succeeds when publishing the large board takes longer than an ordinary save waits, and the board is back to normal',async t=>{
+ const app=await largeUnreadableActive2278(t),{ctx,shim,backend,originalRoot,chosen}=app,store=ctx.window.ScannerDeviceStore,base=backend.docs.get('users/owner').rev;
+ const deviceOnly=JSON.stringify(ctx.state);assert.match(deviceOnly,/Device source only/,'positive control: the device board has a task the chosen source lacks');
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.deepEqual(sourceChoice2272(shim.document.getElementById('modalRoot').innerHTML,'generation:'+originalRoot.activeGeneration),{disabled:true});
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+ slowNewGenerationChunks2278(app,3000);t.after(()=>{delete app.faults.serverRead;});
+ const applied=await ctx.onAction('apply-cloud-source-recovery',{}),modal=shim.document.getElementById('modalRoot').innerHTML;
+ delete app.faults.serverRead;
+ assert.equal(applied,true,'Apply finishes: '+(modal.match(/role="status">([^<]*)/g)||[]).join(' '));
+ // The cloud's current copy is a complete readable generation at the next revision.
+ const root=backend.docs.get('users/owner');assert.equal(root.rev,base+1,'saved once, ordered after the reviewed revision');
+ assert.notEqual(root.activeGeneration,originalRoot.activeGeneration);assert.notEqual(root.activeGeneration,originalRoot.previousGeneration);
+ const pulled=await backend.CS.pull();assert.equal(pulled.rev,base+1);assert.equal(typeof pulled.payload,'string','the new current copy reads back');
+ assert.deepEqual(JSON.parse(pulled.payload).tasks.map(task=>task.title),chosen.tasks.map(task=>task.title),'the cloud holds the chosen source');
+ // Both originals stay protected on the server and on this device.
+ for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original generation '+id+' is protected');
+ assert.ok((await store.listOpaqueArchives()).some(row=>row.key.startsWith('cloud-generation-recovery:')),'the exact original sources are archived');
+ assert.ok((await store.listBackups()).some(row=>row.kind==='cloud-source-recovery-device'&&row.payload.includes('Device source only')),'the device board it replaced stays a protected copy');
+ // This device holds the chosen source, confirmed at that revision.
+ assert.deepEqual(ctx.state.tasks.map(task=>task.title),chosen.tasks.map(task=>task.title));
+ assert.equal(ctx.state.syncRev,base+1);assert.equal(ctx.state.syncDirty,false);
+ const head=JSON.parse((await store.readHead()).payload);assert.equal(head.syncRev,base+1);assert.equal(head.syncDirty,false);
+ // The recovery hold and prepared choice are finished.
+ assert.equal(await store.getRecoveryCloudHold(),null);assert.equal(await store.getPendingUpload('owner'),null);
+ const kinds=(await store.listBackups()).map(row=>row.kind);assert.ok(kinds.includes('decision-recovery-confirmed'));assert.equal(kinds.includes('decision-recovery-choice'),false,'no prepared choice is left waiting');
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Review cloud recovery sources/,'the review closes');
+ // Once the ordinary save debounce runs, the badge is synced without another write.
+ const writes=backend.writes.length;ctx.cloudPushNow();await settleRecovery188(app);
+ assert.equal(backend.docs.get('users/owner').rev,base+1);assert.equal(backend.writes.length,writes,'nothing left to save');
+ assert.deepEqual(syncBadge2278(shim),{text:'☁ synced',className:'syncbtn ok'});
+ // A later ordinary edit saves and is acknowledged normally.
+ shim.document.getElementById('addInput').value='After recovery 2278';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ await ctx.sendPush();await settleRecovery188(app);
+ assert.equal(backend.docs.get('users/owner').rev,base+2);
+ const later=await backend.CS.pull();assert.ok(JSON.parse(later.payload).tasks.some(task=>task.title==='After recovery 2278'));
+ assert.equal(ctx.state.syncDirty,false);assert.deepEqual(syncBadge2278(shim),{text:'☁ synced',className:'syncbtn ok'});
+ const pushes=ctx.buildSupportDiagnosticsReport().sourceOperations.flatMap(operation=>operation.events).filter(event=>event.stage==='push');
+ assert.ok(pushes.some(event=>event.status==='acknowledged'&&event.metadata.revision===base+1),'the debug log records the acknowledged recovery save');
+});
+
+test('RISK cloud source recovery #2278: a failed Apply names a timeout, a protection failure or a storage failure in the modal and the debug log',async t=>{
+ const cases=[
+  {kind:'timeout',code:'deadline-exceeded',message:/The cloud did not answer in time, so this save is not confirmed\. The active board and prepared choice remain protected; check the connection, then read sources again before retrying\./,
+   arrange:app=>slowNewGenerationChunks2278(app,2500)},
+  {kind:'protection',code:'recovery-protection-unavailable',message:/The cloud could not protect the original sources, so nothing was saved\. The active board and prepared choice remain protected; read sources again before retrying\./,
+   // The marker is created but never reads back, as if it did not persist.
+   arrange:app=>{app.faults.serverRead=async(path,docs)=>{if(path.startsWith('users/owner/recoveryProtections/'))docs.delete(path);};}},
+  {kind:'storage',code:'pending-upload-storage',message:/This device could not record the upload, so nothing was saved\. The active board and prepared choice remain protected; free up storage if needed, then read sources again before retrying\./,
+   arrange:app=>{app.ctx.window.ScannerDeviceStore.setPendingUploadIfCurrent=async()=>({ok:false,error:true});}},
+ ];
+ for(const item of cases)await t.test(item.kind,async sub=>{
+  // A small board: only the failure matters here. The ordinary wait and the
+  // recovery limit are short so the timeout case runs in seconds.
+  const app=await freshSourceCheckFixture187(sub,{timeoutMs:500,recoveryTimeoutMs:1500}),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  app.active='users/owner/generations/'+originalRoot.activeGeneration;app.previous='users/owner/generations/'+originalRoot.previousGeneration;
+  for(const key of [...backend.docs.keys()])if(key.startsWith(app.active+'/chunks/'))backend.docs.delete(key);
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+  assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+  const rev=backend.docs.get('users/owner').rev,before=JSON.stringify(ctx.state),head=await store.readHead();
+  item.arrange(app);sub.after(()=>{delete app.faults.serverRead;});
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+  delete app.faults.serverRead;
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(modal,item.message,'the modal names the '+item.kind+' failure: '+(modal.match(/role="status">([^<]*)/)||[])[1]);
+  assert.doesNotMatch(modal,/Cloud confirmation is unavailable/,'not the catch-all message');
+  const failed=ctx.buildSupportDiagnosticsReport().sourceOperations.flatMap(operation=>operation.events).filter(event=>event.stage==='push'&&event.status==='failed');
+  assert.equal(failed.at(-1)?.code.value,item.code,'the debug log names the actual reason');
+  assert.equal(backend.docs.get('users/owner').rev,rev,'the cloud revision is unchanged');
+  assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(await store.readHead(),head);
+ });
+});
+
+test('RISK cloud source recovery #2278 guidance: mounted Help and the November 7 changelog say Apply has a one-minute limit and names why it could not save',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=(help.match(/<dt>What if Apply can’t save the chosen source\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
+ assert.match(answer,/Saving the chosen source can take up to one minute, the same limit as the review, because the whole board is uploaded again\./);
+ assert.match(answer,/the cloud did not answer in time, the cloud could not protect the original sources, or this device could not record the upload\./);
+ assert.match(answer,/The active board and prepared choice stay protected in each case\./);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ const changelog=(html.match(/<h3>November 7, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
+ assert.match(changelog,/<li>Applying a complete source in Review cloud recovery sources no longer fails on a large board because the save took longer than an ordinary save waits; it now has the review’s one-minute limit\./);
+ assert.match(changelog,/If Apply still can’t save, it says whether the cloud did not answer in time, could not protect the original sources, or this device could not record the upload, and the local debug log names the reason\.<\/li>/);
+});
+
 test('RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write',async t=>{
  const app=await freshSourceCheckFixture187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  app.active='users/owner/generations/'+originalRoot.activeGeneration;
