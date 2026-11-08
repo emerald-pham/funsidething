@@ -3924,8 +3924,18 @@ if(process.env.CHAIN_TEST_GROUP==='core'&&(process.env.GITHUB_ACTIONS==='true'||
  const usage=()=>{const cpu=process.cpuUsage(),resource=process.resourceUsage();
   return {cpu:Math.round((cpu.user+cpu.system)/100)/10,inv:resource.involuntaryContextSwitches,vol:resource.voluntaryContextSwitches,minf:resource.minorPageFault,majf:resource.majorPageFault};};
  const mark=label=>{if(probe.armed)probe.marks.push({label,t:clock(),...usage()});};
- new PerformanceObserver(list=>{for(const entry of list.getEntries())if(probe.armed||probe.draining)probe.gc.push({k:entry.detail?.kind,t:entry.startTime-probe.t0,d:entry.duration});})
+ // Every collection of the whole process, to compare the pauses of the whole
+ // run with and without the retained realms.
+ const allGc=[];
+ new PerformanceObserver(list=>{for(const entry of list.getEntries()){allGc.push({k:entry.detail?.kind,at:entry.startTime,d:entry.duration});
+  if(probe.armed||probe.draining)probe.gc.push({k:entry.detail?.kind,t:entry.startTime-probe.t0,d:entry.duration});}})
   .observe({entryTypes:['gc']});
+ const gcSummary=label=>{const fixed=value=>Number(value).toFixed(1),line=text=>console.log('CI-PROBE-2281 '+text);
+  for(const kind of [1,4,8,16]){const rows=allGc.filter(row=>row.k===kind),d=rows.map(row=>row.d).sort((a,b)=>a-b),pick=q=>d.length?fixed(d[Math.min(d.length-1,Math.floor(q*d.length))]):'-';
+   line(`gc-run ${label} k${kind} count ${rows.length} total ${fixed(d.reduce((a,b)=>a+b,0))} p50 ${pick(0.5)} p90 ${pick(0.9)} p99 ${pick(0.99)} max ${pick(1)} over29 ${d.filter(x=>x>=29).length}`);}
+  const t0=probe.armT0||performance.now();
+  line(`gc-run ${label} longest-k4 `+allGc.filter(row=>row.k===4).sort((a,b)=>b.d-a.d).slice(0,12).map(row=>`${fixed(row.d)}@${fixed((row.at-t0)/1000)}s`).join(' '));
+  line(`gc-run ${label} k4-near-test `+allGc.filter(row=>row.k===4&&row.at>=t0-30000).map(row=>`${fixed(row.d)}@${fixed(row.at-t0)}ms`).join(' '));};
  const site=()=>{const holder={},limit=Error.stackTraceLimit;Error.stackTraceLimit=9;Error.captureStackTrace(holder,site);Error.stackTraceLimit=limit;
   return String(holder.stack).split('\n').slice(2,8).map(line=>line.trim().replace(/^at /,'').replace(/file:\/\/\/\S*\//g,'').replace(/[()]/g,'')).join(' < ');};
  for(const [name,kind] of [['setTimeout','t'],['setImmediate','i']]){
@@ -4000,12 +4010,12 @@ if(process.env.CHAIN_TEST_GROUP==='core'&&(process.env.GITHUB_ACTIONS==='true'||
   if(args[0]!==probe2281Title||typeof args.at(-1)!=='function')return plainTest(...args);
   const run=args.at(-1);
   return plainTest(...args.slice(0,-1),async function(...contextArgs){
-   const heap=heapNow();probe.t0=performance.now();probe.armed=true;mark('arm');
+   const heap=heapNow();probe.t0=performance.now();probe.armT0=probe.t0;probe.armed=true;mark('arm');
    try{return await run.apply(this,contextArgs);}
    finally{
     mark('end');await new Promise(resolve=>setTimeout(resolve,300));mark('drain');probe.armed=false;probe.draining=true;
-    await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setTimeout(resolve,20));probe.draining=false;report(heap);
-    await repeat(run,this,contextArgs);
+    await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setTimeout(resolve,20));probe.draining=false;report(heap);gcSummary('before-repeats');
+    await repeat(run,this,contextArgs);gcSummary('after-repeats');
    }
   });
  };
