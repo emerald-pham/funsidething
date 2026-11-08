@@ -3083,13 +3083,15 @@ test('RISK cloud source recovery #2281: after failed attempts saved by the previ
  assert.ok(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.title==='After recovery 2281'));
 });
 
+const changelog2281Guidance=()=>(html.match(/<h3>November 8, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
 test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8 changelog say Apply no longer needs more memory with earlier attempts, including ones earlier versions saved, and name a full device',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=(help.match(/<dt>Why did the app close when I tapped Apply selected source\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
  assert.match(answer,/On a large board, after many earlier attempts that could not save, Apply selected source most likely needed more memory than a phone allows, so the app closed\./,'the cause is not stated as confirmed');
  assert.match(answer,/Each attempt copied every earlier attempt’s prepared choice into its protected originals again\./);
  assert.match(answer,/Apply now names earlier prepared choices by an exact fingerprint instead\./);
- assert.match(answer,/Originals that earlier versions saved are read once, one at a time, to summarize them; after that, Apply and later saves read only the summaries, so earlier attempts no longer add to what they hold at once\./,'old attempts are covered only after their one summary');
+ assert.match(answer,/Unless another recovery is waiting, originals that earlier versions saved are summarized once, one at a time\. Apply and later saves then read those summaries instead of whole originals, and read an original whole only when it still needs protecting in the cloud\./,'the summaries are qualified: none while a recovery waits, and an unprotected original is still read whole');
+ assert.doesNotMatch(answer+changelog2281Guidance(),/read only the summaries|read only those summaries|no longer add to what they hold/,'no unqualified claim');
  assert.match(answer,/Every original stays saved exactly\./);
  assert.match(answer,/If this device’s storage is too full to protect the copies, Apply says so and nothing is applied\./);
  assert.doesNotMatch(answer+help,/the phone allows|changes nothing|its saved originals|gets heavier/,'no earlier wording');
@@ -3099,7 +3101,7 @@ test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8
  const changelog=(html.match(/<h3>November 8, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
  assert.match(changelog,/<li>Apply selected source in Review cloud recovery sources no longer needs more memory with each earlier attempt that could not save\./);
  assert.match(changelog,/Each attempt copied every earlier attempt’s prepared choice into its protected originals again, so on a large board the app could close, most likely because it ran out of memory\./);
- assert.match(changelog,/Earlier prepared choices are now named by an exact fingerprint instead\. Originals that earlier versions saved are read once, one at a time, to summarize them, and Apply and later saves then read only those summaries; every original stays saved exactly\./);
+ assert.match(changelog,/Earlier prepared choices are now named by an exact fingerprint instead\. Unless another recovery is waiting, originals that earlier versions saved are summarized once, one at a time, and Apply and later saves then read those summaries instead of whole originals, reading an original whole only when it still needs protecting in the cloud; every original stays saved exactly\./);
  assert.match(changelog,/If this device’s storage is too full to protect the copies, Apply now says so and nothing is applied\.<\/li>/);
  assert.doesNotMatch(changelog,/changes nothing|its saved originals|gets heavier/,'no earlier wording');
  assert.doesNotMatch((answer+changelog).replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,'Help never sends anyone to another device');
