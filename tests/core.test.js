@@ -3177,8 +3177,13 @@ test('RISK cloud source recovery #2281: a confirmed choice also completes the ea
    assert.equal(backend.docs.get('users/owner').rev,before+1,'the later save is acknowledged');
    assert.deepEqual(reads.filter(path=>path.includes('/recoveryProtections/')),[],'no completed archive has its protection checked again');
    assert.equal(backend.CS.recoveryRetentionPending,false);
-   return;
-  }
+  }else await collectedThenHealthySave2281(sub,app,collector,archives);
+ });
+});
+// The older collector removes the original generations; a healthy save on a
+// cold reopen must then find every same-evidence archive completed.
+async function collectedThenHealthySave2281(sub,app,collector,archives){
+  const {backend}=app;
   const peer=await loadCloudBackendV2({artifacts:collector,timeoutMs:5000});sub.after(()=>peer.CS.suspend());for(const [key,value]of backend.docs)peer.docs.set(key,value);
   for(let i=0;i<2;i++){const remote=await peer.CS.pull();assert.equal((await peer.CS.push(remote.payload,100+i,remote.rev)).ok,true);for(let n=0;n<40;n++)await flush();}
   const oldIds=JSON.parse(archives[0].raw).generations.map(row=>row.id);assert.ok(oldIds.every(id=>!peer.docs.has('users/owner/generations/'+id)),'positive control: the older collector removed the original generations');
@@ -3189,8 +3194,7 @@ test('RISK cloud source recovery #2281: a confirmed choice also completes the ea
   cold.shim.document.getElementById('addInput').value='Healthy work after same-evidence attempts';await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true);await cold.ctx.sendPush();await syncSettle(40);
   assert.ok(current.docs.get('users/owner').rev>prior,'the healthy save is acknowledged');
   assert.equal(current.CS.recoveryRetentionPending,false,'every archive of that evidence counts as recovered, not as lost evidence still pending');
- });
-});
+}
 
 // #2281 review: putBackup now reads back only its own row, so a copy can save
 // while another saved copy is unreadable. The backup list Apply finishes with
