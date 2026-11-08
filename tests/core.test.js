@@ -83,7 +83,13 @@ test('Test fixtures: once a subtest finishes, neither its after hook nor its bod
   });
  }
  assert.equal(hookDisposed,true,'positive control: the after hook ran before its subtest finished');
- await new Promise(resolve=>setImmediate(resolve));collect();collect();
+ // On CI a disposed app's realm once outlived two collections run back to
+ // back right after its subtest. Collections with turns between them reclaim
+ // it, while a finished hook or subtest that still held the app would keep it
+ // through every one of them.
+ for(let round=0;round<50&&(inHook.deref()!==undefined||inBody.deref()!==undefined);round++){
+  await new Promise(resolve=>setTimeout(resolve,10));collect();
+ }
  assert.equal(inHook.deref(),undefined,'a finished after hook no longer keeps the app it disposed');
  assert.equal(inBody.deref(),undefined,'a finished subtest no longer keeps the app its body read');
 });
