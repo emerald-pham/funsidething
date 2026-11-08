@@ -25967,10 +25967,7 @@ test('RISK landscape water browser: GPU distortion preserves contact and sharp p
 test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload',async()=>{
  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
  const cloud=recoveringCloudStatusHarness(shim,ctx);
- // #2281 CI diagnosis: a timeline of the harness's cloud calls, read below.
- const ciTimeline2281=[],ciStart2281=performance.now(),ciMark2281=label=>ciTimeline2281.push(label+'@'+(performance.now()-ciStart2281).toFixed(1)+':'+cloud.CS.errorStage);
- for(const name of ['pull','push','reportError']){const original=cloud.CS[name];cloud.CS[name]=function(...args){ciMark2281(name+'>');const result=original.apply(this,args);Promise.resolve(result).then(()=>ciMark2281(name+'<'),()=>ciMark2281(name+'!'));return result;};}
- await ctx.cloudPull();ciMark2281('first-pull-returned');
+ await ctx.cloudPull();
  cloud.fail('reconcile','invalid-payload');
  const set=storage.setItem;
  storage.setItem=(key,value)=>{
@@ -25980,13 +25977,9 @@ test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale 
  ctx.state.tasks.push(syncTask('recovered-edit','Edit that outlived device quota'));ctx.state.syncDirty=true;
  assert.equal(await ctx.persist(),false,'the production pair write records the local failure first');
  storage.setItem=set;
- assert.equal(await ctx.persist(),true,'automatic archive recovery makes the same board durable');ciMark2281('durable');
- await syncSettle(30);ciMark2281('settled');
+ assert.equal(await ctx.persist(),true,'automatic archive recovery makes the same board durable');
+ await syncSettle(30);
  assert.equal(cloud.pulls(),2,'the successful local recovery retries the failed reconciliation automatically');
- // #2281 CI diagnosis: this assertion fails only on CI. Record the app's
- // cloud and save state at this point and shortly after, without changing it.
- const ciProbe2281=label=>{try{console.log('CI-PROBE-2281 '+label+' '+JSON.stringify({timeline:ciTimeline2281.join(' '),pulls:cloud.pulls(),pushes:cloud.pushes(),stage:cloud.CS.errorStage,code:cloud.CS.errorCode,status:cloud.CS.status,app:JSON.parse(vm.runInContext('JSON.stringify({pulling,cloudPushInFlight,deferredCloudPull,cloudSuspended,cloudResumePending,cloudPullPending,pendingPush,dirty:state.syncDirty,issue:lastDeviceSaveIssue?String(lastDeviceSaveIssue.code||lastDeviceSaveIssue):null,hidden:document.hidden,editor:hasActiveEditor(),modal:document.getElementById("modalRoot").innerHTML.length,retry:!!cloudRetryTimer,store:!!deviceStore})',ctx))}));}catch(error){console.log('CI-PROBE-2281 '+label+' failed '+error.message);}};
- ciProbe2281('at-assert');setTimeout(()=>ciProbe2281('after-300ms'),300);
  assert.equal(cloud.CS.errorStage,null);assert.equal(cloud.CS.errorCode,null);
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing',
   'a successful read clears the stale error but cannot call an unacknowledged edit synced');
