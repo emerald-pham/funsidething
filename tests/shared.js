@@ -3725,6 +3725,9 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
    const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
   },set(target,key,value){return Reflect.set(target,key,value,target);}
  });}};
+ // #2281 CI: teardown deletes the database through this object to release its
+ // in-memory rollback logs; without deleteDatabase every such release threw.
+ if(!nativeDeviceConnection)indexedDB.deleteDatabase=(...args)=>factory.deleteDatabase(...args);
  const localRaw=JSON.stringify(fixture.local),cloudRaw=fixture.remote===null?null:JSON.stringify(fixture.remote);
  const app=await loadAppAtTime(1792323000000,{...(artifacts?{artifacts,appSource:extractAppScript(artifacts.html)}:{}),seed:188,seedStorage:{[SYNC_STORE_KEY]:localRaw,[LOCAL_HEAD_KEY]:localRaw},...(storageBackend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName}:{})});
  if(!app.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),app.ctx,{filename:'device-store-v2.js'});app.ctx.window.ChainStorageV2=app.ctx.ChainStorageV2;}

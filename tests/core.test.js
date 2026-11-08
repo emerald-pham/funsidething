@@ -2724,6 +2724,7 @@ test('RISK cloud source review #2272: after a committedAt-only head refresh duri
 // reproduced in seconds; the review's one-minute limit stays longer.
 async function largeUnreadableActive2278(t){
  const app=await freshSourceCheckFixture187(t,{sourcePadding:2000000,timeoutMs:2000,recoveryTimeoutMs:10000}),{backend,originalRoot}=app;
+ releaseLargeRecovery2281(t,app);
  const active='users/owner/generations/'+originalRoot.activeGeneration,previous='users/owner/generations/'+originalRoot.previousGeneration;
  assert.equal(backend.docs.get(active).chunkCount,8,'the current generation declares 8 chunks, as on the phone');
  for(const key of [...backend.docs.keys()])if(key.startsWith(active+'/chunks/'))backend.docs.delete(key);
@@ -2971,8 +2972,27 @@ async function deviceStorageMeter2281(t){
   if(meter.on)request.addEventListener('success',()=>{if(request.result)meter.largestTransaction=Math.max(meter.largestTransaction,observe(this,request,request.result.value));});
   return request;};
  saved.put=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(value,...args){if(meter.on)meter.written+=bytes(value);return saved.put.call(this,value,...args);};
- t.after(()=>{for(const [name,fn] of Object.entries(saved))IDBObjectStore.prototype[name]=fn;});
+ t.after(()=>{for(const [name,fn] of Object.entries(saved))IDBObjectStore.prototype[name]=fn;meter.on=false;meter.reset();});
  return meter;
+}
+// #2281 CI: the runner keeps finished hooks and, through them, each app realm,
+// and the in-memory database keeps every transaction's multi-megabyte rollback
+// log until the database is deleted. These large-board fixtures kept about
+// 1.4 GB after they finished, so every later major collection was slow and
+// short timing tests later in the core group failed on CI. Release the
+// sources themselves at the end, as the #2254 large fixture does.
+function releaseLargeRecovery2281(t,app){
+ t.after(async()=>{
+  const {ctx,shim,backend}=app;
+  for(let i=0;i<500;i++){let active=0;try{active=vm.runInContext('supportDiagnosticsActivePersistCalls+(saveTimer?1:0)',ctx);}catch{}if(!active)break;await new Promise(resolve=>setTimeout(resolve,10));}
+  try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
+  try{backend.CS.suspend();}catch{}try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
+  try{await app.dispose();}catch{}try{backend.docs.clear();}catch{}try{shim.localStorage.clear();}catch{}
+  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+   'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  try{vm.runInContext('decisionBaseIdentityCache.length=0',ctx);}catch{}
+  await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});
+ });
 }
 // One failed Apply of the intact previous source, as on the phone: the
 // originals are protected and the choice prepared, then the upload stops.
@@ -3121,7 +3141,7 @@ test('RISK cloud source recovery #2281: after failed attempts saved by the previ
  const {readReleasedClient}=await import('../scripts/backward-compatibility.mjs'),artifacts=readReleasedClient(__dirname,PRE_2281_RELEASE);
  const meter=await deviceStorageMeter2281(t),measured=[];let board=0;
  for(const prior of [1,3])await t.test(prior+' earlier attempts',async sub=>{
-  const old=await freshSourceCheckFixture187(sub,{artifacts,sourcePadding:2000000,timeoutMs:2000,recoveryTimeoutMs:10000}),{originalRoot}=old;
+  const old=await freshSourceCheckFixture187(sub,{artifacts,sourcePadding:2000000,timeoutMs:2000,recoveryTimeoutMs:10000}),{originalRoot}=old;releaseLargeRecovery2281(sub,old);
   for(const key of [...old.backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))old.backend.docs.delete(key);
   for(let attempt=0;attempt<prior;attempt++)await failedApply2281(old);
   const oldArchives=(await old.ctx.window.ScannerDeviceStore.listOpaqueArchives()).filter(row=>row.key.startsWith('cloud-generation-recovery:'));
