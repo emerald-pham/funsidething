@@ -417,6 +417,21 @@
       "root": "RISK repository process: nested native fixture output stays isolated at the command boundary",
       "group": "native-process",
       "file": "tests/repository-process.test.js"
+    },
+    {
+      "root": "RISK cloud source recovery \\#2278: Apply of the intact previous source succeeds when publishing the large board takes longer than an ordinary save waits, and the board is back to normal",
+      "group": "persistence-recovery",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK cloud source recovery \\#2281: Apply on the large phone board writes, and reads at once, about the same device storage however many earlier attempts failed, and then succeeds and is synced",
+      "group": "persistence-recovery",
+      "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK cloud source recovery \\#2281: after failed attempts saved by the previous release on the large phone board, Apply and a later save read about the same device storage at once however many there were",
+      "group": "persistence-recovery",
+      "file": "tests/core.test.js"
     }
   ],
   "nightlyRoots": [

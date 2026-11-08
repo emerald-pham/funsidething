@@ -9,7 +9,38 @@
   // #2254: the acknowledged recovery trim's plan (a meta row) and the rows it
   // can never delete (see beginRecoveryTrim).
   const RECOVERY_TRIM_KEY="recoveryTrim",RECOVERY_TRIM_MAX_KEYS=4096;
-  const RECOVERY_TRIM_KEPT_PREFIXES=Object.freeze(["unreadable-generation-record:","device-recovery-original:","device-recovery-file:","cloud-generation-recovery:"]);
+  const RECOVERY_TRIM_KEPT_PREFIXES=Object.freeze(["unreadable-generation-record:","device-recovery-original:","device-recovery-file:","cloud-generation-recovery:","cloud-generation-recovery-summary:"]);
+  // #2281 review: a recovery archive's summary. Archives are kept forever and
+  // never replaced, and the previous release copied every earlier prepared
+  // choice into each one, so each was larger than the last. A save needs only
+  // an archive's identity, manifest, generation ids and headers, and pending
+  // upload, plus exact fingerprints of its cloud evidence to tell which
+  // confirmed choice completes it; the whole archive only when its chunks are
+  // sent for protection. The summary is derived from the archive under the
+  // same key, so it stays true for as long as that archive exists.
+  const CLOUD_RECOVERY_SUMMARY_FORMAT="chain-scanner.cloud-recovery-summary",CLOUD_RECOVERY_SUMMARY_PREFIX="cloud-generation-recovery-summary:";
+  const cloudRecoverySummaryKey=archiveKey=>CLOUD_RECOVERY_SUMMARY_PREFIX+archiveKey;
+  // The canonical text the cloud module's sameRecoveryValue compares: map field
+  // order is ignored, arrays and every value stay exact. An absent value has no
+  // text, so it gets a marker no JSON text can equal.
+  const canonicalRecoveryJson=value=>{
+    const ordered=item=>Array.isArray(item)?item.map(ordered):item&&typeof item==="object"
+      ?Object.fromEntries(Object.keys(item).sort().map(key=>[key,ordered(item[key])])):item;
+    const raw=JSON.stringify(value);return raw===undefined?"\u0000undefined":JSON.stringify(ordered(JSON.parse(raw)));
+  };
+  async function cloudRecoverySummary(archiveKey,archived){
+    if(typeof archiveKey!=="string"||!archiveKey||!archived||typeof archived!=="object"||Array.isArray(archived))return null;
+    const generations=Array.isArray(archived.generations)?archived.generations.map(row=>row&&typeof row==="object"?{id:row.id,header:row.header}:row):null;
+    return {format:CLOUD_RECOVERY_SUMMARY_FORMAT,version:1,archiveKey,archiveFormat:archived.format,archiveVersion:archived.version,
+      identity:archived.identity,manifest:archived.manifest,generations,
+      evidence:{manifest:canonicalRecoveryJson(archived.manifest),generations:await hashPayload(canonicalRecoveryJson(archived.generations)),
+        pending:canonicalRecoveryJson(archived.pending)}};
+  }
+  function validCloudRecoverySummary(summary,archiveKey){
+    return !!summary&&typeof summary==="object"&&summary.format===CLOUD_RECOVERY_SUMMARY_FORMAT&&summary.version===1&&summary.archiveKey===archiveKey&&
+      (summary.generations===null||Array.isArray(summary.generations))&&!!summary.evidence&&typeof summary.evidence.manifest==="string"&&
+      typeof summary.evidence.generations==="string"&&/^[0-9a-f]{64}$/.test(summary.evidence.generations)&&typeof summary.evidence.pending==="string";
+  }
   // Ephemeral aliases distinguish handles, including replacement store instances.
   let connectionSequence=0;
   const connectionNumbers=new WeakMap();
@@ -269,6 +300,8 @@
     // #2239: {keysOnly} names stores whose rows are only looked up by key; each
     // present row's value is then undefined, so a check that a row is still
     // present does not read it (an archive is several times the board's size).
+    // #2281: {keysOnly} may instead map a store to the keys only looked up, so
+    // one transaction can read some rows of a store and only check others.
     async function readRawRows(request,{keysOnly=[]}={}){
       ensureOpen();
       const names=storeNames.filter(name=>Array.isArray(request?.[name]));
@@ -277,7 +310,8 @@
       try{
         const entries=await Promise.all(names.map(async name=>{
           const store=tx.objectStore(name),wanted=[...new Set(request[name])],keyOnly=Array.isArray(keysOnly)&&keysOnly.includes(name);
-          const rows=await Promise.all(wanted.map(key=>Promise.all([requestResult(store.getKey(key)),keyOnly?undefined:requestResult(store.get(key))])));
+          const keyOnlyKeys=keysOnly&&!Array.isArray(keysOnly)&&Array.isArray(keysOnly[name])?new Set(keysOnly[name]):null;
+          const rows=await Promise.all(wanted.map(key=>Promise.all([requestResult(store.getKey(key)),keyOnly||keyOnlyKeys?.has(key)?undefined:requestResult(store.get(key))])));
           const present=rows.filter(([key])=>key!==undefined);
           return [name,{keys:present.map(([key])=>key),values:present.map(([,value])=>value)}];
         }));
@@ -385,25 +419,78 @@
         }catch{return false;}
       };
     }
-    async function listBackups(){
+    // #2281: the exact device recovery originals that may keep an unreadable
+    // row, read only when a listing meets such a row. They are never trimmed
+    // or replaced (RECOVERY_TRIM_KEPT_PREFIXES), so reading them after the
+    // listing's own transaction sees the same originals it would have seen.
+    async function protectedRawReaderFromOriginals(opaqueKeys){
+      const keys=(opaqueKeys||[]).filter(key=>typeof key==="string"&&key.startsWith("device-recovery-original:"));
+      const read=keys.length?await readRawRows({opaque:keys}):{stores:{opaque:{keys:[],values:[]}}};
+      return protectedRawRowReader(read.stores.opaque?.keys??[],read.stores.opaque?.values??[]);
+    }
+    // #2281: each listed row's payload as this store verified it against its
+    // hash. A caller that passes earlier rows back ({reuse}) lets a listing
+    // keep that same payload text when the stored snapshot still equals it
+    // exactly, instead of holding a second copy of every saved board. On the
+    // phone each refresh held every prepared recovery choice twice.
+    const verifiedBackupPayloads=new WeakMap();
+    // #2281: the snapshots are read one at a time with a cursor in the same
+    // readonly transaction as the backup rows, and only the opaque keys are
+    // read: every saved archive (each several times the board's size after a
+    // recovery, and once many times more) was read on every listing only to
+    // find the rare unreadable row. {kinds} lists only the rows of those
+    // kinds, reading only their snapshots; a malformed row is still refused.
+    async function listBackups({kinds=null,reuse=null}={}){
       ensureOpen();
+      const wantedKind=Array.isArray(kinds)?new Set(kinds):null;
+      const reused=new Map();
+      for(const row of Array.isArray(reuse)?reuse:[]){
+        const verified=row&&typeof row==="object"?verifiedBackupPayloads.get(row):undefined;
+        if(verified)reused.set(verified.hash,verified.payload);
+      }
       const tx=await beginTransaction(["backups","snapshots","opaque"],"readonly"),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots"),opaqueStore=tx.objectStore("opaque");
       const done=transactionDone(tx);
-      const [rows,keys,snapshots,snapshotKeys,opaque,opaqueKeys]=await Promise.all([requestResult(backupStore.getAll()),requestResult(backupStore.getAllKeys()),
-        requestResult(snapshotStore.getAll()),requestResult(snapshotStore.getAllKeys()),requestResult(opaqueStore.getAll()),requestResult(opaqueStore.getAllKeys())]),result=[];
+      // Requests run in the order they are placed, so the backup rows arrive
+      // before the first snapshot does and name the snapshots worth keeping.
+      const rowsRequest=backupStore.getAll();let wanted=null;
+      rowsRequest.addEventListener("success",()=>{
+        const rows=rowsRequest.result;
+        if(Array.isArray(rows))wanted=new Set(rows.filter(row=>row&&typeof row==="object"&&(!wantedKind||wantedKind.has(row.kind))).map(row=>row.payloadHash));
+      });
+      const snapshots=new Map();
+      const snapshotsRead=new Promise((resolve,reject)=>{
+        const request=snapshotStore.openCursor();
+        request.onerror=()=>reject(request.error||new Error("IndexedDB request failed"));
+        request.onsuccess=()=>{
+          const cursor=request.result;
+          if(!cursor){resolve();return;}
+          const value=cursor.value,hash=value&&typeof value==="object"?value.hash:undefined;
+          // The first snapshot carrying a hash is the one a row names, as before.
+          if(typeof hash==="string"&&!snapshots.has(hash)&&(wanted===null||wanted.has(hash))){
+            const earlier=reused.get(hash);
+            snapshots.set(hash,earlier!==undefined&&value.payload===earlier?{key:cursor.primaryKey,payload:earlier,verified:true}:{key:cursor.primaryKey,value,payload:value.payload,verified:false});
+          }
+          cursor.continue();
+        };
+      });
+      const [rows,keys,,opaqueKeys]=await Promise.all([requestResult(rowsRequest),requestResult(backupStore.getAllKeys()),snapshotsRead,requestResult(opaqueStore.getAllKeys())]),result=[];
       await done;
-      const protectedRaw=protectedRawRowReader(opaqueKeys,opaque);
+      let protectedRaw=null;
+      const isProtected=async(...args)=>(protectedRaw??=await protectedRawReaderFromOriginals(opaqueKeys))(...args);
       for(const [index,row]of rows.entries()){
         if(!row||typeof row!=="object"||Array.isArray(row)||typeof row.id!=="string"||row.id!==keys[index]||typeof row.payloadHash!=="string"){
-          if(protectedRaw("backups",keys[index],row))continue;
+          if(await isProtected("backups",keys[index],row))continue;
           throw new Error("Durable recovery row is corrupt or unprotected");
         }
-        const at=snapshots.findIndex(candidate=>candidate?.hash===row.payloadHash),snapshot=snapshots[at];
-        if(!snapshot||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==row.payloadHash){
-          if(protectedRaw("backups",keys[index],row)&&(at<0||protectedRaw("snapshots",snapshotKeys[at],snapshot)))continue;
+        if(wantedKind&&!wantedKind.has(row.kind))continue;
+        const snapshot=snapshots.get(row.payloadHash);
+        if(!snapshot||typeof snapshot.payload!=="string"||!snapshot.verified&&await sha(snapshot.payload)!==row.payloadHash){
+          if(await isProtected("backups",keys[index],row)&&(!snapshot||await isProtected("snapshots",snapshot.key,snapshot.value)))continue;
           throw new Error("Durable recovery snapshot is corrupt");
         }
-        const {payloadHash,...visible}=row;result.push({...visible,payload:snapshot.payload});
+        snapshot.verified=true;delete snapshot.value;
+        const {payloadHash,...visible}=row,listed={...visible,payload:snapshot.payload};
+        verifiedBackupPayloads.set(listed,{hash:payloadHash,payload:snapshot.payload});result.push(listed);
       }
       return result.sort((a,b)=>(b.at||0)-(a.at||0)||String(a.id).localeCompare(String(b.id)));
     }
@@ -448,16 +535,80 @@
       return cloned;
     }
 
-    async function protectRecoverySource({expectedHash,key,raw}={}){
+    // #2281: the keys of the archives that start with {prefix}, without
+    // reading any archive, and then one archive at a time by key. A push holds
+    // one saved archive at once instead of all of them; the phone held every
+    // earlier attempt's archive, each larger than the last. A malformed row is
+    // skipped when an exact device recovery original keeps it and refused
+    // otherwise, as listOpaqueArchives does.
+    async function listOpaqueArchiveKeys({prefix}={}){
+      ensureOpen();
+      if(typeof prefix!=="string"||!prefix)throw new Error("An archive key prefix is required");
+      const tx=await beginTransaction("opaque","readonly"),done=transactionDone(tx);
+      const keys=await requestResult(tx.objectStore("opaque").getAllKeys());await done;
+      return keys.filter(key=>typeof key==="string"&&key.startsWith(prefix));
+    }
+    async function readOpaqueArchive(key){
+      ensureOpen();
+      if(typeof key!=="string"||!key)return null;
+      const read=await readRawRows({opaque:[key]}),at=read.stores.opaque.keys.indexOf(key);
+      if(at<0)return null;
+      const row=read.stores.opaque.values[at];
+      if(row&&Object.prototype.toString.call(row)==="[object Object]"){const {order,...visible}=row;return visible;}
+      const tx=await beginTransaction("opaque","readonly"),done=transactionDone(tx);
+      const keys=await requestResult(tx.objectStore("opaque").getAllKeys());await done;
+      if((await protectedRawReaderFromOriginals(keys))("opaque",key,row))return null;
+      throw new Error("Durable opaque recovery row is corrupt or unprotected");
+    }
+
+    // #2281 review: an archive's summary, or null when it has none or its row
+    // is not one this store wrote for that archive.
+    async function readCloudRecoverySummary(archiveKey){
+      ensureOpen();
+      if(typeof archiveKey!=="string"||!archiveKey)return null;
+      const key=cloudRecoverySummaryKey(archiveKey),read=await readRawRows({opaque:[key]}),at=read.stores.opaque.keys.indexOf(key);
+      const row=at<0?null:read.stores.opaque.values[at];
+      if(!row||row.key!==key||typeof row.raw!=="string")return null;
+      let summary;try{summary=JSON.parse(row.raw);}catch{return null;}
+      return validCloudRecoverySummary(summary,archiveKey)?summary:null;
+    }
+    // #2281 review: summaries for archives that have none, each derived from the
+    // archive under its key. One transaction writes them all, only while the
+    // head is the caller's and no recovery hold waits, only for archives that
+    // exist, and never over a summary already saved.
+    async function saveCloudRecoverySummaries({expectedHeadHash,summaries=[]}={}){
+      ensureOpen();
+      if(typeof expectedHeadHash!=="string"||!Array.isArray(summaries)||summaries.some(row=>!validCloudRecoverySummary(row,row?.archiveKey)))return {error:true,code:"invalid-recovery-summary"};
+      const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx),meta=tx.objectStore("meta"),opaque=tx.objectStore("opaque");
+      try{
+        const [head,holdKey]=await Promise.all([requestResult(meta.get("head")),requestResult(meta.getKey("recoveryCloudHold"))]);
+        if(head?.hash!==expectedHeadHash||holdKey!==undefined){tx.abort();try{await done;}catch{}return {conflict:true};}
+        const present=await Promise.all(summaries.map(row=>Promise.all([requestResult(opaque.getKey(row.archiveKey)),requestResult(opaque.getKey(cloudRecoverySummaryKey(row.archiveKey)))])));
+        let written=0;
+        summaries.forEach((row,index)=>{const [archive,summary]=present[index];
+          if(archive===undefined||summary!==undefined)return;const key=cloudRecoverySummaryKey(row.archiveKey);
+          opaque.put({key,raw:JSON.stringify(row),order:Date.now()},key);written++;});
+        await done;return {ok:true,written};
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+    }
+
+    async function protectRecoverySource({expectedHash,key,raw,summary=null}={}){
       ensureOpen();
       if(typeof expectedHash!=="string"||typeof key!=="string"||!key||typeof raw!=="string")return false;
+      if(summary!==null&&!validCloudRecoverySummary(summary,key))return false;
       const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx);
       const head=await requestResult(tx.objectStore("meta").get("head"));
-      const store=tx.objectStore("opaque"),[existingKey,existing]=await Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key))]);
+      const store=tx.objectStore("opaque"),summaryKey=cloudRecoverySummaryKey(key);
+      const [existingKey,existing,existingSummary]=await Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key)),summary?requestResult(store.getKey(summaryKey)):undefined]);
       // A peer edit or different evidence at this identity invalidates the
       // capture. Recovery never replaces an earlier protected original.
       if(head?.hash!==expectedHash||existingKey!==undefined&&(existing?.key!==key||existing?.raw!==raw)){tx.abort();try{await done;}catch{}return false;}
-      if(existingKey===undefined)store.put({key,raw,order:Date.now()},key);
+      // #2281 review: the archive's summary is saved with it. A write that
+      // aborts the transaction is waited for, so its failure is reported once.
+      try{
+        if(existingKey===undefined)store.put({key,raw,order:Date.now()},key);
+        if(summary&&existingSummary===undefined)store.put({key:summaryKey,raw:JSON.stringify(summary),order:Date.now()},summaryKey);
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
       await done;
       // #2239: the protected row is read back once, alone, and compared exactly,
       // rather than read with every saved archive (several times the board's
@@ -764,8 +915,15 @@
       snapshotStore.put({hash:payloadHash,payload:backup.payload},payloadHash);
       if(existingKey===undefined){const {payload,...saved}=backup;backupStore.put({...saved,payloadHash},saved.id);}
       await done;
-      const verified=(await listBackups()).find(row=>row.id===backup.id);
-      if(!verified||verified.payload!==backup.payload) throw new Error("Device recovery verification failed");
+      // #2281: the written row and its snapshot are read back by key and
+      // compared exactly, rather than with every saved copy and archive.
+      const readback=await readRawRows({backups:[backup.id],snapshots:[payloadHash]});
+      const savedRow=readback.stores.backups.values[readback.stores.backups.keys.indexOf(backup.id)];
+      const savedSnapshot=readback.stores.snapshots.values[readback.stores.snapshots.keys.indexOf(payloadHash)];
+      if(!savedRow||typeof savedRow!=="object"||savedRow.id!==backup.id||savedRow.payloadHash!==payloadHash||
+        savedSnapshot?.hash!==payloadHash||savedSnapshot.payload!==backup.payload) throw new Error("Device recovery verification failed");
+      const {payloadHash:savedHash,...visible}=savedRow,verified={...visible,payload:backup.payload};
+      verifiedBackupPayloads.set(verified,{hash:payloadHash,payload:backup.payload});
       return {ok:true,row:verified};
     }
 
@@ -877,11 +1035,12 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
       getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim};
     return api;
   }
 
-  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore};
+  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore,
+    canonicalRecoveryJson,cloudRecoverySummary,cloudRecoverySummaryKey};
 })(globalThis);

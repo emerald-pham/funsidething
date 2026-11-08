@@ -22,12 +22,36 @@ function test(...args){
  if(typeof run!=="function")return nodeTest(...args);
  return nodeTest(...args.slice(0,-1),async context=>{
   const fixtures=new Set();
+  context=releasingTestContext(context);
   try{return await appFixtureScope.run(fixtures,()=>run(context));}
   finally{context.after(async()=>{
    try{for(const fixture of fixtures)await fixture.dispose();}
    finally{fixtures.clear();}
   });}
  });
+}
+
+// #2281 CI: node:test keeps every finished test, with its subtests and hooks,
+// until the process ends, and with them whatever their functions close over.
+// Tests close over the apps they open, so the core process kept every app's
+// realm: on CI, 4,000 to 5,600 realms in a 2.4 to 2.8 GB heap by the test 'a
+// durable ordinary save retries and clears its stale cloud error without
+// reload'. Collections that its save queues run right after the save, before
+// the retry, and with that heap they took up to 37 ms (scavenges) and 124 ms
+// (full collections), longer than its 30 ms settle. Each hook and subtest runs
+// once, so once it has run it drops its function and what that closed over.
+function releasingTestContext(context){
+ const once=fn=>{let held=fn;const released=function(...args){const run=held;held=null;return run.apply(this,args);};
+  Object.defineProperty(released,'length',{value:fn.length});return released;};
+ return new Proxy(context,{get(target,key){
+  if(key==='after')return (fn,...rest)=>target.after(typeof fn==='function'?once(fn):fn,...rest);
+  // A subtest runs once too, and its own hooks are released the same way.
+  if(key==='test')return (...args)=>{const run=args.at(-1);
+   if(typeof run==='function'){const body=once(run),wrapped=function(child,...rest){return body.call(this,releasingTestContext(child),...rest);};
+    Object.defineProperty(wrapped,'length',{value:run.length});args[args.length-1]=wrapped;}
+   return target.test(...args);};
+  const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+ }});
 }
 
 async function injectRecoveryDatabaseFailure187(t,app,{key='pending:owner',failAt=[1],errorName='UnknownError',errorMessage='An internal error was encountered in the Indexed Database server',beforeRequest=false,untilReopened=false,onFailure=()=>{}}={}){
@@ -3725,6 +3749,9 @@ async function heldDecisionApp188(t,{fixture=heldDecisionFixture188(),failures={
    const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
   },set(target,key,value){return Reflect.set(target,key,value,target);}
  });}};
+ // #2281 CI: teardown deletes the database through this object to release its
+ // in-memory rollback logs; without deleteDatabase every such release threw.
+ if(!nativeDeviceConnection)indexedDB.deleteDatabase=(...args)=>factory.deleteDatabase(...args);
  const localRaw=JSON.stringify(fixture.local),cloudRaw=fixture.remote===null?null:JSON.stringify(fixture.remote);
  const app=await loadAppAtTime(1792323000000,{...(artifacts?{artifacts,appSource:extractAppScript(artifacts.html)}:{}),seed:188,seedStorage:{[SYNC_STORE_KEY]:localRaw,[LOCAL_HEAD_KEY]:localRaw},...(storageBackend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName}:{})});
  if(!app.ctx.window.ChainStorageV2){vm.runInContext(fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8'),app.ctx,{filename:'device-store-v2.js'});app.ctx.window.ChainStorageV2=app.ctx.ChainStorageV2;}
