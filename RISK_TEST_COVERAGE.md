@@ -143,6 +143,7 @@ its RISK test; the map follows.
 - RISK cloud source recovery #2281: after failed attempts saved by the previous release on the large phone board, Apply and a later save read about the same device storage at once however many there were
 - RISK cloud source recovery #2281: a confirmed choice also completes the earlier attempts’ archives of the same cloud evidence, so later saves do not re-check them
 - RISK cloud source recovery #2281: while another saved copy cannot be read, Apply stops before any cloud write and changes no board
+- RISK cloud source recovery #2281: opening the app writes no archive summary by itself; only a review of cloud recovery sources does
 - RISK cloud source recovery #2281: a confirmed choice that names its archive still counts its originals as recovered once an older device collected them, and healthy edits save
 - RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write
 - RISK cloud source review #2272: a cloud push deferred by the review resumes after Cancel and after a failed review
