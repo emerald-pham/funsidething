@@ -3912,3 +3912,73 @@ export {
   settleRecoveryOperations188, retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
   replaceIndependentServerPayload263,
 };
+
+// #2281 CI diagnosis (temporary, removed before merge). Only in CI's core
+// group: trace collections, timer callbacks, CPU time and the heap around the
+// durable-save retry test, whose retry starts about 40 ms late there.
+const probe2281Title='RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload';
+if(process.env.CHAIN_TEST_GROUP==='core'&&(process.env.GITHUB_ACTIONS==='true'||process.env.CHAIN_PROBE_2281==='1')){
+ const v8=process.getBuiltinModule('node:v8'),util=process.getBuiltinModule('node:util');
+ const probe={armed:false,draining:false,hooked:false,t0:0,marks:[],timers:[],gc:[],seq:0};
+ const clock=()=>performance.now()-probe.t0;
+ const usage=()=>{const cpu=process.cpuUsage(),resource=process.resourceUsage();
+  return {cpu:Math.round((cpu.user+cpu.system)/100)/10,inv:resource.involuntaryContextSwitches,vol:resource.voluntaryContextSwitches,minf:resource.minorPageFault,majf:resource.majorPageFault};};
+ const mark=label=>{if(probe.armed)probe.marks.push({label,t:clock(),...usage()});};
+ new PerformanceObserver(list=>{for(const entry of list.getEntries())if(probe.armed||probe.draining)probe.gc.push({k:entry.detail?.kind,t:entry.startTime-probe.t0,d:entry.duration});})
+  .observe({entryTypes:['gc']});
+ const site=()=>{const holder={},limit=Error.stackTraceLimit;Error.stackTraceLimit=9;Error.captureStackTrace(holder,site);Error.stackTraceLimit=limit;
+  return String(holder.stack).split('\n').slice(2,8).map(line=>line.trim().replace(/^at /,'').replace(/file:\/\/\/\S*\//g,'').replace(/[()]/g,'')).join(' < ');};
+ for(const [name,kind] of [['setTimeout','t'],['setImmediate','i']]){
+  const original=globalThis[name];
+  const traced=function(callback,delay,...rest){
+   if(!probe.armed||typeof callback!=='function')return original.call(this,callback,delay,...rest);
+   const row={n:++probe.seq,k:kind,ms:kind==='t'?Number(delay)||0:0,at:clock(),site:site(),ran:null,dur:null};probe.timers.push(row);
+   return original.call(this,function(...args){row.ran=clock();try{return callback.apply(this,args);}finally{row.dur=clock()-row.ran;}},delay,...rest);
+  };
+  if(original[util.promisify.custom])traced[util.promisify.custom]=original[util.promisify.custom];
+  globalThis[name]=traced;
+ }
+ const plainHarness=recoveringCloudStatusHarness;
+ recoveringCloudStatusHarness=function(shim,ctx,...rest){
+  const harness=plainHarness(shim,ctx,...rest);
+  if(probe.armed&&!probe.hooked){
+   probe.hooked=true;mark('harness');
+   for(const name of ['pull','push']){const call=harness.CS[name];
+    harness.CS[name]=function(...args){mark(name+'>');const result=call.apply(this,args);Promise.resolve(result).then(()=>mark(name+'<'+harness.CS.errorStage),()=>mark(name+'!'));return result;};}
+   const persist=ctx.persist;
+   ctx.persist=function(...args){mark('persist>');const result=persist.apply(this,args);Promise.resolve(result).then(value=>mark('persist<'+value),()=>mark('persist!'));return result;};
+  }
+  return harness;
+ };
+ const heapNow=()=>{const heap=v8.getHeapStatistics(),mb=value=>Math.round(value/104857.6)/10;
+  return {usedMB:mb(heap.used_heap_size),totalMB:mb(heap.total_heap_size),limitMB:mb(heap.heap_size_limit),mallocMB:mb(heap.malloced_memory),contexts:heap.number_of_native_contexts,detached:heap.number_of_detached_contexts,
+   spaces:Object.fromEntries(v8.getHeapSpaceStatistics().map(space=>[space.space_name,mb(space.space_used_size)])),rssMB:mb(process.memoryUsage().rss)};};
+ const report=heap=>{
+  const fixed=value=>Number(value).toFixed(1),line=text=>console.log('CI-PROBE-2281 '+text);
+  line('heap-at-start '+JSON.stringify(heap));line('heap-at-end '+JSON.stringify(heapNow()));
+  line('marks '+probe.marks.map(row=>`${row.label}@${fixed(row.t)}[cpu${row.cpu} inv${row.inv} vol${row.vol} minf${row.minf} majf${row.majf}]`).join(' '));
+  line('gc '+probe.gc.map(row=>`k${row.k}@${fixed(row.t)}+${fixed(row.d)}`).join(' '));
+  const ran=probe.timers.filter(row=>row.ran!==null).sort((a,b)=>a.ran-b.ran);
+  const failedAt=probe.marks.findIndex(row=>row.label==='persist<false'),durable=probe.marks.find((row,index)=>index>failedAt&&row.label==='persist<true')?.t??0,retry=probe.marks.filter(row=>row.label==='pull>')[1]?.t??Infinity;
+  line('callbacks '+ran.length+' scheduled '+probe.timers.length+' durable@'+fixed(durable)+' retry@'+fixed(retry));
+  ran.forEach((row,index)=>{
+   const next=ran[index+1],gap=next?next.ran-(row.ran+row.dur):0,inWindow=row.ran>=durable-5&&row.ran<=retry+5;
+   if(inWindow||row.dur>=1||gap>=3)line(`cb#${row.n} ${row.k}${row.ms} sched@${fixed(row.at)} ran@${fixed(row.ran)} late${fixed(row.ran-row.at-Math.max(1,row.ms))} dur${fixed(row.dur)} gapAfter${fixed(gap)} ${row.site}`);
+  });
+  const pending=probe.timers.filter(row=>row.ran===null);
+  line('never-ran '+pending.length+' '+pending.slice(0,12).map(row=>`#${row.n}:${row.k}${row.ms}@${fixed(row.at)} ${row.site.split(' < ').slice(0,2).join(' < ')}`).join(' | '));
+ };
+ const plainTest=test;
+ test=function(...args){
+  if(args[0]!==probe2281Title||typeof args.at(-1)!=='function')return plainTest(...args);
+  const run=args.at(-1);
+  return plainTest(...args.slice(0,-1),async function(...contextArgs){
+   const heap=heapNow();probe.t0=performance.now();probe.armed=true;mark('arm');
+   try{return await run.apply(this,contextArgs);}
+   finally{
+    mark('end');await new Promise(resolve=>setTimeout(resolve,300));mark('drain');probe.armed=false;probe.draining=true;
+    await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setTimeout(resolve,20));probe.draining=false;report(heap);
+   }
+  });
+ };
+}
