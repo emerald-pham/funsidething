@@ -2903,6 +2903,44 @@ test('RISK cloud source recovery #2278: a protection read-back slower than an or
  for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1);
 });
 
+// The phone's debug log: three sources read together, one of them an empty
+// collection, all returned after the same 30 s (29,966 to 30,059 ms), against
+// 1.8 s for the same reads a moment earlier. The wait is per read, not per byte.
+test('RISK cloud source recovery #2284: Apply finishes when each chunk read stalls for over half the recovery limit',async t=>{
+ const app=await freshSourceCheckFixture187(t,{timeoutMs:500,recoveryTimeoutMs:5000}),{ctx,shim,backend,originalRoot}=app,base=backend.docs.get('users/owner').rev;
+ for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+ // The protection read-back stalls: the generation already carries its marker.
+ const started=[];
+ app.faults.serverRead=async(path,docs)=>{const id=path.match(/^users\/owner\/generations\/([^/]+)\/chunks$/)?.[1];
+  if(id&&docs.has('users/owner/recoveryProtections/'+id)){started.push(id);await new Promise(resolve=>setTimeout(resolve,3000));}};
+ t.after(()=>{delete app.faults.serverRead;});
+ const applied=await ctx.onAction('apply-cloud-source-recovery',{});delete app.faults.serverRead;
+ assert.equal(applied,true,'Apply finishes: '+(shim.document.getElementById('modalRoot').innerHTML.match(/role="status">([^<]*)/)||[])[1]);
+ assert.ok(started.includes(originalRoot.activeGeneration)&&started.includes(originalRoot.previousGeneration),'positive control: both originals were read back under the stall');
+ assert.equal(backend.docs.get('users/owner').rev,base+1,'saved once, ordered after the reviewed revision');
+ for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original generation '+id+' stays protected');
+});
+
+test('RISK cloud source recovery #2284: Apply confirms a saved board when the read of the new cloud copy stalls past an ordinary wait',async t=>{
+ const app=await freshSourceCheckFixture187(t,{timeoutMs:500,recoveryTimeoutMs:5000}),{ctx,shim,backend,originalRoot}=app,base=backend.docs.get('users/owner').rev;
+ for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+ // Only once the new copy is the published one, so only the confirming reads.
+ let stalled=0;
+ app.faults.serverRead=async(path,docs)=>{const id=path.match(/^users\/owner\/generations\/([^/]+)\/chunks$/)?.[1],root=docs.get('users/owner');
+  if(id&&root.rev>base&&id===root.activeGeneration){stalled++;await new Promise(resolve=>setTimeout(resolve,1500));}};
+ t.after(()=>{delete app.faults.serverRead;});
+ const applied=await ctx.onAction('apply-cloud-source-recovery',{});delete app.faults.serverRead;
+ assert.equal(applied,true,'Apply finishes: '+(shim.document.getElementById('modalRoot').innerHTML.match(/role="status">([^<]*)/)||[])[1]);
+ assert.ok(stalled>0,'positive control: a confirming read stalled');
+ assert.equal(backend.docs.get('users/owner').rev,base+1,'saved once');
+ assert.equal(ctx.state.syncRev,base+1,'this device holds the confirmed revision');
+ assert.equal(ctx.state.syncDirty,false,'nothing is left to save');
+});
+
 test('RISK cloud source recovery #2278: a failed Apply names why it could not save, and the step that stopped, in the modal and the debug log',async t=>{
  const cases=[
   {kind:'timeout',code:'deadline-exceeded',status:'timed-out',phase:'publication',message:/The cloud did not answer in time, so this save is not confirmed\. The active board and prepared choice remain protected; check the connection, then read sources again before retrying\./,
