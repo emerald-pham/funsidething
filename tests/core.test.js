@@ -2911,7 +2911,7 @@ test('RISK cloud source recovery #2284: Apply finishes when each chunk read stal
  for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
  assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
- // Only the protection read-back: the generation already carries its marker.
+ // The protection read-back stalls: the generation already carries its marker.
  const started=[];
  app.faults.serverRead=async(path,docs)=>{const id=path.match(/^users\/owner\/generations\/([^/]+)\/chunks$/)?.[1];
   if(id&&docs.has('users/owner/recoveryProtections/'+id)){started.push(id);await new Promise(resolve=>setTimeout(resolve,3000));}};
