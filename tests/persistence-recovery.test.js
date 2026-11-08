@@ -6564,7 +6564,10 @@ test('RISK contained board adoption: after the person chooses Use my board from 
  ctx.openSettings();shim.document.getElementById('toast').textContent='';
  const button=declineButton2194();
  shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
- await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ // #2281 CI: the hold is cleared by the device commit a few turns before the
+ // decline shows its toast, so waiting for either let a stall in between end
+ // the wait with no toast yet. Wait for the decline's own toast.
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||!shim.document.getElementById('toast').textContent)await wait(20);},'the decline settles',30000);
  const toastText=shim.document.getElementById('toast').textContent;
  assert.equal(await store.getRecoveryCloudHold(),null,'positive control: the decline released the older copy');
  assert.equal(JSON.stringify(ctx.state),before,'positive control: the board from before recovery is back');
@@ -6613,7 +6616,10 @@ test('RISK exact acknowledged cloud source: after the person chooses Use my boar
  ctx.openSettings();shim.document.getElementById('toast').textContent='';
  const button=declineButton2194();
  shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
- await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ // #2281 CI: the hold is cleared by the device commit a few turns before the
+ // decline shows its toast, so waiting for either let a stall in between end
+ // the wait with no toast yet. Wait for the decline's own toast.
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||!shim.document.getElementById('toast').textContent)await wait(20);},'the decline settles',30000);
  assert.equal(shim.document.getElementById('toast').textContent,'Your earlier board is back. Cloud saving stays paused.','positive control: the decline succeeded');
  assert.equal(await store.getRecoveryCloudHold(),null,'positive control: the decline released the older copy');
  assert.ok(ctx.localStorage.getItem(declineKey),'positive control: the choice is remembered');
@@ -6654,7 +6660,10 @@ async function declinedExactCopy2268(t){
  ctx.openSettings();shim.document.getElementById('toast').textContent='';
  const button=declineButton2194();
  shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
- await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',30000);
+ // #2281 CI: the hold is cleared by the device commit a few turns before the
+ // decline shows its toast, so waiting for either let a stall in between end
+ // the wait with no toast yet. Wait for the decline's own toast.
+ await fixtureDeadline(async wait=>{await wait(5);while(!idle()||!shim.document.getElementById('toast').textContent)await wait(20);},'the decline settles',30000);
  assert.equal(shim.document.getElementById('toast').textContent,'Your earlier board is back. Cloud saving stays paused.','positive control: the decline succeeded');
  delete app.faults.push;ctx.closeModal();
  const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};
