@@ -3021,7 +3021,7 @@ test('RISK cloud source recovery #2281: Apply on the large phone board writes, a
  assert.deepEqual(syncBadge2278(shim),{text:'☁ synced',className:'syncbtn ok'});
 });
 
-test('RISK cloud source recovery #2281: when this device has no room to protect a new copy, Apply says storage is full and changes nothing',async t=>{
+test('RISK cloud source recovery #2281: when this device has no room to protect a new copy, Apply says storage is full and nothing is applied',async t=>{
  const quota=()=>Object.assign(Error('isolated device quota'),{name:'QuotaExceededError'});
  const cases=[
   ['the original sources archive',store=>{store.protectRecoverySource=async()=>{throw quota();};}],
@@ -3037,7 +3037,7 @@ test('RISK cloud source recovery #2281: when this device has no room to protect 
   arrange(store);
   assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
   const modal=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(modal,/This device’s storage is full, so the original sources could not be protected and nothing was applied\. Free up space on this device, then read sources again\./,'the modal names a full device: '+(modal.match(/role="status">([^<]*)/)||[])[1]);
+  assert.match(modal,/This device’s storage is full, so Apply could not finish protecting its copies and nothing was applied\. Free up space on this device, then read sources again\./,'the modal names a full device: '+(modal.match(/role="status">([^<]*)/)||[])[1]);
   assert.equal(backend.writes.length,writes,'no cloud write');assert.equal(JSON.stringify(backend.docs.get('users/owner')),root);
   assert.deepEqual(await store.readHead(),head);assert.equal(JSON.stringify(ctx.state),before);
  });
@@ -3083,22 +3083,25 @@ test('RISK cloud source recovery #2281: after failed attempts saved by the previ
  assert.ok(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.title==='After recovery 2281'));
 });
 
-test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8 changelog say Apply no longer grows with earlier attempts and names a full device',async()=>{
+test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8 changelog say Apply no longer needs more memory with earlier attempts, including ones earlier versions saved, and name a full device',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=(help.match(/<dt>Why did the app close when I tapped Apply selected source\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
- assert.match(answer,/On a large board, after many earlier attempts that could not save, Apply selected source most likely needed more memory than the phone allows, so the app closed\./,'the cause is not stated as confirmed');
- assert.match(answer,/Each attempt copied every earlier attempt’s prepared choice into its saved originals again\./);
- assert.match(answer,/Apply now names earlier prepared choices by an exact fingerprint instead and checks saved copies one at a time, so earlier attempts no longer add to what it holds at once\./);
+ assert.match(answer,/On a large board, after many earlier attempts that could not save, Apply selected source most likely needed more memory than a phone allows, so the app closed\./,'the cause is not stated as confirmed');
+ assert.match(answer,/Each attempt copied every earlier attempt’s prepared choice into its protected originals again\./);
+ assert.match(answer,/Apply now names earlier prepared choices by an exact fingerprint instead\./);
+ assert.match(answer,/Originals that earlier versions saved are read once, one at a time, to summarize them; after that, Apply and later saves read only the summaries, so earlier attempts no longer add to what they hold at once\./,'old attempts are covered only after their one summary');
  assert.match(answer,/Every original stays saved exactly\./);
- assert.match(answer,/If this device’s storage is full, Apply says so and changes nothing\./);
+ assert.match(answer,/If this device’s storage is too full to protect the copies, Apply says so and nothing is applied\./);
+ assert.doesNotMatch(answer+help,/the phone allows|changes nothing|its saved originals|gets heavier/,'no earlier wording');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
  const notes=(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)||[])[1]||'';
  assert.ok(notes.indexOf('<h3>November 8, 2026</h3>')>=0&&notes.indexOf('<h3>November 8, 2026</h3>')<notes.indexOf('<h3>November 7, 2026</h3>'),'November 7 is live, so this release has its own newer heading');
  const changelog=(html.match(/<h3>November 8, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
- assert.match(changelog,/<li>Apply selected source in Review cloud recovery sources no longer gets heavier with each earlier attempt that could not save\./);
- assert.match(changelog,/Each attempt copied every earlier attempt’s prepared choice into its saved originals again, so on a large board the app could close, most likely because it ran out of memory\./);
- assert.match(changelog,/Earlier prepared choices are now named by an exact fingerprint instead, and saved copies are checked one at a time; every original stays saved exactly\./);
- assert.match(changelog,/If this device’s storage is full, Apply now says so and changes nothing\.<\/li>/);
+ assert.match(changelog,/<li>Apply selected source in Review cloud recovery sources no longer needs more memory with each earlier attempt that could not save\./);
+ assert.match(changelog,/Each attempt copied every earlier attempt’s prepared choice into its protected originals again, so on a large board the app could close, most likely because it ran out of memory\./);
+ assert.match(changelog,/Earlier prepared choices are now named by an exact fingerprint instead\. Originals that earlier versions saved are read once, one at a time, to summarize them, and Apply and later saves then read only those summaries; every original stays saved exactly\./);
+ assert.match(changelog,/If this device’s storage is too full to protect the copies, Apply now says so and nothing is applied\.<\/li>/);
+ assert.doesNotMatch(changelog,/changes nothing|its saved originals|gets heavier/,'no earlier wording');
  assert.doesNotMatch((answer+changelog).replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,'Help never sends anyone to another device');
 });
 
@@ -3107,6 +3110,110 @@ test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8
 // recovered, so healthy edits are not held once an older device's collector
 // has removed the original generations, as for a choice in the earlier shape
 // ('RISK shared protection history: an exact completed legacy source choice').
+// #2281 review: the phone's earlier attempts were saved by the previous
+// release, whose archives copy in every earlier prepared choice and are kept
+// forever, so each is larger than the last. Apply and every later save may
+// not read them whole: only their small summaries, and the whole archive only
+// when its chunks are needed.
+test('RISK cloud source recovery #2281: after failed attempts saved by the previous release on the large phone board, Apply and a later save read about the same device storage at once however many there were',async t=>{
+ const {readReleasedClient}=await import('../scripts/backward-compatibility.mjs'),artifacts=readReleasedClient(__dirname,PRE_2281_RELEASE);
+ const meter=await deviceStorageMeter2281(t),measured=[];let board=0;
+ for(const prior of [1,3])await t.test(prior+' earlier attempts',async sub=>{
+  const old=await freshSourceCheckFixture187(sub,{artifacts,sourcePadding:2000000,timeoutMs:2000,recoveryTimeoutMs:10000}),{originalRoot}=old;
+  for(const key of [...old.backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))old.backend.docs.delete(key);
+  for(let attempt=0;attempt<prior;attempt++)await failedApply2281(old);
+  const oldArchives=(await old.ctx.window.ScannerDeviceStore.listOpaqueArchives()).filter(row=>row.key.startsWith('cloud-generation-recovery:'));
+  assert.equal(oldArchives.length,prior,'positive control: one archive per earlier attempt');
+  await old.dispose();old.backend.CS.suspend();
+  const app={...await coldRelaunch2198(sub,old,[]),originalRoot},{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,base=backend.docs.get('users/owner').rev;
+  board=JSON.stringify(ctx.state).length;
+  // The first review after the update summarizes the earlier archives once,
+  // reading each one whole, one at a time; that one-time cost is reported.
+  meter.reset();meter.on=true;try{assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);}finally{meter.on=false;}
+  const firstReview={largestRead:meter.largestRead,largestTransaction:meter.largestTransaction,read:meter.read};ctx.closeModal();
+  await failedApply2281(app,meter);const apply={written:meter.written,largestRead:meter.largestRead,largestTransaction:meter.largestTransaction,read:meter.read};
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+  assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true,'Apply finishes: '+(shim.document.getElementById('modalRoot').innerHTML.match(/role="status">([^<]*)/g)||[]).join(' '));
+  assert.equal(backend.docs.get('users/owner').rev,base+1);
+  for(const archive of oldArchives)assert.ok((await store.listOpaqueArchives()).some(row=>row.key===archive.key&&row.raw===archive.raw),'an archive the previous release saved stays exact');
+  shim.document.getElementById('addInput').value='After recovery 2281 review';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  meter.reset();meter.on=true;try{await ctx.sendPush();await app.settle('the later edit saves');}finally{meter.on=false;}
+  await fixtureDeadline(async wait=>{while(vm.runInContext('saveTimer!==null||supportDiagnosticsActivePersistCalls>0',ctx))await wait(10);},'the save bookkeeping finishes');
+  assert.equal(backend.docs.get('users/owner').rev,base+2,'a later edit is acknowledged');
+  measured.push({prior,firstReview,apply,save:{largestRead:meter.largestRead,largestTransaction:meter.largestTransaction,read:meter.read}});
+ });
+ const inBoards=value=>typeof value==='number'?+(value/board).toFixed(2):Object.fromEntries(Object.entries(value).map(([key,item])=>[key,key==='prior'?item:inBoards(item)]));
+ const [one,three]=measured,detail=JSON.stringify(measured.map(inBoards))+' (in boards of '+board+' characters)';
+ t.diagnostic('#2281 previous-release history: '+detail);
+ assert.ok(three.apply.written-one.apply.written<board/2,'what Apply writes does not grow: '+detail);
+ assert.ok(three.apply.largestRead-one.apply.largestRead<board/2,'the largest single read in Apply does not grow: '+detail);
+ assert.ok(three.apply.largestTransaction-one.apply.largestTransaction<board/2,'the most one read transaction returns in Apply does not grow: '+detail);
+ assert.ok(three.save.largestRead-one.save.largestRead<board/2,'the largest single read in a later save does not grow: '+detail);
+ assert.ok(three.save.largestTransaction-one.save.largestTransaction<board/2,'the most one read transaction returns in a later save does not grow: '+detail);
+});
+
+// #2281 review: earlier failed attempts against the same cloud state saved
+// archives of exactly the same cloud evidence. A confirmed choice that names
+// its own archive completes them too, as one that embeds its source did, so
+// later saves do not re-check their protection on every save.
+test('RISK cloud source recovery #2281: a confirmed choice also completes the earlier attempts’ archives of the same cloud evidence, so later saves do not re-check them',async t=>{
+ const {readReleasedClient}=await import('../scripts/backward-compatibility.mjs'),collector=readReleasedClient(__dirname,'4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f');
+ for(const collected of [false,true])await t.test(collected?'after an older device collected the originals':'a later save',async sub=>{
+  const app=await freshSourceCheckFixture187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+  for(let attempt=0;attempt<2;attempt++)await failedApply2281(app);
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+  assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);
+  const archives=(await store.listOpaqueArchives()).filter(row=>row.key.startsWith('cloud-generation-recovery:'));
+  const evidence=archives.map(row=>{const source=JSON.parse(row.raw);return JSON.stringify([source.manifest,source.generations,source.pending]);});
+  assert.equal(archives.length,3);assert.equal(new Set(evidence).size,1,'positive control: three archives of exactly the same cloud evidence');
+  if(!collected){
+   const reads=[];app.faults.serverRead=async path=>{reads.push(path);};sub.after(()=>{delete app.faults.serverRead;});
+   const before=backend.docs.get('users/owner').rev;
+   shim.document.getElementById('addInput').value='Later save after recovery 2281';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+   await ctx.sendPush();await syncSettle(40);
+   assert.equal(backend.docs.get('users/owner').rev,before+1,'the later save is acknowledged');
+   assert.deepEqual(reads.filter(path=>path.includes('/recoveryProtections/')),[],'no completed archive has its protection checked again');
+   assert.equal(backend.CS.recoveryRetentionPending,false);
+   return;
+  }
+  const peer=await loadCloudBackendV2({artifacts:collector,timeoutMs:5000});sub.after(()=>peer.CS.suspend());for(const [key,value]of backend.docs)peer.docs.set(key,value);
+  for(let i=0;i<2;i++){const remote=await peer.CS.pull();assert.equal((await peer.CS.push(remote.payload,100+i,remote.rev)).ok,true);for(let n=0;n<40;n++)await flush();}
+  const oldIds=JSON.parse(archives[0].raw).generations.map(row=>row.id);assert.ok(oldIds.every(id=>!peer.docs.has('users/owner/generations/'+id)),'positive control: the older collector removed the original generations');
+  await app.dispose();backend.CS.suspend();
+  const cold=await loadAppAtTime(1792323000000,{sharedStorage:app.shim.localStorage,indexedDBProvider:app.indexedDB,deviceDbName:app.deviceDbName});sub.after(()=>cold.dispose());
+  const current=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:{authPending:true},timeoutMs:5000});sub.after(()=>current.CS.suspend());for(const [key,value]of peer.docs)current.docs.set(key,value);
+  current.emitAuth({uid:'owner',email:'e@example.com'});await cold.ctx.cloudPull();await settleRecoveryOperations188(cold.ctx);const prior=current.docs.get('users/owner').rev;
+  cold.shim.document.getElementById('addInput').value='Healthy work after same-evidence attempts';await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true);await cold.ctx.sendPush();await syncSettle(40);
+  assert.ok(current.docs.get('users/owner').rev>prior,'the healthy save is acknowledged');
+  assert.equal(current.CS.recoveryRetentionPending,false,'every archive of that evidence counts as recovered, not as lost evidence still pending');
+ });
+});
+
+// #2281 review: putBackup now reads back only its own row, so a copy can save
+// while another saved copy is unreadable. The backup list Apply finishes with
+// is then unreadable too. Apply stops before any cloud write, as it did when
+// every copy failed, instead of publishing and then failing to finish.
+test('RISK cloud source recovery #2281: while another saved copy cannot be read, Apply stops before any cloud write and changes no board',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+ const extra=await store.putBackup({expectedHash:(await store.readHead()).hash,backup:{id:'unrelated-2281',day:'2026-11-01',at:1,kind:'manual',payload:JSON.stringify({tasks:[],unrelated:1})}});
+ assert.equal(extra.ok,true);
+ let payloadHash;await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{const request=tx.objectStore('backups').get('unrelated-2281');
+  request.onsuccess=()=>{payloadHash=request.result.payloadHash;tx.objectStore('snapshots').put({hash:payloadHash,payload:JSON.stringify({tasks:[],unrelated:2})},payloadHash);};});
+ await assert.rejects(store.listBackups(),/corrupt/,'positive control: the saved copies cannot be listed');
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+ const root=JSON.stringify(backend.docs.get('users/owner')),writes=backend.writes.length,head=await store.readHead(),before=JSON.stringify(ctx.state);
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/This device’s saved copies could not all be read back, so nothing was applied\. Every original stays protected; read sources again once the saved copies can be read\./,'the modal names it: '+(modal.match(/role="status">([^<]*)/)||[])[1]);
+ assert.equal(backend.writes.length,writes,'no cloud write');assert.equal(JSON.stringify(backend.docs.get('users/owner')),root);
+ assert.deepEqual(await store.readHead(),head);assert.equal(JSON.stringify(ctx.state),before);
+});
+
 test('RISK cloud source recovery #2281: a confirmed choice that names its archive still counts its originals as recovered once an older device collected them, and healthy edits save',async t=>{
  const {readReleasedClient}=await import('../scripts/backward-compatibility.mjs'),collector=readReleasedClient(__dirname,'4f1d6bdc9ff6ca8a2a2294e34022ad01118a3d5f');
  const app=await divergentCloudSourceApp187(t),{ctx,backend}=app,store=ctx.window.ScannerDeviceStore;

@@ -9,7 +9,38 @@
   // #2254: the acknowledged recovery trim's plan (a meta row) and the rows it
   // can never delete (see beginRecoveryTrim).
   const RECOVERY_TRIM_KEY="recoveryTrim",RECOVERY_TRIM_MAX_KEYS=4096;
-  const RECOVERY_TRIM_KEPT_PREFIXES=Object.freeze(["unreadable-generation-record:","device-recovery-original:","device-recovery-file:","cloud-generation-recovery:"]);
+  const RECOVERY_TRIM_KEPT_PREFIXES=Object.freeze(["unreadable-generation-record:","device-recovery-original:","device-recovery-file:","cloud-generation-recovery:","cloud-generation-recovery-summary:"]);
+  // #2281 review: a recovery archive's summary. Archives are kept forever and
+  // never replaced, and the previous release copied every earlier prepared
+  // choice into each one, so each was larger than the last. A save needs only
+  // an archive's identity, manifest, generation ids and headers, and pending
+  // upload, plus exact fingerprints of its cloud evidence to tell which
+  // confirmed choice completes it; the whole archive only when its chunks are
+  // sent for protection. The summary is derived from the archive under the
+  // same key, so it stays true for as long as that archive exists.
+  const CLOUD_RECOVERY_SUMMARY_FORMAT="chain-scanner.cloud-recovery-summary",CLOUD_RECOVERY_SUMMARY_PREFIX="cloud-generation-recovery-summary:";
+  const cloudRecoverySummaryKey=archiveKey=>CLOUD_RECOVERY_SUMMARY_PREFIX+archiveKey;
+  // The canonical text the cloud module's sameRecoveryValue compares: map field
+  // order is ignored, arrays and every value stay exact. An absent value has no
+  // text, so it gets a marker no JSON text can equal.
+  const canonicalRecoveryJson=value=>{
+    const ordered=item=>Array.isArray(item)?item.map(ordered):item&&typeof item==="object"
+      ?Object.fromEntries(Object.keys(item).sort().map(key=>[key,ordered(item[key])])):item;
+    const raw=JSON.stringify(value);return raw===undefined?"\u0000undefined":JSON.stringify(ordered(JSON.parse(raw)));
+  };
+  async function cloudRecoverySummary(archiveKey,archived){
+    if(typeof archiveKey!=="string"||!archiveKey||!archived||typeof archived!=="object"||Array.isArray(archived))return null;
+    const generations=Array.isArray(archived.generations)?archived.generations.map(row=>row&&typeof row==="object"?{id:row.id,header:row.header}:row):null;
+    return {format:CLOUD_RECOVERY_SUMMARY_FORMAT,version:1,archiveKey,archiveFormat:archived.format,archiveVersion:archived.version,
+      identity:archived.identity,manifest:archived.manifest,generations,
+      evidence:{manifest:canonicalRecoveryJson(archived.manifest),generations:await hashPayload(canonicalRecoveryJson(archived.generations)),
+        pending:canonicalRecoveryJson(archived.pending)}};
+  }
+  function validCloudRecoverySummary(summary,archiveKey){
+    return !!summary&&typeof summary==="object"&&summary.format===CLOUD_RECOVERY_SUMMARY_FORMAT&&summary.version===1&&summary.archiveKey===archiveKey&&
+      (summary.generations===null||Array.isArray(summary.generations))&&!!summary.evidence&&typeof summary.evidence.manifest==="string"&&
+      typeof summary.evidence.generations==="string"&&/^[0-9a-f]{64}$/.test(summary.evidence.generations)&&typeof summary.evidence.pending==="string";
+  }
   // Ephemeral aliases distinguish handles, including replacement store instances.
   let connectionSequence=0;
   const connectionNumbers=new WeakMap();
@@ -530,16 +561,54 @@
       throw new Error("Durable opaque recovery row is corrupt or unprotected");
     }
 
-    async function protectRecoverySource({expectedHash,key,raw}={}){
+    // #2281 review: an archive's summary, or null when it has none or its row
+    // is not one this store wrote for that archive.
+    async function readCloudRecoverySummary(archiveKey){
+      ensureOpen();
+      if(typeof archiveKey!=="string"||!archiveKey)return null;
+      const key=cloudRecoverySummaryKey(archiveKey),read=await readRawRows({opaque:[key]}),at=read.stores.opaque.keys.indexOf(key);
+      const row=at<0?null:read.stores.opaque.values[at];
+      if(!row||row.key!==key||typeof row.raw!=="string")return null;
+      let summary;try{summary=JSON.parse(row.raw);}catch{return null;}
+      return validCloudRecoverySummary(summary,archiveKey)?summary:null;
+    }
+    // #2281 review: summaries for archives that have none, each derived from the
+    // archive under its key. One transaction writes them all, only while the
+    // head is the caller's and no recovery hold waits, only for archives that
+    // exist, and never over a summary already saved.
+    async function saveCloudRecoverySummaries({expectedHeadHash,summaries=[]}={}){
+      ensureOpen();
+      if(typeof expectedHeadHash!=="string"||!Array.isArray(summaries)||summaries.some(row=>!validCloudRecoverySummary(row,row?.archiveKey)))return {error:true,code:"invalid-recovery-summary"};
+      const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx),meta=tx.objectStore("meta"),opaque=tx.objectStore("opaque");
+      try{
+        const [head,holdKey]=await Promise.all([requestResult(meta.get("head")),requestResult(meta.getKey("recoveryCloudHold"))]);
+        if(head?.hash!==expectedHeadHash||holdKey!==undefined){tx.abort();try{await done;}catch{}return {conflict:true};}
+        const present=await Promise.all(summaries.map(row=>Promise.all([requestResult(opaque.getKey(row.archiveKey)),requestResult(opaque.getKey(cloudRecoverySummaryKey(row.archiveKey)))])));
+        let written=0;
+        summaries.forEach((row,index)=>{const [archive,summary]=present[index];
+          if(archive===undefined||summary!==undefined)return;const key=cloudRecoverySummaryKey(row.archiveKey);
+          opaque.put({key,raw:JSON.stringify(row),order:Date.now()},key);written++;});
+        await done;return {ok:true,written};
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
+    }
+
+    async function protectRecoverySource({expectedHash,key,raw,summary=null}={}){
       ensureOpen();
       if(typeof expectedHash!=="string"||typeof key!=="string"||!key||typeof raw!=="string")return false;
+      if(summary!==null&&!validCloudRecoverySummary(summary,key))return false;
       const tx=await beginTransaction(["meta","opaque"],"readwrite"),done=transactionDone(tx);
       const head=await requestResult(tx.objectStore("meta").get("head"));
-      const store=tx.objectStore("opaque"),[existingKey,existing]=await Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key))]);
+      const store=tx.objectStore("opaque"),summaryKey=cloudRecoverySummaryKey(key);
+      const [existingKey,existing,existingSummary]=await Promise.all([requestResult(store.getKey(key)),requestResult(store.get(key)),summary?requestResult(store.getKey(summaryKey)):undefined]);
       // A peer edit or different evidence at this identity invalidates the
       // capture. Recovery never replaces an earlier protected original.
       if(head?.hash!==expectedHash||existingKey!==undefined&&(existing?.key!==key||existing?.raw!==raw)){tx.abort();try{await done;}catch{}return false;}
-      if(existingKey===undefined)store.put({key,raw,order:Date.now()},key);
+      // #2281 review: the archive's summary is saved with it. A write that
+      // aborts the transaction is waited for, so its failure is reported once.
+      try{
+        if(existingKey===undefined)store.put({key,raw,order:Date.now()},key);
+        if(summary&&existingSummary===undefined)store.put({key:summaryKey,raw:JSON.stringify(summary),order:Date.now()},summaryKey);
+      }catch(error){try{tx.abort();}catch{}try{await done;}catch{}throw error;}
       await done;
       // #2239: the protected row is read back once, alone, and compared exactly,
       // rather than read with every saved archive (several times the board's
@@ -966,11 +1035,12 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
       getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim};
     return api;
   }
 
-  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore};
+  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore,
+    canonicalRecoveryJson,cloudRecoverySummary,cloudRecoverySummaryKey};
 })(globalThis);

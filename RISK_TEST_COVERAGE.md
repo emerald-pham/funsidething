@@ -137,9 +137,12 @@ its RISK test; the map follows.
 - RISK cloud source recovery #2278: a late reply after an upload timed out cannot publish, even once the delayed reply arrives
 - RISK cloud source recovery #2278 guidance: mounted Help and the November 7 changelog say recovery saves wait up to a minute per step and Apply selected source names why it could not save
 - RISK cloud source recovery #2281: Apply on the large phone board writes, and reads at once, about the same device storage however many earlier attempts failed, and then succeeds and is synced
-- RISK cloud source recovery #2281: when this device has no room to protect a new copy, Apply says storage is full and changes nothing
+- RISK cloud source recovery #2281: when this device has no room to protect a new copy, Apply says storage is full and nothing is applied
 - RISK cloud source recovery #2281: after failed attempts saved by the previous release, Apply names their prepared choices by exact hash, keeps every original exact and succeeds
-- RISK cloud source recovery #2281 guidance: mounted Help and the November 8 changelog say Apply no longer grows with earlier attempts and names a full device
+- RISK cloud source recovery #2281 guidance: mounted Help and the November 8 changelog say Apply no longer needs more memory with earlier attempts, including ones earlier versions saved, and name a full device
+- RISK cloud source recovery #2281: after failed attempts saved by the previous release on the large phone board, Apply and a later save read about the same device storage at once however many there were
+- RISK cloud source recovery #2281: a confirmed choice also completes the earlier attempts’ archives of the same cloud evidence, so later saves do not re-check them
+- RISK cloud source recovery #2281: while another saved copy cannot be read, Apply stops before any cloud write and changes no board
 - RISK cloud source recovery #2281: a confirmed choice that names its archive still counts its originals as recovered once an older device collected them, and healthy edits save
 - RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write
 - RISK cloud source review #2272: a cloud push deferred by the review resumes after Cancel and after a failed review
@@ -1532,6 +1535,7 @@ its RISK test; the map follows.
 - RISK independent cloud legacy source: supported released v1 boards upgrade only their version during server-only repair
 - RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes
 - RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused
+- RISK backup listing reuse: a cached payload is kept only while the stored snapshot equals it, and a snapshot changed in place is still refused
 - RISK contained board adoption: when the generation before the unreadable one is exactly this device’s acknowledged copy, a large board publishes itself once as the next revision whoever saved the unreadable generation, keeping it protected, untouched and named by a headers-only device record after later saves
 - RISK contained board adoption: when the generation before the unreadable one is not proved to be this device’s acknowledged copy, or this device’s pending upload may hold work this board lacks, nothing is published, a large board still waits, and a proved earlier generation keeps the unreadable one named by a headers-only record
 - RISK contained board adoption: a device that remembers a recovery wait adopts its board when it reconnects once containment is proven, whoever saved the unreadable generation, and a conflicting write keeps the newer revision another device published

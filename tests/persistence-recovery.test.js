@@ -5733,8 +5733,30 @@ test('RISK recovery archive range listing: a corrupt row in the listed range tha
  assert.deepEqual(ranged,full.filter(row=>row.key.startsWith(prefix)),'the range listing skips the kept corrupt row as the full listing does');
  await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('opaque').put('corrupt and outside the range','automatic-recovery-ack:outside'));
  assert.deepEqual((await store.listOpaqueArchives({prefix})).map(row=>row.key),[readable.key],'a corrupt row outside the range does not stop the range listing');
+ // #2281 review: the push now lists the range's keys and reads each archive
+ // on its own, with the same rule for a corrupt row.
+ assert.deepEqual([...await store.listOpaqueArchiveKeys({prefix})].sort(),[kept,readable.key].sort(),'the key listing names the range only');
+ assert.equal(await store.readOpaqueArchive(kept),null,'a corrupt row an exact original keeps is skipped');
+ const {order,...visible}=readable;assert.deepEqual({...await store.readOpaqueArchive(readable.key)},visible,'a readable archive reads back exactly');
  await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('opaque').put('corrupt and kept by nothing',prefix+'unkept'));
  await assert.rejects(store.listOpaqueArchives({prefix}),/corrupt or unprotected/,'a corrupt row in the range that nothing keeps is refused');
+ await assert.rejects(store.readOpaqueArchive(prefix+'unkept'),/corrupt or unprotected/,'and read on its own it is refused too');
+});
+
+// #2281 review: a backup listing may keep the payload text an earlier listing
+// verified (reuse), but only while the stored snapshot still equals it exactly.
+test('RISK backup listing reuse: a cached payload is kept only while the stored snapshot equals it, and a snapshot changed in place is still refused',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='listing-reuse-'+Math.random();
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();t.after(()=>store.close());
+ assert.equal((await store.commitHead({expectedHash:null,payload:JSON.stringify({tasks:[]})})).ok,true);
+ const head=await store.readHead(),payload=JSON.stringify({tasks:[],copy:'exact original'});
+ assert.equal((await store.putBackup({expectedHash:head.hash,backup:{id:'reuse-copy',day:'2026-11-08',at:1,kind:'manual',payload}})).ok,true);
+ const first=await store.listBackups(),again=await store.listBackups({reuse:first});
+ assert.equal(again.length,1);assert.equal(again[0].payload,payload,'an unchanged copy lists exactly');
+ let payloadHash;await editRawDevice187(indexedDB,deviceDbName,tx=>{const request=tx.objectStore('backups').get('reuse-copy');
+  request.onsuccess=()=>{payloadHash=request.result.payloadHash;tx.objectStore('snapshots').put({hash:payloadHash,payload:JSON.stringify({tasks:[],copy:'changed in place'})},payloadHash);};});
+ await assert.rejects(store.listBackups({reuse:again}),/corrupt/,'the cached text cannot stand in for changed stored bytes');
+ await assert.rejects(store.listBackups(),/corrupt/,'positive control: the plain listing refuses it too');
 });
 
 // #2254 (owner decision, 2026-11-06): a phone cannot afford full recovery of a
