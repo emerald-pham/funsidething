@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, webcrypto } from "node:crypto";
 import { inspect } from "node:util";
 import vm from "node:vm";
+import v8 from "node:v8";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -55,6 +56,38 @@ import {
 } from "./shared.js";
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
+import { appFixtureScope } from "./shared.js";
+
+// #2281 CI: the test runner keeps every finished test, with its subtests and
+// hooks, until the process ends. A hook or subtest that closed over an app
+// kept that app's whole realm, so by the middle of the core group one process
+// held about a thousand realms and gigabytes of heap. Its collections were
+// then long enough to delay the 30 ms timing tests that run late in the group.
+// Once a subtest finishes, neither its hook nor its body may keep an app.
+test('Test fixtures: once a subtest finishes, neither its after hook nor its body keeps the app it closed over',async t=>{
+ // Later realms must not see a gc global, so the flag is only on while the
+ // collector is fetched.
+ v8.setFlagsFromString('--expose-gc');const collect=vm.runInNewContext('gc');v8.setFlagsFromString('--no-expose-gc');
+ // Outside the fixture scope, only the closures below refer to these apps,
+ // as when a test disposes its own app in an after hook.
+ const open=()=>appFixtureScope.exit(()=>loadApp());
+ let inHook=null,inBody=null,hookDisposed=false;
+ await t.test('an app disposed by the subtest’s own after hook',async sub=>{
+  const app=await open();inHook=new WeakRef(app.ctx);
+  sub.after(async()=>{await app.dispose();hookDisposed=true;});
+  assert.notEqual(app.ctx.state,null,'positive control: the app opened its board');
+ });
+ {
+  const app=await open();inBody=new WeakRef(app.ctx);
+  await t.test('a subtest that reads an app from the enclosing test',async()=>{
+   try{assert.notEqual(app.ctx.state,null,'positive control: the subtest uses the app');}finally{await app.dispose();}
+  });
+ }
+ assert.equal(hookDisposed,true,'positive control: the after hook ran before its subtest finished');
+ await new Promise(resolve=>setImmediate(resolve));collect();collect();
+ assert.equal(inHook.deref(),undefined,'a finished after hook no longer keeps the app it disposed');
+ assert.equal(inBody.deref(),undefined,'a finished subtest no longer keeps the app its body read');
+});
 
 test('RISK recovery device diagnostics: copied report distinguishes failed reads and replacement connections without private text',async t=>{
  const cases=[
