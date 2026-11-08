@@ -3110,8 +3110,8 @@ test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8
  assert.match(answer,/On a large board, after many earlier attempts that could not save, Apply selected source most likely needed more memory than a phone allows, so the app closed\./,'the cause is not stated as confirmed');
  assert.match(answer,/Each attempt copied every earlier attempt’s prepared choice into its protected originals again\./);
  assert.match(answer,/Apply now names earlier prepared choices by an exact fingerprint instead\./);
- assert.match(answer,/When you next read sources in Review cloud recovery sources, unless another recovery is waiting, originals that earlier versions saved are summarized once, one at a time\. Apply and later saves then read those summaries instead of whole originals, and read an original whole only when it still needs protecting in the cloud\./,'the summaries are qualified: none while a recovery waits, and an unprotected original is still read whole');
- assert.doesNotMatch(answer+changelog2281Guidance(),/read only the summaries|read only those summaries|no longer add to what they hold/,'no unqualified claim');
+ assert.match(answer,/When you next read sources in the review, unless an older copy is in use or a restored-device hold remains, originals that earlier versions saved are summarized once; otherwise that waits for a later review\. Apply and later saves then read those summaries, and read an original whole only when it still needs protecting\./,'the summaries are qualified: none while an older copy is in use or a restored-device hold remains, and an unprotected original is still read whole');
+ assert.doesNotMatch(answer+changelog2281Guidance(),/read only the summaries|read only those summaries|no longer add to what they hold|another recovery is waiting/,'no unqualified or misnamed qualifier');
  assert.match(answer,/Every original stays saved exactly\./);
  assert.match(answer,/If this device’s storage is too full to protect the copies, Apply says so and nothing is applied\./);
  assert.doesNotMatch(answer+help,/the phone allows|changes nothing|its saved originals|gets heavier/,'no earlier wording');
@@ -3121,7 +3121,7 @@ test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8
  const changelog=(html.match(/<h3>November 8, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
  assert.match(changelog,/<li>Apply selected source in Review cloud recovery sources no longer needs more memory with each earlier attempt that could not save\./);
  assert.match(changelog,/Each attempt copied every earlier attempt’s prepared choice into its protected originals again, so on a large board the app could close, most likely because it ran out of memory\./);
- assert.match(changelog,/Earlier prepared choices are now named by an exact fingerprint instead\. When you next read sources in Review cloud recovery sources, unless another recovery is waiting, originals that earlier versions saved are summarized once, one at a time, and Apply and later saves then read those summaries instead of whole originals, reading an original whole only when it still needs protecting in the cloud; every original stays saved exactly\./);
+ assert.match(changelog,/Earlier prepared choices are now named by an exact fingerprint instead\. When you next read sources in the review, unless an older copy is in use or a restored-device hold remains, originals that earlier versions saved are summarized once \(otherwise that waits for a later review\), and Apply and later saves then read those summaries, reading an original whole only when it still needs protecting; every original stays saved exactly\./);
  assert.match(changelog,/If this device’s storage is too full to protect the copies, Apply now says so and nothing is applied\.<\/li>/);
  assert.doesNotMatch(changelog,/changes nothing|its saved originals|gets heavier/,'no earlier wording');
  assert.doesNotMatch((answer+changelog).replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,'Help never sends anyone to another device');
@@ -25967,7 +25967,10 @@ test('RISK landscape water browser: GPU distortion preserves contact and sharp p
 test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload',async()=>{
  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
  const cloud=recoveringCloudStatusHarness(shim,ctx);
- await ctx.cloudPull();
+ // #2281 CI diagnosis: a timeline of the harness's cloud calls, read below.
+ const ciTimeline2281=[],ciStart2281=performance.now(),ciMark2281=label=>ciTimeline2281.push(label+'@'+(performance.now()-ciStart2281).toFixed(1)+':'+cloud.CS.errorStage);
+ for(const name of ['pull','push','reportError']){const original=cloud.CS[name];cloud.CS[name]=function(...args){ciMark2281(name+'>');const result=original.apply(this,args);Promise.resolve(result).then(()=>ciMark2281(name+'<'),()=>ciMark2281(name+'!'));return result;};}
+ await ctx.cloudPull();ciMark2281('first-pull-returned');
  cloud.fail('reconcile','invalid-payload');
  const set=storage.setItem;
  storage.setItem=(key,value)=>{
@@ -25977,12 +25980,12 @@ test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale 
  ctx.state.tasks.push(syncTask('recovered-edit','Edit that outlived device quota'));ctx.state.syncDirty=true;
  assert.equal(await ctx.persist(),false,'the production pair write records the local failure first');
  storage.setItem=set;
- assert.equal(await ctx.persist(),true,'automatic archive recovery makes the same board durable');
- await syncSettle(30);
+ assert.equal(await ctx.persist(),true,'automatic archive recovery makes the same board durable');ciMark2281('durable');
+ await syncSettle(30);ciMark2281('settled');
  assert.equal(cloud.pulls(),2,'the successful local recovery retries the failed reconciliation automatically');
  // #2281 CI diagnosis: this assertion fails only on CI. Record the app's
  // cloud and save state at this point and shortly after, without changing it.
- const ciProbe2281=label=>{try{console.log('CI-PROBE-2281 '+label+' '+JSON.stringify({pulls:cloud.pulls(),pushes:cloud.pushes(),stage:cloud.CS.errorStage,code:cloud.CS.errorCode,status:cloud.CS.status,app:JSON.parse(vm.runInContext('JSON.stringify({pulling,cloudPushInFlight,deferredCloudPull,cloudSuspended,cloudResumePending,cloudPullPending,pendingPush,dirty:state.syncDirty,issue:lastDeviceSaveIssue?String(lastDeviceSaveIssue.code||lastDeviceSaveIssue):null,hidden:document.hidden,editor:hasActiveEditor(),modal:document.getElementById("modalRoot").innerHTML.length,retry:!!cloudRetryTimer,store:!!deviceStore})',ctx))}));}catch(error){console.log('CI-PROBE-2281 '+label+' failed '+error.message);}};
+ const ciProbe2281=label=>{try{console.log('CI-PROBE-2281 '+label+' '+JSON.stringify({timeline:ciTimeline2281.join(' '),pulls:cloud.pulls(),pushes:cloud.pushes(),stage:cloud.CS.errorStage,code:cloud.CS.errorCode,status:cloud.CS.status,app:JSON.parse(vm.runInContext('JSON.stringify({pulling,cloudPushInFlight,deferredCloudPull,cloudSuspended,cloudResumePending,cloudPullPending,pendingPush,dirty:state.syncDirty,issue:lastDeviceSaveIssue?String(lastDeviceSaveIssue.code||lastDeviceSaveIssue):null,hidden:document.hidden,editor:hasActiveEditor(),modal:document.getElementById("modalRoot").innerHTML.length,retry:!!cloudRetryTimer,store:!!deviceStore})',ctx))}));}catch(error){console.log('CI-PROBE-2281 '+label+' failed '+error.message);}};
  ciProbe2281('at-assert');setTimeout(()=>ciProbe2281('after-300ms'),300);
  assert.equal(cloud.CS.errorStage,null);assert.equal(cloud.CS.errorCode,null);
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing',
