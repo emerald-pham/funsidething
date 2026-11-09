@@ -522,6 +522,29 @@ test('RISK repository process: CSS comment removal cannot join selector tokens u
  }finally{cleanupReleaseGateFixture(cssTokenJoin);}
 });
 
+// Release preparation (#2296) runs the real command with its working directory
+// in a fixture repository and git's repository-locating variables removed, so
+// neither the commands nor the fixture can reach this checkout.
+function releaseCommand(fixture,...args){
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const name of Object.keys(env))if(name.startsWith('GIT_'))delete env[name];
+ return spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),...args],{cwd:fixture.repo,encoding:'utf8',timeout:30000,env});
+}
+
+test('RISK repository process: release plan prints the review plan the validator derives for a commit',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const fixture=makeScaledReviewFixture({candidate:{'src/cloud-sync.mjs':'export const value = 2;\n'}});
+ try{
+  const printed=releaseCommand(fixture,'plan',fixture.candidateSha,fixture.baseSha);
+  assert.equal(printed.status,0,printed.stdout+printed.stderr);
+  const plan=JSON.parse(printed.stdout);
+  assert.deepEqual(plan,{schemaVersion:2,changedFiles:['src/cloud-sync.mjs'],mode:'dual-review',
+   requiresCodeReview:true,requiresFaqReview:false,requiresOwnerFaqCoverage:true,requiresSpecialistReview:true,
+   requiresTypographyReview:false,specialistDomains:['memory-cloud-sync']});
+  assert.deepEqual(plan,deriveReleaseReviewPlan(fixture.repo,fixture.candidateSha,fixture.baseSha));
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);

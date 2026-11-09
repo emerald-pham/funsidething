@@ -1386,7 +1386,13 @@ async function main() {
     process.stdout.write('Merged PR exact-SHA release evidence passed for deployed SHA ' + result.deployedSha + ' and reviewed SHA ' + result.reviewedSha + '.\n');
     return;
   }
-  throw new Error('Commands: record, verify, pre-push, publish, verify-deployment.');
+  if (command === 'plan') {
+    const [commitSha, baseSha] = process.argv.slice(3);
+    if (!commitSha || !baseSha) throw new Error('Usage: node scripts/release-evidence.mjs plan <candidate-sha> <base-sha>');
+    process.stdout.write(JSON.stringify(deriveReleaseReviewPlan(gitCommonDir(repoRoot).root, commitSha, baseSha), null, 2) + '\n');
+    return;
+  }
+  throw new Error('Commands: plan, record, verify, pre-push, publish, verify-deployment.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
