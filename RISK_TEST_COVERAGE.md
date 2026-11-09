@@ -1539,7 +1539,7 @@ its RISK test; the map follows.
 - RISK independent cloud boot authority: source-only preflight waits for bounded device startup before repairing remote bytes
 - RISK recovery archive range listing: a corrupt row in the listed range that an exact original keeps is skipped as the full listing skips it, and one that nothing keeps is still refused
 - RISK backup listing reuse: a cached payload is kept only while the stored snapshot equals it, and a snapshot changed in place is still refused
-- RISK contained board adoption: when the generation before the unreadable one is exactly this device’s acknowledged copy, a large board publishes itself once as the next revision whoever saved the unreadable generation, keeping it protected, untouched and named by a headers-only device record after later saves
+- RISK contained board adoption: when the generation before the unreadable one is exactly this device’s acknowledged copy, a large board publishes itself once as the next revision whoever saved the unreadable generation, keeping it untouched until the root has moved past it, with no protection marker, and named by a headers-only device record after later saves
 - RISK contained board adoption: when the generation before the unreadable one is not proved to be this device’s acknowledged copy, or this device’s pending upload may hold work this board lacks, nothing is published, a large board still waits, and a proved earlier generation keeps the unreadable one named by a headers-only record
 - RISK contained board adoption: a device that remembers a recovery wait adopts its board when it reconnects once containment is proven, whoever saved the unreadable generation, and a conflicting write keeps the newer revision another device published
 - RISK contained board adoption: an adoption upload cut off inside the real push by a network drop, the push deadline or an app switch resumes or replaces only its own staged upload on a later attempt, and publishes once over the unreadable revision
@@ -1549,7 +1549,48 @@ its RISK test; the map follows.
 - RISK exact acknowledged cloud source: the exact rebuild of this device’s own upload whose reply was lost publishes the board and shows synced
 - RISK contained board adoption: an upload of exactly this board that was cut off before it published does not stop the device publishing its board over a later unreadable revision, and one that differs from the board still does
 - RISK contained board adoption: after adoption, showing, focusing or reconnecting the app reads no whole device store, and a remembered over-budget mark stays
-- RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts
+- RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so once the automatic attempts are used up the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts
+- RISK contained board adoption #2287: the field-shaped state repairs itself on opening with no action from the person, losing no task or History entry
+- RISK contained board adoption #2287: the field-shaped state repairs itself on opening when every read of a generation’s chunks stalls past the ordinary limit
+- RISK contained board adoption #2287: the field-shaped state repairs itself on opening when root, header, chunk and transaction reads all stall past the ordinary limit
+- RISK contained board adoption #2287: the field-shaped state repairs itself on opening when only header reads stall past the ordinary limit
+- RISK contained board adoption #2287: a full source read fetches each generation’s header and chunks together, so a stall on both costs one stall
+- RISK contained board adoption #2287: each repair step finishes inside its whole-operation limit when every one of its reads stalls
+- RISK contained board adoption #2287: a resumed upload publishes when every read of its publication stalls past the ordinary limit
+- RISK contained board adoption #2287: one cloud read that never answers ends its step at the single-read limit, not after the step’s whole allowance
+- RISK contained board adoption #2287: after a pull times out the next pull for that account has the recovery limit, so a repair with no recorded root and a stalling healthy board both finish, while the first pull keeps its ordinary limit
+- RISK contained board adoption #2287: a page closed mid-repair is retried by the next opening up to the attempt limit, counted across pages and honouring a mark from the previous release, then the board waits and Retry sync still adopts
+- RISK contained board adoption #2287: only a page the app was closed on uses up a try: a clean run neither raises nor resets the count, three timeouts and one real closure still publish, crash, timeout, crash, timeout, crash reaches the limit, and an app switch counts for nothing
+- RISK contained board adoption #2287: the debug log records each repair attempt and the attempt limit being reached, as metadata only, and a waiting board records it once
+- RISK contained board adoption #2287: two live tabs running the repair together publish once and lose nothing
+- RISK contained board adoption #2287: a generation proved unusable gets no protection marker and is retired only after the root has moved past it, while the intact previous generation stays protected, and a marker from an earlier release is left alone
+- RISK contained board adoption #2287: a partly readable generation keeps its marker and its surviving chunks, and the repair still goes ahead
+- RISK contained board adoption #2287: a generation proved unusable with zero chunks gets no marker on any route, and a device archive naming it does not keep it from being retired
+- RISK contained board adoption #2287: a generation seen with zero chunks is not an earlier source: once retired, showing the app reads it no more, starts no capture, exports no device store and Settings never calls it unresolved, as with a marker
+- RISK contained board adoption #2287: after an exact rebuild no ordinary save reads the device archive whole or the zero-chunk generation again, before or after it is retired, at the read counts of a generation with a marker
+- RISK contained board adoption #2287: without containment proof the automatic recovery default still finishes when each read of a generation’s chunks stalls
+- RISK contained board adoption #2287: without containment proof the automatic recovery default also finishes when every read stalls past the ordinary limit, the first pull included
+- RISK contained board adoption #2287: a note from the previous release naming a generation since retired starts no capture and is not reported as unresolved
+- RISK contained board adoption #2287: a summary from the previous release does not count as seeing zero chunks: without the device record the generation stays pinned, and one gone from the cloud is decided from the whole archive
+- RISK contained board adoption #2287: an upload still staging with zero chunks is not proved unusable and keeps its marker
+- RISK contained board adoption #2287: a repair that goes on to the background check of earlier sources ends that check at its old budget, not the repair budget
+- RISK contained board adoption #2287: the optional background check of earlier sources ends at its old budget of one read limit and does not hold cloud saves for the repair budget
+- RISK contained board adoption #2287: a held automatic recovery publishes when every read stalls past the ordinary limit, at the next opening and on Retry sync
+- RISK contained board adoption #2287: an older copy the person declined stays out of the cloud after a save from another device ends the choice, with or without a marker on it
+- RISK contained board adoption #2287: after an app switch a held automatic recovery reaches the next revision on the same page, from returning to the app, Retry sync or an edit, also when every read stalls
+- RISK contained board adoption #2287: a held automatic recovery interrupted after its upload staged reaches the next revision with every task and History entry, after a closed page, an app switch, a closed dialog or Retry sync
+- RISK contained board adoption #2287: a staged upload left by a held automatic recovery never overwrites another device’s save and never publishes after a decline
+- RISK contained board adoption #2287: a declined recovery whose older copy was unavailable when it opened publishes nothing once reads work, with the choice standing or after a save from another device ends it
+- RISK contained board adoption #2287: a note from the previous release naming a retired generation beside a complete older copy starts no capture and publishes nothing
+- RISK contained board adoption #2287: a staged upload that never landed is cleared when another save already holds this board, and resumed or replaced over a readable root at its own base revision
+- RISK contained board adoption #2287: a save debounced before a held publication cannot stop that publication after it has committed its board
+- RISK contained board adoption #2287: a device read that answers just past its limit does not let a server-only repair publish ahead of the board this device adopts
+- RISK contained board adoption #2287: a debounced save with nothing left to write cannot stop the automatic recovery default or Apply after its device commit
+- RISK contained board adoption #2287: a device read that answers after the server-only repair published brings the page to synced with its work in the cloud, without reopening
+- RISK contained board adoption #2287: an edit whose only save is the debounced one is still saved when a held publication starts first, and then reaches the cloud
+- RISK contained board adoption #2287: when device reads stay slow one opening makes one repair check and one pull, at production limits
+- RISK contained board adoption #2287: a debounced save with work left stays armed when the automatic recovery default commit is refused, and saves the edit
+- RISK contained board adoption #2287: a late device answer starts no pull on a hidden page, and the next visible pull finishes the work
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
 - RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused

@@ -12,7 +12,9 @@ retrying, and retain existing idempotency, revision and account guards. Honor
 operation-specific consent, quota, paid-attempt and retry restrictions. Automatic
 recovery may open a validated older source only as a reversible automatic
 recovery default (see GLOSSARY) that keeps newer work and every alternative
-protected. It cannot overwrite protected data or reset user storage as a repair
+protected, except a cloud copy proved unusable with zero chunks received, which
+is discarded once the board has moved past it (owner-approved, #2287). It cannot
+overwrite protected data or reset user storage as a repair
 shortcut, change permissions or bypass validation, consent or security. Required security invalidation of revoked or unauthorized session
 data still applies.
 

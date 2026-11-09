@@ -47,6 +47,8 @@ A retained copy of a board or its saved decisions that may help recover work.
 Keeping a source does not establish that it is complete or safe to apply.
 Shared originals retained by automatic recovery remain protected across devices,
 including after they leave the current cloud slots; this cannot recreate missing bytes.
+A generation seen with zero chunks has nothing to retain: it gets no protection,
+stops being consulted and is retired once the root has moved past it.
 _Avoid_: Recovered board
 
 **Cloud recovery review**:
@@ -65,16 +67,22 @@ _Avoid_: Newest snapshot, invented decision
 **Recovery wait**:
 The automatic recovery default holding off because rebuilding the board from an
 older cloud copy could need more memory than a phone allows. The board stays
-open and saves on this device, every recovery source stays protected and nothing
-is confirmed by cloud until a deliberate run or a newer cloud save.
+open and saves on this device, every readable recovery source stays protected
+and nothing is confirmed by cloud until a deliberate run or a newer cloud save.
+On any recovery route, a cloud copy proved unusable with zero chunks received
+gets no protection and is retired once the root has moved past it; a copy with
+any chunks left stays protected, though it is not used.
 _Avoid_: Failed recovery, paused sync
 
 **Deliberate run**:
 A recovery the person starts on purpose, with Retry sync or by signing in again,
 that goes ahead even when the automatic recovery default would wait. Opening,
-returning to or reconnecting the app never starts one. A deliberate run that
-ends without adopting a board, on its deadline or an error, returns to the
-recovery wait.
+returning to or reconnecting the app never starts one. A contained board adoption
+is retried by itself at each opening until the app has been closed during it
+three times; after that only a deliberate run tries it again. Only the app closing
+uses a try: a run that ends with an outcome it saw, such as a timeout, neither
+uses one nor gives one back. A deliberate run that ends without
+adopting a board, on its deadline or an error, returns to the recovery wait.
 _Avoid_: Forced recovery, automatic retry
 
 **Lossless recovery**:

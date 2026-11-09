@@ -422,7 +422,8 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  const answer=answerTo('Does the app fix an unreadable cloud copy by itself?');
  assert.match(answer,/When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app saves this device’s board as the new cloud copy by itself/);
  assert.match(answer,/even while it says “recovery waiting”/);
- assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud, and this device keeps a note naming it\./);
+ assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; once replaced, it is discarded unless part survives, and this device keeps a note\./);
+ assert.doesNotMatch(answer,/that copy stays protected/,'the unusable copy is no longer kept in the cloud (#2287)');
  assert.match(answer,/The app also waits after you choose Use my board from before recovery\./);
  // #2254 re-review: a run the page did not finish leaves its mark, so the
  // next opening waits until Retry sync instead of starting it again.
@@ -431,8 +432,9 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  // (a smaller one recovers as usual). A dropped connection, the push deadline
  // or an app switch clears the mark, and the staged upload finishes at the
  // next check.
- assert.match(answer,/If the copy before it differs, an unconfirmed save here may hold work the board lacks, or the app closed during this, a large board waits for Retry sync\./,
-  'the answer says a large board waits for Retry sync after the app closed mid-run');
+ assert.match(answer,/Only the app closing uses a try; after three it waits for Retry sync\./,
+  'the answer says only the app closing uses one of its three tries, then it waits (#2287)');
+ assert.match(answer,/A large board also waits if the copy before it differs or an unconfirmed save may hold more\./);
  assert.match(answer,/Losing connection or switching apps only pauses this\./,'the answer says a dropped connection or an app switch only pauses it');
  assert.doesNotMatch(answer,/If a run is interrupted, the next opening waits for Retry sync/,'no interruption makes every next opening wait');
  assert.ok(wordsOf(answer)<=130,'the adoption answer stays within the 130-word limit: '+wordsOf(answer));
@@ -441,7 +443,20 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  assert.match(back,/Afterwards your board saves on this device, cloud saving stays paused, both cloud copies stay protected and the app does not upload this board by itself\./);
  const waiting=answerTo('Why does the cloud button say “recovery waiting”?');
  assert.match(waiting,/If the copy before the unreadable one is the one this device last confirmed, the app saves your board by itself\./);
+ assert.match(waiting,/every readable copy stays protected/,'a copy with nothing left gets no protection (#2287)');
  assert.doesNotMatch(waiting,/own unconfirmed save/);
+ // #2287 release review: Help no longer promises to keep what is discarded, and
+ // says what uses up a try.
+ const reopening=answerTo('Will recovered work reopen and finish saving automatically?');
+ assert.match(reopening,/Shared cloud originals with anything left remain protected permanently; one with nothing left is retired once your board has moved past it\./);
+ assert.doesNotMatch(reopening,/Shared cloud originals remain protected/,'a copy with nothing left is retired (#2287)');
+ const older=answerTo('What does “older copy in use” mean?');
+ assert.match(older,/Anything saved only in the damaged newer copy was not recovered; it stays protected only if some is left\./);
+ assert.doesNotMatch(older,/that original stays protected/,'the unusable copy is not kept (#2287)');
+ const afterRecovery=answerTo('Why does a large board wait for Retry sync after recovery?');
+ assert.match(afterRecovery,/every readable copy stays protected/,'a copy with nothing left gets no protection (#2287)');
+ assert.doesNotMatch(afterRecovery,/every copy stays protected/,'a copy with nothing left gets no protection (#2287)');
+ assert.match(vm.runInContext('CLOUD_RECOVERY_WAITING_DETAIL',app.ctx),/every readable cloud and device copy stays protected\./,'the waiting notice says the same (#2287)');
  const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
  assert.ok(answers.length>100,'positive control: the mounted Help has its answers');
  assert.deepEqual(answers.filter(row=>wordsOf(row.text)>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
@@ -1253,7 +1268,8 @@ test('RISK cloud source recovery automatic fallback: one complete older source o
   assert.equal(JSON.stringify(reader.docs.get(path)),JSON.stringify(original.header),'ACK retains each readable original header unchanged');
   const chunks=[...reader.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
   assert.equal(JSON.stringify(chunks),JSON.stringify(original.chunks),'ACK retains the exact originally readable chunk rows');
-  assert.ok(reader.docs.has('users/owner/recoveryProtections/'+original.id),'the permanent marker protects original bytes from other supported collectors');
+  // #2287: a marker protects bytes; a generation with zero chunks has none to protect.
+  assert.equal(reader.docs.has('users/owner/recoveryProtections/'+original.id),original.chunks.length>0,'the permanent marker protects original bytes from other supported collectors');
  }
  const damagedOriginal=captured.generations.find(row=>row.id===originalRoot.activeGeneration);
  assert.equal(damagedOriginal.chunks.length,0,'protecting a damaged original does not recreate its unavailable chunks');
@@ -1766,7 +1782,7 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
  assert.ok(help.includes('Cloud saves keep their confirmation when earlier saves finish. Later edits still wait for their own confirmation.'),'mounted changelog retains the previously released cloud acknowledgement item');
  assert.match(help,/Saved working boards reopen automatically/i,'accepted cold reopening is part of the automatic recovery policy');
  assert.match(help,/An automatic recovery waiting for cloud confirmation resumes after reopening/i);
- assert.match(help,/Shared cloud originals remain protected permanently/i);
+ assert.match(help,/Shared cloud originals with anything left remain protected permanently/i);
  assert.match(help,/Cloud confirmation is checked again after edits or account changes/i,'the FAQ distinguishes current authority from an earlier completed recovery');
  assert.match(help,/An earlier source can remain unsupported or unresolved while your current board stays usable/i,'unsupported retained history does not require an unavailable picker');
  assert.match(help,/<dt>Will recovered work reopen and finish saving automatically\?<\/dt><dd>Saved working boards reopen automatically/i,'reopening guidance has its own concise reachable FAQ topic');
@@ -2802,8 +2818,10 @@ test('RISK cloud source recovery #2278: Apply of the intact previous source succ
  assert.notEqual(root.activeGeneration,originalRoot.activeGeneration);assert.notEqual(root.activeGeneration,originalRoot.previousGeneration);
  const pulled=await backend.CS.pull();assert.equal(pulled.rev,base+1);assert.equal(typeof pulled.payload,'string','the new current copy reads back');
  assert.deepEqual(JSON.parse(pulled.payload).tasks.map(task=>task.title),chosen.tasks.map(task=>task.title),'the cloud holds the chosen source');
- // Both originals stay protected on the server and on this device.
- for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original generation '+id+' is protected');
+ // The intact original is protected on the server and both are archived on this
+ // device; the generation with no chunks left gets no marker (#2287).
+ assert.equal(backend.docs.has('users/owner/recoveryProtections/'+originalRoot.activeGeneration),false,'the zero-chunk original gets no marker');
+ assert.equal(backend.docs.get('users/owner/recoveryProtections/'+originalRoot.previousGeneration)?.v,1,'the intact original is protected');
  assert.ok((await store.listOpaqueArchives()).some(row=>row.key.startsWith('cloud-generation-recovery:')),'the exact original sources are archived');
  assert.ok((await store.listBackups()).some(row=>row.kind==='cloud-source-recovery-device'&&row.payload.includes('Device source only')),'the device board it replaced stays a protected copy');
  // This device holds the chosen source, confirmed at that revision.
@@ -2900,7 +2918,9 @@ test('RISK cloud source recovery #2278: a protection read-back slower than an or
  const applied=await ctx.onAction('apply-cloud-source-recovery',{});delete app.faults.serverRead;
  assert.equal(applied,true,'Apply finishes: '+(shim.document.getElementById('modalRoot').innerHTML.match(/role="status">([^<]*)/)||[])[1]);
  assert.equal(backend.docs.get('users/owner').rev,base+1);
- for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1);
+ // #2287: the generation with no chunks left gets no marker; the intact one does.
+ assert.equal(backend.docs.has('users/owner/recoveryProtections/'+originalRoot.activeGeneration),false,'the zero-chunk original gets no marker');
+ assert.equal(backend.docs.get('users/owner/recoveryProtections/'+originalRoot.previousGeneration)?.v,1,'the intact original is protected');
 });
 
 // The phone's debug log: three sources read together, one of them an empty
@@ -2918,9 +2938,11 @@ test('RISK cloud source recovery #2284: Apply finishes when each chunk read stal
  t.after(()=>{delete app.faults.serverRead;});
  const applied=await ctx.onAction('apply-cloud-source-recovery',{});delete app.faults.serverRead;
  assert.equal(applied,true,'Apply finishes: '+(shim.document.getElementById('modalRoot').innerHTML.match(/role="status">([^<]*)/)||[])[1]);
- assert.ok(started.includes(originalRoot.activeGeneration)&&started.includes(originalRoot.previousGeneration),'positive control: both originals were read back under the stall');
+ assert.ok(started.includes(originalRoot.previousGeneration),'positive control: the protected original was read back under the stall');
  assert.equal(backend.docs.get('users/owner').rev,base+1,'saved once, ordered after the reviewed revision');
- for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original generation '+id+' stays protected');
+ // #2287: the generation with no chunks left gets no marker and no read-back.
+ assert.equal(backend.docs.has('users/owner/recoveryProtections/'+originalRoot.activeGeneration),false,'the zero-chunk original gets no marker');
+ assert.equal(backend.docs.get('users/owner/recoveryProtections/'+originalRoot.previousGeneration)?.v,1,'the intact original stays protected');
 });
 
 test('RISK cloud source recovery #2284: Apply confirms a saved board when the read of the new cloud copy stalls past an ordinary wait',async t=>{
@@ -2955,8 +2977,9 @@ test('RISK cloud source recovery #2278: a failed Apply names why it could not sa
    arrange:app=>{app.ctx.window.ScannerDeviceStore.setPendingUploadIfCurrent=async()=>({ok:false,error:true});}},
   // #2278 review: the remaining named reasons, so no message is a catch-all.
   {kind:'source unavailable',code:'recovery-source-unavailable',status:'failed',phase:'protection',message:/The cloud could not protect the original sources, so nothing was saved\./,
-   // The current generation's header is gone when protection reads it.
-   arrange:app=>{app.faults.transactionRead=async(path,docs)=>{if(path===app.active)docs.delete(path);};}},
+   // An original's header is gone when protection reads it; the intact one,
+   // since the generation with no chunks left is not protected at all (#2287).
+   arrange:app=>{app.faults.transactionRead=async(path,docs)=>{if(path===app.previous)docs.delete(path);};}},
   {kind:'update required',code:'recovery-storage-update-required',status:'failed',phase:'pending-upload',message:/This app needs an update before it can save this recovery, so nothing was saved\. The active board and prepared choice remain protected; reload the app, then read sources again before retrying\./,
    arrange:app=>{app.ctx.window.ScannerDeviceStore.setPendingUploadIfCurrent=undefined;}},
   {kind:'pending changed',code:'pending-upload-changed',status:'failed',phase:'pending-upload',message:/The unfinished upload changed after the sources were read, so nothing was saved\. The active board and prepared choice remain protected; read sources again and make a fresh choice\./,
@@ -37581,7 +37604,9 @@ test('RISK resilient sync recovery: verified empty and explicit ACK transitions 
    backend.docs.delete('users/owner');await ctx.cloudPull();await ctx.sendPush();await syncSettle(40);
    assert.ok((await backend.CS.pull()).payload,'a positively empty account can receive the current board under ordinary seeding rules');
   }else{
-   const path='users/owner/generations/'+originalRoot.activeGeneration;backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});await ctx.cloudPull();
+   // #2287: a surviving chunk keeps this generation in protection, so the changed
+   // header is refused there and the deliberate choice below is what repairs it.
+   const path='users/owner/generations/'+originalRoot.activeGeneration;backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});backend.docs.set(path+'/chunks/00000000',{index:0,byteLength:1,hash:'0'.repeat(64),text:'x'});await ctx.cloudPull();
    assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
    assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);const selectedRevision=backend.docs.get('users/owner').rev;
    const input=shim.document.getElementById('addInput');input.id='addInput';input.value='Ordinary work after explicit recovery';shim.document.dispatchEvent({type:'input',target:input});
@@ -39242,7 +39267,10 @@ test('RISK shared protection absent-root authority: retained orphan sources lock
 
 test('RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order',async t=>{
  for(const order of ['old-first','current-first','changed-after-preview'])await t.test(order,async sub=>{
-  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  // #2287: partly readable from the first read: an archive that saw zero chunks has
+  // nothing to protect, so only a surviving chunk keeps this generation in protection,
+  // its changed header is refused there and the deliberate choice below decides.
+  const app=await damagedAcknowledgedApp187(sub,{sourcePadding:600000,keepFirstChunk:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
   app.faults.push=Object.assign(Error('offline rebuild'),{code:'unavailable'});await ctx.cloudPull();await settleRecoveryOperations188(ctx);delete app.faults.push;
   const before=await store.listOpaqueArchives(),originals=before.filter(row=>row.key.startsWith('cloud-generation-recovery:'));
   assert.ok(originals.length);const sourcePath='users/owner/generations/'+originalRoot.activeGeneration;

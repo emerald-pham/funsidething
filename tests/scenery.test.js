@@ -414,7 +414,8 @@ test('RISK cloud generation recovery: a readable active generation of the captur
 test('RISK cloud generation recovery: declining the reconciled prior generation through Paste Restore returns the unreconciled board',{timeout:240000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs:CAPTURED_RESULT_BUDGET_MS}),{ctx,shim,backend,originalRoot,activePath,priorPath}=app,store=ctx.window.ScannerDeviceStore;
  const before=JSON.stringify(ctx.state),beforeTitles=ctx.state.tasks.map(task=>task.title);
- const protectedSources=[...backend.docs].filter(([key])=>key===activePath||key===priorPath||key.startsWith(priorPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
+ // #2287: the zero-chunk generation has nothing to protect and is retired once the root moves past it.
+ const protectedSources=[...backend.docs].filter(([key])=>key===priorPath||key.startsWith(priorPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
  ctx.closeModal();await flush();
  // The automatic default publishes through the guarded revision path. Under
  // load its first read budget can end after the local commit; the pending hold
@@ -443,7 +444,7 @@ test('RISK cloud generation recovery: declining the reconciled prior generation 
  assert.equal((await store.readHead()).payload,JSON.stringify(ctx.state),'the restored board is the exact durable head');
  const restored=await backend.CS.pull();
  assert.equal(JSON.parse(restored.payload).tasks.some(task=>task.title==='Saved only in the intact prior generation'),false,'the older generation is not what the cloud keeps after declining');
- for(const [key,raw] of protectedSources)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'the damaged and prior generations remain protected: '+key);
+ for(const [key,raw] of protectedSources)assert.equal(JSON.stringify(backend.docs.get(key)),raw,'the intact prior generation remains protected: '+key);
 });
 
 // #2194 review F2: declining before publication. While the automatic recovery
@@ -1090,6 +1091,8 @@ test('RISK recovery wait: a deliberate run whose over-budget record cannot be sa
 });
 test('RISK recovery wait: after a deliberate run confirmed with an earlier cloud copy still incomplete, returning to the app does not check it again until Retry sync',{timeout:300000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,activePath}=app;
+ // #2287: one chunk survives, so the unreadable generation stays an earlier source; one with zero chunks has nothing to recover.
+ app.backend.docs.set(app.activePath+'/chunks/00000000',{index:0,byteLength:1,hash:'0'.repeat(64),text:'x'});
  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=RECOVERY_WAIT_BUDGET_2228;ctx.window.CLOUD_RETRY_DELAY_MS=0;
  // The harness's timers do not hold the process open while retries wait.
  const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
@@ -1129,7 +1132,8 @@ test('RISK recovery wait: a deliberate run that ends on its deadline without ado
  const reads=[];let slow=true;
  app.faults.serverRead=async path=>{reads.push(path);if(slow&&path===priorPath+'/chunks')await new Promise(resolve=>setTimeout(resolve,HOLD_MS));};
  t.after(()=>{delete app.faults.serverRead;});
- ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=1500;
+ // #2287: the automatic budget is 28 of these, so this one read limit puts its deadline inside the held download.
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=50;
  const before=JSON.stringify(ctx.state),head=await store.readHead(),cloudBefore=JSON.stringify([...backend.docs]),writes=backend.writes.length;
  await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
  // The abandoned download finishes before the app is returned to.
@@ -1180,7 +1184,8 @@ test('RISK recovery wait: a deliberate run that ends on its deadline while Setti
  app.faults.serverRead=async path=>{reads.push(path);
   if(slow&&path===priorPath+'/chunks'){if(!opened){opened=true;ctx.openSettings();}await new Promise(resolve=>setTimeout(resolve,HOLD_MS));}};
  t.after(()=>{delete app.faults.serverRead;});
- ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=1500;
+ // #2287: the automatic budget is 28 of these, so this one read limit puts its deadline inside the held download.
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=50;
  const before=JSON.stringify(ctx.state);
  await ctx.onAction('sync-retry',{});await recoveryWaitIdleAfter2228(ctx,'Retry sync settles');
  await fixtureDeadline(async wait=>{await wait(HOLD_MS+500);while(!recoveryWaitIdle2228(ctx))await wait(10);},'the abandoned download drains',CAPTURED_RESULT_BUDGET_MS+20000);
@@ -1292,7 +1297,10 @@ test('RISK recovery device capture: a deliberate run reads the device sources in
  assert.ok((traffic.calls['readRawExportSnapshot:run']||0)<=2,'the device sources are read in full at most twice until publication ends: '+JSON.stringify(traffic.calls));
 });
 test('RISK recovery background check: after Retry sync publishes with an earlier cloud generation still incomplete, each recheck reads only the header and chunks of that generation',{timeout:300000},async t=>{
- const app=await capturedGenerationAcceptedApp2198(t),{activePath}=app,{traffic,reads}=await deliberateRunWithPublication2239(t,app);
+ const app=await capturedGenerationAcceptedApp2198(t),{activePath}=app;
+ // #2287: one chunk survives, so the unreadable generation stays an earlier source; one with zero chunks has nothing to recover.
+ app.backend.docs.set(app.activePath+'/chunks/00000000',{index:0,byteLength:1,hash:'0'.repeat(64),text:'x'});
+ const {traffic,reads}=await deliberateRunWithPublication2239(t,app);
  const after=reads.filter(read=>read.phase==='after').map(read=>read.path);
  t.diagnostic(JSON.stringify({after,calls:traffic.calls}));
  const status=vm.runInContext('JSON.stringify(automaticCloudSourceResumeStatus)',app.ctx);
@@ -1352,6 +1360,8 @@ test('RISK recovery summary: after publication lists the archives once, the chec
 // that text by the earlier version must keep reading the same way.
 test('RISK automatic recovery summary: a committed recovery’s summary keeps generation ids, headers and chunk indexes without chunk text, the check of earlier sources still finds incomplete generations from it, and a summary saved with chunk text still reads the same',{timeout:300000},async t=>{
  const app=await capturedGenerationAcceptedApp2198(t),{ctx,activePath}=app,store=ctx.window.ScannerDeviceStore;
+ // #2287: one chunk survives, so the unreadable generation stays an earlier source; one with zero chunks has nothing to recover.
+ app.backend.docs.set(app.activePath+'/chunks/00000000',{index:0,byteLength:1,hash:'0'.repeat(64),text:'x'});
  await deliberateRunWithPublication2239(t,app);
  const unreadableId=activePath.split('/').at(-1);
  const [summary]=await store.listOpaqueArchives({prefix:'automatic-recovery-summary:'});

@@ -153,7 +153,7 @@ function refuseNextRecoveryTransaction255(faults){
  Object.defineProperty(faults,'push',{configurable:true,get(){queueMicrotask(()=>{delete faults.push;});return refusal;}});
 }
 
-async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null,nativeDeviceConnection=false}={}){
+async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timerProvider=null,recoveryTimeoutMs=timeoutMs,artifacts=null,nativeDeviceConnection=false,keepFirstChunk=false}={}){
  const fixture=heldDecisionFixture188();
  if(sourcePadding)fixture.remote.futureIOSReportFixture={opaque:'q'.repeat(sourcePadding)};
  fixture.local=structuredClone(fixture.remote);
@@ -197,6 +197,9 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  const previousSource=[...backend.docs].filter(([key])=>key===previousPath||key.startsWith(previousPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
  assert.ok(previousSource.length>1,'the damaged root also names a complete previous source');
  for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+ // keepFirstChunk: a partly readable generation, whose bytes can still come back
+ // (#2287: one with zero chunks has nothing left, and is not an earlier source).
+ if(keepFirstChunk){assert.ok(activeChunks.length>=2,'fixture: a partly readable source needs more than one chunk');backend.docs.set(activePath+'/chunks/0',structuredClone(activeChunks[0]));}
  return {...app,faults,originalRoot,originalHeader,activeSource:{id:originalRoot.activeGeneration,header:originalHeader,chunks:activeChunks},acknowledgedTasks,previousSource};
 }
 
@@ -213,7 +216,8 @@ async function exactOrTrimmedArchives254(store,rows,unresolvedId,message){
  return archives;
 }
 async function automaticSourceLifecycle254(t,afterAcknowledged=null){
- const damaged=await damagedAcknowledgedApp187(t),{backend,originalRoot,activeSource,indexedDB,deviceDbName}=damaged;
+ // #2287: partly readable: a generation whose bytes can come back. One with zero chunks has nothing left to recover.
+ const damaged=await damagedAcknowledgedApp187(t,{sourcePadding:600000,keepFirstChunk:true}),{backend,originalRoot,activeSource,indexedDB,deviceDbName}=damaged;
  const targetPayload=await damaged.ctx.window.ChainStorageV2.decodeSnapshot(activeSource.header,activeSource.chunks);
  const targetTask=JSON.parse(targetPayload).tasks.find(row=>row.title==='Second acknowledged source');
  assert.ok(targetTask,'the independently complete newer source contains a distinct accepted task');
@@ -232,7 +236,7 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  const originalSourceKey=envelope.sourceArchiveKeys[0],originalSourceRow=beforeAckArchives.find(row=>row.key===originalSourceKey);
  assert.ok(originalSourceRow,'the automatic originals envelope names one exact cloud-source archive');
  const originalSourceRaw=originalSourceRow.raw,originalSource=JSON.parse(originalSourceRaw);
- assert.ok(originalSource.generations.some(row=>row.id===activeSource.id&&row.chunks.length===0),
+ assert.ok(originalSource.generations.some(row=>row.id===activeSource.id&&row.chunks.length===1),
   'the unavailable newer generation remains an exact unresolved reference in the durable source archive');
  cold.shim.document.getElementById('addInput').value='Accepted after the older fallback';
  await cold.ctx.onAction('add',{});assert.equal(await cold.ctx.persist(),true,'the accepted edit is durably saved on the fallback');
@@ -506,6 +510,8 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    const later=structuredClone(prior);later.tasks.push({...structuredClone(prior.tasks[0]),id:'native-later-254',title:'Later readable source task'});
    const laterEncoded=await loadStorageV2().encodeSnapshot(JSON.stringify(later)),{chunks:laterChunks,...laterHeader}=laterEncoded,currentHeader={...laterHeader,state:'published',baseRev:3};
    remote.set('users/owner/generations/held-current',currentHeader);publicationAllowed=true;
+   // #2287: one chunk survives, so this generation stays an earlier source; one with zero chunks has nothing to recover.
+   assert.ok(laterChunks.length>1,'fixture: a partly readable source needs more than one chunk');remote.set('users/owner/generations/held-current/chunks/'+laterChunks[0].index,laterChunks[0]);
    const output=process.env.CHAIN_RECOVERY_UI_OUTPUT?path.resolve(process.env.CHAIN_RECOVERY_UI_OUTPUT):null,captures=[];if(output)fs.mkdirSync(output,{recursive:true});
    const capture=async(stage,expected)=>{
     await page.locator('[data-act="settings"]').first().click();const status=page.locator('#automaticCloudSourceResumeStatus'),neighbor=page.locator('#modalRoot [data-act="scene-settings"]');
