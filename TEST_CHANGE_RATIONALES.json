@@ -21733,5 +21733,26 @@
       "command": "node --test --test-name-pattern='only a page the app was closed on uses up a try' tests/persistence-recovery.test.js (and the sibling zero-chunk tests), kept with the #2287 round 2 evidence",
       "failure": "clean failure 2 leaves the count where it was: [2,false] !== [1,false]; a page after a clean end raises nothing: [3,true] !== [2,true]; it is no earlier source to check: one unresolved row !== none; Second save after the rebuild: the archive is not read whole: 1 !== 0"
     }
+  },
+  {
+    "baseCommit": "3d787463d53f041e577ea37766417340cad6f2ad",
+    "weakenedTestLines": [
+      "tests/repository-process.test.js:-for(const name of ['CLAUDE.md','RELEASE_GATES.md']){"
+    ],
+    "reason": "#2297 (spec #2291): the detailed visual-testing paragraph moves from the always-loaded CLAUDE.md to docs/agents/rendered-evidence.md, leaving one pointer that triggers on changed controls or layout. The existing test pinned that paragraph in CLAUDE.md, the old location, so its CLAUDE.md pins move with the text. No requirement changes.",
+    "previousBehavior": "The visual-testing test looped over CLAUDE.md and RELEASE_GATES.md and required the visual-test requirements and the theme-capture rule in both files.",
+    "intendedBehavior": "RELEASE_GATES.md keeps every pin in the existing test. The new test requires the visual-test requirements in docs/agents/rendered-evidence.md, a pointer from CLAUDE.md for changed controls or layout, and the theme-capture rule, which stays in CLAUDE.md.",
+    "preservedCoverage": [
+      "Every assertion on RELEASE_GATES.md is unchanged in the existing test.",
+      "The same visual-test patterns now run against docs/agents/rendered-evidence.md, the requirement text being moved word for word.",
+      "The theme-capture patterns still run against CLAUDE.md, and CLAUDE.md must still route changed controls or layout to the requirements."
+    ],
+    "replacementTests": [
+      "RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='visual test' tests/repository-process.test.js, run after the test edit and before the guidance move",
+      "failure": "AssertionError: review guidance must require executed visual tests, not screenshot presence alone; expected /Actual visual tests are mandatory/ in docs/agents/rendered-evidence.md, which did not yet hold the paragraph (1 pass, 1 fail)"
+    }
   }
 ]

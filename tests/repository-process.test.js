@@ -1884,11 +1884,18 @@ test('RISK repository process: deployment fetches deleted squash PR head and rej
 });
 
 test('RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states',()=>{
- for(const name of ['CLAUDE.md','RELEASE_GATES.md']){
+ for(const name of ['RELEASE_GATES.md']){
   const guide=fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' ');assert.match(guide,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
   assert.match(guide,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(guide,/theme labels alone.*not.*coverage/i);
   assert.match(guide,/changed control.*established neighboring control/i);assert.match(guide,/top, middle and end.*scroll/i);assert.match(guide,/day and night.*enlarged/i);assert.match(guide,/screenshots in isolation.*not.*pass/i);
  }
+});
+test('RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout',()=>{
+ const read=name=>fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' '),requirements=read('docs/agents/rendered-evidence.md'),policy=read('CLAUDE.md');
+ assert.match(requirements,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
+ assert.match(requirements,/changed control.*established neighboring control/i);assert.match(requirements,/top, middle and end.*scroll/i);assert.match(requirements,/day and night.*enlarged/i);assert.match(requirements,/screenshots in isolation.*not.*pass/i);
+ assert.match(policy,/changed controls or layout.*rendered-evidence\.md/i,'the always-loaded instructions must still route changed controls or layout to the requirements');
+ assert.match(policy,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(policy,/theme labels alone.*not.*coverage/i);
 });
 test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{
  const os=await import('node:os'),fixture=fs.mkdtempSync(path.join(os.tmpdir(),'chain-preflight-outgoing-'));
