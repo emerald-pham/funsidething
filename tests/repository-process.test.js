@@ -648,6 +648,46 @@ test('RISK repository process: release prepare needs only the reports the derive
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: release prepare takes specialist domains from the plan and source digests from the exact commit',()=>{
+ const candidateText='export const cloudValue = 2;\n';
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':candidateText}});
+ try{
+  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
+  const specialist=header('2026-11-01T12:05:26.000Z');
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  const inputPath=path.join(reports,'receipt-input.json');
+  const absent=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(absent.status,0,'the plan requires a specialist, so its report cannot be absent');
+  assert.match(absent.stderr,/specialist-review\.md/);
+  assert.equal(fs.existsSync(inputPath),false);
+
+  writeReleaseReports(fixture,{'specialist-review.md':specialist});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  const unassessed={affected:null,rationale:'',tests:[]};
+  assert.deepEqual(input.specialistReview,{task:'specialist-review:2296',outcome:'approved',reviewedSha:fixture.candidateSha,
+   completedAt:'2026-11-01T12:05:26.000Z',summary:'',domains:['memory-cloud-sync'],
+   scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+   memoryScope:{memory:unassessed,cloud:unassessed,sync:unassessed},
+   sources:[{path:path.join(fs.realpathSync(fixture.repo),'scripts/cloud-sync.mjs'),sha256:sha256Of(candidateText)}],
+   evidencePath:path.join(reports,'specialist-review.md'),evidenceSha256:sha256Of(specialist)});
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A cloud tooling change fits the derived code and specialist reviews.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  input.specialistReview.summary='The specialist read the full diff and found no cloud or sync defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const unjudged=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unjudged.status,0,'memory, cloud and sync impact stay a judgement made by a person');
+  assert.match(unjudged.stderr,/memoryScope/);
+  const assessed=area=>({affected:false,rationale:`This candidate does not change ${area} behaviour.`,tests:['RISK focused preservation test']});
+  input.specialistReview.memoryScope={memory:assessed('memory'),cloud:assessed('cloud'),sync:assessed('sync')};
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);

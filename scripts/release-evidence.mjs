@@ -916,6 +916,20 @@ function readReviewReport(reportDirectory, file, commitSha) {
   return { completedAt, evidencePath, evidenceSha256: sha256(bytes) };
 }
 
+function committedFileBytes(repoRoot, commitSha, file) {
+  const result = spawnSync('git', ['-C', repoRoot, 'cat-file', 'blob', commitSha + ':' + file], { maxBuffer: 64 * 1024 * 1024 });
+  return result.status === 0 ? result.stdout : null;
+}
+
+// Digests come from the exact commit, so they cannot describe a different tree.
+// A file the candidate deleted has no bytes to fingerprint.
+function candidateSources(repoRoot, commitSha, changedFiles) {
+  return changedFiles.flatMap(file => {
+    const bytes = committedFileBytes(repoRoot, commitSha, file);
+    return bytes === null ? [] : [{ path: path.join(repoRoot, file), sha256: sha256(bytes) }];
+  });
+}
+
 // Writes receipt input from a directory of reports. Fields a person must author
 // are left empty because record refuses an empty summary or rationale; any
 // placeholder text long enough to pass would become permanent in the receipt.
@@ -927,7 +941,8 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
     const { completedAt, ...evidence } = readReviewReport(reportDirectory, file, commitSha);
     return { task: task + ':' + issue, outcome: 'approved', reviewedSha: commitSha, completedAt, summary: '', evidence };
   };
-  const withScope = ({ evidence, ...fields }, scope) => ({ ...fields, scope, ...evidence });
+  const withScope = ({ evidence, ...fields }, scope, details = {}) => ({ ...fields, scope, ...details, ...evidence });
+  const unassessed = () => ({ affected: null, rationale: '', tests: [] });
   const input = {
     schemaVersion: 2,
     candidate: { commitSha, treeSha, baseSha },
@@ -935,6 +950,17 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
     ...(plan.requiresCodeReview ? {
       independentReview: withScope(review('independent-review', 'independent-review.md'),
         { fullDiff: true, relevantTests: true, userVisibleAndDataSafety: true }),
+    } : {}),
+    ...(plan.requiresSpecialistReview ? {
+      specialistReview: withScope(review('specialist-review', 'specialist-review.md'),
+        { fullDiff: true, relevantTests: true, userVisibleAndDataSafety: true },
+        {
+          domains: plan.specialistDomains,
+          ...(plan.specialistDomains.includes('memory-cloud-sync') ? {
+            memoryScope: { memory: unassessed(), cloud: unassessed(), sync: unassessed() },
+            sources: candidateSources(root, commitSha, plan.changedFiles),
+          } : {}),
+        }),
     } : {}),
   };
   const inputPath = path.resolve(reportDirectory, 'receipt-input.json');
