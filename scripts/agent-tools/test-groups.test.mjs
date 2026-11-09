@@ -845,6 +845,9 @@ test('test group refuses a pending nightly root that names no owning PR', async 
     const description=invoke(fixture,{args:['--describe']});
     assert.notEqual(description.status,0,'a pending row without an owning PR must not validate');
     assert.match(description.stderr,/fixture pending cross-engine root.*owning PR/);
+  });
+});
+
 test('test group nightly job log names why a cross-engine case failed', t => {
   const fixture = nightlyFixture(t, { body: '()=>{throw new Error("webkit pageerror")}' });
   const result = invoke(fixture, { group: 'nightly-cross-engine' });
