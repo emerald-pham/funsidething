@@ -31,8 +31,36 @@ version 2 and the risk plan derived from the exact diff.
 
 ## Prepare and record evidence
 
-Create the final candidate commit first. Record its full 40-character commit
-SHA, tree SHA, and intended base SHA. Every schema version 2 input includes an
+Create the final candidate commit first. Print the plan before reviews start:
+`npm run release:plan -- <candidate-sha> <base-sha>`.
+
+Put each required report outside the checkout in one directory, named
+`owner-review.md`, `independent-review.md` and `specialist-review.md`. Each
+report begins with exactly this header; a `Verdict: approved` also attests that
+the review covered the full diff, relevant tests and user-visible and data
+safety:
+
+```text
+Commit: <full candidate SHA>
+Verdict: approved
+Completed: <UTC ISO timestamp with milliseconds>
+```
+
+With the exact candidate checked out, run
+`npm run release:prepare -- <candidate-sha> <base-sha> <report-directory> <issue-number>`.
+It writes `receipt-input.json` beside the reports, with digests, the plan's
+domains, each report's time, and source digests of the changed files in that
+exact commit. It refuses a report naming another commit, without an approved
+verdict, or with a missing or future time, a changed file that differs on disk,
+and an existing `receipt-input.json`. Task identities are `owner:<issue>`,
+`independent-review:<issue>` and `specialist-review:<issue>`. A person then
+fills the fields left empty: every `summary`, the owner `scope.rationale`,
+`faqCoverage` and `memoryScope`. `release:record` refuses them while empty. An
+`additionalSpecialistDomains` escalation is still added by hand, with the
+matching `specialistReview` domains.
+
+The input fields below are what preparation writes. Record the candidate's full
+40-character commit SHA, tree SHA, and intended base SHA. Every schema version 2 input includes an
 owner exact-diff review with a specific risk rationale. It includes an
 `independentReview` only when `reviewPlan.requiresCodeReview` is true and a
 `specialistReview` only when `reviewPlan.requiresSpecialistReview` is true. Add

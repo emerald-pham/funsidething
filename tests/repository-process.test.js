@@ -726,6 +726,21 @@ test('RISK repository process: release prepare leaves FAQ coverage for a person 
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: release prepare keeps summaries a person already wrote',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
+  const inputPath=path.join(reports,'receipt-input.json');
+  const authored='{"note":"summaries a person already wrote"}\n';
+  fs.writeFileSync(inputPath,authored);
+  const again=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(again.status,0,'preparing again must not silently discard authored text');
+  assert.match(again.stderr,/receipt-input\.json/);
+  assert.equal(fs.readFileSync(inputPath,'utf8'),authored);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);

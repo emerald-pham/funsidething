@@ -971,7 +971,12 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
     } : {}),
   };
   const inputPath = path.resolve(reportDirectory, 'receipt-input.json');
-  fs.writeFileSync(inputPath, JSON.stringify(input, null, 2) + '\n');
+  try {
+    fs.writeFileSync(inputPath, JSON.stringify(input, null, 2) + '\n', { flag: 'wx' });
+  } catch (error) {
+    if (error.code === 'EEXIST') throw new Error(inputPath + ' already exists and may hold authored summaries; move it aside to prepare again.');
+    throw error;
+  }
   return inputPath;
 }
 
