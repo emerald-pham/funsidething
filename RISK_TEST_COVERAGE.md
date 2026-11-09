@@ -1588,6 +1588,9 @@ its RISK test; the map follows.
 - RISK contained board adoption #2287: a debounced save with nothing left to write cannot stop the automatic recovery default or Apply after its device commit
 - RISK contained board adoption #2287: a device read that answers after the server-only repair published brings the page to synced with its work in the cloud, without reopening
 - RISK contained board adoption #2287: an edit whose only save is the debounced one is still saved when a held publication starts first, and then reaches the cloud
+- RISK contained board adoption #2287: when device reads stay slow one opening makes one repair check and one pull, at production limits
+- RISK contained board adoption #2287: a debounced save with work left stays armed when the automatic recovery default commit is refused, and saves the edit
+- RISK contained board adoption #2287: a late device answer starts no pull on a hidden page, and the next visible pull finishes the work
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
 - RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused

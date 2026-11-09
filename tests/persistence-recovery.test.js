@@ -7640,6 +7640,67 @@ test('RISK contained board adoption #2287: an edit whose only save is the deboun
  assert.ok(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.title===title),'the edit is in the cloud');
 });
 
+// #2287 release review: the follow-up to a late device answer is for a pull that
+// stopped at the repair. When the same pull carried on, a device whose reads stay
+// slow started a new pull from every answer, each with its own slow read and repair.
+// These are the production limits: a read limit of one second against a two-second read.
+test('RISK contained board adoption #2287: when device reads stay slow one opening makes one repair check and one pull, at production limits',{timeout:60000},async t=>{
+ const app=await damagedAcknowledgedApp187(t),{ctx,shim,backend,activeSource}=app,store=ctx.window.ScannerDeviceStore;
+ for(const chunk of activeSource.chunks)backend.docs.set('users/owner/generations/'+activeSource.id+'/chunks/'+String(chunk.index).padStart(8,'0'),structuredClone(chunk));
+ assert.equal(typeof (await backend.CS.pull()).payload,'string','positive control: the root is readable');
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const counts={pulls:0,repairs:0},read=store.getPendingUpload,repair=backend.CS.repairCloudSources,pull=ctx.cloudPull;
+ store.getPendingUpload=async(...args)=>{await new Promise(resolve=>setTimeout(resolve,2000));return read.apply(store,args);};
+ backend.CS.repairCloudSources=(...args)=>{counts.repairs++;return repair(...args);};
+ ctx.cloudPull=(...args)=>{counts.pulls++;return pull(...args);};
+ t.after(()=>{store.getPendingUpload=read;backend.CS.repairCloudSources=repair;ctx.cloudPull=pull;});
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ // Long enough for two further slow answers, each of which used to start a pull.
+ await new Promise(resolve=>setTimeout(resolve,4600));
+ assert.deepEqual(counts,{pulls:1,repairs:1},'one pull and one repair check');
+ assert.notEqual(shim.document.getElementById('syncBtn').textContent,'☁ syncing','the page does not sit on syncing');
+});
+
+// #2287 release review: regression pins for the two guards no other test reaches.
+// An edit that still has work to save keeps its timer even when the commit it sat
+// beside is refused, and a late answer starts nothing on a page that is no longer current.
+test('RISK contained board adoption #2287: a debounced save with work left stays armed when the automatic recovery default commit is refused, and saves the edit',{timeout:120000},async t=>{
+ const app=await containedAdoptionApp2254(t),{ctx,backend,acknowledgedPath}=app,store=ctx.window.ScannerDeviceStore,title='Edit saved only by its debounce';
+ await rewriteGenerationFixture(backend,acknowledgedPath,ctx.window.ChainStorageV2,board=>{board.futureEarlierFixture={opaque:'not this device’s copy'};return JSON.stringify(board);});
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=64*1048576;ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const jobs=[],schedule=ctx.setTimeout,cancel=ctx.clearTimeout,write=store.writeRecoveredSource;let reached=false;
+ ctx.setTimeout=(fn,delay,...args)=>{if(delay!==350)return schedule(fn,delay,...args);const token={debouncedSave2287:true};jobs.push({token,fn,args,cancelled:false,fired:false});return token;};
+ ctx.clearTimeout=token=>{const job=jobs.find(row=>row.token===token);if(job)job.cancelled=true;else cancel(token);};
+ t.after(()=>{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;store.writeRecoveredSource=write;});
+ ctx.state.tasks.push(syncTask('timer-only-edit-refused-2287',title));ctx.commit();await flush();
+ assert.equal((await store.readHead()).payload.includes(title),false,'positive control: the edit is not on the device yet');
+ store.writeRecoveredSource=async()=>{reached=true;return {conflict:true};};
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{await wait(20);while(vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx))await wait(10);},'the recovery stops',60000);
+ assert.equal(reached,true,'positive control: the recovery reached its commit');
+ assert.equal(jobs.filter(job=>!job.cancelled).length,1,'the save with work left is still armed');
+ for(const job of jobs)if(!job.cancelled&&!job.fired){job.fired=true;await job.fn(...job.args);}
+ assert.equal((await store.readHead()).payload.includes(title),true,'the edit is saved on the device');
+});
+test('RISK contained board adoption #2287: a late device answer starts no pull on a hidden page, and the next visible pull finishes the work',async t=>{
+ const app=await containedAdoptionApp2254(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ await newerEditBeforeAdoption2254(app);await adoptionSettle2254(ctx,'the edit is saved');
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=400; // the availability check's limit is a quarter of this
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const read=store.getPendingUpload,pull=ctx.cloudPull;let answer,slow=true,pulls=0;const answering=new Promise(resolve=>{answer=resolve;});
+ store.getPendingUpload=async(...args)=>{if(slow){slow=false;await answering;}return read.apply(store,args);};
+ ctx.cloudPull=(...args)=>{pulls++;return pull(...args);};
+ t.after(()=>{answer();store.getPendingUpload=read;ctx.cloudPull=pull;shim.document.hidden=false;});
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{while(!/^repair-/.test(backend.docs.get('users/owner').activeGeneration))await wait(5);},'the server-only repair publishes first',30000);
+ assert.equal(pulls,1,'positive control: one pull so far');
+ shim.document.hidden=true;answer();await new Promise(resolve=>setTimeout(resolve,150));
+ assert.equal(pulls,1,'a hidden page starts no pull from the late answer');
+ shim.document.hidden=false;await ctx.cloudPull();await adoptionSettle2254(ctx,'the visible pull settles');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the next visible pull finishes the work');
+});
+
 // #2254 review (S2): an unreadable generation lets the board's next frame and
 // any input queued behind it go first (#2226). Adoption reads the device's
 // pending upload and the cloud's generation headers, so it starts after that
