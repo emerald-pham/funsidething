@@ -522,6 +522,225 @@ test('RISK repository process: CSS comment removal cannot join selector tokens u
  }finally{cleanupReleaseGateFixture(cssTokenJoin);}
 });
 
+// Release preparation (#2296) runs the real command with its working directory
+// in a fixture repository and git's repository-locating variables removed, so
+// neither the commands nor the fixture can reach this checkout.
+function releaseCommand(fixture,...args){
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const name of Object.keys(env))if(name.startsWith('GIT_'))delete env[name];
+ return spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),...args],{cwd:fixture.repo,encoding:'utf8',timeout:30000,env});
+}
+
+test('RISK repository process: release plan prints the review plan the validator derives for a commit',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const fixture=makeScaledReviewFixture({candidate:{'src/cloud-sync.mjs':'export const value = 2;\n'}});
+ try{
+  const printed=releaseCommand(fixture,'plan',fixture.candidateSha,fixture.baseSha);
+  assert.equal(printed.status,0,printed.stdout+printed.stderr);
+  const plan=JSON.parse(printed.stdout);
+  assert.deepEqual(plan,{schemaVersion:2,changedFiles:['src/cloud-sync.mjs'],mode:'dual-review',
+   requiresCodeReview:true,requiresFaqReview:false,requiresOwnerFaqCoverage:true,requiresSpecialistReview:true,
+   requiresTypographyReview:false,specialistDomains:['memory-cloud-sync']});
+  assert.deepEqual(plan,deriveReleaseReviewPlan(fixture.repo,fixture.candidateSha,fixture.baseSha));
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+const releaseReportHeader=(commit,verdict,completed)=>`Commit: ${commit}\nVerdict: ${verdict}\nCompleted: ${completed}\n\n`;
+function writeReleaseReports(fixture,reports){
+ const directory=path.join(fixture.root,'reports');
+ fs.mkdirSync(directory,{recursive:true});
+ for(const [name,text] of Object.entries(reports))fs.writeFileSync(path.join(directory,name),text);
+ return directory;
+}
+const sha256Of=text=>createHash('sha256').update(text).digest('hex');
+
+test('RISK repository process: release prepare writes receipt input that record accepts once a person adds the summaries',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independent});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input,{
+   schemaVersion:2,
+   candidate:{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha},
+   ownerReview:{task:'owner:2296',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:'2026-11-01T12:00:33.000Z',
+    summary:'',scope:{fullDiff:true,rationale:''},
+    evidencePath:path.join(reports,'owner-review.md'),evidenceSha256:sha256Of(owner)},
+   independentReview:{task:'independent-review:2296',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:'2026-11-01T11:53:58.000Z',
+    summary:'',scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+    evidencePath:path.join(reports,'independent-review.md'),evidenceSha256:sha256Of(independent)},
+  });
+  const unauthored=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unauthored.status,0,'an input nobody has summarized must not become a receipt');
+  assert.match(unauthored.stderr,/summary/i);
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='An ordinary tooling change fits the derived independent review.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+  const verified=releaseCommand(fixture,'verify',fixture.candidateSha);
+  assert.equal(verified.status,0,verified.stdout+verified.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+// Prepares an ordinary tooling candidate whose owner report is fine and whose
+// independent report is the one under test.
+function prepareWithIndependentReport(independentReport){
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+ const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independentReport(fixture)});
+ const result=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+ const inputWritten=fs.existsSync(path.join(reports,'receipt-input.json'));
+ cleanupReleaseGateFixture(fixture);
+ return {result,inputWritten};
+}
+
+test('RISK repository process: release prepare refuses a report naming another commit',()=>{
+ const {result,inputWritten}=prepareWithIndependentReport(fixture=>
+  releaseReportHeader(fixture.baseSha,'approved','2026-11-01T11:53:58.000Z')+'A review of the previous commit.\n');
+ assert.notEqual(result.status,0,'a review of another commit cannot approve this candidate');
+ assert.match(result.stderr,/independent-review\.md.*names commit/i);
+ assert.equal(inputWritten,false);
+});
+
+test('RISK repository process: release prepare refuses a report with no approved verdict',()=>{
+ const missing=prepareWithIndependentReport(fixture=>`Commit: ${fixture.candidateSha}\nCompleted: 2026-11-01T11:53:58.000Z\n\nNo verdict line.\n`);
+ assert.notEqual(missing.result.status,0,'a report without a verdict cannot approve this candidate');
+ assert.match(missing.result.stderr,/independent-review\.md.*Verdict/);
+ assert.equal(missing.inputWritten,false);
+ const blocked=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'changes-requested','2026-11-01T11:53:58.000Z'));
+ assert.notEqual(blocked.result.status,0,'a report that asks for changes cannot approve this candidate');
+ assert.match(blocked.result.stderr,/independent-review\.md.*changes-requested/);
+ assert.equal(blocked.inputWritten,false);
+});
+
+test('RISK repository process: release prepare refuses a report with a missing or future completion time',()=>{
+ const missing=prepareWithIndependentReport(fixture=>`Commit: ${fixture.candidateSha}\nVerdict: approved\n\nNo completion time.\n`);
+ assert.notEqual(missing.result.status,0,'a report without a completion time cannot supply the receipt time');
+ assert.match(missing.result.stderr,/independent-review\.md.*Completed/);
+ assert.equal(missing.inputWritten,false);
+ const future=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved',new Date(Date.now()+3600000).toISOString()));
+ assert.notEqual(future.result.status,0,'a future completion time cannot enter an immutable receipt');
+ assert.match(future.result.stderr,/independent-review\.md.*future/);
+ assert.equal(future.inputWritten,false);
+});
+
+test('RISK repository process: release prepare needs only the reports the derived plan requires',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(Object.keys(input),['schemaVersion','candidate','ownerReview']);
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A documentation-only diff needs only the owner review.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare takes specialist domains from the plan and source digests from the exact commit',()=>{
+ const candidateText='export const cloudValue = 2;\n';
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':candidateText}});
+ try{
+  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
+  const specialist=header('2026-11-01T12:05:26.000Z');
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  const inputPath=path.join(reports,'receipt-input.json');
+  const absent=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(absent.status,0,'the plan requires a specialist, so its report cannot be absent');
+  assert.match(absent.stderr,/specialist-review\.md/);
+  assert.equal(fs.existsSync(inputPath),false);
+
+  writeReleaseReports(fixture,{'specialist-review.md':specialist});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  const unassessed={affected:null,rationale:'',tests:[]};
+  assert.deepEqual(input.specialistReview,{task:'specialist-review:2296',outcome:'approved',reviewedSha:fixture.candidateSha,
+   completedAt:'2026-11-01T12:05:26.000Z',summary:'',domains:['memory-cloud-sync'],
+   scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+   memoryScope:{memory:unassessed,cloud:unassessed,sync:unassessed},
+   sources:[{path:path.join(fs.realpathSync(fixture.repo),'scripts/cloud-sync.mjs'),sha256:sha256Of(candidateText)}],
+   evidencePath:path.join(reports,'specialist-review.md'),evidenceSha256:sha256Of(specialist)});
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A cloud tooling change fits the derived code and specialist reviews.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  input.specialistReview.summary='The specialist read the full diff and found no cloud or sync defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const unjudged=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unjudged.status,0,'memory, cloud and sync impact stay a judgement made by a person');
+  assert.match(unjudged.stderr,/memoryScope/);
+  const assessed=area=>({affected:false,rationale:`This candidate does not change ${area} behaviour.`,tests:['RISK focused preservation test']});
+  input.specialistReview.memoryScope={memory:assessed('memory'),cloud:assessed('cloud'),sync:assessed('sync')};
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare refuses a source file that differs from the exact commit',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  fs.writeFileSync(path.join(fixture.repo,'scripts/cloud-sync.mjs'),'export const cloudValue = 3;\n');
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(prepared.status,0,'a digest of the commit cannot be paired with different bytes on disk');
+  assert.match(prepared.stderr,/scripts\/cloud-sync\.mjs/);
+  assert.equal(fs.existsSync(path.join(reports,'receipt-input.json')),false);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'src/feature.mjs':'export const value = 2;\n'}});
+ try{
+  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input.ownerReview.faqCoverage,{result:'',summary:''});
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='An ordinary product change fits the derived independent review.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const unauthored=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unauthored.status,0,'FAQ coverage stays a result a person records');
+  assert.match(unauthored.stderr,/FAQ coverage/);
+  input.ownerReview.faqCoverage=SCALED_FAQ_COVERAGE;
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare keeps summaries a person already wrote',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
+  const inputPath=path.join(reports,'receipt-input.json');
+  const authored='{"note":"summaries a person already wrote"}\n';
+  fs.writeFileSync(inputPath,authored);
+  const again=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(again.status,0,'preparing again must not silently discard authored text');
+  assert.match(again.stderr,/receipt-input\.json/);
+  assert.equal(fs.readFileSync(inputPath,'utf8'),authored);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);
@@ -1884,11 +2103,18 @@ test('RISK repository process: deployment fetches deleted squash PR head and rej
 });
 
 test('RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states',()=>{
- for(const name of ['CLAUDE.md','RELEASE_GATES.md']){
+ for(const name of ['RELEASE_GATES.md']){
   const guide=fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' ');assert.match(guide,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
   assert.match(guide,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(guide,/theme labels alone.*not.*coverage/i);
   assert.match(guide,/changed control.*established neighboring control/i);assert.match(guide,/top, middle and end.*scroll/i);assert.match(guide,/day and night.*enlarged/i);assert.match(guide,/screenshots in isolation.*not.*pass/i);
  }
+});
+test('RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout',()=>{
+ const read=name=>fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' '),requirements=read('docs/agents/rendered-evidence.md'),policy=read('CLAUDE.md');
+ assert.match(requirements,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
+ assert.match(requirements,/changed control.*established neighboring control/i);assert.match(requirements,/top, middle and end.*scroll/i);assert.match(requirements,/day and night.*enlarged/i);assert.match(requirements,/screenshots in isolation.*not.*pass/i);
+ assert.match(policy,/changed controls or layout.*rendered-evidence\.md/i,'the always-loaded instructions must still route changed controls or layout to the requirements');
+ assert.match(policy,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(policy,/theme labels alone.*not.*coverage/i);
 });
 test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{
  const os=await import('node:os'),fixture=fs.mkdtempSync(path.join(os.tmpdir(),'chain-preflight-outgoing-'));

@@ -1657,6 +1657,16 @@ its RISK test; the map follows.
 - RISK repository process: persisting generic sessions requires both affected specialists
 - RISK repository process: TypeScript tooling directives cannot use comment-only exemption
 - RISK repository process: CSS comment removal cannot join selector tokens under owner-only review
+- RISK repository process: release plan prints the review plan the validator derives for a commit
+- RISK repository process: release prepare writes receipt input that record accepts once a person adds the summaries
+- RISK repository process: release prepare refuses a report naming another commit
+- RISK repository process: release prepare refuses a report with no approved verdict
+- RISK repository process: release prepare refuses a report with a missing or future completion time
+- RISK repository process: release prepare needs only the reports the derived plan requires
+- RISK repository process: release prepare takes specialist domains from the plan and source digests from the exact commit
+- RISK repository process: release prepare refuses a source file that differs from the exact commit
+- RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change
+- RISK repository process: release prepare keeps summaries a person already wrote
 - RISK repository process: release recording classifies the tail of a complete large diff
 - RISK repository process: risk-based receipts require the derived exact-final reviewer roles
 - RISK repository process: caller-declared specialist domains can only raise the derived plan
@@ -1717,6 +1727,7 @@ its RISK test; the map follows.
 - RISK repository process: the repository AGENTS.md wording switches on the scaled review policy
 - RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
+- RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout
 - RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes
 - RISK repository process: large immutable installed assets retain exact bytes and reject a changed checkout
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
