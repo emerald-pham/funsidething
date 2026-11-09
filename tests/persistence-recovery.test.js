@@ -7388,6 +7388,117 @@ test('RISK contained board adoption #2287: a staged upload left by a held automa
  });
 });
 
+// #2287 release review (round 4): the same rule when the older copy could not be
+// read as the recovery opened: its row says unavailable, not complete, and a
+// decline must hold whether the choice still stands or a save elsewhere ended it.
+test('RISK contained board adoption #2287: a declined recovery whose older copy was unavailable when it opened publishes nothing once reads work, with the choice standing or after a save from another device ends it',{timeout:240000},async t=>{
+ for(const variant of ['the choice standing','a save from another device ended it'])await t.test(variant,async sub=>{
+  const app=await containedAdoptionApp2254(sub),{ctx,shim,backend,faults,acknowledgedPath}=app,codec=ctx.window.ChainStorageV2,store=ctx.window.ScannerDeviceStore,revision=ctx.state.syncRev;
+  await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.tasks.push(syncTask('only-in-older-copy','Only in the older copy'));return JSON.stringify(board);});
+  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=64*1048576;ctx.window.CLOUD_RETRY_DELAY_MS=10;ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+  const alive=setInterval(()=>{},20);sub.after(()=>clearInterval(alive));
+  const settled=message=>fixtureDeadline(async wait=>{await wait(50);let quiet=0;while(quiet<8){quiet=adoptionIdle2254(ctx)?quiet+1:0;await wait(25);}},message,60000);
+  const pushes=[],push=backend.CS.push;backend.CS.push=async(payload,updatedAt,baseRev,context)=>{pushes.push(baseRev);return push(payload,updatedAt,baseRev,context);};sub.after(()=>{backend.CS.push=push;});
+  // The older copy's chunks cannot be read while the recovery opens and tries to publish.
+  faults.serverRead=async path=>{if(path===acknowledgedPath+'/chunks')throw Object.assign(Error('unavailable'),{code:'unavailable'});};
+  ctx.closeModal();await flush();await ctx.cloudPull();await settled('the first attempt settles');
+  assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'positive control: a recovery is open and held');
+  ctx.openSettings();assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'the person declines');await settled('the decline settles');
+  delete faults.serverRead;
+  const standing=variant==='the choice standing';
+  if(!standing){
+   // The check must not run before the choice ends, or the standing case decides this one.
+   vm.runInContext('automaticCloudSourceResumeRequested=false',ctx);
+   const elsewhere=JSON.parse(ctx.state.decisionBase.payload);elsewhere.tasks.push(syncTask('saved-elsewhere','Saved on another device'));
+   await publishElsewhere2254(backend,codec,JSON.stringify(elsewhere));
+  }
+  const before=pushes.length,revisionBefore=backend.docs.get('users/owner').rev;
+  ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});await settled('the return settles');await new Promise(resolve=>setTimeout(resolve,600));await settled('what follows settles');
+  assert.equal(pushes.length-before,0,'nothing is published by itself');
+  assert.equal(backend.docs.get('users/owner').rev,revisionBefore,'the cloud stays where it was');
+  assert.equal(ctx.state.tasks.some(task=>task.id==='only-in-older-copy'),false,'the older copy is not on this board');
+  if(standing)assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: the unreadable revision is still current');
+  else{assert.equal(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.id==='only-in-older-copy'),false,'the older copy is not in the cloud');
+   assert.ok(ctx.state.tasks.some(task=>task.id==='saved-elsewhere'),'positive control: the healthy save reached this board');}
+ });
+});
+
+// #2287 release review (round 4): an explicit decline is never overridden. A note
+// from the previous release can name a zero-chunk generation since retired beside
+// a complete older copy; the retired row said the check had nothing to reconcile
+// from it, so the older copy alone started a capture and was published.
+test('RISK contained board adoption #2287: a note from the previous release naming a retired generation beside a complete older copy starts no capture and publishes nothing',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t,{zeroChunks:true}),{ctx,shim,backend,store,unreadableId,activePath}=app,codec=ctx.window.ChainStorageV2;
+ ctx.localStorage.removeItem('fvp:chain-scanner:automatic-recovery-over-budget');ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1073741824;ctx.window.CLOUD_RETRY_DELAY_MS=0;
+ const decoy=collectorDecoy2287(backend),header=backend.docs.get(activePath);
+ await ordinaryAcknowledgedSave2254(app,'Saved after the recovery');await collectorRan2287(backend,decoy);
+ assert.equal(backend.docs.has(activePath),false,'positive control: the zero-chunk generation is retired');
+ const older=JSON.parse(ctx.state.decisionBase.payload);older.tasks.push(syncTask('only-in-older-note','Only in an older copy a note names'));
+ const olderId='generation-older-note-2287',olderPath='users/owner/generations/'+olderId,encoded=await codec.encodeSnapshot(JSON.stringify(older));
+ backend.docs.set(olderPath,{schemaVersion:2,state:'published',encoding:encoded.encoding,chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash:encoded.hash,baseRev:1,createdAt:{toMillis:()=>1234}});
+ for(const chunk of encoded.chunks)backend.docs.set(olderPath+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+ backend.docs.set('users/owner/recoveryProtections/'+olderId,{v:1,rootRevision:1,createdAt:{toMillis:()=>1234}});
+ const raw=JSON.stringify({format:'chain-scanner.automatic-recovery-note',version:1,identity:'owner',account:ctx.state.syncAccount,revision:backend.docs.get('users/owner').rev,
+  unresolved:[{kind:'cloud-generation',id:unreadableId,reason:'generation-incomplete',header},{kind:'cloud-generation',id:olderId,reason:'generation-awaiting-ack',header:backend.docs.get(olderPath)}],permanent:[]});
+ const key='automatic-recovery-note:'+encodeURIComponent('owner')+':'+await codec.hashPayload(raw);
+ assert.equal(await store.protectRecoverySource({expectedHash:(await store.readHead()).hash,key,raw}),true,'fixture: the device holds the note as the previous release wrote it');
+ assert.deepEqual((await earlierSources2254(ctx)).unresolved,[[unreadableId,'generation-incomplete'],[olderId,'generation-awaiting-ack']],'positive control: the note names both');
+ vm.runInContext('globalThis.__sources2287=0;globalThis.__sourcesOriginal2287=cloudSourceRecoverySources;cloudSourceRecoverySources=(...args)=>{__sources2287++;return __sourcesOriginal2287(...args);}',ctx);
+ const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};t.after(()=>{backend.CS.push=push;});
+ const revisionBefore=backend.docs.get('users/owner').rev;
+ ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});await new Promise(resolve=>setTimeout(resolve,300));await trimSettle2254(ctx,'the return settles');
+ assert.equal(vm.runInContext('__sources2287',ctx),0,'no capture starts');
+ assert.deepEqual(pushes,[],'nothing is published');
+ assert.equal(backend.docs.get('users/owner').rev,revisionBefore,'the cloud stays where it was');
+ assert.equal(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.id==='only-in-older-note'),false,'the older copy is not in the cloud');
+ assert.equal(syncStatus2200(shim).text,'☁ synced','the board stays synced');
+});
+
+// #2287 release review (round 4): the two branches of the resume-or-replace change
+// no other test reaches. Each would strand the device if it went wrong.
+test('RISK contained board adoption #2287: a staged upload that never landed is cleared when another save already holds this board, and resumed or replaced over a readable root at its own base revision',{timeout:240000},async t=>{
+ const countPushes=(sub,backend)=>{const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};sub.after(()=>{backend.CS.push=push;});return pushes;};
+ await t.test('another save already holds exactly this board',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,shim,backend,store,settled}=app,codec=ctx.window.ChainStorageV2;
+  await stagedThenCut2287(app);
+  const staged=await store.getPendingUpload('owner'),payload=ctx.cloudPayload();
+  await publishElsewhere2254(backend,codec,payload);
+  const root=backend.docs.get('users/owner');
+  assert.notEqual(root.activeGeneration,staged.generationId,'positive control: another save holds the bytes, not the staged upload');
+  assert.equal(createHash('sha256').update(payload,'utf8').digest('hex'),staged.payloadHash,'positive control: the staged upload is this same board');
+  const pushes=countPushes(sub,backend);
+  await ctx.cloudPull();await settled('the next attempt settles');
+  assert.deepEqual(pushes,[],'nothing needs publishing');
+  assert.equal(backend.docs.get('users/owner').rev,root.rev,'the cloud stays at that save');
+  assert.equal(await store.getPendingUpload('owner'),null,'the record of the staged upload is cleared');
+  assert.equal(await store.getRecoveryCloudHold(),null,'the hold is released');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','synced');
+ });
+ await t.test('the root at the upload’s base revision became readable',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,shim,backend,store,settled,revision}=app,codec=ctx.window.ChainStorageV2;
+  await stagedThenCut2287(app);
+  const staged=await store.getPendingUpload('owner'),expected=app.expected(),root=backend.docs.get('users/owner');
+  assert.equal(staged.baseRev,root.rev,'positive control: the upload is based on the current root');
+  // The current root's generation is readable after all, at that same revision.
+  const healed=JSON.parse(ctx.state.decisionBase.payload);healed.tasks.push(syncTask('only-in-healed-base','Only in the healed base'));
+  const encoded=await codec.encodeSnapshot(JSON.stringify(healed)),path='users/owner/generations/'+root.activeGeneration;
+  backend.docs.set(path,{...backend.docs.get(path),encoding:encoded.encoding,chunkCount:encoded.chunkCount,byteLength:encoded.byteLength,hash:encoded.hash,baseRev:root.rev-1});
+  for(const key of [...backend.docs.keys()])if(key.startsWith(path+'/chunks/'))backend.docs.delete(key);
+  for(const chunk of encoded.chunks)backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
+  assert.equal(typeof (await backend.CS.pull()).payload,'string','positive control: the root reads now');
+  const pushes=countPushes(sub,backend);
+  await ctx.cloudPull();await settled('the next attempt settles');
+  assert.deepEqual(pushes,[root.rev],'it publishes over that revision');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'the next revision');
+  const board=JSON.parse((await backend.CS.pull()).payload);
+  assert.ok(board.tasks.some(task=>task.id==='only-in-healed-base'),'what the readable root held is kept');
+  assert.deepEqual(expected.tasks.filter(id=>!board.tasks.some(task=>task.id===id)),[],'and every task of this board');
+  assert.equal(await store.getPendingUpload('owner'),null,'nothing is left pending');
+  assert.equal(await store.getRecoveryCloudHold(),null,'the hold is released');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','synced');
+ });
+});
+
 // #2254 review (S2): an unreadable generation lets the board's next frame and
 // any input queued behind it go first (#2226). Adoption reads the device's
 // pending upload and the cloud's generation headers, so it starts after that

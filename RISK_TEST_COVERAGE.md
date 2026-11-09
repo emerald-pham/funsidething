@@ -1580,6 +1580,9 @@ its RISK test; the map follows.
 - RISK contained board adoption #2287: after an app switch a held automatic recovery reaches the next revision on the same page, from returning to the app, Retry sync or an edit, also when every read stalls
 - RISK contained board adoption #2287: a held automatic recovery interrupted after its upload staged reaches the next revision with every task and History entry, after a closed page, an app switch, a closed dialog or Retry sync
 - RISK contained board adoption #2287: a staged upload left by a held automatic recovery never overwrites another device’s save and never publishes after a decline
+- RISK contained board adoption #2287: a declined recovery whose older copy was unavailable when it opened publishes nothing once reads work, with the choice standing or after a save from another device ends it
+- RISK contained board adoption #2287: a note from the previous release naming a retired generation beside a complete older copy starts no capture and publishes nothing
+- RISK contained board adoption #2287: a staged upload that never landed is cleared when another save already holds this board, and resumed or replaced over a readable root at its own base revision
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
 - RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused
