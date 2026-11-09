@@ -1727,6 +1727,7 @@ its RISK test; the map follows.
 - RISK repository process: the repository AGENTS.md wording switches on the scaled review policy
 - RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
+- RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout
 - RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes
 - RISK repository process: large immutable installed assets retain exact bytes and reject a changed checkout
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
