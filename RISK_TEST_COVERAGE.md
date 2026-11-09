@@ -1729,6 +1729,7 @@ its RISK test; the map follows.
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
+- RISK repository process: Nightly on this head reports zero cross-engine cases and names both roots pending on the WebKit work
 
 ## tests/scenery.test.js
 

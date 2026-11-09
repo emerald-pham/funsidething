@@ -2018,3 +2018,26 @@ test('RISK repository process: nested native fixture output stays isolated at th
  assert.match(result.stdout||'',/^# Nested output negative control:.*ENOENT: no such file or directory, open .*candidate-identity\.json/m,
   'The unisolated inherited-output child must actually fail before the isolated child proves success');
 });
+
+// #2293: both Nightly cross-engine roots name tests that exist only on the #285
+// work, so the job used to stop at its preflight on every candidate and its red
+// result said nothing about that candidate. Until #285 lands the job must say
+// plainly that it ran nothing and name what it is waiting for. When #285 lands,
+// its roots move to active and this pin goes with them.
+test('RISK repository process: Nightly on this head reports zero cross-engine cases and names both roots pending on the WebKit work',()=>{
+ const pending=['RISK repository process: native button gate detects errors raised by a real click','RISK repository process: required native button actions execute in Chromium and WebKit'];
+ const parent=fs.mkdtempSync(path.join(os.tmpdir(),'chain-nightly-pending-')),output=path.join(parent,'run');
+ try{
+  const head=spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
+  const result=spawnSync(process.execPath,['scripts/test-groups.mjs','--group','nightly-cross-engine','--output-dir',output,'--repository','local/nightly','--event-policy','local','--run-id','1','--run-attempt','1','--source-sha',head,'--comparison-base',head],{cwd:__dirname,encoding:'utf8',timeout:60000});
+  assert.equal(result.status,0,'a dispatched candidate with only pending roots must succeed: '+result.stdout+result.stderr);
+  assert.match(result.stdout,/^::notice [^\n]*\b0 cross-engine cases ran\b/m,'the job must annotate that no cross-engine case ran');
+  const notice=result.stdout.split('\n').find(line=>line.startsWith('::notice'));
+  for(const root of pending)assert.ok(notice.includes(root),'the annotation must name the pending root: '+root);
+  const evidence=JSON.parse(fs.readFileSync(path.join(output,'result.json'),'utf8'));
+  assert.notEqual(evidence.status,'passed','zero cases must never be recorded as a pass');
+  assert.deepEqual(evidence.cases,[]);
+  assert.equal(evidence.crossEngine.casesRun,0);
+  assert.deepEqual(evidence.crossEngine.pendingRoots.map(entry=>[entry.root,entry.pendingOn]).sort(),pending.map(root=>[root,'#285']));
+ }finally{fs.rmSync(parent,{recursive:true,force:true});}
+});

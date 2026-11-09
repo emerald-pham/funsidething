@@ -867,7 +867,10 @@ test('workflow runs the weekly velocity report nightly with only the permissions
   const report = /node scripts\/agent-tools\/ci-monitor\.mjs velocity-report\b/;
   const scheduled = workflowJobsRunning(workflowContext('schedule', 'refs/heads/main'), report);
   assert.equal(scheduled.length, 1, 'a scheduled run on main must produce the velocity report exactly once');
-  assert.equal(workflowJobsRunning(workflowContext('workflow_dispatch', 'refs/heads/main'), report).length, 1, 'the maintainer can run the report on demand');
+  // #2293: a repository-wide count says nothing about a dispatched candidate, so
+  // the report stays a scheduled alarm and a dispatch cannot fail on it or comment on its issue.
+  for (const ref of ['refs/heads/main', 'refs/heads/release-candidate'])
+    assert.deepEqual(workflowJobsRunning(workflowContext('workflow_dispatch', ref), report), [], `a dispatched run on ${ref} must skip the velocity report`);
   for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
     assert.deepEqual(workflowJobsRunning(context, report), [], `${context.github.event_name} runs must not file velocity alerts`);
   const { text } = scheduled[0];

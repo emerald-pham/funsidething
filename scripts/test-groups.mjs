@@ -392,6 +392,7 @@ function validateNightlyRoots(assignments, fileSet, assignmentsByRoot) {
     if (assignmentsByRoot.has(entry.root) || assignments.processControls.some(control => control.id === entry.root)) {
       fail(`Nightly root ${JSON.stringify(entry.root)} is also a required case; move it out of the required cohort instead of declaring it twice.`);
     }
+    if (Object.hasOwn(entry, 'pendingOn') && !/^#[1-9]\d*$/.test(entry.pendingOn)) fail(`Pending nightly root ${JSON.stringify(entry.root)} must name its owning PR as #<number>.`);
     if (nightlyRoots.has(entry.root)) fail(`Nightly root ${JSON.stringify(entry.root)} is declared more than once.`);
     nightlyRoots.set(entry.root, entry);
   }
@@ -851,16 +852,33 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
 }
 
 // The nightly job exists so engine regressions stay visible before a Stable
-// release. An empty, missing, skipped or failed nightly case therefore fails
-// the run instead of passing quietly.
+// release. An empty list, a missing active root, or a skipped or failed nightly
+// case therefore fails the run instead of passing quietly. A pending root names
+// a test that has not landed (#2293): it runs nothing until its PR lands, and it
+// fails here as soon as its test appears so that landed test cannot go unrun.
 function nightlySelection(assignmentIndex) {
   const entries = [...assignmentIndex.nightlyRoots.values()];
   if (!entries.length) fail('No nightly cross-engine roots are declared in scripts/test-group-assignments.json.');
-  for (const entry of entries) {
-    const count = countTestRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+  const pending = entries.filter(entry => entry.pendingOn), active = entries.filter(entry => !entry.pendingOn);
+  const registrations = entry => countTestRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+  for (const entry of pending) {
+    if (registrations(entry)) fail(`Pending nightly cross-engine root ${JSON.stringify(entry.root)} (${entry.pendingOn}) has landed in ${entry.file}; remove its pendingOn to move it to active so it runs.`);
+  }
+  for (const entry of active) {
+    const count = registrations(entry);
     if (count !== 1) fail(`Nightly cross-engine root ${JSON.stringify(entry.root)} is registered ${count} times in ${entry.file}; expected exactly one.`);
   }
-  return { files: [...new Set(entries.map(entry => entry.file))].sort(), roots: entries.map(entry => entry.root).sort() };
+  return { files: [...new Set(active.map(entry => entry.file))].sort(), roots: active.map(entry => entry.root).sort(), pending };
+}
+
+// A zero must read as a zero (#2293): the result and the run's annotation both
+// state how many cases ran and which roots still wait on their owning PR.
+function crossEngineReport(nightly, casesRun) {
+  return { casesRun, activeRoots: nightly.roots, pendingRoots: nightly.pending.map(({ root, file, pendingOn }) => ({ root, file, pendingOn })) };
+}
+function crossEngineNotice({ casesRun, pendingRoots }) {
+  const pending = pendingRoots.length ? ` Pending, not run: ${pendingRoots.map(entry => `${JSON.stringify(entry.root)} (${entry.pendingOn})`).join('; ')}.` : '';
+  return `::notice title=Nightly cross-engine coverage::${casesRun} cross-engine case${casesRun === 1 ? '' : 's'} ran on this head.${casesRun ? '' : ' This run is no cross-engine evidence.'}${pending}\n`;
 }
 
 function verifyNightlyResults(cases, roots) {
@@ -1239,6 +1257,14 @@ async function main() {
     }
 
     const nightly = options.group === NIGHTLY_GROUP_ID ? nightlySelection(assignmentIndex) : null;
+    if (nightly && !nightly.roots.length) {
+      result.status = 'no_active_roots';
+      result.crossEngine = crossEngineReport(nightly, 0);
+      result.finishedAt = new Date().toISOString();
+      atomicWrite(path.join(outputDir, 'result.json'), result);
+      process.stdout.write(crossEngineNotice(result.crossEngine));
+      return 0;
+    }
     const selectedFiles = nightly ? nightly.files : [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
     ])].sort();
@@ -1298,6 +1324,10 @@ async function main() {
     if (childResult.exit.code !== 0) result.issues.unshift(`Test process exited with ${childResult.exit.code ?? childResult.exit.signal ?? childResult.exit.error}.`);
     if (gitStatus.trim() && !source.dirty) result.issues.push('Checkout dirty state could not be reconciled with its identity.');
     result.status = result.issues.length ? 'failed' : 'passed';
+    if (nightly) {
+      result.crossEngine = crossEngineReport(nightly, childResult.cases.length);
+      process.stdout.write(crossEngineNotice(result.crossEngine));
+    }
   } catch (error) {
     result.issues.push(error.message);
     result.status = 'preflight_failed';

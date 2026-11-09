@@ -150,10 +150,18 @@ npm run test:group -- --group nightly-cross-engine --output-dir <new-empty-dir> 
   --source-sha <sha> --comparison-base <sha>
 ```
 
-The run fails when no nightly root is declared, when a declared root is not
-registered exactly once in its file (resolves to zero tests), or when any
-nightly case fails, is skipped or is missing. `--describe` does not check
-nightly roots, so required CI stays green while only the nightly run is red. It writes `result.json` and TAP like a group run, but it is not
+A row whose test has not landed declares its owning PR as `pendingOn: "#<number>"`
+and is pending; every other row is active. The run executes the active roots.
+With none it succeeds without starting a test process, records status
+`no_active_roots`, and annotates that 0 cross-engine cases ran, naming the
+pending roots. Every run's `result.json` carries `crossEngine` with the case
+count and the active and pending roots.
+
+The run fails when no nightly root is declared at all, when an active root is
+not registered exactly once in its file (resolves to zero tests), when a pending
+root's test is registered (remove its `pendingOn` to move it to active), or when
+any nightly case fails, is skipped or is missing. `--describe` does not check
+whether nightly roots are registered, so required CI stays green while only the nightly run is red. It writes `result.json` and TAP like a group run, but it is not
 a required group and cannot be described, covered or aggregated. When and how
 releases depend on it is in
 [release and review](release-and-review.md#nightly-cross-engine-native-checks).
