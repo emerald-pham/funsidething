@@ -11,6 +11,15 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
 const FAILURE_REASON_MAX_CHARS = 200;
+// A loaded run (#2294) reproduces a slow machine. It is never canonical evidence,
+// so a clean one writes this status rather than 'passed': every consumer of
+// group evidence accepts only 'passed' and so refuses it without a special case.
+const LOADED_PASS_STATUS = 'passed-under-load';
+const MAX_CPU_LOAD_WORKERS = 64;
+// One spin per event-loop turn: the loop must still run so stdin closing, which
+// happens however the runner dies, ends the worker with no second signal path.
+const BUSY_WORKER_SOURCE = `process.stdin.on('end',()=>process.exit(0)).on('close',()=>process.exit(0)).on('error',()=>process.exit(0)).resume();
+const spin=()=>{const until=Date.now()+50;while(Date.now()<until);setImmediate(spin);};spin();`;
 const MIN_GROUP_HEAP_MB = 512;
 const MAX_GROUP_HEAP_MB = 12288;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -51,6 +60,7 @@ function parseArgs(argv) {
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
     ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
+    ['--cpu-load', 'cpuLoad'],
   ]);
   for (let index = 0; index < argv.length; index++) {
     if (['--describe','--aggregate','--covered','--changed-groups'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
@@ -70,6 +80,14 @@ function parseArgs(argv) {
     comparisonBase: process.env.CHAIN_TEST_COMPARISON_BASE,
   };
   for (const [key, value] of Object.entries(defaults)) if (values[key] === undefined) values[key] = value;
+  if (values.cpuLoad !== undefined) {
+    // Evidence modes produce or read canonical results, which a load run is not.
+    const mode = ['describe', 'aggregate', 'covered', 'changed-groups'].find(name => values[name]);
+    if (mode) fail(`--cpu-load cannot be used with --${mode}: a loaded run is never canonical evidence.`);
+    const workers = Number(values.cpuLoad);
+    if (!/^[1-9]\d*$/.test(values.cpuLoad) || workers > MAX_CPU_LOAD_WORKERS) fail(`--cpu-load must be a whole number of busy processes from 1 to ${MAX_CPU_LOAD_WORKERS}.`);
+    values.cpuLoad = workers;
+  }
   return values;
 }
 
@@ -1009,6 +1027,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       const root = path.resolve(options.resultsDir,id);
       if (fs.lstatSync(root).isSymbolicLink()) fail('Group evidence must be a real directory.');
       const record = readJson(path.join(root,'result.json'),`required result for ${id}`);
+      if (record.cpuLoad !== undefined) fail(`Required group ${id} is a loaded run (${record.cpuLoad?.workers} busy processes); a loaded run is never canonical evidence.`);
       const inputCovered=!covered&&reused.includes(id)&&record.status==='covered';
       if (record.status !== (covered||inputCovered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
       const identity = record.resultIdentity;
@@ -1139,6 +1158,15 @@ async function unclassifiedRootGuard(files, assignments, outputDir) {
   return report;
 }
 
+function startCpuLoad(count) {
+  const workers = Array.from({ length: count }, () => spawn(process.execPath, ['-e', BUSY_WORKER_SOURCE], { stdio: ['pipe', 'ignore', 'ignore'] }));
+  // A pending worker pipe must not hold the runner open if its write side fails.
+  for (const worker of workers) worker.stdin.on('error', () => {});
+  const closed = workers.map(worker => new Promise(resolve => { worker.once('error', resolve); worker.once('close', resolve); }));
+  const stop = async () => { for (const worker of workers) worker.kill('SIGKILL'); await Promise.all(closed); };
+  return { pids: workers.map(worker => worker.pid), stop };
+}
+
 async function runChild(files, roots, outputDir, options, source, heapMb) {
   const runtimeTmp = path.join(outputDir, 'runtime-tmp');
   const nativeDir = path.join(outputDir, 'native');
@@ -1166,15 +1194,32 @@ async function runChild(files, roots, outputDir, options, source, heapMb) {
   };
   // The test runner passes this flag on to every per-file child process.
   const heapArguments = heapMb === undefined ? [] : [`--max-old-space-size=${heapMb}`];
-  const child = spawn(process.execPath, [...heapArguments, '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
-    cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  child.stdout.pipe(tap);
-  child.stderr.pipe(stderr);
-  const exit = await new Promise(resolve => {
-    child.once('error', error => resolve({ code: null, signal: null, error: error.message }));
-    child.once('close', (code, signal) => resolve({ code, signal, error: null }));
-  });
+  const load = options.cpuLoad ? startCpuLoad(options.cpuLoad) : null;
+  let exit, interrupted = null;
+  try {
+    if (load) {
+      if (load.pids.some(pid => !pid)) fail('--cpu-load could not start every busy process.');
+      env.CHAIN_TEST_CPU_LOAD_PIDS = load.pids.join(',');
+      process.stderr.write(`CPU load: ${options.cpuLoad} busy process${options.cpuLoad === 1 ? '' : 'es'} for this run (pids ${load.pids.join(', ')}). This result is not canonical evidence.\n`);
+    }
+    // A loaded run owns its test processes as a group, so an interrupt ends the
+    // whole run instead of leaving the test process working after the load is gone.
+    const child = spawn(process.execPath, [...heapArguments, '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
+      cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], ...(load ? { detached: true } : {}),
+    });
+    child.stdout.pipe(tap);
+    child.stderr.pipe(stderr);
+    const forward = signal => { interrupted = signal; try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; } };
+    const signals = load ? ['SIGINT', 'SIGTERM'] : [];
+    for (const signal of signals) process.on(signal, forward);
+    try {
+      exit = await new Promise(resolve => {
+        child.once('error', error => resolve({ code: null, signal: null, error: error.message }));
+        child.once('close', (code, signal) => resolve({ code, signal, error: null }));
+      });
+    } finally { for (const signal of signals) process.off(signal, forward); }
+    if (interrupted) exit = { ...exit, error: `Interrupted by ${interrupted}.` };
+  } finally { await load?.stop(); }
   await Promise.all([new Promise(resolve => tap.end(resolve)), new Promise(resolve => stderr.end(resolve))]);
   const tapText = fs.readFileSync(tapPath, 'utf8');
   const stderrText = fs.readFileSync(stderrPath, 'utf8');
@@ -1206,7 +1251,7 @@ function listChangedGroups(options) {
 
 async function main() {
   if (process.argv.slice(2).includes('--help')) {
-    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha>\n');
+    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha> [--cpu-load <busy-processes>]\n');
     return 0;
   }
   let outputDir;
@@ -1239,6 +1284,7 @@ async function main() {
     artifacts: [],
     process: null,
     issues: [],
+    ...(options.cpuLoad ? { cpuLoad: { workers: options.cpuLoad } } : {}),
   };
   let nativeDir;
   try {
@@ -1376,7 +1422,7 @@ async function main() {
         status: childResult.cases.find(item => item.id === normalizeTapIdentity(entry.root))?.status ?? 'missing' }));
     if (childResult.exit.code !== 0) result.issues.unshift(`Test process exited with ${childResult.exit.code ?? childResult.exit.signal ?? childResult.exit.error}.`);
     if (gitStatus.trim() && !source.dirty) result.issues.push('Checkout dirty state could not be reconciled with its identity.');
-    result.status = result.issues.length ? 'failed' : 'passed';
+    result.status = result.issues.length ? 'failed' : (options.cpuLoad ? LOADED_PASS_STATUS : 'passed');
     if (nightly) {
       result.crossEngine = crossEngineReport(nightly, childResult.cases.length);
       process.stdout.write(crossEngineNotice(result.crossEngine));
@@ -1390,11 +1436,13 @@ async function main() {
   }
   result.finishedAt = new Date().toISOString();
   atomicWrite(path.join(outputDir, 'result.json'), result);
-  if (result.status !== 'passed') {
+  if (result.status !== 'passed' && result.status !== LOADED_PASS_STATUS) {
     process.stderr.write(`${result.status}: ${result.issues.join('\n')}\n`);
     return 1;
   }
-  process.stdout.write(`${options.group}: ${result.cases.length} test cases passed; evidence: ${path.join(outputDir, 'result.json')}\n`);
+  process.stdout.write(result.status === LOADED_PASS_STATUS
+    ? `${options.group}: ${result.cases.length} test cases passed under ${options.cpuLoad} busy processes; not canonical evidence: ${path.join(outputDir, 'result.json')}\n`
+    : `${options.group}: ${result.cases.length} test cases passed; evidence: ${path.join(outputDir, 'result.json')}\n`);
   return 0;
 }
 

@@ -129,6 +129,23 @@ This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
 
+## Loaded runs
+
+Add `--cpu-load <busy-processes>` (1 to 64) to a group run to reproduce a slow
+machine locally. It is for timer, debounce and race work: a change that orders
+asynchronous steps, or a failure that appears only on slower hosts. Skip it
+elsewhere. Nothing requires it and CI never sets it.
+
+Check `status` in the [host coordination](host-coordination.md) ledger first and
+do not starve another owner's active work. The busy processes run only while the
+group's test process runs, and they end with the run on pass, failure, interrupt
+or the runner's death. A count near the host's core count (or above it) is the
+useful range.
+
+A loaded result records `cpuLoad.workers` and passes as `passed-under-load`, so
+the aggregate, the CI consumer and input-pass reuse all refuse it. It is never
+release or canonical evidence.
+
 ## Which groups a diff needs
 
 ```sh

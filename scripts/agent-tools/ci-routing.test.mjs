@@ -885,3 +885,20 @@ test('workflow runs the weekly velocity report nightly with only the permissions
   const granted = Object.fromEntries(permissions.body.split('\n').filter(line => line.trim()).map(line => line.trim().split(/:\s*/)));
   assert.deepEqual(granted, { contents: 'read', actions: 'read', 'pull-requests': 'read', issues: 'write' }, 'issues: write is the only write the report needs');
 });
+
+test('RISK test inventory: workflow input reuse refuses a loaded run as an original pass', t => {
+  const f=fixture(t),plan=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,planOnly:true});
+  f.largeNativeEvidence=Buffer.from('{"status":"passed"}\n');
+  const github=publishedInputPass(f,plan.record,['native-process']);
+  const artifact=github.artifacts.find(a=>a.name.endsWith('-native-process')),directory=artifact.fixturePath.slice(0,-4);
+  const reportPath=path.join(directory,'result.json'),report=JSON.parse(readFileSync(reportPath));
+  report.status='passed-under-load';report.cpuLoad={workers:1};
+  const bytes=JSON.stringify(report);writeFileSync(reportPath,bytes);
+  const marker=github.jobs.find(j=>j.name==='regression-native-process').steps.find(s=>s.name.startsWith('Completed CI gate '));
+  marker.name=marker.name.replace(/result [a-f0-9]{64}$/,'result '+createHash('sha256').update(bytes).digest('hex'));
+  const zip=spawnSync('zip',['-qr',artifact.fixturePath,'.'],{cwd:directory,encoding:'utf8'});assert.equal(zip.status,0,zip.stderr);
+  artifact.digest='sha256:'+createHash('sha256').update(readFileSync(artifact.fixturePath)).digest('hex');
+  writeFileSync(f.external,JSON.stringify(github));
+  const main=invoke(f,{ref:'refs/heads/main',checkout:f.merge,source:f.merge});assert.equal(main.status,0,main.stderr);
+  assert.equal(main.record.inputPasses['native-process'],undefined,'a loaded original must require current execution');
+});

@@ -2,6 +2,7 @@ import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -1444,4 +1445,132 @@ test('test group runner refuses the retired single tests.js suite command', t =>
   const described = invoke(fixture, { args: ['--describe'] });
   assert.notEqual(described.status, 0, 'the single-file layout must not group: ' + described.stdout + described.stderr);
   assert.match(described.stderr, /full npm test entry point changed/);
+});
+
+// Loaded runs (#2294). The fixture's own test observes the busy processes from
+// inside the run; the runner's real command line is the seam under test.
+function loadObservingFixture(t) {
+  const fixture = createFixture(t);
+  const file = path.join(fixture.root, suiteFile);
+  const source = fs.readFileSync(file, 'utf8').replace("  await t.test('fixture accepted environment skip'", `  if (process.env.CHAIN_GROUP_FIXTURE_LOAD_SENTINEL) {
+    const { execFileSync } = await import('node:child_process');
+    const pids = (process.env.CHAIN_TEST_CPU_LOAD_PIDS || '').split(',').filter(Boolean);
+    const cpuSeconds = pid => { try { return execFileSync('ps', ['-o', 'time=', '-p', pid], { encoding: 'utf8' }).trim().split(':').reduce((sum, part) => sum * 60 + Number(part), 0); } catch { return -1; } };
+    const deadline = Date.now() + 8000; let burned = [];
+    while (Date.now() < deadline) { burned = pids.map(cpuSeconds); if (burned.length && burned.every(value => value >= 1)) break; await new Promise(resolve => setTimeout(resolve, 25)); }
+    fs.writeFileSync(process.env.CHAIN_GROUP_FIXTURE_LOAD_SENTINEL, JSON.stringify({ pids: pids.map(Number), burned, testPid: process.pid }));
+    if (process.env.CHAIN_GROUP_FIXTURE_HOLD === '1') await new Promise(resolve => setTimeout(resolve, 30000));
+    if (process.env.CHAIN_GROUP_FIXTURE_LOAD_FAIL === '1') assert.fail('intentional loaded failure');
+  }
+  await t.test('fixture accepted environment skip'`);
+  assert.notEqual(source, fs.readFileSync(file, 'utf8'), 'the load observer must be installed in the fixture test');
+  fs.writeFileSync(file, source);
+  const sentinel = path.join(os.tmpdir(), `chain-test-group-load-${process.pid}-${++outputSerial}.json`);
+  fixture.outputs.push(sentinel);
+  return { fixture, sentinel };
+}
+const processGone = pid => { try { process.kill(pid, 0); return false; } catch (error) { return error.code === 'ESRCH'; } };
+async function waitUntil(condition, message, ms = 10000) {
+  const deadline = Date.now() + ms;
+  while (!condition()) {
+    assert.ok(Date.now() < deadline, message);
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
+test('test group runner keeps the requested busy processes running and ends them after a pass and a failure', async parent => {
+  for (const scenario of ['pass', 'failure']) await parent.test(scenario, t => {
+    const { fixture, sentinel } = loadObservingFixture(t);
+    const result = invoke(fixture, { args: ['--cpu-load', '2'], env: { CHAIN_GROUP_FIXTURE_LOAD_SENTINEL: sentinel, ...(scenario === 'failure' ? { CHAIN_GROUP_FIXTURE_LOAD_FAIL: '1' } : {}) } });
+    assert.equal(result.status, scenario === 'pass' ? 0 : 1, result.stdout + result.stderr);
+    const observed = JSON.parse(fs.readFileSync(sentinel, 'utf8'));
+    assert.equal(observed.pids.length, 2, 'the run has exactly the requested busy processes');
+    assert.ok(observed.burned.every(seconds => seconds >= 1), `each busy process burns a full second of CPU during the run (an idle process does not): ${observed.burned}`);
+    for (const pid of observed.pids) assert.equal(processGone(pid), true, `busy process ${pid} ends with the run`);
+    assert.deepEqual(result.evidence.cpuLoad, { workers: 2 }, 'the result records how many busy processes ran');
+    assert.match(result.stderr, /CPU load: 2 busy processes/, 'the run says it is loaded');
+  });
+});
+
+test('test group runner ends its busy processes and test process when the run is interrupted or killed', async parent => {
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGKILL']) await parent.test(signal, async t => {
+    const { fixture, sentinel } = loadObservingFixture(t);
+    const outputDir = path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
+    fixture.outputs.push(outputDir);
+    const env = { ...process.env, CHAIN_GROUP_FIXTURE_LOAD_SENTINEL: sentinel, CHAIN_GROUP_FIXTURE_HOLD: '1' };
+    delete env.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, ['scripts/test-groups.mjs', '--group', 'core', '--output-dir', outputDir,
+      '--repository', 'example/fixture', '--event-policy', 'local', '--run-id', 'fixture-run-1', '--run-attempt', '1',
+      '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, '--cpu-load', '2'],
+    { cwd: fixture.root, env, stdio: 'ignore' });
+    const closed = new Promise(resolve => child.once('close', (code, childSignal) => resolve({ code, signal: childSignal })));
+    let observed;
+    t.after(() => {
+      if (!processGone(child.pid)) child.kill('SIGKILL');
+      for (const pid of observed ? [observed.testPid, ...observed.pids] : []) { if (!processGone(pid)) process.kill(pid, 'SIGKILL'); }
+    });
+    await waitUntil(() => fs.existsSync(sentinel), 'the loaded run must reach its held test');
+    observed = JSON.parse(fs.readFileSync(sentinel, 'utf8'));
+    assert.equal(observed.pids.length, 2, 'the requested busy processes are running before the interrupt');
+    child.kill(signal);
+    const exit = await closed;
+    assert.ok(exit.code !== 0 || exit.signal, 'an interrupted run never reports success');
+    await waitUntil(() => observed.pids.every(processGone), `busy processes must end after ${signal}`);
+    if (signal !== 'SIGKILL') {
+      await waitUntil(() => processGone(observed.testPid), `the test process must end after ${signal}`);
+      const evidence = readEvidence(outputDir);
+      assert.notEqual(evidence?.status, 'passed', 'an interrupted run is not recorded as passed');
+    }
+  });
+});
+
+test('test group runner refuses a CPU load count it cannot honour', async parent => {
+  for (const value of ['0', '-1', '1.5', 'many', '1000']) await parent.test(value, t => {
+    const fixture = createFixture(t);
+    const result = invoke(fixture, { args: ['--cpu-load', value] });
+    assert.notEqual(result.status, 0, 'an invalid load count must not run');
+    assert.match(result.stderr, /--cpu-load/, 'the refusal names the option');
+  });
+});
+
+test('RISK test inventory: a loaded group run records its load and every canonical evidence check refuses it', async parent => {
+  await parent.test('the passing loaded result is not a canonical pass', t => {
+    const result = invoke(createFixture(t), { args: ['--cpu-load', '1'] });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.deepEqual(result.evidence.cpuLoad, { workers: 1 });
+    assert.notEqual(result.evidence.status, 'passed', 'a loaded pass must never carry the canonical passed status');
+    assert.equal(result.evidence.resultIdentity.selectedGroup, 'core');
+  });
+  await parent.test('the aggregate refuses one loaded group among otherwise complete groups', t => {
+    const fixture = aggregateFixture(t);
+    const loaded = invoke(fixture, { group: 'scenery', args: ['--cpu-load', '1'] });
+    assert.equal(loaded.status, 0, loaded.stdout + loaded.stderr);
+    fixture.originals.set('scenery', loaded.outputDir);
+    const result = aggregateCopy(t, fixture);
+    assert.notEqual(result.status, 0, 'a loaded result cannot complete the required cohort');
+    const aggregate = path.join(result.outputDir, 'aggregate.json');
+    assert.match(result.stderr + (fs.existsSync(aggregate) ? fs.readFileSync(aggregate, 'utf8') : ''), /loaded run|busy process/i, 'the refusal names the load');
+  });
+  await parent.test('the CI consumer refuses a loaded execution', t => {
+    const fixture = createFixture(t);
+    const result = invoke(fixture, { consumer: true, args: ['--proof', path.join(fixture.root, 'absent-proof.json'), '--cpu-load', '1'] });
+    assert.notEqual(result.status, 0, 'the CI consumer must not run a loaded group');
+    assert.match(result.stderr, /--cpu-load/, 'the refusal names the option');
+    assert.equal(result.evidence, null, 'nothing is written as evidence');
+  });
+  for (const mode of ['--describe', '--aggregate', '--covered', '--changed-groups']) await parent.test(`${mode} takes no load`, t => {
+    const fixture = createFixture(t);
+    const result = invoke(fixture, { args: [mode, '--cpu-load', '1'] });
+    assert.notEqual(result.status, 0, `${mode} produces or reads evidence and cannot be loaded`);
+    assert.match(result.stderr, /--cpu-load/, 'the refusal names the option');
+  });
+});
+
+test('test group CPU load is never set by CI or required by any entry point', () => {
+  const workflows = path.join(repository, '.github/workflows');
+  for (const file of fs.readdirSync(workflows)) {
+    assert.doesNotMatch(fs.readFileSync(path.join(workflows, file), 'utf8'), /cpu-load/, `${file} must not set CPU load`);
+  }
+  const scripts = JSON.parse(fs.readFileSync(path.join(repository, 'package.json'), 'utf8')).scripts;
+  for (const [name, command] of Object.entries(scripts)) assert.doesNotMatch(command, /cpu-load/, `npm script ${name} must not require CPU load`);
 });
