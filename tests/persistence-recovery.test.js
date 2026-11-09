@@ -7499,6 +7499,31 @@ test('RISK contained board adoption #2287: a staged upload that never landed is 
  });
 });
 
+// #2287 CI: a save debounced before the held publication began can fire after the
+// publication committed its head. It then took the app's own commit for another
+// writer's, merged it into the board and the publication stopped with the cloud
+// confirmed and the hold kept. Slow machines reached this; the timer is owned here
+// so the order is exact: nothing is timing-dependent.
+test('RISK contained board adoption #2287: a save debounced before a held publication cannot stop that publication after it has committed its board',{timeout:240000},async t=>{
+ const app=await heldAutomaticRecovery2287(t),{ctx,shim,backend,store,revision,settled}=app;
+ await holdRefusedOnce2287(app);
+ const jobs=[],schedule=ctx.setTimeout,cancel=ctx.clearTimeout,commit=store.commitHeadIfCurrent;
+ ctx.setTimeout=(fn,delay,...args)=>{if(delay!==350)return schedule(fn,delay,...args);const token={debouncedSave2287:true};jobs.push({token,fn,args,cancelled:false,fired:false});return token;};
+ ctx.clearTimeout=token=>{const job=jobs.find(row=>row.token===token);if(job)job.cancelled=true;else cancel(token);};
+ t.after(()=>{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;store.commitHeadIfCurrent=commit;});
+ shim.document.getElementById('addInput').value='Edit whose save is still debounced';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ assert.equal(jobs.filter(job=>!job.cancelled).length,1,'positive control: the debounced save is still armed when the publication starts');
+ // The debounced save comes due the moment the publication's commit lands.
+ store.commitHeadIfCurrent=async(...args)=>{const result=await commit.apply(store,args);for(const job of jobs)if(!job.cancelled&&!job.fired){job.fired=true;await job.fn(...job.args);}return result;};
+ await ctx.sendPush();await settled('the publication settles');
+ assert.equal(backend.docs.get('users/owner').rev,revision+2,'the publication reached the cloud');
+ assert.equal(await store.getRecoveryCloudHold(),null,'the publication finished and released its hold');
+ assert.ok((await store.listOpaqueArchives()).some(row=>row.key.startsWith('automatic-recovery-ack:')),'and recorded its acknowledgement');
+ assert.equal(vm.runInContext('!!deviceRecoveryCloudHold',ctx),false,'the page agrees');
+ assert.equal(ctx.state.syncDirty,false,'the board is confirmed');
+ assert.equal(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.title==='Edit whose save is still debounced'),true,'the edit is in the cloud');
+});
+
 // #2254 review (S2): an unreadable generation lets the board's next frame and
 // any input queued behind it go first (#2226). Adoption reads the device's
 // pending upload and the cloud's generation headers, so it starts after that
