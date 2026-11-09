@@ -588,6 +588,26 @@ test('RISK repository process: release prepare writes receipt input that record 
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+// Prepares an ordinary tooling candidate whose owner report is fine and whose
+// independent report is the one under test.
+function prepareWithIndependentReport(independentReport){
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+ const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independentReport(fixture)});
+ const result=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+ const inputWritten=fs.existsSync(path.join(reports,'receipt-input.json'));
+ cleanupReleaseGateFixture(fixture);
+ return {result,inputWritten};
+}
+
+test('RISK repository process: release prepare refuses a report naming another commit',()=>{
+ const {result,inputWritten}=prepareWithIndependentReport(fixture=>
+  releaseReportHeader(fixture.baseSha,'approved','2026-11-01T11:53:58.000Z')+'A review of the previous commit.\n');
+ assert.notEqual(result.status,0,'a review of another commit cannot approve this candidate');
+ assert.match(result.stderr,/independent-review\.md.*names commit/i);
+ assert.equal(inputWritten,false);
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);

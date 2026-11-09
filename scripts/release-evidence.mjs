@@ -893,10 +893,22 @@ export function recordReleaseEvidence(repoRoot, input) {
   }
 }
 
-function readReviewReport(reportDirectory, file) {
+// Every report starts with the three header lines documented in
+// RELEASE_GATES.md: Commit, Verdict and Completed, in that order.
+function reportHeaderValue(line, field) {
+  const prefix = field + ': ';
+  return typeof line === 'string' && line.startsWith(prefix) ? line.slice(prefix.length).trim() : '';
+}
+
+function readReviewReport(reportDirectory, file, commitSha) {
   const evidencePath = path.resolve(reportDirectory, file);
   const bytes = fs.readFileSync(evidencePath);
-  const completedAt = bytes.toString('utf8').split('\n')[2].slice('Completed: '.length);
+  const [commitLine, , completedLine] = bytes.toString('utf8').split('\n');
+  const namedCommit = reportHeaderValue(commitLine, 'Commit');
+  if (namedCommit !== commitSha) {
+    throw new Error(file + ' names commit ' + (namedCommit || '(none)') + ', not the candidate ' + commitSha + '.');
+  }
+  const completedAt = reportHeaderValue(completedLine, 'Completed');
   return { completedAt, evidencePath, evidenceSha256: sha256(bytes) };
 }
 
@@ -908,7 +920,7 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
   deriveReleaseReviewPlan(root, commitSha, baseSha);
   const treeSha = candidateTree(root, commitSha);
   const review = (task, file) => {
-    const { completedAt, ...evidence } = readReviewReport(reportDirectory, file);
+    const { completedAt, ...evidence } = readReviewReport(reportDirectory, file, commitSha);
     return { task: task + ':' + issue, outcome: 'approved', reviewedSha: commitSha, completedAt, summary: '', evidence };
   };
   const withScope = ({ evidence, ...fields }, scope) => ({ ...fields, scope, ...evidence });
