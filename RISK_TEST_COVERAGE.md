@@ -1584,6 +1584,10 @@ its RISK test; the map follows.
 - RISK contained board adoption #2287: a note from the previous release naming a retired generation beside a complete older copy starts no capture and publishes nothing
 - RISK contained board adoption #2287: a staged upload that never landed is cleared when another save already holds this board, and resumed or replaced over a readable root at its own base revision
 - RISK contained board adoption #2287: a save debounced before a held publication cannot stop that publication after it has committed its board
+- RISK contained board adoption #2287: a device read that answers just past its limit does not let a server-only repair publish ahead of the board this device adopts
+- RISK contained board adoption #2287: a debounced save with nothing left to write cannot stop the automatic recovery default or Apply after its device commit
+- RISK contained board adoption #2287: a device read that answers after the server-only repair published brings the page to synced with its work in the cloud, without reopening
+- RISK contained board adoption #2287: an edit whose only save is the debounced one is still saved when a held publication starts first, and then reaches the cloud
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
 - RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused

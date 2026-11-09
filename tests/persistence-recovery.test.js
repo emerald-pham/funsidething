@@ -7524,6 +7524,122 @@ test('RISK contained board adoption #2287: a save debounced before a held public
  assert.equal(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.title==='Edit whose save is still debounced'),true,'the edit is in the cloud');
 });
 
+// #2287 CI: the check that device storage answers has a short limit, and a read
+// past it counted as storage being unavailable, so a server-only repair published
+// an older copy ahead of the board this device was about to adopt. A read that
+// answers has shown the device is there, whenever it answers. The moment it
+// answers is owned here so the order is exact. A read that never answers still
+// repairs from the server (RISK independent cloud stalled storage).
+test('RISK contained board adoption #2287: a device read that answers just past its limit does not let a server-only repair publish ahead of the board this device adopts',async t=>{
+ const app=await containedAdoptionApp2254(t),{ctx,backend,faults,revision=ctx.state.syncRev,unreadableId,pushes}=app,store=ctx.window.ScannerDeviceStore;
+ await newerEditBeforeAdoption2254(app);await adoptionSettle2254(ctx,'the edit is saved');
+ pushes.length=0;
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=400; // the availability check's limit is a quarter of this
+ // The harness's timers do not hold the process open while the limit runs.
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const read=store.getPendingUpload;let answer,slow=true,answered=false;const answering=new Promise(resolve=>{answer=resolve;});
+ store.getPendingUpload=async(...args)=>{if(slow){slow=false;await answering;answered=true;}return read.apply(store,args);};
+ t.after(()=>{store.getPendingUpload=read;delete faults.serverRead;});
+ // The repair's first server read is when the device's answer arrives.
+ let reads=0;faults.serverRead=async()=>{if(++reads===1){answer();await new Promise(resolve=>setTimeout(resolve,20));}};
+ ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the opening settles');
+ assert.equal(answered,true,'positive control: the device read answered after its limit');
+ assert.ok(reads>=1,'positive control: the repair had started reading the server');
+ const root=backend.docs.get('users/owner');
+ assert.deepEqual(pushes.map(row=>row.baseRev),[revision+1],'this device publishes once, over the unreadable revision');
+ assert.equal(root.rev,revision+2,'one publication reached the cloud');
+ assert.equal(root.previousGeneration,unreadableId,'over the unreadable revision');
+ assert.doesNotMatch(root.activeGeneration,/^repair-/,'the current copy is this device’s board, not a server-only repair');
+ assert.ok(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.title==='Newer local edit before adoption'),'the newer local edit is in the cloud');
+});
+
+// #2287 CI audit: the same order on the other routes that commit a repaired board:
+// a save already written by an explicit save comes due right after the commit.
+test('RISK contained board adoption #2287: a debounced save with nothing left to write cannot stop the automatic recovery default or Apply after its device commit',{timeout:120000},async t=>{
+ const ownSaves=(sub,ctx)=>{const jobs=[],schedule=ctx.setTimeout,cancel=ctx.clearTimeout;
+  ctx.setTimeout=(fn,delay,...args)=>{if(delay!==350)return schedule(fn,delay,...args);const token={debouncedSave2287:true};jobs.push({token,fn,args,cancelled:false,fired:false});return token;};
+  ctx.clearTimeout=token=>{const job=jobs.find(row=>row.token===token);if(job)job.cancelled=true;else cancel(token);};
+  sub.after(()=>{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;});
+  return {jobs,fire:async()=>{for(const job of jobs)if(!job.cancelled&&!job.fired){job.fired=true;await job.fn(...job.args);}}};};
+ const settled=(ctx,message)=>fixtureDeadline(async wait=>{await wait(50);let quiet=0;while(quiet<8){quiet=vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx)?0:quiet+1;await wait(25);}},message,30000);
+ const unproved=async(sub,budget,retry)=>{const app=await containedAdoptionApp2254(sub),{ctx,backend,acknowledgedPath}=app;
+  await rewriteGenerationFixture(backend,acknowledgedPath,ctx.window.ChainStorageV2,board=>{board.futureEarlierFixture={opaque:'not this device’s copy'};return JSON.stringify(board);});
+  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=budget;ctx.window.CLOUD_RETRY_DELAY_MS=retry;
+  const alive=setInterval(()=>{},20);sub.after(()=>clearInterval(alive));return app;};
+ const armedEdit=async(app,saves,title)=>{app.shim.document.getElementById('addInput').value=title;await app.ctx.onAction('add',{});assert.equal(await app.ctx.persist(),true);
+  assert.equal(saves.jobs.filter(job=>!job.cancelled).length,1,'positive control: the save is still armed');};
+ await t.test('the automatic recovery default',async sub=>{
+  const app=await unproved(sub,64*1048576,10),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,revision=ctx.state.syncRev,title='Saved, its debounce still armed',saves=ownSaves(sub,ctx);
+  await armedEdit(app,saves,title);
+  const write=store.writeRecoveredSource;store.writeRecoveredSource=async(...args)=>{const result=await write.apply(store,args);await saves.fire();return result;};sub.after(()=>{store.writeRecoveredSource=write;});
+  ctx.closeModal();await flush();await ctx.cloudPull();await settled(ctx,'the recovery settles');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'the recovery reached the cloud');
+  assert.equal(await store.getRecoveryCloudHold(),null,'and released its hold');
+  assert.ok(JSON.parse((await backend.CS.pull()).payload).tasks.some(row=>row.title===title),'the edit is in the cloud');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ });
+ await t.test('Apply selected source',async sub=>{
+  const app=await unproved(sub,1,600000),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore,revision=ctx.state.syncRev,title='Saved, its debounce still armed';
+  ctx.closeModal();await flush();await ctx.cloudPull();await settled(ctx,'the board waits');
+  const saves=ownSaves(sub,ctx);await armedEdit(app,saves,title);
+  assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await settled(ctx,'the review settles');
+  await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
+  const commit=store.commitHeadIfCurrent;store.commitHeadIfCurrent=async(...args)=>{const result=await commit.apply(store,args);await saves.fire();return result;};sub.after(()=>{store.commitHeadIfCurrent=commit;});
+  assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true,'Apply finishes');await settled(ctx,'Apply settles');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'the choice reached the cloud');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ });
+});
+
+// #2287 CI: when the device answers only after the server-only repair has already
+// published, the page was left saying syncing until it was opened again, with this
+// device's own work never saved to the cloud. The late answer shows the device is
+// there, so the page goes on and reconciles.
+test('RISK contained board adoption #2287: a device read that answers after the server-only repair published brings the page to synced with its work in the cloud, without reopening',async t=>{
+ const app=await containedAdoptionApp2254(t),{ctx,shim,backend,revision=ctx.state.syncRev}=app,store=ctx.window.ScannerDeviceStore;
+ await newerEditBeforeAdoption2254(app);await adoptionSettle2254(ctx,'the edit is saved');
+ const expected=ctx.state.tasks.map(task=>task.id);
+ ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=400; // the availability check's limit is a quarter of this
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const read=store.getPendingUpload;let answer,slow=true;const answering=new Promise(resolve=>{answer=resolve;});
+ store.getPendingUpload=async(...args)=>{if(slow){slow=false;await answering;}return read.apply(store,args);};
+ t.after(()=>{answer();store.getPendingUpload=read;});
+ ctx.closeModal();await flush();await ctx.cloudPull();
+ await fixtureDeadline(async wait=>{while(!/^repair-/.test(backend.docs.get('users/owner').activeGeneration))await wait(5);},'the server-only repair publishes first',30000);
+ assert.equal(backend.docs.get('users/owner').rev,revision+2,'positive control: the repair is the next revision');
+ answer();
+ await fixtureDeadline(async wait=>{while(shim.document.getElementById('syncBtn').textContent!=='☁ synced')await wait(10);},'the page reaches synced without being reopened',30000);
+ await adoptionSettle2254(ctx,'the page settles');
+ const board=JSON.parse((await backend.CS.pull()).payload);
+ assert.deepEqual(expected.filter(id=>!board.tasks.some(task=>task.id===id)),[],'every task of this board is in the cloud');
+ assert.ok(board.tasks.some(task=>task.title==='Newer local edit before adoption'),'the newer local edit is in the cloud');
+ assert.equal(ctx.state.syncDirty,false,'the board is confirmed');
+ assert.equal(await store.getPendingUpload('owner'),null,'nothing is left pending');
+});
+
+// #2287 CI: only a save with nothing left to write may be skipped. An edit whose
+// only save is the debounced one is not on the device yet, so it must still be
+// saved when a held publication has started and stopped in between.
+test('RISK contained board adoption #2287: an edit whose only save is the debounced one is still saved when a held publication starts first, and then reaches the cloud',{timeout:120000},async t=>{
+ const app=await heldAutomaticRecovery2287(t),{ctx,shim,backend,store,revision,settled}=app,title='Edit saved only by its debounce';
+ await holdRefusedOnce2287(app);
+ const jobs=[],schedule=ctx.setTimeout,cancel=ctx.clearTimeout;
+ ctx.setTimeout=(fn,delay,...args)=>{if(delay!==350)return schedule(fn,delay,...args);const token={debouncedSave2287:true};jobs.push({token,fn,args,cancelled:false,fired:false});return token;};
+ ctx.clearTimeout=token=>{const job=jobs.find(row=>row.token===token);if(job)job.cancelled=true;else cancel(token);};
+ t.after(()=>{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;});
+ ctx.state.tasks.push(syncTask('timer-only-edit-2287',title));ctx.commit();await flush();
+ assert.equal((await store.readHead()).payload.includes(title),false,'positive control: the edit is not on the device yet');
+ await ctx.sendPush();await fixtureDeadline(async wait=>{await wait(20);while(vm.runInContext('pulling||cloudPushInFlight||cloudSourceRecoveryBusy',ctx))await wait(10);},'the publication stops',30000);
+ assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: a board not yet saved is not published');
+ // Its debounce comes due now, with no explicit save behind it.
+ for(const job of jobs)if(!job.cancelled&&!job.fired){job.fired=true;await job.fn(...job.args);}
+ assert.equal((await store.readHead()).payload.includes(title),true,'the edit is saved on the device');
+ ctx.setTimeout=schedule;ctx.clearTimeout=cancel;
+ await ctx.sendPush();await settled('the publication settles');
+ assert.equal(backend.docs.get('users/owner').rev,revision+2,'the next attempt publishes');
+ assert.ok(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.title===title),'the edit is in the cloud');
+});
+
 // #2254 review (S2): an unreadable generation lets the board's next frame and
 // any input queued behind it go first (#2226). Adoption reads the device's
 // pending upload and the cloud's generation headers, so it starts after that
