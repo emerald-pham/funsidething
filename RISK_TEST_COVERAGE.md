@@ -1560,14 +1560,22 @@ its RISK test; the map follows.
 - RISK contained board adoption #2287: one cloud read that never answers ends its step at the single-read limit, not after the step’s whole allowance
 - RISK contained board adoption #2287: after a pull times out the next pull for that account has the recovery limit, so a repair with no recorded root and a stalling healthy board both finish, while the first pull keeps its ordinary limit
 - RISK contained board adoption #2287: a page closed mid-repair is retried by the next opening up to the attempt limit, counted across pages and honouring a mark from the previous release, then the board waits and Retry sync still adopts
-- RISK contained board adoption #2287: a clean failure neither adds to nor clears the attempt count, so three timeouts never strand anyone, and a crash, a timeout and a crash reach the limit
+- RISK contained board adoption #2287: only a page the app was closed on uses up a try: a clean run neither raises nor resets the count, three timeouts and one real closure still publish, crash, timeout, crash, timeout, crash reaches the limit, and an app switch counts for nothing
 - RISK contained board adoption #2287: the debug log records each repair attempt and the attempt limit being reached, as metadata only, and a waiting board records it once
 - RISK contained board adoption #2287: two live tabs running the repair together publish once and lose nothing
 - RISK contained board adoption #2287: a generation proved unusable gets no protection marker and is retired only after the root has moved past it, while the intact previous generation stays protected, and a marker from an earlier release is left alone
 - RISK contained board adoption #2287: a partly readable generation keeps its marker and its surviving chunks, and the repair still goes ahead
 - RISK contained board adoption #2287: a generation proved unusable with zero chunks gets no marker on any route, and a device archive naming it does not keep it from being retired
+- RISK contained board adoption #2287: a generation seen with zero chunks is not an earlier source: once retired, showing the app reads it no more, starts no capture, exports no device store and Settings never calls it unresolved, as with a marker
+- RISK contained board adoption #2287: after an exact rebuild no ordinary save reads the device archive whole or the zero-chunk generation again, before or after it is retired, at the read counts of a generation with a marker
 - RISK contained board adoption #2287: without containment proof the automatic recovery default still finishes when each read of a generation’s chunks stalls
 - RISK contained board adoption #2287: without containment proof the automatic recovery default also finishes when every read stalls past the ordinary limit, the first pull included
+- RISK contained board adoption #2287: a note from the previous release naming a generation since retired starts no capture and is not reported as unresolved
+- RISK contained board adoption #2287: a summary from the previous release does not count as seeing zero chunks: without the device record the generation stays pinned, and one gone from the cloud is decided from the whole archive
+- RISK contained board adoption #2287: an upload still staging with zero chunks is not proved unusable and keeps its marker
+- RISK contained board adoption #2287: a repair that goes on to the background check of earlier sources ends that check at its old budget, not the repair budget
+- RISK contained board adoption #2287: the optional background check of earlier sources ends at its old budget of one read limit and does not hold cloud saves for the repair budget
+- RISK contained board adoption #2287: a held automatic recovery publishes when every read stalls past the ordinary limit, at the next opening and on Retry sync
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
 - RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused

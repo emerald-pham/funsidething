@@ -432,8 +432,8 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  // (a smaller one recovers as usual). A dropped connection, the push deadline
  // or an app switch clears the mark, and the staged upload finishes at the
  // next check.
- assert.match(answer,/If the app closes during this, it has up to three tries, then waits for Retry sync\./,
-  'the answer says the app gets up to three tries, the first run included, then waits (#2287)');
+ assert.match(answer,/Only the app closing uses a try; after three it waits for Retry sync\./,
+  'the answer says only the app closing uses one of its three tries, then it waits (#2287)');
  assert.match(answer,/A large board also waits if the copy before it differs or an unconfirmed save may hold more\./);
  assert.match(answer,/Losing connection or switching apps only pauses this\./,'the answer says a dropped connection or an app switch only pauses it');
  assert.doesNotMatch(answer,/If a run is interrupted, the next opening waits for Retry sync/,'no interruption makes every next opening wait');
@@ -445,6 +445,18 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  assert.match(waiting,/If the copy before the unreadable one is the one this device last confirmed, the app saves your board by itself\./);
  assert.match(waiting,/every readable copy stays protected/,'a copy with nothing left gets no protection (#2287)');
  assert.doesNotMatch(waiting,/own unconfirmed save/);
+ // #2287 release review: Help no longer promises to keep what is discarded, and
+ // says what uses up a try.
+ const reopening=answerTo('Will recovered work reopen and finish saving automatically?');
+ assert.match(reopening,/Shared cloud originals with anything left remain protected permanently; one with nothing left is retired once your board has moved past it\./);
+ assert.doesNotMatch(reopening,/Shared cloud originals remain protected/,'a copy with nothing left is retired (#2287)');
+ const older=answerTo('What does “older copy in use” mean?');
+ assert.match(older,/Anything saved only in the damaged newer copy was not recovered; it stays protected only if some is left\./);
+ assert.doesNotMatch(older,/that original stays protected/,'the unusable copy is not kept (#2287)');
+ const afterRecovery=answerTo('Why does a large board wait for Retry sync after recovery?');
+ assert.match(afterRecovery,/every readable copy stays protected/,'a copy with nothing left gets no protection (#2287)');
+ assert.doesNotMatch(afterRecovery,/every copy stays protected/,'a copy with nothing left gets no protection (#2287)');
+ assert.match(vm.runInContext('CLOUD_RECOVERY_WAITING_DETAIL',app.ctx),/every readable cloud and device copy stays protected\./,'the waiting notice says the same (#2287)');
  const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
  assert.ok(answers.length>100,'positive control: the mounted Help has its answers');
  assert.deepEqual(answers.filter(row=>wordsOf(row.text)>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
@@ -1770,7 +1782,7 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
  assert.ok(help.includes('Cloud saves keep their confirmation when earlier saves finish. Later edits still wait for their own confirmation.'),'mounted changelog retains the previously released cloud acknowledgement item');
  assert.match(help,/Saved working boards reopen automatically/i,'accepted cold reopening is part of the automatic recovery policy');
  assert.match(help,/An automatic recovery waiting for cloud confirmation resumes after reopening/i);
- assert.match(help,/Shared cloud originals remain protected permanently/i);
+ assert.match(help,/Shared cloud originals with anything left remain protected permanently/i);
  assert.match(help,/Cloud confirmation is checked again after edits or account changes/i,'the FAQ distinguishes current authority from an earlier completed recovery');
  assert.match(help,/An earlier source can remain unsupported or unresolved while your current board stays usable/i,'unsupported retained history does not require an unavailable picker');
  assert.match(help,/<dt>Will recovered work reopen and finish saving automatically\?<\/dt><dd>Saved working boards reopen automatically/i,'reopening guidance has its own concise reachable FAQ topic');
@@ -39255,13 +39267,14 @@ test('RISK shared protection absent-root authority: retained orphan sources lock
 
 test('RISK shared protection changed originals: deliberate current recovery selects exact server capture independently of archive order',async t=>{
  for(const order of ['old-first','current-first','changed-after-preview'])await t.test(order,async sub=>{
-  const app=await damagedAcknowledgedApp187(sub),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+  // #2287: partly readable from the first read: an archive that saw zero chunks has
+  // nothing to protect, so only a surviving chunk keeps this generation in protection,
+  // its changed header is refused there and the deliberate choice below decides.
+  const app=await damagedAcknowledgedApp187(sub,{sourcePadding:600000,keepFirstChunk:true}),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
   app.faults.push=Object.assign(Error('offline rebuild'),{code:'unavailable'});await ctx.cloudPull();await settleRecoveryOperations188(ctx);delete app.faults.push;
   const before=await store.listOpaqueArchives(),originals=before.filter(row=>row.key.startsWith('cloud-generation-recovery:'));
   assert.ok(originals.length);const sourcePath='users/owner/generations/'+originalRoot.activeGeneration;
-  // #2287: a surviving chunk keeps this generation in protection, so its changed
-  // header is refused there and the deliberate choice below decides.
-  backend.docs.set(sourcePath,{...backend.docs.get(sourcePath),hash:'f'.repeat(64)});backend.docs.set(sourcePath+'/chunks/00000000',{index:0,byteLength:1,hash:'0'.repeat(64),text:'x'});await ctx.cloudPull();
+  backend.docs.set(sourcePath,{...backend.docs.get(sourcePath),hash:'f'.repeat(64)});await ctx.cloudPull();
   assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});
   const list=store.listOpaqueArchives.bind(store);store.listOpaqueArchives=async()=>{const rows=await list();return order==='current-first'?rows.reverse():rows;};
   if(order==='changed-after-preview')backend.docs.set(sourcePath,{...backend.docs.get(sourcePath),hash:'e'.repeat(64)});

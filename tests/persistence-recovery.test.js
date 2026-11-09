@@ -567,7 +567,7 @@ test('RISK automatic source status: completed confirmation follows current edits
 });
 
 test('RISK integrated automatic recovery: no-input fallback continues through exact cloud confirmation',async t=>{
- const damaged=await damagedAcknowledgedApp187(t),{backend,activeSource}=damaged;await closeLegacyApp173(damaged);backend.CS.suspend();
+ const damaged=await damagedAcknowledgedApp187(t,{sourcePadding:600000,keepFirstChunk:true}),{backend,activeSource}=damaged;await closeLegacyApp173(damaged);backend.CS.suspend();
  const {IDBFactory}=await import('fake-indexeddb'),cold=await loadAppAtTime(1792323000000,{indexedDBProvider:new IDBFactory(),deviceDbName:'no-input-255-'+Math.random()});t.after(()=>closeLegacyApp173(cold));
  await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'fresh startup authority is captured');
  const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,sharedDocs:backend.docs,failures:{authPending:true},timeoutMs:5000});t.after(()=>reader.CS.suspend());
@@ -5778,8 +5778,9 @@ test('RISK backup listing reuse: a cached payload is kept only while the stored 
 // revision before the unreadable one), this device's board was built on that
 // copy and already holds everything it holds. The app then publishes the
 // device board as the next revision through the ordinary save, by itself:
-// no reconciliation and no recovery archive, the unreadable generation stays
-// protected and untouched, and the write is guarded by revision.
+// no reconciliation and no recovery archive, the unreadable generation is left
+// as it is (with no marker if no chunks remain, #2287), and the write is
+// guarded by revision.
 async function containedAdoptionApp2254(t,options={}){
  const app=await damagedAcknowledgedApp187(t,options),{ctx,backend,originalRoot,activeSource}=app,generations='users/owner/generations/';
  // The generation this device acknowledged is complete again.
@@ -6589,10 +6590,17 @@ test('RISK contained board adoption #2287: the field-shaped state repairs itself
 test('RISK contained board adoption #2287: a full source read fetches each generation’s header and chunks together, so a stall on both costs one stall',async t=>{
  const app=await ownInterruptedUploadApp2254(t,STALLED_READ_LIMITS_2287),{backend,faults}=app,stalled=[];
  stallReads2287(faults,stalled,path=>generationHeaderRead2287(path)||generationChunksRead2287(path));
+ // The limit now fits several stalls, so finishing inside it proves nothing about order; when each read starts does.
+ const stall=faults.serverRead,startedAt=new Map();faults.serverRead=async path=>{if(!startedAt.has(path))startedAt.set(path,performance.now());return stall(path);};
  const source=await backend.CS.readRecoverySource({}).catch(error=>({failed:error?.code??error?.message}));
  assert.equal(source.failed,undefined,'the source read finishes inside its limit');
  assert.deepEqual(Array.from(source.generations,row=>row.id).sort(),[app.unreadableId,app.acknowledgedId].sort(),'it read both named generations');
  assert.ok(stalled.length>=4,'positive control: header and chunk reads stalled');
+ for(const id of [app.unreadableId,app.acknowledgedId]){
+  const path='users/owner/generations/'+id,header=startedAt.get(path),chunks=startedAt.get(path+'/chunks');
+  assert.ok(Number.isFinite(header)&&Number.isFinite(chunks),'positive control: both reads of '+id+' happened');
+  assert.ok(Math.abs(chunks-header)<STALLED_READS_2287.stallMs/2,'the chunks of '+id+' are read while its header stalls, '+Math.round(chunks-header)+' ms apart');
+ }
 });
 // #2287 review: each step of the repair reads several times in sequence, each
 // inside one whole-operation limit, so stalls on every read used to add up past
@@ -6719,43 +6727,44 @@ test('RISK contained board adoption #2287: a page closed mid-repair is retried b
 });
 
 
-// #2287 review: the count measures pages the phone closed. A clean failure (a
-// timeout, an offline read) neither adds to it nor clears it, so a phone that
-// keeps timing out is never stranded, and a crash, a timeout and a crash still
-// reach the limit. Same-page re-runs do not reset it either.
+// #2287 review (owner decided): only real app closures use up a try. The count
+// rises only when a new page finds a run left going by another page. A run that
+// ends with an outcome it saw (a timeout, an offline read) neither raises nor
+// resets it, so three timeouts and then one real closure still publish at the
+// next opening, and crash, timeout, crash, timeout, crash is three closures.
 const crashingPage2287=async fixture=>{const pageFaults={publishPending:new Promise(()=>{})},page=await fixture.open({pageFaults,timeoutMs:60000,recoveryTimeoutMs:60000});
  await fixtureDeadline(async wait=>{while(!pageFaults.publicationStarted)await wait(10);},'the page starts publishing and is closed by the phone',30000);return page;};
 const cleanFailurePage2287=async fixture=>{let chunkReads=0;const pageFaults={serverRead:async path=>{if(path.endsWith('/chunks')&&++chunkReads>1)throw Object.assign(Error('offline'),{code:'unavailable'});}},page=await fixture.open({pageFaults,timeoutMs:60000,recoveryTimeoutMs:60000});
  await fieldOpeningSettled2287(page,'the clean failure settles');return page;};
 const adoptionMark2287=shim=>JSON.parse(shim.localStorage.getItem(ADOPTION_RUN_KEY)||'null');
-test('RISK contained board adoption #2287: a clean failure neither adds to nor clears the attempt count, so three timeouts never strand anyone, and a crash, a timeout and a crash reach the limit',async t=>{
- await t.test('three clean failures do not strand the person',async sub=>{
+test('RISK contained board adoption #2287: only a page the app was closed on uses up a try: a clean run neither raises nor resets the count, three timeouts and one real closure still publish, crash, timeout, crash, timeout, crash reaches the limit, and an app switch counts for nothing',async t=>{
+ await t.test('three clean failures and one real closure still publish at the next opening',async sub=>{
   const fixture=await fieldShapedDamage2287(sub),shim=fixture.first.shim;shim.localStorage.removeItem(ADOPTION_RUN_KEY); // the fixture's own cut-off run counted one
   for(let attempt=1;attempt<=3;attempt++){
    const page=await cleanFailurePage2287(fixture);
    assert.deepEqual(page.pushes,[],'attempt '+attempt+' stopped cleanly and published nothing');
-   assert.equal(adoptionMark2287(shim).attempts,attempt,'the count survives the clean failure');
-   assert.equal(adoptionMark2287(shim).running,false,'and the mark says the run is over');
+   assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[1,false],'clean failure '+attempt+' leaves the count where it was');
    if(attempt===3){
     // A same-page re-run keeps the count.
     await page.ctx.cloudPull();await fieldOpeningSettled2287(page,'the same page runs again');
-    assert.equal(adoptionMark2287(shim).attempts,3,'a same-page re-run does not reset the count');
+    assert.equal(adoptionMark2287(shim).attempts,1,'a same-page re-run does not raise the count');
    }
   }
+  await crashingPage2287(fixture);
+  assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[1,true],'the page closed by the phone left its run marked');
   const page=await fixture.open({timeoutMs:60000,recoveryTimeoutMs:60000});
-  await fieldOpeningSettled2287(page,'the opening after three clean failures settles');
-  assertFieldBoardRepaired2287(fixture,page,'after three clean failures');
+  await fieldOpeningSettled2287(page,'the opening after the one real closure settles');
+  assertFieldBoardRepaired2287(fixture,page,'after three clean failures and one closure');
   assert.equal(adoptionMark2287(shim),null,'publishing moved the root, so the count clears');
  });
- await t.test('a crash, a clean failure and a crash reach the limit',async sub=>{
+ await t.test('crash, timeout, crash, timeout, crash reaches the limit of three closures',async sub=>{
   const fixture=await fieldShapedDamage2287(sub),{first,backend,revision,expected}=fixture,shim=first.shim;shim.localStorage.removeItem(ADOPTION_RUN_KEY); // the fixture's own cut-off run counted one
-  await crashingPage2287(fixture);
-  assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[1,true],'the crashed page left its run marked');
-  const clean=await cleanFailurePage2287(fixture);
-  assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[2,false],'the clean failure kept the count');
-  assert.deepEqual(clean.pushes,[],'and published nothing');
-  await crashingPage2287(fixture);
-  assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[3,true],'the second crash reaches the limit');
+  const mark=()=>[adoptionMark2287(shim).attempts,adoptionMark2287(shim).running];
+  await crashingPage2287(fixture);assert.deepEqual(mark(),[1,true],'first closure: the run is left going');
+  const clean1=await cleanFailurePage2287(fixture);assert.deepEqual(mark(),[2,false],'the next page found one run left going, then ended cleanly');assert.deepEqual(clean1.pushes,[],'and published nothing');
+  await crashingPage2287(fixture);assert.deepEqual(mark(),[2,true],'a page after a clean end raises nothing; second closure: left going');
+  const clean2=await cleanFailurePage2287(fixture);assert.deepEqual(mark(),[3,false],'the next page found the second run left going, then ended cleanly');assert.deepEqual(clean2.pushes,[],'and published nothing');
+  await crashingPage2287(fixture);assert.deepEqual(mark(),[3,true],'third closure: left going');
   const waiting=await fixture.open({timeoutMs:60000,recoveryTimeoutMs:60000});
   await fieldOpeningSettled2287(waiting,'the opening past the limit settles');
   assert.deepEqual(waiting.pushes,[],'past the limit nothing is published by itself');
@@ -6766,6 +6775,16 @@ test('RISK contained board adoption #2287: a clean failure neither adds to nor c
   assert.equal(backend.docs.get('users/owner').rev,revision+2,'a deliberate run still goes ahead');
   assert.deepEqual(JSON.parse(JSON.stringify(waiting.ctx.state.tasks)).map(task=>task.id).sort(),expected.tasks.map(task=>task.id).sort(),'every task is present');
  });
+ await t.test('an app switch and then a new page uses up no try',async sub=>{
+  const fixture=await fieldShapedDamage2287(sub),shim=fixture.first.shim;shim.localStorage.removeItem(ADOPTION_RUN_KEY); // the fixture's own cut-off run counted one
+  const switched=await crashingPage2287(fixture);
+  assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[1,true],'positive control: a run is under way');
+  switched.shim.document.hidden=true;switched.shim.document.dispatchEvent({type:'visibilitychange'});
+  assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[1,false],'hiding the page ends the run the page could see');
+  const next=await crashingPage2287(fixture);
+  assert.deepEqual([adoptionMark2287(shim).attempts,adoptionMark2287(shim).running],[1,true],'the new page found no run left going, so the count did not rise');
+  assert.deepEqual(next.pushes.map(row=>row.baseRev),[fixture.revision+1],'and it went ahead');
+ });
 });
 
 // #2287 review: the debug log says which attempt this page is on and when the
@@ -6773,14 +6792,14 @@ test('RISK contained board adoption #2287: a clean failure neither adds to nor c
 test('RISK contained board adoption #2287: the debug log records each repair attempt and the attempt limit being reached, as metadata only, and a waiting board records it once',async t=>{
  const repairEvents=page=>JSON.parse(page.ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='repair-attempt').map(event=>event.metadata);
  const fixture=await fieldShapedDamage2287(t),shim=fixture.first.shim;shim.localStorage.removeItem(ADOPTION_RUN_KEY); // the fixture's own cut-off run counted one
- const attempt=(repairAttempt,repairLimitReached=false)=>({repairAttempt,repairAttemptLimit:AUTOMATIC_ATTEMPTS_2287,repairLimitReached});
- for(const n of [1,2,3]){const page=await crashingPage2287(fixture);assert.deepEqual(repairEvents(page),[attempt(n)],'attempt '+n+' is logged by the page making it');}
+ const attempt=(repairAttempt,repairClosedPages,repairLimitReached=false)=>({repairAttempt,repairAttemptLimit:AUTOMATIC_ATTEMPTS_2287,repairClosedPages,repairLimitReached});
+ for(const n of [1,2,3]){const page=await crashingPage2287(fixture);assert.deepEqual(repairEvents(page),[attempt(n,n-1)],'attempt '+n+' is logged by the page making it, with the pages closed so far');}
  const waiting=await fixture.open({timeoutMs:60000,recoveryTimeoutMs:60000});
  await fieldOpeningSettled2287(waiting,'the opening past the limit settles');
  assert.deepEqual(waiting.pushes,[],'positive control: the attempts have run out');
- assert.deepEqual(repairEvents(waiting),[attempt(3,true)],'the limit being reached is logged');
+ assert.deepEqual(repairEvents(waiting),[attempt(3,3,true)],'the limit being reached is logged');
  await waiting.ctx.cloudPull();await fieldOpeningSettled2287(waiting,'the next read settles');
- assert.deepEqual(repairEvents(waiting),[attempt(3,true)],'a waiting board logs it once');
+ assert.deepEqual(repairEvents(waiting),[attempt(3,3,true)],'a waiting board logs it once');
  const text=waiting.ctx.supportDiagnosticsText();
  for(const task of fixture.expected.tasks.slice(0,5))assert.ok(!text.includes(task.title),'no task text reaches the log');
  assert.ok(!text.includes(fixture.unreadableId),'no generation id reaches the log');
@@ -6893,6 +6912,23 @@ test('RISK contained board adoption #2287: a generation proved unusable with zer
   assert.equal(backend.docs.has(protections+unreadableId),false,'the unusable generation gets no marker');
   assert.equal(backend.docs.get(protections+acknowledgedId)?.v,1,'the intact one is protected');
  });
+ await t.test('a device archive with no summary, as older archives have',async sub=>{
+  const app=await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,revision,unreadableId,acknowledgedId,unreadablePath,acknowledgedPath}=app;
+  await newerEditBeforeAdoption2254(app);
+  const store=ctx.window.ScannerDeviceStore,root=backend.docs.get('users/owner');
+  const chunks=path=>[...backend.docs].filter(([key])=>key.startsWith(path+'/chunks/')).map(([,row])=>row).sort((a,b)=>a.index-b.index);
+  const archive={format:'chain-scanner.cloud-recovery-source',version:1,identity:'owner',manifest:root,generations:[{id:unreadableId,header:backend.docs.get(unreadablePath),chunks:[]},{id:acknowledgedId,header:backend.docs.get(acknowledgedPath),chunks:chunks(acknowledgedPath)}],deviceSource:JSON.stringify(ctx.state),pending:await store.getPendingUpload('owner')};
+  const raw=JSON.stringify(archive),key='cloud-generation-recovery:owner:'+root.rev+':'+unreadableId+':'+await ctx.window.ChainStorageV2.hashPayload(raw);
+  assert.equal(await store.protectRecoverySource({expectedHash:(await store.readHead()).hash,key,raw}),true,'fixture: the device keeps an archive with no summary');
+  assert.equal(await store.readCloudRecoverySummary(key),null,'positive control: it has no summary');
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the adoption settles');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'positive control: the board was adopted');
+  const decoy=collectorDecoy2287(backend);
+  shim.document.getElementById('addInput').value='Next ordinary save after adoption';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+  await ctx.sendPush();await adoptionSettle2254(ctx,'the next ordinary save settles');await collectorRan2287(backend,decoy);
+  assert.equal(backend.docs.get('users/owner').rev,revision+3,'positive control: the next save published');
+  assert.equal(backend.docs.has(unreadablePath),false,'the archive does not keep the unusable generation from being retired');
+ });
  await t.test('a device archive names the generation',async sub=>{
   const app=await ownInterruptedUploadApp2254(sub),{ctx,shim,backend,revision,unreadableId,acknowledgedId,unreadablePath,acknowledgedPath}=app;
   await newerEditBeforeAdoption2254(app);
@@ -6919,6 +6955,72 @@ test('RISK contained board adoption #2287: a generation proved unusable with zer
   assert.equal(backend.docs.get('users/owner').rev,revision+4,'positive control: the later save published');
   assert.equal(archiveReads,0,'the later save does not read the whole archive');
  });
+});
+
+// #2287 release review: a generation this device saw with zero chunks has
+// nothing to recover. Once the collector retired it the check of earlier sources
+// found no header and took that for a generation it could reconcile: a full
+// double capture and a raw device export at every return, for good, and Settings
+// said it was unresolved and protected, which it no longer was.
+test('RISK contained board adoption #2287: a generation seen with zero chunks is not an earlier source: once retired, showing the app reads it no more, starts no capture, exports no device store and Settings never calls it unresolved, as with a marker',{timeout:300000},async t=>{
+ for(const variant of ['a marker from an earlier release','no marker, retired by the collector'])await t.test(variant,async sub=>{
+  const app=await recoveredLeftoversApp2254(sub,{zeroChunks:true}),{ctx,shim,backend,store,unreadableId,activePath}=app,marker=variant.startsWith('a marker');
+  ctx.localStorage.removeItem('fvp:chain-scanner:automatic-recovery-over-budget');ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1073741824;
+  if(marker)backend.docs.set('users/owner/recoveryProtections/'+unreadableId,{v:1,rootRevision:backend.docs.get('users/owner').rev-1,createdAt:{toMillis:()=>1234}});
+  const decoy=collectorDecoy2287(backend);
+  await ordinaryAcknowledgedSave2254(app,'Saved after the recovery');await collectorRan2287(backend,decoy);
+  assert.equal(backend.docs.has(activePath),marker,'positive control: only the marker keeps the header');
+  assert.deepEqual(await earlierSources2254(ctx),{error:null,unresolved:[],permanent:[]},'it is no earlier source to check');
+  vm.runInContext('globalThis.__sources2287=0;globalThis.__sourcesOriginal2287=cloudSourceRecoverySources;cloudSourceRecoverySources=(...args)=>{__sources2287++;return __sourcesOriginal2287(...args);}',ctx);
+  let exports=0;const exportSnapshot=store.readRawExportSnapshot;store.readRawExportSnapshot=async(...args)=>{exports++;return exportSnapshot.apply(store,args);};
+  sub.after(()=>{store.readRawExportSnapshot=exportSnapshot;});
+  for(const round of [1,2]){
+   const before=backend.network.length;
+   ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});await trimSettle2254(ctx,'the return to the app settles');
+   assert.deepEqual(backend.network.slice(before).filter(path=>path.includes(unreadableId)),[],'return '+round+': nothing reads it again');
+   assert.equal(vm.runInContext('__sources2287',ctx),0,'return '+round+': no capture starts');
+   assert.equal(exports,0,'return '+round+': the whole device store is not exported');
+   assert.equal(syncStatus2200(shim).text,'☁ synced','return '+round+': the board stays synced');
+   assert.doesNotMatch(vm.runInContext('automaticCloudSourceResumeMessage(automaticCloudSourceResumeStatus)',ctx),/remains? unresolved|remains? protected|protected and unresolved|still protected/,'return '+round+': Settings does not call it unresolved');
+  }
+ });
+});
+
+// #2287 release review: the exact-rebuild route keeps a device archive naming the
+// generation and writes no adoption record, so once the collector retired it
+// every ordinary save read that archive whole and downloaded the intact
+// generation again, the cost #2281 removed. The archive's summary says what the
+// archive saw, so each save decides from that.
+test('RISK contained board adoption #2287: after an exact rebuild no ordinary save reads the device archive whole or the zero-chunk generation again, before or after it is retired, at the read counts of a generation with a marker',{timeout:240000},async t=>{
+ const measured={};
+ for(const variant of ['a marker from an earlier release','no marker'])await t.test(variant,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,marker=variant.startsWith('a marker'),unusableId=originalRoot.activeGeneration,path='users/owner/generations/'+unusableId;
+  ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+  if(marker)backend.docs.set('users/owner/recoveryProtections/'+unusableId,{v:1,rootRevision:originalRoot.rev,createdAt:{toMillis:()=>1234}});
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the exact rebuild settles');
+  await ctx.sendPush();await adoptionSettle2254(ctx,'the exact rebuild push settles');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1,'positive control: the exact rebuild published');
+  const keys=await store.listOpaqueArchiveKeys({prefix:'cloud-generation-recovery:'+encodeURIComponent('owner')+':'});
+  assert.equal(keys.length,1,'positive control: the exact rebuild kept one device archive');
+  assert.deepEqual(await store.listOpaqueArchiveKeys({prefix:'unreadable-generation-record:'}),[],'positive control: this route writes no adoption record');
+  const read=store.readOpaqueArchive;let archiveReads=0;store.readOpaqueArchive=async(...args)=>{if(args[0]===keys[0])archiveReads++;return read.apply(store,args);};
+  sub.after(()=>{store.readOpaqueArchive=read;});
+  const save=async title=>{const before=backend.network.length;archiveReads=0;
+   shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+   await ctx.sendPush();await adoptionSettle2254(ctx,title+' settles');
+   assert.equal(archiveReads,0,title+': the archive is not read whole');
+   return backend.network.slice(before);};
+  await save('First save after the rebuild');
+  const decoy=collectorDecoy2287(backend);
+  await save('Second save after the rebuild');await collectorRan2287(backend,decoy);
+  assert.equal(backend.docs.has(path),marker,'positive control: only the marker keeps the header');
+  const reads=await save('Ordinary save after retirement');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+4,'positive control: the save published');
+  assert.deepEqual(reads.filter(item=>item.includes(path+'/chunks')),[],'its chunks are not read again');
+  measured[variant]={server:reads.length,chunks:reads.filter(item=>item.endsWith('/chunks')).length};
+ });
+ assert.ok(measured['no marker'].chunks<=measured['a marker from an earlier release'].chunks,'no more chunk reads than the marker control: '+JSON.stringify(measured));
+ assert.ok(measured['no marker'].server<=measured['a marker from an earlier release'].server,'no more server reads than the marker control: '+JSON.stringify(measured));
 });
 
 // #2287: without the containment proof the existing automatic recovery decides.
@@ -6969,6 +7071,137 @@ test('RISK contained board adoption #2287: without containment proof the automat
  assert.equal(ctx.state.syncDirty,false,'the board is confirmed');
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
  assert.ok(stalled.length>=8,'positive control: the reads stalled '+stalled.length);
+});
+
+// #2287 release review: a note written before the zero-chunks rule cannot say
+// what it saw. A generation it names that now has no header and no chunks has
+// been retired: nothing can be reconciled from it, so it starts no capture.
+test('RISK contained board adoption #2287: a note from the previous release naming a generation since retired starts no capture and is not reported as unresolved',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t,{zeroChunks:true}),{ctx,shim,backend,store,unreadableId,activePath}=app;
+ ctx.localStorage.removeItem('fvp:chain-scanner:automatic-recovery-over-budget');ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1073741824;
+ const decoy=collectorDecoy2287(backend);
+ const header=backend.docs.get(activePath);
+ await ordinaryAcknowledgedSave2254(app,'Saved after the recovery');await collectorRan2287(backend,decoy);
+ assert.equal(backend.docs.has(activePath),false,'positive control: the collector retired it');
+ const raw=JSON.stringify({format:'chain-scanner.automatic-recovery-note',version:1,identity:'owner',account:ctx.state.syncAccount,revision:backend.docs.get('users/owner').rev,
+  unresolved:[{kind:'cloud-generation',id:unreadableId,reason:'generation-incomplete',header}],permanent:[]});
+ const key='automatic-recovery-note:'+encodeURIComponent('owner')+':'+await ctx.window.ChainStorageV2.hashPayload(raw);
+ assert.equal(await store.protectRecoverySource({expectedHash:(await store.readHead()).hash,key,raw}),true,'fixture: the device holds a note as the previous release wrote it');
+ assert.deepEqual((await earlierSources2254(ctx)).unresolved,[[unreadableId,'generation-incomplete']],'positive control: the note names it');
+ vm.runInContext('globalThis.__sources2287=0;globalThis.__sourcesOriginal2287=cloudSourceRecoverySources;cloudSourceRecoverySources=(...args)=>{__sources2287++;return __sourcesOriginal2287(...args);}',ctx);
+ ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});await trimSettle2254(ctx,'the return to the app settles');
+ assert.ok(backend.network.some(path=>path.includes(unreadableId)),'positive control: the check looked it up');
+ assert.equal(vm.runInContext('__sources2287',ctx),0,'no capture starts');
+ assert.doesNotMatch(vm.runInContext('automaticCloudSourceResumeMessage(automaticCloudSourceResumeStatus)',ctx),/remains? unresolved|remains? protected|protected and unresolved|still protected/,'Settings does not call it unresolved');
+ assert.equal(syncStatus2200(shim).text,'☁ synced','the board stays synced');
+});
+
+// #2287 release review: a summary the previous release saved does not say what
+// its archive saw. Without the device record such a generation is kept, not
+// retired, and one that has gone is not taken for one with nothing left: its
+// absence alone proves nothing, as an intact generation could also have gone.
+test('RISK contained board adoption #2287: a summary from the previous release does not count as seeing zero chunks: without the device record the generation stays pinned, and one gone from the cloud is decided from the whole archive',{timeout:240000},async t=>{
+ for(const variant of ['still there, no record','gone from the cloud, no record'])await t.test(variant,async sub=>{
+  const app=await damagedAcknowledgedApp187(sub),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore,unusableId=originalRoot.activeGeneration,path='users/owner/generations/'+unusableId;
+  ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+  ctx.closeModal();await flush();await ctx.cloudPull();await adoptionSettle2254(ctx,'the exact rebuild settles');
+  await ctx.sendPush();await adoptionSettle2254(ctx,'the exact rebuild push settles');
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+1,'positive control: the exact rebuild published');
+  const keys=await store.listOpaqueArchiveKeys({prefix:'cloud-generation-recovery:'+encodeURIComponent('owner')+':'});
+  const readSummary=store.readCloudRecoverySummary,read=store.readOpaqueArchive;let archiveReads=0;
+  store.readCloudRecoverySummary=async(...args)=>{const summary=await readSummary.apply(store,args);return summary&&{...summary,generations:summary.generations.map(({id,header})=>({id,header}))};};
+  store.readOpaqueArchive=async(...args)=>{if(args[0]===keys[0])archiveReads++;return read.apply(store,args);};
+  sub.after(()=>{store.readCloudRecoverySummary=readSummary;store.readOpaqueArchive=read;});
+  const save=async title=>{shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();await adoptionSettle2254(ctx,title+' settles');};
+  if(variant.startsWith('gone'))backend.docs.delete(path);
+  await save('First save');
+  const decoy=collectorDecoy2287(backend);await save('Second save');await collectorRan2287(backend,decoy);
+  assert.equal(backend.docs.get('users/owner').rev,originalRoot.rev+3,'positive control: both saves published');
+  if(variant.startsWith('still')){
+   assert.equal(backend.docs.has(path),true,'it stays pinned without the record');
+   assert.equal(archiveReads,0,'and a save does not read the archive whole');
+  }else assert.ok(archiveReads>=1,'absence alone proves nothing: the whole archive decides, '+archiveReads);
+ });
+});
+
+// #2287 release review: an upload still staging with zero chunks has not been
+// proved unusable: its chunks may yet arrive.
+test('RISK contained board adoption #2287: an upload still staging with zero chunks is not proved unusable and keeps its marker',async t=>{
+ const app=await ownInterruptedUploadApp2254(t),{backend}=app,id='generation-staging-2287',path='users/owner/generations/'+id,root=backend.docs.get('users/owner');
+ const {sealedAt:_sealed,publishedAt:_published,...rest}=backend.docs.get('users/owner/generations/'+root.previousGeneration),header={...rest,state:'staging'};
+ backend.docs.set(path,header);
+ const evidence=await backend.CS.recoveryEvidence();
+ const result=await backend.CS.protectRecoverySources({source:{identity:evidence.identity,epoch:evidence.epoch,manifest:root,generations:[{id,header,chunks:[]}]},expectedRevision:root.rev});
+ assert.equal(result.ok,true,'positive control: the protection step finished, '+JSON.stringify(result));
+ assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'it gets a marker');
+});
+
+// #2287 release review: a repair run that goes on to check earlier sources after
+// publishing has finished repairing, so the rest of it has the check's old budget.
+test('RISK contained board adoption #2287: a repair that goes on to the background check of earlier sources ends that check at its old budget, not the repair budget',{timeout:300000},async t=>{
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,backend,activePath}=app,readLimitMs=1000;
+ backend.docs.set(activePath+'/chunks/00000000',{index:0,byteLength:1,hash:'0'.repeat(64),text:'x'}); // partly readable, so an earlier source remains
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1073741824;ctx.window.CLOUD_RETRY_DELAY_MS=600000;ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=readLimitMs;
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ ctx.closeModal();await flush();const pull=ctx.cloudPull();
+ const continuing=()=>vm.runInContext('cloudSourceRecoveryRead?.automaticHistoryResume===true',ctx);
+ await fixtureDeadline(async wait=>{while(!continuing())await wait(5);},'the repair publishes and goes on to the check',60000);
+ assert.equal(vm.runInContext('cloudSourceRecoveryRead?.automaticFallback===true',ctx),true,'positive control: this is the run that repaired');
+ const started=performance.now();
+ await fixtureDeadline(async wait=>{while(continuing())await wait(5);},'the check ends',60000);
+ const elapsed=performance.now()-started;await pull;
+ assert.ok(elapsed<readLimitMs*8,'it ends near one read limit ('+readLimitMs+' ms), not the rest of the repair budget: '+Math.round(elapsed)+' ms');
+});
+
+// #2287 release review: the background check of earlier sources is optional, and
+// cloud saves wait for it (cloudSourceRecoveryBusy), so it keeps the budget it
+// had. Only a run that is actually repairing gets the budget that fits its reads.
+test('RISK contained board adoption #2287: the optional background check of earlier sources ends at its old budget of one read limit and does not hold cloud saves for the repair budget',{timeout:300000},async t=>{
+ const app=await recoveredLeftoversApp2254(t),{ctx,shim,backend,unreadableId}=app,readLimitMs=300;
+ ctx.localStorage.removeItem('fvp:chain-scanner:automatic-recovery-over-budget');ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1073741824;
+ assert.deepEqual((await earlierSources2254(ctx)).unresolved,[[unreadableId,'generation-incomplete']],'positive control: the partly readable generation is an earlier source');
+ // The retry outlasts the test, so only the check's own budget can end it.
+ ctx.window.CLOUD_RETRY_DELAY_MS=600000;ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=readLimitMs;
+ ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});
+ const running=()=>vm.runInContext('cloudSourceRecoveryRead?.automaticHistoryResume===true',ctx);
+ await fixtureDeadline(async wait=>{while(!running())await wait(5);},'the background check starts',30000);
+ const started=performance.now();
+ await fixtureDeadline(async wait=>{while(running())await wait(5);},'the background check ends at its own budget',30000);
+ const elapsed=performance.now()-started;
+ assert.ok(elapsed<readLimitMs*10,'it ends near one read limit ('+readLimitMs+' ms), not the repair budget: '+Math.round(elapsed)+' ms');
+ assert.equal(vm.runInContext('cloudSourceRecoveryBusy',ctx),false,'cloud saves are no longer held');
+ assert.equal(syncStatus2200(shim).text,'☁ synced','the board stays synced');
+});
+
+// #2287 release review: a held automatic recovery resumes with one read limit
+// for its pull, protection, publication and confirming pulls, so a phone whose
+// reads stall about 30 s spent it on the first pull and stayed on the older copy,
+// and Review (kept at one minute) could not finish either.
+test('RISK contained board adoption #2287: a held automatic recovery publishes when every read stalls past the ordinary limit, at the next opening and on Retry sync',{timeout:240000},async t=>{
+ for(const route of ['the next opening','Retry sync'])await t.test(route,async sub=>{
+  const limits={timeoutMs:300,recoveryTimeoutMs:900},stallMs=450;
+  const app=await containedAdoptionApp2254(sub,limits),{ctx,shim,backend,faults,acknowledgedPath}=app,revision=ctx.state.syncRev;
+  await rewriteGenerationFixture(backend,acknowledgedPath,ctx.window.ChainStorageV2,board=>{board.futureEarlierFixture={opaque:'not this device’s copy'};return JSON.stringify(board);});
+  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=64*1048576;ctx.window.CLOUD_RETRY_DELAY_MS=10;
+  await newerEditBeforeAdoption2254(app);await adoptionSettle2254(ctx,'the edit is saved');
+  const alive=setInterval(()=>{},20);sub.after(()=>clearInterval(alive));
+  const settled=message=>fixtureDeadline(async wait=>{await wait(50);let quiet=0;while(quiet<8){quiet=adoptionIdle2254(ctx)?quiet+1:0;await wait(25);}},message,90000);
+  // The first automatic publication is refused after the board was adopted here.
+  refuseNextRecoveryTransaction255(faults);
+  ctx.closeModal();await flush();await ctx.cloudPull();await settled('the first attempt settles');
+  assert.ok((await ctx.window.ScannerDeviceStore.getRecoveryCloudHold())?.automaticRecovery,'positive control: the recovery is held, waiting to publish');
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: nothing was published');
+  const stalled=[];stallReads2287(faults,stalled,()=>true,stallMs);
+  faults.transactionRead=async path=>{stalled.push('transaction:'+path);await new Promise(resolve=>setTimeout(resolve,stallMs));};
+  if(route==='Retry sync')await ctx.onAction('sync-retry',{});else await ctx.cloudPull();
+  await settled('the held publication settles');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'the held recovery reaches the next revision, code '+backend.CS.errorCode+' stage '+backend.CS.errorStage);
+  assert.equal(await ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),null,'the hold is released');
+  assert.ok(ctx.state.tasks.some(task=>task.title==='Newer local edit before adoption'),'the newer local edit is kept');
+  assert.equal(ctx.state.syncDirty,false,'the board is confirmed');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  assert.ok(stalled.length>=8,'positive control: the reads stalled '+stalled.length);
+ });
 });
 
 // #2254 review (S2): an unreadable generation lets the board's next frame and
@@ -8336,8 +8569,12 @@ const earlierSources2254=async ctx=>{
  const history=JSON.parse(await vm.runInContext('automaticCloudSourceHistory().then(JSON.stringify)',ctx));
  return {error:history.error,unresolved:history.unresolved.map(row=>[row.id,row.reason]),permanent:history.permanent.map(row=>[row.id,row.reason])};
 };
-async function recoveredLeftoversApp2254(t){
- const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+// One chunk of the unreadable generation is left behind, so it stays an earlier
+// source to reconcile or note; zeroChunks leaves none, and a generation seen with
+// zero chunks has nothing left to recover (#2287).
+async function recoveredLeftoversApp2254(t,{zeroChunks=false}={}){
+ const app=await capturedGenerationAcceptedApp2198(t),{ctx,shim,backend,activePath}=app,store=ctx.window.ScannerDeviceStore;
+ if(!zeroChunks)backend.docs.set(activePath+'/chunks/00000000',{index:0,byteLength:1,hash:'0'.repeat(64),text:'x'});
  // The unreadable generation declares this acknowledged copy, padded.
  const acknowledgedBefore=ctx.state.decisionBase.payload;
  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=1048576;ctx.window.CLOUD_RETRY_DELAY_MS=0;
@@ -8716,9 +8953,6 @@ test('RISK acknowledged recovery trim: the recovery file holds only what the dev
 
 test('RISK acknowledged recovery trim: a note the trim kept still lets the check of earlier sources reconcile that generation once it can be read, and the trim after its acknowledgement clears the note',{timeout:300000},async t=>{
  const app=await recoveredLeftoversApp2254(t),{ctx,backend,store,unreadableId,activePath}=app,codec=ctx.window.ChainStorageV2;
- // #2287: this generation's bytes come back below, so it needs a marker from an
- // earlier release; without one a generation with no chunks left is retired.
- backend.docs.set('users/owner/recoveryProtections/'+unreadableId,{v:1,rootRevision:backend.docs.get('users/owner').rev-1,createdAt:{toMillis:()=>1234}});
  await ordinaryAcknowledgedSave2254(app,'Saved after the recovery');
  assert.deepEqual((await deviceRows2254(store)).opaque.filter(row=>trimLeftover2254(row.key)).map(row=>row.key),[],'positive control: the trim cleared the recovery');
  assert.deepEqual((await earlierSources2254(ctx)).unresolved,[[unreadableId,'generation-incomplete']],'positive control: the note names the unreadable generation');

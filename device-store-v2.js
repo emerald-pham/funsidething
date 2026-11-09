@@ -28,9 +28,20 @@
       ?Object.fromEntries(Object.keys(item).sort().map(key=>[key,ordered(item[key])])):item;
     const raw=JSON.stringify(value);return raw===undefined?"\u0000undefined":JSON.stringify(ordered(JSON.parse(raw)));
   };
+  // #2287 (owner, 2026-11-08): the one rule for a generation with nothing left
+  // to recover, on every route. It was declared complete and zero chunks
+  // arrived, so no marker can keep anything, no later read can find anything,
+  // and the collector retires it once the root has moved past it. A generation
+  // with some chunks left is not used either, but keeps its marker: no readable
+  // data goes with it. A failed read leaves chunks null (unavailable), never
+  // empty, and an upload still staging may yet receive its chunks.
+  const provedUnusableGeneration=row=>Array.isArray(row?.chunks)&&row.chunks.length===0&&
+    ["sealed","published"].includes(row.header?.state)&&Number.isSafeInteger(row.header?.chunkCount)&&row.header.chunkCount>=1;
   async function cloudRecoverySummary(archiveKey,archived){
     if(typeof archiveKey!=="string"||!archiveKey||!archived||typeof archived!=="object"||Array.isArray(archived))return null;
-    const generations=Array.isArray(archived.generations)?archived.generations.map(row=>row&&typeof row==="object"?{id:row.id,header:row.header}:row):null;
+    // #2287 review: an archive's generation seen with zero chunks says so here
+    // too, so a save decides without reading the archive whole or the server.
+    const generations=Array.isArray(archived.generations)?archived.generations.map(row=>row&&typeof row==="object"?{id:row.id,header:row.header,...(provedUnusableGeneration(row)?{chunks:[]}:{})}:row):null;
     return {format:CLOUD_RECOVERY_SUMMARY_FORMAT,version:1,archiveKey,archiveFormat:archived.format,archiveVersion:archived.version,
       identity:archived.identity,manifest:archived.manifest,generations,
       evidence:{manifest:canonicalRecoveryJson(archived.manifest),generations:await hashPayload(canonicalRecoveryJson(archived.generations)),
@@ -1042,5 +1053,5 @@
   }
 
   root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore,
-    canonicalRecoveryJson,cloudRecoverySummary,cloudRecoverySummaryKey};
+    canonicalRecoveryJson,cloudRecoverySummary,cloudRecoverySummaryKey,provedUnusableGeneration};
 })(globalThis);
