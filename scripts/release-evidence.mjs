@@ -912,7 +912,7 @@ function readReviewReport(reportDirectory, file, commitSha) {
   if (verdict !== 'approved') {
     throw new Error(file + ' needs the header line "Verdict: approved"; it has ' + (verdict || 'no verdict') + '.');
   }
-  const completedAt = reportHeaderValue(completedLine, 'Completed');
+  const completedAt = validTime(reportHeaderValue(completedLine, 'Completed'), file + ' header line Completed');
   return { completedAt, evidencePath, evidenceSha256: sha256(bytes) };
 }
 

@@ -619,6 +619,17 @@ test('RISK repository process: release prepare refuses a report with no approved
  assert.equal(blocked.inputWritten,false);
 });
 
+test('RISK repository process: release prepare refuses a report with a missing or future completion time',()=>{
+ const missing=prepareWithIndependentReport(fixture=>`Commit: ${fixture.candidateSha}\nVerdict: approved\n\nNo completion time.\n`);
+ assert.notEqual(missing.result.status,0,'a report without a completion time cannot supply the receipt time');
+ assert.match(missing.result.stderr,/independent-review\.md.*Completed/);
+ assert.equal(missing.inputWritten,false);
+ const future=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved',new Date(Date.now()+3600000).toISOString()));
+ assert.notEqual(future.result.status,0,'a future completion time cannot enter an immutable receipt');
+ assert.match(future.result.stderr,/independent-review\.md.*future/);
+ assert.equal(future.inputWritten,false);
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);
