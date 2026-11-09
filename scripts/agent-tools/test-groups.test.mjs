@@ -490,6 +490,56 @@ test('test group runner removes only its process temp files after failure', t =>
   assert.ok(fs.existsSync(path.join(result.outputDir, 'test.tap')), 'failure output remains available for diagnosis');
 });
 
+test('test group runner names why a test failed in the job log', t => {
+  const fixture = createFixture(t, { failOnRequest: true });
+  const result = invoke(fixture, { env: {
+    CHAIN_GROUP_FIXTURE_FAILURE: '1',
+    CHAIN_GROUP_FOREIGN_SENTINEL: path.join(fixture.root, 'foreign-owner-data.txt'),
+  } });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /^Test case failed: fixture core baseline root: intentional fixture process failure$/m, 'the failed job log gives the assertion without downloading an artifact');
+});
+
+// Roots appended here throw exactly what their source says; the expected log
+// text below is written out by hand, not derived from the runner's own parsing.
+function failingRootsFixture(t, roots) {
+  const fixture = createFixture(t);
+  fs.appendFileSync(path.join(fixture.root, suiteFile), roots.map(([title, body]) => `\ntest(${JSON.stringify(title)}, () => { ${body} });\n`).join(''));
+  const file = path.join(fixture.root, 'scripts/test-group-assignments.json'), catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
+  catalog.rootAssignments.push(...roots.map(([root]) => ({ root, group: 'core', file: suiteFile })));
+  writeJson(file, catalog);
+  git(fixture.root, 'add', '.'); git(fixture.root, 'commit', '-qm', 'failing assertion roots');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  return fixture;
+}
+const failureLine = (stderr, title) => {
+  const lines = stderr.split('\n').filter(line => line.startsWith(`Test case failed: ${title}: `));
+  assert.equal(lines.length, 1, `exactly one log line names ${title}`);
+  return lines[0].slice(`Test case failed: ${title}: `.length);
+};
+
+test('test group runner keeps a failed test reason to one capped line of the first assertion', t => {
+  const fixture = failingRootsFixture(t, [
+    ['fixture long assertion root', 'assert.fail("x".repeat(5000));'],
+    ['fixture multi-line assertion root', 'throw new Error("first assertion line\\n\\nboard data stays out of the log\\n");'],
+    ['fixture long multi-line assertion root', 'throw new Error("y".repeat(5000) + "\\nsecond line");'],
+    ['fixture terminal escape assertion root', 'throw new Error("\\u001b[31mcolored first line\\u001b[0m\\nrest");'],
+  ]);
+  const result = invoke(fixture);
+  assert.notEqual(result.status, 0);
+  assert.equal(failureLine(result.stderr, 'fixture multi-line assertion root'), 'first assertion line');
+  assert.doesNotMatch(result.stderr, /board data stays out of the log/, 'only the first assertion line reaches the public log');
+  for (const [title, character] of [['fixture long assertion root', 'x'], ['fixture long multi-line assertion root', 'y']]) {
+    const reason = failureLine(result.stderr, title);
+    assert.ok(reason.length <= 200, `${title} stays within the 200 character cap: ${reason.length}`);
+    assert.ok(reason.startsWith(character.repeat(150)), `${title} keeps the start of its assertion`);
+  }
+  assert.doesNotMatch(result.stderr, /second line/);
+  const escaped = failureLine(result.stderr, 'fixture terminal escape assertion root');
+  assert.doesNotMatch(escaped, /\u001b/, 'terminal control characters do not reach the log');
+  assert.match(escaped, /colored first line/);
+});
+
 test('test group runner fails closed when a required native child registration is missing or duplicated', t => {
   const validFixture = createFixture(t, { processControl: true });
   const valid = invoke(validFixture, { group: 'native-process' });
@@ -733,6 +783,83 @@ test('test group nightly cohort runs only the declared cross-engine cases and fa
     assert.notEqual(result.status,0,'a nightly '+name+' must fail the nightly run');
     assert.notEqual(result.evidence?.status,'passed');
     assert.match(result.stderr,message);
+  });
+});
+
+test('test group nightly job log names why a cross-engine case failed', t => {
+  const fixture = nightlyFixture(t, { body: '()=>{throw new Error("webkit pageerror")}' });
+  const result = invoke(fixture, { group: 'nightly-cross-engine' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /^Nightly case failed: fixture cross-engine native button root: webkit pageerror$/m);
+});
+
+// CI's answer for a diff, read from the actual router's plan: the descriptor's
+// cohort less any verified reuse. --plan-only keeps the router off GitHub.
+function ciRoutedGroups(fixture) {
+  const head = git(fixture.root, 'rev-parse', 'HEAD');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-listing-'));
+  fixture.outputs.push(directory);
+  const eventPath = path.join(directory, 'event.json');
+  writeJson(eventPath, { after: head });
+  const env = { ...process.env, GITHUB_REPOSITORY: 'example/fixture', GITHUB_RUN_ID: '41', GITHUB_RUN_ATTEMPT: '1', GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: eventPath, GITHUB_SHA: head, GITHUB_REF: 'refs/heads/topic' };
+  for (const name of ['NODE_TEST_CONTEXT', 'GITHUB_OUTPUT', 'GITHUB_TOKEN']) delete env[name];
+  const described = run('npm', ['run', 'test:group', '--', '--describe', '--group', 'core', '--output-dir', path.join(directory, 'described'),
+    '--repository', 'example/fixture', '--event-policy', 'local', '--run-id', '41', '--run-attempt', '1', '--source-sha', head, '--comparison-base', fixture.comparisonBase], fixture.root, env);
+  assert.equal(described.status, 0, described.stdout + described.stderr);
+  const routed = run(process.execPath, [path.join(repository, 'scripts/agent-tools/ci-routing.mjs'), '--comparison-base', fixture.comparisonBase,
+    '--evidence-dir', path.join(directory, 'routing'), '--plan-only', '1', '--descriptor', path.join(directory, 'described/descriptor.json')], fixture.root, env);
+  assert.equal(routed.status, 0, routed.stdout + routed.stderr);
+  const record = JSON.parse(fs.readFileSync(path.join(directory, 'routing/routing.json'), 'utf8'));
+  assert.equal(record.decision, 'full');
+  return record.cohortContext.expectedGroups.filter(group => !record.inputPasses[group]);
+}
+function listChangedGroups(fixture, ...args) {
+  const env = { ...process.env };
+  for (const name of ['NODE_TEST_CONTEXT', 'CHAIN_TEST_COMPARISON_BASE']) delete env[name];
+  return run('npm', ['run', '--silent', 'test:group', '--', '--changed-groups', ...args], fixture.root, env);
+}
+
+test('test group listing gives the groups CI routes for a diff and writes nothing', async parent => {
+  // A file only scenery tests read, and one no test reads: CI's input keys bind
+  // the complete tree, so neither narrows the groups.
+  for (const [name, file] of [['a diff touching a file scenery tests read', 'landscape.js'], ['a documentation-only diff', 'docs/note.md']]) await parent.test(name, t => {
+    const fixture = createFixture(t);
+    fs.mkdirSync(path.dirname(path.join(fixture.root, file)), { recursive: true });
+    fs.writeFileSync(path.join(fixture.root, file), 'changed\n');
+    // The router binds the workflow blob of the checkout it plans for.
+    fs.mkdirSync(path.join(fixture.root, '.github/workflows'), { recursive: true });
+    fs.writeFileSync(path.join(fixture.root, '.github/workflows/data-safety.yml'), 'fixture workflow\n');
+    git(fixture.root, 'add', '.'); git(fixture.root, 'commit', '-qm', 'candidate diff');
+    const listed = listChangedGroups(fixture, '--comparison-base', fixture.comparisonBase);
+    assert.deepEqual(listed.stdout.trim().split('\n'), ['core', 'scenery', 'persistence-recovery', 'native-process'], listed.stderr);
+    assert.equal(listed.status, 0, listed.stderr);
+    assert.match(listed.stderr, /complete tree/, 'the listing says why no file set narrows it');
+    assert.deepEqual(listed.stdout.trim().split('\n'), ciRoutedGroups(fixture), 'the listing and CI routing agree on the same diff');
+    assert.equal(git(fixture.root, 'status', '--porcelain', '--untracked-files=all'), '', 'the listing leaves the checkout untouched');
+  });
+});
+
+test('test group listing needs a known base and takes no evidence options', async parent => {
+  const refused = [
+    ['no comparison base', () => [], /comparison-base/],
+    ['an unknown comparison base', () => ['--comparison-base', 'no-such-base'], /no-such-base/],
+    ['an output directory', outputDir => ['--output-dir', outputDir, '--comparison-base', 'HEAD~1'], /--output-dir/],
+    ['a group', () => ['--group', 'core', '--comparison-base', 'HEAD~1'], /--group/],
+  ];
+  for (const [name, args, message] of refused) await parent.test(name, t => {
+    const fixture = createFixture(t), outputDir = path.join(os.tmpdir(), `chain-test-group-listing-refused-${process.pid}-${++outputSerial}`);
+    fixture.outputs.push(outputDir);
+    const listed = listChangedGroups(fixture, ...args(outputDir));
+    assert.notEqual(listed.status, 0, `the listing must refuse ${name}: ${listed.stdout}`);
+    assert.equal(listed.stdout, '', 'a refused listing names no groups');
+    assert.match(listed.stderr, message);
+    assert.equal(fs.existsSync(outputDir), false, 'a refused listing creates no output directory');
+  });
+  await parent.test('a branch or relative revision is accepted as the base', t => {
+    const fixture = createFixture(t);
+    const listed = listChangedGroups(fixture, '--comparison-base', 'HEAD~1');
+    assert.equal(listed.status, 0, listed.stderr);
+    assert.deepEqual(listed.stdout.trim().split('\n'), ['core', 'scenery', 'persistence-recovery', 'native-process']);
   });
 });
 
