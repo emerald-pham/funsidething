@@ -893,6 +893,37 @@ export function recordReleaseEvidence(repoRoot, input) {
   }
 }
 
+function readReviewReport(reportDirectory, file) {
+  const evidencePath = path.resolve(reportDirectory, file);
+  const bytes = fs.readFileSync(evidencePath);
+  const completedAt = bytes.toString('utf8').split('\n')[2].slice('Completed: '.length);
+  return { completedAt, evidencePath, evidenceSha256: sha256(bytes) };
+}
+
+// Writes receipt input from a directory of reports. Fields a person must author
+// are left empty because record refuses an empty summary or rationale; any
+// placeholder text long enough to pass would become permanent in the receipt.
+export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirectory, issue) {
+  const { root } = gitCommonDir(repoRoot);
+  deriveReleaseReviewPlan(root, commitSha, baseSha);
+  const treeSha = candidateTree(root, commitSha);
+  const review = (task, file) => {
+    const { completedAt, ...evidence } = readReviewReport(reportDirectory, file);
+    return { task: task + ':' + issue, outcome: 'approved', reviewedSha: commitSha, completedAt, summary: '', evidence };
+  };
+  const withScope = ({ evidence, ...fields }, scope) => ({ ...fields, scope, ...evidence });
+  const input = {
+    schemaVersion: 2,
+    candidate: { commitSha, treeSha, baseSha },
+    ownerReview: withScope(review('owner', 'owner-review.md'), { fullDiff: true, rationale: '' }),
+    independentReview: withScope(review('independent-review', 'independent-review.md'),
+      { fullDiff: true, relevantTests: true, userVisibleAndDataSafety: true }),
+  };
+  const inputPath = path.resolve(reportDirectory, 'receipt-input.json');
+  fs.writeFileSync(inputPath, JSON.stringify(input, null, 2) + '\n');
+  return inputPath;
+}
+
 function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
   const errors = [];
   if (receipt?.candidate?.commitSha !== commitSha) errors.push('Release receipt is stale or names a different candidate SHA.');
@@ -1392,7 +1423,16 @@ async function main() {
     process.stdout.write(JSON.stringify(deriveReleaseReviewPlan(gitCommonDir(repoRoot).root, commitSha, baseSha), null, 2) + '\n');
     return;
   }
-  throw new Error('Commands: plan, record, verify, pre-push, publish, verify-deployment.');
+  if (command === 'prepare') {
+    const [commitSha, baseSha, reportDirectory, issue] = process.argv.slice(3);
+    if (!commitSha || !baseSha || !reportDirectory || !issue) {
+      throw new Error('Usage: node scripts/release-evidence.mjs prepare <candidate-sha> <base-sha> <report-directory> <issue-number>');
+    }
+    const inputPath = prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirectory, issue);
+    process.stdout.write('Wrote ' + inputPath + '. Add the empty authored fields, then run release:record.\n');
+    return;
+  }
+  throw new Error('Commands: plan, prepare, record, verify, pre-push, publish, verify-deployment.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

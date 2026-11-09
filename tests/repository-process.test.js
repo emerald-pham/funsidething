@@ -545,6 +545,49 @@ test('RISK repository process: release plan prints the review plan the validator
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+const releaseReportHeader=(commit,verdict,completed)=>`Commit: ${commit}\nVerdict: ${verdict}\nCompleted: ${completed}\n\n`;
+function writeReleaseReports(fixture,reports){
+ const directory=path.join(fixture.root,'reports');
+ fs.mkdirSync(directory,{recursive:true});
+ for(const [name,text] of Object.entries(reports))fs.writeFileSync(path.join(directory,name),text);
+ return directory;
+}
+const sha256Of=text=>createHash('sha256').update(text).digest('hex');
+
+test('RISK repository process: release prepare writes receipt input that record accepts once a person adds the summaries',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independent});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input,{
+   schemaVersion:2,
+   candidate:{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha},
+   ownerReview:{task:'owner:2296',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:'2026-11-01T12:00:33.000Z',
+    summary:'',scope:{fullDiff:true,rationale:''},
+    evidencePath:path.join(reports,'owner-review.md'),evidenceSha256:sha256Of(owner)},
+   independentReview:{task:'independent-review:2296',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:'2026-11-01T11:53:58.000Z',
+    summary:'',scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+    evidencePath:path.join(reports,'independent-review.md'),evidenceSha256:sha256Of(independent)},
+  });
+  const unauthored=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unauthored.status,0,'an input nobody has summarized must not become a receipt');
+  assert.match(unauthored.stderr,/summary/i);
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='An ordinary tooling change fits the derived independent review.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+  const verified=releaseCommand(fixture,'verify',fixture.candidateSha);
+  assert.equal(verified.status,0,verified.stdout+verified.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);
