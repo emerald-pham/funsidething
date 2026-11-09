@@ -1,3 +1,4 @@
+import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';

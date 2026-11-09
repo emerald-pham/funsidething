@@ -2018,3 +2018,79 @@ test('RISK repository process: nested native fixture output stays isolated at th
  assert.match(result.stdout||'',/^# Nested output negative control:.*ENOENT: no such file or directory, open .*candidate-identity\.json/m,
   'The unisolated inherited-output child must actually fail before the isolated child proves success');
 });
+
+// A reviewer ran these tests with GIT_DIR set, and the fixtures' own git
+// commands moved the real branch and HEAD (#2292). These cases start real test
+// processes aimed at a throwaway repository and inspect it afterwards, so the
+// repository running the suite is never the one at risk.
+const environmentWithoutGitLocation=()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const name of ['GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE'])delete env[name];
+ return env;
+};
+function sacrificialGitRepository(t){
+ const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'chain-sacrificial-git-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',env:environmentWithoutGitLocation()});assert.equal(r.status,0,r.stderr);return r.stdout;};
+ fs.writeFileSync(path.join(root,'tracked.txt'),'original\n');
+ git('init','-q','-b','main');git('config','user.email','sacrificial@example.invalid');git('config','user.name','Sacrificial fixture');git('add','.');git('commit','-qm','base');
+ const snapshot=()=>({
+  head:fs.readFileSync(path.join(root,'.git/HEAD'),'utf8'),
+  refs:git('for-each-ref','--format=%(refname) %(objectname)'),
+  index:createHash('sha256').update(fs.readFileSync(path.join(root,'.git/index'))).digest('hex'),
+  workTree:fs.readdirSync(root).filter(entry=>entry!=='.git').sort().join(','),
+ });
+ return {root,gitDir:path.join(root,'.git'),indexFile:path.join(root,'.git/index'),snapshot};
+}
+const changedSnapshotFields=(before,after)=>Object.keys(before).filter(field=>before[field]!==after[field]);
+
+test('RISK repository process: a real git-fixture test cannot change the repository an inherited git variable names',t=>{
+ const fixtureRoot='RISK test-first gate: an app change paired with an edit to any split test file is accepted';
+ const outcomes={},expected={};
+ for(const variable of ['GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE']){
+  const sacrificial=sacrificialGitRepository(t);
+  const value={GIT_DIR:sacrificial.gitDir,GIT_WORK_TREE:sacrificial.root,GIT_INDEX_FILE:sacrificial.indexFile}[variable];
+  const before=sacrificial.snapshot();
+  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+fixtureRoot+'$','tests/repository-process.test.js'],
+   {cwd:__dirname,encoding:'utf8',env:{...environmentWithoutGitLocation(),[variable]:value},maxBuffer:16*1024*1024});
+  outcomes[variable]={changed:changedSnapshotFields(before,sacrificial.snapshot()),exitStatus:child.status,passed:/^# pass (\d+)$/m.exec(child.stdout||'')?.[1]};
+  expected[variable]={changed:[],exitStatus:0,passed:'1'};
+ }
+ assert.deepEqual(outcomes,expected,'The fixture must work only on its own repository and still pass');
+});
+
+test('RISK repository process: every test file keeps inherited git variables away from the fixtures it spawns',t=>{
+ // The directories are listed rather than named so a new test file is covered
+ // the moment it exists. Selecting no test keeps each process to its load; the
+ // preload then acts as that file's git fixture, in the file's own process.
+ const testFiles=[
+  ...fs.readdirSync(path.join(__dirname,'tests')).filter(file=>file.endsWith('.test.js')).map(file=>'tests/'+file),
+  ...fs.readdirSync(path.join(__dirname,'scripts/agent-tools')).filter(file=>file.endsWith('.test.mjs')).map(file=>'scripts/agent-tools/'+file),
+ ];
+ assert.ok(testFiles.includes('tests/core.test.js')&&testFiles.includes('scripts/agent-tools/checkpoint.test.mjs'),'both test directories were listed');
+ const workspace=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'chain-git-preload-'));
+ t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+ const preload=path.join(workspace,'fixture-preload.mjs');
+ fs.writeFileSync(preload,`import {spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+// node --test passes --import to each file's process and also runs it itself;
+// only the file's process is the one under test.
+if(process.env.NODE_TEST_CONTEXT)process.on('exit',()=>{
+ const cwd=process.env.FIXTURE_PRELOAD_REPOSITORY;fs.mkdirSync(cwd,{recursive:true});
+ for(const args of [['init','-q'],['-c','user.email=fixture@example.invalid','-c','user.name=Fixture','commit','--allow-empty','-qm','fixture'],['checkout','-q','-b','preload-fixture']])
+  spawnSync('git',args,{cwd,stdio:'ignore'});
+});
+`);
+ const unprotected={};
+ for(const file of testFiles){
+  const sacrificial=sacrificialGitRepository(t);
+  const fixtureRepository=path.join(workspace,file.replace(/\W/g,'-'));
+  const before=sacrificial.snapshot();
+  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--import='+preload,'--test-name-pattern=^no test has this name$',file],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024,
+   env:{...environmentWithoutGitLocation(),GIT_DIR:sacrificial.gitDir,GIT_WORK_TREE:sacrificial.root,GIT_INDEX_FILE:sacrificial.indexFile,FIXTURE_PRELOAD_REPOSITORY:fixtureRepository}});
+  const changed=changedSnapshotFields(before,sacrificial.snapshot());
+  const ownFixtureWritten=fs.existsSync(path.join(fixtureRepository,'.git/refs/heads/preload-fixture'));
+  if(changed.length||child.status!==0||!ownFixtureWritten)unprotected[file]={changed,exitStatus:child.status,ownFixtureWritten};
+ }
+ assert.deepEqual(unprotected,{},'Each file named here must load tests/isolate-git-env.js before its tests run (tests/shared.js already does)');
+});

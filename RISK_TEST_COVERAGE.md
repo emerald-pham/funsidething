@@ -1729,6 +1729,8 @@ its RISK test; the map follows.
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
+- RISK repository process: a real git-fixture test cannot change the repository an inherited git variable names
+- RISK repository process: every test file keeps inherited git variables away from the fixtures it spawns
 
 ## tests/scenery.test.js
 

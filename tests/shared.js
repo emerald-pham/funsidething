@@ -1,3 +1,4 @@
+import "./isolate-git-env.js";
 import { test as nodeTest } from "node:test";
 import assert from "node:assert/strict";
 import { AsyncLocalStorage } from "node:async_hooks";
