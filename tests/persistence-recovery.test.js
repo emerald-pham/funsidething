@@ -25,6 +25,7 @@ import {
   largeSignedInBoardFixture,
 } from "./shared.js";
 import { rewriteGenerationFixture } from "./shared.js";
+import { createDeviceBudgetClock, expireDeviceBudget } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
 import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDGET_MS, coldRelaunch2198, refuseNextRecoveryTransaction255,
   exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
@@ -338,10 +339,14 @@ test('RISK offline startup budget: stalled open and raw reads expose unsaved wor
   const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-startup-budget-'+fault+'-'+Math.random(),control={stallRawRead:fault==='stalled-raw-read'},inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
   const original=JSON.stringify(syncState({v:2,tasks:[syncTask('late-original','Late original task')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'late-backup',kind:'manual',at:1,day:'2026-10-24',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
   const indexedDBProvider=fault==='stalled-open'?{open(){return {};}}:deviceFaultProvider187(factory,control);let app;
-  const loading=loadApp({indexedDBProvider,deviceDbName,deviceOpenTimeoutMs:35,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
-  t.after(async()=>{control.releaseRawRead?.();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));
+  const clock=createDeviceBudgetClock(35),stalls=()=>(control.rawReadReleases||[]).length;
+  const loading=loadApp({indexedDBProvider,deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
+  t.after(async()=>{await clock.advance(350);control.releaseRawRead?.();await loading;await app?.dispose();});
+  await expireDeviceBudget(clock,()=>fault==='stalled-open'?clock.armed>0:!!control.releaseRawRead,'startup reaches the stalled storage step');await fixtureDeadline(loading,'one startup budget releases the stalled startup');
   assert.ok(app,'one original startup budget must release a permanently stalled storage read into a useful workspace');
-  assert.equal(app.ctx.deviceStorageActive(),false);app.shim.document.getElementById('addInput').value='Accepted while storage read stalled';await fixtureDeadline(app.ctx.onAction('add',{}),'stalled storage Add returns honestly',400);assert.equal(await fixtureDeadline(app.ctx.persist(),'stalled storage save returns honestly',400),false);
+  assert.equal(app.ctx.deviceStorageActive(),false);app.shim.document.getElementById('addInput').value='Accepted while storage read stalled';
+  {const before=stalls(),adding=app.ctx.onAction('add',{});await expireDeviceBudget(clock,()=>fault==='stalled-open'?clock.armed>0:stalls()>before,'the Add reaches the stalled storage step');await fixtureDeadline(adding,'stalled storage Add returns honestly');}
+  {const before=stalls(),saving=app.ctx.persist();await expireDeviceBudget(clock,()=>fault==='stalled-open'?clock.armed>0:stalls()>before,'the save reaches the stalled storage step');assert.equal(await fixtureDeadline(saving,'stalled storage save returns honestly'),false);}
   const id=app.ctx.state.tasks.find(row=>row.title==='Accepted while storage read stalled').id;assert.ok(app.ctx.deviceSaveIssue());
   if(fault==='stalled-raw-read'){
    control.releaseRawRead();await flush();await flush();assert.ok(app.ctx.state.tasks.some(row=>row.id===id),'a late original read cannot replace accepted in-memory work');assert.equal(app.ctx.deviceStorageActive(),false,'timed-out startup cannot activate later');
@@ -355,13 +360,15 @@ test('RISK offline startup resume: fresh storage saves accepted memory work whil
  const inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
  const original=JSON.stringify(syncState({v:2,tasks:[syncTask('withheld-original','Protected original before withheld callback')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'withheld-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>{tx.objectStore('meta').delete('head');tx.objectStore('meta').put({unknown:[31]},'pending:withheld');});
  const before=await inspector.readRawExportSnapshot(),storage=sharedScannerStorage({[DEVICE_AUTHORITY_KEY]:'1'});let app;
- const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);
- t.after(async()=>{for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);const releaseOld=control.releaseRawRead;assert.equal(typeof releaseOld,'function');
- app.shim.document.getElementById('addInput').value='Accepted while old readonly delivery stays withheld';await fixtureDeadline(app.ctx.onAction('add',{}),'withheld readonly Add returns',400);assert.equal(await fixtureDeadline(app.ctx.persist(),'withheld readonly save returns',400),false);const accepted=JSON.stringify(app.ctx.state),id=app.ctx.state.tasks.find(row=>row.title==='Accepted while old readonly delivery stays withheld').id;
+ const clock=createDeviceBudgetClock(35),stalls=()=>(control.rawReadReleases||[]).length;
+ const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);
+ t.after(async()=>{await clock.advance(350);for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});
+ await expireDeviceBudget(clock,()=>!!control.releaseRawRead,'startup reaches the withheld readonly delivery');await fixtureDeadline(loading,'one startup budget releases the withheld delivery');assert.ok(app);const releaseOld=control.releaseRawRead;assert.equal(typeof releaseOld,'function');
+ app.shim.document.getElementById('addInput').value='Accepted while old readonly delivery stays withheld';{const stalled=stalls(),adding=app.ctx.onAction('add',{});await expireDeviceBudget(clock,()=>stalls()>stalled,'the Add reaches the withheld readonly delivery');await fixtureDeadline(adding,'withheld readonly Add returns');}{const stalled=stalls(),saving=app.ctx.persist();await expireDeviceBudget(clock,()=>stalls()>stalled,'the save reaches the withheld readonly delivery');assert.equal(await fixtureDeadline(saving,'withheld readonly save returns'),false);}const accepted=JSON.stringify(app.ctx.state),id=app.ctx.state.tasks.find(row=>row.title==='Accepted while old readonly delivery stays withheld').id;
  assert.equal(vm.runInContext('localDeviceStartupAttempt.expired&&localDeviceStartupAttempt.pending',app.ctx),true);
  control.stallRawRead=false;
- const fresh=await fixtureDeadline(app.ctx.window.ScannerDeviceStore.readRawExportSnapshot(),'fresh raw request completes before old callback',400);assert.equal(JSON.stringify(fresh),JSON.stringify(before));
- assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh save after readonly storage returns',400),true,'an expired readonly callback cannot permanently block a fresh guarded save');
+ const fresh=await fixtureDeadline(app.ctx.window.ScannerDeviceStore.readRawExportSnapshot(),'fresh raw request completes before old callback');assert.equal(JSON.stringify(fresh),JSON.stringify(before));
+ assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh save after readonly storage returns'),true,'an expired readonly callback cannot permanently block a fresh guarded save');
  const saved=await inspector.readHead(),hold=await inspector.getRecoveryCloudHold(),archive=(await inspector.listOpaqueArchives()).find(row=>row.key===hold.originalKey);assert.ok(JSON.parse(saved.payload).tasks.some(row=>row.id===id));assert.ok(archive);
  assert.equal(JSON.stringify(JSON.parse(archive.raw).indexedDB),JSON.stringify(app.ctx.encodeManualArchiveSnapshot(before).stores));
  releaseOld();await flush();await flush();assert.equal((await inspector.readHead()).payload,saved.payload,'obsolete readonly delivery cannot overwrite the verified current head');assert.equal(JSON.stringify(app.ctx.state),saved.payload,'obsolete delivery cannot adopt the old original over current work');assert.notEqual(saved.payload,original);assert.ok(JSON.parse(accepted).tasks.some(row=>row.id===id));
@@ -373,16 +380,21 @@ test('RISK offline startup resume budget: fresh stalled captures stop and uncert
   const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-resume-bound-'+fault+'-'+Math.random(),control={stallRawRead:fault==='fresh-read-stalls',stallRawWrite:fault==='startup-write-withheld'};
   const inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
   const original=JSON.stringify(syncState({v:2,tasks:[syncTask('budget-original','Protected source before delayed storage')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'budget-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
-  let app;const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,seedStorage:{[DEVICE_AUTHORITY_KEY]:'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
-  t.after(async()=>{for(const release of control.rawReadReleases||[])release();control.releaseRawWrite?.();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);
-  app.shim.document.getElementById('addInput').value='Accepted work during delayed '+fault;await fixtureDeadline(app.ctx.onAction('add',{}),'delayed storage Add returns',400);const accepted=JSON.stringify(app.ctx.state);
+  let app;const clock=createDeviceBudgetClock(35),stalls=()=>(control.rawReadReleases||[]).length;
+  const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,seedStorage:{[DEVICE_AUTHORITY_KEY]:'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
+  t.after(async()=>{await clock.advance(350);for(const release of control.rawReadReleases||[])release();control.releaseRawWrite?.();await loading;await app?.dispose();});
+  await expireDeviceBudget(clock,()=>fault==='fresh-read-stalls'?!!control.releaseRawRead:!!control.releaseRawWrite,'startup reaches the delayed storage step');await fixtureDeadline(loading,'one startup budget releases the delayed storage');assert.ok(app);
+  app.shim.document.getElementById('addInput').value='Accepted work during delayed '+fault;
+  if(fault==='fresh-read-stalls'){const stalled=stalls(),adding=app.ctx.onAction('add',{});await expireDeviceBudget(clock,()=>stalls()>stalled,'the Add reaches the delayed storage read');await fixtureDeadline(adding,'delayed storage Add returns');}
+  else await fixtureDeadline(app.ctx.onAction('add',{}),'delayed storage Add returns');
+  const accepted=JSON.stringify(app.ctx.state);
   if(fault==='fresh-read-stalls'){
    control.releaseRawRead();await flush();await flush();control.stallRawRead=true;
-   assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh recovery capture has one bounded budget',400),false);
+   {const stalled=stalls(),saving=app.ctx.persist();await expireDeviceBudget(clock,()=>stalls()>stalled,'the fresh capture reaches the stalled read');assert.equal(await fixtureDeadline(saving,'fresh recovery capture has one bounded budget'),false);}
    assert.equal(app.ctx.deviceStorageActive(),false);assert.equal(JSON.stringify(app.ctx.state),accepted);control.releaseRawRead();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted);assert.equal(app.ctx.deviceStorageActive(),false,'late fresh read cannot activate after its own timeout');assert.equal(await inspector.readHead(),null);
   }else{
    assert.equal(typeof control.releaseRawWrite,'function','the original recovery write started before its completion delivery was withheld');const before=await inspector.readRawExportSnapshot();
-   assert.equal(await fixtureDeadline(app.ctx.persist(),'uncertain started mutation remains protected',400),false);assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(before),'a pending started mutation cannot be replayed as a fresh recovery write');
+   assert.equal(await fixtureDeadline(app.ctx.persist(),'uncertain started mutation remains protected'),false);assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(before),'a pending started mutation cannot be replayed as a fresh recovery write');
    control.releaseRawWrite();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted);assert.equal(app.ctx.deviceStorageActive(),false,'late original write completion cannot adopt over accepted memory work');
   }
  });
@@ -390,14 +402,14 @@ test('RISK offline startup resume budget: fresh stalled captures stop and uncert
 
 test('RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),control={quotaOpaque:true},deviceDbName='offline-final-activation-'+Math.random(),original='{unreadable activation original',storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:original,[SYNC_STORE_KEY]:'{other unreadable activation original'});
- const app=await loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(async()=>{for(const release of control.rawReadReleases||[])release();await app.dispose();});
+ const clock=createDeviceBudgetClock(60),app=await loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,budgetClock:clock,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(async()=>{await clock.advance(600);for(const release of control.rawReadReleases||[])release();await app.dispose();});
  app.shim.document.getElementById('addInput').value='Accepted before verified recovery activates';await app.ctx.onAction('add',{});assert.equal(await app.ctx.persist(),false);const first=app.ctx.state.tasks.find(row=>row.title==='Accepted before verified recovery activates').id;
  control.quotaOpaque=false;let armed=true;const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{set(key,value);if(armed&&key===DEVICE_AUTHORITY_KEY){armed=false;control.stallRawRead=true;}};
- assert.equal(await fixtureDeadline(app.ctx.persist(),'verified fresh recovery activation completes',400),true,'the fully read-back committed head and process flags must activate as one transition');assert.equal(armed,false);
+ assert.equal(await fixtureDeadline(app.ctx.persist(),'verified fresh recovery activation completes'),true,'the fully read-back committed head and process flags must activate as one transition');assert.equal(armed,false);
  assert.equal(app.ctx.deviceStorageActive(),true);assert.equal(vm.runInContext('memoryRecoveryWorkspace',app.ctx),false);assert.equal(app.ctx.deviceSaveIssue(),null);
  const hold=await app.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),saved=await app.ctx.window.ScannerDeviceStore.readHead();assert.equal(saved.payload,JSON.stringify(app.ctx.state));assert.ok(JSON.parse(saved.payload).tasks.some(row=>row.id===first));
  control.stallRawRead=false;
- app.shim.document.getElementById('addInput').value='Later accepted work after verified activation';await fixtureDeadline(app.ctx.onAction('add',{}),'later activation Add returns',400);const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after verified activation').id;
+ app.shim.document.getElementById('addInput').value='Later accepted work after verified activation';await fixtureDeadline(app.ctx.onAction('add',{}),'later activation Add returns');const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after verified activation').id;
  app.ctx.doneTask(later);assert.equal(await app.ctx.persist(),true);await app.ctx.onAction('undo',{});assert.equal(await app.ctx.persist(),true);assert.equal(!!app.ctx.state.tasks.find(row=>row.id===later).done,false);
  app.shim.document.getElementById('addInput').value='Unfinished activation draft';const accepted=JSON.stringify(app.ctx.state);for(const release of control.rawReadReleases||[])release();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted,'late optional cache delivery cannot replace current accepted edits');assert.equal(app.shim.document.getElementById('addInput').value,'Unfinished activation draft');
  assert.equal(await app.ctx.persist(),true);const final=await app.ctx.window.ScannerDeviceStore.readHead(),archive=(await app.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===hold.originalKey);assert.equal(final.payload,JSON.stringify(app.ctx.state));assert.ok(JSON.parse(archive.raw).localStorage.some(row=>row.key===LOCAL_HEAD_KEY&&row.raw===original));
@@ -408,15 +420,22 @@ test('RISK offline recovery reentry: settled own recovery writes permit fresh cu
  for(const mode of ['settled-own-intent','settled-own-intent-read-retry','settled-own-intent-write-retry','changed-hold'])await t.test(mode,async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),control={stallRawWrite:true},deviceDbName='offline-settled-reentry-'+mode+'-'+Math.random(),storage=sharedScannerStorage({[DEVICE_AUTHORITY_KEY]:'1'}),inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
   const original=JSON.stringify(syncState({v:2,tasks:[syncTask('settled-original','Original before uncertain recovery completion')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'settled-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>{tx.objectStore('meta').delete('head');tx.objectStore('meta').put({unknown:[41]},'pending:settled');});
-  let app;const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);t.after(async()=>{control.releaseRawWrite?.();for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);
-  app.shim.document.getElementById('addInput').value='Accepted while recovery completion is uncertain';await fixtureDeadline(app.ctx.onAction('add',{}),'uncertain completion Add returns',400);const first=app.ctx.state.tasks.find(row=>row.title==='Accepted while recovery completion is uncertain').id,prior=await inspector.readRawExportSnapshot(),priorHold=await inspector.getRecoveryCloudHold(),priorArchive=(await inspector.listOpaqueArchives()).find(row=>row.key===priorHold.originalKey);
+  let app;const clock=createDeviceBudgetClock(60);
+  const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,budgetClock:clock,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);t.after(async()=>{await clock.advance(600);control.releaseRawWrite?.();for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});
+  await expireDeviceBudget(clock,()=>!!control.releaseRawWrite,'startup reaches the uncertain recovery write');await fixtureDeadline(loading,'one startup budget releases the uncertain recovery write');assert.ok(app);
+  app.shim.document.getElementById('addInput').value='Accepted while recovery completion is uncertain';await fixtureDeadline(app.ctx.onAction('add',{}),'uncertain completion Add returns');const first=app.ctx.state.tasks.find(row=>row.title==='Accepted while recovery completion is uncertain').id,prior=await inspector.readRawExportSnapshot(),priorHold=await inspector.getRecoveryCloudHold(),priorArchive=(await inspector.listOpaqueArchives()).find(row=>row.key===priorHold.originalKey);
   assert.equal(await app.ctx.persist(),false,'an uncertain started write cannot replay before completion settles');assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(prior));
   control.releaseRawWrite();await flush();await flush();assert.equal(app.ctx.deviceStorageActive(),false,'late completion alone cannot adopt over accepted memory work');assert.ok(app.ctx.state.tasks.some(row=>row.id===first));
   if(mode==='changed-hold')await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').put({...priorHold,unknownPeer:{keep:[43]}},'recoveryCloudHold'));
   if(mode==='settled-own-intent-read-retry')control.stallRawRead=true;if(mode==='settled-own-intent-write-retry')control.quotaOpaque=true;
-  app.shim.document.getElementById('addInput').value='Later accepted work after recovery settles';await fixtureDeadline(app.ctx.onAction('add',{}),'settled completion Add returns',400);const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after recovery settles').id;app.shim.document.getElementById('addInput').value='Unfinished settled recovery draft';
+  app.shim.document.getElementById('addInput').value='Later accepted work after recovery settles';
+  {const stalled=(control.rawReadReleases||[]).length;let addReturned=false;const adding=Promise.resolve(app.ctx.onAction('add',{})).finally(()=>{addReturned=true;});
+   // A read stalled by this Add needs its own budget to pass; Add may also return without reaching storage.
+   if(mode==='settled-own-intent-read-retry'){await fixtureDeadline(async wait=>{while(!addReturned&&(control.rawReadReleases||[]).length<=stalled)await wait();},'the settled Add reaches the stalled read or returns');if(!addReturned)await clock.advance();}
+   await fixtureDeadline(adding,'settled completion Add returns');}
+  const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after recovery settles').id;app.shim.document.getElementById('addInput').value='Unfinished settled recovery draft';
   if(mode==='settled-own-intent-read-retry')control.stallRawRead=false;if(mode==='settled-own-intent-write-retry')control.quotaOpaque=false;const beforeSave=await inspector.readRawExportSnapshot();
-  assert.equal(await fixtureDeadline(app.ctx.persist(),'settled recovery permits one fresh current save',400),mode!=='changed-hold','only exact own settled recovery intent can resume durable progress');assert.equal(app.shim.document.getElementById('addInput').value,'Unfinished settled recovery draft');
+  assert.equal(await fixtureDeadline(app.ctx.persist(),'settled recovery permits one fresh current save'),mode!=='changed-hold','only exact own settled recovery intent can resume durable progress');assert.equal(app.shim.document.getElementById('addInput').value,'Unfinished settled recovery draft');
   if(mode==='changed-hold'){assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(beforeSave));assert.equal(app.ctx.deviceStorageActive(),false);return;}
   app.ctx.doneTask(later);assert.equal(await app.ctx.persist(),true);await app.ctx.onAction('undo',{});assert.equal(await app.ctx.persist(),true);
   const saved=await inspector.readHead(),hold=await inspector.getRecoveryCloudHold();assert.equal(saved.payload,JSON.stringify(app.ctx.state));for(const id of [first,later])assert.ok(JSON.parse(saved.payload).tasks.some(row=>row.id===id));assert.equal((await inspector.listOpaqueArchives()).find(row=>row.key===priorHold.originalKey).raw,priorArchive.raw);assert.ok(hold.originalKey);
@@ -427,6 +446,19 @@ test('RISK offline recovery reentry: settled own recovery writes permit fresh cu
   }
   await app.dispose();const cold=await loadApp({indexedDBProvider:factory,deviceDbName,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(()=>cold.dispose());for(const id of [first,later])assert.ok(cold.ctx.state.tasks.some(row=>row.id===id));assert.equal(!!cold.ctx.state.tasks.find(row=>row.id===later).done,false);assert.equal((await inspector.getRecoveryCloudHold()).originalKey,hold.originalKey);
  });
+});
+
+test('RISK offline startup budget: a stalled start stays pending until its one controlled budget expires',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-budget-clock-'+Math.random(),control={stallRawRead:true},inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+ const original=JSON.stringify(syncState({v:2,tasks:[syncTask('clock-original','Original before stalled start')]}));await inspector.commitHead({expectedHash:null,payload:original});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
+ let app;const clock=createDeviceBudgetClock(35);
+ const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
+ t.after(async()=>{await clock.advance(350);control.releaseRawRead?.();await loading;await app?.dispose();});
+ await fixtureDeadline(async wait=>{while(!control.releaseRawRead)await wait();},'startup reaches the stalled read');
+ await new Promise(resolve=>setTimeout(resolve,100));
+ assert.equal(app,undefined,'real time alone cannot spend the controlled startup budget');
+ await clock.advance();await fixtureDeadline(loading,'one startup budget releases the stalled startup');
+ assert.ok(app,'one controlled budget must release the stalled startup into a useful workspace');assert.equal(app.ctx.deviceStorageActive(),false);
 });
 
 test('RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work',async t=>{

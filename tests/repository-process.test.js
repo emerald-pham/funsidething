@@ -2353,3 +2353,14 @@ test('RISK repository process: Nightly on this head reports zero cross-engine ca
   assert.deepEqual(evidence.crossEngine.pendingRoots.map(entry=>[entry.root,entry.pendingOn]).sort(),pending.map(root=>[root,'#285']));
  }finally{fs.rmSync(parent,{recursive:true,force:true});}
 });
+
+test('RISK test inventory: the group CPU-load option stays local, guided and off in every required entry point',()=>{
+ const workflows=path.join(__dirname,'.github/workflows');
+ for(const file of fs.readdirSync(workflows))assert.doesNotMatch(fs.readFileSync(path.join(workflows,file),'utf8'),/cpu-load/,file+' must not set the CPU-load option');
+ for(const [name,command] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8')).scripts))assert.doesNotMatch(command,/cpu-load/,'npm script '+name+' must not require it');
+ const guide=fs.readFileSync(path.join(__dirname,'docs/agents/test-groups.md'),'utf8');
+ assert.match(guide,/## Loaded runs/,'the guide has one Loaded runs section');
+ assert.match(guide,/--cpu-load/,'it names the option');
+ assert.match(guide,/timer, debounce and race/,'it says when to reach for a loaded run');
+ assert.match(guide,/host coordination/i,'it says to respect the host coordination ledger');
+});

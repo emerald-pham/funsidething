@@ -1441,6 +1441,7 @@ its RISK test; the map follows.
 - RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay
 - RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits
 - RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected
+- RISK offline startup budget: a stalled start stays pending until its one controlled budget expires
 - RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work
 - RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
 - RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
@@ -1744,6 +1745,7 @@ its RISK test; the map follows.
 - RISK repository process: a real git-fixture test cannot change the repository an inherited git variable names
 - RISK repository process: every test file keeps inherited git variables away from the fixtures it spawns
 - RISK repository process: Nightly on this head reports zero cross-engine cases and names both roots pending on the WebKit work
+- RISK test inventory: the group CPU-load option stays local, guided and off in every required entry point
 
 ## tests/scenery.test.js
 
