@@ -1,5 +1,11 @@
 # Rendered evidence cases
 
+## Visual test requirements
+
+Actual visual tests are mandatory for changed controls or layout. Code and typography reviewers inspect the final rendered visual-test evidence for every changed control and its established neighboring control. Compare the controls in the same pane, not a modal reference substituted for a list toolbar. Test day and night themes, ordinary and enlarged relevant mobile/desktop views, natural disabled and selected states, native keyboard focus, and top, middle and end task scrolling. Check row height before/after selection, group spacing, pane insets, safe-area spacing and unobscured content as well as individual styles. Screenshots in isolation are not a pass: record executed assertions, exact artifact and visible changed surfaces together with the named reference and coverage limits. Missing relevant runtime evidence remains a review gap.
+
+## FAQ typography command
+
 Use `scripts/agent-tools/rendered-evidence.mjs` to capture one isolated FAQ typography case against the local app. Each invocation creates `case.json`, an ordinary-size reference PNG, and the requested capture PNG in a new case directory. Keep the JSON beside its images; the hashes and paths bind those files to the measured case.
 
 The caller supplies the local app URL, a fresh output directory, an absolute path to an installed Playwright module that exports `chromium.launch()`, and the exact source or artifact identity being served. The command does not start a server or discover a commit from an arbitrary URL. Run it only against a local unauthenticated app and a browser runtime allocated to this task. It rejects non-loopback URLs, gives Chromium a fresh in-memory context with no storage state, blocks external requests and service workers, and adds two synthetic tasks using the app’s Add control. It chooses normal motion only when the first-run motion choice is visible, sets the requested theme through the native theme button, verifies that the other theme changes computed paint, restores the requested theme, then opens and expands FAQs through the app’s existing controls. It does not read or write a personal browser profile or saved board.
