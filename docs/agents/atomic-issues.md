@@ -22,7 +22,7 @@ body, alongside the release gates that apply to the change;
 - [ ] Owner exact-diff review
 - [ ] Any other reviews the derived plan requires
 - [ ] Required CI green on the exact head
-- [ ] Nightly `cross-engine-native` job dispatched on the exact head and green, or failing only the accepted #285 WebKit cases (Stable releases)
+- [ ] Nightly `cross-engine-native` job dispatched on the exact head and green; a run with no active roots is cited as no cross-engine evidence (Stable releases)
 - [ ] Merged and Pages deployment verified
 - [ ] Live behavior checked on Stable
 - [ ] Branch and worktree cleaned up

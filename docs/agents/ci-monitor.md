@@ -99,8 +99,9 @@ or identity mismatch, and 2 requires continued observation or investigation.
 The `velocity-report` subcommand summarizes the last 7 days: PRs merged to
 `main`, median and p90 duration of finished Data safety runs (nearest rank;
 cancelled and unfinished runs excluded), issues opened, and open PR ages. The
-Nightly workflow's `velocity-report` job runs it and writes the summary to the
-step summary. If no PR merged to `main` while PRs are open, or more than 100
+Nightly workflow's `velocity-report` job runs it on the schedule only (a
+dispatched run skips it, because the count says nothing about a candidate) and
+writes the summary to the step summary. If no PR merged to `main` while PRs are open, or more than 100
 issues were opened, it annotates the run with an error, exits 1, and comments on
 the open `Weekly velocity alert` issue (labelled `needs-triage`) or creates it.
 Close that issue once the cause is handled; the next alert opens a new one.

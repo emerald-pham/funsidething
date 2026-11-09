@@ -10,6 +10,7 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 // Not a required group: the scheduled/dispatched nightly job runs it alone.
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
+const FAILURE_REASON_MAX_CHARS = 200;
 const MIN_GROUP_HEAP_MB = 512;
 const MAX_GROUP_HEAP_MB = 12288;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,7 +53,7 @@ function parseArgs(argv) {
     ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
   ]);
   for (let index = 0; index < argv.length; index++) {
-    if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
+    if (['--describe','--aggregate','--covered','--changed-groups'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
     const key = keyMap.get(argv[index]);
     if (!key) fail(`Unknown argument: ${argv[index]}`);
     if (values[key] !== undefined) fail(`Argument ${argv[index]} was provided more than once.`);
@@ -392,6 +393,7 @@ function validateNightlyRoots(assignments, fileSet, assignmentsByRoot) {
     if (assignmentsByRoot.has(entry.root) || assignments.processControls.some(control => control.id === entry.root)) {
       fail(`Nightly root ${JSON.stringify(entry.root)} is also a required case; move it out of the required cohort instead of declaring it twice.`);
     }
+    if (Object.hasOwn(entry, 'pendingOn') && !/^#[1-9]\d*$/.test(entry.pendingOn)) fail(`Pending nightly root ${JSON.stringify(entry.root)} must name its owning PR as #<number>.`);
     if (nightlyRoots.has(entry.root)) fail(`Nightly root ${JSON.stringify(entry.root)} is declared more than once.`);
     nightlyRoots.set(entry.root, entry);
   }
@@ -744,13 +746,45 @@ function testNamePatternArguments(roots) {
   return argumentsForPatterns;
 }
 
+// Job logs are public and assertion text can come from any test, so only the
+// first assertion line is kept: later lines carry the compared values. It is
+// one line of printable text, capped in length.
+function publicFailureReason(text) {
+  const characters = Array.from(text.replace(/[\p{C}\p{Zl}\p{Zp}]+/gu, ' ').trim());
+  if (!characters.length) return null;
+  return characters.length > FAILURE_REASON_MAX_CHARS ? `${characters.slice(0, FAILURE_REASON_MAX_CHARS - 1).join('')}…` : characters.join('');
+}
+
+// Why a failed result failed, for the public job log: the error key of that
+// result's own YAML diagnostics, read at its exact indentation so assertion
+// text that resembles TAP cannot stand in for it.
+function tapFailureReason(lines, resultIndex, indentation) {
+  const indent = ' '.repeat(indentation + 2);
+  if (lines[resultIndex + 1] !== `${indent}---`) return null;
+  for (let index = resultIndex + 2; index < lines.length && lines[index] !== `${indent}...`; index++) {
+    if (!lines[index].startsWith(`${indent}error: `)) continue;
+    const value = lines[index].slice(indent.length + 'error: '.length).trim();
+    if (!/^[|>][-+]?$/.test(value)) return publicFailureReason(value.replace(/^(['"`])(.*)\1$/, '$2'));
+    const block = `${indent}  `;
+    for (let cursor = index + 1; cursor < lines.length && (lines[cursor].startsWith(block) || !lines[cursor].trim()); cursor++) {
+      const reason = publicFailureReason(lines[cursor]);
+      if (reason) return reason;
+    }
+    return null;
+  }
+  return null;
+}
+
+const failedCaseLabel = item => `${item.id}${item.failureReason ? `: ${item.failureReason}` : ''}`;
+
 function parseTap(text) {
   if (!/^TAP version \d+/m.test(text)) fail('The test process did not produce a TAP stream.');
   const stack = [];
   const cases = [];
   const resultLine = /^(\s*)(not )?ok \d+ - (.*?)(?: # (SKIP|TODO)(?:\s+(.*))?)?\s*$/;
   const subtestLine = /^(\s*)# Subtest: (.*)$/;
-  for (const line of text.split(/\r?\n/)) {
+  const lines = text.split(/\r?\n/);
+  for (const [lineIndex, line] of lines.entries()) {
     const subtest = line.match(subtestLine);
     if (subtest) {
       const indentation = subtest[1].length;
@@ -765,12 +799,14 @@ function parseTap(text) {
     if (!active.length) fail(`Could not associate TAP result with a test identity: ${line}`);
     const names = active.map(item => normalizeTapIdentity(item.name));
     const directive = result[4]?.toLowerCase();
+    const status = directive === 'skip' ? 'skipped' : directive === 'todo' ? 'todo' : result[2] ? 'failed' : 'passed';
     cases.push({
       id: names.join(' > '),
       root: names[0],
-      status: directive === 'skip' ? 'skipped' : directive === 'todo' ? 'todo' : result[2] ? 'failed' : 'passed',
+      status,
       skipReason: directive === 'skip' ? (result[5] || '').trim() : null,
       line,
+      ...(status === 'failed' ? { failureReason: tapFailureReason(lines, lineIndex, indentation) } : {}),
     });
   }
   return cases;
@@ -827,7 +863,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
     if (selectedRootSet.has(id) && !process.env[entry.environment]) acceptedSkips.add(id);
   }
   for (const item of cases) {
-    if (item.status === 'failed') errors.push(`Test case failed: ${item.id}`);
+    if (item.status === 'failed') errors.push(`Test case failed: ${failedCaseLabel(item)}`);
     else if (item.status === 'todo') errors.push(`Test case was unexpectedly marked TODO: ${item.id}`);
     else if (item.status === 'skipped' && !acceptedSkips.has(item.id)) errors.push(`Test case was unexpectedly skipped: ${item.id}`);
   }
@@ -851,16 +887,33 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
 }
 
 // The nightly job exists so engine regressions stay visible before a Stable
-// release. An empty, missing, skipped or failed nightly case therefore fails
-// the run instead of passing quietly.
+// release. An empty list, a missing active root, or a skipped or failed nightly
+// case therefore fails the run instead of passing quietly. A pending root names
+// a test that has not landed (#2293): it runs nothing until its PR lands, and it
+// fails here as soon as its test appears so that landed test cannot go unrun.
 function nightlySelection(assignmentIndex) {
   const entries = [...assignmentIndex.nightlyRoots.values()];
   if (!entries.length) fail('No nightly cross-engine roots are declared in scripts/test-group-assignments.json.');
-  for (const entry of entries) {
-    const count = countTestRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+  const pending = entries.filter(entry => entry.pendingOn), active = entries.filter(entry => !entry.pendingOn);
+  const registrations = entry => countTestRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+  for (const entry of pending) {
+    if (registrations(entry)) fail(`Pending nightly cross-engine root ${JSON.stringify(entry.root)} (${entry.pendingOn}) has landed in ${entry.file}; remove its pendingOn to move it to active so it runs.`);
+  }
+  for (const entry of active) {
+    const count = registrations(entry);
     if (count !== 1) fail(`Nightly cross-engine root ${JSON.stringify(entry.root)} is registered ${count} times in ${entry.file}; expected exactly one.`);
   }
-  return { files: [...new Set(entries.map(entry => entry.file))].sort(), roots: entries.map(entry => entry.root).sort() };
+  return { files: [...new Set(active.map(entry => entry.file))].sort(), roots: active.map(entry => entry.root).sort(), pending };
+}
+
+// A zero must read as a zero (#2293): the result and the run's annotation both
+// state how many cases ran and which roots still wait on their owning PR.
+function crossEngineReport(nightly, casesRun) {
+  return { casesRun, activeRoots: nightly.roots, pendingRoots: nightly.pending.map(({ root, file, pendingOn }) => ({ root, file, pendingOn })) };
+}
+function crossEngineNotice({ casesRun, pendingRoots }) {
+  const pending = pendingRoots.length ? ` Pending, not run: ${pendingRoots.map(entry => `${JSON.stringify(entry.root)} (${entry.pendingOn})`).join('; ')}.` : '';
+  return `::notice title=Nightly cross-engine coverage::${casesRun} cross-engine case${casesRun === 1 ? '' : 's'} ran on this head.${casesRun ? '' : ' This run is no cross-engine evidence.'}${pending}\n`;
 }
 
 function verifyNightlyResults(cases, roots) {
@@ -873,7 +926,7 @@ function verifyNightlyResults(cases, roots) {
   }
   for (const item of cases) {
     if (!rootSet.has(item.root)) errors.push(`Case ${JSON.stringify(item.id)} is outside the nightly cohort.`);
-    if (item.status === 'failed') errors.push(`Nightly case failed: ${item.id}`);
+    if (item.status === 'failed') errors.push(`Nightly case failed: ${failedCaseLabel(item)}`);
     else if (item.status === 'skipped') errors.push(`Nightly case was skipped: ${item.id}`);
     else if (item.status === 'todo') errors.push(`Nightly case was marked TODO: ${item.id}`);
   }
@@ -1134,6 +1187,23 @@ async function runChild(files, roots, outputDir, options, source, heapMb) {
   };
 }
 
+// The groups a diff needs, as CI routes them. Each CI gate is keyed on the
+// complete checkout tree, so a changed file of any kind runs every group CI's
+// cohort declares; GROUP_IDS is that cohort, handed to the router by --describe.
+// A retained pass for identical inputs only reuses a run CI already has.
+function listChangedGroups(options) {
+  for (const [key, flag] of [['group', '--group'], ['outputDir', '--output-dir'], ['describe', '--describe'], ['aggregate', '--aggregate'], ['covered', '--covered']]) {
+    if (options[key] !== undefined) fail(`--changed-groups writes no evidence, so it cannot take ${flag}.`);
+  }
+  if (!options.comparisonBase) fail('--changed-groups needs --comparison-base <commit> for the diff.');
+  if (requireGit(['rev-parse', '--verify', '--quiet', '--end-of-options', `${options.comparisonBase}^{commit}`], 'utf8').status !== 0) {
+    fail(`Unknown comparison base ${JSON.stringify(options.comparisonBase)}.`);
+  }
+  process.stdout.write(`${GROUP_IDS.join('\n')}\n`);
+  process.stderr.write('CI keys every group on the complete tree, so no file set narrows this list.\n');
+  return 0;
+}
+
 async function main() {
   if (process.argv.slice(2).includes('--help')) {
     process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha>\n');
@@ -1144,6 +1214,7 @@ async function main() {
   const startedAt = new Date().toISOString();
   try {
     const parsed = parseArgs(process.argv.slice(2));
+    if (parsed['changed-groups']) return listChangedGroups(parsed);
     outputDir = validateOutputDirectory(parsed.outputDir);
     options = requiredIdentity(parsed);
   } catch (error) {
@@ -1239,6 +1310,14 @@ async function main() {
     }
 
     const nightly = options.group === NIGHTLY_GROUP_ID ? nightlySelection(assignmentIndex) : null;
+    if (nightly && !nightly.roots.length) {
+      result.status = 'no_active_roots';
+      result.crossEngine = crossEngineReport(nightly, 0);
+      result.finishedAt = new Date().toISOString();
+      atomicWrite(path.join(outputDir, 'result.json'), result);
+      process.stdout.write(crossEngineNotice(result.crossEngine));
+      return 0;
+    }
     const selectedFiles = nightly ? nightly.files : [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
     ])].sort();
@@ -1298,6 +1377,10 @@ async function main() {
     if (childResult.exit.code !== 0) result.issues.unshift(`Test process exited with ${childResult.exit.code ?? childResult.exit.signal ?? childResult.exit.error}.`);
     if (gitStatus.trim() && !source.dirty) result.issues.push('Checkout dirty state could not be reconciled with its identity.');
     result.status = result.issues.length ? 'failed' : 'passed';
+    if (nightly) {
+      result.crossEngine = crossEngineReport(nightly, childResult.cases.length);
+      process.stdout.write(crossEngineNotice(result.crossEngine));
+    }
   } catch (error) {
     result.issues.push(error.message);
     result.status = 'preflight_failed';
