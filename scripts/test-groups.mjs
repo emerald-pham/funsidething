@@ -10,6 +10,7 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 // Not a required group: the scheduled/dispatched nightly job runs it alone.
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
+const FAILURE_REASON_MAX_CHARS = 200;
 const MIN_GROUP_HEAP_MB = 512;
 const MAX_GROUP_HEAP_MB = 12288;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,7 +53,7 @@ function parseArgs(argv) {
     ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
   ]);
   for (let index = 0; index < argv.length; index++) {
-    if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
+    if (['--describe','--aggregate','--covered','--changed-groups'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
     const key = keyMap.get(argv[index]);
     if (!key) fail(`Unknown argument: ${argv[index]}`);
     if (values[key] !== undefined) fail(`Argument ${argv[index]} was provided more than once.`);
@@ -745,13 +746,45 @@ function testNamePatternArguments(roots) {
   return argumentsForPatterns;
 }
 
+// Job logs are public and assertion text can come from any test, so only the
+// first assertion line is kept: later lines carry the compared values. It is
+// one line of printable text, capped in length.
+function publicFailureReason(text) {
+  const characters = Array.from(text.replace(/[\p{C}\p{Zl}\p{Zp}]+/gu, ' ').trim());
+  if (!characters.length) return null;
+  return characters.length > FAILURE_REASON_MAX_CHARS ? `${characters.slice(0, FAILURE_REASON_MAX_CHARS - 1).join('')}…` : characters.join('');
+}
+
+// Why a failed result failed, for the public job log: the error key of that
+// result's own YAML diagnostics, read at its exact indentation so assertion
+// text that resembles TAP cannot stand in for it.
+function tapFailureReason(lines, resultIndex, indentation) {
+  const indent = ' '.repeat(indentation + 2);
+  if (lines[resultIndex + 1] !== `${indent}---`) return null;
+  for (let index = resultIndex + 2; index < lines.length && lines[index] !== `${indent}...`; index++) {
+    if (!lines[index].startsWith(`${indent}error: `)) continue;
+    const value = lines[index].slice(indent.length + 'error: '.length).trim();
+    if (!/^[|>][-+]?$/.test(value)) return publicFailureReason(value.replace(/^(['"`])(.*)\1$/, '$2'));
+    const block = `${indent}  `;
+    for (let cursor = index + 1; cursor < lines.length && (lines[cursor].startsWith(block) || !lines[cursor].trim()); cursor++) {
+      const reason = publicFailureReason(lines[cursor]);
+      if (reason) return reason;
+    }
+    return null;
+  }
+  return null;
+}
+
+const failedCaseLabel = item => `${item.id}${item.failureReason ? `: ${item.failureReason}` : ''}`;
+
 function parseTap(text) {
   if (!/^TAP version \d+/m.test(text)) fail('The test process did not produce a TAP stream.');
   const stack = [];
   const cases = [];
   const resultLine = /^(\s*)(not )?ok \d+ - (.*?)(?: # (SKIP|TODO)(?:\s+(.*))?)?\s*$/;
   const subtestLine = /^(\s*)# Subtest: (.*)$/;
-  for (const line of text.split(/\r?\n/)) {
+  const lines = text.split(/\r?\n/);
+  for (const [lineIndex, line] of lines.entries()) {
     const subtest = line.match(subtestLine);
     if (subtest) {
       const indentation = subtest[1].length;
@@ -766,12 +799,14 @@ function parseTap(text) {
     if (!active.length) fail(`Could not associate TAP result with a test identity: ${line}`);
     const names = active.map(item => normalizeTapIdentity(item.name));
     const directive = result[4]?.toLowerCase();
+    const status = directive === 'skip' ? 'skipped' : directive === 'todo' ? 'todo' : result[2] ? 'failed' : 'passed';
     cases.push({
       id: names.join(' > '),
       root: names[0],
-      status: directive === 'skip' ? 'skipped' : directive === 'todo' ? 'todo' : result[2] ? 'failed' : 'passed',
+      status,
       skipReason: directive === 'skip' ? (result[5] || '').trim() : null,
       line,
+      ...(status === 'failed' ? { failureReason: tapFailureReason(lines, lineIndex, indentation) } : {}),
     });
   }
   return cases;
@@ -828,7 +863,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
     if (selectedRootSet.has(id) && !process.env[entry.environment]) acceptedSkips.add(id);
   }
   for (const item of cases) {
-    if (item.status === 'failed') errors.push(`Test case failed: ${item.id}`);
+    if (item.status === 'failed') errors.push(`Test case failed: ${failedCaseLabel(item)}`);
     else if (item.status === 'todo') errors.push(`Test case was unexpectedly marked TODO: ${item.id}`);
     else if (item.status === 'skipped' && !acceptedSkips.has(item.id)) errors.push(`Test case was unexpectedly skipped: ${item.id}`);
   }
@@ -891,7 +926,7 @@ function verifyNightlyResults(cases, roots) {
   }
   for (const item of cases) {
     if (!rootSet.has(item.root)) errors.push(`Case ${JSON.stringify(item.id)} is outside the nightly cohort.`);
-    if (item.status === 'failed') errors.push(`Nightly case failed: ${item.id}`);
+    if (item.status === 'failed') errors.push(`Nightly case failed: ${failedCaseLabel(item)}`);
     else if (item.status === 'skipped') errors.push(`Nightly case was skipped: ${item.id}`);
     else if (item.status === 'todo') errors.push(`Nightly case was marked TODO: ${item.id}`);
   }
@@ -1152,6 +1187,23 @@ async function runChild(files, roots, outputDir, options, source, heapMb) {
   };
 }
 
+// The groups a diff needs, as CI routes them. Each CI gate is keyed on the
+// complete checkout tree, so a changed file of any kind runs every group CI's
+// cohort declares; GROUP_IDS is that cohort, handed to the router by --describe.
+// A retained pass for identical inputs only reuses a run CI already has.
+function listChangedGroups(options) {
+  for (const [key, flag] of [['group', '--group'], ['outputDir', '--output-dir'], ['describe', '--describe'], ['aggregate', '--aggregate'], ['covered', '--covered']]) {
+    if (options[key] !== undefined) fail(`--changed-groups writes no evidence, so it cannot take ${flag}.`);
+  }
+  if (!options.comparisonBase) fail('--changed-groups needs --comparison-base <commit> for the diff.');
+  if (requireGit(['rev-parse', '--verify', '--quiet', '--end-of-options', `${options.comparisonBase}^{commit}`], 'utf8').status !== 0) {
+    fail(`Unknown comparison base ${JSON.stringify(options.comparisonBase)}.`);
+  }
+  process.stdout.write(`${GROUP_IDS.join('\n')}\n`);
+  process.stderr.write('CI keys every group on the complete tree, so no file set narrows this list.\n');
+  return 0;
+}
+
 async function main() {
   if (process.argv.slice(2).includes('--help')) {
     process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha>\n');
@@ -1162,6 +1214,7 @@ async function main() {
   const startedAt = new Date().toISOString();
   try {
     const parsed = parseArgs(process.argv.slice(2));
+    if (parsed['changed-groups']) return listChangedGroups(parsed);
     outputDir = validateOutputDirectory(parsed.outputDir);
     options = requiredIdentity(parsed);
   } catch (error) {

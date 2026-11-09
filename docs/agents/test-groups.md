@@ -129,6 +129,23 @@ This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
 
+## Which groups a diff needs
+
+```sh
+npm run --silent test:group -- --changed-groups --comparison-base origin/main
+```
+
+This read-only mode prints one group per line and writes no evidence, so it takes
+no `--output-dir` or `--group`. Today it always prints all four required groups:
+CI keys each group on the complete checkout tree, so no changed file narrows the
+list, and a documentation-only diff needs the same groups as a scenery change.
+
+## Reading a failed group
+
+A failed group's log gives each failed test's first assertion line, capped at 200
+characters. Compared values on later assertion lines stay in the `test.tap`
+artifact, because job logs are public.
+
 ## Nightly cross-engine cohort
 
 `scripts/test-group-assignments.json` lists cross-engine native roots under

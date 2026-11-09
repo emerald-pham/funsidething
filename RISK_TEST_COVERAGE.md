@@ -1737,6 +1737,7 @@ its RISK test; the map follows.
 - RISK repository process: CI admission enforces reuse before repeating a passed test child
 - RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes
 - RISK repository process: grouped runner stays covered at the default npm test boundary
+- RISK repository process: failed groups state a capped reason and the group listing matches CI routing
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
