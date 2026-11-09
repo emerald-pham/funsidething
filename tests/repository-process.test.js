@@ -688,6 +688,20 @@ test('RISK repository process: release prepare takes specialist domains from the
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: release prepare refuses a source file that differs from the exact commit',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  fs.writeFileSync(path.join(fixture.repo,'scripts/cloud-sync.mjs'),'export const cloudValue = 3;\n');
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(prepared.status,0,'a digest of the commit cannot be paired with different bytes on disk');
+  assert.match(prepared.stderr,/scripts\/cloud-sync\.mjs/);
+  assert.equal(fs.existsSync(path.join(reports,'receipt-input.json')),false);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);

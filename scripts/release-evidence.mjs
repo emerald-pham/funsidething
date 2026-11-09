@@ -922,11 +922,17 @@ function committedFileBytes(repoRoot, commitSha, file) {
 }
 
 // Digests come from the exact commit, so they cannot describe a different tree.
-// A file the candidate deleted has no bytes to fingerprint.
+// A file the candidate deleted has no bytes to fingerprint. Record checks each
+// digest against the file on disk, so the candidate must be the checkout.
 function candidateSources(repoRoot, commitSha, changedFiles) {
   return changedFiles.flatMap(file => {
     const bytes = committedFileBytes(repoRoot, commitSha, file);
-    return bytes === null ? [] : [{ path: path.join(repoRoot, file), sha256: sha256(bytes) }];
+    if (bytes === null) return [];
+    const source = path.join(repoRoot, file);
+    if (!fs.existsSync(source) || !bytes.equals(fs.readFileSync(source))) {
+      throw new Error(file + ' on disk differs from the candidate; check out the exact candidate before preparing.');
+    }
+    return [{ path: source, sha256: sha256(bytes) }];
   });
 }
 
