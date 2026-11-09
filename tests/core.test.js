@@ -422,7 +422,8 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  const answer=answerTo('Does the app fix an unreadable cloud copy by itself?');
  assert.match(answer,/When the newest cloud copy cannot be read but the copy before it is exactly the one this device last confirmed, the app saves this device’s board as the new cloud copy by itself/);
  assert.match(answer,/even while it says “recovery waiting”/);
- assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud, and this device keeps a note naming it\./);
+ assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; once replaced, that copy is discarded and this device keeps a note naming it\./);
+ assert.doesNotMatch(answer,/that copy stays protected/,'the unusable copy is no longer kept in the cloud (#2287)');
  assert.match(answer,/The app also waits after you choose Use my board from before recovery\./);
  // #2254 re-review: a run the page did not finish leaves its mark, so the
  // next opening waits until Retry sync instead of starting it again.
@@ -431,8 +432,9 @@ test('RISK contained board adoption guidance: mounted FAQ and changelog say the 
  // (a smaller one recovers as usual). A dropped connection, the push deadline
  // or an app switch clears the mark, and the staged upload finishes at the
  // next check.
- assert.match(answer,/If the copy before it differs, an unconfirmed save here may hold work the board lacks, or the app closed during this, a large board waits for Retry sync\./,
-  'the answer says a large board waits for Retry sync after the app closed mid-run');
+ assert.match(answer,/If the app closes during this, it tries again up to three times, then waits for Retry sync\./,
+  'the answer says a page closed mid-run is retried up to the limit, then waits (#2287)');
+ assert.match(answer,/A large board also waits if the copy before it differs or an unconfirmed save may hold more\./);
  assert.match(answer,/Losing connection or switching apps only pauses this\./,'the answer says a dropped connection or an app switch only pauses it');
  assert.doesNotMatch(answer,/If a run is interrupted, the next opening waits for Retry sync/,'no interruption makes every next opening wait');
  assert.ok(wordsOf(answer)<=130,'the adoption answer stays within the 130-word limit: '+wordsOf(answer));

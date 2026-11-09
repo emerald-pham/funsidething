@@ -65,16 +65,19 @@ _Avoid_: Newest snapshot, invented decision
 **Recovery wait**:
 The automatic recovery default holding off because rebuilding the board from an
 older cloud copy could need more memory than a phone allows. The board stays
-open and saves on this device, every recovery source stays protected and nothing
-is confirmed by cloud until a deliberate run or a newer cloud save.
+open and saves on this device, every readable recovery source stays protected
+and nothing is confirmed by cloud until a deliberate run or a newer cloud save.
+A cloud copy proved unusable from its downloaded bytes gets no protection and is
+retired once the root has moved past it.
 _Avoid_: Failed recovery, paused sync
 
 **Deliberate run**:
 A recovery the person starts on purpose, with Retry sync or by signing in again,
 that goes ahead even when the automatic recovery default would wait. Opening,
-returning to or reconnecting the app never starts one. A deliberate run that
-ends without adopting a board, on its deadline or an error, returns to the
-recovery wait.
+returning to or reconnecting the app never starts one, and after the app has
+closed during a contained board adoption three times only a deliberate run
+tries it again. A deliberate run that ends without adopting a board, on its
+deadline or an error, returns to the recovery wait.
 _Avoid_: Forced recovery, automatic retry
 
 **Lossless recovery**:
