@@ -7204,6 +7204,190 @@ test('RISK contained board adoption #2287: a held automatic recovery publishes w
  });
 });
 
+// #2287 release review (round 3): a held automatic recovery, no containment proof,
+// board adopted here and the cloud not yet confirming it.
+async function heldAutomaticRecovery2287(t,limits={timeoutMs:5000,recoveryTimeoutMs:5000}){
+ const app=await containedAdoptionApp2254(t,limits),{ctx,backend,faults,acknowledgedPath}=app,revision=ctx.state.syncRev,store=ctx.window.ScannerDeviceStore;
+ await rewriteGenerationFixture(backend,acknowledgedPath,ctx.window.ChainStorageV2,board=>{board.futureEarlierFixture={opaque:'not this device’s copy'};return JSON.stringify(board);});
+ ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=64*1048576;ctx.window.CLOUD_RETRY_DELAY_MS=10;
+ await newerEditBeforeAdoption2254(app);await adoptionSettle2254(ctx,'the edit is saved');
+ const alive=setInterval(()=>{},20);t.after(()=>clearInterval(alive));
+ const settled=(message,c=ctx)=>fixtureDeadline(async wait=>{await wait(50);let quiet=0;while(quiet<8){quiet=adoptionIdle2254(c)?quiet+1:0;await wait(25);}},message,120000);
+ const reachedNextRevision=async(c,shim,message,{tasks,history},cloud=backend.CS)=>{
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,message+': the cloud is at the next revision');
+  delete faults.serverRead;delete faults.transactionRead; // the test's own read below is no stall to survive
+  const board=JSON.parse((await cloud.pull()).payload);
+  assert.deepEqual(tasks.filter(id=>!board.tasks.some(task=>task.id===id)),[],message+': every task is in the cloud');
+  assert.deepEqual(history.filter(id=>!(board.workLog||[]).some(row=>row.id===id)),[],message+': every History entry is in the cloud');
+  assert.equal(await c.window.ScannerDeviceStore.getRecoveryCloudHold(),null,message+': the hold is released');
+  assert.equal(await c.window.ScannerDeviceStore.getPendingUpload('owner'),null,message+': nothing is left pending');
+  assert.equal(c.state.syncDirty,false,message+': the board is confirmed');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced',message+': synced');
+ };
+ const expected=()=>({tasks:ctx.state.tasks.map(task=>task.id),history:(ctx.state.workLog||[]).map(row=>row.id).filter(Boolean)});
+ return {...app,store,revision,settled,reachedNextRevision,expected};
+}
+const holdRefusedOnce2287=async app=>{const {ctx,faults,store,backend,revision,settled}=app;
+ refuseNextRecoveryTransaction255(faults);ctx.closeModal();await flush();await ctx.cloudPull();await settled('the first attempt settles');
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'positive control: the recovery is held');
+ assert.equal(await store.getPendingUpload('owner'),null,'positive control: nothing is staged yet');
+ assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: nothing was published');};
+const stagedThenCut2287=async app=>{const {ctx,faults,store,backend,revision,settled}=app;let cut=false;
+ // The next attempt is the one under test: no retry, and a budget that ends this one quickly.
+ ctx.window.CLOUD_RETRY_DELAY_MS=600000;ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS=100;
+ faults.beforeTransaction=async()=>{if(!cut&&await store.getPendingUpload('owner')){cut=true;throw Object.assign(Error('cut after staging'),{code:'unavailable'});}};
+ ctx.closeModal();await flush();await ctx.cloudPull();await settled('the upload is cut off after it staged');delete faults.beforeTransaction;delete ctx.window.CLOUD_RECOVERY_READ_TIMEOUT_MS;
+ assert.equal(cut,true,'positive control: the upload was cut off after staging');
+ assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'positive control: the recovery is held');
+ assert.ok(await store.getPendingUpload('owner'),'positive control: the staged upload is recorded');
+ assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: nothing was published');};
+const stallEveryRead2287=(faults,stalled,stallMs)=>{stallReads2287(faults,stalled,()=>true,stallMs);faults.transactionRead=async path=>{stalled.push('transaction:'+path);await new Promise(resolve=>setTimeout(resolve,stallMs));};};
+const clearStalls2287=faults=>{delete faults.serverRead;delete faults.transactionRead;};
+
+// #2287 release review (round 3): retiring a zero-chunk generation must not open a
+// publication that was closed before. The person declined the older copy; a save
+// from another device, without that copy's content, ends the choice. The older
+// copy is still what the check would reconcile, and it publishes it.
+test('RISK contained board adoption #2287: an older copy the person declined stays out of the cloud after a save from another device ends the choice, with or without a marker on it',{timeout:240000},async t=>{
+ for(const variant of ['no marker on the older copy','a marker another device’s repair wrote on it'])await t.test(variant,async sub=>{
+  const app=await containedAdoptionApp2254(sub),{ctx,shim,backend,faults,acknowledgedPath,acknowledgedId}=app,codec=ctx.window.ChainStorageV2,store=ctx.window.ScannerDeviceStore;
+  await rewriteGenerationFixture(backend,acknowledgedPath,codec,board=>{board.tasks.push(syncTask('only-in-older-copy','Only in the older copy'));return JSON.stringify(board);});
+  ctx.window.CLOUD_RECOVERY_WORK_BUDGET_BYTES=64*1048576;ctx.window.CLOUD_RETRY_DELAY_MS=10;ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+  const alive=setInterval(()=>{},20);sub.after(()=>clearInterval(alive));
+  const settled=message=>fixtureDeadline(async wait=>{await wait(50);let quiet=0;while(quiet<8){quiet=adoptionIdle2254(ctx)?quiet+1:0;await wait(25);}},message,60000);
+  const hasOlder=()=>ctx.state.tasks.some(task=>task.id==='only-in-older-copy');
+  const pushes=[],push=backend.CS.push;backend.CS.push=async(payload,updatedAt,baseRev,context)=>{pushes.push(baseRev);return push(payload,updatedAt,baseRev,context);};sub.after(()=>{backend.CS.push=push;});
+  refuseNextRecoveryTransaction255(faults);ctx.closeModal();await flush();await ctx.cloudPull();await settled('the first attempt settles');
+  assert.ok((await store.getRecoveryCloudHold())?.automaticRecovery,'positive control: the older copy is open and held');
+  assert.equal(hasOlder(),true,'positive control: the older copy added its task');
+  ctx.openSettings();assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'the person declines');await settled('the decline settles');
+  assert.equal(hasOlder(),false,'positive control: the earlier board is back');
+  assert.equal(await store.getRecoveryCloudHold(),null,'positive control: no hold');
+  if(variant.startsWith('a marker'))backend.docs.set('users/owner/recoveryProtections/'+acknowledgedId,{v:1,rootRevision:backend.docs.get('users/owner').rev,createdAt:{toMillis:()=>1234}});
+  const elsewhere=JSON.parse(ctx.state.decisionBase.payload);elsewhere.tasks.push(syncTask('saved-elsewhere','Saved on another device'));
+  await publishElsewhere2254(backend,codec,JSON.stringify(elsewhere));
+  const before=pushes.length,revisionBefore=backend.docs.get('users/owner').rev;
+  ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});await settled('the healthy read settles');await new Promise(resolve=>setTimeout(resolve,600));await settled('what follows settles');
+  assert.equal(pushes.length-before,0,'nothing is published by itself');
+  assert.equal(backend.docs.get('users/owner').rev,revisionBefore,'the cloud stays at the other device’s save');
+  assert.equal(JSON.parse((await backend.CS.pull()).payload).tasks.some(task=>task.id==='only-in-older-copy'),false,'the older copy the person declined is not in the cloud');
+  assert.equal(hasOlder(),false,'nor on this board');
+  assert.ok(ctx.state.tasks.some(task=>task.id==='saved-elsewhere'),'positive control: the healthy save reached this board');
+ });
+});
+
+// #2287 release review (round 3): suspending sets cloudResumePending, and the hold
+// branch of cloudPull returned before the one line that clears it, so a phone
+// lock or an app switch left the hold waiting until the app was opened anew.
+test('RISK contained board adoption #2287: after an app switch a held automatic recovery reaches the next revision on the same page, from returning to the app, Retry sync or an edit, also when every read stalls',{timeout:300000},async t=>{
+ for(const stalls of [false,true])for(const route of ['returning to the app','Retry sync','an edit'])await t.test(route+(stalls?', every read stalling':''),async sub=>{
+  const limits=stalls?{timeoutMs:300,recoveryTimeoutMs:900}:undefined,app=await heldAutomaticRecovery2287(sub,limits),{ctx,shim,backend,faults,store,revision,settled,reachedNextRevision}=app;
+  await holdRefusedOnce2287(app);
+  const expected=app.expected();
+  shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});await settled('the page is hidden');
+  // Retry sync and an edit come after a return whose own publication was refused.
+  if(route!=='returning to the app')refuseNextRecoveryTransaction255(faults);
+  const stalled=[];if(stalls)stallEveryRead2287(faults,stalled,450);
+  shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});await settled('the page is back');
+  if(route==='Retry sync'){assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: the return alone did not publish');await ctx.onAction('sync-retry',{});}
+  if(route==='an edit'){assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: the return alone did not publish');
+   shim.document.getElementById('addInput').value='Edit after the app switch';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);await ctx.sendPush();expected.tasks=ctx.state.tasks.map(task=>task.id);}
+  await settled('the held publication settles');
+  if(route==='an edit'){await ctx.sendPush();await settled('the edit’s own save settles');}
+  if(stalls)assert.ok(stalled.length>=8,'positive control: the reads stalled '+stalled.length);
+  await reachedNextRevision(ctx,shim,route,expected);
+ });
+});
+
+// #2287 release review (round 3): a publication interrupted after its upload
+// staged left the pending record, and every later attempt stopped because that
+// upload had not landed. It is this recovery's own upload, named by its intent
+// archive: the push resumes or replaces it, as contained adoption does.
+test('RISK contained board adoption #2287: a held automatic recovery interrupted after its upload staged reaches the next revision with every task and History entry, after a closed page, an app switch, a closed dialog or Retry sync',{timeout:300000},async t=>{
+ await t.test('a closed page',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,backend,revision}=app;
+  await stagedThenCut2287(app);const expected=app.expected();
+  backend.CS.suspend();await closeLegacyApp173(app);
+  const page=await reopenBoard2287(sub,app,{config:{CLOUD_RECOVERY_WORK_BUDGET_BYTES:64*1048576,CLOUD_RETRY_DELAY_MS:10}});
+  await fieldOpeningSettled2287(page,'the next opening settles');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'the next opening publishes');
+  await app.reachedNextRevision(page.ctx,page.shim,'after a closed page',expected,page.cloud.CS);
+ });
+ await t.test('an app switch',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,shim,faults,store,settled,reachedNextRevision}=app;
+  await holdRefusedOnce2287(app);const expected=app.expected();
+  faults.publishPending=new Promise(()=>{});ctx.cloudPull();
+  await fixtureDeadline(async wait=>{while(!faults.publicationStarted)await wait(10);},'the held upload reaches its final write',30000);
+  assert.ok(await store.getPendingUpload('owner'),'positive control: the upload has staged');
+  shim.document.hidden=true;shim.document.dispatchEvent({type:'visibilitychange'});await settled('the page is hidden');
+  delete faults.publishPending;
+  shim.document.hidden=false;shim.document.dispatchEvent({type:'visibilitychange'});await settled('the page is back');
+  await reachedNextRevision(ctx,shim,'after an app switch',expected);
+ });
+ for(const action of ['a closed dialog','Retry sync'])await t.test(action,async sub=>{
+  const app=await heldAutomaticRecovery2287(sub,{timeoutMs:300,recoveryTimeoutMs:900}),{ctx,shim,faults,store,settled,reachedNextRevision}=app;
+  await holdRefusedOnce2287(app);const expected=app.expected();
+  const stalled=[];stallEveryRead2287(faults,stalled,450);
+  const run=ctx.cloudPull();
+  await fixtureDeadline(async wait=>{while(!(await store.getPendingUpload('owner')))await wait(10);},'the held publication stages its upload',60000);
+  await new Promise(resolve=>setTimeout(resolve,300));
+  let retry=null;if(action==='a closed dialog')ctx.closeModal();else retry=ctx.onAction('sync-retry',{});
+  await run;await retry;await settled('the interruption settles');
+  clearStalls2287(faults);
+  await ctx.onAction('sync-retry',{});await settled('Retry sync settles');
+  await reachedNextRevision(ctx,shim,'after '+action,expected);
+ });
+ await t.test('the upload landed but the page closed before the reply',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,backend,faults,revision}=app;
+  await holdRefusedOnce2287(app);const expected=app.expected();
+  let lost=false;faults.afterTransaction=async docs=>{if(!lost&&docs.get('users/owner')?.rev===revision+2){lost=true;throw Object.assign(Error('reply lost'),{code:'unavailable'});}};
+  await ctx.cloudPull();await app.settled('the publication whose reply is lost settles');delete faults.afterTransaction;
+  assert.equal(lost,true,'positive control: the upload landed and its reply was lost');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'positive control: the cloud has the upload');
+  assert.ok(await app.store.getPendingUpload('owner'),'positive control: the device still records it as pending');
+  backend.CS.suspend();await closeLegacyApp173(app);
+  const page=await reopenBoard2287(sub,app,{config:{CLOUD_RECOVERY_WORK_BUDGET_BYTES:64*1048576,CLOUD_RETRY_DELAY_MS:10}});
+  await fieldOpeningSettled2287(page,'the next opening settles');
+  await app.reachedNextRevision(page.ctx,page.shim,'the landed upload converges',expected,page.cloud.CS);
+ });
+});
+test('RISK contained board adoption #2287: a staged upload left by a held automatic recovery never overwrites another device’s save and never publishes after a decline',{timeout:300000},async t=>{
+ const publishSavedElsewhere=async app=>{const {ctx,backend}=app,elsewhere=JSON.parse(ctx.state.decisionBase.payload);elsewhere.tasks.push(syncTask('saved-elsewhere','Saved on another device'));await publishElsewhere2254(backend,ctx.window.ChainStorageV2,JSON.stringify(elsewhere));};
+ const cloudTasks=async backend=>JSON.parse((await backend.CS.pull()).payload).tasks.map(task=>task.id);
+ await t.test('another device saved first',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,shim,backend,settled}=app;
+  await stagedThenCut2287(app);const expected=app.expected();await publishSavedElsewhere(app);
+  const elsewhereRev=backend.docs.get('users/owner').rev,pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};sub.after(()=>{backend.CS.push=push;});
+  await ctx.cloudPull();await settled('the next attempt settles');
+  assert.deepEqual(pushes,[elsewhereRev],'it publishes over the other device’s revision, never over the one it staged on');
+  assert.equal(backend.docs.get('users/owner').rev,elsewhereRev+1,'it is the next revision after that save');
+  const tasks=await cloudTasks(backend);
+  assert.ok(tasks.includes('saved-elsewhere'),'the other device’s save is kept');
+  assert.deepEqual(expected.tasks.filter(id=>!tasks.includes(id)),[],'and every task of this board');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ });
+ await t.test('another device wins the race at the final write',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,backend,settled,revision}=app;
+  await stagedThenCut2287(app);
+  const push=backend.CS.push;let raced=false;backend.CS.push=async(...args)=>{if(!raced){raced=true;await publishSavedElsewhere(app);}return push(...args);};sub.after(()=>{backend.CS.push=push;});
+  ctx.window.CLOUD_RETRY_DELAY_MS=600000;
+  await ctx.cloudPull();await settled('the raced attempt settles');
+  assert.equal(raced,true,'positive control: the other device saved during this publication');
+  assert.ok(await cloudTasks(backend).then(tasks=>tasks.includes('saved-elsewhere')),'the other device’s save is not overwritten');
+  assert.equal(backend.docs.get('users/owner').rev,revision+2,'the conditional write refused this publication');
+ });
+ await t.test('the person declines',async sub=>{
+  const app=await heldAutomaticRecovery2287(sub),{ctx,shim,backend,store,revision,settled}=app;
+  await stagedThenCut2287(app);
+  const pushes=[],push=backend.CS.push;backend.CS.push=async(...args)=>{pushes.push(args[2]);return push(...args);};sub.after(()=>{backend.CS.push=push;});
+  ctx.openSettings();assert.equal(await ctx.onAction('decline-automatic-cloud-recovery',{}),true,'the person declines');await settled('the decline settles');
+  ctx.closeModal();await flush();shim.window.dispatchEvent({type:'pageshow'});await settled('a return settles');
+  await ctx.onAction('sync-retry',{});await settled('Retry sync settles');
+  assert.deepEqual(pushes,[],'nothing is published');
+  assert.equal(backend.docs.get('users/owner').rev,revision+1,'the cloud stays where it was');
+ });
+});
+
 // #2254 review (S2): an unreadable generation lets the board's next frame and
 // any input queued behind it go first (#2226). Adoption reads the device's
 // pending upload and the cloud's generation headers, so it starts after that

@@ -510,6 +510,8 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
    const later=structuredClone(prior);later.tasks.push({...structuredClone(prior.tasks[0]),id:'native-later-254',title:'Later readable source task'});
    const laterEncoded=await loadStorageV2().encodeSnapshot(JSON.stringify(later)),{chunks:laterChunks,...laterHeader}=laterEncoded,currentHeader={...laterHeader,state:'published',baseRev:3};
    remote.set('users/owner/generations/held-current',currentHeader);publicationAllowed=true;
+   // #2287: one chunk survives, so this generation stays an earlier source; one with zero chunks has nothing to recover.
+   assert.ok(laterChunks.length>1,'fixture: a partly readable source needs more than one chunk');remote.set('users/owner/generations/held-current/chunks/'+laterChunks[0].index,laterChunks[0]);
    const output=process.env.CHAIN_RECOVERY_UI_OUTPUT?path.resolve(process.env.CHAIN_RECOVERY_UI_OUTPUT):null,captures=[];if(output)fs.mkdirSync(output,{recursive:true});
    const capture=async(stage,expected)=>{
     await page.locator('[data-act="settings"]').first().click();const status=page.locator('#automaticCloudSourceResumeStatus'),neighbor=page.locator('#modalRoot [data-act="scene-settings"]');

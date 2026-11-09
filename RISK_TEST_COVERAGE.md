@@ -1576,6 +1576,10 @@ its RISK test; the map follows.
 - RISK contained board adoption #2287: a repair that goes on to the background check of earlier sources ends that check at its old budget, not the repair budget
 - RISK contained board adoption #2287: the optional background check of earlier sources ends at its old budget of one read limit and does not hold cloud saves for the repair budget
 - RISK contained board adoption #2287: a held automatic recovery publishes when every read stalls past the ordinary limit, at the next opening and on Retry sync
+- RISK contained board adoption #2287: an older copy the person declined stays out of the cloud after a save from another device ends the choice, with or without a marker on it
+- RISK contained board adoption #2287: after an app switch a held automatic recovery reaches the next revision on the same page, from returning to the app, Retry sync or an edit, also when every read stalls
+- RISK contained board adoption #2287: a held automatic recovery interrupted after its upload staged reaches the next revision with every task and History entry, after a closed page, an app switch, a closed dialog or Retry sync
+- RISK contained board adoption #2287: a staged upload left by a held automatic recovery never overwrites another device’s save and never publishes after a decline
 - RISK contained board adoption: the board’s next frame and queued input go before the adoption’s first cloud or device read
 - RISK contained board adoption: a headers-only record write refused because another tab moved the device head is not retried over that newer head
 - RISK contained board adoption: after the person chooses Use my board from before recovery, adoption does not publish that board by itself and cloud saving stays paused
