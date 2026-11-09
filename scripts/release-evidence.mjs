@@ -952,7 +952,8 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
   const input = {
     schemaVersion: 2,
     candidate: { commitSha, treeSha, baseSha },
-    ownerReview: withScope(review('owner', 'owner-review.md'), { fullDiff: true, rationale: '' }),
+    ownerReview: withScope(review('owner', 'owner-review.md'), { fullDiff: true, rationale: '' },
+      plan.requiresOwnerFaqCoverage ? { faqCoverage: { result: '', summary: '' } } : {}),
     ...(plan.requiresCodeReview ? {
       independentReview: withScope(review('independent-review', 'independent-review.md'),
         { fullDiff: true, relevantTests: true, userVisibleAndDataSafety: true }),

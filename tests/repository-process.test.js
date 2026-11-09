@@ -702,6 +702,30 @@ test('RISK repository process: release prepare refuses a source file that differ
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'src/feature.mjs':'export const value = 2;\n'}});
+ try{
+  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input.ownerReview.faqCoverage,{result:'',summary:''});
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='An ordinary product change fits the derived independent review.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const unauthored=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unauthored.status,0,'FAQ coverage stays a result a person records');
+  assert.match(unauthored.stderr,/FAQ coverage/);
+  input.ownerReview.faqCoverage=SCALED_FAQ_COVERAGE;
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);
