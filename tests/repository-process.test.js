@@ -608,6 +608,17 @@ test('RISK repository process: release prepare refuses a report naming another c
  assert.equal(inputWritten,false);
 });
 
+test('RISK repository process: release prepare refuses a report with no approved verdict',()=>{
+ const missing=prepareWithIndependentReport(fixture=>`Commit: ${fixture.candidateSha}\nCompleted: 2026-11-01T11:53:58.000Z\n\nNo verdict line.\n`);
+ assert.notEqual(missing.result.status,0,'a report without a verdict cannot approve this candidate');
+ assert.match(missing.result.stderr,/independent-review\.md.*Verdict/);
+ assert.equal(missing.inputWritten,false);
+ const blocked=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'changes-requested','2026-11-01T11:53:58.000Z'));
+ assert.notEqual(blocked.result.status,0,'a report that asks for changes cannot approve this candidate');
+ assert.match(blocked.result.stderr,/independent-review\.md.*changes-requested/);
+ assert.equal(blocked.inputWritten,false);
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);

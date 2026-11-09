@@ -903,10 +903,14 @@ function reportHeaderValue(line, field) {
 function readReviewReport(reportDirectory, file, commitSha) {
   const evidencePath = path.resolve(reportDirectory, file);
   const bytes = fs.readFileSync(evidencePath);
-  const [commitLine, , completedLine] = bytes.toString('utf8').split('\n');
+  const [commitLine, verdictLine, completedLine] = bytes.toString('utf8').split('\n');
   const namedCommit = reportHeaderValue(commitLine, 'Commit');
   if (namedCommit !== commitSha) {
     throw new Error(file + ' names commit ' + (namedCommit || '(none)') + ', not the candidate ' + commitSha + '.');
+  }
+  const verdict = reportHeaderValue(verdictLine, 'Verdict');
+  if (verdict !== 'approved') {
+    throw new Error(file + ' needs the header line "Verdict: approved"; it has ' + (verdict || 'no verdict') + '.');
   }
   const completedAt = reportHeaderValue(completedLine, 'Completed');
   return { completedAt, evidencePath, evidenceSha256: sha256(bytes) };
