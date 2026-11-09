@@ -736,6 +736,68 @@ test('test group nightly cohort runs only the declared cross-engine cases and fa
   });
 });
 
+// #2293: a root whose test has not landed is declared pending with its owning
+// PR. The job runs the active roots, and with none it succeeds while saying that
+// no cross-engine case ran and naming what it is waiting for.
+const pendingNightlyRoot='fixture pending cross-engine root';
+const pendingEntry=(root=pendingNightlyRoot)=>({root,file:suiteFile,pendingOn:'#285',reason:'Fixture root whose test has not landed.'});
+function pendingNightlyFixture(t,nightlyRoots){
+  // nightlyFixture always registers its appended root; assign it to core when the catalog does not declare it.
+  const fixture=nightlyFixture(t,{nightlyRoots});
+  if(nightlyRoots.some(entry=>entry.root===nightlyFixtureRoot))return fixture;
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+  catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:suiteFile});
+  writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','pending nightly roots');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group nightly with only pending roots succeeds, runs nothing and names them', t => {
+  const fixture=pendingNightlyFixture(t,[pendingEntry()]),sentinel=path.join(fixture.root,'nightly-executed');
+  const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+  assert.equal(result.status,0,'only pending roots is not a broken run: '+result.stdout+result.stderr);
+  assert.match(result.stdout,/^::notice [^\n]*\b0 cross-engine cases ran\b[^\n]*fixture pending cross-engine root[^\n]*#285/m,'the job must annotate zero cases and name the pending root with its owner');
+  assert.equal(fs.existsSync(sentinel),false,'no test may execute when no root is active');
+  assert.notEqual(result.evidence.status,'passed','zero cases must never be recorded as a pass');
+  assert.deepEqual(result.evidence.cases,[]);
+  assert.deepEqual(result.evidence.crossEngine,{casesRun:0,activeRoots:[],pendingRoots:[{root:pendingNightlyRoot,file:suiteFile,pendingOn:'#285'}]});
+});
+test('test group nightly preflight fails a pending root whose test has landed until it is moved to active', t => {
+  const fixture=pendingNightlyFixture(t,[pendingEntry(nightlyFixtureRoot)]),sentinel=path.join(fixture.root,'nightly-executed');
+  const description=invoke(fixture,{args:['--describe']});
+  assert.equal(description.status,0,'required CI must not depend on the nightly pending state: '+description.stdout+description.stderr);
+  const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+  assert.notEqual(result.status,0,'a landed test must not go unrun behind a pending row');
+  assert.equal(result.evidence.status,'preflight_failed');
+  assert.match(result.stderr,/fixture cross-engine native button root.*#285.*active/,'the failure must name the root, its owner and the move to active');
+  assert.equal(fs.existsSync(sentinel),false,'preflight stops before any test runs');
+});
+test('test group nightly runs active roots beside pending ones and states the count', t => {
+  const active={root:nightlyFixtureRoot,file:suiteFile,reason:'Fixture active cross-engine root.'};
+  const fixture=pendingNightlyFixture(t,[active,pendingEntry()]),sentinel=path.join(fixture.root,'nightly-executed');
+  const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+  assert.equal(result.status,0,'a pending root must not stop the active ones: '+result.stdout+result.stderr);
+  assert.equal(result.evidence.status,'passed');
+  assert.deepEqual(result.evidence.cases.map(item=>[item.id,item.status]),[[nightlyFixtureRoot,'passed']]);
+  assert.equal(fs.existsSync(sentinel),true,'the active root must actually execute');
+  assert.deepEqual(result.evidence.crossEngine,{casesRun:1,activeRoots:[nightlyFixtureRoot],pendingRoots:[{root:pendingNightlyRoot,file:suiteFile,pendingOn:'#285'}]});
+  assert.match(result.stdout,/^::notice [^\n]*\b1 cross-engine case ran\b[^\n]*fixture pending cross-engine root[^\n]*#285/m);
+});
+test('test group nightly preflight still fails a missing active root beside a pending one', t => {
+  const missing={root:'fixture misspelled active root',file:suiteFile,reason:'A typo in an active root must stay loud.'};
+  const fixture=pendingNightlyFixture(t,[missing,pendingEntry()]);
+  const result=invoke(fixture,{group:'nightly-cross-engine'});
+  assert.notEqual(result.status,0,'a pending root must not excuse a missing active root');
+  assert.equal(result.evidence.status,'preflight_failed');
+  assert.match(result.stderr,/fixture misspelled active root.*registered 0 times/);
+});
+test('test group refuses a pending nightly root that names no owning PR', async parent => {
+  for(const [name,pendingOn]of [['free text','soon'],['empty','']])await parent.test(name,t=>{
+    const fixture=pendingNightlyFixture(t,[{...pendingEntry(),pendingOn}]);
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'a pending row without an owning PR must not validate');
+    assert.match(description.stderr,/fixture pending cross-engine root.*owning PR/);
+  });
+});
+
 // #2232: a declared root that resolves to zero tests must fail visibly. Describe
 // checks every required root against its file before any group runs; a declared
 // nightly root that resolves to nothing fails the nightly run's own preflight,
