@@ -223,6 +223,9 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  await fixtureDeadline(async wait=>{while(!vm.runInContext('automaticCloudFallbackBootBaseline',cold.ctx))await wait();},'verified empty startup capture completes before fallback recovery');
  const firstPublicationFault={authPending:true};refuseNextRecoveryTransaction255(firstPublicationFault);const reader=await loadCloudBackendV2({runtimeWindow:cold.ctx.window,failures:firstPublicationFault,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>reader.CS.suspend());
  for(const [key,value]of backend.docs)reader.docs.set(key,value);
+ // #2287: this generation's bytes come back later, so it needs a marker from an
+ // earlier release; without one a generation with no chunks left is retired.
+ reader.docs.set('users/owner/recoveryProtections/'+activeSource.id,{v:1,rootRevision:originalRoot.rev,createdAt:{toMillis:()=>1234}});
  reader.emitAuth({uid:'owner',email:'e@example.test'});cold.ctx.closeModal();await cold.ctx.cloudPull();
  const store=cold.ctx.window.ScannerDeviceStore,firstHold=await store.getRecoveryCloudHold();
  assert.ok(firstHold?.automaticRecovery,'the complete older source opens under the exact automatic fallback authority');

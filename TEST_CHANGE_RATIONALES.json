@@ -21654,34 +21654,66 @@
     "baseCommit": "ec634fc6b7e5f288fdab179a381c4868669ab0a1",
     "weakenedTestLines": [
       "tests/core.test.js:-'the answer says a large board waits for Retry sync after the app closed mid-run');",
+      "tests/core.test.js:-arrange:app=>{app.faults.transactionRead=async(path,docs)=>{if(path===app.active)docs.delete(path);};}},",
       "tests/core.test.js:-assert.match(answer,/If the copy before it differs, an unconfirmed save here may hold work the board lacks, or the app closed during this, a large board waits for Retry sync\\./,",
       "tests/core.test.js:-assert.match(answer,/No device can read the unreadable copy, so work saved only there, from any device, cannot be recovered; that copy stays protected in the cloud, and this device keeps a note naming it\\./);",
+      "tests/core.test.js:-assert.ok(reader.docs.has('users/owner/recoveryProtections/'+original.id),'the permanent marker protects original bytes from other supported collectors');",
+      "tests/core.test.js:-assert.ok(started.includes(originalRoot.activeGeneration)&&started.includes(originalRoot.previousGeneration),'positive control: both originals were read back under the stall');",
+      "tests/core.test.js:-backend.docs.set(sourcePath,{...backend.docs.get(sourcePath),hash:'f'.repeat(64)});await ctx.cloudPull();",
+      "tests/core.test.js:-const path='users/owner/generations/'+originalRoot.activeGeneration;backend.docs.set(path,{...backend.docs.get(path),hash:'f'.repeat(64)});await ctx.cloudPull();",
+      "tests/core.test.js:-for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1);",
+      "tests/core.test.js:-for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original generation '+id+' is protected');",
+      "tests/core.test.js:-for(const id of [originalRoot.activeGeneration,originalRoot.previousGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original generation '+id+' stays protected');",
       "tests/persistence-recovery.test.js:-assert.deepEqual(JSON.parse(next.shim.localStorage.getItem(MARK)||'null'),left,'the mark stays for later openings too');",
       "tests/persistence-recovery.test.js:-assert.equal(generationDocs2254(backend,unreadablePath),unreadableBefore,'and untouched');",
+      "tests/persistence-recovery.test.js:-assert.equal(next.shim.localStorage.getItem(MARK),null,'the completed run clears the mark');",
+      "tests/persistence-recovery.test.js:-assert.match(answer,/those cloud copies stay protected in the cloud/);",
       "tests/persistence-recovery.test.js:-assert.ok(backend.docs.get('users/owner/recoveryProtections/'+elsewhereId),'and protected in the cloud');",
       "tests/persistence-recovery.test.js:-assert.ok(backend.docs.get('users/owner/recoveryProtections/'+unreadableId),'the unreadable generation stays protected in the cloud');",
+      "tests/persistence-recovery.test.js:-async function containedAdoptionApp2254(t){",
+      "tests/persistence-recovery.test.js:-await fixtureDeadline(ctx.cloudPull(),'unsupported-source recovery stays within its existing bounded attempt',7000);await ctx.sendPush();await syncSettle(30);",
+      "tests/persistence-recovery.test.js:-const MARK='fvp:chain-scanner:contained-adoption-run';",
+      "tests/persistence-recovery.test.js:-const app=await damagedAcknowledgedApp187(t),{ctx,backend,originalRoot,activeSource}=app,generations='users/owner/generations/';",
+      "tests/persistence-recovery.test.js:-const left=JSON.parse(first.shim.localStorage.getItem(MARK)||'null');",
+      "tests/persistence-recovery.test.js:-ctx.window.CLOUD_RETRY_DELAY_MS=600000;",
+      "tests/persistence-recovery.test.js:-ctx.window.CLOUD_RETRY_DELAY_MS=600000;",
+      "tests/persistence-recovery.test.js:-for(const id of [originalRoot.activeGeneration,prior])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1,'original server references receive durable immutable pins');",
+      "tests/persistence-recovery.test.js:-for(const id of [retainedId,originalRoot.activeGeneration])assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id)?.v,1);",
       "tests/persistence-recovery.test.js:-for(const id of [unreadableId,acknowledgedId])assert.ok(backend.docs.get('users/owner/recoveryProtections/'+id),'generation '+id+' is protected in the cloud');",
       "tests/persistence-recovery.test.js:-for(const id of [unreadableId,acknowledgedId])assert.ok(backend.docs.get('users/owner/recoveryProtections/'+id),'generation '+id+' stays protected');",
+      "tests/persistence-recovery.test.js:-for(const id of originalPins)assert.equal(backend.docs.get('users/owner/recoveryProtections/'+id).v,1);",
+      "tests/persistence-recovery.test.js:-for(const key of [...backend.docs.keys()])if(key.startsWith(generations+unreadableId+'/chunks/'))backend.docs.delete(key);",
+      "tests/persistence-recovery.test.js:-reader.emitAuth({uid:'owner',email:'e@example.com'});cold.ctx.closeModal();await fixtureDeadline(cold.ctx.cloudPull(),'selective source attempt retains its original bounded deadline',7000);await settleRecoveryOperations188(cold.ctx);",
+      "tests/persistence-recovery.test.js:-shim.localStorage.setItem=function(key,value){if(key===MARK)throw Object.assign(Error('storage full'),{name:'QuotaExceededError'});return setItem.call(this,key,value);};",
       "tests/persistence-recovery.test.js:-test('RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts',async t=>{",
       "tests/persistence-recovery.test.js:-test('RISK contained board adoption: when the generation before the unreadable one is exactly this device’s acknowledged copy, a large board publishes itself once as the next revision whoever saved the unreadable generation, keeping it protected, untouched and named by a headers-only device record after later saves',async t=>{"
     ],
-    "reason": "#2287 (owner decision 2026-11-08): a cloud copy proved unusable from its downloaded bytes is now discarded by the app instead of being kept protected, and a crash mark from an earlier page no longer makes every later opening wait until Retry sync. The contained-adoption tests asserted the old behaviour by name (unreadable generation protected and untouched forever, crash mark waits at the very next opening), so they change deliberately, and the FAQ regexes follow the new answer.",
-    "previousBehavior": "Adoption set a cloud protection marker on the generation it proved unusable, so the collector could never retire it, and any crash mark an earlier page left stopped the next opening from adopting at all.",
-    "intendedBehavior": "Adoption protects only intact named generations; the unusable generation gets no marker and the collector retires it after the root moves past it, a marker from an earlier release stays and leaves an unreferenced header. A crash mark gives each unreadable root three automatic attempts across pages (old marks count as the first), then the board waits as before; a deliberate run always goes ahead.",
+    "reason": "#2287 (owner decision 2026-11-08, review 2026-11-09): a generation proved unusable with zero chunks received gets no cloud protection marker on any route and the collector retires it, a generation with chunks left keeps its marker; attempts count only pages the phone closed; the automatic default's budget and each adoption step's limit fit a stall on each of their sequential reads. The FAQ and independent-repair expectations changed with the rule, and two deadlines were re-tuned under honest names.",
+    "previousBehavior": "Adoption and every other route set a marker on the unusable generation, a device archive naming it kept writing one and pinning it from the collector, an earlier page's crash mark blocked every later opening, a clean failure reset the attempt count, and each step's limit allowed only one stall; two re-tuned tests said their deadlines were the original bound.",
+    "intendedBehavior": "Generations with zero chunks get no marker at the single protection boundary and the push's archive check no longer pins them; partly readable generations keep theirs. The attempt count stops the repair only after three pages left it running, a clean failure neither adds to nor clears it, and each step's limit is one read limit per sequential read; the Help text states this.",
     "preservedCoverage": [
       "One publication over the unreadable revision, device board published byte-exact, lossless tasks and History, no recovery archive, headers-only device record and the confirmation state stay asserted in the same contained-adoption tests.",
       "The unusable generation stays untouched while the root still names it, and intact generations stay protected; the crash mark is still written before reading sources, stays at the limit and is cleared by a completed run; Retry sync still adopts deliberately.",
-      "The FAQ still states the app saves the board by itself, that work saved only in the unreadable copy cannot be recovered, that it can wait for Retry sync, and the 130-word limit."
+      "The FAQ still states the app saves the board by itself, that work saved only in the unreadable copy cannot be recovered, that it can wait for Retry sync, and the 130-word limit.",
+      "Independent server repair still publishes without acknowledging local work and every intact original keeps its pin; the test now pins the zero-chunk generation's absence of a marker.",
+      "The re-tuned deadline tests still exercise the same bounded automatic attempt inside the same 7000 ms fixture deadline; the read limit now sizes that attempt's budget.",
+      "The FAQ still states what the app keeps and retires, and every Help answer stays within the 130-word limit.",
+      "Apply still protects its intact original and archives both on the device; the two scenarios whose chunks come back later keep their retention by a marker from an earlier release, which the rule leaves alone."
     ],
     "replacementTests": [
       "RISK contained board adoption #2287: a generation proved unusable gets no protection marker and is retired only after the root has moved past it, while the intact previous generation stays protected, and a marker from an earlier release is left alone",
       "RISK contained board adoption #2287: a page closed mid-repair is retried by the next opening up to the attempt limit, counted across pages and honouring a mark from the previous release, then the board waits and Retry sync still adopts",
       "RISK contained board adoption: when the generation before the unreadable one is exactly this device’s acknowledged copy, a large board publishes itself once as the next revision whoever saved the unreadable generation, keeping it untouched until the root has moved past it, with no protection marker, and named by a headers-only device record after later saves",
-      "RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so once the automatic attempts are used up the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts"
+      "RISK contained board adoption: a run that ends without completing leaves its saved crash mark, so once the automatic attempts are used up the next opening waits instead of adopting again and Retry sync adopts deliberately, and a mark that cannot be saved and read back stops adoption before it starts",
+      "RISK contained board adoption #2287: the field-shaped state repairs itself on opening when root, header, chunk and transaction reads all stall past the ordinary limit",
+      "RISK contained board adoption #2287: each repair step finishes inside its whole-operation limit when every one of its reads stalls",
+      "RISK contained board adoption #2287: a generation proved unusable with zero chunks gets no marker on any route, and a device archive naming it does not keep it from being retired",
+      "RISK contained board adoption #2287: a partly readable generation keeps its marker and its surviving chunks, and the repair still goes ahead",
+      "RISK contained board adoption #2287: a clean failure neither adds to nor clears the attempt count, so three timeouts never strand anyone, and a crash, a timeout and a crash reach the limit"
     ],
     "redEvidence": {
-      "command": "node --max-old-space-size=8192 --test --test-name-pattern='#2287' tests/persistence-recovery.test.js on ec634fc with the tests only, before the index.html change for each slice",
-      "failure": "AssertionError [ERR_ASSERTION]: the generation proved unusable gets no marker (variant no marker yet); the crash-mark test failed its deadline 'attempt 2 starts publishing' because the mark stopped the next opening from adopting"
+      "command": "node --max-old-space-size=8192 --test --test-name-pattern='#2287' tests/persistence-recovery.test.js on e23d08d with each new test written first, before the index.html change for its slice (focused logs kept outside the repo)",
+      "failure": "AssertionError [ERR_ASSERTION]: under every kind of stalled read: one publication, over the unreadable revision (actual [] expected [ 7 ]); the source read finishes inside its limit (actual 'deadline-exceeded'); the archive adds no marker for the unusable generation (actual true); the partly readable generation keeps its marker (actual undefined expected 1); the count survives the clean failure (Cannot read properties of null (reading 'attempts'), the mark was deleted); and the independent-repair test: original server references receive durable immutable pins (actual undefined expected 1) once the boundary changed; the wording pins failed against the previous Help text."
     }
   }
 ]

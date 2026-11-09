@@ -67,17 +67,19 @@ The automatic recovery default holding off because rebuilding the board from an
 older cloud copy could need more memory than a phone allows. The board stays
 open and saves on this device, every readable recovery source stays protected
 and nothing is confirmed by cloud until a deliberate run or a newer cloud save.
-A cloud copy proved unusable from its downloaded bytes gets no protection and is
-retired once the root has moved past it.
+On any recovery route, a cloud copy proved unusable with zero chunks received
+gets no protection and is retired once the root has moved past it; a copy with
+any chunks left stays protected, though it is not used.
 _Avoid_: Failed recovery, paused sync
 
 **Deliberate run**:
 A recovery the person starts on purpose, with Retry sync or by signing in again,
 that goes ahead even when the automatic recovery default would wait. Opening,
 returning to or reconnecting the app never starts one, and after the app has
-closed during a contained board adoption three times only a deliberate run
-tries it again. A deliberate run that ends without adopting a board, on its
-deadline or an error, returns to the recovery wait.
+closed during a contained board adoption until its three tries are used, only a
+deliberate run tries it again. A run that ends with an outcome it saw, such as a
+timeout, leaves the tries as they were. A deliberate run that ends without
+adopting a board, on its deadline or an error, returns to the recovery wait.
 _Avoid_: Forced recovery, automatic retry
 
 **Lossless recovery**:
