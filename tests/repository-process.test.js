@@ -630,6 +630,24 @@ test('RISK repository process: release prepare refuses a report with a missing o
  assert.equal(future.inputWritten,false);
 });
 
+test('RISK repository process: release prepare needs only the reports the derived plan requires',()=>{
+ const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(Object.keys(input),['schemaVersion','candidate','ownerReview']);
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A documentation-only diff needs only the owner review.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
  const makeFixture=options=>{
   const fixture=makeReleaseGateFixture(options);

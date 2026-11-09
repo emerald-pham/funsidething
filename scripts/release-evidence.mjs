@@ -921,7 +921,7 @@ function readReviewReport(reportDirectory, file, commitSha) {
 // placeholder text long enough to pass would become permanent in the receipt.
 export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirectory, issue) {
   const { root } = gitCommonDir(repoRoot);
-  deriveReleaseReviewPlan(root, commitSha, baseSha);
+  const plan = deriveReleaseReviewPlan(root, commitSha, baseSha);
   const treeSha = candidateTree(root, commitSha);
   const review = (task, file) => {
     const { completedAt, ...evidence } = readReviewReport(reportDirectory, file, commitSha);
@@ -932,8 +932,10 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
     schemaVersion: 2,
     candidate: { commitSha, treeSha, baseSha },
     ownerReview: withScope(review('owner', 'owner-review.md'), { fullDiff: true, rationale: '' }),
-    independentReview: withScope(review('independent-review', 'independent-review.md'),
-      { fullDiff: true, relevantTests: true, userVisibleAndDataSafety: true }),
+    ...(plan.requiresCodeReview ? {
+      independentReview: withScope(review('independent-review', 'independent-review.md'),
+        { fullDiff: true, relevantTests: true, userVisibleAndDataSafety: true }),
+    } : {}),
   };
   const inputPath = path.resolve(reportDirectory, 'receipt-input.json');
   fs.writeFileSync(inputPath, JSON.stringify(input, null, 2) + '\n');
