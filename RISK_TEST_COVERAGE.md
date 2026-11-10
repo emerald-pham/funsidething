@@ -178,25 +178,31 @@ its RISK test; the map follows.
 - RISK corrupt cloud work budget: a failed exact-source read does not permanently hold a later repair
 - RISK resilient sync recovery: an exact acknowledged copy recovers missing cloud chunks and publishes subsequent local work
 - RISK resilient sync recovery: a failed rebuild protects every source and retries after another local edit
-- RISK optional oldest start: enabled Start offers a candidate without dotting or learning
-- RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally
-- RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it
-- RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data
-- RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow
-- RISK optional oldest start: skips before the first choice survive that choice and cold reopen
-- RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary
-- RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate
-- RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes
-- RISK optional oldest start: zero and one eligible tasks remain usable with either preference
-- RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries
-- RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged
-- RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit
-- RISK optional oldest start: an empty started pass publishes and resumes with its saved draw
-- RISK optional oldest start: synced Undo reverses first choices Start and preference without learning
-- RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots
-- RISK optional oldest start: Save settings alone persists the checkbox transition
-- RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw
-- RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts
+- RISK chain start: Settings offers Oldest eligible and Most likely, defaulting to Oldest eligible, without the old checkbox
+- RISK chain start: Most likely starts the chain with the highest displayed overall chance in every scan mode
+- RISK chain start: Most likely ties go to the older task then the task id, with no randomness
+- RISK chain start: Most likely draws only from the eligible pool, including a task done before
+- RISK chain start: the row preview, empty-chain notice and percentage explanation follow the selected option
+- RISK chain start: the saved preview marks the same first dot on a detached board with no scan mode
+- RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag
+- RISK chain start: a board saved mid-pass with an empty chain and the old checkbox on starts with Oldest eligible
+- RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting
+- RISK chain start: replacing the head of a started chain is the same under either option
+- RISK BACKWARD COMPATIBILITY: a board carrying Chain starts with and a recorded settings decision syncs through an older released client
+- RISK chain start: a chain started with Most likely compares and learns like any other chain
+- RISK chain start: a No after a Most likely start skips for this pass and Undo restores it
+- RISK chain start: Settings change and reopen retain Most likely and unrelated data
+- RISK chain start: a pass started with Most likely keeps its scan skips through a cold reopen
+- RISK chain start: scan marks still clear at the ordinary day boundary under Most likely
+- RISK chain start: changing the option waits for explicit Start before dotting
+- RISK chain start: missing invalid and legacy values start with Oldest eligible across all supported scan modes
+- RISK chain start: zero and one eligible tasks remain usable with either option
+- RISK chain start: the choice follows the board to another device beside an independent peer edit
+- RISK chain start: a started Most likely pass publishes reloads and resumes with its saved draw
+- RISK chain start: synced Undo reverses the option and the Start it enabled without learning
+- RISK chain start: Save settings alone persists the Chain starts with transition
+- RISK chain start: Quick start and the immediate-save FAQ describe the dropdown
+- RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox
 - RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption
 - RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup
 - RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet
