@@ -134,6 +134,9 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .crumbs{display:flex;align-items:center;gap:6px;margin:2px 2px 10px;font-size:12.5px;color:var(--mut)}
 .crumbs .lbl{font-weight:600}
 .crumbs .lbl,.crumbs .arrow{flex:none;white-space:nowrap}
+/* A flex-basis instead of a content base shares the row by title length: a
+   short title keeps its full width while long ones ellipsize. */
+.crumbs .crumb{flex:0 1 190px;max-width:max-content}
 .crumb{background:light-dark(#eceafd,#272247);color:var(--accent);border:1px solid light-dark(#ddd7fb,#3a3268);border-radius:99px;padding:2px 10px;max-width:190px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crumb:hover{background:light-dark(#e0dcfb,#322a58)}
 .crumbs .arrow{color:light-dark(#b9b3e8,#5f5796)}
@@ -199,19 +202,19 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .btn.dot{background:var(--chain-deep)}   /* the chain's own colour — this is the button that puts a task on it */
 .qline{font-family:var(--font-q);font-style:italic;font-size:19px;margin:16px 2px 12px;color:var(--ink)}
 .qline .until{white-space:nowrap}
-.decide{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 /* Yes, No and Can't never move between answers. The row is pinned to the bottom
-   of the screen and reads bottom-up, so a Run WOOP button for one candidate adds
-   height above the choices instead of pushing them. */
-.decide-pinned{position:fixed;left:0;right:0;bottom:0;z-index:30;box-sizing:border-box;max-width:760px;margin-inline:auto;display:flex;flex-direction:column-reverse;gap:8px;
-  padding:10px max(14px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+   of the screen and its lines stack upward, so a Run WOOP button for one candidate
+   or the finish group adds height above the choices instead of pushing them. */
+.decide{position:fixed;left:0;right:0;bottom:0;z-index:30;box-sizing:border-box;max-width:732px;margin-inline:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap-reverse;
+  padding:8px max(14px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
   background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint,var(--panel)));border-top:1px solid var(--line);box-shadow:0 -6px 18px rgba(20,24,48,.12)}
-.decide-choices{display:flex;flex-wrap:wrap;gap:8px}
-.decide-choices .btn{flex:1 1 auto;min-height:44px}
-.decide-pinned [data-act="run-woop"]{min-height:44px}
-.wrap:has(.decide-pinned){padding-bottom:calc(var(--pinned-decide-height,72px) + 24px)}
-:root:has(.decide-pinned) .toast{bottom:calc(var(--pinned-decide-height,72px) + 12px)}
-.decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 290px;justify-content:flex-end}
+.decide>.btn{flex:1 1 auto;min-height:44px}
+.decide>[data-act="run-woop"]{flex-basis:100%}
+@media (min-width:761px){.decide{border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0}}
+@media (max-width:420px){.decide>.btn{padding-left:8px;padding-right:8px}}
+.wrap:has(.decide){padding-bottom:calc(var(--pinned-decide-height,110px) + 24px)}
+:root:has(.decide) .toast{bottom:calc(var(--pinned-decide-height,110px) + 12px)}
+.decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 100%;justify-content:flex-end}
 .decide-finish .btn{white-space:nowrap}
 .decide-finish .sparkbox{margin-left:auto;min-width:0;flex:0 1 auto}
 .decide-finish .spark{width:clamp(56px,12vw,84px);max-width:84px;height:20px}
@@ -447,7 +450,6 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
    Wrapping preserves every action; clipping would hide a choice. */
 @media (max-width:420px){
   .crumb{max-width:min(190px,100%)}
-  .crumbs-word{display:none}
   .card{flex-wrap:wrap}
   .card .title{flex:1 1 160px;min-width:0}
   .card .chiprow{flex-wrap:wrap;max-width:100%}
@@ -11320,7 +11322,7 @@ const boardPresentation=Object.freeze({
   tagFilters(view){return !view.tagOptions.length?'':'<span class="ltaglabel">Filter</span>'+view.tagOptions.map(o=>'<button type="button" class="ltag'+(o.key.startsWith('c:')?' task-context':'')+(view.tagFilter===o.key?' on':'')+'" data-act="list-tag" data-id="'+esc(o.key)+'" aria-pressed="'+(view.tagFilter===o.key?'true':'false')+'">'+esc(o.label)+'</button>').join('');},
   candidateShowing(board,hasPool,benchmark,candidate){return !(board.interventionActive&&benchmark)&&board.mode!=="work"&&hasPool&&!!candidate;},
   card(classes,title,chips=''){return '<div class="card '+classes+'"><span class="title">'+title+'</span><span class="chiprow">'+chips+'</span></div>';},
-  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),shown=behind.slice(-CHAIN_TRAIL_NEWEST_DOTS),earlier=behind.length-shown.length;let html='<div class="crumbs">'+(earlier?'<span class="lbl" title="'+tasks.length+' dots in the chain; '+earlier+' earlier not shown">+'+earlier+' earlier</span>':'<span class="lbl"><span class="crumbs-word">Chain · </span>'+tasks.length+' dots:</span>');shown.forEach((t,i)=>{if(i>0)html+='<span class="arrow">→</span>';html+='<button class="crumb" data-act="reveal" data-id="'+esc(t.id)+'" title="'+esc(t.title)+'">'+esc(t.title)+'</button>';});return html+'<span class="arrow">→</span><span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
+  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),shown=behind.slice(-CHAIN_TRAIL_NEWEST_DOTS),earlier=behind.length-shown.length;let html='<div class="crumbs">'+(earlier?'<span class="lbl" title="'+tasks.length+' dots in the chain; '+earlier+' earlier not shown">+'+earlier+' earlier</span>':'<span class="lbl">Chain · '+tasks.length+' dots:</span>');shown.forEach((t,i)=>{if(i>0)html+='<span class="arrow">→</span>';html+='<button class="crumb" data-act="reveal" data-id="'+esc(t.id)+'" title="'+esc(t.title)+'">'+esc(t.title)+'</button>';});return html+'<span class="arrow">→</span><span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
   context(c,info,settings=false){return '<button type="button" class="ctxitem '+info.mode+'" data-act="'+(c?'cycle-context':'toggle-no-context')+'"'+(c?' data-id="'+esc(c.id)+'" data-ctx="'+esc(c.id)+'"':'')+' data-ctx-scope="'+(settings?'settings':'main')+'" data-filter-state="'+info.mode+'" aria-label="'+esc(info.label)+'" title="'+esc(info.label)+'">'+info.mark+(c&&settings?'':' '+esc(c?c.name:'No context'))+'</button>';},
   taskRow({task,rankColumns,dim=false,rankSummary='',inChain=false,nextDotted=false,titleAttrs='',url='',chips='',blockerTitles=[],skipLabel=''}){
     return '<div class="trow '+rankColumns+'" data-row="'+esc(task.id)+'" style="'+(dim?'opacity:.45':'')+'">'+rankSummary+'<div class="tmain">'
@@ -11671,12 +11673,12 @@ function renderScan(){
            + '<button class="btn sm danger" data-act="delete-task" data-id="'+esc(cand.id)+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button></div></div>';
       html += b?'<div class="qline">Would I rather have spent the next hour (until <span class="until">'+untilClock()+'</span>) doing this?</div>'
         :'<div class="qline">Choose this task as the first dot? Yes chooses it; No skips it for this pass.</div>';
-      html += '<div class="decide"><span class="decide-pinned"><span class="decide-choices">'
+      html += '<div class="decide">'
            + '<button class="btn yes" data-act="yes"'+choiceBinding+'>Yes<span class="keyhint">y</span></button>'
            + '<button class="btn no" data-act="no"'+choiceBinding+'>No<span class="keyhint">n</span></button>'
            + '<button class="btn cant" data-act="cant"'+choiceBinding+' title="Skip it for a while, even if the chain empties out before then \u2014 see Settings">Can\u2019t<span class="keyhint">c</span></button>'
            + (!state.settings.showPostpone ? '' : '<button class="btn subtle postpone" data-act="postpone"'+choiceBinding+' title="Temporarily defer this task for the Postpone duration in Settings">Postpone</button>')
-           + '</span>'+overdueWoopControl(cand)+'</span>'
+           + overdueWoopControl(cand)
            + '<span class="decide-finish">'
            + (state.mode==="scan" && b ? '<button class="btn subtle" data-act="start-working"'+choiceBinding+' title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
            + '<span class="sparkbox">'
@@ -11704,7 +11706,7 @@ function trackPinnedDecide(scan){
     document.documentElement.style.setProperty("--pinned-decide-height",height+"px");
   });
   pinnedDecideObserver.disconnect();
-  const row=scan.querySelector?.(".decide-pinned");
+  const row=scan.querySelector?.(".decide");
   if(row)pinnedDecideObserver.observe(row);
 }
 

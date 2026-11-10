@@ -21612,11 +21612,12 @@ test('RISK steady scanner browser: a long chain keeps the dot trail to one row o
     const trail=await page.evaluate(()=>{
      const row=document.querySelector('.crumbs');if(!row)return null;
      const crumbs=[...row.querySelectorAll('[data-act="reveal"]')],tops=[...row.children].map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
-     return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...[...row.children].map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
+     return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...[...row.children].map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),narrowest:Math.min(...crumbs.map(c=>c.getBoundingClientRect().width)),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
     });
     if(!trail)continue;
     assert.ok(trail.height<=trail.tallest+2&&trail.spread<=8,`${label}: ${trail.chain.length} dots stay on one row: the trail is ${Math.round(trail.height)} px tall`);
     assert.ok(trail.overflow<=1&&trail.right<=trail.innerWidth,`${label}: the trail stays inside the screen`);
+    assert.ok(trail.narrowest>=40,`${label}: every shown dot stays wide enough to read: the narrowest is ${Math.round(trail.narrowest)} px`);
     const behindBenchmark=trail.chain.slice(0,-1),hidden=behindBenchmark.length-trail.shown.length;
     assert.deepEqual(trail.shown,behindBenchmark.slice(hidden),`${label}: the trail shows the newest dots`);
     if(hidden>0){hiddenSeen=hidden;assert.match(trail.text,new RegExp(`\\+${hidden} earlier`),`${label}: the trail counts the ${hidden} earlier dots: ${trail.text}`);}
@@ -21643,7 +21644,7 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
   const atEnd={foot,scrollY:scrollY};scroller.scrollTo(0,0);
   return {controls:Object.fromEntries(controls.map(([act,el])=>[act,{...box(el),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1}])),
    titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,atEnd,header:box(document.getElementById('appHeader')),headerFloating:document.getElementById('appHeader').classList.contains('floating'),
-   overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
+   finishTop:box(document.querySelector('.decide-finish')).top,overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
  });
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -21666,7 +21667,7 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
      await page.waitForFunction(()=>!!document.querySelector('[data-act="run-woop"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate offers Run WOOP`);});
      await page.waitForTimeout(80);
      const shot=await measure(page);
-     const pinnedTop=Math.min(...Object.values(shot.controls).map(c=>c.top));
+     const pinnedTop=Math.min(shot.finishTop,...Object.values(shot.controls).map(c=>c.top));
      for(const [act,c] of Object.entries(shot.controls)){
       assert.ok(c.top>=0&&c.bottom<=shot.viewportHeight&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} is on screen: ${JSON.stringify(c)}`);
       assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
@@ -21703,7 +21704,7 @@ test('RISK steady scanner browser: the pinned row exists only while a candidate 
    try{
     await page.waitForSelector('[data-act="yes"]',{timeout:15000});
     await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
-    const shown=await page.evaluate(()=>{const t=document.querySelector('.toast.show').getBoundingClientRect(),row=document.querySelector('[data-act="run-woop"],[data-act="yes"]').getBoundingClientRect();return {toastBottom:t.bottom,rowTop:row.top};});
+    const shown=await page.evaluate(()=>{const t=document.querySelector('.toast.show').getBoundingClientRect(),row=document.querySelector('.decide-finish').getBoundingClientRect();return {toastBottom:t.bottom,rowTop:row.top};});
     assert.ok(shown.toastBottom<=shown.rowTop,`${engineName}: a toast sits above the pinned row: ends ${Math.round(shown.toastBottom)}, row starts ${Math.round(shown.rowTop)}`);
     if(engineName==='chromium'){
      const cdp=await context.newCDPSession(page);
