@@ -5223,7 +5223,7 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commitHead=store.commitHead.bind(store),
   paints=[],deviceWrites=[];let phase='idle',markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
-  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
+  const visible=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
   if(bench)visible.push(bench[1]);paints.push({phase,chain:Array.from(local.ctx.state.chain),visible,done:!!local.ctx.state.tasks.find(row=>row.id===targetId)?.done,markup:String(value)});
  }}});
  store.commitHead=async options=>{const result=await commitHead(options);if(result?.ok&&phase!=='idle'){
@@ -5357,7 +5357,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,originalCommit=store.commitHead.bind(store),paints=[],writes=[];
  let phase='idle',markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase==='stale-cloud'){
-  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
+  const visible=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
   paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
  }}});
  store.commitHead=async options=>{const result=await originalCommit(options);if(result?.ok&&phase==='stale-cloud'){
@@ -12126,10 +12126,9 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
 /* ---------- Reveal -> direct Edit on the benchmark/candidate cards ----------
    These two siderail buttons used to scroll-and-flash the task in the
    (possibly collapsed) All-tasks list. That's now a direct Edit button, same
-   action as clicking a title in the list. The chain breadcrumb crumbs reuse
-   the old reveal-in-list behavior on purpose — they show the task's own
-   title, not a "Reveal" label, so they're a different affordance and stay
-   as-is. */
+   action as clicking a title in the list. The chain breadcrumb crumbs kept
+   reveal-in-list until #221 made them open the same editor; they still show
+   the task's own title, not an "Edit" label. */
 
 test("UI: the benchmark card shows a direct Edit button, not Reveal", async () => {
   const { ctx, shim } = await loadApp({ seed: 92 });
@@ -12167,15 +12166,33 @@ test("UI: clicking the benchmark's Edit button opens the edit pane for that task
   assert.match(html, /value="Dotted task"/);
 });
 
-test("UI: the chain breadcrumb still reveals-in-list (untouched by the Edit swap)", async () => {
-  const { ctx, shim } = await loadApp({ seed: 95 });
+/* ---------- #221: a chain pill opens its task's editor ----------
+   The trail's pills used to scroll All Tasks to the row. They now open the
+   same editor as Edit on the benchmark card, where Return as candidate can
+   take that one dot back off the chain. Each test presses the pill a person
+   would see: the action and id are read from the rendered trail. */
+const chainPill = (scanHtml, title) => {
+  const button = [...String(scanHtml).matchAll(/<button\b[^>]*class="crumb"[^>]*>([^<]*)<\/button>/g)].find(match => match[1] === title)?.[0];
+  assert.ok(button, `expected a pill titled ${title} in: ${scanHtml}`);
+  return { markup: button, act: button.match(/data-act="([^"]+)"/)?.[1], id: button.match(/data-id="([^"]+)"/)?.[1] };
+};
+
+test("UI #221: tapping a pill in the chain trail opens that task's editor and leaves All Tasks as it was", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2211 });
   const first = ctx.addTask("First dot", true);
   ctx.addTask("Second dot", true);
+  ctx.addTask("Third dot", true);
+  ctx.state.listOpen = false;
   ctx.render();
-  const scanHtml = shim.elements.get("scan").innerHTML;
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "First dot");
+  assert.equal(pill.id, first.id, "the pill is bound to its own task");
 
-  assert.match(scanHtml, new RegExp(`class="crumb" data-act="reveal" data-id="${first.id}"`));
-  assert.match(scanHtml, />First dot</, "the crumb shows the task's own title, not the word Edit");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+
+  const modal = shim.elements.get("modalRoot").innerHTML;
+  assert.match(modal, /Edit task/, "the pill opens the task editor");
+  assert.match(modal, /id="etTitle" type="text" value="First dot"/, "for the pill's own task");
+  assert.equal(ctx.state.listOpen, false, "the pill no longer opens All Tasks to reveal the row");
 });
 
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
@@ -14511,26 +14528,6 @@ test('RISK saved view cloud adoption: this device keeps its open All Tasks view 
   'new cloud task data is accepted while this browser retains its own open list and filters through adoption and reload');
 });
 
-test('RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload',async()=>{
- const task=syncTask('shared-reveal','Shared task');
- const local=syncState({tasks:[task],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
- const remote=syncState({tasks:[{...task}],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
- const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)}),h=makeSyncHarness({remote,rev:5});
- const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
- opened.ctx.onAction('reveal',{dataset:{id:'shared-reveal'}});
- const afterReveal={listOpen:opened.ctx.state.listOpen,cachedListOpen:JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null')?.listOpen??null,hidden:opened.shim.document.getElementById('listBody').hidden};
- vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
- await opened.ctx.cloudPull();
- const adopted={title:opened.ctx.state.tasks[0].title,listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden};
- await opened.ctx.cloudPull();
- const repeatedPull={listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden,remoteListOpen:h.remoteState().listOpen};
- vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
- const reopened=await loadApp({sharedStorage:storage});
- assert.deepEqual({afterReveal,adopted,repeatedPull,reloaded:{listOpen:reopened.ctx.state.listOpen,hidden:reopened.shim.document.getElementById('listBody').hidden}},
-  {afterReveal:{listOpen:true,cachedListOpen:true,hidden:false},adopted:{title:'Shared task',listOpen:true,hidden:false},repeatedPull:{listOpen:true,hidden:false,remoteListOpen:false},reloaded:{listOpen:true,hidden:false}},
-  'the actual reveal action records this device’s list-open choice and keeps it around newer cloud task data');
-});
-
 test('RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable',async()=>{
  const board=syncState({tasks:[syncTask('view-fallback','Keep task')],listOpen:true,seenQuickStart:true}),payload=JSON.stringify(board);
  const corrupt=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:payload,'fvp:chain-scanner:saved-view:v1':'{'})});
@@ -16154,7 +16151,7 @@ test('RISK deletion authority: real Delete defeats a stale saved and cloud Dot a
  earlier.ctx.suspendCloudSync();
 
  const scanChain=html=>{
-  const ids=[...String(html).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+  const ids=[...String(html).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
   const benchmark=String(html).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
   if(benchmark)ids.push(benchmark[1]);
   return ids;
@@ -19437,7 +19434,7 @@ test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratin
   assert.notEqual((await store.readHead()).hash,originalHead.hash,'the durable head reflects the explicit restore and Undo sequence');
 });
 
-test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal',async()=>{
+test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break opening the task',async()=>{
   const base=syncState({tasks:[syncTask('task" autofocus data-injected="yes','Restored task')],contexts:[
     {id:'ctx" autofocus data-injected="yes',name:'Restored context',active:true},
   ],listOpen:true});
@@ -19449,9 +19446,12 @@ test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or br
   assert.match(rendered,/&quot; autofocus data-injected=&quot;yes/,'the identifier remains data, not markup');
   ctx.openSettings();
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-(?:mgrctx|mgrname|id)="ctx" autofocus/);
-  shim.document.querySelector=selector=>{if(selector.includes('autofocus'))throw Error('invalid selector');return null;};
-  shim.document.querySelectorAll=selector=>{assert.equal(selector,'[data-row]');return [];};
-  assert.doesNotThrow(()=>ctx.revealTask(base.tasks[0].id));
+  // #221 retired reveal-in-list; a chain pill opens the editor through the
+  // same edit action, so the restored identifier must open its own task.
+  assert.doesNotThrow(()=>ctx.onAction('edit',{dataset:{id:base.tasks[0].id}}));
+  const editor=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(editor,/id="etTitle" type="text" value="Restored task"/);
+  assert.doesNotMatch(editor,/data-(?:id|act)="task" autofocus/);
 });
 
 test('LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched', async () => {
@@ -21633,7 +21633,7 @@ test('RISK steady scanner browser: a long chain keeps the dot trail to one row o
     await page.waitForTimeout(40);
     const trail=await page.evaluate(()=>{
      const row=document.querySelector('.crumbs');if(!row)return null;
-     const crumbs=[...row.querySelectorAll('[data-act="reveal"]:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
+     const crumbs=[...row.querySelectorAll('.crumb:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
      return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),narrowest:Math.min(...crumbs.map(c=>c.getBoundingClientRect().width)),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
     });
     if(!trail)continue;
@@ -21883,9 +21883,9 @@ const steadyTrailBoard=({dots,title=()=>STEADY_LONG_TITLE})=>steadyScannerBoard(
 const steadyReadTrail=page=>page.evaluate(()=>{
  const row=document.querySelector('.crumbs'),box=row.getBoundingClientRect(),font=parseFloat(getComputedStyle(row).fontSize);
  const visible=[...row.children].filter(c=>!c.hidden),pen=document.createElement('canvas').getContext('2d');
- const dots=visible.filter(c=>c.matches('[data-act="reveal"]')).map(dot=>{const style=getComputedStyle(dot);pen.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;return {id:dot.dataset.id,room:dot.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),natural:pen.measureText(dot.textContent).width};});
+ const dots=visible.filter(c=>c.matches('.crumb')).map(dot=>{const style=getComputedStyle(dot);pen.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;return {id:dot.dataset.id,room:dot.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),natural:pen.measureText(dot.textContent).width};});
  const tops=visible.map(c=>{const r=c.getBoundingClientRect();return r.top+r.height/2;});
- return {chain:[...state.chain],everyDot:[...row.querySelectorAll('[data-act="reveal"]')].map(d=>d.dataset.id),dots,font,text:row.innerText,
+ return {chain:[...state.chain],everyDot:[...row.querySelectorAll('.crumb')].map(d=>d.dataset.id),dots,font,text:row.innerText,
   spread:Math.max(...tops)-Math.min(...tops),height:box.height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),
   overflow:row.scrollWidth-row.clientWidth,furthest:Math.max(...visible.map(c=>c.getBoundingClientRect().right))-box.right,past:box.right-document.querySelector('.card.bench').getBoundingClientRect().right,
   page:document.documentElement.scrollWidth-innerWidth};
@@ -29396,7 +29396,7 @@ test('RISK completion lifecycle Start: an unaware pass root cannot bypass comple
    const scan=app.shim.document.getElementById('scan'),CS=app.ctx.window.CloudSync,pull=CS.pull.bind(CS);let markup=scan.innerHTML,completionObserved=app.ctx.state.decisionEvents?.some(event=>event.id===completion.id)||false;
    CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.id===completion.id))completionObserved=true;return response;};
    Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-    const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+    const painted=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
     const row={completionObserved,chain:Array.from(app.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
    }});
@@ -29456,7 +29456,7 @@ test('RISK completion lifecycle maintenance: the local day marker and Resume or 
  assert.equal(ctx.state.tasks.find(row=>row.id===task.id).evergreen,true);assert.ok(ctx.state.tasks.find(row=>row.id===task.id).lastDoneAt>0);
  const scan=shim.document.getElementById('scan').innerHTML;
  assert.match(scan,new RegExp(`data-act="bench-done" data-benchmark="${reference.id}"`),'the visible benchmark remains the legitimate current member');
- assert.doesNotMatch(scan,new RegExp(`data-act="reveal" data-id="${task.id}"`),'the completed task is not rendered as a dotted member');
+ assert.doesNotMatch(scan,new RegExp(`class="crumb" data-act="edit" data-id="${task.id}"`),'the completed task is not rendered as a dotted member');
 });
 
 test('RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen',async t=>{
@@ -29476,7 +29476,7 @@ test('RISK completion lifecycle return: observed Dot and next Done survive stale
  const paints=[],observations=[],deviceWrites=[],scan=stale.shim.document.getElementById('scan'),CS=stale.ctx.window.CloudSync,pull=CS.pull.bind(CS);let completionObserved=false,markup=scan.innerHTML;
  CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.kind==='completion'&&event.taskId===taskId))completionObserved=true;return response;};
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-  const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+  const painted=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
   const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
   const row={completionObserved,chain:Array.from(stale.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
  }});
@@ -29636,7 +29636,7 @@ test('RISK completion boundaries: delayed stale cloud adoption retains Done and 
  assert.equal(h.conflicts,1,'the stale base is rejected once by the revision-conditioned cloud boundary');
  assert.ok(h.calls.filter(call=>call==='push').length>=2,'the conflict is read back and retried from the newer revision');
  assert.ok(paints.length>0&&paints.every(row=>row.chain.every(id=>id!==doneId)
-  &&![...String(row.markup).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
+  &&![...String(row.markup).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
   'each scanner paint during delayed adoption keeps the completed task out');
  const head=JSON.parse((await store.readHead()).payload);
  assert.deepEqual(head.chain,[peerId],'the exact repaired board is durable in production IndexedDB');

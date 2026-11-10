@@ -3391,7 +3391,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  assert.equal(cloud.decisionEvents.filter(event=>event.kind==='completion'&&event.taskId===doneId).length,1);
  assert.equal(ctx.state.listOpen,true);assert.equal(search.value,'Independent peer');assert.equal(body.scrollTop,420);
  assert.ok(paints.length>0&&paints.every(row=>row.chain.every(id=>id!==doneId)
-  &&![...String(row.markup).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
+  &&![...String(row.markup).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
   'every scan replacement while deferred recovery is released omits the completed member');
  assert.ok(durable.length>0&&durable.every(row=>row.chain.every(id=>id!==doneId)
   &&row.events.filter(event=>event.kind==='completion'&&event.taskId===doneId).length===1),
@@ -3428,7 +3428,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  assert.equal(JSON.stringify(h.remoteState().decisionEvents.find(event=>event.id===noFact.id)),JSON.stringify(noFact));
  assert.deepEqual([...ctx.state.chain],[peerId]);
  assert.ok(paints.every(row=>row.chain.every(id=>id!==doneId)
-  &&![...String(row.markup).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
+  &&![...String(row.markup).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
   'scanner paints after the held control still exclude the completed member');
  assert.ok(durable.every(row=>row.chain.every(id=>id!==doneId)
   &&row.events.filter(event=>event.kind==='completion'&&event.taskId===doneId).length===1),

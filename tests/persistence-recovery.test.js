@@ -974,7 +974,7 @@ test("RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  const scan=local.shim.document.getElementById('scan'),paints=[];
  let markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
-  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
+  const visible=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
   paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
  }}});
  await preUndoResponse.promise;
@@ -5473,7 +5473,7 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
   for(const app of clients){
    const scan=app.shim.document.getElementById('scan');let markup=scan.innerHTML;
    Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-    const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+    const painted=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
     const currentCompletionIds=(app.ctx.state.decisionEvents||[]).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id),row={sequence:++sequence,client:app===dotClient?'dot':app===doneClient?'done':'no',chain:Array.from(app.ctx.state.chain),painted,currentCompletionIds,deliveredCompletionIds:[...knowledge.get(app)],knownCloudCompletionIds:JSON.parse(vm.runInContext('JSON.stringify(JSON.parse(lastKnownCloudPayload||"null")?.decisionEvents||[])',app.ctx)).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id)};
     if(currentCompletionIds.length||row.knownCloudCompletionIds.length||row.deliveredCompletionIds.length)completionObserved.add(app);row.completionObserved=completionObserved.has(app);
@@ -5677,7 +5677,7 @@ test('RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 1
     paints=[],durable=[],scan=app.shim.document.getElementById('scan');
   let phase='actions',markup=scan.innerHTML,removed=[];
   const scanChain=html=>{
-   const crumbs=[...String(html).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+   const crumbs=[...String(html).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
    const benchmark=String(html).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
    if(benchmark)crumbs.push(benchmark[1]);return crumbs;
   };

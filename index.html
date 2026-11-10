@@ -262,8 +262,6 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .trow.rank-topk{grid-template-columns:minmax(118px,max-content) minmax(0,1fr)}
 .trow.rank-both{grid-template-columns:minmax(118px,max-content) minmax(0,1fr)}
 .trow:last-child{border-bottom:none}
-.trow.flash{animation:flash 1.6s ease}
-@keyframes flash{0%{background:light-dark(#fff3c4,#3a3318)}100%{background:transparent}}
 .trow .spark{opacity:.9}
 .rank-summary{position:relative;font-family:var(--font-mono);font-size:10.5px;min-inline-size:calc(8ch + 16px);min-height:max(22px,calc(1.45em + 4px));display:flex;align-items:center}
 .rank-summary .spark{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.82;pointer-events:none}
@@ -4597,7 +4595,7 @@ function supportDiagnosticsIso(at){
 const RESTART_DIAGNOSTICS_KEY="fvp:chain-scanner:restart-diagnostics:v1";
 const RESTART_DIAGNOSTICS_BYTES=8192,RESTART_DIAGNOSTICS_DOCUMENTS=4,RESTART_DIAGNOSTICS_EVENTS=8;
 const RESTART_DIAGNOSTICS_STAGES=new Set(["boot","action","save","persist","push","worker","cache","network-ready","aggregate","root","header","chunks","final-root","source-read","source-validation","recovery-budget","repair-attempt","review-start","review-sources","review-validation","review-render-start","review-rendered","review-finished","review-failed","review-cancelled","reload-requested","pagehide","pageshow","hidden","visible","error","unhandled-rejection"]);
-const RESTART_DIAGNOSTICS_ACTIONS=new Set("yes no cant cand-done cand-worked bench-done bench-cant postpone bench-postpone dislodge worked reveal continue-scan start-working resume-scan start-scan rescan clear-done new-pass toggle-list toggle-ctx toggle-hist toggle-add add add-ctx bulk-edit bulk-save edit save-edit done-task worked-task dot-task return-candidate delete-task restore cycle-theme settings save-settings help close-modal sync review-cloud-source-recovery choose-cloud-recovery-source apply-cloud-source-recovery review-decision-recovery apply-decision-recovery sync-retry sync-reload sync-signout undo view-support-diagnostics copy-support-diagnostics refresh-support-diagnostics".split(" "));
+const RESTART_DIAGNOSTICS_ACTIONS=new Set("yes no cant cand-done cand-worked bench-done bench-cant postpone bench-postpone dislodge worked continue-scan start-working resume-scan start-scan rescan clear-done new-pass toggle-list toggle-ctx toggle-hist toggle-add add add-ctx bulk-edit bulk-save edit save-edit done-task worked-task dot-task return-candidate delete-task restore cycle-theme settings save-settings help close-modal sync review-cloud-source-recovery choose-cloud-recovery-source apply-cloud-source-recovery review-decision-recovery apply-decision-recovery sync-retry sync-reload sync-signout undo view-support-diagnostics copy-support-diagnostics refresh-support-diagnostics".split(" "));
 const RESTART_DIAGNOSTICS_NAVIGATION=new Set(["navigate","reload","back_forward","prerender","unavailable"]);
 // Each document keeps its latest event of these kinds beside its recent steps.
 const RESTART_DIAGNOSTICS_SLOTS=["lastAction","review","reload","recoveryBudget"];
@@ -9581,18 +9579,6 @@ function toggleNoContext(){
   pushUndo();state.settings.excludeNoContext=!state.settings.excludeNoContext;recordCurrentChoiceSettings(gesture,before);commit();
   if(refocus)for(const button of document.querySelectorAll('[data-act="toggle-no-context"]'))if(button.dataset.ctxScope===scope){button.focus();break;}
 }
-function revealTask(id){
-  clearListFilters();   // scrolling to a row the filter is hiding reveals nothing
-  state.listOpen = true;
-  allTasksView.setListOpen(state.listOpen);
-  render();
-  requestAnimationFrame(()=>{
-    const row = [...document.querySelectorAll('[data-row]')].find(candidate=>candidate.dataset.row===id);
-    // CSS reduced-motion rules do not override an explicit smooth-scroll request.
-    const reduced=document.documentElement.dataset.landscapeMotion!=="normal" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if(row){ row.scrollIntoView({block:"center",behavior:reduced?"instant":"smooth"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
-  });
-}
 function commit(doSave, immediateSync, preserveBackupId=null){
   projectLegacyPrerequisites(state);
   ensureCandidate();
@@ -11589,7 +11575,7 @@ const boardPresentation=Object.freeze({
   tagFilters(view){return !view.tagOptions.length?'':'<span class="ltaglabel">Filter</span>'+view.tagOptions.map(o=>'<button type="button" class="ltag'+(o.key.startsWith('c:')?' task-context':'')+(view.tagFilter===o.key?' on':'')+'" data-act="list-tag" data-id="'+esc(o.key)+'" aria-pressed="'+(view.tagFilter===o.key?'true':'false')+'">'+esc(o.label)+'</button>').join('');},
   candidateShowing(board,hasPool,benchmark,candidate){return !(board.interventionActive&&benchmark)&&board.mode!=="work"&&hasPool&&!!candidate;},
   card(classes,title,chips=''){return '<div class="card '+classes+'"><span class="title">'+title+'</span><span class="chiprow">'+chips+'</span></div>';},
-  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),earlier=Math.max(0,behind.length-CHAIN_TRAIL_NEWEST_DOTS),label=chainTrailLabel(tasks.length,earlier);let html='<div class="crumbs"><span class="lbl"'+(label.title?' title="'+label.title+'"':'')+'>'+label.text+'</span>';behind.forEach((t,i)=>{html+='<button class="crumb" data-act="reveal" data-id="'+esc(t.id)+'"'+(i<earlier?' hidden':'')+' title="'+esc(t.title)+'">'+esc(t.title)+'</button><span class="arrow"'+(i<earlier&&i<behind.length-1?' hidden':'')+'>→</span>';});return html+'<span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
+  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),earlier=Math.max(0,behind.length-CHAIN_TRAIL_NEWEST_DOTS),label=chainTrailLabel(tasks.length,earlier);let html='<div class="crumbs"><span class="lbl"'+(label.title?' title="'+label.title+'"':'')+'>'+label.text+'</span>';behind.forEach((t,i)=>{html+='<button class="crumb" data-act="edit" data-id="'+esc(t.id)+'"'+(i<earlier?' hidden':'')+' title="'+esc(t.title)+'">'+esc(t.title)+'</button><span class="arrow"'+(i<earlier&&i<behind.length-1?' hidden':'')+'>→</span>';});return html+'<span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
   context(c,info,settings=false){return '<button type="button" class="ctxitem '+info.mode+'" data-act="'+(c?'cycle-context':'toggle-no-context')+'"'+(c?' data-id="'+esc(c.id)+'" data-ctx="'+esc(c.id)+'"':'')+' data-ctx-scope="'+(settings?'settings':'main')+'" data-filter-state="'+info.mode+'" aria-label="'+esc(info.label)+'" title="'+esc(info.label)+'">'+info.mark+(c&&settings?'':' '+esc(c?c.name:'No context'))+'</button>';},
   taskRow({task,rankColumns,dim=false,rankSummary='',inChain=false,nextDotted=false,titleAttrs='',url='',chips='',blockerTitles=[],skipLabel=''}){
     return '<div class="trow '+rankColumns+'" data-row="'+esc(task.id)+'" style="'+(dim?'opacity:.45':'')+'">'+rankSummary+'<div class="tmain">'
@@ -12359,7 +12345,6 @@ function drawListRows(body,wanted,selecting,deferRanks,emptyHTML){
       if(element){element.replaceWith(next);if(cursor===element)cursor=next;}
       element=next;
     }
-    element.classList.remove("flash");   // a redrawn row never kept its highlight
     if(element===cursor)cursor=cursor.nextElementSibling;else body.insertBefore(element,cursor);
     rows.set(row.id,{rest:row.rest,spark:row.spark,summary:row.summary,element});
   }
@@ -17673,7 +17658,6 @@ function onAction(act, el){
     case "woop-next": advanceWoop(el.dataset); break;
     case "woop-delete": deleteWoop(el.dataset); break;
     case "worked": TaskActionOwner.perform({type:"benchmark",action:"worked"}); break;
-    case "reveal": revealTask(el.dataset.id); break;
     case "continue-scan": {
       const gesture=captureCurrentChoiceGesture(),before=state.mode;
       // Answering Continue is deliberate Scan intent, including reaffirmation.

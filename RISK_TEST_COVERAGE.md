@@ -405,7 +405,6 @@ its RISK test; the map follows.
 - RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes
 - RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks
 - RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload
-- RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload
 - RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable
 - RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
 - RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available
@@ -550,7 +549,7 @@ its RISK test; the map follows.
 - RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
 - RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
 - RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
-- RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
+- RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break opening the task
 - RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client
 - RISK comparison replay: repeated same-pair Yes and No actions remain distinct and replay once by original action order
 - RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history
