@@ -892,11 +892,11 @@
     },
     {
       "baselineRoot": "RISK optional oldest start: Save settings alone persists the checkbox transition",
-      "currentRoot": "RISK chain start: Save settings alone persists the Chain starts with transition",
+      "currentRoot": "RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
-      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry. #2303 removes Save settings, so the root now commits the dropdown itself."
     },
     {
       "baselineRoot": "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",

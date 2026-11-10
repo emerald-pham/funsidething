@@ -21,7 +21,7 @@ import {
   landscapeLuminance, manifestHrefFromHtml, serviceWorkerSource, appShellContract,
   serviceWorkerHarness, slice, loadEngine, readConst, extractAppScript, appSrc, makeFakeElement,
   makeDomShim, flush, loadApp, setFakeTime, realNow, publishedBetaContinuation, settle, persisted,
-  makeFakeCloudSyncFactory, setInput, WH_STORE_KEY, preChangeState, localAt, addTaskAged, titleOf,
+  makeFakeCloudSyncFactory, setInput, commitSetting, WH_STORE_KEY, preChangeState, localAt, addTaskAged, titleOf,
   scanHtmlOf, benchAction, fillEditPane, STORE_KEY, THEME_HINT_KEY, runThemeBoot, themeBtnText,
   styleSrc, offendingDeclarations, ALLOWED_NON_ASCII, decodeEscapes, themeTokens, channel, luminance,
   contrast, CONTRAST_PAIRS, openList, listHTML, listCount, selectedListIds, tagRowHTML, litTags,
@@ -632,8 +632,8 @@ test('RISK unreadable device recovery: the recovery file excludes the placeholde
  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
  ctx.URL={createObjectURL(value){blob=value;return 'blob:source-only';},revokeObjectURL(){}};
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download recovery file\s*<\/button>/);
- assert.ok(download,'the unavailable-board view exposes the single Download recovery file action');
+ const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+ assert.ok(download,'the unavailable-board view exposes the single Download backup action');
  assert.doesNotMatch(settings,/data-act="download-current-board"/,'without an accepted board no board export is offered');
  assert.match(settings,/no accepted board, so the file has none/,'Settings says the recovery file has no board');
  await ctx.onAction('download-current-board',{});assert.equal(downloads.length,0,'the shell cannot be exported as an accepted board');
@@ -760,7 +760,7 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
- assert.match(answer,/one Restore action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Download recovery file saves the readable sources as evidence, never a restorable board/i);
+ assert.match(answer,/one Restore action.*choose a file or paste board data/i);assert.match(answer,/Download backup saves the readable sources as evidence, never a restorable board/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
  assert.match(answer,/When cloud sync is configured, the header shows disabled syncing while the board is still opening; this does not confirm cloud saving\./);
  assert.match(answer,/After the board opens, genuine recovery warnings and cloud errors remain visible\./);
@@ -4302,12 +4302,13 @@ test('RISK chain start: synced Undo reverses the option and the Start it enabled
  assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-older',25],['undo-likely',30]],'every reversal stays neutral');
 });
 
-test('RISK chain start: Save settings alone persists the Chain starts with transition',async()=>{
+test('RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button',async()=>{
  const app=await loadApp({seed:2324}),{ctx,shim}=app;
  Object.assign(ctx.addTask('Save older',false),{id:'save-older',createdAt:1});Object.assign(ctx.addTask('Save likely',false),{id:'save-likely',createdAt:2,mu:32});
  ctx.openSettings();assert.equal(ctx.state.settings.chainStartsWith,undefined);
- shim.document.getElementById('stChainStartsWith').value='mostLikely';ctx.onAction('save-settings',{});
- assert.equal(ctx.state.settings.chainStartsWith,'mostLikely','Save must read the selected draft even without an immediate change event');
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="save-settings"/,'#2303: there is no Save settings button to remember');
+ commitSetting(shim,'stChainStartsWith','mostLikely');
+ assert.equal(ctx.state.settings.chainStartsWith,'mostLikely','the committed choice saves by itself');
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),['save-likely']);
  assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
  reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/<option value="mostLikely" selected>Most likely<\/option>/);
@@ -5899,21 +5900,23 @@ test('RISK changelog dates: direct FAQ notes combine repeated dates in descendin
  ctx.openHelp();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Where can I see what changed\?/,'chronological notes no longer repeat the removed navigation question');
 });
 
-test('RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation',async()=>{
+test('RISK Settings hierarchy: moved Changelog leaves no Save settings button and committed fields keep their validation',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
  assert.doesNotMatch(markup,/<summary>Changelog<\/summary>/,'release notes have moved to FAQs / Changelog');
- const save=markup.indexOf('data-act="save-settings"');assert.ok(save>markup.lastIndexOf('</details>'),'Save settings is after every disclosure, including backups');assert.equal((markup.match(/data-act="save-settings"/g)||[]).length,1);
+ assert.doesNotMatch(markup,/data-act="save-settings"|>Save settings</,'#2303: every field saves when committed, so there is no Save settings button');
  for(const entry of html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1].matchAll(/<li>([\s\S]*?)<\/li>/g)){ctx.openHelp();assert.ok(shim.document.getElementById('modalRoot').innerHTML.includes(entry[0]),'all historical entries remain in help');}ctx.openSettings();
- for(const [id,value] of Object.entries({stHorizon:'999',stCantMin:'',stWorkedHrs:'17',stThresh:'0',stSamples:'50',stEverHours:'21',stEverUnit:'hours',stScanMode:'both',stListMetric:'chance',stDateFormat:'ymd'}))shim.document.getElementById(id).value=value;
- ctx.onAction('save-settings',{});await ctx.persist();assert.equal(ctx.state.settings.horizonMin,480);assert.equal(ctx.state.settings.cantMin,30);assert.equal(ctx.state.settings.workedHours,17);assert.equal(ctx.state.settings.thresholdPct,25);assert.equal(ctx.state.settings.evergreenHours,21);
+ for(const [id,value] of Object.entries({stHorizon:'999',stCantMin:'',stWorkedHrs:'17',stThresh:'0',stSamples:'50',stEverHours:'21',stEverUnit:'hours',stScanMode:'both',stListMetric:'chance',stDateFormat:'ymd'}))commitSetting(shim,id,value);
+ await ctx.persist();assert.equal(ctx.state.settings.horizonMin,60,'an out-of-range Horizon returns to its last valid value; it is not clamped');assert.equal(shim.document.getElementById('stHorizon').value,'60','the field shows that value again');
+ assert.equal(ctx.state.settings.cantMin,30);assert.equal(shim.document.getElementById('stCantMin').value,'30','an emptied field returns to its last valid value');assert.equal(ctx.state.settings.workedHours,17);assert.equal(ctx.state.settings.thresholdPct,25);assert.equal(shim.document.getElementById('stThresh').value,'25');assert.equal(ctx.state.settings.samples,50);assert.equal(ctx.state.settings.evergreenHours,21);
  const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reloaded.ctx.state.settings.workedHours,17);assert.equal(reloaded.ctx.state.settings.scanMode,'both');assert.equal(reloaded.ctx.state.settings.listMetric,'chance');assert.equal(reloaded.ctx.state.settings.dateFormat,'ymd');
 });
 
-test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
+test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and saving as you change',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Every setting saves as soon as you change it/i])assert.match(help,pattern);
+ assert.doesNotMatch(help,/Save settings is at the bottom/,'#2303: there is no Save settings button to describe');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 
@@ -5942,8 +5945,9 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     assert.equal(styles.font,styles.otherFont);assert.equal(styles.surface,styles.otherSurface);assert.equal(styles.summary,styles.otherSummary);assert.equal(styles.last,true);assert.equal(styles.overflow,true);
     await modal.locator('[data-act="close-modal"]').click();await page.locator('[data-act="settings"]').click();modal=page.locator('#modalRoot .modal');await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
     await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
-    const save=modal.locator('[data-act="save-settings"]');await save.scrollIntoViewIfNeeded();if(width<1000)await save.tap();else await save.click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
-    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
+    assert.equal(await page.locator('#stHorizon').inputValue(),'60','#2303: leaving an out-of-range Horizon returns it to its last valid value');
+    assert.equal(await modal.locator('[data-act="save-settings"]').count(),0,'#2303: there is no Save settings button');await modal.locator('[data-act="close-modal"]').click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
+    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),60);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
     await page.evaluate(()=>openSettings());await page.locator('#modalRoot [data-act="close-modal"]').click();assert.equal(await page.evaluate(()=>state.settings.workedHours),19,'closing Settings retains the saved value');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     if(process.env.CONTEXT_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.CONTEXT_EVIDENCE_DIR,`${name}-${width}x${height}-contexts.png`)});
@@ -9966,22 +9970,18 @@ test("RISK rating bounds: hydration and frozen chance opponents normalize extrem
   assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
 });
 
-test("RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore", async () => {
+test("RISK backup and Restore consolidation: Settings keeps one Download backup and one guarded Restore", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openSettings();
   const panel = shim.document.getElementById("modalRoot").innerHTML;
-  assert.match(panel, /<h3>Download<\/h3>/);
-  assert.match(panel, /<h3>Debug log<\/h3>/);
-  assert.equal((panel.match(/data-act="download-current-board"/g) || []).length, 1, "the board-data area has one Download board action");
-  assert.equal((panel.match(/data-act="download-recovery-file"/g) || []).length, 1, "the board-data area has one Download recovery file action");
+  assert.equal((panel.match(/data-act="download-current-board"/g) || []).length, 0, "#2303: with a complete backup there is no separate board download");
+  assert.equal((panel.match(/data-act="download-recovery-file">Download backup</g) || []).length, 1, "the board-data area has one Download backup action");
   assert.equal((panel.match(/data-act="restore-backup"/g) || []).length, 1, "the board-data area has one guarded Restore action");
   assert.doesNotMatch(panel, /id="backupDownloadFormat"|data-act="download-backup"|data-act="view-current-board"|data-act="view-database-repair"/);
-  assert.match(panel, /id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/);
+  assert.doesNotMatch(panel, /id="backupRestoreSource"/, "#2303: file or paste is chosen inside Restore, not beside it");
+  assert.match(panel, /data-act="restore-backup"[^>]*>Restore<\/button><\/div><div id="restoreChoices"[^>]*hidden[^>]*>[\s\S]*?data-act="choose-backup-file"[\s\S]*?data-act="open-paste-recovery"/, "Restore holds the file and paste choices");
   assert.doesNotMatch(panel, /data-act="download-recovery-archive"/);
-  assert.doesNotMatch(panel, /data-act="choose-backup-file"|data-act="open-paste-recovery"/);
   assert.doesNotMatch(panel, /Current board recovery/i);
-  assert.match(html, /use Download board in Settings before closing it/);
-  assert.match(html, /use Download board in Settings before choosing whether to delete an older backup/);
   assert.doesNotMatch(html, /Current board recovery/);
 });
 
@@ -9996,7 +9996,7 @@ test('RISK backup format safety: without an accepted board the recovery download
  assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
 });
 
-test('RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK backup format browser: enlarged unreadable Settings keeps the Restore choices and the backup safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),{resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,browser=await chromium.launch({headless:true});
  const evidence=process.env.BACKUP_CONTROL_EVIDENCE_DIR;if(evidence)fs.mkdirSync(evidence,{recursive:true});
@@ -10013,19 +10013,22 @@ test('RISK backup format browser: enlarged unreadable Settings keeps the Restore
    // precondition). Either way this device has no accepted board to export.
    const noBoard=()=>page.evaluate(()=>({accepted:liveBoardAccepted,emptyNewWork:emptyNewWorkWorkspace()}));
    const opened=await noBoard();assert.ok(!opened.accepted||opened.emptyNewWork,'no accepted board to export '+JSON.stringify(opened));
-   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupRestoreSource')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
+   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details.settings-section').filter({has:page.locator('[data-act="restore-backup"]')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
    const before=await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot());
-   await page.addStyleTag({content:'#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
-   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupRestoreSource').scrollIntoViewIfNeeded();
-   // #2246: no format selector; without an accepted board only Download recovery file is offered.
-   assert.equal(await page.locator('#backupDownloadFormat').count(),0);
+   await page.addStyleTag({content:'#modalRoot .modal .btn,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
+   await page.evaluate(()=>document.fonts.ready);
+   // #2246: no format selector; without an accepted board only Download backup is offered.
+   assert.equal(await page.locator('#backupDownloadFormat').count(),0);assert.equal(await page.locator('#backupRestoreSource').count(),0,'#2303: no source selector beside Restore');
    assert.deepEqual(await page.locator('#modalRoot [data-act^="download-"]').evaluateAll(es=>es.map(e=>e.dataset.act).filter(act=>act!=='download-raw-backups')),['download-recovery-file']);
-   const geometry=await page.locator('#backupRestoreSource').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
+   const restore=page.locator('#modalRoot [data-act="restore-backup"]');await restore.scrollIntoViewIfNeeded();await restore.click();assert.equal(await page.locator('#restoreChoices').isVisible(),true,'Restore opens its file and paste choices');
+   await page.locator('#restoreChoices').scrollIntoViewIfNeeded();
+   const geometry=await page.locator('#restoreChoices [data-act]').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.closest('.modal').getBoundingClientRect(),s=getComputedStyle(e);return{act:e.dataset.act,left:r.left,right:r.right,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,scrollWidth:e.scrollWidth,clientWidth:e.clientWidth,text:e.textContent};}));
    if(evidence)await page.screenshot({path:path.join(evidence,theme+'-raw-format.png')});t.diagnostic(JSON.stringify({theme,geometry}));
-   for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.id+' must remain inside its real Settings row');assert.ok(r.nativeIntrinsicWidth<=r.width+1,r.id+' leaves room for its complete label and native arrow compared with an unconstrained native reference');assert.notEqual(r.appearance,'none');}
+   assert.deepEqual(geometry.map(r=>r.act),['choose-backup-file','open-paste-recovery']);
+   for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.act+' must remain inside the Settings pane');assert.ok(r.scrollWidth<=r.clientWidth+1,r.act+' shows its complete label '+r.text);}
    const help=page.locator('#modalRoot p.kv').filter({hasText:'the file has none: it is marked partial and cannot be restored as a board.'});assert.equal(await help.isVisible(),true);
    assert.equal(await help.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
-   await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.deepEqual(await noBoard(),opened,'the device still has no accepted board to export');
+   assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.deepEqual(await noBoard(),opened,'the device still has no accepted board to export');
   }finally{await context.close();}
  });}finally{await browser.close();}
 });
@@ -10230,50 +10233,72 @@ test("UI: the list badge shows remaining cooldown minutes for an active can't ma
   assert.match(listHtml, /class="skipped">can.t \u00b7 50m<\/span>/, `expected a "can't · 50m" badge in: ${listHtml}`);
 });
 
-test("save-settings: cantMin is read, clamped [5,480], and persisted independently of horizonMin", async () => {
+// #2303: with no Save settings button, every remaining Settings field saves
+// when it is committed, survives a reload and reaches the rule it controls.
+test("RISK committed settings: every remaining Settings field saves when committed, survives a reload and takes effect", async () => {
+  const app = await loadApp({ seed: 2303 }), { ctx, shim } = app;
+  ctx.openSettings();
+  const committed = { stHorizon: 90, stCantMin: 12, stWorkedHrs: 20, stThresh: 30, stSamples: 400, stPostponeHours: 2.5,
+    stEverHours: 3, stEverUnit: "days", stEverReset: false, stShowPostpone: true, stLastTaskWoop: true, stFloatingHeader: true,
+    stPatternedIndicators: true, stDateFormat: "ymd", stListMetric: "chance", stScanMode: "chance", stChainStartsWith: "mostLikely" };
+  for (const [id, value] of Object.entries(committed)) commitSetting(shim, id, value);
+  const expected = { horizonMin: 90, cantMin: 12, workedHours: 20, thresholdPct: 30, samples: 400, postponeHours: 2.5, evergreenHours: 72,
+    evergreenResetAtDay: false, showPostpone: true, lastTaskWoop: true, floatingHeader: true, patternedIndicators: true,
+    dateFormat: "ymd", listMetric: "chance", scanMode: "chance", chainStartsWith: "mostLikely" };
+  const pick = settings => Object.fromEntries(Object.keys(expected).map(key => [key, settings[key]]));
+  assert.deepEqual(pick(ctx.state.settings), expected, "each committed field saved without a Save settings button");
+  ctx.closeModal();
+  assert.equal(await ctx.persist(), true);
+  const reloaded = await loadApp({ seed: 2304, seedStorage: { [SYNC_STORE_KEY]: shim.localStorage.getItem(SYNC_STORE_KEY) } });
+  assert.deepEqual(pick(reloaded.ctx.state.settings), expected, "every committed setting survives a reload");
+  // A committed number reaches its rule: Can't now holds for 12 minutes.
+  const r = reloaded.ctx;
+  r.addTask("Task A", false); r.addTask("Said can't", false);
+  r.startScan("descending");
+  const t0 = realNow(r); setFakeTime(r, t0); r.decide("cant");
+  setFakeTime(r, t0 + 2 * 60000); r.state.listOpen = true; r.render();
+  assert.match(r.document.getElementById("listBody").innerHTML, /class="skipped">can.t \u00b7 10m<\/span>/, "the committed Can't sticks for value is the one in effect");
+});
+
+test("committed settings: cantMin saves on its own and leaves horizonMin alone", async () => {
   const { ctx } = await loadApp({ seed: 50 });
-  setInput(ctx, "stHorizon", 90);
-  setInput(ctx, "stCantMin", 12);
-  setInput(ctx, "stThresh", 20);
-  setInput(ctx, "stSamples", 300);
-  ctx.onAction("save-settings", {});
+  commitSetting(ctx, "stHorizon", 90);
+  commitSetting(ctx, "stCantMin", 12);
   assert.equal(ctx.state.settings.horizonMin, 90);
   assert.equal(ctx.state.settings.cantMin, 12);
+  assert.equal(await ctx.persist(), true);
+  const reloaded = await loadApp({ seedStorage: { [SYNC_STORE_KEY]: ctx.localStorage.getItem(SYNC_STORE_KEY) } });
+  assert.equal(reloaded.ctx.state.settings.cantMin, 12, "the committed value survives a reload");
 });
 
-test("save-settings: cantMin below 5 clamps up to 5, above 480 clamps down to 480", async () => {
+test("committed settings: an out-of-range cantMin returns to its last valid value instead of clamping", async () => {
   const { ctx } = await loadApp({ seed: 51 });
-  setInput(ctx, "stHorizon", 60);
-  setInput(ctx, "stCantMin", 2); // non-zero (0 is falsy and hits the ||default fallback instead, same as horizonMin)
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 5);
-
-  setInput(ctx, "stCantMin", 9999);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 480);
+  commitSetting(ctx, "stCantMin", 12);
+  const low = commitSetting(ctx, "stCantMin", 2);
+  assert.equal(ctx.state.settings.cantMin, 12, "below 5 keeps the last valid value, not a clamp to 5");
+  assert.equal(low.value, "12", "the field shows the last valid value again");
+  commitSetting(ctx, "stCantMin", 9999);
+  assert.equal(ctx.state.settings.cantMin, 12, "above 480 keeps the last valid value, not a clamp to 480");
 });
 
-test("save-settings: a blank/non-numeric cantMin falls back to 30, not to horizonMin's default", async () => {
+test("committed settings: a blank or non-numeric cantMin returns to its last valid value", async () => {
   const { ctx } = await loadApp({ seed: 52 });
-  setInput(ctx, "stHorizon", 60);
-  setInput(ctx, "stCantMin", "");
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 30);
+  commitSetting(ctx, "stCantMin", 45);
+  const blank = commitSetting(ctx, "stCantMin", "");
+  assert.equal(ctx.state.settings.cantMin, 45);
+  assert.equal(blank.value, "45");
+  commitSetting(ctx, "stCantMin", "abc");
+  assert.equal(ctx.state.settings.cantMin, 45);
 });
 
-test("save-settings: a literal 0 is falsy and falls back to the default rather than clamping to the minimum (shared quirk with horizonMin/thresholdPct)", async () => {
+test("committed settings: 0 for horizonMin or cantMin returns to the last valid value", async () => {
   const { ctx } = await loadApp({ seed: 53 });
-  setInput(ctx, "stHorizon", 0);
-  setInput(ctx, "stCantMin", 0);
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.horizonMin, 60, "0 hits the existing ||60 fallback, not Math.max(5,...)");
-  assert.equal(ctx.state.settings.cantMin, 30, "0 hits the ||30 fallback the same way, for consistency");
+  commitSetting(ctx, "stHorizon", 90);
+  commitSetting(ctx, "stCantMin", 40);
+  commitSetting(ctx, "stHorizon", 0);
+  commitSetting(ctx, "stCantMin", 0);
+  assert.equal(ctx.state.settings.horizonMin, 90, "0 is out of range, so the last valid value stays");
+  assert.equal(ctx.state.settings.cantMin, 40);
 });
 
 /* ---------- quick-add context picker ---------- */
@@ -10755,57 +10780,41 @@ test("data from before this change: a stored 'worked' task with no timestamp is 
   assert.equal(ctx.state.considered.w, undefined);
 });
 
-/* ---- save-settings validation (mirrors the cantMin tests) ---- */
+/* ---- committed settings validation (mirrors the cantMin tests) ---- */
 
-test("save-settings: workedHours is read, clamped [1,720], and persisted independently of the other fields", async () => {
+test("committed settings: workedHours saves on its own and leaves the other fields alone", async () => {
   const { ctx } = await loadApp({ seed: 404 });
-  setInput(ctx, "stHorizon", 90);
-  setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  setInput(ctx, "stWorkedHrs", 12);
-  ctx.onAction("save-settings", {});
+  commitSetting(ctx, "stCantMin", 30);
+  commitSetting(ctx, "stWorkedHrs", 12);
   assert.equal(ctx.state.settings.workedHours, 12);
   assert.equal(ctx.state.settings.cantMin, 30, "an unrelated field must be untouched");
 });
 
-test("save-settings: workedHours below 1 clamps up to 1, above 720 clamps down to 720", async () => {
+test("committed settings: an out-of-range workedHours returns to its last valid value instead of clamping", async () => {
   const { ctx } = await loadApp({ seed: 405 });
-  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
-
-  setInput(ctx, "stWorkedHrs", -3);                       // non-zero, so it clamps rather than hitting the fallback
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, 1);
-
-  setInput(ctx, "stWorkedHrs", 9999);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, 720);
+  commitSetting(ctx, "stWorkedHrs", 12);
+  const field = commitSetting(ctx, "stWorkedHrs", -3);
+  assert.equal(ctx.state.settings.workedHours, 12, "below 1 keeps the last valid value, not a clamp to 1");
+  assert.equal(field.value, "12");
+  commitSetting(ctx, "stWorkedHrs", 9999);
+  assert.equal(ctx.state.settings.workedHours, 12, "above 720 keeps the last valid value, not a clamp to 720");
 });
 
-/* These two used to assert a literal 8, which was right when 8 was the
-   default and went stale the moment it moved to 16 — leaving them pinning the
-   one save-settings fallback that no longer matched DEFAULT_SETTINGS, i.e.
-   the exact drift AUDIT H6 is about. The behaviour under test is unchanged:
-   an empty or falsy field takes the default. It just reads the default now
-   instead of restating a number that can move again. */
-test("save-settings: a blank or non-numeric workedHours falls back to the default", async () => {
+/* These two once pinned the Save settings fallback to the default (AUDIT H6).
+   #2303 removed Save settings: an empty, non-numeric or out-of-range field now
+   returns to its last valid value, so no fallback number can drift. */
+test("committed settings: a blank or non-numeric workedHours returns to its last valid value", async () => {
   const { ctx } = await loadApp({ seed: 406 });
-  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
-  setInput(ctx, "stWorkedHrs", "");
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, readConst(ctx, "DEFAULT_SETTINGS").workedHours);
+  commitSetting(ctx, "stWorkedHrs", 20);
+  commitSetting(ctx, "stWorkedHrs", "");
+  assert.equal(ctx.state.settings.workedHours, 20);
 });
 
-test("save-settings: a literal 0 workedHours is falsy and takes the default, not a clamp to 1", async () => {
+test("committed settings: 0 workedHours returns to the last valid value", async () => {
   const { ctx } = await loadApp({ seed: 407 });
-  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
-  setInput(ctx, "stWorkedHrs", 0);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, readConst(ctx, "DEFAULT_SETTINGS").workedHours,
-    "0 is falsy, so it takes the default — the same way horizonMin and cantMin take theirs");
+  commitSetting(ctx, "stWorkedHrs", 20);
+  commitSetting(ctx, "stWorkedHrs", 0);
+  assert.equal(ctx.state.settings.workedHours, 20, "0 is out of range, so the last valid value stays");
 });
 
 /* ---- settings UI ---- */
@@ -16533,8 +16542,10 @@ test('LOCAL BACKUPS: seven local calendar days, latest save today, and pre-resto
     ['2026-09-06','2026-09-07','2026-09-08']);
   const day3 = entries.find(entry => entry.day === '2026-09-03' && entry.kind === 'latest');
   ctx.openSettings();
-  assert.match(shim.document.getElementById('modalRoot').innerHTML, /Daily local backups/);
-  assert.match(shim.document.getElementById('modalRoot').innerHTML, /seven calendar days/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML, /Daily local backups|seven calendar days/, '#2303: retention details moved out of Settings');
+  ctx.openHelp();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML.split('<summary><h3>Data and backups</h3></summary>')[1], /seven calendar days/, 'the Data and backups FAQ keeps the retention details');
+  ctx.openSettings();
   ctx.onAction('restore-local-backup', { dataset: { id: day3.id } });
   entries = ctx.readLocalBackups();
   assert.ok(entries.some(entry => entry.kind === 'before-restore' && entry.payload.includes('Day 8')),
@@ -16558,7 +16569,7 @@ test('LOCAL BACKUPS: a manual backup remains restorable after the seven-day wind
   ctx.addTask('Current board'); await ctx.persist();
   assert.ok(ctx.readLocalBackups().some(entry=>entry.id===saved.id));
   ctx.openSettings();
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Make manual backup/);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="make-manual-backup">Make backup</);
   ctx.onAction('restore-local-backup',{dataset:{id:saved.id}});
   assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Keep indefinitely','Current board']);
   assert.ok(ctx.readLocalBackups().some(entry=>entry.kind==='before-restore' && entry.payload.includes('Current board')));
@@ -17508,7 +17519,7 @@ test('RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device 
  assert.equal(JSON.stringify(ctx.deviceSaveIssue()),JSON.stringify({stage:'primary-write',code:'quota-exhausted'}));
  assert.match(shim.document.getElementById('toast').textContent,/device-save:primary-write\/quota-exhausted/);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/primary-write\/quota-exhausted/);
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/available in Download board below/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/available in Download backup below/);
  blockOriginal=false;assert.equal(await ctx.persist(),true);assert.equal(ctx.deviceSaveIssue(),null,'a successful retry clears the stale diagnosis');
 
  const missing=await loadApp();
@@ -17880,20 +17891,20 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
-test('RISK JSON COPY PASTE: Download board saves the exact board JSON without saving, and pasting it restores through the guarded preview',async t=>{
+test('RISK JSON COPY PASTE: Download backup saves the exact board JSON without saving, and pasting it restores through the guarded preview',async t=>{
   const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
   t.after(()=>app.dispose());
   const task=ctx.addTask('Copy <board> & keep 🌿');await ctx.persist();
   task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};
   const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),writes=[];
   const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{writes.push(key);return set(key,value);};
-  // #2246: Download board is the one board export; the person copies the file's text.
+  // #2303: Download backup is the one download; the person copies the file's text.
   const files=captureDownloads(app);ctx.openSettings();
-  const download=shim.document.getElementById('modalRoot').innerHTML.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download board<\/button>/);
-  assert.ok(download,'Settings offers Download board');
-  assert.equal(await ctx.onAction(download[1],{}),true);assert.equal(files.length,1);assert.equal(files[0].name,'chain-scanner-current-board.json');
+  const download=shim.document.getElementById('modalRoot').innerHTML.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download backup<\/button>/);
+  assert.ok(download,'Settings offers Download backup');
+  assert.equal(await ctx.onAction(download[1],{}),true);for(let i=0;i<100&&!files.length;i++)await flush();assert.equal(files.length,1);assert.equal(files[0].name,'chain-scanner-recovery-file.json');
   const copied=await downloadedText(files[0]);
-  const board=JSON.parse(copied);
+  const board=JSON.parse(copied).currentBoard;
   assert.equal(board.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
   assert.equal(board.futureCopyBoardField.retain,true);
   assert.equal(JSON.stringify(ctx.state),before,'downloading leaves accepted unsaved fields untouched');
@@ -17905,8 +17916,8 @@ test('RISK JSON COPY PASTE: Download board saves the exact board JSON without sa
   const target=destination.ctx,dom=destination.shim;
   target.addTask('Board before pasted restore',false);await prepareBackupFileFixtureSource(destination);
   const original=JSON.stringify(target.state),originalHead=await target.window.ScannerDeviceStore.readHead();
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';
-  await target.onAction('restore-backup',{});
+  target.openSettings();await target.onAction('restore-backup',{});
+  await target.onAction('open-paste-recovery',{});
   const pasted=dom.document.getElementById('jsonBox');pasted.id='jsonBox';pasted.value=copied;
   dom.document.dispatchEvent({type:'input',target:pasted});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
@@ -17924,15 +17935,15 @@ test('RISK JSON COPY PASTE: Download board saves the exact board JSON without sa
   assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the displaced board remains protected');
 });
 
-test('RISK JSON COPY PASTE: Quick start explains Download board, copying the file and guarded paste',async t=>{
+test('RISK JSON COPY PASTE: Quick start explains Download backup, copying the file and guarded paste',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
   const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const answer=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'Quick start includes the JSON copy and paste workflow');
-  assert.match(answer,/Download board saves.*JSON file/);
-  assert.match(answer,/does not include local backups or recovery sources.*Download recovery file does/i);
+  assert.match(answer,/Download backup saves.*JSON file/);
+  assert.match(answer,/every readable saved source.*Restore applies only its current board/i);
   assert.match(answer,/open the file and copy its text/i);
-  assert.match(answer,/Restore.*Paste JSON.*preview.*confirm/i);
+  assert.match(answer,/Restore.*Paste board data.*preview.*confirm/i);
   assert.match(answer,/accepted.*unsaved|may not have saved/i);
   assert.match(answer,/not.*Debug log/i);
 });
@@ -17947,7 +17958,7 @@ test('RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact sav
   const head=await store.readHead();await store.putBackup({expectedHash:head.hash,backup:{id:'repair-manual-original',kind:'manual',day:'2026-10-25',at:1,payload:'{"unknownOriginal":"keep exact"}'}});
   const before=JSON.stringify(await store.readRawExportSnapshot()),boardBefore=JSON.stringify(ctx.state);
   const files=captureDownloads(app);ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const view=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download recovery file<\/button>/);
+  const view=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download backup<\/button>/);
   assert.ok(view,'Settings exposes one combined database and repair export');
   assert.equal(await ctx.onAction(view[1],{}),true);assert.equal(files.length,1);assert.equal(files[0].name,'chain-scanner-recovery-file.json');
   const copied=await downloadedText(files[0]);
@@ -17961,7 +17972,7 @@ test('RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact sav
   assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before);assert.equal(JSON.stringify(ctx.state),boardBefore,'repair export is read-only');
   const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-copy-restore-'+Date.now()});
   t.after(()=>destination.dispose());target.addTask('Before repair-file restore',false);await prepareBackupFileFixtureSource(target);
-  const original=JSON.stringify(target.state);target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  const original=JSON.stringify(target.state);target.openSettings();await target.onAction('restore-backup',{});await target.onAction('open-paste-recovery',{});
   const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;dom.document.dispatchEvent({type:'input',target:box});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);assert.equal(JSON.stringify(target.state),original);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);assert.equal(target.state.tasks[0].futureRepairField.keep,'unknown 🌿');
@@ -17969,11 +17980,11 @@ test('RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact sav
   assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===copied),'the exact package remains protected for repair');
 });
 
-// #2246 (owner, 2026-11-06): one export and one recovery option. Settings →
-// Data and backups offers exactly two downloads, Download board (ordinary
-// board JSON) and Download recovery file (the board, every readable saved
-// source, build details and the Debug log), with no format choice and no
-// view/copy dialogs, and both files round-trip through the single Restore.
+// #2246 (owner, 2026-11-06): one export and one recovery option, with no format
+// choice and no view/copy dialogs. #2303 (owner, 2026-11-10): Settings shows one
+// Download backup (the board, every readable saved source, build details and the
+// Debug log); Download board only (ordinary board JSON) appears beside it only when
+// the backup comes out partial. Both files round-trip through the single Restore.
 function captureDownloads(app){
  const files=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>files.push({href:link.href,name:link.download});
  const createElement=app.shim.document.createElement;app.shim.document.createElement=tag=>tag==='a'?link:createElement.call(app.shim.document,tag);
@@ -17984,13 +17995,13 @@ async function restorePasted(text,label){
  const {IDBFactory}=await import('fake-indexeddb');
  const target=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'restore-'+label+'-'+Date.now()+'-'+Math.random()});
  target.ctx.addTask('Before restoring '+label,false);await prepareBackupFileFixtureSource(target);
- target.ctx.openSettings();target.shim.document.getElementById('backupRestoreSource').value='paste';await target.ctx.onAction('restore-backup',{});
+ target.ctx.openSettings();await target.ctx.onAction('restore-backup',{});await target.ctx.onAction('open-paste-recovery',{});
  const box=target.shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;target.shim.document.dispatchEvent({type:'input',target:box});
  const previewed=await target.ctx.onAction('preview-pasted-recovery',{}),toastText=target.shim.document.getElementById('toast').textContent;
  const confirmed=previewed?await target.ctx.onAction('confirm-file-restore',{}):false;
  return {target,previewed,confirmed,toast:toastText};
 }
-test('RISK DOWNLOADS: Settings offers exactly one board export and one recovery export, and both files round-trip through Restore',async t=>{
+test('RISK DOWNLOADS: Settings offers one Download backup, and the backup and the board-only file both round-trip through Restore',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'two-downloads-'+Date.now()}),{ctx,shim}=app;
   t.after(()=>app.dispose());ctx.addTask('Exported task',false);await prepareBackupFileFixtureSource(app);
@@ -18001,9 +18012,10 @@ test('RISK DOWNLOADS: Settings offers exactly one board export and one recovery 
   // Every export or download control, apart from the Debug log's own report.
   const exports=[...data.matchAll(/<button\b[^>]*data-act="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map(([,act,label])=>({act,label}))
    .filter(({act,label})=>/download|export|view \/ copy|copy/i.test(label)&&act!=='view-support-diagnostics');
-  assert.deepEqual(exports.map(({label})=>label),['Download board','Download recovery file'],'exactly one board export and one recovery export');
+  assert.deepEqual(exports.map(({label})=>label),['Download backup'],'#2303: one download while the backup comes out complete');
   assert.doesNotMatch(data,/id="backupDownloadFormat"|Full recovery archive|data-act="view-current-board"|data-act="view-database-repair"/,'no format choice and no view/copy export dialogs');
-  await ctx.onAction(exports[0].act,{});await ctx.onAction(exports[1].act,{});for(let i=0;i<100&&files.length<2;i++)await flush();
+  // The board-only file stays available for a partial backup; its action still saves the board.
+  await ctx.onAction('download-current-board',{});await ctx.onAction(exports[0].act,{});for(let i=0;i<100&&files.length<2;i++)await flush();
   assert.equal(files.length,2,'both controls save a file');
   const boardText=await downloadedText(files[0]),recoveryText=await downloadedText(files[1]);
   const board=JSON.parse(boardText),recovery=JSON.parse(recoveryText);
@@ -18149,7 +18161,7 @@ test('RISK DATABASE REPAIR EXPORT: a large recovery file downloads losslessly wi
   // The downloaded file restores through the existing Restore preview.
   const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-large-restore-'+Date.now()});
   t.after(()=>destination.dispose());target.addTask('Before large repair-file restore',false);await prepareBackupFileFixtureSource(target);
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  target.openSettings();await target.onAction('restore-backup',{});await target.onAction('open-paste-recovery',{});
   const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;dom.document.dispatchEvent({type:'input',target:box});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);
@@ -18187,7 +18199,7 @@ test('RISK MANUAL JSON EXPORT: a large recovery file with several saved copies d
   assert.equal(JSON.stringify(ctx.state),boardBefore,'the archive download is read-only');
   const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'full-archive-large-restore-'+Date.now()});
   t.after(()=>destination.dispose());target.addTask('Before large archive restore',false);await prepareBackupFileFixtureSource(target);
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  target.openSettings();await target.onAction('restore-backup',{});await target.onAction('open-paste-recovery',{});
   const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;dom.document.dispatchEvent({type:'input',target:box});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);
@@ -18216,7 +18228,7 @@ test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial
       assert.equal(JSON.stringify(ctx.state),before,'an incomplete export cannot replace accepted work');
       IDBDatabase.prototype.transaction=transaction;storage.getItem=get;
       const copied=raw;
-      ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('restore-backup',{});
+      ctx.openSettings();await ctx.onAction('restore-backup',{});await ctx.onAction('open-paste-recovery',{});
       const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;shim.document.dispatchEvent({type:'input',target:box});
       assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'a partial diagnostic package cannot be restored as a complete backup');
       assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);assert.equal(JSON.stringify(ctx.state),before);
@@ -18336,20 +18348,21 @@ test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without in
 
 test('RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diagnostics and partial-report limits',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  const answer=help.match(/<dt>What does Download recovery file contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
+  const answer=help.match(/<dt>What does Download backup contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
   assert.match(answer,/current board.*saved.*sources.*Debug log/i);assert.match(answer,/build.*storage|storage.*build/i);
   assert.match(answer,/partial.*cannot.*restore/i);assert.match(answer,/only.*current board.*pending.*never replayed/i);
   assert.match(answer,/read.only|never saves or syncs/i);assert.match(answer,/one source at a time/);
   const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.doesNotMatch(log,/copy, or download the report/,'the FAQ no longer advertises removed standalone exporters');
-  assert.match(log,/Download recovery file/);
+  assert.match(log,/Download backup/);
 });
 
 test('RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the recovery file for repairs',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const reload=help.match(/<dt>Why did the app reload\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(reload);
   assert.match(reload,/View debug log, then Copy debug log or Download debug log/);assert.match(reload,/metadata only/);
-  assert.match(reload,/Download recovery file/);assert.match(reload,/partial|unreadable/i);
+  assert.match(reload,/Troubleshooting → View debug log, then Copy debug log or Download debug log/,'#2303: the log is under Troubleshooting');
+  assert.match(reload,/Download backup/);assert.match(reload,/partial|unreadable/i);
 });
 
 test('RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage',async()=>{
@@ -18362,18 +18375,18 @@ test('RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable with
   ctx.state.protectedBackupIds=['device-only-recovery-id'];
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(settings,/data-act="download-current-board"/);
-  assert.match(settings,/data-act="download-recovery-file"/);
+  assert.match(settings,/data-act="download-recovery-file">Download backup</,'#2303: Download backup saves the board open in this tab');
   assert.doesNotMatch(settings,/data-act="import-json"|id="jsonBox"/,'bulk import stays out of Settings');
-  let download=null;
-  const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={...download,href:link.href,name:link.download};};
-  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
-  ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
-  ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board';},revokeObjectURL(){}};
+  const files=captureDownloads({ctx,shim});
   ctx.onAction('settings',{});
+  assert.equal(await ctx.onAction('download-recovery-file',{}),true);for(let i=0;i<100&&!files.length;i++)await flush();
+  assert.equal(files[0].name,'chain-scanner-recovery-file.json');
+  const board=JSON.stringify(JSON.parse(await downloadedText(files[0])).currentBoard);
+  assert.match(board,/Only in this open tab/);assert.doesNotMatch(board,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of the backup board');
+  // The board-only file, offered when a backup comes out partial, keeps the same contract.
   ctx.onAction('download-current-board',{});
-  assert.equal(download.name,'chain-scanner-current-board.json');assert.equal(download.href,'blob:current-board');
-  assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of exports');
+  assert.equal(files[1].name,'chain-scanner-current-board.json');const text=await downloadedText(files[1]);
+  assert.match(text,/Only in this open tab/);assert.doesNotMatch(text,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of exports');
 });
 
 test('RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file',async t=>{
@@ -18426,13 +18439,13 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download the board an
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const boardControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download board\s*<\/button>/);
-  const recoveryControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download recovery file\s*<\/button>/);
-  assert.ok(boardControl&&recoveryControl,'Settings exposes Download board and Download recovery file');
-  assert.equal((settings.match(/data-act="download-current-board"/g)||[]).length,1,'Settings has exactly one board download action');
-  assert.equal((settings.match(/data-act="download-recovery-file"/g)||[]).length,1,'Settings has exactly one recovery download action');
+  const recoveryControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+  assert.ok(recoveryControl,'Settings exposes Download backup');
+  // #2303: the board-only action is offered beside a backup that comes out partial; it is exercised directly here.
+  const boardControl=[null,'download-current-board'];
+  assert.equal((settings.match(/data-act="download-current-board"/g)||[]).length,0,'no separate board download while the backup is complete');
+  assert.equal((settings.match(/data-act="download-recovery-file"/g)||[]).length,1,'Settings has exactly one backup download action');
   assert.doesNotMatch(settings,/id="backupDownloadFormat"|data-act="download-backup"|data-act="download-recovery-archive"/,'no format choice remains');
-  assert.match(settings,/Download recovery file saves that board together with every readable saved source/i,'Settings explains the recovery file contents');
 
   await ctx.onAction(boardControl[1],{});
   for(let attempt=0;attempt<100&&downloads.length<1;attempt++)await flush();
@@ -18506,13 +18519,13 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download the board an
   assert.equal(JSON.stringify(roundTrip.ctx.state),roundTripBefore,'the versioned archive is rejected by the ordinary board importer without changing the board');
 
   ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
-  const exportFaq=help.match(/<dt>What does Download board contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  const exportFaq=help.match(/<dt>What does Download board only contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(exportFaq,'the extended FAQ explains the two downloads');
   assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
-  assert.match(exportFaq,/Download board saves ordinary board JSON.*accepted edits that may not have saved/i);
-  assert.match(exportFaq,/one board export; Download recovery file is the one recovery export/i);
-  assert.match(exportFaq,/recovery file restores only its current board, and pending work is never replayed/i);
-  assert.match(exportFaq,/Without an accepted board, only Download recovery file is offered and its file has no board/i);
+  assert.match(exportFaq,/It saves ordinary board JSON.*accepted edits that may not have saved/i);
+  assert.match(exportFaq,/appears beside Download backup when a backup comes out partial/i);
+  assert.match(exportFaq,/a backup restores only its current board, and pending work is never replayed/i);
+  assert.match(exportFaq,/Without an accepted board, Download backup.s file has no board and Download board only does not appear/i);
   assert.match(exportFaq,/Restore accepts either file, older recovery archives and repair exports, and raw backup lists/i);
 
   assert.equal(JSON.stringify(ctx.state),memoryBefore,'export leaves the accepted in-memory board untouched');
@@ -18578,8 +18591,9 @@ test('RISK BACKUP FILE RESTORE: current decisions survive file selection and cro
   app.shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
   app.ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
   app.ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board-fixture';},revokeObjectURL(){}};
-  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-current-board"/);
-  app.ctx.onAction('download-current-board',{});assert.ok(download?.blob,'the actual Settings download produced a board file');
+  // #2303: the board-only file is offered beside a backup that comes out partial; Settings always has Download backup.
+  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-recovery-file">Download backup</);
+  app.ctx.onAction('download-current-board',{});assert.ok(download?.blob,'the board-only download produced a board file');
   assert.equal(download.name,'chain-scanner-current-board.json');
   return new File([download.blob.text],name,{type:'application/json'});
  }
@@ -18590,7 +18604,7 @@ test('RISK BACKUP FILE RESTORE: current decisions survive file selection and cro
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=app.shim.document.getElementById.bind(app.shim.document);
   app.shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
-  await app.ctx.onAction(action[1],{});input.files=[file];app.shim.document.dispatchEvent({type:'change',target:input});
+  await app.ctx.onAction(action[1],{});await app.ctx.onAction('choose-backup-file',{});input.files=[file];app.shim.document.dispatchEvent({type:'change',target:input});
   for(let attempt=0;attempt<160;attempt++){
    await flush();const markup=app.shim.document.getElementById('modalRoot').innerHTML;
    if(markup.includes('data-act="confirm-file-restore"')||app.shim.document.getElementById('toast').textContent.includes('could not be prepared safely')
@@ -20999,17 +21013,13 @@ test("AUDIT H5: with nothing dotted, only the task Start scanning will dot carri
    the migration will not run again to correct it. */
 test("AUDIT H6: a cleared 'worked on it' field falls back to the current default, not the retired 8", async () => {
   const { ctx } = await loadApp({ seed: 8006 });
-  const d = ctx.document;
-  d.getElementById("stHorizon").value = "60";
-  d.getElementById("stCantMin").value = "30";
-  d.getElementById("stWorkedHrs").value = "";        // cleared the box, hit Save
-  d.getElementById("stThresh").value = "25";
-  d.getElementById("stSamples").value = "250";
-  ctx.onAction("save-settings", {});
+  // #2303: cleared the box and left it; there is no Save settings button.
+  const field = commitSetting(ctx, "stWorkedHrs", "");
 
   const DEFAULTS = readConst(ctx, "DEFAULT_SETTINGS");
   assert.equal(ctx.state.settings.workedHours, DEFAULTS.workedHours,
-    "every save-settings fallback must come from DEFAULT_SETTINGS, workedHours included");
+    "a cleared field keeps the current value, which on a fresh board is DEFAULT_SETTINGS, not the retired 8");
+  assert.equal(field.value, String(DEFAULTS.workedHours), "and the box shows that value again");
 });
 
 /* ---- H7: a dot pointing at nothing strands the scan ----
@@ -25282,11 +25292,11 @@ test('RISK PWA updates: the extended FAQ and changelog explain uninterrupted use
 test('Scan preference: saving always chance changes the current scan, without changing ratings or marks',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan();ctx.state.snooze=100;ctx.decide('no');
  const marks=JSON.stringify(ctx.state.considered), ratings=ctx.state.tasks.map(t=>t.mu);
- ctx.openSettings();shim.document.getElementById('stScanMode').value='chance';ctx.onAction('save-settings',{});
+ ctx.openSettings();commitSetting(shim,'stScanMode','chance');
  assert.equal(ctx.state.scanMode,'chance');assert.ok(ctx.state.chance);
  assert.equal(JSON.stringify(ctx.state.considered),marks);assert.deepEqual(ctx.state.tasks.map(t=>t.mu),ratings);
  const seed=ctx.state.chance.seed;ctx.onAction('start-working',{});ctx.onAction('resume-scan',{});assert.equal(ctx.state.chance.seed,seed);
- shim.document.getElementById('stScanMode').value='descending';ctx.onAction('save-settings',{});assert.equal(ctx.state.scanMode,'descending');
+ commitSetting(shim,'stScanMode','descending');assert.equal(ctx.state.scanMode,'descending');
 });
 test('Scan preference: both mode buttons are available when resuming a chain',async()=>{
  const {ctx,shim}=await loadApp();ctx.addTask('a');ctx.addTask('b');ctx.startScan();ctx.state.settings.scanMode='both';ctx.onAction('start-working',{});
@@ -26230,8 +26240,8 @@ test('RISK evergreen hours or days: stored hours survive conversion, UI save, an
  shim.document.getElementById('etEverHours').value='2';shim.document.getElementById('etEverUnit').value='days';
  ctx.onAction('save-edit',{dataset:{id:weekly.id}});assert.equal(weekly.evergreenHours,48);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stEverUnit"/);
- shim.document.getElementById('stEverHours').value='3';shim.document.getElementById('stEverUnit').value='days';
- ctx.onAction('save-settings',{});assert.equal(ctx.state.settings.evergreenHours,72);
+ commitSetting(shim,'stEverHours','3');assert.equal(ctx.state.settings.evergreenHours,3,'#2303: the number saves when committed, in the unit shown');
+ commitSetting(shim,'stEverUnit','days');assert.equal(ctx.state.settings.evergreenHours,72,'changing the unit saves the same number in days');
  const fresh=ctx.addTask('New default');assert.equal(fresh.evergreenHours,72);
 });
 
@@ -26527,15 +26537,16 @@ test('RISK synced scene: Settings reflects board scene choices when device mirro
  const panel=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-unset/);
  assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-set/);
- assert.match(panel,/A scene time is selected\. Synced with your board when signed in/);
- assert.match(panel,/Sky location set\. Synced with your board when signed in/);
+ assert.match(panel,/id="settingsSceneTimeStatus" class="kv">A scene time is selected\.</);
+ assert.match(panel,/id="settingsLocationStatus" class="kv">Sky location set\.</);
+ assert.doesNotMatch(panel,/Synced with your board/,'#2303: Settings no longer repeats that choices sync');
 });
 
 test('RISK synced scene: Settings discloses coordinate sync and offline device copies',()=>{
  assert.match(html,/id="locationDescription"[^>]*>[^<]*coordinates[^<]*signed-in board/i);
  assert.doesNotMatch(html,/It stays on this device and is never sent to a location service/);
- assert.match(appSrc,/Scene time[^\n]*Synced with your board when signed in/);
- assert.match(appSrc,/Location[^\n]*Synced with your board when signed in/);
+ // #2303: the location dialog keeps the disclosure; Settings rows no longer repeat it.
+ assert.doesNotMatch(appSrc,/Synced with your board when signed in/);
 });
 
 test('Landscape polish: small autumn leaves, seeded group sizes, stronger vertical drift, and daytime skyline',()=>{
@@ -28865,6 +28876,15 @@ test('RISK fireworks realism: uneven blooms leave ballistic trails and fading em
 });
 
 
+// #2303: recent sync errors are shown inside the Debug log, which Settings
+// opens from its closed Troubleshooting section.
+function openRecentSyncErrors(ctx){
+ ctx.openSettings();
+ const settings=ctx.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(settings,/Recent sync errors/,'Settings itself no longer lists sync errors');
+ assert.match(settings,/<details class="settings-troubleshooting"><summary>Troubleshooting<\/summary>[\s\S]*?data-act="view-support-diagnostics"/,'the Debug log is under the closed Troubleshooting section');
+ ctx.onAction('view-support-diagnostics',{});
+}
 test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload',async()=>{
  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});
  const failures={push:Object.assign(Error('private task and token detail'),{code:'unavailable'})};
@@ -28874,11 +28894,9 @@ test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics af
  delete failures.push;
  assert.equal((await backend.CS.push('{}',1,0)).ok,true);
  assert.equal(backend.CS.status,'ok');assert.equal(backend.CS.errorCode,null);
- app.ctx.openSettings();
+ openRecentSyncErrors(app.ctx);
  const rendered=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(rendered,/Recent sync errors/);
- assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Current-board view and copy'));
- assert.ok(rendered.indexOf('Recent sync errors')<rendered.indexOf('Daily local backups'));
+ assert.match(rendered,/<h2>Debug log<\/h2>[\s\S]*Recent sync errors/,'#2303: recent sync errors are inside the Debug log');
  assert.match(rendered,/push.*unavailable/);
  assert.match(rendered,/<time datetime="[^"]+"/);
  assert.doesNotMatch(rendered,/private task and token detail/);
@@ -28887,23 +28905,23 @@ test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics af
  const raw=storage.getItem('fvp:chain-scanner:sync-error-log:v1');
  assert.ok(raw,'the diagnosis survives the recovered error fields');
  assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(),['at','code','stage']);
- const reloaded=await loadApp({sharedStorage:storage});reloaded.ctx.openSettings();
+ const reloaded=await loadApp({sharedStorage:storage});openRecentSyncErrors(reloaded.ctx);
  assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/push.*unavailable/);
 });
 
 test('RISK SYNC ERROR LOG: history rejects unsafe or malformed diagnostic fields',async()=>{
  const storage=sharedScannerStorage({'fvp:chain-scanner:sync-error-log:v1':'{broken'}),{ctx,shim}=await loadApp({sharedStorage:storage});
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/No sync errors recorded/);
+ openRecentSyncErrors(ctx);assert.match(shim.document.getElementById('modalRoot').innerHTML,/No sync errors recorded/);
  for(let i=0;i<35;i++)ctx.recordSyncError('pull','failure-'+i);
  ctx.recordSyncError('<img src=x>','private@example.test / task contents');
  const entries=JSON.parse(storage.getItem('fvp:chain-scanner:sync-error-log:v1'));
  assert.equal(entries.length,36);assert.deepEqual(entries[0],{at:entries[0].at,stage:'sync',code:'unknown'});
  assert.equal(entries[1].code,'failure-34');assert.equal(entries.at(-1).code,'failure-0');
  assert.ok(entries.every(entry=>Number.isFinite(entry.at)&&entry.at>0));
- ctx.openSettings();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<img src=x>|private@example/);
+ openRecentSyncErrors(ctx);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<img src=x>|private@example/);
  storage.setItem('fvp:chain-scanner:sync-error-log:v1',JSON.stringify([{at:1e99,stage:'push',code:'invalid'},
   {at:Date.now(),stage:'pull',code:'unavailable',payload:'private payload',account:'private@example.test'}]));
- const restored=await loadApp({sharedStorage:storage});restored.ctx.openSettings();
+ const restored=await loadApp({sharedStorage:storage});openRecentSyncErrors(restored.ctx);
  assert.match(restored.shim.document.getElementById('modalRoot').innerHTML,/unavailable/);
  assert.doesNotMatch(restored.shim.document.getElementById('modalRoot').innerHTML,/private payload|private@example|Invalid Date/);
 });
@@ -28913,7 +28931,7 @@ test('RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder can
  const original=storage.setItem;
  storage.setItem=(key,value)=>{if(key==='fvp:chain-scanner:sync-error-log:v1')throw Error('quota');return original(key,value);};
  assert.doesNotThrow(()=>ctx.recordSyncError('reconcile','revision-conflict'));
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/revision-conflict/);
+ openRecentSyncErrors(ctx);assert.match(shim.document.getElementById('modalRoot').innerHTML,/revision-conflict/);
  ctx.state.tasks.push(syncTask('saved','Still saved'));assert.equal(await ctx.persist(),true);
  assert.equal(ctx.deviceSaveIssue(),null);
  const backend=await loadCloudBackendV2({failures:{pull:Object.assign(Error('offline'),{code:'unavailable'})},recordSyncError:()=>{throw Error('recorder failed');}});
@@ -28923,7 +28941,7 @@ test('RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder can
 test('RISK SYNC ERROR LOG: reconciliation errors record once and update an open Settings log without replacing drafts',async()=>{
  const {ctx,shim}=await loadApp();
  shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok'};
- ctx.openSettings();
+ openRecentSyncErrors(ctx);
  const root=shim.document.getElementById('modalRoot'),before=root.innerHTML;
  const log=shim.document.getElementById('syncErrorLog');
  ctx.reportCloudReconcileError('invalid-payload');
@@ -28945,7 +28963,7 @@ test('RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expir
  setFakeTime(ctx,start+10*minute);ctx.recordSyncError('push','unavailable');
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'the code can record again at the ten-minute boundary');
  setFakeTime(ctx,start+59*minute);ctx.recordSyncError('pull','deadline-exceeded');
- ctx.openSettings();
+ openRecentSyncErrors(ctx);
  assert.equal(JSON.parse(storage.getItem(key)).length,3);
  assert.equal(timers.size,1,'one expiry timer tracks the oldest retained entry');
  assert.equal([...timers.values()][0].delay,minute);
@@ -28957,7 +28975,7 @@ test('RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expir
  assert.match(shim.document.getElementById('syncErrorLog').innerHTML,/No sync errors recorded/);
  assert.equal(timers.size,0);
  storage.setItem(key,JSON.stringify([{at:Date.now()-61*minute,stage:'pull',code:'expired-code'}]));
- const reloaded=await loadApp({sharedStorage:storage});reloaded.ctx.openSettings();
+ const reloaded=await loadApp({sharedStorage:storage});openRecentSyncErrors(reloaded.ctx);
  assert.doesNotMatch(reloaded.shim.document.getElementById('modalRoot').innerHTML,/expired-code/);
  assert.equal(storage.getItem(key),null,'cold startup removes expired persisted rows too');
 });
@@ -28970,7 +28988,7 @@ test('RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'a stale tab must retain errors recorded since it loaded');
  setFakeTime(b.ctx,start+2000);b.ctx.recordSyncError('push','unavailable');
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'another tab must respect the existing code interval');
- setFakeTime(a.ctx,start+3000);a.ctx.openSettings();
+ setFakeTime(a.ctx,start+3000);openRecentSyncErrors(a.ctx);
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/deadline-exceeded/);
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'opening older Settings cannot erase another tab error');
 });
@@ -29082,7 +29100,7 @@ test('RISK SYNC ERROR ICON: the small thundercloud appears only beside a current
  assert.match(rule,/font-size:\s*12px/);
  CS.status='syncing';ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
  CS.status='ok';await ctx.cloudPull();ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/pull: unavailable/,'the retained error remains available after the icon clears');
+ openRecentSyncErrors(ctx);assert.match(shim.document.getElementById('modalRoot').innerHTML,/pull: unavailable/,'the retained error remains available after the icon clears');
 });
 
 
@@ -31579,7 +31597,7 @@ test('RISK backup help: expiry, protected-copy deletion, the two downloads and a
  const countdown=answer('What do the countdown tags mean?');
  const taskHelp=answer('Can I undo, restore, or remove a task?');
  const backups=answer('How do backups and Restore work?');
- const exports=answer('What does Download board contain?');
+ const exports=answer('What does Download board only contain?');
  const worked=answer('What does Worked on it mean?');
  assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'expired holds clear before the next eligible pool is built');
  assert.match(taskHelp,/Backup deletion asks for confirmation and keeps the current board/);
@@ -31592,11 +31610,11 @@ test('RISK backup help: expiry, protected-copy deletion, the two downloads and a
  assert.match(backups,/Manual and protected recovery copies remain/);
  assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
- assert.match(exports,/It is the one board export; Download recovery file is the one recovery export/);
- assert.match(exports,/Download board saves ordinary board JSON/);
+ assert.match(exports,/appears beside Download backup when a backup comes out partial/);
+ assert.match(exports,/It saves ordinary board JSON/);
  assert.match(exports,/adding every readable saved source, build details and the Debug log/i);
- assert.match(exports,/only Download recovery file is offered and its file has no board/i);
- assert.match(exports,/a recovery file restores only its current board/);
+ assert.match(exports,/Download backup.s file has no board and Download board only does not appear/i);
+ assert.match(exports,/a backup restores only its current board/);
  assert.match(exports,/pending work is never replayed/);
  assert.match(exports,/File restore keeps supported recorded choices and protects displaced decisions\./);
  assert.match(worked,/It leaves the dotted chain and stays off it through saving and syncing\./);
@@ -31975,11 +31993,13 @@ test('RISK daily backup retention adoption copy: a manual backup of the same boa
 
 // #2254 (owner rule): Settings, Help and the November 6 changelog say what
 // the rule keeps. Every Help answer keeps the 130-word limit.
-test('RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
+test('RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- const section=settings.split('<h3>Daily local backups</h3>')[1]?.split('</p>')[0]||'';
+ assert.doesNotMatch(settings,/Daily local backups|Daily copies stay on this device/,'#2303: Settings leaves retention details to the FAQ');
+ await app.ctx.onAction('help',{});
+ const section=app.shim.document.getElementById('modalRoot').innerHTML.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(section,/Daily copies stay on this device for today and the two calendar days before it, so at most three; other automatic copies stay for up to seven calendar days/);
  assert.match(section,/While cloud recovery waits or holds your board, before the cloud confirms it, daily copies keep the seven days\./);
  assert.match(section,/Daily copies saved before this update, or holding another account’s board, also keep seven days\./);
@@ -32105,8 +32125,8 @@ test('RISK Squared Weighting joins: newly eligible tasks share one frozen scale 
  assert.deepEqual(other.slice().reverse(),scores,'a new weight cannot change the scale midway through one ordering');
 });
 
-test('RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks',async()=>{
- for(const entry of ['change','save-settings']){
+test('RISK Squared Weighting consumer transitions: actual Settings changes switch modes without changing ratings or pass marks',async()=>{
+ for(const entry of ['change']){
   const {ctx,shim}=await loadApp({seed:952});const root=ctx.addTask('Oldest'),next=ctx.addTask('Next'),blocked=ctx.addTask('Blocked');ctx.setTaskPrerequisites(blocked.id,[next.id]);
   const click=(act,mode)=>{const control=makeFakeElement();control.dataset={act,...(mode?{mode}:{})};control.closest=()=>control;shim.document.dispatchEvent({type:'click',detail:1,target:control});};
   ctx.openSettings();const select=shim.document.getElementById('stScanMode');select.id='stScanMode';select.matches=()=>true;select.value='descending';shim.document.dispatchEvent({type:'change',target:select});
@@ -32115,7 +32135,8 @@ test('RISK Squared Weighting consumer transitions: actual Settings change and Sa
   for(const mode of ['squared','chance','descending','squared']){
    ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('<option value="'+mode+'"'));
    select.value=mode;
-   if(entry==='change')shim.document.dispatchEvent({type:'change',target:select});else click('save-settings');
+   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="save-settings"/,'#2303: the change itself is the only way a mode is saved');
+   shim.document.dispatchEvent({type:'change',target:select});
    assert.equal(ctx.state.settings.scanMode,mode,entry+' reaches the shared preference rule');assert.equal(ctx.state.scanMode,mode);
    assert.equal(JSON.stringify(ctx.state.tasks),tasks,'presentation transitions invent no rating decisions');assert.equal(JSON.stringify(ctx.state.considered),marks);
    assert.equal(ctx.state.settings.squaredDefaultVersion,1);
@@ -33849,7 +33870,8 @@ test('RISK Postpone: mounted scanner action defers without rating or task edits 
 });
 test('RISK Postpone: Settings validates custom hours preserves old values and final task resumes coherently',async()=>{
  const {ctx,shim}=await loadApp({seed:982});assert.equal(ctx.state.settings.postponeHours,1);for(const v of [null,'',Infinity,NaN,-1,0])assert.equal(ctx.normalizeSettings({postponeHours:v,cantMin:47}).postponeHours,1);assert.equal(ctx.normalizeSettings({cantMin:47,workedHours:19}).workedHours,19);
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label for="stPostponeHours">/);shim.document.getElementById('stPostponeHours').value='2.5';ctx.onAction('save-settings',{dataset:{}});assert.equal(ctx.state.settings.postponeHours,2.5);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label for="stPostponeHours">/);commitSetting(shim,'stPostponeHours','2.5');assert.equal(ctx.state.settings.postponeHours,2.5);
+ for(const invalid of ['-1','0','','abc','100000']){const field=commitSetting(shim,'stPostponeHours',invalid);assert.equal(ctx.state.settings.postponeHours,2.5,invalid+' returns to the last valid value');assert.equal(field.value,'2.5');}
  setFakeTime(ctx,Date.parse('2026-10-10T12:00:00Z'));const a=ctx.addTask('Sole');ctx.state.chain=[a.id];ctx.state.mode='work';const at=realNow(ctx);ctx.onAction('bench-postpone',{dataset:{benchmark:a.id}});assert.equal(ctx.taskPostponeUntil(a),at+9000000);assert.equal(ctx.state.chain.length,0);assert.equal(ctx.state.candidateId,null);assert.equal(ctx.state.mode,'scan');
  await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});setFakeTime(reload.ctx,Date.parse('2026-10-10T12:00:00Z'));assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===a.id)),false);assert.equal(reload.ctx.state.settings.postponeHours,2.5);
  ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===a.id)),0);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
@@ -35480,7 +35502,7 @@ test('RISK Show Postpone preference: actual Settings checkbox hides both scanner
  shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.showPostpone,false);
  assert.doesNotMatch(scanner(),/data-act="(?:bench-)?postpone"/);assert.equal(JSON.stringify(ctx.state.tasks),tasks);assert.equal(JSON.stringify(ctx.state.chain),chain);assert.equal(ctx.state.candidateId,b.id);
  ctx.closeModal();ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stShowPostpone" type="checkbox"\//);
- ctx.onAction('save-settings',{dataset:{}});assert.equal(ctx.state.settings.showPostpone,false);
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="save-settings"/,'#2303: the checkbox change is the saved choice; there is no Save settings button to repeat it');assert.equal(ctx.state.settings.showPostpone,false);
  await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.state.settings.showPostpone,false);assert.equal(reload.ctx.taskPostponeUntil(reload.ctx.state.tasks.find(t=>t.id===held.id)),until);
  field.checked=true;shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.showPostpone,true);assert.match(scanner(),/data-act="postpone"/);
  ctx.state.mode='work';ctx.state.candidateId=null;ctx.render();assert.match(scanner(),/data-act="bench-postpone"/);
@@ -36001,7 +36023,7 @@ test('RISK cloud current choices: explicit Start scanning mode records its new a
  assert.ok(ctx.supportedCurrentChoiceEvent(rootEvent),'the strict projector recognizes only the bounded fresh-pass root choice');
 });
 
-test('RISK cloud current choices: Save settings retains changed shared preferences as one action',async()=>{
+test('RISK cloud current choices: each committed shared preference is retained as its own action',async()=>{
  const at=Date.parse('2026-10-16T17:05:00.000Z');
  const initial=syncState({tasks:[syncTask('settings-choice','Settings task')],chain:[],candidateId:null,
   passStartedAt:at-60000,passId:'shared-pass-settings',scanMode:'descending',syncRev:4,
@@ -36014,14 +36036,14 @@ test('RISK cloud current choices: Save settings retains changed shared preferenc
  const h=makeSyncHarness({remote,rev:4,delayMs:1});
  const {ctx,shim}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
  await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+1234);ctx.openSettings();
- shim.document.getElementById('stHorizon').value='90';
- shim.document.getElementById('stSamples').value='500';
- shim.document.getElementById('stScanMode').value='descending';
- ctx.onAction('save-settings',{});
+ commitSetting(shim,'stHorizon','90');
+ setFakeTime(ctx,at+1300);commitSetting(shim,'stSamples','500');
+ commitSetting(shim,'stScanMode','descending');
  const events=ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target.type==='setting')||[];
- assert.equal(events.length,2,'Save records both changed shared preferences instead of replacing settings wholesale');
- assert.equal(new Set(events.map(event=>event.actionId)).size,1,'one Save settings gesture has one Undo grouping identity');
- assert.ok(events.every(event=>event.at===at+1234),'all settings retain the original Save action time');
+ assert.equal(events.length,2,'#2303: each committed field records its changed shared preference; an unchanged one records nothing');
+ assert.equal(new Set(events.map(event=>event.actionId)).size,2,'each committed field is its own action with its own Undo grouping identity');
+ assert.equal(events.find(event=>event.target.property==='horizonMin').at,at+1234,'each setting retains the time it was committed');
+ assert.equal(events.find(event=>event.target.property==='samples').at,at+1300);
  assert.deepEqual(JSON.parse(JSON.stringify(events.map(event=>event.target).sort((a,b)=>a.property<b.property?-1:a.property>b.property?1:0))),[
   {type:'setting',id:'board',property:'horizonMin'},{type:'setting',id:'board',property:'samples'}]);
  assert.deepEqual(JSON.parse(JSON.stringify(events.find(event=>event.target.property==='horizonMin').before)),{present:true,value:60});
@@ -37359,10 +37381,10 @@ test('RISK device save warning browser: actual held Add keeps every text line on
    await page.locator('[data-act="settings"]').click();
    await poll(page,()=>!document.querySelector('#toast.show'),null,'natural warning expiry');
    const data=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')});for(const panel of await data.all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
-   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Download recovery file/);
+   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Download backup/);
    const issue=page.locator('#modalRoot .kv').filter({hasText:'Last device save issue:'});await issue.scrollIntoViewIfNeeded();assert.equal(await issue.isVisible(),true);assert.match(await issue.innerText(),/Last device save issue:.*device-save:completion-upgrade\/ambiguous-legacy-completion/s);
    row.details=await issue.evaluate(el=>{const b=el.getBoundingClientRect(),code=el.querySelector('code'),r=code.getBoundingClientRect();return {text:el.textContent,rect:{x:b.x,y:b.y,w:b.width,h:b.height},code:{x:r.x,y:r.y,w:r.width,h:r.height},scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});assert.ok(row.details.scrollWidth<=row.details.clientWidth+1);assert.ok(row.details.code.x>=row.details.rect.x&&row.details.code.x+row.details.code.w<=row.details.rect.x+row.details.rect.w+1);
-   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['download-current-board','download-recovery-file'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
+   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['download-current-board','download-recovery-file'])if(await page.locator('#modalRoot [data-act="'+act+'"]').count())fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
    if(evidence){fs.writeFileSync(path.join(evidence,theme+'-'+scale+'.json'),JSON.stringify(row,null,2));await page.screenshot({path:path.join(evidence,theme+'-'+scale+'-details.png')});
     if(process.env.TOAST_REVIEW_PAUSE==='1'){const ack=path.join(evidence,theme+'-'+scale+'-details-inspected');const end=Date.now()+180000;while(!fs.existsSync(ack)&&Date.now()<end)await new Promise(r=>setTimeout(r,100));assert.ok(fs.existsSync(ack),'owner inspected actual native details before closing its context');}}
    assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),exactOldDevice);assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:protected:v1')),exactOldDevice);
@@ -38004,8 +38026,8 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
  const settings=root.innerHTML;assert.match(settings,/<h2>Settings<\/h2>/,'the visible header Settings action opens Settings');
  const restoreButton=settings.match(/<button\b(?=[^>]*data-act="restore-backup")[^>]*>\s*Restore\s*<\/button>/);
  assert.ok(restoreButton,'Settings exposes one guarded Restore action');
- assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the same Restore action offers native file and paste sources');
- assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'file and paste are choices, not competing Settings actions');
+ assert.match(settings,/data-act="restore-backup"[^>]*>Restore<\/button><\/div><div id="restoreChoices"[^>]*hidden[^>]*>[\s\S]*?data-act="choose-backup-file"[\s\S]*?data-act="open-paste-recovery"/,'#2303: the same Restore action offers native file and paste sources inside it, hidden until Restore is chosen');
+ assert.doesNotMatch(settings,/id="backupRestoreSource"/,'file and paste are not chosen beside Restore');
  assert.doesNotMatch(settings,/id="jsonBox"/,'the editable paste area stays in its own dialog');
  const numericDraft=shim.document.getElementById('stHorizon');numericDraft.value='77';
  root.querySelectorAll=selector=>selector==='input,select,textarea'?[numericDraft]:[];
@@ -38019,7 +38041,9 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
   assert.equal((markup.match(/class="modal" role="dialog"/g)||[]).length,1,message+' keeps one dialog');
   return markup;
  };
- click('restore-backup');
+ const choices=shim.document.getElementById('restoreChoices');choices.hidden=true;
+ click('restore-backup');assert.equal(choices.hidden,false,'Restore reveals its file and paste choices');
+ click('open-paste-recovery');
  assert.match(oneDialog('Opening paste recovery'),/id="jsonBox"/,'the visible Settings route opens an editable text area');
  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
  const waitForPreview=async()=>{
@@ -38159,7 +38183,7 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
   const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
   dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'pasting starts from the visible Settings control');
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-backup"/);
-  dispatch('restore-backup');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  dispatch('restore-backup');dispatch('open-paste-recovery');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="preview-pasted-recovery"/);
   dispatch('preview-pasted-recovery');
   const expectedChoice=format==='raw'?'fileRestoreBackupChoice':'fileRestoreLearningChoice';
@@ -38913,13 +38937,13 @@ test('RISK recovery identity consumers: verified cloud adoption rebases independ
 });
 
 
-test('RISK support diagnostics: Settings names the board and recovery downloads for their contents',async t=>{
+test('RISK support diagnostics: Settings names Download backup and the FAQ names what each download holds',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openSettings();
  const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/Download board saves the board open in this tab as ordinary board JSON/i,'the board download is distinct from the recovery file');
- assert.match(settings,/data-act="download-current-board"/,'the one board download action remains available');
- assert.match(settings,/data-act="download-recovery-file"/,'the one recovery download action remains available');
+ assert.match(settings,/data-act="download-recovery-file">Download backup</,'#2303: the one backup download action remains available');
+ assert.doesNotMatch(settings,/data-act="download-current-board"/,'the board-only download appears only beside a partial backup');
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help.match(/<dt>What does Download board only contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1]||'',/It saves ordinary board JSON for the board open in this tab/i,'the board-only download is distinct from the backup');
  const faq=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');
  assert.match(faq,/local metadata report/i);assert.match(faq,/never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text/i);
@@ -39086,8 +39110,8 @@ test('RISK debug log: an interrupted actual cloud review retains its stage in a 
 test('RISK debug log: the replacement screen copies a unified log without a download',async t=>{
  let copied=null;const app=await loadApp({navigatorProvider:{clipboard:{async writeText(text){copied=text;}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
  ctx.openSettings();let modal=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(modal,/<h3>Debug log<\/h3>/,'Settings replaces the old debugger with the unified log');
- assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/Download recovery file/);
+ assert.match(modal,/<summary>Troubleshooting<\/summary>[\s\S]*?>View debug log</,'#2303: Settings replaces the old debugger with the unified log, under Troubleshooting');
+ assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/Download backup/);
  assert.equal(await ctx.onAction('view-support-diagnostics',{}),true);modal=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(modal,/<h2>Debug log<\/h2>/);assert.match(modal,/readonly aria-label="Debug log"/,'manual copy remains available without a clipboard API');
  assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);assert.ok(JSON.parse(copied).restartDiagnostics);

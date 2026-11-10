@@ -1415,6 +1415,17 @@ function setInput(ctx, id, value) {
   ctx.document.getElementById(id).value = String(value);
 }
 
+// #2303: every Settings field saves when it is committed. A committed field is
+// a change event on the real control, the way a browser reports leaving an
+// edited number box or picking an option; there is no Save settings button.
+function commitSetting(shim, id, value) {
+  const field = shim.document.getElementById(id);
+  Object.assign(field, { id, matches: () => false });
+  if (typeof value === "boolean") field.checked = value; else field.value = String(value);
+  shim.document.dispatchEvent({ type: "change", target: field });
+  return field;
+}
+
 /* =====================================================================
    "WORKED ON IT" IS BULLETPROOF FOR A CONFIGURABLE WINDOW
    Forster rule 7 crosses a task off and sends it to the bottom of the list.
@@ -3943,7 +3954,7 @@ export {
   manifestHrefFromHtml, serviceWorkerSource, appShellContract, serviceWorkerHarness, slice, engineSrc,
   mulberry32, SEED_SNIPPET, loadEngine, readConst, extractAppScript, appSrc, makeFakeElement,
   makeDomShim, flush, loadApp, setFakeTime, realNow, publishedBetaContinuation, SAVE_DEBOUNCE_MS,
-  settle, persisted, makeFakeCloudSyncFactory, setInput, WH_STORE_KEY, preChangeState, localAt,
+  settle, persisted, makeFakeCloudSyncFactory, setInput, commitSetting, WH_STORE_KEY, preChangeState, localAt,
   addTaskAged, titleOf, scanHtmlOf, benchAction, fillEditPane, STORE_KEY, THEME_HINT_KEY, themeBootSrc,
   runThemeBoot, themeBtnText, styleSrc, COLOR_RE, WHITE_RE, INVARIANT_PROPS, ALLOWED_DECLS,
   declarations, lightDarkArgs, offendingDeclarations, ALLOWED_NON_ASCII, decodeEscapes, themeTokens,
