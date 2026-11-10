@@ -12879,6 +12879,31 @@ test("UI #221: a held Enter that pressed Return as candidate cannot press the co
   assert.equal(ctx.state.chain.length, 1, "a fresh press of Enter starts the scan");
 });
 
+// #221 release review (specialist F7): only an editor that opened hands focus back.
+test("UI #221: a pill pressed after its task has gone opens no editor, and closing the dialog still open leaves focus where it was", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2243 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  const panel = scanPanelDom221(shim);
+  const pill = panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id);
+  ctx.onAction("help", {});   // a dialog is open; keyboard focus can still move on to the pills behind it
+  ctx.state.tasks = ctx.state.tasks.filter(task => task.id !== middle.id);   // the task goes before the panel is drawn again
+
+  shim.document.activeElement = pill;
+  ctx.onAction("edit", pill);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /FAQs/, "precondition: no editor opened; the dialog is still the one showing");
+
+  const inDialog = editorControl221("close-modal");
+  shim.document.activeElement = inDialog;
+  ctx.onAction("close-modal", inDialog);
+  await flush();
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "precondition: the dialog closed");
+  assert.equal(shim.document.activeElement, inDialog, "focus is left where it was");
+  assert.equal(panel.controls().includes(shim.document.activeElement), false, "nothing in the scan panel takes it");
+});
+
 // #221 release review (independent F3): two cases that already behaved.
 test("UI #221: a dialog that opens as the editor closes keeps focus; the scan panel does not take it", async () => {
   const { ctx, shim } = await loadApp({ seed: 2237 });
