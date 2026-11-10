@@ -1646,6 +1646,7 @@ its RISK test; the map follows.
 - RISK test-first gate: an app change paired with an edit to any split test file is accepted
 - RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected
 - RISK test-first gate: the edit hook treats the test directory as the test surface
+- RISK test-first gate: the edit hook guards app edits inside an agent worktree
 - RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test
 - RISK test-first gate: future runtime modules are detected without a filename allowlist
 - RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case
