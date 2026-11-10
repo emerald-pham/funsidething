@@ -5091,7 +5091,7 @@ function debugLogLinkClearFragment(){
 // The opening resumes from here; a reload now opens the ordinary board.
 function debugLogLinkLeave(){
   debugLogLinkHeld=window.__chainDebugLogLinkHeld=false;document.getElementById("modalRoot").innerHTML="";debugLogLinkClearFragment();
-  debugLogLinkRelease?.();debugLogLinkRelease=null;window.dispatchEvent?.(new Event("chain-debug-log-closed"));return true;
+  debugLogLinkRelease?.();debugLogLinkRelease=null;window.__chainDebugLogLinkOnClose?.();return true;
 }
 // An ordinary opening knows each backup's size from its listed facts, so it
 // notes the total here for a later link opening. Counts only.
@@ -5121,12 +5121,12 @@ function supportDiagnosticsUndoCharacters(frames){
   return characters;
 }
 function supportDiagnosticsSavedDataReport(){
-  const now=supportDiagnosticsNow(),held=deviceStorageAuthority&&deviceBackupCacheReadable&&!deviceBackupMeasuringOwed,recorded=held?null:debugLogLinkReadBackupSizes();
+  const now=supportDiagnosticsNow(),held=deviceStorageAuthority&&deviceBackupCacheReadable,measured=held&&!deviceBackupMeasuringOwed,recorded=measured?null:debugLogLinkReadBackupSizes();
   const frames=Array.isArray(undoStack)?undoStack:[];
   return {
     backups:{
       count:held?supportDiagnosticsField(deviceBackupCache.length,"observed",now):debugLogLinkBackupCount,
-      totalCharacters:held?supportDiagnosticsField(deviceBackupCache.reduce((sum,row)=>sum+backupRowCharacters(row),0),"observed",now):
+      totalCharacters:measured?supportDiagnosticsField(deviceBackupCache.reduce((sum,row)=>sum+backupRowCharacters(row),0),"observed",now):
         recorded?supportDiagnosticsField(recorded.characters,"observed",recorded.at):supportDiagnosticsField(null,"unobserved")
     },
     undo:{

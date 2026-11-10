@@ -24949,6 +24949,7 @@ test('RISK PWA updates: a scanner gesture commits durably without an automatic s
  shim.document.dispatchEvent({type:'pointerdown'});await handlers.controllerchange();
  assert.equal(reloads.length,0,'a ready worker cannot replace the page between pointerdown and the scanner click');
  const noButton={dataset:{act:'no'},disabled:false};
+ ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'finishing a response does not end the active session');
@@ -24977,6 +24978,7 @@ test('RISK PWA updates: a gesture beginning during an update save preserves the 
  assert.equal(reloads.length,0,'a gesture that begins before save resolution still blocks page replacement');
  const noButton={dataset:{act:'no'},disabled:false};
  shim.document.dispatchEvent({type:'pointerup'});
+ ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'the downloaded update keeps the used document open after the real scanner click');
@@ -31889,6 +31891,7 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   const {ctx,shim}=await loadApp({seed:618});const bench=ctx.addTask('Synthetic benchmark'),candidate=ctx.addTask('Synthetic candidate'),next=ctx.addTask('Synthetic next');
   Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',scanMode,snooze:100});ctx.render();
   const initial=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
   assert.equal(ctx.state.candidateId,next.id,'the ordinary first press advances to the next candidate');
   if(key==='y')assert.ok(candidate.mu>25&&bench.mu<25,'Yes retains candidate-over-benchmark orientation');
@@ -31898,6 +31901,7 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   for(let repeat=0;repeat<3;repeat++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
   assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a held key cannot act on the replacement or record another observation');
   assert.equal(vm.runInContext('undoStack.length',ctx),undoDepth,'ignored repeats add no Undo frame');
+  ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
   assert.notEqual(JSON.stringify(ctx.state),after,'a fresh keypress can judge the replacement');
   ctx.undo();assert.equal(ctx.state.candidateId,next.id,'one Undo reverses the second fresh decision');
@@ -31920,6 +31924,7 @@ test('RISK Squared Weighting held keys: real keyboard repeats preserve the newly
   const {ctx,shim}=await loadApp({seed:959});ctx.addTask('Oldest synthetic task');ctx.addTask('Synthetic one');ctx.addTask('Synthetic two');ctx.addTask('Synthetic three');
   const el=makeFakeElement();el.dataset={act:'start-scan',mode:'squared'};el.closest=()=>el;shim.document.dispatchEvent({type:'click',detail:1,target:el});ctx.state.snooze=100;
   assert.equal(ctx.state.scanMode,'squared');const first=ctx.state.candidateId,original=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});assert.notEqual(ctx.state.candidateId,first);
   const after=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
   for(let i=0;i<3;i++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
@@ -38877,6 +38882,7 @@ test('RISK debug log link #2309: the report gains backup and Undo counts and siz
  // The ordinary opening holds every backup anyway, so it can note their size
  // for a later opening that must not read them.
  const normal=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage});t.after(()=>normal.dispose());
+ for(let i=0;i<200&&vm.runInContext('deviceBackupMeasuringOwed',normal.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10)); // backups are measured just after the board opens
  for(const title of ['PRIVATE undo one 2309','PRIVATE undo two 2309','PRIVATE undo three 2309']){normal.shim.document.getElementById('addInput').value=title;normal.ctx.onAction('add',{});}
  const rebuilt=vm.runInContext('(()=>{const seen={count:0},original=UndoBoardCopy.prototype.toString;UndoBoardCopy.prototype.toString=function(){seen.count++;return original.call(this);};return seen;})()',normal.ctx);
  const boardChars=JSON.stringify(normal.ctx.state).length,running=normal.ctx.buildSupportDiagnosticsReport().savedData;

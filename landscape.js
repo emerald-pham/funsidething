@@ -1623,17 +1623,13 @@
   }
   function openMotion(){
     if(dialog.open)return;
+    // The Debug log link holds the opening with no end of its own, and a modal
+    // dialog over it would block the only way out, so the check waits its turn.
+    if(window.__chainDebugLogLinkHeld){window.__chainDebugLogLinkOnClose=()=>{if(preference===null)openMotion();};return;}
     returnFocus=document.activeElement;
     if(!returnFocus || returnFocus===document.body) returnFocus=document.querySelector('#modalRoot button')||motionButton;
     dialog.showModal();
     dialog.querySelector('[data-landscape-motion="reduced"]').focus();
-  }
-  // The Debug log link holds the opening with no end of its own, and a modal
-  // dialog over it would block the only way out, so the check waits its turn.
-  function offerMotionCheck(){
-    if(preference!==null||dialog.open)return;
-    if(window.__chainDebugLogLinkHeld){window.addEventListener('chain-debug-log-closed',offerMotionCheck,{once:true});return;}
-    openMotion();
   }
   const timeDialog=document.getElementById('sceneTimeDialog'),timeInput=document.getElementById('sceneTimeInput'),timeStatus=document.getElementById('sceneTimeStatus'),seasonInput=document.getElementById('sceneSeasonInput');
   let timeReturnFocus=null;
@@ -1736,7 +1732,7 @@
   document.addEventListener('visibilitychange',()=>{
     // Hidden tabs do no rendering. Returning reconstructs only the current
     // UTC scene; missed arrivals are never animated as a catch-up burst.
-    if(document.hidden)stop();else {preference=S.readMotion(storage);updateMotion();offerMotionCheck();}
+    if(document.hidden)stop();else {preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();}
   });
   // A board adoption reapplies its saved location on every open. Only a
   // location that actually changed repaints; the same one cost a full paint
@@ -1761,11 +1757,11 @@
     try{localStorage.setItem('fvp:chain-scanner:scene-placeholder',JSON.stringify({v:1,at:Date.now(),sky:p.sky.slice(0,3)}));}catch{}
   }
   window.addEventListener('pagehide',stop);
-  window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();offerMotionCheck();});
+  window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
   openingPaint={opening:true,due:false};
   // A sized opaque canvas is black until painted (#2194 review F8).
   back.style.visibility='hidden';
-  resize();updateMotion();offerMotionCheck();
+  resize();updateMotion();if(preference===null)openMotion();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
   document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));
