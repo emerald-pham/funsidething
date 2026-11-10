@@ -828,6 +828,22 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#221 retired revealTask, so this root now opens the restored task's editor through the real edit action that chain pills use; every injection assertion is kept, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "revealTask: clears the list filters so the task it reveals is actually visible",
+      "currentRoot": "UI \\#221: Return as candidate is enabled in the editor a chain pill opens, and its tooltip names the chain",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired revealTask, whose filter clearing this root tested; reaching a task from the trail is now the pill-to-editor route this root pins, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "Animation controls: revealing a task respects app and device reduced motion",
+      "currentRoot": "UI \\#221: returning an older dot from its pill takes only that dot off; the rest keep their order, benchmark and candidate",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired the reveal scroll whose motion choice this root tested; the trail pill's action is now the editor route and the return this root pins, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }
