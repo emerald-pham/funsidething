@@ -21978,5 +21978,30 @@
       "command": "node --test --test-name-pattern='RISK chain start' tests/core.test.js (and RISK BACKWARD COMPATIBILITY: a board carrying Chain starts with), kept with the #2300 task evidence",
       "failure": "Before the dropdown: Settings has a Chain starts with dropdown: actual null. Before the flag was retired: Nothing dotted yet — Start scanning to choose the first dot does not match /starts on the oldest eligible task/, and a saved candidate was still offered. Recording a current-choice decision for the new setting made the released client report older client: no hold on the published board (unsupported-decision-evidence)."
     }
+  },
+  {
+    "baseCommit": "3d787463d53f041e577ea37766417340cad6f2ad",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.match(markup,/<details class=\"help-faq\" open><summary>Quick start<\\/summary>/);",
+      "tests/core.test.js:-const chapters=[...help.matchAll(/<details class=\"help-faq\"([^>]*)><summary>(.*?)<\\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\\bopen\\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\\bopen\\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\\/summary>/);",
+      "tests/core.test.js:-const faqStart = markup.indexOf('<details class=\"help-faq\">');",
+      "tests/core.test.js:-const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.help-faq')],first=section.at(-1),next=section[1],save=e.querySelector('[data-act=\"ok-quickstart\"]');return {font:getComputedStyle(first.querySelector('summary')).fontSize,otherFont:getComputedStyle(next.querySelector('summary')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});"
+    ],
+    "reason": "#2302 (maintainer spec #2298): the ? menu now has Changelog as its first section and every section, including Quick start, closed each time it opens. Three assertions named the old order, the open Quick start or the first plain help-faq section, and the Changelog styling comparison picked Changelog as the last section, so each had to follow the requested layout.",
+    "previousBehavior": "Quick start was the first section and open; Changelog was the last section. The tests asserted that order, an open attribute on Quick start, that the first details element with no other attribute came after the Quick start steps, and took the last section as Changelog when comparing its styling.",
+    "intendedBehavior": "Changelog is first, the other six sections keep their order, and no section carries an open attribute when the menu is shown. The detailed-chapter check now finds the first chapter with a heading summary, which still comes after the Quick start steps, and the styling comparison finds Changelog by its own marker.",
+    "preservedCoverage": [
+      "All seven sections and their native disclosures stay in the mounted menu, with matching details tags and no More FAQs wrapper.",
+      "Quick start keeps its four steps and stays a section of the menu; detailed chapters still follow those steps.",
+      "Changelog still matches the other sections in font, surface and summary padding, and the OK button stays last in the dialog."
+    ],
+    "replacementTests": [
+      "RISK FAQs menu order: the ? menu lists Changelog first and keeps the other sections in their usual order",
+      "RISK FAQs menu closed: every section starts closed when a person opens the ? menu and when a new person is shown it automatically"
+    ],
+    "redEvidence": {
+      "command": "Before the runtime change: node --test --test-name-pattern='RISK FAQs menu order' tests/core.test.js, then --test-name-pattern='RISK FAQs menu closed' on the Changelog-first code. After it: node --test tests/core.test.js for the three old assertions.",
+      "failure": "Order RED on 3d78746: actual [Quick start ... Data and backups, Changelog] !== expected [Changelog, Quick start ... Data and backups]. Closed RED: the menu shown automatically on first boot had Quick start open: true !== open: false. After the implementation the old expectations failed in three tests: UI: Quick start keeps task-state explanations (faqStart before quickStartEnd), RISK Quick start chapters (old order and open) and RISK FAQs menu label (open Quick start). The Changelog styling comparison is env-gated and did not fail; it would have silently compared Data and backups instead."
+    }
   }
 ]

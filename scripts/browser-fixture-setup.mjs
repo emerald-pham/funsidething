@@ -3,7 +3,7 @@
 export async function resolveExpectedFirstRunHelp(page){
  const panel=page.locator('#modalRoot .mback .modal');
  if(!await panel.count())return false;
- const heading=page.locator('#modalRoot #faqsTitle'),quickStart=page.locator('#modalRoot details.help-faq summary').first();
+ const heading=page.locator('#modalRoot #faqsTitle'),quickStart=page.locator('#modalRoot details.help-faq > summary:text-is("Quick start")').first();
  const title=await heading.count()? (await heading.innerText()).trim():'';
  const summary=await quickStart.count()? (await quickStart.innerText()).trim():'';
  if(title!=='FAQs / Changelog'||summary!=='Quick start')throw new Error(`Unexpected first-run panel: ${title||'unidentified dialog'} / ${summary||'no Quick start'}`);
