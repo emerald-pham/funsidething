@@ -213,6 +213,9 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 @media (min-width:761px){.decide{border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0}}
 .wrap:has(.decide){padding-bottom:calc(var(--pinned-decide-height,110px) + 24px)}
 :root:has(.decide) .toast{bottom:calc(var(--pinned-decide-height,110px) + 12px)}
+/* The browser cannot see that a fixed row covers the page, so without this Tab
+   stops on controls underneath it and the focus ring is hidden. */
+:root:has(.decide){scroll-padding-bottom:calc(var(--pinned-decide-height,110px) + 12px)}
 .decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 100%;justify-content:flex-end}
 .decide-finish .btn{white-space:nowrap}
 .decide-finish .sparkbox{margin-left:auto;min-width:0;flex:0 1 auto}
@@ -11905,6 +11908,23 @@ function trackPinnedDecide(scan){
   const row=scan.querySelector?.(".decide");
   if(row)pinnedDecideObserver.observe(row);
 }
+
+// Scroll padding covers most focus moves, but the browser ignores it for WebKit
+// text fields and for a control revealed inside the All tasks list, which left
+// the focus ring under the pinned row. Checked after the browser's own scroll,
+// and only for a control the row really covers: a modal over it is not hidden.
+function keepFocusClearOfPinnedRow(event){
+  const target=event.target;
+  requestAnimationFrame(()=>{
+    const row=document.querySelector(".decide");
+    if(!row||document.activeElement!==target||row.contains(target)||!target.getBoundingClientRect)return;
+    const box=target.getBoundingClientRect(),rowTop=row.getBoundingClientRect().top,gap=12;
+    if(box.bottom<=rowTop)return;
+    const covering=document.elementFromPoint(box.left+box.width/2,Math.min(box.bottom-1,innerHeight-1));
+    if(row.contains(covering))document.scrollingElement.scrollBy(0,box.bottom-rowTop+gap);
+  });
+}
+document.addEventListener("focusin",keepFocusClearOfPinnedRow);
 
 /* ---------- all-tasks list filters ----------
    Independent narrowings of the *view* only. None touches

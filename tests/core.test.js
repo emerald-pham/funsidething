@@ -21699,6 +21699,46 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
  assert.deepEqual(failures,[]);
 });
 
+// A fixed row sits over the page without the browser knowing, so a control under
+// it counted as already on screen: Tab stopped there and the focus ring was
+// invisible. Real key presses are the only way to observe the browser's choice.
+// macOS WebKit needs Option for Tab to stop on buttons.
+test('RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[],STOPS=70;
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:390,height:844},{width:320,height:568},{width:844,height:390},{width:1280,height:800}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const board=steadyScannerBoard({tasks:24,over:{chain:['steady-0','steady-1'],candidateId:'steady-2',listOpen:true}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{...viewport,touch:false});
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+     await page.waitForTimeout(80);
+     const hidden=[];let onThePage=0;
+     for(let i=0;i<STOPS;i++){
+      await page.keyboard.press(engineName==='webkit'?'Alt+Tab':'Tab');
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const stop=await page.evaluate(()=>{
+       const el=document.activeElement,row=document.querySelector('.decide');
+       if(!el||el===document.body||el.closest('.decide'))return null;
+       const r=el.getBoundingClientRect();
+       return {name:el.dataset.act||el.id||el.tagName,top:r.top,bottom:r.bottom,rowTop:row.getBoundingClientRect().top};
+      });
+      if(!stop)continue;
+      onThePage++;
+      if(stop.bottom>stop.rowTop)hidden.push(`${stop.name} ends ${Math.round(stop.bottom)}, the row starts ${Math.round(stop.rowTop)}`);
+     }
+     assert.ok(onThePage>=30,`${label}: the walk reached the page's controls: ${onThePage} stops`);
+     assert.deepEqual(hidden,[],`${label}: ${hidden.length} of ${onThePage} focus stops are behind the pinned row`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.slice(0,900));}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[],safeBottom=34;
  for(const [engineName,engine] of await steadyScannerEngines()){
