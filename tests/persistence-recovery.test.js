@@ -10395,3 +10395,30 @@ test('RISK chain return sync: a return on one device and a Dot of another task o
   assert.deepEqual(Array.from(cold.ctx.state.chain),['undo-base','undo-peer','undo-extra']);
  });
 });
+
+test('RISK chain return sync: another device completing the returned task keeps it completed in either publication order',async t=>{
+ for(const first of ['return','done'])await t.test(first+' publishes first',async t=>{
+  const {local,peer,h,at}=await threeDotClients221(t);
+  returnDotFromBoard221(local,'undo-local',at+200);
+  setFakeTime(peer.ctx,at+250);hydrateUnchangedEditorDraft(peer,'undo-local');peer.ctx.onAction('done-task',{dataset:{id:'undo-local'}});
+  assert.equal(peer.ctx.state.tasks.find(task=>task.id==='undo-local').done,true,'precondition: completed on the other device');
+  const [a,b]=first==='return'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);await a.ctx.cloudPull();await syncSettle(20);
+  for(const [label,board] of [['cloud',h.remoteState()],['returning device',local.ctx.state],['completing device',peer.ctx.state]]){
+   assert.equal(board.tasks.find(task=>task.id==='undo-local').done,true,label+': the completion is kept, not reopened by the return');
+   assert.deepEqual(Array.from(board.chain),['undo-base','undo-peer'],label+': and the task is off the chain');
+  }
+ });
+});
+
+test('RISK chain return sync: a later explicit Dot of the returned task on the other device puts it back on the chain everywhere',async t=>{
+ const {local,peer,h,at}=await threeDotClients221(t);
+ returnDotFromBoard221(local,'undo-local',at+200);await publish221(local);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await syncSettle(20);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['undo-base','undo-peer'],'precondition: the other device received the return');
+ await dotFromEditor221(peer,'undo-local',at+300);await publish221(peer);await local.ctx.cloudPull();await syncSettle(20);
+ for(const [label,chain] of [['cloud',h.remoteState().chain],['dotting device',peer.ctx.state.chain],['returning device',local.ctx.state.chain]])
+  assert.deepEqual(Array.from(chain),['undo-base','undo-peer','undo-local'],label+': the later Dot adds it again, as the newest dot');
+ const cold=await reopen221(local,h,at+400,t);await cold.ctx.cloudPull();await syncSettle(20);
+ assert.deepEqual(Array.from(cold.ctx.state.chain),['undo-base','undo-peer','undo-local'],'a return is not a permanent ban');
+});
