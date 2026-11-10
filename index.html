@@ -7766,14 +7766,63 @@ window.addEventListener("online", event=>{if(cloudRetryOwner!=="automatic-source
 document.addEventListener("visibilitychange", event=>{if(document.hidden)suspendCloudSync();else resumeCloudSync(event);});
 document.addEventListener("focusout", ()=>setTimeout(resumeDeferredCloudPull, 0));
 document.addEventListener("close", resumeDeferredCloudPull, true);
+// Undo keeps a frame's boards as text in pieces: one string per row of each
+// top-level array and one per other value. A new copy reuses the earlier
+// copy's strings and row lists wherever they are unchanged, so the 30 frames
+// hold about one board plus what each action changed (#2311). Whole serialized
+// boards were more than two board copies per frame. Frames stay in this
+// process, and reordered rows only lose sharing, never accuracy. A copy never
+// changes: its text is rebuilt byte-for-byte only when Undo reads it, through
+// JSON.parse or String().
+class UndoBoardCopy{
+  constructor(keys,parts){this.keys=keys;this.parts=parts;}
+  toString(){
+    return "{"+this.keys.map((key,index)=>{
+      const part=this.parts[index];
+      return JSON.stringify(key)+":"+(Array.isArray(part)?"["+part.join(",")+"]":part);
+    }).join(",")+"}";
+  }
+}
+function reuseUndoRows(rows,prior){
+  if(!Array.isArray(prior))return rows;
+  // Rows are usually appended, or dropped or changed in place: match from the
+  // start, then align from the end so a shifted tail still shares its strings.
+  let same=rows.length===prior.length,head=0;
+  const limit=Math.min(rows.length,prior.length);
+  while(head<limit&&rows[head]===prior[head]){rows[head]=prior[head];head++;}
+  for(let i=rows.length-1,j=prior.length-1;i>=head&&j>=head;i--,j--){
+    if(rows[i]===prior[j])rows[i]=prior[j];else same=false;
+  }
+  return same?prior:rows;
+}
+function captureUndoBoard(board,prior){
+  const base=prior instanceof UndoBoardCopy?prior:null,baseParts=new Map(base?.keys.map((key,index)=>[key,base.parts[index]]));
+  const keys=[],parts=[];
+  for(const key of Object.keys(board)){
+    const value=board[key],earlier=baseParts.get(key);
+    let part;
+    if(Array.isArray(value)){
+      const rows=new Array(value.length);
+      for(let i=0;i<value.length;i++)rows[i]=JSON.stringify(value[i])??"null";
+      part=reuseUndoRows(rows,earlier);
+    }else{
+      part=JSON.stringify(value);
+      if(part===undefined)continue;
+      if(part===earlier)part=earlier;
+    }
+    keys.push(key);parts.push(part);
+  }
+  if(base&&keys.length===base.keys.length&&keys.every((key,index)=>key===base.keys[index]&&parts[index]===base.parts[index]))return base;
+  return new UndoBoardCopy(keys,parts);
+}
 function sealUndoFrame(){
   // Freeze the local gesture before a later save/adoption can add peer effects.
   const frame=undoStack.at(-1);
-  if(frame&&!frame.after)frame.after=JSON.stringify(state);
+  if(frame&&!frame.after)frame.after=captureUndoBoard(state,frame.snapshot);
 }
 function pushUndo(kind="ordinary"){
   sealUndoFrame();
-  undoStack.push({snapshot:JSON.stringify(state), generation:chanceGeneration,kind});
+  undoStack.push({snapshot:captureUndoBoard(state,undoStack.at(-1)?.after), generation:chanceGeneration,kind});
   if(undoStack.length > 30) undoStack.shift();
 }
 function scopedUndoState(frame){
@@ -8744,7 +8793,7 @@ const taskActionOwnerBundle=(()=>{
         // The first empty-account adoption already attests this exact guest
         // Reset frame. Recover its source before restoring its available Undo;
         // archived event identities, times and original owners stay unchanged.
-        if(!await inheritDecisionAuthority(next,state.syncAccount,"guest-first-empty-account",frame.snapshot)||!current())return false;
+        if(!await inheritDecisionAuthority(next,state.syncAccount,"guest-first-empty-account",String(frame.snapshot))||!current())return false;
         next.syncAccount=state.syncAccount;next.syncIdentity=state.syncIdentity;
       }
       if(!await prepareDecisionReplacement(next,state,"explicit-undo"))return false;

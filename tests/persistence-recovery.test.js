@@ -1112,6 +1112,88 @@ test('RISK large board opening browser: a large saved board opens from device st
 // margin over the empty board stays the same.
 test('RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'normal'));
 
+// #2311 (spec #2308): a long scan used to retain two whole serialized boards
+// per Undo frame, so 30 frames held about 62 board copies of JS memory. The
+// answers are trusted taps on the real scanner buttons, paced like a quick
+// person. Rendering and saving also raise peak web-process memory during a
+// scan, independent of Undo and of the board, so each engine repeats the same
+// scan with Undo capture turned off and the bound applies to what Undo adds on
+// top of that same control: a fixed margin for sampler noise plus a small
+// multiple of the board size. Growth compares each run against its own settled
+// scanning board, so a machine's absolute baseline does not matter.
+const LONG_SCAN_ANSWERS=60,LONG_SCAN_PACE_MS=150,LONG_SCAN_FIXED_MARGIN=80*1024*1024,LONG_SCAN_BYTES_FACTOR=16;
+test('RISK long scan memory browser: Undo adds no more than a small multiple of the board size to 60 answers on a large saved board, keeps 30 steps, and still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),{stats}=fixture,allowance=LONG_SCAN_FIXED_MARGIN+LONG_SCAN_BYTES_FACTOR*stats.serializedBytes;
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ const mib=bytes=>Math.round(bytes/1048576),observed=[],failures=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const scan=async undoCaptured=>{
+   const label=undoCaptured?'undo':'control',profile=fs.mkdtempSync(path.join(os.tmpdir(),`chain-2311-${engineName}-${label}-`)),tag=`chain-2311-${engineName}-${label}-${process.pid}-${Date.now()}`;
+   const launch=async(runTag,seed)=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},deviceScaleFactor:3,serviceWorkers:'block',reducedMotion:'reduce',
+     env:webProcessMemoryEnv(runTag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({seed})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);},{seed});
+    return context;
+   };
+   const opened=page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&document.querySelectorAll('#listBody [data-row]').length===count,LARGE_BOARD_SHAPE.tasks,{timeout:90000});
+   try{
+    let context=await launch(tag+'-seed',fixture.payload);
+    try{
+     const page=context.pages()[0]||await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await opened(page);
+     await page.waitForFunction(()=>new Promise(resolve=>{const request=indexedDB.open('chain-scanner-v2');request.onerror=()=>resolve(false);
+      request.onsuccess=()=>{const names=[...request.result.objectStoreNames];request.result.close();resolve(names.length>0);};}),null,{timeout:30000});
+     await page.waitForTimeout(1000);
+    }finally{await context.close();}
+    context=await launch(tag,null);
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await opened(page);
+     if(!undoCaptured)await page.evaluate(()=>{window.pushUndo=function(){};window.sealUndoFrame=function(){};});
+     if(!await page.evaluate(()=>state.candidateId))await page.locator('[data-act="start-scan"]').first().click();
+     await page.waitForFunction(()=>!!state.candidateId,null,{timeout:30000});
+     await page.waitForTimeout(3000);
+     const settledSampler=webProcessMemorySampler(tag);await page.waitForTimeout(3000);const settled=await settledSampler.stop();
+     const sampler=webProcessMemorySampler(tag);let memory,answered=0,last=null;
+     try{
+      for(let guard=0;answered<LONG_SCAN_ANSWERS&&guard<LONG_SCAN_ANSWERS*3;guard++){
+       const before=await page.evaluate(()=>({candidate:state.candidateId,intervention:!!state.interventionActive,length:state.chain.length}));
+       if(before.intervention){await page.locator('[data-act="continue-scan"]').click();await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
+       assert.ok(before.candidate,`${engineName} ${label}: the scan offers a candidate at answer ${answered}`);
+       const act=before.length%5?'no':'yes';
+       last={act,candidate:before.candidate};
+       await page.locator(`[data-act="${act}"]`).click();
+       await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
+       answered++;
+       await page.waitForTimeout(LONG_SCAN_PACE_MS);
+      }
+      await page.waitForTimeout(1500);
+     }finally{memory=await sampler.stop();}
+     assert.equal(answered,LONG_SCAN_ANSWERS,`${engineName} ${label}: every answer was accepted`);
+     if(undoCaptured){
+      // Undo still reaches its limit and reverses only the newest answer.
+      assert.equal(await page.evaluate(()=>undoStack.length),30,`${engineName}: 60 answers keep the 30-step Undo limit`);
+      await page.evaluate(()=>undo());
+      await page.waitForFunction(({act,candidate})=>state.candidateId===candidate||(act==='no'&&!Object.hasOwn(state.considered,candidate)),last,{timeout:10000});
+      assert.equal(await page.evaluate(()=>undoStack.length),29,`${engineName}: Undo consumed one step`);
+     }
+     assert.deepEqual(errors,[],`${engineName} ${label}: no page errors`);
+     assert.ok(settled.processes>0&&memory.processes>0&&settled.samples>10&&memory.samples>10,`${engineName} ${label}: web-process memory was sampled`);
+     return {growth:memory.peakBytes-settled.peakBytes,settled:settled.peakBytes,peak:memory.peakBytes};
+    }finally{await context.close();}
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const control=await scan(false),undo=await scan(true),added=undo.growth-control.growth;
+  const summary={engine:engineName,controlGrowthMiB:mib(control.growth),undoGrowthMiB:mib(undo.growth),addedByUndoMiB:mib(added),allowanceMiB:mib(allowance),settledPeakMiB:mib(undo.settled),answersPeakMiB:mib(undo.peak)};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  if(added>allowance)failures.push(`${engineName}: Undo added ${mib(added)} MiB to 60 answers, above the ${mib(allowance)} MiB allowance`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
+
 // #2226 (spec #2224): the accepted device board appears and takes input before
 // any automatic recovery default work starts, extending #2194's board before
 // scenery ordering to cloud recovery. The cloud is faked in the page, as in the

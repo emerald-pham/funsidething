@@ -26206,6 +26206,64 @@ test('RISK RESET SAFETY: quota compaction makes room for the mandatory copy with
  for(const row of retained)assert.equal(rows.find(saved=>saved.id===row.id)?.payload,row.payload,'retained recovery stays exact: '+row.id);
 });
 
+// #2311: Undo frames no longer hold whole serialized boards, so this drives a
+// long scan through the real actions and checks each answer stays exactly once,
+// each of the 30 Undo steps reverses its own action, and the frame text still
+// reads back byte-for-byte for recovery. Expected values are recorded from the
+// board before each action, independent of how a frame stores it.
+test('RISK long scan Undo: every answer is kept exactly once through reload, each of 30 Undo steps reverses its own action, and frame text stays byte-exact',async()=>{
+ const start=Date.parse('2026-06-01T12:00:00Z');let now=start;
+ const seeded=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:80},(_,i)=>({...syncTask('long-scan-'+i,'Zoë ✓ 𝒳 task '+i),ctx:['home'],createdAt:start-(80-i)*3600000}))});
+ const app=await loadApp({seed:2311,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}}),{ctx}=app;
+ await ctx.__dataReady;
+ const at=()=>{now+=60000;setFakeTime(ctx,now);};at();
+ const facts=()=>JSON.stringify({chain:ctx.state.chain,considered:ctx.state.considered,ratings:ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])});
+ ctx.onAction('start-scan',{});
+ const history=[];let answers=0;
+ for(let guard=0;answers<40&&guard<120;guard++){
+  at();
+  const benchmark=ctx.state.chain.at(-1);
+  const before=facts(),depth=vm.runInContext('undoStack.length',ctx);
+  if(ctx.state.interventionActive){ctx.onAction('continue-scan',{dataset:{benchmark}});}
+  else{
+   assert.ok(ctx.state.candidateId,'the scan offers a candidate at answer '+answers);
+   ctx.onAction(ctx.state.chain.length%5?'no':'yes',{dataset:{candidate:ctx.state.candidateId,benchmark}});
+   answers++;
+  }
+  if(vm.runInContext('undoStack.length',ctx)!==depth||depth===30)history.push(before);
+ }
+ assert.equal(answers,40,'the scan takes 40 answers');
+ assert.equal(vm.runInContext('undoStack.length',ctx),30,'Undo keeps its 30-step limit');
+ assert.equal(await ctx.persist(),true);
+ const answersOnBoard=ctx.state.decisionEvents.filter(event=>event.kind==='no'||event.kind==='comparison');
+ const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
+ await reload.ctx.__dataReady;
+ const reloadedIds=reload.ctx.state.decisionEvents.map(event=>event.id);
+ assert.equal(new Set(reloadedIds).size,reloadedIds.length,'no decision is duplicated through reload');
+ for(const event of answersOnBoard)assert.equal(reload.ctx.state.decisionEvents.filter(row=>row.id===event.id).length,1,'each answer is kept exactly once through reload');
+ await reload.dispose();
+ for(let step=1;step<=30;step++){
+  at();
+  assert.ok(await ctx.onAction('undo',{}),'Undo step '+step+' is available');
+  assert.equal(facts(),history[history.length-step],'Undo step '+step+' restores the board before its own action');
+ }
+ assert.equal(vm.runInContext('undoStack.length',ctx),0,'30 steps used the whole stack');
+ assert.equal(await ctx.onAction('undo',{}),false,'a 31st Undo step is unavailable');
+ // A frame reads back exactly as JSON.stringify would write the board, for
+ // every value JSON treats specially, because recovery saves that text.
+ ctx.state.undoOddValues={absent:undefined,nan:NaN,text:'line\n"quote" ✓ 𝒳'};
+ ctx.state.undoOddRows=[1,undefined,()=>0,NaN,,'✓'];
+ ctx.state.undoOmitted=undefined;
+ vm.runInContext('pushUndo()',ctx);
+ assert.equal(String(vm.runInContext('undoStack.at(-1).snapshot',ctx)),JSON.stringify(ctx.state),'a frame reads back byte-for-byte');
+ ctx.state.tasks[0].title='Changed after the frame';
+ vm.runInContext('sealUndoFrame()',ctx);
+ assert.equal(String(vm.runInContext('undoStack.at(-1).after',ctx)),JSON.stringify(ctx.state),'the sealed side of a frame reads back byte-for-byte');
+ assert.notEqual(String(vm.runInContext('undoStack.at(-1).snapshot',ctx)),String(vm.runInContext('undoStack.at(-1).after',ctx)),'a frame keeps both sides apart');
+ await app.dispose();
+});
+
 test('RISK RESET SAFETY: failed primary reset preserves Undo and never restores an old account after switching',async()=>{
  const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
  ctx.addTask('Old account board');ctx.state.syncAccount='old@example.test';assert.equal(await ctx.persist(),true);
