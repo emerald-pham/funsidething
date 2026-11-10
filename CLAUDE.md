@@ -11,6 +11,8 @@ Use only relevant installed skills, routed by
 [workflow](docs/agents/workflow.md). Read it before functional work, bug diagnosis,
 code review, PR writing or guidance edits. It defines strict behavioral RED→GREEN,
 seam agreement, honest evidence and user feedback boundaries.
+Before every Claude Agent call, set model and effort per
+[subagent models](docs/agents/subagent-models.md); Fable is never used.
 
 Domain docs: single-context; see [domain rules](docs/agents/domain.md) before exploration.
 Before publishing or triaging issues/specs, read the
