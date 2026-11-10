@@ -1101,6 +1101,16 @@ function chanceBetterSoon(bench, pool, perMin){
   }
   return math.max(0,math.min(1,1-weightedNone));
 }
+/* True when one of the next `perMin` candidates alone is enough to reach
+   `threshold`, so chanceBetterSoon() cannot come out below it: the chance that
+   at least one of them beats the benchmark is never less than the chance that
+   a given one does. The margin covers Phi's approximation error and the
+   quadrature tolerance. NaN ratings fail the comparison and take the full path. */
+function betterSoonClearsThreshold(bench, pool, perMin, threshold){
+  const M = Math.max(1, Math.min(pool.length, Number.isFinite(perMin) ? Math.round(perMin) : 1));
+  for(let i=0;i<M;i++) if(pBeats(pool[i], bench) >= threshold+1e-4) return true;
+  return false;
+}
 function median(arr){ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a-b); const m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
 /*ENGINE-END*/
 
@@ -8735,8 +8745,12 @@ function maybeIntervene(){
   const b = benchmark(); if(!b) return;
   const p = pool(); if(!p.length) return;
   if(state.snooze > 0){ state.snooze--; return; }
-  const chance = chanceBetterSoon(b, candidateOrder(p), decisionsPerMinute());
-  if(chance < state.settings.thresholdPct/100){
+  const order = candidateOrder(p), perMin = decisionsPerMinute(), threshold = state.settings.thresholdPct/100;
+  // Only whether the chance is below the threshold matters unless it is, so
+  // the integration runs only when no single candidate has already settled it.
+  if(betterSoonClearsThreshold(b, order, perMin, threshold)) return;
+  const chance = chanceBetterSoon(b, order, perMin);
+  if(chance < threshold){
     state.interventionActive = true;
     state.interventionP = chance;
     state.candidateId = null;

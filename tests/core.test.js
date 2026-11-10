@@ -39296,6 +39296,49 @@ test('RISK numeric responsiveness: a rank refresh reusing the previous refresh a
  assert.deepEqual(view(draw(fewer,draw(items))),view(draw(fewer)),'a different task count gets arrays of its own size');
 });
 
+// #2308 review: an answer whose next candidates already clear the threshold has
+// no use for the exact chance: only whether it is below the threshold matters.
+const betterSoonBoard2308=(mu,thresholdPct)=>syncState({tasks:[{...syncTask('bench','Benchmark'),mu:30,sigma:3},...Array.from({length:12},(_,i)=>({...syncTask('c'+i,'Candidate '+i),mu,sigma:3}))],chain:['bench'],candidateId:'c0',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'better-pass',settings:{...syncState().settings,thresholdPct}});
+const betterSoonApp2308=board=>{const raw=JSON.stringify(board);return loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw})});};
+const countBetterSoon2308=ctx=>vm.runInContext('(()=>{const seen={count:0},original=chanceBetterSoon;chanceBetterSoon=function(...args){seen.count++;return original.apply(this,args);};return seen;})()',ctx);
+test('RISK numeric responsiveness: an answer whose next candidates plainly clear the threshold skips the full better-task integration, and one that may not still runs it',async t=>{
+ const clear=await betterSoonApp2308(betterSoonBoard2308(30,25));t.after(()=>clear.dispose());
+ const counted=countBetterSoon2308(clear.ctx);
+ clear.ctx.onAction('no',{dataset:{candidate:'c0',benchmark:'bench'}});
+ assert.equal(counted.count,0,'one equal candidate alone clears 25%, so no integration is needed');
+ assert.equal(clear.ctx.state.interventionActive,false);assert.ok(clear.ctx.state.candidateId,'the next candidate is dealt');
+ const unsure=await betterSoonApp2308(betterSoonBoard2308(22,40));t.after(()=>unsure.dispose());
+ const countedUnsure=countBetterSoon2308(unsure.ctx);
+ unsure.ctx.onAction('no',{dataset:{candidate:'c0',benchmark:'bench'}});
+ assert.equal(countedUnsure.count,1,'no single candidate clears the threshold, so the shared-draw integration still decides');
+});
+test('RISK forecast caller preservation: the better-task check decides every board and threshold exactly as the full integration does',async t=>{
+ const app=await betterSoonApp2308(betterSoonBoard2308(30,25));t.after(()=>app.dispose());const {ctx}=app,state=ctx.state;
+ let seed=2308;const next=()=>(seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296;
+ let skippedChecks=0,intervened=0,kept=0;
+ for(let round=0;round<120;round++){
+  const spread=[1,4,12][round%3];
+  state.tasks.forEach((row,i)=>{row.mu=25+(next()-.5)*spread*(i?2:1)+(i?(round%5)-2:0);row.sigma=.8+next()*(round%4===0?8:3);});
+  state.decisionsMs=round%7===0?[]:Array.from({length:5},()=>2000+next()*28000);
+  const order=ctx.candidateOrder(ctx.pool()),bench=ctx.benchmark(),perMin=ctx.decisionsPerMinute();
+  const exact=ctx.chanceBetterSoon(bench,order,perMin);
+  const single=Math.max(...order.slice(0,Math.max(1,Math.round(perMin))).map(row=>ctx.pBeats(row,bench)));
+  // Thresholds on and around both exact values are where a shortcut could disagree.
+  for(const threshold of [exact,exact-1e-9,exact+1e-9,single,single-1e-9,single+1e-9,single+1e-4,single+1e-3,.05,.25,.5,.9]){
+   if(!(threshold>0&&threshold<=1))continue;
+   state.settings.thresholdPct=threshold*100;state.interventionActive=false;state.interventionP=null;state.candidateId='c0';state.snooze=0;
+   ctx.maybeIntervene();
+   const expected=exact<state.settings.thresholdPct/100;
+   assert.equal(state.interventionActive,expected,`round ${round} threshold ${threshold}: exact chance ${exact}`);
+   assert.equal(state.interventionP,expected?exact:null,'the shown chance is the exact one whenever the notice appears');
+   assert.equal(state.candidateId,expected?null:'c0');
+   if(expected)intervened++;else kept++;
+   if(threshold===.05&&single>=.051)skippedChecks++;
+  }
+ }
+ assert.ok(intervened>40&&kept>40&&skippedChecks>40,`the run covers both outcomes and the shortcut: ${intervened} / ${kept} / ${skippedChecks}`);
+});
+
 test('RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements',async t=>{
  const app=await loadApp({seed:317});t.after(()=>app.dispose());const {ctx}=app;
  const texts=['','a','history:[["task-a",25,8,true],250]','\u0000😀café\ud800','history:'+('task-25,8,true;'.repeat(4096))];
