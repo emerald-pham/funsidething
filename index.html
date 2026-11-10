@@ -8622,7 +8622,8 @@ function scanStartButtons(action = "start-scan"){
     : '<button class="btn '+(action === "resume-scan" ? 'subtle' : 'primary')+'" data-act="'+action+'">'+(action === "resume-scan" ? 'Resume scanning' : 'Start scanning')+'</button>';
 }
 function scanMetricHelpText(mode){
-  return "Saves immediately and syncs with your board. Scan buttons keep their own mode."+(mode==="halving"?" Likelihood (%) shows underlying Chance-mode likelihood, not Halving weighting selection odds.":"");
+  // #2303: one short line, only where the label alone would mislead.
+  return mode==="halving"?"Shows underlying Chance-mode likelihood, not Halving selection odds.":"";
 }
 function syncScanPreferenceControls(){
   // Update only the mounted options: rebuilding Settings would discard drafts.
@@ -16774,29 +16775,29 @@ function openSettings(){
           :window.CloudSync.user?'<p class="kv">Signed in as '+esc(window.CloudSync.user)+'.</p><div class="mbtns"><button class="btn subtle" data-act="sync-signout">Sign out to change account</button></div>'
           :'<div class="mbtns"><button class="btn subtle" data-act="sync">Sign in to review recovery</button></div>'):'')
     + '<details class="settings-section" open><summary>Scene and appearance</summary>'
-    + '<label class="cbox"><input id="stPatternedIndicators" type="checkbox"'+(s.patternedIndicators?' checked':'')+'/> Patterned active indicators</label><p class="kv">Off by default. Saves immediately with your board. Light dashed diagonal stripes add a cue to colored states; opposite directions distinguish included and excluded contexts. Labels and checkmarks stay visible.</p>'
-    + '<div class="frow"><label for="stDateFormat">Date format</label><select id="stDateFormat">'+[['system','System'],['mdy','MM/DD/YYYY'],['dmy','DD/MM/YYYY'],['ymd','YYYY-MM-DD']].map(([value,label])=>'<option value="'+value+'"'+(s.dateFormat===value?' selected':'')+'>'+label+'</option>').join('')+'</select><span id="stDatePreview" class="kv">'+esc(formatCalendarDate(new Date(Date.now()),{year:true}))+'</span></div><p class="kv">Saves immediately. System follows your device language. Calendar pickers follow your browser.</p>'
-    + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows the sky; app theme stays independent.</span></div>'
-    + '<div class="frow"><label>Scene time</label><button data-act="scene-time-settings" class="btn setting-choice '+(sceneTimeSet?'setting-unset':'setting-set')+'">Choose scene time</button><span id="settingsSceneTimeStatus" class="kv">'+(sceneTimeSet?'A scene time is selected.':'Following live time.')+' Synced with your board when signed in.</span></div>'
-    + '<div class="frow"><label>Location</label><button data-act="location-settings" class="btn setting-choice '+(locationSet?'setting-set':'setting-unset')+'">Choose location</button><span id="settingsLocationStatus" class="kv">'+(locationSet?'Sky location set.':'Using the default sky.')+' Synced with your board when signed in.</span></div>'
+    + '<label class="cbox"><input id="stPatternedIndicators" type="checkbox"'+(s.patternedIndicators?' checked':'')+'/> Patterned active indicators</label><p class="kv">Adds light diagonal stripes to colored states.</p>'
+    + '<div class="frow"><label for="stDateFormat">Date format</label><select id="stDateFormat">'+[['system','System'],['mdy','MM/DD/YYYY'],['dmy','DD/MM/YYYY'],['ymd','YYYY-MM-DD']].map(([value,label])=>'<option value="'+value+'"'+(s.dateFormat===value?' selected':'')+'>'+label+'</option>').join('')+'</select><span id="stDatePreview" class="kv">'+esc(formatCalendarDate(new Date(Date.now()),{year:true}))+'</span></div>'
+    + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button></div>'
+    + '<div class="frow"><label>Scene time</label><button data-act="scene-time-settings" class="btn setting-choice '+(sceneTimeSet?'setting-unset':'setting-set')+'">Choose scene time</button><span id="settingsSceneTimeStatus" class="kv">'+(sceneTimeSet?'A scene time is selected.':'Following live time.')+'</span></div>'
+    + '<div class="frow"><label>Location</label><button data-act="location-settings" class="btn setting-choice '+(locationSet?'setting-set':'setting-unset')+'">Choose location</button><span id="settingsLocationStatus" class="kv">'+(locationSet?'Sky location set.':'Using the default sky.')+'</span></div>'
     + '</details>'
     + '<details class="settings-section"><summary>Scanning and recurrence</summary>'
     + '<div class="frow"><label>On your phone</label><button class="btn subtle" data-act="install-app">Install this app on your phone</button><span class="kv">Add a home-screen icon and open Chain Scanner like an app.</span></div>'
-    + '<div class="frow"><label for="stChainStartsWith">Chain starts with</label><select id="stChainStartsWith">'+[['oldest','Oldest eligible'],['mostLikely','Most likely']].map(([value,label])=>'<option value="'+value+'"'+((s.chainStartsWith||'oldest')===value?' selected':'')+'>'+label+'</option>').join('')+'</select><span class="kv">The first dot Start scanning adds to an empty chain.</span></div>'
-    + '<label class="cbox"><input id="stLastTaskWoop" type="checkbox"'+(s.lastTaskWoop?' checked':'')+'/> Last task WOOP</label><p class="kv">Off by default. On the sole remaining dot, when paused or at End of the list, plan your outcome, obstacle and if/then action after two recorded dislodgements. Turning this off hides saved plans without deleting them.</p>'
-    + '<label class="cbox"><input id="stFloatingHeader" type="checkbox"'+(s.floatingHeader?' checked':'')+'/> Keep the header visible while scrolling</label><p class="kv">Keeps Undo, Help, and Settings within reach. Off by default.</p>'
-    + '<div class="frow"><label for="stScanMode">Scan buttons</label><select id="stScanMode">'+[['descending','Scan in descending likelihood always'],['chance','Scan in chance mode always'],['squared','Squared Weighting always'],['halving','Halving weighting'],...(s.scanMode==='both'?[['both','Show all three scan buttons (legacy)']]:[])].map(([v,label])=>'<option value="'+v+'"'+(s.scanMode===v?' selected':'')+'>'+label+'</option>').join('')+'</select><span class="kv">Scan mode saves immediately.</span></div>'
+    + '<div class="frow"><label for="stChainStartsWith">Chain starts with</label><select id="stChainStartsWith">'+[['oldest','Oldest eligible'],['mostLikely','Most likely']].map(([value,label])=>'<option value="'+value+'"'+((s.chainStartsWith||'oldest')===value?' selected':'')+'>'+label+'</option>').join('')+'</select></div>'
+    + '<label class="cbox"><input id="stLastTaskWoop" type="checkbox"'+(s.lastTaskWoop?' checked':'')+'/> Last task WOOP</label><p class="kv">Plan the last dot after two dislodgements.</p>'
+    + '<label class="cbox"><input id="stFloatingHeader" type="checkbox"'+(s.floatingHeader?' checked':'')+'/> Keep the header visible while scrolling</label>'
+    + '<div class="frow"><label for="stScanMode">Scan buttons</label><select id="stScanMode">'+[['descending','Scan in descending likelihood always'],['chance','Scan in chance mode always'],['squared','Squared Weighting always'],['halving','Halving weighting'],...(s.scanMode==='both'?[['both','Show all three scan buttons (legacy)']]:[])].map(([v,label])=>'<option value="'+v+'"'+(s.scanMode===v?' selected':'')+'>'+label+'</option>').join('')+'</select></div>'
     + '<div class="frow"><label for="stListMetric">All Tasks display and sort</label><select id="stListMetric" aria-describedby="stListMetricHelp"><option value="rank"'+(s.listMetric==='rank'?' selected':'')+'>Top x (estimated rank)</option><option value="chance"'+(s.listMetric==='chance'?' selected':'')+'>'+(s.scanMode==='halving'?'Likelihood (%)':'Overall percent chance')+'</option></select><span id="stListMetricHelp" class="kv settings-metric-help">'+esc(scanMetricHelpText(s.scanMode))+'</span></div>'
     + '<div class="frow"><label for="stEverHours">Default evergreen interval (hours or days)</label><input id="stEverHours" type="number" min="0.01" max="87600" step="any" value="'+evergreenIntervalParts(s.evergreenHours).value+'"/><select id="stEverUnit" aria-label="Default evergreen interval unit"><option value="hours"'+(evergreenIntervalParts(s.evergreenHours).unit==='hours'?' selected':'')+'>Hours</option><option value="days"'+(evergreenIntervalParts(s.evergreenHours).unit==='days'?' selected':'')+'>Days</option></select></div>'
-    + '<label class="cbox"><input id="stEverReset" type="checkbox"'+(s.evergreenResetAtDay?' checked':'')+'/> Default evergreen reset at day mark (2 AM)</label><p class="kv">Evergreen defaults apply to newly added tasks.</p>'
+    + '<label class="cbox"><input id="stEverReset" type="checkbox"'+(s.evergreenResetAtDay?' checked':'')+'/> Default evergreen reset at day mark (2 AM)</label>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
     + '<span class="kv">the "next hour" in the question</span></div>'
     + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'
-    + '<span class="kv">how long a Can\u2019t holds before it\u2019s reconsidered</span></div>'
-    + '<label class="cbox"><input id="stShowPostpone" type="checkbox"'+(s.showPostpone?' checked':'')+'/> Show Postpone button</label><p class="kv">Off for new clients; on for older saved boards without this preference. Saves immediately with your board. Shows Postpone for candidates and dotted tasks; existing holds stay in effect.</p>'
-    + '<div class="frow"><label for="stPostponeHours">Postpone for (hrs)</label><input id="stPostponeHours" type="number" min="0.01" max="87600" step="any" value="'+s.postponeHours+'" style="width:90px;max-width:100%"/><span class="kv">One hour by default. Applies to future postponements.</span></div>'
+    + '</div>'
+    + '<label class="cbox"><input id="stShowPostpone" type="checkbox"'+(s.showPostpone?' checked':'')+'/> Show Postpone button</label>'
+    + '<div class="frow"><label for="stPostponeHours">Postpone for (hrs)</label><input id="stPostponeHours" type="number" min="0.01" max="87600" step="any" value="'+s.postponeHours+'" style="width:90px;max-width:100%"/></div>'
     + '<div class="frow"><label for="stWorkedHrs">Worked on it sticks for (hrs)</label><input id="stWorkedHrs" type="number" min="1" max="720" value="'+s.workedHours+'" style="width:90px"/>'
-    + '<span class="kv">up to this long \u2014 a mark always clears at the 02:00 day line</span></div>'
+    + '<span class="kv">Clears at the 02:00 day line.</span></div>'
     + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
@@ -18171,7 +18172,7 @@ document.addEventListener('landscape-location-change',()=>{
   const set=!!globalThis.LivingLocation?.current()?.enabled;
   button.classList.toggle('setting-set',set);button.classList.toggle('setting-unset',!set);
   const status=document.getElementById('settingsLocationStatus');
-  if(status)status.textContent=(set?'Sky location set.':'Using the default sky.')+' Synced with your board when signed in.';
+  if(status)status.textContent=set?'Sky location set.':'Using the default sky.';
 });
 document.addEventListener('landscape-scene-time-change',event=>{
   recordScenePreferences({time:event.detail?.time??null,season:event.detail?.season??null});
