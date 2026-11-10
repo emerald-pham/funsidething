@@ -897,6 +897,63 @@ test('RISK device save settle: a board that never stops changing still ends in a
  const head=await f.store.readHead();assert.equal(JSON.parse(head.payload).futureChurn2324,attempts,'the newer saved board is not overwritten by the refused save');
 });
 
+// #2323 review: when the head is this tab's own earlier save, the save writes
+// the live board on top of it as a queued save would, without the peer merge's
+// carryProtectedBackupIds() or retainConfirmedDeviceRevision(). Both only copy
+// from the live board into the head, and the live board is what is written, so
+// every pin and the confirmed revision the live board holds are kept. A pin the
+// live board released after the earlier save stays released, exactly as the
+// ordinary save that follows a finished commit would write it.
+test('RISK device save settle: saving on top of this tab\'s own save keeps the live board\'s protected backups, and a released pin stays released',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-own-pins',tasks:[syncTask('settle-pins-anchor','Anchor'),syncTask('settle-pins-a','A'),syncTask('settle-pins-b','B')]});
+ f.ctx.state.protectedBackupIds=['pin-kept-2323','pin-released-2323'];
+ assert.equal(await f.ctx.persist(),true);
+ assert.deepEqual(JSON.parse((await f.store.readHead()).payload).protectedBackupIds,['pin-kept-2323','pin-released-2323'],'both pins start on the saved board');
+ const inner=f.store.commitHead,results=[];
+ f.store.commitHead=async options=>{const result=await inner(options);results.push(result);return result;};
+ t.after(()=>{f.store.commitHead=inner;});
+ f.commitDelayMs=400;
+ f.edit('settle-pins-a','Edited A');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,400)));
+ // The earlier save, with both pins, is still being written when the live
+ // board releases one pin and takes the next edit.
+ assert.equal(vm.runInContext("releaseCloudRecoveryPins(['pin-released-2323'])",f.ctx),true);
+ f.edit('settle-pins-b','Edited B');
+ const head=await f.settled('saves on top of this tab\'s own save');
+ assert.ok(results.some(result=>result?.conflict),'a save found the head moved by this tab\'s own earlier save');
+ assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'it saved on top of it rather than merging');
+ const durable=JSON.parse(head.payload);
+ assert.deepEqual(durable.protectedBackupIds,['pin-kept-2323'],'the kept pin stays protected and the released pin stays released');
+ assert.deepEqual(f.ctx.state.protectedBackupIds,['pin-kept-2323'],'the live board agrees');
+ assert.deepEqual([durable.syncRev,durable.syncAccount??null,durable.decisionBase??null],[f.ctx.state.syncRev,f.ctx.state.syncAccount??null,f.ctx.state.decisionBase??null],'the saved revision is the live board\'s');
+ assert.deepEqual(['settle-pins-a','settle-pins-b'].map(id=>durable.tasks.find(task=>task.id===id).title),['Edited A','Edited B']);
+});
+
+// #2323 review, pinned as found and not redesigned: a different save failure
+// after the held message replaces it with its own 9 s notice, and once that
+// ends nothing is on screen although the edit is still unsaved. Settings and
+// the Debug log keep the newer failure.
+test('RISK device save settle: a later different save failure replaces the held message for its own time only (current behaviour)',{timeout:60000},async t=>{
+ const {f,stop}=await deviceSaveExhausted2325(t,'replaced-exhausted');
+ const toast=f.shim.document.getElementById('toast'),shown=()=>toast.classList.contains('show')?toast.textContent:null,frame=()=>f.alive(new Promise(resolve=>setTimeout(resolve,30)));
+ await frame();assert.equal(shown(),deviceSaveExhaustedMessage2325);
+ stop();
+ // The device store now fails outright on the next change.
+ f.beforeCommit=async()=>{throw Object.assign(Error('device store unavailable'),{name:'UnknownError'});};
+ f.edit('replaced-exhausted-anchor','Change while the store fails');
+ const end=performance.now()+10000;
+ while(f.ctx.deviceSaveIssue()?.code!=='write-failed'){assert.ok(performance.now()<end,'the next save fails');await frame();}
+ await frame();
+ assert.match(shown()||'',/^Couldn't save this edit on this device \(device-save:device-store\/write-failed\)\./,'the coded notice replaces the held message');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,9500)));
+ assert.equal(shown(),null,'after its 9 s nothing is on screen');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'write-failed','Settings shows the newer failure');
+ const head=await f.store.readHead();
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='replaced-exhausted-mine').title,'Mine','the edit is still unsaved');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='replaced-exhausted-mine').title,'Kept in this tab','and still in this tab');
+ f.beforeCommit=null;
+});
+
 // #2323 review: the time budget covers the whole save, slow commits included.
 // A commit already sent cannot be aborted, so the refusal can land up to one
 // commit after the five seconds.
