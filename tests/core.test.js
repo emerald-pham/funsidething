@@ -21524,6 +21524,214 @@ test('Scanner browser: secondary actions dim during scanning and brighten for fo
  }finally{await browser.close();}
 });
 
+// #2312 (spec #2308 slice 4): Yes, No and Can't stay under the thumb. This journey
+// runs at phone size in Chromium and WebKit with real touch taps. Every answer
+// after the first taps the spot Yes, No and Can't first appeared at, across
+// titles from a few words to a full paragraph and a chain that keeps growing.
+const STEADY_SCANNER_FILLER='ask for the quote again and compare the two replies before deciding what to keep ';
+const steadyScannerBoard=({tasks=60,showPostpone=false,over={},taskOver=()=>({})}={})=>JSON.stringify(syncState({
+ tasks:Array.from({length:tasks},(_,i)=>({...syncTask('steady-'+i,'Steady task '+i+' '+STEADY_SCANNER_FILLER.repeat([0,0,1,3,0,6,1][i%7])),createdAt:1790000000000+i,...taskOver(i)})),
+ listOpen:false,seenQuickStart:true,...over,settings:{...syncState().settings,showPostpone,...(over.settings||{})}}));
+async function steadyScannerEngines(){
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT||process.env.PLAYWRIGHT_MODULE||'playwright');
+ return [['chromium',chromium],['webkit',webkit]];
+}
+async function steadyScannerPage(browser,board,{width=390,height=844,touch=true}={}){
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:3,hasTouch:touch,isMobile:touch,serviceWorkers:'block',reducedMotion:'reduce'});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await context.addInitScript(board=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+ },board);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+ return {context,page,errors};
+}
+const steadyScannerCenter=box=>({x:box.left+box.width/2,y:box.top+box.height/2});
+const steadyScannerControls=page=>page.evaluate(()=>{
+ const box=act=>{const el=document.querySelector(`[data-act="${act}"]`);if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+ return {yes:box('yes'),no:box('no'),cant:box('cant'),continue:box('continue-scan'),candidate:state.candidateId,intervention:!!state.interventionActive,chain:state.chain.length,viewportHeight:innerHeight,viewportWidth:innerWidth};
+});
+async function steadyScannerStart(page){
+ const start=page.locator('[data-act="start-scan"]').first();
+ const box=await start.boundingBox();assert.ok(box,'the opening view offers Start scanning');
+ await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);
+ await page.waitForFunction(()=>!!state.candidateId&&!!document.querySelector('[data-act="yes"]'),null,{timeout:15000});
+ await page.waitForTimeout(250);
+}
+// The answer that was tapped has to be the one that took effect, so the page
+// is asked for a new candidate (or the honest paused notice) each time.
+async function steadyScannerAnswer(page,point,prior){
+ await page.touchscreen.tap(point.x,point.y);
+ await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,prior,{timeout:10000});
+}
+test('RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const ANSWERS=36,failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}));
+   await steadyScannerStart(page);
+   let home=null,answered=0;
+   for(let guard=0;answered<ANSWERS&&guard<ANSWERS*3;guard++){
+    const now=await steadyScannerControls(page);
+    if(now.intervention){const c=steadyScannerCenter(now.continue);await page.touchscreen.tap(c.x,c.y);await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
+    assert.ok(now.yes&&now.no&&now.cant,`${engineName} answer ${answered}: Yes, No and Can't are showing`);
+    home??=now;
+    for(const act of ['yes','no','cant']){
+     assert.ok(Math.abs(now[act].top-home[act].top)<=1&&Math.abs(now[act].left-home[act].left)<=1,`${engineName} answer ${answered}: ${act} stayed where it first appeared (chain ${now.chain}): started at ${Math.round(home[act].left)},${Math.round(home[act].top)} and is now at ${Math.round(now[act].left)},${Math.round(now[act].top)}`);
+     assert.ok(now[act].top>=0&&now[act].bottom<=now.viewportHeight&&now[act].left>=0&&now[act].right<=now.viewportWidth,`${engineName} answer ${answered}: ${act} is fully on screen: bottom ${Math.round(now[act].bottom)} of ${now.viewportHeight}`);
+    }
+    const act=answered%3===1?'yes':answered%7===5?'cant':'no';
+    await steadyScannerAnswer(page,steadyScannerCenter(home[act]),now.candidate);
+    answered++;
+   }
+   assert.equal(answered,ANSWERS,`${engineName}: every answer was accepted`);
+   assert.deepEqual(errors,[],`${engineName}: no page errors`);
+  }catch(error){failures.push(error.message);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone widths in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const YES_ANSWERS=14,failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines())for(const width of [320,390]){
+  const label=`${engineName} ${width}px`;
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard(),{width});
+   await steadyScannerStart(page);
+   let hiddenSeen=0;
+   for(let guard=0,answered=0;answered<YES_ANSWERS&&guard<YES_ANSWERS*3;guard++){
+    const now=await steadyScannerControls(page);
+    if(now.intervention){const c=steadyScannerCenter(now.continue);await page.touchscreen.tap(c.x,c.y);await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
+    await steadyScannerAnswer(page,steadyScannerCenter(now.yes),now.candidate);answered++;
+    await page.waitForTimeout(40);
+    const trail=await page.evaluate(()=>{
+     const row=document.querySelector('.crumbs');if(!row)return null;
+     const crumbs=[...row.querySelectorAll('[data-act="reveal"]:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
+     return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),narrowest:Math.min(...crumbs.map(c=>c.getBoundingClientRect().width)),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
+    });
+    if(!trail)continue;
+    assert.ok(trail.height<=trail.tallest+2&&trail.spread<=8,`${label}: ${trail.chain.length} dots stay on one row: the trail is ${Math.round(trail.height)} px tall`);
+    assert.ok(trail.overflow<=1&&trail.right<=trail.innerWidth,`${label}: the trail stays inside the screen`);
+    assert.ok(trail.narrowest>=40,`${label}: every shown dot stays wide enough to read: the narrowest is ${Math.round(trail.narrowest)} px`);
+    const behindBenchmark=trail.chain.slice(0,-1),hidden=behindBenchmark.length-trail.shown.length;
+    assert.deepEqual(trail.shown,behindBenchmark.slice(hidden),`${label}: the trail shows the newest dots`);
+    if(hidden>0){hiddenSeen=hidden;assert.match(trail.text,new RegExp(`\\+${hidden} earlier`),`${label}: the trail counts the ${hidden} earlier dots: ${trail.text}`);}
+    else assert.doesNotMatch(trail.text,/earlier/,`${label}: no count is shown when nothing is hidden`);
+   }
+   assert.ok(hiddenSeen>0,`${label}: a 14-dot chain has earlier dots to count`);
+   assert.deepEqual(errors,[],`${label}: no page errors`);
+  }catch(error){failures.push(error.message);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';
+const steadySeededBoard=({floatingHeader=false,showPostpone=false,tasks=8}={})=>steadyScannerBoard({tasks,showPostpone,
+ taskOver:i=>i===2?{due:'2026-01-02'}:{},
+ over:{chain:['steady-0','steady-1'],candidateId:'steady-2',settings:{floatingHeader}}});
+test('RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const measure=page=>page.evaluate(()=>{
+  const box=el=>{if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+  const controls=['yes','no','cant','postpone','run-woop'].map(act=>[act,document.querySelector(`[data-act="${act}"]`)]).filter(([,el])=>el);
+  const scroller=document.scrollingElement;scroller.scrollTo(0,scroller.scrollHeight);
+  const foot=box(document.querySelector('.foot')),title=document.querySelector('.card.cand .title');
+  const atEnd={foot,scrollY:scrollY};scroller.scrollTo(0,0);
+  return {controls:Object.fromEntries(controls.map(([act,el])=>[act,{...box(el),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1}])),
+   titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,atEnd,header:box(document.getElementById('appHeader')),headerFloating:document.getElementById('appHeader').classList.contains('floating'),
+   finishTop:box(document.querySelector('.decide-finish')).top,overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
+ });
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone with enlarged text',width:320,height:568,enlarged:true},
+    {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
+    {name:'iPhone portrait with enlarged text and Postpone',width:390,height:844,enlarged:true,showPostpone:true},
+    {name:'iPhone portrait with floating header',width:390,height:844,floatingHeader:true},
+    {name:'short landscape',width:844,height:390},
+    {name:'short landscape with enlarged text',width:844,height:390,enlarged:true},
+    {name:'short landscape with floating header',width:844,height:390,floatingHeader:true},
+    {name:'desktop',width:1000,height:900,touch:false},
+   ]){
+    const label=`${engineName} ${spec.name}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    try{
+     if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('[data-act="run-woop"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate offers Run WOOP`);});
+     await page.waitForTimeout(80);
+     const shot=await measure(page);
+     const pinnedTop=Math.min(shot.finishTop,...Object.values(shot.controls).map(c=>c.top));
+     for(const [act,c] of Object.entries(shot.controls)){
+      assert.ok(c.top>=0&&c.bottom<=shot.viewportHeight&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} is on screen: ${JSON.stringify(c)}`);
+      assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
+      assert.ok(c.height>=44,`${label}: ${act} is ${Math.round(c.height)} px tall, too small to tap`);
+     }
+     assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
+     assert.ok(shot.atEnd.foot.bottom<=pinnedTop+1,`${label}: scrolled to the end, the footer clears the pinned row: footer ends ${Math.round(shot.atEnd.foot.bottom)}, the row starts ${Math.round(pinnedTop)}`);
+     assert.equal(shot.titleText,('Steady task 2 '+STEADY_SCANNER_FILLER).trim(),`${label}: the candidate title is shown in full`);
+     assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
+     if(spec.floatingHeader){assert.equal(shot.headerFloating,true,`${label}: the header floats`);assert.ok(shot.header.bottom<=pinnedTop,`${label}: the floating header and pinned row do not overlap`);}
+     // Run WOOP belongs to one candidate, so it must not move the choices when it goes.
+     const withWoop=await steadyScannerControls(page);
+     await page.evaluate(()=>document.scrollingElement.scrollTo(0,0));
+     const answerAt=steadyScannerCenter(withWoop.no);
+     if(spec.touch===false)await page.mouse.click(answerAt.x,answerAt.y);else await page.touchscreen.tap(answerAt.x,answerAt.y);
+     await page.waitForFunction(prior=>state.candidateId!==prior,withWoop.candidate,{timeout:10000});
+     const after=await steadyScannerControls(page);
+     assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the next candidate is not overdue`);
+     for(const act of ['yes','no','cant'])assert.ok(Math.abs(after[act].top-withWoop[act].top)<=1&&Math.abs(after[act].left-withWoop[act].left)<=1,`${label}: ${act} stays put when Run WOOP goes: ${Math.round(withWoop[act].top)} to ${Math.round(after[act].top)}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[],safeBottom=34;
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:4}));
+   try{
+    await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+    await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
+    const shown=await page.evaluate(()=>{const t=document.querySelector('.toast.show').getBoundingClientRect(),row=document.querySelector('.decide-finish').getBoundingClientRect();return {toastBottom:t.bottom,rowTop:row.top};});
+    assert.ok(shown.toastBottom<=shown.rowTop,`${engineName}: a toast sits above the pinned row: ends ${Math.round(shown.toastBottom)}, row starts ${Math.round(shown.rowTop)}`);
+    if(engineName==='chromium'){
+     const cdp=await context.newCDPSession(page);
+     await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:47,topMax:47,left:0,leftMax:0,bottom:safeBottom,bottomMax:safeBottom,right:0,rightMax:0}});
+     await page.waitForTimeout(80);
+     const clear=await page.evaluate(()=>({bottom:document.querySelector('[data-act="yes"]').getBoundingClientRect().bottom,height:innerHeight}));
+     assert.ok(clear.bottom<=clear.height-safeBottom,`${engineName}: Yes clears a ${safeBottom}px home indicator: ends ${Math.round(clear.bottom)} of ${clear.height}`);
+     await cdp.send('Emulation.clearSafeAreaInsetsOverride').catch(()=>{});
+    }
+    for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
+     const before=await steadyScannerControls(page);if(before.intervention)break;
+     await page.touchscreen.tap(steadyScannerCenter(before.no).x,steadyScannerCenter(before.no).y);
+     await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
+    }
+    await page.waitForTimeout(80);
+    const ended=await page.evaluate(()=>({text:document.getElementById('scan').textContent,fixedDescendants:[...document.querySelectorAll('#scan *')].filter(e=>getComputedStyle(e).position==='fixed').length,padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom)}));
+    assert.match(ended.text,/End of the list/,`${engineName}: the scan ended honestly: ${ended.text.slice(0,80)}`);
+    assert.equal(ended.fixedDescendants,0,`${engineName}: nothing stays pinned without a candidate`);
+    assert.ok(ended.padding<=62+(engineName==='chromium'?safeBottom:0),`${engineName}: the page gives back the room it reserved: ${ended.padding}`);
+    assert.deepEqual(errors,[],`${engineName}: no page errors`);
+   }catch(error){failures.push(error.message);}finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('Scanner emphasis clears when the candidate pool is exhausted without changing scan mode',async()=>{
  const {ctx,shim}=await loadApp({seed:2821});
  ctx.addTask('Dotted task',true);ctx.addTask('Next task',false);ctx.render();

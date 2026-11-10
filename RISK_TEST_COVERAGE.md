@@ -594,6 +594,10 @@ its RISK test; the map follows.
 - RISK landscape metropolis: city silhouettes occlude selected-party spotlights
 - RISK landscape metropolis: gardens and patios both skip towers with lightning rods
 - RISK landscape city and aircraft: current changelog names the skyline and plane details
+- RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit
+- RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone widths in Chromium and WebKit
+- RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit
+- RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
 - RISK landscape shadows: grounded objects share the dominant celestial light
 - RISK landscape vehicles: lower train shadows lie along its rail under changing light
