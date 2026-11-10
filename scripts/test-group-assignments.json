@@ -510,7 +510,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit",
+      "root": "RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },

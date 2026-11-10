@@ -1265,7 +1265,15 @@ test('RISK large board opening browser: with normal motion, a large saved board 
 // scanning board, so a machine's absolute baseline does not matter.
 const LONG_SCAN_ANSWERS=60,LONG_SCAN_PACE_MS=150,LONG_SCAN_FIXED_MARGIN=80*1024*1024,LONG_SCAN_BYTES_FACTOR=16;
 const LONG_SCAN_ROWS_PER_ANSWER=4,LONG_SCAN_RANK_BUFFERS_PER_ANSWER=8;
-test('RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+// #2308 (owner-approved): the whole-scan ceiling only guards against getting
+// worse. The original target was 117 MiB, the same allowance Undo still has, but
+// the same scan with Undo off already grows more than that in both engines here
+// (WebKit 316-365 MiB, Chromium 138-156 MiB), so no Undo fix can reach it. Each
+// ceiling is about 15% above the highest of three runs per engine on desktop
+// (Chromium 168 MiB, WebKit 394 MiB). Passing here does not show a phone is
+// safe: the installed iPhone run is the real acceptance.
+const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};
+test('RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fixture=await largeBoardFixture(),{stats}=fixture,allowance=LONG_SCAN_FIXED_MARGIN+LONG_SCAN_BYTES_FACTOR*stats.serializedBytes;
  assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
@@ -1351,7 +1359,7 @@ test('RISK long scan memory browser: 60 answers on a large saved board grow memo
   observed.push(summary);t.diagnostic(JSON.stringify(summary));
   if(added>allowance)failures.push(`${engineName}: Undo added ${mib(added)} MiB to 60 answers, above the ${mib(allowance)} MiB allowance`);
   // #2313 (seam agreed in #2308): the whole scan, not only Undo's part of it.
-  if(undo.growth>allowance)failures.push(`${engineName}: 60 answers grew web process memory by ${mib(undo.growth)} MiB, above the ${mib(allowance)} MiB allowance`);
+  if(undo.growth>LONG_SCAN_GROWTH_GUARD_MIB[engineName]*1048576)failures.push(`${engineName}: 60 answers grew web process memory by ${mib(undo.growth)} MiB, above the ${LONG_SCAN_GROWTH_GUARD_MIB[engineName]} MiB guard`);
   // Each answer changes a few tasks: only those rows may be drawn from scratch,
   // and a rank refresh reuses its per-task buffers instead of allocating more.
   t.diagnostic(JSON.stringify({engine:engineName,work:longScanWork}));
