@@ -1253,7 +1253,7 @@ test('RISK backup memory browser: saved backups add no more than a small fixed m
 // the person saves in the first seconds. A device with learned facts is the
 // reference; the margin allows the measuring itself and sampler noise.
 const FIRST_OPENING_MEASURE_MARGIN_MIB=130;
-test('RISK backup memory browser: the first opening with no learned facts stays close to an ordinary opening while every backup is measured, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL,timeout:300000},async t=>{
+test('RISK backup memory browser: the first opening with no learned facts stays close to an ordinary opening while every backup is measured, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fixture=await largeBoardFixture(),failures=[],mib=bytes=>Math.round(bytes/1048576);
  const FACTS='fvp:chain-scanner:backup-facts';

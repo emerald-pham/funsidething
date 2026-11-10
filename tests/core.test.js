@@ -21703,6 +21703,7 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
      assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
      if(spec.floatingHeader){assert.equal(shot.headerFloating,true,`${label}: the header floats`);assert.ok(shot.header.bottom<=pinnedTop,`${label}: the floating header and pinned row do not overlap`);}
      // Run WOOP belongs to one candidate, so it must not move the choices when it goes.
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      const withWoop=await steadyScannerControls(page);
      await page.evaluate(()=>document.scrollingElement.scrollTo(0,0));
      const answerAt=steadyScannerCenter(withWoop.no);
