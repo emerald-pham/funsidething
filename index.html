@@ -8866,6 +8866,7 @@ const taskActionOwnerBundle=(()=>{
     pushUndo();
     if(modeOnStart)state.mode=modeOnStart;
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
+    const returningDot=action==="return"&&state.chain.includes(id);
     if(draft){
       applyEditorDraft(task,draft);
       appendCurrentChoiceEvents(prepareCurrentChoiceEvents(
@@ -8918,6 +8919,9 @@ const taskActionOwnerBundle=(()=>{
     if(action==="return"){
       if(resting)reopenTask(task);
       if(supportedPostponeEvidence(task)&&Date.now()<taskPostponeUntil(task))writeTaskPostpone(task,0);
+      // #221: membership only. The rest of the chain keeps its order, and the
+      // task keeps its fields, rating and History; no skip mark is added.
+      if(returningDot)state.chain=state.chain.filter(c=>c!==id);
       delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
       const change=currentChoiceDispositionChange(id,beforeDisposition);
       const observedCtx=beforeChoice?.ctx?.value??task.ctx;

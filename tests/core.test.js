@@ -12224,6 +12224,38 @@ test("UI #221: Return as candidate is enabled in the editor a chain pill opens, 
   assert.match(button, /title="[^"]*chain[^"]*"/i, "the tooltip says it takes the dot off the chain");
 });
 
+// What a person sees of the board: trail pills in order, the benchmark card
+// and the candidate card, read from the rendered scan panel.
+const renderedBoard = scanHtml => ({
+  pills: [...String(scanHtml).matchAll(/<button\b[^>]*class="crumb"[^>]*>([^<]*)<\/button>/g)].map(match => match[1]),
+  benchmark: String(scanHtml).match(/<div class="card bench"><span class="title">([^<]*)</)?.[1] ?? null,
+  candidate: String(scanHtml).match(/<div class="card cand"><span class="title">([^<]*)</)?.[1] ?? null,
+});
+const returnFromPill = (ctx, shim, title) => {
+  const pill = chainPill(shim.elements.get("scan").innerHTML, title);
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  const button = returnButton(shim.elements.get("modalRoot").innerHTML);
+  ctx.onAction("return-candidate", { dataset: { id: button.match(/data-id="([^"]+)"/)[1] } });
+};
+
+test("UI #221: returning an older dot from its pill takes only that dot off; the rest keep their order, benchmark and candidate", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2214 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Middle dot", true);
+  ctx.addTask("Newest dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML),
+    { pills: ["First dot", "Middle dot"], benchmark: "Newest dot", candidate: "Waiting candidate" }, "precondition: a scan with three dots and a candidate");
+
+  returnFromPill(ctx, shim, "Middle dot");
+
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML),
+    { pills: ["First dot"], benchmark: "Newest dot", candidate: "Waiting candidate" });
+  assert.equal(ctx.state.mode, "scan", "the scan carries on");
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the editor closes behind the action");
+});
+
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
    The card already reads as the benchmark (purple fill, "Done" checkbox, its
    position in the layout), so the little filled circle beside the title was
