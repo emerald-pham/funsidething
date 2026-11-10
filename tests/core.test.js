@@ -12525,6 +12525,85 @@ test("UI #221: a repeated Return is one return and one Undo step, and a stale Re
   assert.equal(ctx.state.tasks.find(task => task.id === bench.id).done, true);
 });
 
+// #221 review: cases from the spec's inventory that had no test yet.
+test("UI #221: in work mode, returning the only dot leaves work mode's empty queue with no replacement dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2232 });
+  ctx.addTask("Only dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.onAction("start-working", {});
+  assert.match(shim.elements.get("scan").innerHTML, /Scanning paused/, "precondition: working the one dot");
+
+  returnBenchmarkFromEdit(ctx, shim);
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: [], benchmark: null, candidate: null }, "no dot is chosen in its place");
+  assert.match(scan, /Queue’s empty — resume scanning whenever you’re ready/, "work mode's own empty state");
+  assert.equal(ctx.state.mode, "work", "still working, not scanning");
+});
+
+test("UI #221: returning an older dot while an intervention shows keeps the intervention about the unchanged benchmark", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2233 });
+  ctx.addTask("Older dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.state.interventionActive = true; ctx.state.interventionP = 0.1; ctx.state.candidateId = null;
+  ctx.render();
+  assert.match(shim.elements.get("scan").innerHTML, /Only 10% chance of finding a better task/, "precondition: the intervention about this benchmark is showing");
+
+  returnFromPill(ctx, shim, "Older dot");
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan).pills, [], "precondition: the older dot is off the chain");
+  assert.equal(renderedBoard(scan).benchmark, "Benchmark dot");
+  assert.match(scan, /Only 10% chance of finding a better task/, "the intervention weighed this benchmark, which has not changed, so it stays");
+  assert.equal(ctx.state.interventionActive, true);
+});
+
+test("UI #221: a returned dot still waits on its contexts and dependencies before the scan deals it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2234 });
+  const [home] = ctx.state.contexts;
+  const blocker = ctx.addTask("Unfinished prerequisite", false);
+  ctx.addTask("First dot", true);
+  ctx.addTask("Context dot", true, [home.id]);
+  const dependent = ctx.addTask("Dependent dot", true);
+  ctx.addTask("Benchmark dot", true);
+  assert.equal(ctx.setTaskPrerequisites(dependent.id, [blocker.id]), true, "precondition: the dot waits on an unfinished task");
+  ctx.onAction("cycle-context", { dataset: { id: home.id } });
+  assert.equal(ctx.isEligible(ctx.state.tasks.find(task => task.title === "Context dot")), false, "precondition: its context is off");
+  assert.equal(ctx.isEligible(dependent), false, "precondition: its prerequisite is unfinished");
+
+  returnFromPill(ctx, shim, "Context dot");
+  returnFromPill(ctx, shim, "Dependent dot");
+
+  const board = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual(board.pills, ["First dot"], "precondition: both dots are off the chain");
+  assert.equal(ctx.pool().some(task => ["Context dot", "Dependent dot"].includes(task.title)), false, "neither returned task joins the pool");
+  assert.ok(!["Context dot", "Dependent dot"].includes(board.candidate), `neither is dealt as the candidate, got ${board.candidate}`);
+});
+
+test("UI #221: a later Yes on a returned task puts it back on the chain as the newest dot, through the next answer and a reload", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2235 });
+  ctx.addTask("First dot", true);
+  const returned = ctx.addTask("Returned dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+  returnFromPill(ctx, shim, "Returned dot");
+  assert.equal(answerShownCandidate(ctx, "no"), "Waiting candidate", "precondition: the first candidate is answered");
+  assert.equal(ctx.state.candidateId, returned.id, "precondition: the scan deals the returned task again");
+
+  answerShownCandidate(ctx, "yes");
+
+  const board = () => renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: board().pills, benchmark: board().benchmark }, { pills: ["First dot", "Benchmark dot"], benchmark: "Returned dot" }, "the Yes adds it back as the newest dot");
+  ctx.addTask("Later arrival", false);
+  answerShownCandidate(ctx, "no");   // the next answer rebuilds the chain from the recorded decisions
+  assert.deepEqual({ pills: board().pills, benchmark: board().benchmark }, { pills: ["First dot", "Benchmark dot"], benchmark: "Returned dot" }, "it stays on after the next answer");
+  assert.equal(await ctx.persist(), true);
+  const reopened = await loadApp({ seedStorage: { [STORE_KEY]: shim.localStorage.getItem(STORE_KEY) } });
+  assert.deepEqual(Array.from(reopened.ctx.state.chain), Array.from(ctx.state.chain), "and after a reload");
+});
+
 // #221 review: where focus goes when the editor closes. A person presses a
 // control in the scan panel, which takes focus, and the editor opens; then a
 // control in the editor takes focus, and closing the editor removes it.
