@@ -8695,6 +8695,44 @@ function setDateFormatPreference(preference){
   const preview=document.getElementById("stDatePreview");
   if(preview)preview.textContent=formatCalendarDate(new Date(Date.now()),{year:true});
 }
+// #2303 (owner decisions of 2026-11-09 and 2026-11-10): Settings has no Save
+// settings button. Each field saves when it is committed, which is the browser's
+// change event on leaving an edited number box or picking an option. A number
+// that is empty, not a number or out of range is not clamped: the field returns
+// to the last valid value and nothing is saved.
+const COMMITTED_NUMBER_SETTINGS={stHorizon:"horizonMin",stCantMin:"cantMin",stWorkedHrs:"workedHours",stThresh:"thresholdPct",stSamples:"samples",stPostponeHours:"postponeHours"};
+function committedSettingNumber(raw,key){
+  const text=String(raw??"").trim(),value=text===""?NaN:Number(text),range=SETTINGS_RANGE[key];
+  if(!Number.isFinite(value)||!range||value<range[0]||value>range[1])return null;
+  // Only Postpone for takes fractions of an hour; the other boxes count whole units.
+  return key==="postponeHours"||Number.isInteger(value)?value:null;
+}
+function commitSettingsChange(apply){
+  const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+  pushUndo();apply();recordCurrentChoiceSettings(gesture,before);recomputeRanks();commit();
+  persist(); // A committed field is the saved choice, even if Settings closes at once.
+}
+function commitNumberSetting(field){
+  const key=COMMITTED_NUMBER_SETTINGS[field.id],value=committedSettingNumber(field.value,key);
+  if(value===null){field.value=String(state.settings[key]);return false;}
+  if(state.settings[key]!==value)commitSettingsChange(()=>{state.settings[key]=value;});
+  return true;
+}
+function commitEvergreenDefault(){
+  const field=document.getElementById("stEverHours"),unit=document.getElementById("stEverUnit");
+  if(!field)return false;
+  const text=String(field.value??"").trim(),number=text===""?NaN:Number(text),hours=number*(unit?.value==="days"?24:1);
+  const [low,high]=SETTINGS_RANGE.evergreenHours;
+  if(!Number.isFinite(hours)||hours<low||hours>high){
+    const parts=evergreenIntervalParts(state.settings.evergreenHours);field.value=String(parts.value);if(unit)unit.value=parts.unit;return false;
+  }
+  // The reset suggestion that typing makes is part of the same committed default.
+  suggestEvergreenReset(field);
+  const reset=document.getElementById("stEverReset")?.checked??state.settings.evergreenResetAtDay;
+  if(state.settings.evergreenHours!==hours||state.settings.evergreenResetAtDay!==reset)
+    commitSettingsChange(()=>{state.settings.evergreenHours=hours;state.settings.evergreenResetAtDay=reset;});
+  return true;
+}
 function applyScanPreference(mode){
   const selected = mode || state.settings.scanMode;
   if(selected === "both" || selected === state.scanMode) return;
@@ -16800,7 +16838,6 @@ function openSettings(){
     + backupIssue + rawBackupActions
     + (backupHtml || '<p class="kv">No local backups yet.</p>')
     + '</details>'
-    + '<div class="mbtns"><button class="btn primary" data-act="save-settings">Save settings</button></div>'
   );
 }
 
@@ -17849,44 +17886,6 @@ function onAction(act, el){
     }
     case "install-app": openInstallHelp(); break;
     case "native-install": installNative(); break;
-    case "save-settings": {
-      const choiceGesture=captureCurrentChoiceGesture(),beforeSettings=currentChoiceSettingSnapshot();
-      const beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
-      pushUndo();
-      const s=state.settings;
-      /* Bounds from SETTINGS_RANGE and the empty-field fallback from
-         DEFAULT_SETTINGS, both read rather than retyped.
-
-         BUG FIX: these were five hand-written pairs of literals, and one of
-         them had already drifted — a cleared "worked on it" box fell back to
-         8, the exact value the v2 migration in hydrateState() exists to move
-         people OFF. Saving once put it back, and since the migration only
-         runs for st.v < 2 it never got corrected again. */
-      const field=(id,k)=> clampSetting(k, parseInt(document.getElementById(id).value) || DEFAULT_SETTINGS[k]);
-      s.horizonMin   = field("stHorizon",  "horizonMin");
-      s.cantMin      = field("stCantMin",  "cantMin");
-      s.postponeHours = postponeDurationHours(document.getElementById("stPostponeHours")?.value,s.postponeHours);
-      s.workedHours  = field("stWorkedHrs","workedHours");
-      s.thresholdPct = field("stThresh",   "thresholdPct");
-      s.samples      = field("stSamples",  "samples");
-      s.evergreenHours = evergreenDurationHours(document.getElementById("stEverHours")?.value,document.getElementById("stEverUnit")?.value,s.evergreenHours);
-      s.evergreenResetAtDay = document.getElementById("stEverReset")?.checked ?? s.evergreenResetAtDay;
-      s.showPostpone = document.getElementById("stShowPostpone")?.checked ?? s.showPostpone;
-      s.patternedIndicators = document.getElementById("stPatternedIndicators")?.checked ?? s.patternedIndicators;
-      s.floatingHeader = document.getElementById("stFloatingHeader")?.checked ?? s.floatingHeader;
-      s.lastTaskWoop = document.getElementById("stLastTaskWoop")?.checked ?? s.lastTaskWoop;
-      if(document.getElementById("stChainStartsWith")?.value==="mostLikely")s.chainStartsWith="mostLikely";else if(document.getElementById("stChainStartsWith"))delete s.chainStartsWith;
-      s.scanMode = normalizeSettings({scanMode:document.getElementById("stScanMode")?.value}).scanMode;
-      s.listMetric = normalizeSettings({listMetric:document.getElementById("stListMetric")?.value || s.listMetric}).listMetric;
-      s.dateFormat = normalizeDateFormat(document.getElementById("stDateFormat")?.value || s.dateFormat);
-      applyScanPreference();
-      const choices=currentChoiceSettingChanges(beforeSettings),afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
-      if(JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.push({
-        target:{type:"pass",id:choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
-        before:{present:true,value:beforePassMode}});
-      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture));
-      recomputeRanks(); closeModal(); commit(); break;
-    }
     case "help": openHelp(); break;
     case "reopen-apology": showApologyNotice(); break;
     case "close-modal": closeModal(); break;
@@ -18129,6 +18128,13 @@ document.addEventListener("change", e=>{
   if(el.id === "stPatternedIndicators"){ setPatternedIndicatorsPreference(el.checked); return; }
   if(el.id === "stFloatingHeader"){ setFloatingHeaderPreference(el.checked); return; }
   if(el.id === "stDateFormat"){ setDateFormatPreference(el.value); return; }
+  if(Object.hasOwn(COMMITTED_NUMBER_SETTINGS,el.id)){ commitNumberSetting(el); return; }
+  if(el.id === "stEverHours"){ commitEvergreenDefault(); return; }
+  if(el.id === "stEverReset"){
+    const value=!!el.checked;
+    if(state.settings.evergreenResetAtDay!==value)commitSettingsChange(()=>{state.settings.evergreenResetAtDay=value;});
+    return;
+  }
   if(el.id === "stQuoteHour"){
     settingsQuoteHour=el.value;
     const field=document.getElementById("stQuoteLines");
@@ -18140,7 +18146,9 @@ document.addEventListener("change", e=>{
     // Untouched eighteen-hour defaults suggest a week; returning to hours keeps the number.
     if(el.id==="addEverUnit" && el.value==="days" && quickAddEvergreenUses18HourDefault && !quickAddEvergreenDurationEdited && Number(field?.value)===18) field.value="7";
     if(el.id==="etEverUnit" && el.value==="days" && editEvergreenUses18HourDefault && !editEvergreenDurationEdited && Number(field?.value)===18) field.value="7";
-    suggestEvergreenReset(field);syncQuickAddAppearance();return;
+    suggestEvergreenReset(field);syncQuickAddAppearance();
+    if(el.id==="stEverUnit")commitEvergreenDefault();
+    return;
   }
   if(el.matches("[data-ctx]")){ toggleContext(el.dataset.ctx); return; }
   if(el.matches("[data-mgrname]")){
