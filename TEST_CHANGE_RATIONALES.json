@@ -21796,5 +21796,103 @@
       "command": "On commit 08fd5164 with 22 busy processes running: node --test --test-reporter=spec --max-old-space-size=8192 --test-name-pattern='RISK offline startup budget|RISK offline startup resume|RISK offline recovery activation|RISK offline recovery reentry' tests/persistence-recovery.test.js, repeated 20 times",
       "failure": "6 of 20 runs failed before this change with AssertionError 'an expired readonly callback cannot permanently block a fresh guarded save' (false !== true) and 'a separate current save may protect originals and persist the current workspace after the old read settles' (false !== true); 0 of 20 failed after it under the same load"
     }
+  },
+  {
+    "baseCommit": "3d787463d53f041e577ea37766417340cad6f2ad",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-app.shim.document.getElementById('addInput').value='Accepted while old readonly delivery stays withheld';await fixtureDeadline(app.ctx.onAction('add',{}),'withheld readonly Add returns',400);assert.equal(await fixtureDeadline(app.ctx.persist(),'withheld readonly save returns',400),false);const accepted=JSON.stringify(app.ctx.state),id=app.ctx.state.tasks.find(row=>row.title==='Accepted while old readonly delivery stays withheld').id;",
+      "tests/persistence-recovery.test.js:-app.shim.document.getElementById('addInput').value='Accepted while recovery completion is uncertain';await fixtureDeadline(app.ctx.onAction('add',{}),'uncertain completion Add returns',400);const first=app.ctx.state.tasks.find(row=>row.title==='Accepted while recovery completion is uncertain').id,prior=await inspector.readRawExportSnapshot(),priorHold=await inspector.getRecoveryCloudHold(),priorArchive=(await inspector.listOpaqueArchives()).find(row=>row.key===priorHold.originalKey);",
+      "tests/persistence-recovery.test.js:-app.shim.document.getElementById('addInput').value='Accepted work during delayed '+fault;await fixtureDeadline(app.ctx.onAction('add',{}),'delayed storage Add returns',400);const accepted=JSON.stringify(app.ctx.state);",
+      "tests/persistence-recovery.test.js:-app.shim.document.getElementById('addInput').value='Later accepted work after recovery settles';await fixtureDeadline(app.ctx.onAction('add',{}),'settled completion Add returns',400);const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after recovery settles').id;app.shim.document.getElementById('addInput').value='Unfinished settled recovery draft';",
+      "tests/persistence-recovery.test.js:-app.shim.document.getElementById('addInput').value='Later accepted work after verified activation';await fixtureDeadline(app.ctx.onAction('add',{}),'later activation Add returns',400);const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after verified activation').id;",
+      "tests/persistence-recovery.test.js:-assert.equal(app.ctx.deviceStorageActive(),false);app.shim.document.getElementById('addInput').value='Accepted while storage read stalled';await fixtureDeadline(app.ctx.onAction('add',{}),'stalled storage Add returns honestly',400);assert.equal(await fixtureDeadline(app.ctx.persist(),'stalled storage save returns honestly',400),false);",
+      "tests/persistence-recovery.test.js:-assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh recovery capture has one bounded budget',400),false);",
+      "tests/persistence-recovery.test.js:-assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh save after readonly storage returns',400),true,'an expired readonly callback cannot permanently block a fresh guarded save');",
+      "tests/persistence-recovery.test.js:-assert.equal(await fixtureDeadline(app.ctx.persist(),'settled recovery permits one fresh current save',400),mode!=='changed-hold','only exact own settled recovery intent can resume durable progress');assert.equal(app.shim.document.getElementById('addInput').value,'Unfinished settled recovery draft');",
+      "tests/persistence-recovery.test.js:-assert.equal(await fixtureDeadline(app.ctx.persist(),'uncertain started mutation remains protected',400),false);assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(before),'a pending started mutation cannot be replayed as a fresh recovery write');",
+      "tests/persistence-recovery.test.js:-assert.equal(await fixtureDeadline(app.ctx.persist(),'verified fresh recovery activation completes',400),true,'the fully read-back committed head and process flags must activate as one transition');assert.equal(armed,false);",
+      "tests/persistence-recovery.test.js:-const app=await loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(async()=>{for(const release of control.rawReadReleases||[])release();await app.dispose();});",
+      "tests/persistence-recovery.test.js:-const fresh=await fixtureDeadline(app.ctx.window.ScannerDeviceStore.readRawExportSnapshot(),'fresh raw request completes before old callback',400);assert.equal(JSON.stringify(fresh),JSON.stringify(before));",
+      "tests/persistence-recovery.test.js:-const loading=loadApp({indexedDBProvider,deviceDbName,deviceOpenTimeoutMs:35,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);",
+      "tests/persistence-recovery.test.js:-const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);",
+      "tests/persistence-recovery.test.js:-let app;const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,seedStorage:{[DEVICE_AUTHORITY_KEY]:'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);",
+      "tests/persistence-recovery.test.js:-let app;const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);t.after(async()=>{control.releaseRawWrite?.();for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);",
+      "tests/persistence-recovery.test.js:-t.after(async()=>{control.releaseRawRead?.();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));",
+      "tests/persistence-recovery.test.js:-t.after(async()=>{for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);const releaseOld=control.releaseRawRead;assert.equal(typeof releaseOld,'function');",
+      "tests/persistence-recovery.test.js:-t.after(async()=>{for(const release of control.rawReadReleases||[])release();control.releaseRawWrite?.();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);",
+      "tests/repository-process.test.js:-for(const name of ['CLAUDE.md','RELEASE_GATES.md']){",
+      "tests/shared.js:-async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider } = {}) {"
+    ],
+    "reason": "Spec #2291, one record for the whole diff against main, because the gate needs a single record covering every weakened line. #2297 moves the detailed visual-testing paragraph from the always-loaded CLAUDE.md to docs/agents/rendered-evidence.md, so its CLAUDE.md pin moves with the text. #2294 replaces the real-time budget waits in the offline startup, resume, activation and reentry tests with a controlled budget clock, because CPU contention decided the outcome of budget-sensitive assertions.",
+    "previousBehavior": "The visual-testing test required the visual-test requirements and the theme-capture rule in both CLAUDE.md and RELEASE_GATES.md. Each offline test waited 150 ms of real time for a 35 or 60 ms budget and wrapped following steps in a 400 ms real deadline, so a slow machine expired the budget while storage was still working.",
+    "intendedBehavior": "RELEASE_GATES.md keeps every pin; the requirements are pinned in docs/agents/rendered-evidence.md behind one pointer from CLAUDE.md, and the theme-capture rule stays in CLAUDE.md. In the offline tests only the configured budget timer and its clock are controlled; the budget expires when the test has parked storage on a known stall and spends exactly one budget, and the helper fails if no budget timer was armed. Five-second fixtureDeadline remains only as a hang watchdog. Assertions on results, durable bytes, adoption, replay and draft preservation are unchanged.",
+    "preservedCoverage": [
+      "Every assertion on RELEASE_GATES.md is unchanged, and the same visual-test patterns now run against docs/agents/rendered-evidence.md, where the text moved word for word.",
+      "Stalled open and raw reads still release startup after one budget into a useful unsaved workspace and never adopt the late read over accepted work.",
+      "Expired readonly deliveries, uncertain started writes, late completions and changed recovery holds keep their assertions on durable bytes, archives, cold reopen and drafts.",
+      "Verified activation before optional cache reads, later edits, Done and Undo, and the settled-recovery write and read retries keep their assertions."
+    ],
+    "replacementTests": [
+      "RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout",
+      "RISK offline startup budget: a stalled start stays pending until its one controlled budget expires",
+      "RISK offline startup budget: spending a budget no timer armed fails the test",
+      "RISK test inventory: the group CPU-load option stays local, guided and off in every required entry point"
+    ],
+    "redEvidence": {
+      "command": "#2297: node --test --test-name-pattern='visual test' tests/repository-process.test.js, after the test edit and before the guidance move. #2294: on 08fd5164 with 22 busy processes, node --test --test-name-pattern='RISK offline startup budget|RISK offline startup resume|RISK offline recovery activation|RISK offline recovery reentry' tests/persistence-recovery.test.js, 20 times.",
+      "failure": "#2297: AssertionError: review guidance must require executed visual tests, not screenshot presence alone (1 pass, 1 fail). #2294: 6 of 20 runs failed with AssertionError 'an expired readonly callback cannot permanently block a fresh guarded save' (false !== true) and 'a separate current save may protect originals and persist the current workspace after the old read settles' (false !== true); 0 of 20 failed after the change under the same load. Budget-armed check: with the device budget 5x and 50x, 0 converted cases failed before it and 11 failed after it."
+    }
+  },
+  {
+    "baseCommit": "951413503f9708c944869e0ecb35749ab316f629",
+    "weakenedTestLines": [
+      "tests/repository-process.test.js:-assert.deepEqual(evidence.cases,[]);",
+      "tests/repository-process.test.js:-assert.deepEqual(evidence.crossEngine.pendingRoots.map(entry=>[entry.root,entry.pendingOn]).sort(),pending.map(root=>[root,'#285']));",
+      "tests/repository-process.test.js:-assert.equal(evidence.crossEngine.casesRun,0);",
+      "tests/repository-process.test.js:-assert.equal(result.status,0,'a dispatched candidate with only pending roots must succeed: '+result.stdout+result.stderr);",
+      "tests/repository-process.test.js:-assert.match(result.stdout,/^::notice [^\\n]*\\b0 cross-engine cases ran\\b/m,'the job must annotate that no cross-engine case ran');",
+      "tests/repository-process.test.js:-assert.notEqual(evidence.status,'passed','zero cases must never be recorded as a pass');",
+      "tests/repository-process.test.js:-const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--import='+preload,'--test-name-pattern=^no test has this name$',file],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024,",
+      "tests/repository-process.test.js:-const evidence=JSON.parse(fs.readFileSync(path.join(output,'result.json'),'utf8'));",
+      "tests/repository-process.test.js:-const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\\n'}});",
+      "tests/repository-process.test.js:-const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\\n'}});",
+      "tests/repository-process.test.js:-const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\\n'}});",
+      "tests/repository-process.test.js:-const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':candidateText}});",
+      "tests/repository-process.test.js:-const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\\n'}});",
+      "tests/repository-process.test.js:-const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\\n'}});",
+      "tests/repository-process.test.js:-const fixture=makeScaledReviewFixture({candidate:{'src/feature.mjs':'export const value = 2;\\n'}});",
+      "tests/repository-process.test.js:-const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\\n';",
+      "tests/repository-process.test.js:-const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\\n';",
+      "tests/repository-process.test.js:-const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\\n';",
+      "tests/repository-process.test.js:-const notice=result.stdout.split('\\n').find(line=>line.startsWith('::notice'));",
+      "tests/repository-process.test.js:-const parent=fs.mkdtempSync(path.join(os.tmpdir(),'chain-nightly-pending-')),output=path.join(parent,'run');",
+      "tests/repository-process.test.js:-const pending=['RISK repository process: native button gate detects errors raised by a real click','RISK repository process: required native button actions execute in Chromium and WebKit'];",
+      "tests/repository-process.test.js:-const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),",
+      "tests/repository-process.test.js:-const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});",
+      "tests/repository-process.test.js:-const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});",
+      "tests/repository-process.test.js:-const result=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');",
+      "tests/repository-process.test.js:-const result=spawnSync(process.execPath,['scripts/test-groups.mjs','--group','nightly-cross-engine','--output-dir',output,'--repository','local/nightly','--event-policy','local','--run-id','1','--run-attempt','1','--source-sha',head,'--comparison-base',head],{cwd:__dirname,encoding:'utf8',timeout:60000});",
+      "tests/repository-process.test.js:-for(const root of pending)assert.ok(notice.includes(root),'the annotation must name the pending root: '+root);",
+      "tests/repository-process.test.js:-function prepareWithIndependentReport(independentReport){",
+      "tests/repository-process.test.js:-test('RISK repository process: Nightly on this head reports zero cross-engine cases and names both roots pending on the WebKit work',()=>{",
+      "tests/repository-process.test.js:-{cwd:__dirname,encoding:'utf8',env:{...environmentWithoutGitLocation(),[variable]:value},maxBuffer:16*1024*1024});"
+    ],
+    "reason": "Review findings on 95141350 (#2291): a pin in the required core group ran Nightly on the live head, so a landed pending root turned required CI red. The diff also dates the release-prepare fixtures, gives owner and reviewer distinct report bodies now that prepare refuses a shared body, and bounds the two git-isolation test spawns.",
+    "previousBehavior": "The core pin required the Nightly run on this head to report zero cases and both roots pending on the WebKit work. Release-prepare fixtures committed at the current time while their reports were dated earlier, and owner and independent reports shared one body. The two git-isolation spawns had no timeout.",
+    "intendedBehavior": "The core pin checks that the required cohort accepts the declared Nightly roots, that both WebKit roots stay declared, that each names an existing file and that each pending row names its owning PR, whether or not those tests have landed. Release-prepare fixtures commit at a fixed time before their reports and use distinct bodies. Both spawns are bounded at two minutes.",
+    "preservedCoverage": [
+      "Fixture tests in test-groups.test.mjs still pin the zero-case Nightly run: its annotation, status, empty cases and the named pending roots.",
+      "A landed pending root still fails Nightly preflight, now for escaped, template, constant and table titles as well as plain ones.",
+      "Every release-prepare assertion on receipts, refusals and digests is unchanged apart from the fixture commit time and the owner report body."
+    ],
+    "replacementTests": [
+      "RISK repository process: the Nightly root list stays valid whether or not its pending roots have landed",
+      "RISK repository process: release prepare refuses a completion time before the candidate commit",
+      "RISK repository process: release prepare refuses one report body used for both the owner and independent review"
+    ],
+    "redEvidence": {
+      "command": "With one pending root registered in tests/native-process.test.js: node --test --test-name-pattern='Nightly on this head' tests/repository-process.test.js, before the pin changed",
+      "failure": "The pin failed with 'a dispatched candidate with only pending roots must succeed' (exit 1, 1 fail) while the same head's Nightly correctly stopped at preflight_failed; the replacement pin passes on that landing and fails on an empty list, a malformed owner, a missing file and a dropped root."
+    }
   }
 ]
