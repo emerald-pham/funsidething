@@ -29,7 +29,7 @@ import { createDeviceBudgetClock, expireDeviceBudget } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
 import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDGET_MS, coldRelaunch2198, refuseNextRecoveryTransaction255,
   exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
-import { fillEditPane } from "./shared.js";
+import { chainPills, chainPillIds, returnDotFromScan } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -975,7 +975,7 @@ test("RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  const scan=local.shim.document.getElementById('scan'),paints=[];
  let markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
-  const visible=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
+  const visible=chainPillIds(value),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
   paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
  }}});
  await preUndoResponse.promise;
@@ -5474,7 +5474,7 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
   for(const app of clients){
    const scan=app.shim.document.getElementById('scan');let markup=scan.innerHTML;
    Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-    const painted=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
+    const painted=chainPillIds(value);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
     const currentCompletionIds=(app.ctx.state.decisionEvents||[]).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id),row={sequence:++sequence,client:app===dotClient?'dot':app===doneClient?'done':'no',chain:Array.from(app.ctx.state.chain),painted,currentCompletionIds,deliveredCompletionIds:[...knowledge.get(app)],knownCloudCompletionIds:JSON.parse(vm.runInContext('JSON.stringify(JSON.parse(lastKnownCloudPayload||"null")?.decisionEvents||[])',app.ctx)).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id)};
     if(currentCompletionIds.length||row.knownCloudCompletionIds.length||row.deliveredCompletionIds.length)completionObserved.add(app);row.completionObserved=completionObserved.has(app);
@@ -5678,7 +5678,7 @@ test('RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 1
     paints=[],durable=[],scan=app.shim.document.getElementById('scan');
   let phase='actions',markup=scan.innerHTML,removed=[];
   const scanChain=html=>{
-   const crumbs=[...String(html).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
+   const crumbs=chainPillIds(html);
    const benchmark=String(html).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
    if(benchmark)crumbs.push(benchmark[1]);return crumbs;
   };
@@ -10323,16 +10323,7 @@ test('RISK debug log link #2309: an installed offline shell opens the log from t
 // chains are written from the spec, never read back from the projection.
 function returnDotFromBoard221(app,id,at){
  setFakeTime(app.ctx,at);app.ctx.renderScan();
- const scan=app.shim.document.getElementById('scan').innerHTML;
- const pill=[...scan.matchAll(/<button\b[^>]*class="crumb"[^>]*>/g)].map(match=>match[0]).find(button=>button.includes('data-id="'+id+'"'));
- const bench=scan.match(/<div class="card bench">[\s\S]*?<button\b[^>]*data-act="edit" data-id="([^"]+)"/);
- const act=pill?pill.match(/data-act="([^"]+)"/)[1]:bench?.[1]===id?'edit':null;
- assert.ok(act,'the chain trail or the benchmark card offers '+id);
- app.ctx.onAction(act,{dataset:{id}});
- const task=app.ctx.state.tasks.find(row=>row.id===id);
- fillEditPane(app.ctx,app.shim,{title:task.title,url:task.url||'',due:task.due||'',start:task.startsAt||'',evergreen:task.evergreen,ctxIds:task.ctx});
- app.shim.document.getElementById('etEverReset').checked=task.evergreenResetAtDay!==false;
- app.ctx.onAction('return-candidate',{dataset:{id}});
+ returnDotFromScan(app.ctx,app.shim,id);
 }
 // undo-base is dotted; Yes on undo-local then undo-peer makes three real dots.
 async function threeDotClients221(t){
@@ -10543,7 +10534,7 @@ test('RISK chain return compatibility: a board saved before #221 opens with the 
  assert.deepEqual(Array.from(opened.ctx.state.chain),savedChain,'the same chain in the same order');
  const titles=savedChain.map(id=>board.tasks.find(task=>task.id===id).title);
  opened.ctx.renderScan();const scan=opened.shim.document.getElementById('scan').innerHTML;
- assert.deepEqual([...scan.matchAll(/<button\b[^>]*class="crumb"[^>]*>([^<]*)<\/button>/g)].map(match=>match[1]),titles.slice(0,-1),'the same trail');
+ assert.deepEqual(chainPills(scan).map(pill=>pill.title),titles.slice(0,-1),'the same trail');
  assert.equal(opened.shim.localStorage.getItem(SYNC_STORE_KEY),saved,'opening writes nothing: no migration of the saved board');
 
  returnDotFromBoard221(opened,savedChain[1],at+400);

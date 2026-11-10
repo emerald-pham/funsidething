@@ -58,7 +58,7 @@ import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
 import { backupRowsWithText } from "./shared.js";
-import { scanPanelDom221 } from "./shared.js";
+import { scanPanelDom221, chainPills, chainPillIds, chainPill, keepEditorValues, returnButton, returnFromPill, returnBenchmarkFromEdit } from "./shared.js";
 
 // #2281 CI: node:test keeps every finished test with its subtests and hooks,
 // so a hook or subtest that closed over an app kept that app's realm until the
@@ -5224,7 +5224,7 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commitHead=store.commitHead.bind(store),
   paints=[],deviceWrites=[];let phase='idle',markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
-  const visible=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
+  const visible=chainPillIds(value),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
   if(bench)visible.push(bench[1]);paints.push({phase,chain:Array.from(local.ctx.state.chain),visible,done:!!local.ctx.state.tasks.find(row=>row.id===targetId)?.done,markup:String(value)});
  }}});
  store.commitHead=async options=>{const result=await commitHead(options);if(result?.ok&&phase!=='idle'){
@@ -5358,7 +5358,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,originalCommit=store.commitHead.bind(store),paints=[],writes=[];
  let phase='idle',markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase==='stale-cloud'){
-  const visible=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
+  const visible=chainPillIds(value),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
   paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
  }}});
  store.commitHead=async options=>{const result=await originalCommit(options);if(result?.ok&&phase==='stale-cloud'){
@@ -12171,12 +12171,8 @@ test("UI: clicking the benchmark's Edit button opens the edit pane for that task
 // The trail's pills used to scroll All Tasks to the row. They now open the
 // same editor as Edit on the benchmark card, where Return as candidate can
 // take that one dot back off the chain. Each test presses the pill a person
-// would see: the action and id are read from the rendered trail.
-const chainPill = (scanHtml, title) => {
-  const button = [...String(scanHtml).matchAll(/<button\b[^>]*class="crumb"[^>]*>([^<]*)<\/button>/g)].find(match => match[1] === title)?.[0];
-  assert.ok(button, `expected a pill titled ${title} in: ${scanHtml}`);
-  return { markup: button, act: button.match(/data-act="([^"]+)"/)?.[1], id: button.match(/data-id="([^"]+)"/)?.[1] };
-};
+// would see: the action and id are read from the rendered trail (chainPill and
+// the other pill helpers are in tests/shared.js).
 
 test("UI #221: tapping a pill in the chain trail opens that task's editor and leaves All Tasks as it was", async () => {
   const { ctx, shim } = await loadApp({ seed: 2211 });
@@ -12206,12 +12202,6 @@ test("UI #221: each chain pill is a native button whose accessible name says it 
   assert.match(pill.markup, /aria-label="Open Water the ferns to edit it"/, "its name says what pressing it does");
 });
 
-const returnButton = modalHtml => {
-  const button = String(modalHtml).match(/<button\b[^>]*data-act="return-candidate"[^>]*>[^<]*<\/button>/)?.[0];
-  assert.ok(button, `expected a Return as candidate button in: ${modalHtml}`);
-  return button;
-};
-
 test("UI #221: Return as candidate is enabled in the editor a chain pill opens, and its tooltip names the chain", async () => {
   const { ctx, shim } = await loadApp({ seed: 2213 });
   ctx.addTask("Older dot", true);
@@ -12228,25 +12218,10 @@ test("UI #221: Return as candidate is enabled in the editor a chain pill opens, 
 // What a person sees of the board: trail pills in order, the benchmark card
 // and the candidate card, read from the rendered scan panel.
 const renderedBoard = scanHtml => ({
-  pills: [...String(scanHtml).matchAll(/<button\b[^>]*class="crumb"[^>]*>([^<]*)<\/button>/g)].map(match => match[1]),
+  pills: chainPills(scanHtml).map(pill => pill.title),
   benchmark: String(scanHtml).match(/<div class="card bench"><span class="title">([^<]*)</)?.[1] ?? null,
   candidate: String(scanHtml).match(/<div class="card cand"><span class="title">([^<]*)</)?.[1] ?? null,
 });
-// The Node shim does not parse the editor's input values out of its markup,
-// so an untouched editor is given the task's own values, as a person sees them
-// (the same fields hydrateUnchangedEditorDraft fills).
-const keepEditorValues = (ctx, shim, id) => {
-  const task = ctx.state.tasks.find(row => row.id === id);
-  fillEditPane(ctx, shim, { title: task.title, url: task.url || "", due: task.due || "", start: task.startsAt || "", evergreen: task.evergreen, ctxIds: task.ctx });
-  shim.document.getElementById("etEverReset").checked = task.evergreenResetAtDay !== false;
-};
-const returnFromPill = (ctx, shim, title) => {
-  const pill = chainPill(shim.elements.get("scan").innerHTML, title);
-  ctx.onAction(pill.act, { dataset: { id: pill.id } });
-  keepEditorValues(ctx, shim, pill.id);
-  const button = returnButton(shim.elements.get("modalRoot").innerHTML);
-  ctx.onAction("return-candidate", { dataset: { id: button.match(/data-id="([^"]+)"/)[1] } });
-};
 
 test("UI #221: returning an older dot from its pill takes only that dot off; the rest keep their order, benchmark and candidate", async () => {
   const { ctx, shim } = await loadApp({ seed: 2214 });
@@ -12288,16 +12263,6 @@ test("UI #221: a returned dot stays off when later answers rebuild the chain fro
   assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: ["Oldest task", third], benchmark: fourth },
     "the returned dot does not come back when the next Yes replays the pass");
 });
-
-const returnBenchmarkFromEdit = (ctx, shim) => {
-  const edit = shim.elements.get("scan").innerHTML.match(/<div class="card bench">[\s\S]*?<button\b[^>]*data-act="edit" data-id="([^"]+)"/);
-  assert.ok(edit, "the benchmark card offers Edit");
-  ctx.onAction("edit", { dataset: { id: edit[1] } });
-  keepEditorValues(ctx, shim, edit[1]);
-  const button = returnButton(shim.elements.get("modalRoot").innerHTML);
-  assert.doesNotMatch(button, /\bdisabled\b/, "the benchmark's editor offers Return as candidate");
-  ctx.onAction("return-candidate", { dataset: { id: edit[1] } });
-};
 
 test("UI #221: returning the benchmark while its intervention is showing clears that intervention and the scan deals against the new benchmark", async () => {
   const { ctx, shim } = await loadApp({ seed: 2216 });
@@ -16746,7 +16711,7 @@ test('RISK deletion authority: real Delete defeats a stale saved and cloud Dot a
  earlier.ctx.suspendCloudSync();
 
  const scanChain=html=>{
-  const ids=[...String(html).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
+  const ids=chainPillIds(html);
   const benchmark=String(html).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
   if(benchmark)ids.push(benchmark[1]);
   return ids;
@@ -29978,7 +29943,7 @@ test('RISK completion lifecycle Start: an unaware pass root cannot bypass comple
    const scan=app.shim.document.getElementById('scan'),CS=app.ctx.window.CloudSync,pull=CS.pull.bind(CS);let markup=scan.innerHTML,completionObserved=app.ctx.state.decisionEvents?.some(event=>event.id===completion.id)||false;
    CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.id===completion.id))completionObserved=true;return response;};
    Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-    const painted=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
+    const painted=chainPillIds(value);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
     const row={completionObserved,chain:Array.from(app.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
    }});
@@ -30038,7 +30003,7 @@ test('RISK completion lifecycle maintenance: the local day marker and Resume or 
  assert.equal(ctx.state.tasks.find(row=>row.id===task.id).evergreen,true);assert.ok(ctx.state.tasks.find(row=>row.id===task.id).lastDoneAt>0);
  const scan=shim.document.getElementById('scan').innerHTML;
  assert.match(scan,new RegExp(`data-act="bench-done" data-benchmark="${reference.id}"`),'the visible benchmark remains the legitimate current member');
- assert.doesNotMatch(scan,new RegExp(`class="crumb" data-act="edit" data-id="${task.id}"`),'the completed task is not rendered as a dotted member');
+ assert.equal(chainPillIds(scan).includes(task.id),false,'the completed task is not rendered as a dotted member');
 });
 
 test('RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen',async t=>{
@@ -30058,7 +30023,7 @@ test('RISK completion lifecycle return: observed Dot and next Done survive stale
  const paints=[],observations=[],deviceWrites=[],scan=stale.shim.document.getElementById('scan'),CS=stale.ctx.window.CloudSync,pull=CS.pull.bind(CS);let completionObserved=false,markup=scan.innerHTML;
  CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.kind==='completion'&&event.taskId===taskId))completionObserved=true;return response;};
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-  const painted=[...String(value).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].map(match=>match[1]);
+  const painted=chainPillIds(value);
   const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
   const row={completionObserved,chain:Array.from(stale.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
  }});
@@ -30218,7 +30183,7 @@ test('RISK completion boundaries: delayed stale cloud adoption retains Done and 
  assert.equal(h.conflicts,1,'the stale base is rejected once by the revision-conditioned cloud boundary');
  assert.ok(h.calls.filter(call=>call==='push').length>=2,'the conflict is read back and retried from the newer revision');
  assert.ok(paints.length>0&&paints.every(row=>row.chain.every(id=>id!==doneId)
-  &&![...String(row.markup).matchAll(/class="crumb" data-act="edit" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
+  &&!chainPillIds(row.markup).includes(doneId)),
   'each scanner paint during delayed adoption keeps the completed task out');
  const head=JSON.parse((await store.readHead()).payload);
  assert.deepEqual(head.chain,[peerId],'the exact repaired board is durable in production IndexedDB');
