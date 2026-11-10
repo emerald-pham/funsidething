@@ -2620,7 +2620,7 @@ test('RISK downloads visual browser: Download backup, Download board only beside
  for(const [key,byView] of Object.entries(paints))for(const [viewName] of viewports)
   if(byView['light/'+viewName]===byView['dark/'+viewName])failures.push(`${key}/${viewName}: the modal paints the same in day and night (${byView['light/'+viewName]})`);
  t.diagnostic(JSON.stringify({paints,focus:observed.map(({where,focus})=>({where,focus}))}));
- assert.equal(observed.length,36,'every engine, view, theme and viewport was measured');
+ assert.equal(observed.length,2*scenarios.length*2*viewports.length,'every engine, view, theme and viewport was measured');assert.equal(scenarios.length,6,'#2303: downloads, partial, no board, Restore choices, Troubleshooting and the Debug log');
  assert.deepEqual(failures,[],JSON.stringify(observed.slice(0,2)));
 });
 
