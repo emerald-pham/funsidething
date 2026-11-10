@@ -1076,6 +1076,10 @@ its RISK test; the map follows.
 - RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion
 - RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies
 - RISK FAQs menu label: help navigation and named dialog use FAQs while retaining Quick start chapter
+- RISK FAQs menu order: the ? menu lists Changelog first and keeps the other sections in their usual order
+- RISK FAQs menu closed: every section starts closed when a person opens the ? menu and when a new person is shown it automatically
+- RISK FAQs menu guidance: the extended FAQ and the November 9 release note explain Changelog first and closed sections
+- RISK FAQs menu browser: Chromium and WebKit show every section closed on each open and each section still opens and closes by pointer and keyboard
 - RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers
 - RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format

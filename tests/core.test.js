@@ -5871,7 +5871,7 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included','restore green before testing Settings green-to-red transition');
     await page.locator('[data-act="help"]').click();let modal=page.locator('#modalRoot .modal');const log=modal.locator('[data-help-changelog]');
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
-    const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.help-faq')],first=section.at(-1),next=section[1],save=e.querySelector('[data-act="ok-quickstart"]');return {font:getComputedStyle(first.querySelector('summary')).fontSize,otherFont:getComputedStyle(next.querySelector('summary')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
+    const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.help-faq')],first=e.querySelector('[data-help-changelog]'),next=section[1],save=e.querySelector('[data-act="ok-quickstart"]');return {font:getComputedStyle(first.querySelector('summary')).fontSize,otherFont:getComputedStyle(next.querySelector('summary')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
     assert.equal(styles.font,styles.otherFont);assert.equal(styles.surface,styles.otherSurface);assert.equal(styles.summary,styles.otherSummary);assert.equal(styles.last,true);assert.equal(styles.overflow,true);
     await modal.locator('[data-act="close-modal"]').click();await page.locator('[data-act="settings"]').click();modal=page.locator('#modalRoot .modal');await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
     await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
@@ -12077,7 +12077,7 @@ test("UI: Quick start keeps task-state explanations in a collapsed scanning chap
   ctx.openHelp();
   const markup = shim.elements.get("modalRoot").innerHTML;
   const quickStartEnd = markup.indexOf("</ol>");
-  const faqStart = markup.indexOf('<details class="help-faq">');
+  const faqStart = markup.indexOf('<details class="help-faq"><summary><h3>');
   assert.ok(quickStartEnd > 0 && faqStart > quickStartEnd, "Detailed chapters follow essential quick-start steps");
   const faq = markup.match(/<details class="help-faq"><summary><h3>Scanning and recurrence<\/h3><\/summary>([\s\S]*?)<\/details>/)?.[1];
   assert.ok(faq, "Scanning is a separate native disclosure, closed by default");
@@ -32886,7 +32886,7 @@ test('RISK dependency form presentation: Hard heading follows active rows across
 
 test('RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\bopen\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
+ const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups']);for(const c of chapters)assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
 });
 
 test('RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins',()=>{
@@ -33383,11 +33383,84 @@ test('RISK FAQs menu label: help navigation and named dialog use FAQs while reta
  assert.match(html,/<button class="ghost" data-act="help" title="FAQs \/ Changelog" aria-label="FAQs \/ Changelog">\?<\/button>/);
  const {ctx,shim}=await loadApp();const before=JSON.stringify(ctx.state);ctx.onAction('help',{});
  const markup=shim.elements.get('modalRoot').innerHTML;assert.match(markup,/<h2 id="faqsTitle">FAQs \/ Changelog<\/h2>/);
- assert.match(markup,/<details class="help-faq" open><summary>Quick start<\/summary>/);
+ assert.match(markup,/<details class="help-faq"><summary>Quick start<\/summary>/);
  assert.equal(JSON.stringify(ctx.state),before,'opening FAQs preserves board state');
  assert.match(html,/querySelector\('#modalRoot \.modal'\)\?\.setAttribute\('aria-labelledby','faqsTitle'\)/);
  assert.match(ctx.taskRatingHistoryHTML({ratingHistory:[]}),/Help: FAQs \/ Changelog → Task history/);
  assert.match(ctx.dependencyFieldsHTML('edit',[]),/See dependency FAQ in FAQs \/ Changelog\./);
+});
+
+// #2302: reads the sections a person sees in the ? menu, with the real release
+// notes loaded so a Changelog section at the top is tested with its true content.
+function helpMenuSections2302(app){
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ app.ctx.onAction('help',{});
+ return [...app.shim.document.getElementById('modalRoot').innerHTML.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)].map(([,attributes,title])=>({title:title.replace(/<[^>]+>/g,''),open:/\bopen\b/.test(attributes)}));
+}
+
+test('RISK FAQs menu order: the ? menu lists Changelog first and keeps the other sections in their usual order',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ assert.deepEqual(helpMenuSections2302(app).map(section=>section.title),['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups']);
+});
+
+test('RISK FAQs menu closed: every section starts closed when a person opens the ? menu and when a new person is shown it automatically',async t=>{
+ const closedSections=['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups'].map(title=>({title,open:false}));
+ const newcomer=await loadApp({seed:5});t.after(()=>newcomer.dispose());
+ assert.equal(newcomer.ctx.state.seenQuickStart,undefined,'a new person has not seen the menu yet');
+ const shown=newcomer.shim.document.getElementById('modalRoot').innerHTML;
+ assert.deepEqual([...shown.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)].map(([,attributes,title])=>({title:title.replace(/<[^>]+>/g,''),open:/\bopen\b/.test(attributes)})),closedSections,'the menu shown automatically on first boot');
+ const returning=await loadApp({seed:6});t.after(()=>returning.dispose());
+ returning.ctx.state.seenQuickStart=true;returning.ctx.closeModal();
+ assert.deepEqual(helpMenuSections2302(returning),closedSections,'the menu opened from the ? button');
+});
+
+test('RISK FAQs menu guidance: the extended FAQ and the November 9 release note explain Changelog first and closed sections',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());helpMenuSections2302(app);
+ const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=markup.match(/<dt>How is this menu arranged\?<\/dt><dd>(.*?)<\/dd>/)?.[1]||'';
+ assert.match(answer,/Changelog comes first/);
+ assert.match(answer,/Every section, including Quick start, starts closed each time this menu opens/);
+ assert.match(answer,/never changes your board/);
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 9, 2026</h3>')[1]?.split('<h3>')[0]||'';
+ assert.match(release,/The \? menu now opens with Changelog first and every section closed, including Quick start\./);
+});
+
+test('RISK FAQs menu browser: Chromium and WebKit show every section closed on each open and each section still opens and closes by pointer and keyboard',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const titles=['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups'],allClosed=titles.map(title=>({title,open:false}));
+ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true});
+  try{for(const [width,height] of [[390,844],[1280,800]]){
+   const label=name+' '+width+'px: ',context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
+   try{
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+    const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.help-faq');
+    const shown=()=>sections.evaluateAll(list=>list.map(section=>({title:section.querySelector(':scope > summary').textContent,open:section.open})));
+    const openMenu=async()=>{await page.getByRole('button',{name:'FAQs / Changelog'}).click();await modal.waitFor();};
+    await modal.waitFor();await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.deepEqual(await shown(),allClosed,label+'a new person is shown the menu with every section closed');
+    await modal.locator('[data-act="ok-quickstart"]').click();await modal.waitFor({state:'detached'});
+    await openMenu();assert.deepEqual(await shown(),allClosed,label+'the ? button opens the menu with every section closed');
+    await modal.locator('[data-act="close-modal"]').focus();await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Changelog',label+'Tab reaches Changelog first');
+    for(const [index,title] of titles.entries()){
+     const section=sections.nth(index),summary=section.locator(':scope > summary'),isOpen=()=>section.evaluate(element=>element.open);
+     await summary.click();assert.equal(await isOpen(),true,label+title+' opens by pointer');
+     await summary.click();assert.equal(await isOpen(),false,label+title+' closes by pointer');
+     await summary.focus();await page.keyboard.press('Enter');assert.equal(await isOpen(),true,label+title+' opens by Enter');
+     await page.keyboard.press('Space');assert.equal(await isOpen(),false,label+title+' closes by Space');
+    }
+    for(const closeControl of ['close-modal','ok-quickstart']){
+     for(const index of [0,5])await sections.nth(index).locator(':scope > summary').click();
+     assert.deepEqual((await shown()).filter(section=>section.open).map(section=>section.title),['Changelog','Contexts'],label+'the opened sections are open before leaving');
+     await modal.locator('[data-act="'+closeControl+'"]').click();await modal.waitFor({state:'detached'});
+     await openMenu();assert.deepEqual(await shown(),allClosed,label+'sections opened earlier are closed after leaving with '+closeControl);
+    }
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
 });
 
 test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers',async()=>{
