@@ -12646,6 +12646,38 @@ test("UI #221: an editor opened from the candidate card gives focus back to its 
   assert.notEqual(ctx.state.candidateId, candidate);
 });
 
+// #221 review: a double tap on Return as candidate. WebKit touch reports
+// detail 1 for both taps, so only the time since the press decides.
+test("UI #221: the second tap of a double tap on Return as candidate cannot answer the candidate the closing editor uncovers", async t => {
+  for (const answer of ["yes", "no", "cant"]) await t.test(answer, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2231 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    await new Promise(resolve => setTimeout(resolve, 240));   // the board has been on screen long enough to read
+    const panel = scanPanelDom221(shim);
+    const tap = control => shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: () => false }, closest: () => control } });
+    tap(panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+    keepEditorValues(ctx, shim, middle.id);
+    const shown = { benchmark: ctx.state.chain.at(-1), candidate: ctx.state.candidateId };
+
+    tap(editorControl221("return-candidate", middle.id));
+    assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: the first tap returned the dot");
+    assert.deepEqual({ benchmark: ctx.state.chain.at(-1), candidate: ctx.state.candidateId }, shown, "precondition: the benchmark and candidate are the ones already on screen");
+    const board = ctx.cloudPayload(), answerControl = panel.find(control => control.dataset.act === answer);
+    assert.ok(answerControl, `precondition: the scan panel shows ${answer}`);
+
+    tap(answerControl);
+    assert.equal(ctx.cloudPayload(), board, `the second tap does not answer ${answer}`);
+
+    await new Promise(resolve => setTimeout(resolve, 240));
+    tap(panel.find(control => control.dataset.act === answer));
+    assert.notEqual(ctx.cloudPayload(), board, `a moment later ${answer} answers as usual`);
+  });
+});
+
 test("UI #221: an editor opened from All Tasks or with the e shortcut leaves focus where it was when it closes", async t => {
   for (const opener of ["All Tasks", "the e shortcut"]) await t.test(opener, async () => {
     const { ctx, shim } = await loadApp({ seed: 2229 });
