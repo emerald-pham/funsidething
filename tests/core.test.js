@@ -31041,6 +31041,88 @@ test('RISK delete red backups: a device-store backup rewritten elsewhere while t
  assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days. 1 backup was kept and is still listed. It changed or could not be removed.');
 });
 
+// Second independent review. The run compared each stored backup with what
+// Settings had last drawn, so anything that redrew Settings during the run
+// (the person's own Delete on another row, reopening Settings) replaced what
+// the person had confirmed with whatever storage held by then.
+const rewriteDeviceBackup2327=async(fixture,id,change)=>{
+ const db=await new Promise((resolve,reject)=>{const request=fixture.indexedDB.open(fixture.deviceDbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ try{await new Promise((resolve,reject)=>{
+  const tx=db.transaction('backups','readwrite'),backups=tx.objectStore('backups'),request=backups.get(id);
+  request.onsuccess=()=>{const next=change(request.result);if(next===null)backups.delete(id);else backups.put(next,id);};
+  tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(tx.error||Error('rewrite aborted'));
+ });}finally{db.close();}
+};
+const addOlderDeviceBackup2327=async fixture=>{
+ const older={id:'device-older',day:'2026-09-05',at:fixture.now-31*24*HOUR,kind:'manual',payload:fixture.head.payload};
+ assert.equal((await fixture.store.putBackup({expectedHash:(await fixture.store.readHead()).hash,backup:older})).ok,true);await fixture.ctx.refreshDeviceBackupCache();
+ return older;
+};
+// Runs `during` once, right after the run's first device-store deletion.
+const afterFirstDeletion2327=(fixture,during)=>{
+ const deleteBackup=fixture.store.deleteBackup;let first=true;
+ fixture.store.deleteBackup=async(...args)=>{const result=await deleteBackup.apply(fixture.store,args);if(first){first=false;await during();}return result;};
+ return ()=>first===false;
+};
+test('RISK delete red backups: Settings redrawing during the run does not replace what the person confirmed; a backup rewritten since the press is kept',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ await addOlderDeviceBackup2327(fixture);ctx.openSettings();
+ const happened=afterFirstDeletion2327(fixture,async()=>{
+  await rewriteDeviceBackup2327(fixture,'device-older',row=>({...row,at:fixture.now-HOUR,day:'2026-10-06',note:'rewritten in another tab'}));
+  await ctx.refreshDeviceBackupCache();ctx.openSettings();
+ });
+ await fixture.press();
+ assert.equal(happened(),true,'fixture: Settings was redrawn from current storage after the first deletion');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-older','device-week','mirror-new'],'the rewritten backup, now recent, is kept');
+ assert.equal(Array.from(await store.listBackups()).find(row=>row.id==='device-older').note,'rewritten in another tab');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days. 1 backup was kept and is still listed. It changed or could not be removed.');
+});
+
+test('RISK delete red backups: a copy a recovery pins while the run is under way is kept',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim}=fixture;
+ ctx.openSettings();let pinned=null;
+ afterFirstDeletion2327(fixture,async()=>{pinned=(await fixture.ids()).find(id=>/-old$/.test(id));ctx.state.protectedBackupIds=[pinned];});
+ await fixture.press();
+ assert.ok(pinned,'fixture: one red backup was still stored when the pin arrived');
+ assert.ok((await fixture.ids()).includes(pinned),'the newly pinned copy is kept in the device store');
+ assert.equal(fixture.listed().some(item=>item.id==='mirror-old'),pinned==='mirror-old','and its older-list mirror, if it has one, is kept with it');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 1 backup was kept and is still listed. It changed or could not be removed.');
+});
+
+test('RISK delete red backups: a backup something else removes during the run is not reported as kept',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim}=fixture;
+ await addOlderDeviceBackup2327(fixture);ctx.openSettings();
+ afterFirstDeletion2327(fixture,()=>rewriteDeviceBackup2327(fixture,'device-older',()=>null));
+ await fixture.press();
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new'],'fixture: the other tab removed the third red backup');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days from this device. 1 backup was already removed.');
+});
+
+test('RISK delete red backups: while the device store cannot be listed no button is offered, so a mirrored backup never loses only its older-list copy',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ const list=store.listBackupFacts;store.listBackupFacts=async()=>{throw new Error('device store cannot be listed');};
+ await ctx.refreshDeviceBackupCache();ctx.openSettings();
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/data-act="delete-local-backup" data-id="mirror-old"/,'fixture: the mirrored red backup is still listed, from the older backup list');
+ assert.equal(redBackupsButton(markup),null);
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);for(let i=0;i<10;i++)await flush();
+ assert.equal(fixture.asked.length,0);
+ store.listBackupFacts=list;
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old']);
+ assert.deepEqual(fixture.listed().filter(fixture.mine).map(item=>item.id),['mirror-old','mirror-new'],'the older backup list still holds both mirrors');
+});
+
+test('RISK delete red backups: when the device store stays unreadable after a deletion the message does not claim the rest are still listed',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ ctx.openSettings();
+ const list=store.listBackupFacts;
+ afterFirstDeletion2327(fixture,async()=>{store.listBackupFacts=async()=>{throw new Error('device store cannot be listed');};});
+ await fixture.press();
+ store.listBackupFacts=list;
+ assert.equal((await fixture.ids()).filter(id=>/-old$/.test(id)).length,1,'exactly one red backup was deleted');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 1 backup was not deleted. The backup list could not be read, so deleting stopped.');
+});
+
 // Coverage limit: each recovery state is set on the loaded app directly, not
 // reached through a failing cloud or device read. Settings' own notice for the
 // state is asserted so the fixture is the state Settings recognises.
