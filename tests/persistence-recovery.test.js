@@ -5012,6 +5012,90 @@ test('RISK backup list memory: a copy whose stored bytes were damaged is refused
  await reopened.dispose?.();
 });
 
+// #2308 review: before an account switch replaces the board, cloudPull finds the
+// previous board's safety copy by hash and reads its exact bytes back. These
+// drive that real pull with a real device store; only the read is interfered with.
+async function accountSwitchDeviceApp2308(t){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-switch-'+Date.now()+'-'+Math.random();
+ const local=syncState({tasks:[syncTask('board-a','Board of the previous account')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});t.after(()=>app.dispose?.());
+ const remote=syncState({tasks:[syncTask('board-b','Board of the new account')],syncAccount:'other@example.com'});
+ const sync=makeSyncHarness({remote,rev:7}),backend=sync.factory();backend.user='other@example.com';
+ app.shim.window.CloudSync=backend;
+ // Only the device copy can prove this board: no older browser list holds it.
+ storage.removeItem(LOCAL_BACKUPS_KEY);
+ const store=app.shim.window.ScannerDeviceStore,readBackups=store.readBackups;
+ // The safety copy's read: earlier reads have other jobs and are left alone.
+ const faults={reads:0,fail:0,during:null};
+ store.readBackups=async function(ids){
+  if(!Array.from(ids).some(id=>String(id).startsWith('before-account-switch')))return readBackups.call(this,ids);
+  faults.reads++;
+  if(faults.fail>0){faults.fail--;throw Object.assign(Error('fixture read aborted'),{name:'AbortError'});}
+  const rows=await readBackups.call(this,ids);
+  faults.during?.();
+  return rows;
+ };
+ const titles=()=>Array.from(app.ctx.state.tasks,row=>row.title),toastText=()=>app.shim.document.getElementById('toast').textContent;
+ // The app's own timers are unreferenced; this keeps the process up through a retry wait.
+ const keepAlive=setInterval(()=>{},10);t.after(()=>clearInterval(keepAlive));
+ return {...app,store,sync,faults,titles,toastText};
+}
+const deviceReadFailures2308=ctx=>ctx.buildSupportDiagnosticsReport().events.filter(row=>row.stage==='device-store'&&row.status==='failed');
+
+test('RISK backup read back: a brief device read failure during an account switch is retried, keeps its diagnostics and still adopts the new board',async t=>{
+ const app=await accountSwitchDeviceApp2308(t);
+ app.faults.fail=1;
+ await app.ctx.cloudPull();
+ assert.deepEqual(app.titles(),['Board of the new account'],'the retried read proves the safety copy, so the switch completes: '+app.toastText());
+ assert.equal(app.faults.reads,2,'one failed read and one retry');
+ assert.doesNotMatch(app.toastText(),/held/i,'a recovered read needs no notice');
+ assert.equal(deviceReadFailures2308(app.ctx).length,1,'the failed attempt is kept in the Debug log');
+ assert.ok((await app.store.listBackups()).some(row=>row.kind==='before-account-switch'&&row.payload.includes('Board of the previous account')),'the previous board stays exactly recoverable');
+});
+
+test('RISK backup read back: a device read that keeps failing holds the switch honestly within its budget and leaves the board alone',async t=>{
+ const app=await accountSwitchDeviceApp2308(t),before=JSON.stringify(app.ctx.state);
+ app.faults.fail=99;
+ await app.ctx.cloudPull();
+ assert.equal(JSON.stringify(app.ctx.state),before,'the board is not replaced');
+ assert.deepEqual(app.titles(),['Board of the previous account']);
+ assert.ok(app.faults.reads>=2&&app.faults.reads<=4,'retries stop at a small budget: '+app.faults.reads);
+ assert.equal(deviceReadFailures2308(app.ctx).length,app.faults.reads,'every attempt is kept in the Debug log');
+ assert.equal(vm.runInContext('cloudAdoptionHeld',app.ctx),true,'the cloud copy stays held, so no write can follow');
+ assert.doesNotMatch(app.toastText(),/no restorable local copy/,'a failed read is not reported as a missing copy');
+ assert.match(app.toastText(),/could not (?:be )?read/i,'the notice names what actually happened: '+app.toastText());
+ assert.ok(vm.runInContext('syncErrorLog',app.ctx).some(row=>row.code==='recovery-unavailable'),'the failure stays visible in the sync log');
+ assert.equal(app.sync.calls.includes('push'),false,'nothing is written to the new account');
+});
+
+test('RISK backup read back: a sign-out during the retry budget stops reading',async t=>{
+ const app=await accountSwitchDeviceApp2308(t);
+ app.faults.fail=99;
+ const realFail=app.faults;
+ app.ctx.window.CloudSync.user='other@example.com';
+ const pull=app.ctx.cloudPull();
+ for(let i=0;i<500&&!app.faults.reads;i++)await flush();
+ assert.equal(app.faults.reads,1,'the first attempt has run');
+ app.ctx.window.CloudSync.user=null;
+ await pull;await syncSettle(400);
+ assert.equal(realFail.reads,1,'no attempt starts once the sign-in it served is gone');
+ assert.deepEqual(app.titles(),['Board of the previous account'],'nothing is adopted');
+});
+
+test('RISK backup read back: an edit made while the safety copy is being read back holds the account switch instead of being lost',async t=>{
+ const app=await accountSwitchDeviceApp2308(t);
+ app.faults.during=()=>{app.faults.during=null;app.ctx.addTask('Edit made during the read');};
+ await app.ctx.cloudPull();
+ assert.ok(app.titles().includes('Edit made during the read'),'the edit stays on the board: '+JSON.stringify(app.titles()));
+ assert.ok(app.titles().includes('Board of the previous account'),'the previous board was not replaced');
+ assert.equal(app.ctx.state.syncAccount,'e@example.com','the edited board stays with its own account');
+ assert.equal(app.ctx.state.syncRev,3,'and keeps its own revision base');
+ assert.equal(vm.runInContext('undoStack.length',app.ctx),1,'and its Undo step');
+ assert.equal(vm.runInContext('cloudAdoptionHeld',app.ctx),true);
+ assert.equal(vm.runInContext('deferredCloudPull',app.ctx),true,'a later pull reconciles the edit with its own safety copy');
+});
+
 test('RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board',async()=>{
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-destructive-'+Date.now()+'-'+Math.random();
  const original=syncState({tasks:[syncTask('original','Original large board')],syncDirty:true});original.futureBoardData={blob:'R'.repeat(1100000)};

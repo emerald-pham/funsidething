@@ -3084,12 +3084,26 @@ async function deviceBackupsWithText(ids){
   if(typeof deviceStore?.readBackups==="function")return deviceStore.readBackups(ids);
   const wanted=new Set(ids);return (await deviceStore.listBackups()).filter(row=>wanted.has(row.id));
 }
+// Gaps before each retry of a device backup read: iOS can end an idle database
+// connection under a read, and a moment later the same read succeeds.
+const DEVICE_BACKUP_READ_RETRY_MS=[60,240];
 // The device backups that hold exactly this text: found by hash, then confirmed
-// against the stored bytes. A copy that cannot be read counts as not holding it.
-async function deviceBackupsHoldingPayload(payload){
+// against the stored bytes. A read that keeps failing rejects, because "these
+// copies could not be read" must not be mistaken for "no copy exists". Each
+// failed attempt stays in the Debug log; {current} ends the retries when the
+// work it serves has been superseded.
+async function deviceBackupsHoldingPayload(payload,current=()=>true){
   const payloadHash=await ChainStorageV2.hashPayload(payload),ids=deviceBackupCache.filter(row=>row.payload===payload||row.payloadHash===payloadHash).map(row=>row.id);
   if(!ids.length)return [];
-  try{return (await deviceBackupsWithText(ids)).filter(row=>row.payload===payload);}catch(e){return [];}
+  for(let attempt=0;;attempt++){
+    try{return (await deviceBackupsWithText(ids)).filter(row=>row.payload===payload);}
+    catch(error){
+      supportDiagnosticsObserve("device-store","failed","current",null,null,null,null,null,null,null,null,null,supportDiagnosticsErrorCode(error));
+      if(attempt>=DEVICE_BACKUP_READ_RETRY_MS.length||!current())throw error;
+      await new Promise(resolve=>setTimeout(resolve,DEVICE_BACKUP_READ_RETRY_MS[attempt]));
+      if(!current())throw error;
+    }
+  }
 }
 // #2310: the metadata of a device row, comparable without its text. Compared
 // with the text hash (backupRowsSamePayload) it stands in for backupRowIdentity.
@@ -3685,7 +3699,8 @@ async function saveDurableBackup(kind,payload,metadata=null){
   try{
     if(["before-account-switch","before-cloud-local-edit","before-cloud-adoption"].includes(kind)){
       // Compared by hash first, then confirmed against the exact stored text.
-      const existing=(await deviceBackupsHoldingPayload(payload)).find(row=>row.kind===kind);
+      // Copies that cannot be read back are not reused: a second copy is safe.
+      const existing=(await deviceBackupsHoldingPayload(payload).catch(()=>[])).find(row=>row.kind===kind);
       if(existing)return existing;
     }
     // #2254: a manual backup names its board's account (manualBackupReminderHtml).
@@ -7605,15 +7620,23 @@ async function cloudPull(){
       }
       if(pendingDeviceCloudBackup?.backend===window.CloudSync&&pendingDeviceCloudBackup.account===acct)pendingDeviceCloudBackup=null;
     }
+    const priorBoard = remoteWins ? safetyBoard : null;
+    let priorCopyUnread=false;
+    // #2310: the backup list no longer holds text, so an account switch reads
+    // the stored bytes back here. A copy made by this pull is used as it stands
+    // and a browser-list copy needs no read. Either way it must be the board
+    // captured above, so every path meets the edit check that follows.
+    const stablePrior = remoteWins && useLocal
+      ? (remoteSafetyCopy&&typeof remoteSafetyCopy==="object" ? remoteSafetyCopy : deviceStorageAuthority&&deviceStore ? (await deviceBackupsHoldingPayload(priorBoard,pullStillCurrent).catch(()=>{priorCopyUnread=true;return [];})).find(row=>row.kind!=="latest")??readLegacyBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard) : readLocalBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard)) : null;
     if(remoteWins && JSON.stringify(state)!==safetyBoard){
       cloudAdoptionHeld=true;deferredCloudPull=true;return;
     }
-    const priorBoard = remoteWins ? safetyBoard : null;
-    const stablePrior = remoteWins && useLocal
-      ? (remoteSafetyCopy&&typeof remoteSafetyCopy==="object" ? remoteSafetyCopy : deviceStorageAuthority&&deviceStore ? (await deviceBackupsHoldingPayload(priorBoard)).find(row=>row.kind!=="latest")??readLegacyBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard) : readLocalBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard)) : null;
     if(remoteWins && useLocal && !stablePrior){
       cloudAdoptionHeld=true;
-      toast("Cloud copy held: the previous board has no restorable local copy.", 7000);
+      if(priorCopyUnread)reportCloudReconcileError("recovery-unavailable");
+      toast(priorCopyUnread
+        ? "Cloud copy held: this device could not read back the safety copy of your board. Your board is unchanged, and sync will try again."
+        : "Cloud copy held: the previous board has no restorable local copy.", 7000);
       return;
     }
     const priorMarkers = remoteWins ? {reconciledAs,lastKnownCloudPayload,lastKnownCloudAccount,lastKnownCloudRevision,deferredCloudPull,lastPushed,pendingPush,undoStack:undoStack.slice(),generation:chanceGeneration} : null;
