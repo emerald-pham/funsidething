@@ -14001,15 +14001,16 @@ test("clearCompleted: still runs (and clears the log) when there are no done tas
   assert.deepEqual([...ctx.state.workLog], [], "should have cleared even with zero done tasks");
 });
 
-test("openSettings: shows the housekeeping copy and Clear history button when only work-log entries exist", async () => {
+test("History: offers Clear history when only work-log entries exist, and Settings does not repeat it", async () => {
   const { ctx, shim } = await loadApp({ seed: 367 });
   const t = ctx.addTask("Task A", false);
   ctx.workedOnTask(t.id);
 
   ctx.openSettings();
   const html = shim.elements.get("modalRoot").innerHTML;
-  assert.match(html, /data-act="clear-done"/, "Clear history should be offered");
-  assert.ok(!/No completed tasks stored right now/.test(html));
+  assert.doesNotMatch(html, /data-act="clear-done"|Housekeeping/, "#2303: Settings no longer repeats Clear history");
+  ctx.closeModal(); ctx.state.histOpen = true; ctx.render();
+  assert.match(shim.elements.get("histPanel").innerHTML, /data-act="clear-done">Clear history</, "Clear history should be offered in History");
 });
 
 test("theme: a fresh state defaults the preference to 'system'", async () => {
@@ -16721,9 +16722,11 @@ test('RISK LOCAL BACKUPS: the non-actionable backup-full warning is absent from 
   'a genuinely failed primary save still reports unsaved work');
 });
 
-test('RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies',async()=>{
+test('RISK LOCAL BACKUPS: the Data and backups FAQ explains automatic early retirement while preserving chosen copies',async()=>{
  const {ctx,shim}=await loadApp();ctx.openSettings();
- const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/older automatic copies may retire sooner/,'#2303: Settings leaves retention details to the FAQ');
+ ctx.openHelp();
+ const markup=shim.document.getElementById('modalRoot').innerHTML.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(markup,/older automatic copies may retire sooner/);
  assert.match(markup,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
 });
@@ -30767,10 +30770,11 @@ test('RISK live scan sync: the second physical click of one double-click cannot 
  assert.equal(next.lastDoneAt,null,'a physical double click remains one completion even when the DOM has replaced the control');
 });
 
-test('RISK live scan sync: Settings describes live revision refresh while retaining draft protection',async()=>{
- const {a}=await liveScanSyncClients();a.ctx.openSettings();
- assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
- assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts and pressed controls wait until you finish/,'the draft and pressed-control boundary remains visible to the user');
+test('RISK live scan sync: the Data and backups FAQ describes live revision refresh while retaining draft protection',async()=>{
+ const {a}=await liveScanSyncClients();a.ctx.openHelp();
+ const answer=a.shim.document.getElementById('modalRoot').innerHTML.split('<dt>When does cloud sync check for changes?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/when another device saves/,'#2303: the FAQ must describe the open-device refresh that Settings used to');
+ assert.match(answer,/Drafts and pressed controls wait until you finish/,'the draft and pressed-control boundary remains visible to the user');
 });
 
 /* Dependencies are saved by task ID; fixtures never use an account or a real board. */
@@ -31864,7 +31868,8 @@ test('RISK legacy automatic expiry FAQ: save rotation permanently removes expire
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Automatic backups cover today and the previous six local dates/);assert.match(help,/older automatic entries.*successful save/);assert.match(help,/Manual and protected recovery copies remain/i);assert.match(help,/opening Settings does not delete it/i);assert.match(help,/more than seven days old/);
  assert.match(help,/removed after a successful save, without Undo/);assert.match(help,/protected recovery copies remain until you delete/);
- ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);
+ // #2303: the cleanup notes moved from Settings to the Data and backups FAQ.
+ const settings=help.split('<dt>When are old backups cleaned up?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(settings,/removed permanently from the active backup list.*successful save/);
  // #2254 release review (B3): the acknowledged trim (owner authorization on
  // #2254, 2026-11-07, "migrated legacy copies") clears the storage upgrade's
  // copy of the older backup list once the cloud confirms the board, so
@@ -32107,6 +32112,7 @@ test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved s
  const words=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].filter(m=>m[2].replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length>130).map(m=>m[1]);
  assert.deepEqual(words,[],'every Help answer stays within the 130-word limit');
  assert.doesNotMatch(data,/Download recovery file|Save settings is at the bottom|Paste JSON/,'the FAQ names the controls Settings now shows');
+ assert.doesNotMatch(markup.split('data-changelog-notes>')[0]+(markup.split('data-changelog-notes>')[1]||'').split('</details>').slice(1).join('</details>'),/Save settings applies|in Settings and Save settings/,'no FAQ answer sends anyone to the removed Save settings button');
  const current=(markup.split('data-changelog-notes>')[1]||'').split('</ul>')[0]||'';
  assert.match(current,/<li>Settings is much shorter\./,'the newest changelog entry describes the simpler Settings');
  assert.match(current,/Every setting now saves as soon as you change it, and a number out of range returns to the last valid one\./);
@@ -37389,7 +37395,7 @@ test('RISK cloud current choices: projected Can’t and Return preserve the orig
  assert.ok(returned.observedActionIds.includes(cant.id),'Return retains its causal link to the exact hold');
 });
 
-test('RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence',async()=>{
+test('RISK independent decision guidance: the rendered FAQ distinguishes retained decisions targeted Undo and held evidence',async()=>{
  const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML;
  const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
@@ -37407,8 +37413,8 @@ test('RISK independent decision guidance: rendered FAQ and Settings distinguish 
  assert.match(answer('Can I undo, restore, or remove a task?'),/keeping unrelated decisions/i);
  assert.match(answer('How does Undo work after Bulk Edit?'),/One Undo reverses the batch.*keeping unrelated progress/i);
  assert.doesNotMatch(answer('How does Undo work after Bulk Edit?'),/restore an earlier board|older peer fields|leave batch values in place/i);
- shim.window.CloudSync={configured:true,ready:true,user:'guidance-fixture@example.invalid'};ctx.closeModal();ctx.openSettings();
- const settings=shim.document.getElementById('modalRoot').innerHTML;
+ // #2303: the sync explanation Settings showed is now in the Data and backups FAQ.
+ const settings=answer('When does cloud sync check for changes?');
  assert.match(settings,/Independent decisions combine/);
  assert.match(settings,/conflicting current choices use when each choice was made/);
  assert.doesNotMatch(settings,/newest revision wins/);
@@ -39303,8 +39309,8 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(settings,/Debug log/i,'Settings offers a separate support report');
  assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="download-recovery-file"/);assert.doesNotMatch(settings,/data-act="copy-support-diagnostics"/);assert.doesNotMatch(settings,/data-act="download-support-diagnostics"/);
- assert.match(settings,/metadata report.*not a board backup/i,'the local report cannot be mistaken for restorable board data');
  app.ctx.onAction('view-support-diagnostics',{});
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/debug log[\s\S]*not a board backup/i,'#2303: the log itself says it cannot be mistaken for restorable board data');
  let report=app.ctx.buildSupportDiagnosticsReport();
  for(let i=0;i<100&&report.app.executingScriptSha256.status==='pending';i++){await flush();report=app.ctx.buildSupportDiagnosticsReport();}
  const text=app.ctx.supportDiagnosticsText();
