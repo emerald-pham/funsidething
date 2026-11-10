@@ -5288,7 +5288,10 @@ function downloadSupportDiagnostics(){
   const raw=supportDiagnosticsText();
   try{
     const url=URL.createObjectURL(new Blob([raw],{type:"application/json"})),link=document.createElement("a");
-    link.href=url;link.download="chain-scanner-debug-log.json";document.body.appendChild(link);link.click();link.remove();
+    link.href=url;link.download="chain-scanner-debug-log.json";
+    // Inside the modal, because the guard for an opening still in progress
+    // cancels clicks anywhere else and the Debug log link can hold it open.
+    (document.getElementById("modalRoot")||document.body).appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),30000);return true;
   }catch{
     viewSupportDiagnostics();toast("Download is unavailable. The report remains selectable on this device.",7000);return false;

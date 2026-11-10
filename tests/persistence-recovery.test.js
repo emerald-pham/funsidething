@@ -10083,6 +10083,22 @@ test('RISK debug log link #2309: a due motion check never traps the log, which c
  assert.deepEqual(failures,[]);
 });
 
+test('RISK debug log link #2309: Download debug log delivers the file while the link holds the opening',async t=>{
+ await openingBoardFixture(t);
+ const failures=[];
+ for(const [engineName,engine] of await debugLogLinkEngines2309()){
+  const {browser,page,errors}=await debugLogLinkHeldPage2309(engine,engineName,{motionAgeDays:0});
+  try{
+   const downloaded=page.waitForEvent('download',{timeout:4000}).then(file=>file.suggestedFilename()).catch(()=>'no download');
+   await page.locator('#modalRoot [data-act="download-support-diagnostics"]').click({timeout:3000});
+   assert.equal(await downloaded,'chain-scanner-debug-log.json',`${engineName}: the file arrives`);
+   assert.equal(await page.evaluate(()=>document.querySelector('#modalRoot h2')?.textContent),'Debug log',`${engineName}: the log stays open`);
+   assert.deepEqual(errors,[],`${engineName}: no page errors`);
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read',async t=>{
  await openingBoardFixture(t);
  const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
