@@ -10336,7 +10336,7 @@ function returnDotFromBoard221(app,id,at){
 }
 // undo-base is dotted; Yes on undo-local then undo-peer makes three real dots.
 async function threeDotClients221(t){
- const clients=await scopedUndoClients();const {local,peer,at}=clients;
+ const clients=await scopedUndoClients(initial=>{initial.tasks.push(syncTask('undo-extra','Undotted task'));});const {local,peer,at}=clients;
  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
  setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
  setFakeTime(local.ctx,at+150);local.ctx.onAction('yes',{dataset:{candidate:'undo-peer',benchmark:'undo-local'}});
@@ -10375,4 +10375,23 @@ test('RISK chain return sync: a returned dot stays returned through cloud acknow
  const cold=await reopen221(local,h,at+400,t);await cold.ctx.cloudPull();await syncSettle(20);
  assert.deepEqual(Array.from(cold.ctx.state.chain),['undo-base','undo-peer'],'reopening keeps it returned');
  assert.equal(cold.ctx.state.syncDirty,false);
+});
+
+async function dotFromEditor221(app,id,at){
+ setFakeTime(app.ctx,at);hydrateUnchangedEditorDraft(app,id);app.ctx.onAction('dot-task',{dataset:{id}});
+}
+
+test('RISK chain return sync: a return on one device and a Dot of another task on the other are both honored in either publication order',async t=>{
+ for(const first of ['return','dot'])await t.test(first+' publishes first',async t=>{
+  const {local,peer,h,at}=await threeDotClients221(t);
+  returnDotFromBoard221(local,'undo-local',at+200);
+  await dotFromEditor221(peer,'undo-extra',at+250);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['undo-base','undo-local','undo-peer','undo-extra'],'precondition: the other device dotted without seeing the return');
+  const [a,b]=first==='return'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);await a.ctx.cloudPull();await syncSettle(20);
+  for(const [label,chain] of [['cloud',h.remoteState().chain],['returning device',local.ctx.state.chain],['dotting device',peer.ctx.state.chain]])
+   assert.deepEqual(Array.from(chain),['undo-base','undo-peer','undo-extra'],label+': the return and the other Dot are both kept');
+  const cold=await reopen221(peer,h,at+400,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['undo-base','undo-peer','undo-extra']);
+ });
 });
