@@ -748,6 +748,55 @@ test('RISK rapid action durability: ten distinct actions remain pending through 
  const head=await store.readHead();await app.dispose();const reopened=await loadAppAtTime(at,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off',async pull(){return{error:true};},async push(){return{error:true};}})});apps.push(reopened);assertFacts(reopened.ctx.state);assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload);
 });
 
+/* #2324: the owner's iPhone, signed out, showed "The saved board changed again
+   while this tab was merging it". These fixtures drive the loaded app against a
+   real device store; a phone's slower IndexedDB is modelled by holding each
+   head commit before it reaches the store. */
+const settleQuietCloud2324=()=>({configured:false,ready:false,user:null,status:'off',async pull(){return {error:true};},async push(){return {error:true};}});
+async function deviceSaveSettleApp2324(t,{name,tasks,options={}}){
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=options.indexedDBProvider||new IDBFactory(),dbName=options.deviceDbName||name+'-'+Math.random(),at=Date.parse('2026-11-10T14:16:00Z');
+ const board=syncState({tasks,chain:[tasks[0].id],syncAccount:null,syncRev:0,syncDirty:false,updatedAt:at-HOUR}),raw=JSON.stringify(board);
+ const app=await loadAppAtTime(at,{seed:2324,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:settleQuietCloud2324,...options});
+ const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),inFlight=new Set(),messages=[],toast=shim.document.getElementById('toast');
+ let message=toast.textContent;
+ Object.defineProperty(toast,'textContent',{configurable:true,get:()=>message,set(value){message=value;messages.push(value);}});
+ const fixture={app,ctx,shim,store,indexedDB,dbName,at,messages,commitDelayMs:0,beforeCommit:null,
+  async settled(label,limitMs=20000){
+   const end=performance.now()+limitMs;let head;
+   do{
+    head=await store.readHead();
+    if(!inFlight.size&&!vm.runInContext('saveTimer',ctx)&&!vm.runInContext('deviceSavesInFlight.size',ctx)&&head?.payload===JSON.stringify(ctx.state)&&vm.runInContext('lastPersistedRaw',ctx)===head.payload)return head;
+    await new Promise(resolve=>setTimeout(resolve,25));
+   }while(performance.now()<end);
+   assert.fail(label+': device saves did not settle; issue '+JSON.stringify(ctx.deviceSaveIssue())+'; messages '+JSON.stringify(messages));
+  },
+  edit(id,title){hydrateUnchangedEditorDraft(app,id);shim.document.getElementById('etTitle').value=title;ctx.onAction('save-edit',{dataset:{id}});assert.equal(ctx.state.tasks.find(task=>task.id===id).title,title,'the edit is accepted on screen');},
+ };
+ store.commitHead=async options=>{
+  const run=(async()=>{if(fixture.beforeCommit)await fixture.beforeCommit(options);if(fixture.commitDelayMs)await new Promise(resolve=>setTimeout(resolve,fixture.commitDelayMs));return commit(options);})();
+  inFlight.add(run);try{return await run;}finally{inFlight.delete(run);}
+ };
+ t.after(async()=>{fixture.commitDelayMs=0;fixture.beforeCommit=null;await Promise.allSettled([...inFlight]);vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);store.commitHead=commit;await app.dispose();});
+ return fixture;
+}
+
+test('RISK device save settle: ordinary signed-out edits during slow device commits never collide with this tab\'s own saves',async t=>{
+ const ids=Array.from({length:6},(_,i)=>'settle-own-'+i);
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-own',tasks:[syncTask('settle-own-anchor','Anchor'),...ids.map((id,i)=>syncTask(id,'Original '+i))]});
+ assert.equal(await f.ctx.persist(),true);
+ // Each head commit takes longer than the 350 ms edit debounce, as on a phone.
+ f.commitDelayMs=400;
+ for(const [i,id] of ids.entries()){f.edit(id,'Edited '+i);await new Promise(resolve=>setTimeout(resolve,400));}
+ const head=await f.settled('own saves');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:|changed again while this tab was merging it/,'no save failure is shown for work the app finished itself');
+ assert.equal(f.ctx.deviceSaveIssue(),null);
+ const durable=JSON.parse(head.payload);
+ for(const [i,id] of ids.entries())assert.equal(durable.tasks.find(task=>task.id===id).title,'Edited '+i,'every accepted edit is on the saved board');
+ const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows the settled board');
+ for(const [i,id] of ids.entries())assert.equal(reopened.ctx.state.tasks.find(task=>task.id===id).title,'Edited '+i);
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.

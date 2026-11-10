@@ -5060,7 +5060,33 @@ async function deviceSavesSettled(stillCurrent,limitMs=5000){
   }
   return stillCurrent();
 }
-async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
+/* #2324: one device save at a time in this tab. On a phone a head commit can
+   outlast the 350 ms edit debounce; two saves of the same tab then committed
+   against the same head, and each conflict repair kept losing to the other
+   save until the owner, signed out on one iPhone, saw "The saved board changed
+   again while this tab was merging it". A new request waits for the running
+   save and then snapshots the newest board. A save's own retry and follow-up
+   (the third argument) belong to the running save and never wait for it.
+   Waiting requests with the same arguments share one save: it starts after
+   all of them and so carries every edit they asked for. */
+let deviceSaveTail=null,deviceSaveWaiting=null;
+function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry){
+  if(deviceRetry!==undefined)return persistAttempt(backupAlreadySafe,preserveBackupId,deviceRetry);
+  const waiting=deviceSaveWaiting;
+  if(waiting&&waiting.backupAlreadySafe===backupAlreadySafe&&waiting.preserveBackupId===preserveBackupId)return waiting.run;
+  const prior=deviceSaveTail,entry={backupAlreadySafe,preserveBackupId,run:null};
+  if(!prior)entry.run=persistAttempt(backupAlreadySafe,preserveBackupId,0);
+  else{
+    deviceSaveWaiting=entry;
+    entry.run=prior.then(()=>{if(deviceSaveWaiting===entry)deviceSaveWaiting=null;return persistAttempt(backupAlreadySafe,preserveBackupId,0);});
+    // deviceSavesSettled() counts a waiting save as a save in flight.
+    deviceSavesInFlight.add(entry.run);entry.run.then(()=>deviceSavesInFlight.delete(entry.run),()=>deviceSavesInFlight.delete(entry.run));
+  }
+  const tail=Promise.resolve(entry.run).then(()=>{},()=>{}).then(()=>{if(deviceSaveTail===tail)deviceSaveTail=null;});
+  deviceSaveTail=tail;
+  return entry.run;
+}
+async function persistAttempt(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
   const startedAt=supportDiagnosticsNow(),requestGeneration=saveRequestGeneration,priorIssue=lastDeviceSaveIssue;
   supportDiagnosticsPersistCalls++;
   if(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)supportDiagnosticsRetryAttempts++;
