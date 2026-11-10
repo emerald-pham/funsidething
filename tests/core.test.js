@@ -22001,6 +22001,57 @@ test('RISK steady scanner browser: the trail fits again when web fonts finish lo
  assert.deepEqual(failures,[]);
 });
 
+// The first candidate after opening, Start or Resume has to be readable too, but
+// a person's own place on the page, such as a restored saved view, comes first.
+test('RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const clear=page=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title')?.getBoundingClientRect(),row=document.querySelector('.decide')?.getBoundingClientRect();return t&&row?{bottom:t.bottom,top:t.top,rowTop:row.top,clear:t.bottom<=row.top&&t.top>=0}:null;});
+ const titles=i=>({title:'Same length title number '+String(i).padStart(2,'0')});
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:1280,height:720},{width:1000,height:700},{width:375,height:667}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const seeded=steadyScannerBoard({tasks:12,taskOver:titles,over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const opened=await steadyScannerPage(browser,seeded,{...viewport,touch:false});
+    try{
+     await opened.page.waitForSelector('[data-act="yes"]',{timeout:15000});await opened.page.waitForTimeout(150);
+     const shown=await clear(opened.page);
+     assert.ok(shown?.clear,`${label}: opening reveals the first candidate: ${JSON.stringify(shown)}`);
+     // Resume from work mode, starting at the top of the page.
+     await opened.page.locator('[data-act="start-working"]').first().click();
+     await opened.page.waitForSelector('[data-act="resume-scan"]',{timeout:5000});
+     await opened.page.evaluate(()=>scrollTo(0,0));
+     await opened.page.locator('[data-act="resume-scan"]').first().click();
+     await opened.page.waitForSelector('[data-act="yes"]',{timeout:5000});await opened.page.waitForTimeout(100);
+     const resumed=await clear(opened.page);
+     assert.ok(resumed?.clear,`${label}: Resume reveals the candidate: ${JSON.stringify(resumed)}`);
+     // A restored place on the page is the person's, even with the title covered.
+     const covered=await opened.page.evaluate(()=>{scrollTo(0,0);const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return t.bottom>row.top+24;});
+     if(covered){
+      await opened.page.evaluate(()=>scrollTo(0,12));await opened.page.waitForTimeout(100);
+      const place=await opened.page.evaluate(()=>scrollY);
+      assert.ok(place>0,`${label}: positive control: the page is scrolled`);
+      await opened.page.reload({waitUntil:'domcontentloaded'});
+      await opened.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:30000});await opened.page.waitForTimeout(200);
+      const after=await opened.page.evaluate(()=>scrollY);
+      assert.ok(Math.abs(after-place)<=3,`${label}: a restored position stays: ${place} became ${after}`);
+     }
+     assert.deepEqual(opened.errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await opened.context.close();}
+    const fresh=await steadyScannerPage(browser,steadyScannerBoard({tasks:12,taskOver:titles}),{...viewport,touch:false});
+    try{
+     await fresh.page.locator('[data-act="start-scan"]').first().click();
+     await fresh.page.waitForFunction(()=>!!state.candidateId&&!!document.querySelector('[data-act="yes"]'),null,{timeout:15000});await fresh.page.waitForTimeout(100);
+     const started=await clear(fresh.page);
+     assert.ok(started?.clear,`${label}: Start reveals the first candidate: ${JSON.stringify(started)}`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await fresh.context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 // The reveal belongs to answering. Undo and context changes are pressed from
 // above the scanner, and moving the page would carry that control off-screen.
 test('RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{

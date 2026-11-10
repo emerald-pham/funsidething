@@ -607,6 +607,7 @@ its RISK test; the map follows.
 - RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit
 - RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit
 - RISK steady scanner browser: the trail fits again when web fonts finish loading in Chromium and WebKit
+- RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit
 - RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit
 - RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit
 - RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts
