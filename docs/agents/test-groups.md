@@ -150,7 +150,7 @@ release or canonical evidence.
 
 CI runs every group on any diff, because it keys each group on the complete
 checkout tree. No changed file narrows the list, and a documentation-only diff
-needs the same groups as a scenery change. Run all four before review.
+needs the same groups as a scenery change.
 
 ## Reading a failed group
 
