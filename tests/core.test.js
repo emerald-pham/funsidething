@@ -38615,6 +38615,21 @@ test('RISK debug log link #2309: the link opens the read-only log at opening wit
  assert.deepEqual(reads,[],'no saved board or backup text is read to open the log');
 });
 
+// A backup row can carry a retained file's bytes, so the rows are full backup
+// text too: counting them must not load them (#2308 review).
+test('RISK debug log link #2309: counting backups loads no backup rows, so a cold opening stays clear of retained file bytes',async t=>{
+ const device=await debugLogLinkDevice2309(),{IDBObjectStore}=await import('fake-indexeddb'),reads=[];
+ for(const method of ['get','getAll','openCursor']){
+  const original=IDBObjectStore.prototype[method];
+  IDBObjectStore.prototype[method]=function(...args){if(this.name==='backups')reads.push(method);return original.apply(this,args);};
+  t.after(()=>{IDBObjectStore.prototype[method]=original;});
+ }
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+ const report=await debugLogLinkReport2309(app);
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups,'the count is the real number of stored backups');
+ assert.deepEqual(reads,[],'no backup row is loaded to count them');
+});
+
 test('RISK debug log link #2309: the report gains backup and Undo counts and sizes, and never their contents',async t=>{
  const device=await debugLogLinkDevice2309();
  // The ordinary opening holds every backup anyway, so it can note their size

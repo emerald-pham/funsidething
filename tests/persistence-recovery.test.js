@@ -5142,6 +5142,45 @@ test('RISK backup read back: an edit made while the safety copy is being read ba
  assert.equal(vm.runInContext('deferredCloudPull',app.ctx),true,'a later pull reconciles the edit with its own safety copy');
 });
 
+// #2308 review: the scanner deals a missing candidate while drawing, and the
+// candidate is in the cloud payload, so a clean board could differ from its own
+// acknowledged copy only because of a redraw.
+async function cleanDealtBoard2308(t,deliver=remote=>remote){
+ const board=syncState({tasks:[{...syncTask('bench','Benchmark task'),mu:35},syncTask('next','Next task'),syncTask('later','Later task')],chain:['bench'],candidateId:null,presentedAt:0,mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'deal-pass',settings:{...syncState().settings,thresholdPct:0},syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.stringify(board),sync=makeSyncHarness({remote:board,rev:4,delayMs:1}),storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw});
+ const app=await loadApp({sharedStorage:storage,cloudSyncFactory:()=>sync.factory()});t.after(()=>app.dispose?.());
+ const {ctx}=app;
+ assert.equal(ctx.state.candidateId,'next','drawing dealt the missing candidate');
+ assert.notEqual(ctx.state.presentedAt,0);
+ // The cloud copy is exactly this board as acknowledged, before the deal.
+ const acknowledged=JSON.parse(ctx.cloudPayload());acknowledged.candidateId=null;acknowledged.presentedAt=0;
+ sync.doc=deliver({...sync.doc,payload:JSON.stringify(acknowledged)})??sync.doc;
+ return {...app,sync,acknowledged};
+}
+test('RISK sync dealt candidate: a candidate dealt by a redraw on a clean board does not queue a cloud write',async t=>{
+ const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.deepEqual(sync.calls.filter(call=>call==='push'),[],'nothing changed but the redraw, so nothing is sent');
+ assert.equal(ctx.state.syncDirty,false,'the board stays clean');
+ assert.equal(ctx.state.candidateId,'next','the dealt candidate stays on screen');
+ assert.equal(sync.doc.rev,4);
+});
+test('RISK sync dealt candidate: a same-revision copy differing in anything else still publishes this board',async t=>{
+ const app=await cleanDealtBoard2308(t,doc=>{const other=JSON.parse(doc.payload);other.tasks[1].title='Older cloud title';return {...doc,payload:JSON.stringify(other)};}),{ctx,sync}=app;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'a real difference still reaches the cloud');
+ assert.equal(sync.remoteState().tasks[1].title,'Next task');
+});
+test('RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered',async t=>{
+ const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
+ await ctx.cloudPull();
+ ctx.onAction('no',{dataset:{candidate:'next',benchmark:'bench'}});
+ await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'an answer is an edit and reaches the cloud');
+ assert.equal(sync.remoteState().considered.next,'no');
+ assert.equal(ctx.state.syncDirty,false);
+});
+
 test('RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board',async()=>{
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-destructive-'+Date.now()+'-'+Math.random();
  const original=syncState({tasks:[syncTask('original','Original large board')],syncDirty:true});original.futureBoardData={blob:'R'.repeat(1100000)};

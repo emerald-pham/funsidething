@@ -5039,8 +5039,8 @@ function supportDiagnosticsRecentErrors(now){
 const DEBUG_LOG_LINK_HASH="#debug-log",BACKUP_SIZES_KEY="fvp:chain-scanner:backup-sizes:v1";
 let debugLogLinkHeld=false,debugLogLinkRelease=null,debugLogLinkBackupCount=supportDiagnosticsField(null,"unobserved");
 function debugLogLinkRequested(){try{return window.location?.hash===DEBUG_LOG_LINK_HASH;}catch{return false;}}
-// Backup rows are small; their board text lives in the separate snapshots
-// store, which this reads by key only.
+// Counted without loading a row or any board text (#2308): a row can carry a
+// retained file's bytes, and the link has to open when memory is the problem.
 async function debugLogLinkObserveBackupCount(){
   if(window.storage||!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle)return;
   let store=null;
@@ -5048,8 +5048,8 @@ async function debugLogLinkObserveBackupCount(){
     store=ChainStorageV2.createDeviceStore({indexedDB:window.indexedDB,crypto,dbName:window.CHAIN_STORAGE_DB_NAME||"chain-scanner-v2",
       openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
     await store.open();
-    const raw=await store.readRawFingerprint(),at=supportDiagnosticsNow();
-    debugLogLinkBackupCount=supportDiagnosticsField(raw.stores.backups.keys.length,"observed",at);
+    const count=await store.countBackups();
+    debugLogLinkBackupCount=supportDiagnosticsField(count,"observed",supportDiagnosticsNow());
   }catch{debugLogLinkBackupCount=supportDiagnosticsField(null,"unavailable",supportDiagnosticsNow());}
   finally{try{await store?.close();}catch{}}
 }
@@ -7878,6 +7878,12 @@ async function cloudPull(){
       // switch still needs the recovery notice so work does not seem lost.
       if(switchedAccount) toast("Signed in as " + acct + " — the previous board is in Settings backups.");
       else if(hadLocalEdits && !localChoicesRetained) toast("This tab was out of date \u2014 combined the saved changes. The previous board is in Settings backups.", 7000);
+    }else if(state.syncDirty===false && !remoteState.candidateId &&
+      cloudPayloadFor({...state,candidateId:remoteState.candidateId,presentedAt:remoteState.presentedAt})===remotePayload){
+      // Drawing deals a candidate the acknowledged copy doesn't have
+      // (dealMissingCandidate). That redraw is the only difference on this
+      // clean board, and it is not worth a cloud write or another device's sync.
+      if(remoteAt!==null) state.lastCloudServerAt=remoteAt;
     }else{
       // Same revision, different content: even an old clean marker cannot
       // acknowledge this board. Preserve one retry budget until it is saved

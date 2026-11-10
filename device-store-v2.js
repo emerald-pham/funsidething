@@ -364,6 +364,15 @@
       }
     }
 
+    // #2309: how many backups are stored, loading no row: a row can carry a
+    // retained file's bytes, and a failing app must still open its Debug log.
+    async function countBackups(){
+      ensureOpen();
+      const tx=await beginTransaction(["backups"],"readonly");
+      const [count]=await readonlyResults(tx,[readonlyRequest(tx,"count-backups",()=>tx.objectStore("backups").count())],"count-backups");
+      return count;
+    }
+
     async function readHead(){
       ensureOpen();
       const tx=await beginTransaction(["meta","snapshots"],"readonly");
@@ -1141,7 +1150,7 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listBackupFacts,readBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,countBackups,listBackups,listBackupFacts,readBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
       getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim};
     return api;
