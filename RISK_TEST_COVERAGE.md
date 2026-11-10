@@ -1465,6 +1465,7 @@ its RISK test; the map follows.
 - RISK device save settle: a board that never stops changing still ends in a bounded refusal with no retry loop
 - RISK device save settle: with slow commits the refusal still arrives about five seconds after the save began
 - RISK device save settle: repairs of both kinds share one bounded attempt count
+- RISK device save settle: the Debug log counts repairs onto this tab\
 - RISK device save settle: an account change during the repair is still refused
 - RISK device save settle: a save that runs out of repairs says plainly what happened, what is protected and what to do next
 - RISK device save settle: a save that runs out of repairs keeps its stage, code and attempt count for support

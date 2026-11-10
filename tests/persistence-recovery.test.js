@@ -933,6 +933,39 @@ test('RISK device save settle: repairs of both kinds share one bounded attempt c
  assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-mixed-mine').title,'Kept in this tab','the accepted edit stays in this tab');
 });
 
+// #2323 review: support can tell which writer each repair met. Before commit n
+// this fixture wrote another writer's board when n is odd and bytes equal to
+// this tab's last save when n is even; each later commit repaired onto that head.
+test('RISK device save settle: the Debug log counts repairs onto this tab\'s own save and onto another writer\'s, with no board content',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-repair-kinds',tasks:[syncTask('settle-kinds-anchor','Anchor'),syncTask('settle-kinds-mine','PRIVATE-KINDS-2323')]});
+ assert.equal(await f.ctx.persist(),true);
+ const saved=vm.runInContext('lastPersistedRaw',f.ctx);let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead();let payload=saved;
+  if(commits%2){const next=JSON.parse(head.payload);next.futureChurn2323=commits;payload=JSON.stringify(next);}
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload,account:head.account??null})).ok,true);
+ };
+ f.edit('settle-kinds-mine','PRIVATE-KINDS-EDIT-2323');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false);f.beforeCommit=null;
+ const repairedHeads=Array.from({length:commits-1},(_,i)=>i+1);
+ const own=repairedHeads.filter(n=>n%2===0).length,other=repairedHeads.filter(n=>n%2===1).length;
+ assert.ok(own>0&&other>0,'both kinds of repair happened: '+own+' own, '+other+' other');
+ f.ctx.onAction('view-support-diagnostics',{});const report=f.ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(report.localFailureAttempts.value,commits,'the existing attempt count is unchanged');
+ assert.equal(report.localFailureOwnSaveRepairs?.value,own,'repairs onto this tab\'s own save');
+ assert.equal(report.localFailureOtherWriterRepairs?.value,other,'repairs onto another writer\'s save');
+ assert.doesNotMatch(f.ctx.supportDiagnosticsText(),/PRIVATE-KINDS/,'no board content enters the report');
+ // A peer-only refusal counts every repair as another writer's.
+ const exhausted=await deviceSaveExhausted2325(t,'repair-kinds-peer');
+ exhausted.f.ctx.onAction('view-support-diagnostics',{});const peerOnly=exhausted.f.ctx.buildSupportDiagnosticsReport().save;
+ assert.deepEqual([peerOnly.localFailureOwnSaveRepairs.value,peerOnly.localFailureOtherWriterRepairs.value],[0,exhausted.commits()-1]);
+ // A verified save clears them with the rest of the failure record.
+ exhausted.stop();exhausted.f.edit('repair-kinds-peer-anchor','Next change here');await exhausted.f.settled('verified save');
+ const cleared=exhausted.f.ctx.buildSupportDiagnosticsReport().save;
+ assert.deepEqual([cleared.localFailureOwnSaveRepairs.value,cleared.localFailureOtherWriterRepairs.value],[null,null]);
+ assert.deepEqual([cleared.localFailureOwnSaveRepairs.status,cleared.localFailureOtherWriterRepairs.status],['unobserved','unobserved']);
+});
+
 test('RISK device save settle: an account change during the repair is still refused',async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-account',tasks:[syncTask('settle-account-anchor','Anchor'),syncTask('settle-account-mine','Mine')]});
  assert.equal(await f.ctx.persist(),true);
