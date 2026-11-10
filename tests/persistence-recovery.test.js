@@ -782,7 +782,7 @@ async function deviceSaveSettleApp2324(t,{name,tasks,options={}}){
  return fixture;
 }
 
-test('RISK device save settle: ordinary signed-out edits during slow device commits never collide with this tab\'s own saves',async t=>{
+test('RISK device save settle: ordinary signed-out edits during slow device commits never collide with the same tab saving',async t=>{
  const ids=Array.from({length:6},(_,i)=>'settle-own-'+i);
  const f=await deviceSaveSettleApp2324(t,{name:'settle-own',tasks:[syncTask('settle-own-anchor','Anchor'),...ids.map((id,i)=>syncTask(id,'Original '+i))]});
  assert.equal(await f.ctx.persist(),true);
@@ -810,7 +810,7 @@ async function deviceSaveSettlePeer2324(t,f){
  }};
 }
 
-test('RISK device save settle: a second copy saving once during this tab\'s save leaves both edits on the saved board',async t=>{
+test('RISK device save settle: a second copy saving once during a save leaves both edits on the saved board',async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-peer-once',tasks:[syncTask('settle-once-anchor','Anchor'),syncTask('settle-once-mine','Mine'),syncTask('settle-once-theirs','Theirs')]});
  assert.equal(await f.ctx.persist(),true);
  const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
@@ -827,7 +827,7 @@ test('RISK device save settle: a second copy saving once during this tab\'s save
  assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows both edits');
 });
 
-test('RISK device save settle: a second copy saving repeatedly but finitely during this tab\'s save still settles with every copy\'s work',async t=>{
+test('RISK device save settle: a second copy saving repeatedly but finitely during a save still settles with the work of every copy',async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-peer-repeat',tasks:[syncTask('settle-repeat-anchor','Anchor'),syncTask('settle-repeat-mine','Mine'),syncTask('settle-repeat-later','Later'),syncTask('settle-repeat-gone','Deleted by the other copy'),...Array.from({length:4},(_,i)=>syncTask('settle-repeat-theirs-'+i,'Theirs '+i))]});
  assert.equal(await f.ctx.persist(),true);
  const other=await deviceSaveSettlePeer2324(t,f);let commits=0,draft=null;

@@ -33952,6 +33952,13 @@ test('RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from a
  assert.match(faq,/Synced requires server acknowledgement of the latest save/);
 });
 
+test('Device save settle guidance: the FAQ and changelog say saves on one device settle by themselves (#2324)',()=>{
+ const faq=html.slice(html.indexOf("<dt>What can I do if a save or sync fails?"),html.indexOf("<dt>How do I switch accounts?"));
+ assert.match(faq,/Saves on this device run one at a time\. If another open copy of the app saves at the same moment, this tab combines both boards and keeps trying for up to five seconds before it warns you\./);
+ const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
+ assert.match(current,/<h3>November 10, 2026<\/h3><ul><li>Ordinary edits no longer fail to save on this device with “The saved board changed again while this tab was merging it”\./);
+});
+
 test('Firestore rules: production cleanup resumes deleting tombstones and protects active previous pending and young staging generations', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
  const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
  const F=await import('firebase/firestore');
