@@ -21565,6 +21565,7 @@ async function steadyScannerStart(page){
 // The answer that was tapped has to be the one that took effect, so the page
 // is asked for a new candidate (or the honest paused notice) each time.
 async function steadyScannerAnswer(page,point,prior){
+ await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
  await page.touchscreen.tap(point.x,point.y);
  await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,prior,{timeout:10000});
 }
@@ -21693,6 +21694,73 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
      for(const act of ['yes','no','cant'])assert.ok(Math.abs(after[act].top-withWoop[act].top)<=1&&Math.abs(after[act].left-withWoop[act].left)<=1,`${label}: ${act} stays put when Run WOOP goes: ${Math.round(withWoop[act].top)} to ${Math.round(after[act].top)}`);
      assert.deepEqual(errors,[],`${label}: no page errors`);
     }catch(error){failures.push(error.message);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// With the row pinned, a second tap lands on the button of the next candidate
+// before anyone could have read it, so a physical answer inside the same 300 ms
+// that recordDecisionTime already treats as no real decision is dropped.
+test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const input of ['two touch taps 60 ms apart','two touch taps 180 ms apart','mouse double click','two key presses']){
+    const label=`${engineName} ${input}`,touch=input.includes('touch');
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:390,height:844,touch});
+    try{
+     await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(400);
+     const first=await steadyScannerControls(page),at=steadyScannerCenter(first.no);
+     if(input==='mouse double click')await page.mouse.click(at.x,at.y,{clickCount:2,delay:15});
+     else if(input==='two key presses'){await page.keyboard.press('n');await page.waitForTimeout(40);await page.keyboard.press('n');}
+     else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('180')?180:60);await page.touchscreen.tap(at.x,at.y);}
+     await page.waitForFunction(prior=>state.candidateId!==prior,first.candidate,{timeout:5000});
+     await page.waitForTimeout(40);
+     const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
+     assert.deepEqual(seen.answered,[first.candidate],`${label}: only the task on screen was answered: ${seen.answered}`);
+     await page.waitForTimeout(400);
+     if(touch)await page.touchscreen.tap(at.x,at.y);else if(input==='two key presses')await page.keyboard.press('n');else await page.mouse.click(at.x,at.y);
+     await page.waitForFunction(prior=>state.candidateId!==prior,seen.candidate,{timeout:5000}).catch(()=>{throw new Error(`${label}: an answer after the window was not accepted`);});
+     assert.equal(await page.evaluate(id=>state.considered[id],seen.candidate),'no',`${label}: the later answer counted`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// A short page can leave the task being decided on entirely under the pinned row.
+test('RISK steady scanner browser: the candidate title is visible when presented on short screens, and a stable layout does not move between answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:1280,height:720},{width:1000,height:700},{width:375,height:667},{width:390,height:844}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{...viewport,touch:false});
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});await page.waitForTimeout(200);
+     const read=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect(),yes=document.querySelector('[data-act="yes"]').getBoundingClientRect();return {titleTop:t.top,titleBottom:t.bottom,rowTop:row.top,y:scrollY,yesTop:yes.top,candidate:state.candidateId};});
+     const shown=await read();
+     assert.ok(shown.titleBottom<=shown.rowTop&&shown.titleTop>=0,`${label}: the title is clear of the pinned row: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}, scrolled ${Math.round(shown.y)}`);
+     let previous=shown;
+     for(let answer=0;answer<3;answer++){
+      await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+      await page.keyboard.press('n');
+      await page.waitForFunction(prior=>state.candidateId!==prior,previous.candidate,{timeout:5000});await page.waitForTimeout(60);
+      const now=await read();
+      assert.equal(now.y,previous.y,`${label}: answer ${answer} does not move a stable layout`);
+      assert.equal(now.yesTop,shown.yesTop,`${label}: Yes stays where it was`);
+      assert.ok(now.titleBottom<=now.rowTop,`${label}: answer ${answer}: the next title is clear of the row`);
+      previous=now;
+     }
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
    }
   }finally{await browser.close();}
  }
@@ -21857,6 +21925,7 @@ test('RISK steady scanner browser: the pinned row exists only while a candidate 
     }
     for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
      const before=await steadyScannerControls(page);if(before.intervention)break;
+     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
      await page.touchscreen.tap(steadyScannerCenter(before.no).x,steadyScannerCenter(before.no).y);
      await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
     }

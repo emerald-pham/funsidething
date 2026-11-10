@@ -1326,6 +1326,7 @@ test('RISK long scan memory browser: 60 answers on a large saved board stay unde
        assert.ok(before.candidate,`${engineName} ${label}: the scan offers a candidate at answer ${answered}`);
        const act=before.length%5?'no':'yes';
        last={act,candidate:before.candidate};
+       await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
        await page.locator(`[data-act="${act}"]`).click();
        await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
        answered++;
