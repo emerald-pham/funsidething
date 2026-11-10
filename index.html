@@ -12489,8 +12489,8 @@ function renderList(){
   });
   const inChain = new Set(state.chain);
   /* Which task the "→" marker below belongs to. Its tooltip promises the dot
-     that Start scanning is about to hand out when automatic starts are on:
-     firstDotTask().
+     that Start scanning hands out on an empty chain, chosen by Chain starts
+     with: firstDotTask(), the rule every first-dot preview shares (#2300).
 
      BUG FIX: the marker was drawn on every row whenever the chain was empty,
      so a twenty-task list showed twenty rows each claiming they were the one
@@ -16769,6 +16769,10 @@ function reopenSettingsAtBackups(){
   const modal=root?.querySelector?.(".modal");if(modal&&Number.isFinite(top))modal.scrollTop=top;
   try{document.getElementById("settingsBackupList")?.scrollIntoView?.({block:"nearest"});}catch{}
 }
+// renderSettings takes options only so a backup action can reopen Settings
+// with its sections kept (reopenSettingsAtBackups). Every other caller opens
+// Settings fresh, with the default sections, through this argument-free
+// wrapper, so nothing a caller passes can be read as those options.
 function openSettings(){renderSettings({});}
 function renderSettings(options={}){
   refreshSyncErrorLog();
