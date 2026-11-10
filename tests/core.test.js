@@ -33441,7 +33441,9 @@ test('RISK FAQs menu browser: Chromium and WebKit show every section closed on e
     const shown=()=>sections.evaluateAll(list=>list.map(section=>({title:section.querySelector(':scope > summary').textContent,open:section.open})));
     const openMenu=async()=>{await page.getByRole('button',{name:'FAQs / Changelog'}).click();await modal.waitFor();};
     await modal.waitFor();await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.deepEqual(await shown(),allClosed,label+'a new person is shown the menu with every section closed');
-    await modal.locator('[data-act="ok-quickstart"]').click();await modal.waitFor({state:'detached'});
+    // The shared browser fixtures use this to recognize the first-run menu; it must not depend on which section is first.
+    const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+    assert.equal(await resolveExpectedFirstRunHelp(page),true,label+'the shared fixture still recognizes and closes the first-run menu');await modal.waitFor({state:'detached'});
     await openMenu();assert.deepEqual(await shown(),allClosed,label+'the ? button opens the menu with every section closed');
     await modal.locator('[data-act="close-modal"]').focus();await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Changelog',label+'Tab reaches Changelog first');
