@@ -5063,6 +5063,37 @@ test('RISK backup list memory: a copy whose stored bytes were damaged is refused
  await reopened.dispose?.();
 });
 
+// #2310 review: measuring every backup used to run inside the five-second
+// device opening budget, and on the first opening after the update a slow phone
+// could spend it all there and end up read-only. Nothing the opening needs comes
+// from a measure, so the measuring waits until the board is open.
+test('RISK backup list memory: a first opening does not measure backups before the board is open, lists them all, and learns their measures afterwards',async t=>{
+ const {indexedDB,IDBObjectStore}=await import('fake-indexeddb'),dbName='chain-scanner-facts-first-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Saved before the update');assert.equal(await first.ctx.persist(),true);
+ const store=first.shim.window.ScannerDeviceStore,head=await store.readHead();
+ for(let i=0;i<4;i++)assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id:'first-open-'+i,kind:'manual',day:'2026-11-0'+(i+1),at:i+1,payload:head.payload+' '.repeat(i+1)}})).ok);
+ await vm.runInContext('refreshDeviceBackupCache()',first.ctx);
+ const rows=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',first.ctx)),hashes=new Set(rows.filter(row=>row.id.startsWith('first-open-')).map(row=>row.payloadHash));
+ assert.equal(hashes.size,4,'four distinct saved boards');
+ await first.dispose?.();
+ storage.removeItem('fvp:chain-scanner:backup-facts');
+ let boardOpen=()=>false;const early=[],original=IDBObjectStore.prototype.get;
+ IDBObjectStore.prototype.get=function(key){if(this.name==='snapshots'&&hashes.has(key)&&!boardOpen())early.push(key);return original.call(this,key);};
+ t.after(()=>{IDBObjectStore.prototype.get=original;});
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,awaitStartup:false});
+ t.after(()=>reopened.dispose?.());
+ boardOpen=()=>vm.runInContext('!!state',reopened.ctx);
+ const until=async(check,what)=>{for(let i=0;i<400;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail(what);};
+ await until(boardOpen,'the board opens');
+ assert.deepEqual(early,[],'no backup was measured before the board opened');
+ assert.equal(vm.runInContext('deviceStorageAuthority',reopened.ctx),true,'device storage opened with authority');
+ const listed=()=>JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx));
+ assert.deepEqual(listed().filter(row=>row.id.startsWith('first-open-')).map(row=>row.id).sort(),['first-open-0','first-open-1','first-open-2','first-open-3'],'every backup is listed as soon as the board opens');
+ await until(()=>listed().filter(row=>row.id.startsWith('first-open-')).every(row=>Number.isSafeInteger(row.payloadChars)&&row.payloadFacts?.readable===true),'the measures are learned after the board opens');
+ assert.equal(JSON.parse(storage.getItem('fvp:chain-scanner:backup-facts')).rows.filter(([hash])=>hashes.has(hash)).length,4,'what was measured is saved for later openings');
+});
+
 test('RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back',async t=>{
  const {indexedDB,IDBObjectStore}=await import('fake-indexeddb'),dbName='chain-scanner-save-read-'+Date.now()+'-'+Math.random();
  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;t.after(()=>app.dispose?.());

@@ -3046,16 +3046,30 @@ function protectedBrowserPayload(raw){
   }
   return raw;
 }
-async function refreshDeviceBackupCache(current=()=>true){
+let deviceBackupCacheRefreshes=0,deviceBackupMeasuringOwed=false;
+async function refreshDeviceBackupCache(current=()=>true,{deferMeasuring=false}={}){
   if(!deviceStore) return [];
+  deviceBackupCacheRefreshes++;
   // #2310: the list holds identity and display facts only. Full text is read
   // from device storage by the action that needs it (deviceBackupsWithText).
   try{
-    const rows=await deviceStore.listBackupFacts({describe:deviceBackupDisplayFacts,textKinds:DEVICE_BACKUP_TEXT_KINDS,facts:knownDeviceBackupFacts(),onFactsChanged:saveDeviceBackupFacts});
-    if(current()){deviceBackupCache=rows;deviceBackupCacheReadable=true;debugLogLinkRecordBackupSizes(rows);await rememberLegacyBackupHashes();}
+    const rows=await deviceStore.listBackupFacts({describe:deviceBackupDisplayFacts,textKinds:DEVICE_BACKUP_TEXT_KINDS,facts:knownDeviceBackupFacts(),onFactsChanged:saveDeviceBackupFacts,deferUnknown:deferMeasuring});
+    if(current()){deviceBackupCache=rows;deviceBackupCacheReadable=true;deviceBackupMeasuringOwed=rows.some(row=>row.payloadFacts?.pending===true);if(!deviceBackupMeasuringOwed)debugLogLinkRecordBackupSizes(rows);await rememberLegacyBackupHashes();}
   }
   catch(e){if(current()){deviceBackupCache=[];deviceBackupCacheReadable=false;}}
   return deviceBackupCache;
+}
+// The first opening after #2310 has no learned measures, and reading every
+// backup for them could use up the device opening budget on a slow phone. The
+// opening lists rows by identity only and this finishes the job once the board
+// is open. A newer listing has measured them itself, so this one then stands down.
+function measureOwedDeviceBackups(){
+  if(!deviceBackupMeasuringOwed)return;
+  setTimeout(()=>{
+    if(!deviceBackupMeasuringOwed)return;
+    const started=deviceBackupCacheRefreshes+1;
+    void refreshDeviceBackupCache(()=>deviceBackupCacheRefreshes===started);
+  },300);
 }
 // A prepared recovery choice is read by every recovery guard, synchronously,
 // and is the one kind of backup that stays in memory with its text. It exists
@@ -3577,7 +3591,7 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
     if(!localDeviceStartupCurrent(bootAttempt))return null;
     deviceLegacySeenSignature=deviceRecoveryCloudHold?.reason==="device-source-recovery"?legacySignature:
       legacy&&head.sourceFingerprint===legacyFingerprint?legacySignature:null;
-    await refreshDeviceBackupCache();
+    await refreshDeviceBackupCache(()=>true,{deferMeasuring:true});
     if(!localDeviceStartupCurrent(bootAttempt))return null;
     if(legacy&&!deviceLegacySeenSignature){
       if(!await reconcileDeviceLegacyCopy())return null;
@@ -5106,7 +5120,7 @@ function supportDiagnosticsUndoCharacters(frames){
   return characters;
 }
 function supportDiagnosticsSavedDataReport(){
-  const now=supportDiagnosticsNow(),held=deviceStorageAuthority&&deviceBackupCacheReadable,recorded=held?null:debugLogLinkReadBackupSizes();
+  const now=supportDiagnosticsNow(),held=deviceStorageAuthority&&deviceBackupCacheReadable&&!deviceBackupMeasuringOwed,recorded=held?null:debugLogLinkReadBackupSizes();
   const frames=Array.isArray(undoStack)?undoStack:[];
   return {
     backups:{
@@ -18267,6 +18281,7 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
   render();
   if(window.SavedAppearance)window.SavedAppearance.hydrate(state.syncAccount||null);
   else document.documentElement?.setAttribute("data-app-ready","true");
+  measureOwedDeviceBackups();
   // A September 2026 replacement bug concatenated identical causal deletion
   // rows on every Undo, Restore, import, and Reset. Repair that losslessly on
   // cold open, make the smaller board durable, then let the normal read-before-
