@@ -31110,6 +31110,15 @@ test('RISK delete red backups: while the device store cannot be listed no button
  store.listBackupFacts=list;
  assert.deepEqual(await fixture.ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old']);
  assert.deepEqual(fixture.listed().filter(fixture.mine).map(item=>item.id),['mirror-old','mirror-new'],'the older backup list still holds both mirrors');
+ // Third review, wording: the device store stops listing after Settings drew the button.
+ await ctx.refreshDeviceBackupCache();ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days','fixture: the list reads again and the button is back');
+ store.listBackupFacts=async()=>{throw new Error('device store cannot be listed');};await ctx.refreshDeviceBackupCache();
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);for(let i=0;i<10;i++)await flush();
+ store.listBackupFacts=list;
+ assert.equal(fixture.asked.length,0,'the press refuses before asking');
+ assert.equal(shim.document.getElementById('toast').textContent,'Backup list cannot be read right now. No backup was deleted; try again later.','and says the list could not be read, not that it changed');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old']);
 });
 
 test('RISK delete red backups: when the device store stays unreadable after a deletion the message does not claim the rest are still listed',async t=>{
