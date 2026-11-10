@@ -1149,8 +1149,9 @@ async function largeBoardOpeningWithinMargin(t,motion){
 }
 // #2310 (spec #2308 slice 2): memory is compared on one board with and without
 // extra saved backups, never against an absolute byte count, so the same page
-// work cancels out. 30 extra backups measured about 400 MB at opening and
-// 260 MB at Settings before this; the margin only absorbs engine noise.
+// work cancels out. On the release before #2310, this test measured 30 extra
+// backups adding 104 to 124 MiB at opening and 168 to 412 MiB at Settings; the
+// 64 MiB margin only absorbs engine noise.
 const BACKUP_MEMORY_EXTRA=30,BACKUP_MEMORY_MARGIN=64*1024*1024;
 async function backupMemoryStaysFlat(t){
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
@@ -1222,7 +1223,7 @@ test('RISK large board opening browser: with normal motion, a large saved board 
 // scanning board, so a machine's absolute baseline does not matter.
 const LONG_SCAN_ANSWERS=60,LONG_SCAN_PACE_MS=150,LONG_SCAN_FIXED_MARGIN=80*1024*1024,LONG_SCAN_BYTES_FACTOR=16;
 const LONG_SCAN_ROWS_PER_ANSWER=4,LONG_SCAN_RANK_BUFFERS_PER_ANSWER=8;
-test('RISK long scan memory browser: Undo adds no more than a small multiple of the board size to 60 answers on a large saved board, keeps 30 steps, and still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fixture=await largeBoardFixture(),{stats}=fixture,allowance=LONG_SCAN_FIXED_MARGIN+LONG_SCAN_BYTES_FACTOR*stats.serializedBytes;
  assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);

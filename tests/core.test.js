@@ -21570,10 +21570,11 @@ async function steadyScannerAnswer(page,point,prior){
 }
 test('RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const ANSWERS=36,failures=[];
- for(const [engineName,engine] of await steadyScannerEngines()){
-  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+ for(const [baseEngineName,engine] of await steadyScannerEngines())for(const viewport of [{width:390,height:844},{width:768,height:1024}]){
+  const engineName=`${baseEngineName} ${viewport.width}px`;
+  const browser=await engine.launch({headless:true,...(baseEngineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}));
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}),viewport);
    await steadyScannerStart(page);
    let home=null,answered=0;
    for(let guard=0;answered<ANSWERS&&guard<ANSWERS*3;guard++){
@@ -21596,13 +21597,13 @@ test('RISK steady scanner browser: Yes No and Cant keep their exact position on 
  assert.deepEqual(failures,[]);
 });
 
-test('RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone widths in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const YES_ANSWERS=14,failures=[];
- for(const [engineName,engine] of await steadyScannerEngines())for(const width of [320,390]){
+ for(const [engineName,engine] of await steadyScannerEngines())for(const width of [320,390,768]){
   const label=`${engineName} ${width}px`;
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard(),{width});
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard(),{width,height:width>=768?1024:844});
    await steadyScannerStart(page);
    let hiddenSeen=0;
    for(let guard=0,answered=0;answered<YES_ANSWERS&&guard<YES_ANSWERS*3;guard++){
@@ -21656,6 +21657,8 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
     {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
     {name:'iPhone portrait with enlarged text and Postpone',width:390,height:844,enlarged:true,showPostpone:true},
     {name:'iPhone portrait with floating header',width:390,height:844,floatingHeader:true},
+    {name:'tablet portrait',width:768,height:1024},
+    {name:'tablet portrait with enlarged text and Postpone',width:768,height:1024,enlarged:true,showPostpone:true},
     {name:'short landscape',width:844,height:390},
     {name:'short landscape with enlarged text',width:844,height:390,enlarged:true},
     {name:'short landscape with floating header',width:844,height:390,floatingHeader:true},
@@ -38628,6 +38631,18 @@ test('RISK debug log link #2309: counting backups loads no backup rows, so a col
  const report=await debugLogLinkReport2309(app);
  assert.equal(report.savedData.backups.count.value,device.expectedBackups,'the count is the real number of stored backups');
  assert.deepEqual(reads,[],'no backup row is loaded to count them');
+});
+
+test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ for(const [topic,answer] of [
+  [/stay at the bottom of the screen\?<\/dt>/,/Yes, No and Can’t stay in one place at the bottom of the screen/],
+  [/How long can the dot trail get\?<\/dt>/,/stays on one row[^<]*a count such as \+3 earlier/],
+  [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
+  [/Does Settings load every backup\?<\/dt>/,/read only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
+  [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],
+ ]){assert.match(help,topic);assert.match(help,answer);}
 });
 
 test('RISK debug log link #2309: the report gains backup and Undo counts and sizes, and never their contents',async t=>{

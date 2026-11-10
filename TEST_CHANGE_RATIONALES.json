@@ -21763,8 +21763,37 @@
       "RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once"
     ],
     "redEvidence": {
-      "command": "node run-browser-test.mjs <worktree> 'RISK backup memory browser' (serves the worktree on an OS-assigned port and sets LANDSCAPE_BROWSER_URL and LANDSCAPE_PLAYWRIGHT), on the unchanged app at 3d78746",
+      "command": "A local helper script outside this repository, not retained, which served the worktree on an OS-assigned port, set LANDSCAPE_BROWSER_URL and LANDSCAPE_PLAYWRIGHT, and ran the test named RISK backup memory browser on the unchanged app at 3d78746. To repeat it, serve a checkout at a local URL, set those two variables and run node --test --test-name-pattern='RISK backup memory browser' tests/persistence-recovery.test.js.",
       "failure": "chromium: 30 extra backups added 124 MiB at opening and 168 MiB at Settings; webkit: 30 extra backups added 104 MiB at opening and 412 MiB at Settings, against a 64 MiB margin."
+    }
+  },
+  {
+    "baseCommit": "2a3772468a73308f03834a4363cacf7a92be11e1",
+    "weakenedTestLines": [
+      "tests/core.test.js:-const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});",
+      "tests/core.test.js:-const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard(),{width});",
+      "tests/core.test.js:-const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}));",
+      "tests/core.test.js:-for(const [engineName,engine] of await steadyScannerEngines())for(const width of [320,390]){",
+      "tests/core.test.js:-for(const [engineName,engine] of await steadyScannerEngines()){",
+      "tests/core.test.js:-test('RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone widths in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{",
+      "tests/persistence-recovery.test.js:-test('RISK long scan memory browser: Undo adds no more than a small multiple of the board size to 60 answers on a large saved board, keeps 30 steps, and still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{"
+    ],
+    "reason": "#2308 code review: docs/agents/tdd-and-regression.md requires phone, tablet and short-landscape viewports for a layout change, and the steady-scanner specs had no tablet. Two of those test lines change to add 768x1024 runs, and the dot-trail test and the long-scan memory test are renamed so each title says what it checks. These tests exist only on this branch, so main sees them as new; the entry records the change for review.",
+    "previousBehavior": "The steady-scanner specs ran the pinned row and dot trail at phone sizes, short landscape and desktop only, the dot-trail title said phone widths, and the long-scan memory title named only Undo although the test also bounds whole-scan growth, rows drawn and rank buffers.",
+    "intendedBehavior": "The same specs also run at tablet size in Chromium and WebKit, with every existing viewport and assertion kept. The dot-trail title says phone and tablet widths, and the long-scan title names everything the test checks.",
+    "preservedCoverage": [
+      "Every existing phone, short-landscape, floating-header, enlarged-text and desktop case still runs with its original assertions.",
+      "The long-scan memory test body is unchanged, including its failing total-growth assertion, which stays for the maintainer to decide."
+    ],
+    "replacementTests": [
+      "RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit",
+      "RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit",
+      "RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit",
+      "RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit"
+    ],
+    "redEvidence": {
+      "command": "None for these changes: adding a viewport and renaming titles fix test coverage and names, not app behavior. Run as LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK steady scanner browser' tests/core.test.js",
+      "failure": "No failure was observed: the tablet cases passed on their first run in Chromium and WebKit, 4 tests passing, so they record existing behavior at that size rather than a repaired fault."
     }
   }
 ]
