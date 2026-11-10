@@ -597,6 +597,9 @@ its RISK test; the map follows.
 - RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit
 - RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit
 - RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit
+- RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit
+- RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit
+- RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit
 - RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
 - RISK landscape shadows: grounded objects share the dominant celestial light
@@ -1524,6 +1527,7 @@ its RISK test; the map follows.
 - RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority never revives or uploads its stale legacy shell
 - RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes
 - RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once
+- RISK backup list memory: a first opening does not measure backups before the board is open, lists them all, and learns their measures afterwards
 - RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back
 - RISK backup list memory: the older browser backup list is compared by hash without keeping its text, so a mirrored row merges and a different one stays listed
 - RISK backup read back: a brief device read failure during an account switch is retried, keeps its diagnostics and still adopts the new board
@@ -1657,6 +1661,8 @@ its RISK test; the map follows.
 - RISK acknowledged recovery trim: a note the trim kept still lets the check of earlier sources reconcile that generation once it can be read, and the trim after its acknowledgement clears the note
 - RISK acknowledged recovery trim: an adoption the cloud acknowledges while the app opens is trimmed without a further save, once the check of earlier sources has run or when a phone over its work budget leaves that check for a deliberate run
 - RISK acknowledged recovery trim guidance: Settings, mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays
+- RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice
+- RISK debug log link #2309: Download debug log delivers the file while the link holds the opening
 - RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read
 
 ## tests/repository-process.test.js
