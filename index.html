@@ -8544,6 +8544,17 @@ function ensureCandidate(){
     state.presentedAt = Date.now();
   }
 }
+/* #2306: reconciliation can hand the scanner a board with no candidate, because
+   projecting merged Start choices clears it and several of those paths draw
+   without commit(). Drawing deals one so the person is never left with a chain
+   and nothing to decide. This is display state only: no decision, save or push
+   is made here, and the sweeps in ensureCandidate() stay with their own callers. */
+function dealMissingCandidate(){
+  if(state.mode!=="scan"||state.interventionActive||state.candidateId) return;
+  if(chainStart()&&(state.settings.skipOldestFirstDot!==true||!state.passStartedAt)) return;
+  const pick=candidateOrder(pool())[0];
+  if(pick){state.candidateId=pick.id;state.presentedAt=Date.now();}
+}
 function maybeIntervene(){
   if(state.mode!=="scan") return;
   const b = benchmark(); if(!b) return;
@@ -11550,6 +11561,7 @@ function renderScan(){
   if(state&&!liveBoardAccepted){
     el.innerHTML='<div class="panel emptystate"><strong>Your saved source needs recovery.</strong><p>The saved board is unreadable, missing or unsupported. Its originals remain untouched. This view is not an empty recovered board.</p><p>Use Restore in Settings to choose a supported file or paste a saved board. Download recovery file keeps every readable saved source.</p><div class="mbtns"><button class="btn subtle" data-act="settings">Review recovery in Settings</button></div></div>';return;
   }
+  dealMissingCandidate();
   const open = openTasks();
   if(!open.length){
     el.innerHTML = '<div class="panel emptystate">'
