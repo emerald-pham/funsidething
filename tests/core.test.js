@@ -18435,6 +18435,34 @@ test('RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only
   assert.match(reload,/Download backup/);assert.match(reload,/partial|unreadable/i);
 });
 
+// #2303 (owner decision of 2026-11-10): Download backup saves the recovery file.
+// Restore refuses a partial one, so once a backup comes out partial Download
+// board only appears beside it, and the storage-failure messages point to
+// whichever button applies.
+test('RISK storage-failure messages: a failed device save names Download backup, or Download board only once a backup has come out partial',async()=>{
+  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
+  ctx.addTask('Board to protect',false);assert.equal(await ctx.persist(),true);
+  const set=storage.setItem;
+  const fail=()=>{storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)throw Error('denied');return set.call(storage,key,value);};};
+  const heal=()=>{storage.setItem=set;};
+  const toastText=()=>shim.document.getElementById('toast').textContent;
+  fail();ctx.addTask('Unsaved edit',false);assert.equal(await ctx.persist(),false);
+  assert.match(toastText(),/use Download backup in Settings before closing it/,'before any partial backup the message names Download backup');
+  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(settings,/available in Download backup below/);assert.doesNotMatch(settings,/data-act="download-current-board"/);
+  heal();
+  const files=captureDownloads(app);assert.equal(await ctx.onAction('download-recovery-file',{}),true);for(let i=0;i<100&&!files.length;i++)await flush();
+  assert.equal(JSON.parse(await downloadedText(files[0])).manifest.status,'partial','fixture: with no device database the backup comes out partial');
+  assert.match(shim.document.getElementById('settingsDownloads').innerHTML,/data-act="download-recovery-file">Download backup<\/button><button[^>]*data-act="download-current-board">Download board only<\/button>/,'the open Settings shows Download board only beside Download backup at once');
+  ctx.openSettings();settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(settings,/id="settingsDownloads"><button[^>]*data-act="download-recovery-file">Download backup<\/button><button[^>]*data-act="download-current-board">Download board only<\/button><\/div>/,'reopened Settings keeps it beside Download backup');
+  fail();ctx.addTask('Another unsaved edit',false);assert.equal(await ctx.persist(),false);
+  assert.match(toastText(),/use Download board only in Settings before closing it/,'after a partial backup the message names Download board only');
+  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/available in Download board only below/);
+  heal();
+  assert.equal(await ctx.onAction('download-current-board',{}),true);assert.match(await downloadedText(files.at(-1)),/Another unsaved edit/,'the board-only file holds the edit that could not save');
+});
+
 test('RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage',async()=>{
   const storage=sharedScannerStorage();
   const {ctx,shim}=await loadApp({sharedStorage:storage});
