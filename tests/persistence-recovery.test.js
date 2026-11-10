@@ -991,6 +991,37 @@ test('RISK device save settle: the plain message stays until a later save verifi
  assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows the saved edits');
 });
 
+// The message asks for another change; that change must not wipe the support
+// record of the failure it is trying to repair.
+test('RISK device save settle: the Debug log keeps the failed save\'s stage, code and attempts through the next change until a save is verified',{timeout:60000},async t=>{
+ const {f,stop,commits}=await deviceSaveExhausted2325(t,'diagnostics-kept');
+ const attempts=commits(),report=()=>f.ctx.buildSupportDiagnosticsReport().save;
+ f.ctx.onAction('view-support-diagnostics',{});
+ const failed=report();
+ assert.deepEqual([failed.localFailureStage.value,failed.localFailureCode.value,failed.localFailureAttempts.value],['device-store','changed-during-save',attempts]);
+ // The change the message asks for, while the other copy still saves.
+ f.edit('diagnostics-kept-anchor','Change while the other copy saves');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','Settings still shows the open issue');
+ const pending=report();
+ assert.deepEqual([pending.localFailureStage.value,pending.localFailureCode.value,pending.localFailureAttempts.value],['device-store','changed-during-save',attempts],'the Debug log agrees with Settings while the next save is pending');
+ const end=performance.now()+15000;
+ while(vm.runInContext('!!saveTimer||deviceSavesInFlight.size>0',f.ctx)){
+  const during=report();
+  assert.deepEqual([during.localFailureStage.value,during.localFailureCode.value],['device-store','changed-during-save'],'and while it runs');
+  assert.ok(performance.now()<end,'the attempt finishes');await f.alive(new Promise(resolve=>setTimeout(resolve,30)));
+ }
+ const again=report();
+ assert.deepEqual([again.localFailureStage.value,again.localFailureCode.value],['device-store','changed-during-save'],'a second refusal records its own failure');
+ assert.ok(Number.isSafeInteger(again.localFailureAttempts.value)&&again.localFailureAttempts.value>1);
+ // The other copy closes; the next change saves and is verified.
+ stop();
+ f.edit('diagnostics-kept-anchor','Next change here');
+ await f.settled('next change after the other copy closed');
+ const durable=report();
+ assert.equal(durable.localDurability.value,'durable');
+ assert.deepEqual([durable.localFailureStage.value,durable.localFailureCode.value,durable.localFailureAttempts.value],['unknown','unknown',null],'a verified save clears the failure record');
+});
+
 // A hidden tab runs no animation frames, yet its saves still finish. The frame
 // that would show the message can then arrive after a verified save cleared it.
 test('RISK device save settle: a message cleared by a verified save while the tab was hidden does not appear when it is shown again',{timeout:60000},async t=>{

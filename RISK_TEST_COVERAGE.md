@@ -1467,6 +1467,7 @@ its RISK test; the map follows.
 - RISK device save settle: a save that runs out of repairs says plainly what happened, what is protected and what to do next
 - RISK device save settle: a save that runs out of repairs keeps its stage, code and attempt count for support
 - RISK device save settle: the plain message stays until a later save verifiably succeeds, and the next change saves the kept edit
+- RISK device save settle: the Debug log keeps the failed save\
 - RISK device save settle: a message cleared by a verified save while the tab was hidden does not appear when it is shown again
 - RISK device save settle: when both copies changed the same task, the board keeps one version and a backup keeps this tab\
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
