@@ -941,6 +941,16 @@ test('RISK device save settle: a save that runs out of repairs says plainly what
  assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='plain-exhausted-theirs').title,'Other copy write '+commits(),'the other copy\'s latest save was not overwritten, as the message says');
 });
 
+test('RISK device save settle: a save that runs out of repairs keeps its stage, code and attempt count for support',async t=>{
+ const {f,commits}=await deviceSaveExhausted2325(t,'support-exhausted');
+ const attempts=commits();
+ assert.deepEqual(JSON.parse(JSON.stringify(f.ctx.deviceSaveIssue())),{stage:'device-store',code:'changed-during-save',attempts},'the save issue record keeps the stage, code and every commit attempt');
+ f.ctx.onAction('view-support-diagnostics',{});const report=f.ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(report.localFailureStage.value,'device-store','the Debug log names the stage');
+ assert.equal(report.localFailureCode.value,'changed-during-save','the Debug log keeps the code');
+ assert.equal(report.localFailureAttempts.value,attempts,'the Debug log counts the commit attempts');
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.

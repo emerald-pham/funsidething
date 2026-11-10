@@ -1200,7 +1200,7 @@ const automaticRecoveryDeviceAuthorities=new WeakMap();
 let deviceLegacySeenSignature = null;
 let lastDeviceSaveIssue = null;
 function deviceStorageActive(){ return deviceStorageAuthority; }
-function setDeviceSaveIssue(stage,code){ lastDeviceSaveIssue={stage,code}; renderSync(); }
+function setDeviceSaveIssue(stage,code,attempts){ lastDeviceSaveIssue=Number.isSafeInteger(attempts)?{stage,code,attempts}:{stage,code}; renderSync(); }
 function clearDeviceSaveIssue(){
   const recovered=lastDeviceSaveIssue;
   lastDeviceSaveIssue=null;
@@ -1213,14 +1213,14 @@ function clearDeviceSaveIssue(){
   if(recovered) retryCloudAfterDeviceRecovery();
 }
 function deviceSaveIssue(){ return lastDeviceSaveIssue ? {...lastDeviceSaveIssue} : null; }
-function reportDeviceSaveFailure(stage,code,help="Keep this tab open and try again.",{plain=false}={}){
-  setDeviceSaveIssue(stage,code);
-  // A plain message stands alone; its stage and code stay in the save issue
-  // record, Settings and the Debug log for whoever is helping (#2325).
+function reportDeviceSaveFailure(stage,code,help="Keep this tab open and try again.",{plain=false,attempts}={}){
+  setDeviceSaveIssue(stage,code,attempts);
+  // A plain message stands alone; its stage, code and attempt count stay in
+  // the save issue record and the Debug log for whoever is helping (#2325).
   toast(plain?help:"Couldn't save this edit on this device (device-save:"+stage+"/"+code+"). "+help,9000);
   return false;
 }
-// #2325: the conflict repair below has run out of attempts or time against a
+// #2325: persistImpl()'s device conflict repair has run out of attempts or time against a
 // board that kept changing. Every commit was guarded by the head hash, so
 // none replaced a board it had not merged, and the refusal writes nothing
 // more; the live board in this tab still holds the edit.
@@ -3996,7 +3996,9 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   const payload = JSON.stringify(state);
   if(deviceStorageAuthority){
     try{
+      let commitAttempts=0;
       const commit=async(options,base=options.payload)=>{
+        commitAttempts++;
         // Two saves can send the same bytes (a follow-up and the next edit's
         // save); each holds its own reference until its commit returns.
         let result;const own=deviceOwnCommits.get(options.payload)||{base,count:0};own.count++;deviceOwnCommits.set(options.payload,own);
@@ -4093,7 +4095,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           }
         }
         if(result?.conflict)
-          return reportDeviceSaveFailure("device-store","changed-during-save",DEVICE_SAVE_EXHAUSTED_MESSAGE,{plain:true});
+          return reportDeviceSaveFailure("device-store","changed-during-save",DEVICE_SAVE_EXHAUSTED_MESSAGE,{plain:true,attempts:commitAttempts});
       }
       if(!result?.ok) return reportDeviceSaveFailure("device-store",result?.code||"write-failed","The previous durable board remains unchanged; keep this tab open and try again.");
       if(mergedState){
@@ -4250,7 +4252,7 @@ function save(preserveBackupId=null){
   saveRequestGeneration++;
   const at=supportDiagnosticsNow();
   supportDiagnosticsLastLocalStatus="pending";supportDiagnosticsLastLocalAt=at;
-  supportDiagnosticsLastLocalCode="unknown";
+  supportDiagnosticsLastLocalCode="unknown";supportDiagnosticsLastLocalStage="unknown";supportDiagnosticsLastLocalAttempts=null;
   supportDiagnosticsServerAck=window.CloudSync?.configured?"pending":"unavailable";
   supportDiagnosticsServerAckAt=at;supportDiagnosticsPushOutcome=window.CloudSync?.configured?"pending":"unavailable";
   supportDiagnosticsObserve("save","started","current",null,null,null,null,null,null,null,null,null,"unknown");
@@ -4426,6 +4428,10 @@ const supportDiagnosticsEvents=[];
 let supportDiagnosticsDroppedEvents=0,supportDiagnosticsSourceSequence=0;
 let supportDiagnosticsActivePersistCalls=0,supportDiagnosticsPersistCalls=0,supportDiagnosticsRetryAttempts=0;
 let supportDiagnosticsLastLocalStatus="unobserved",supportDiagnosticsLastLocalAt=null,supportDiagnosticsLastLocalCode="unknown";
+// #2325: a failed save's stage, from the fixed set reportDeviceSaveFailure
+// uses, and its commit attempts, beside the code.
+const SUPPORT_DIAGNOSTICS_SAVE_STAGES=new Set(["device-recovery","storage","completion-upgrade","device-store","primary-write","restore-safety"]);
+let supportDiagnosticsLastLocalStage="unknown",supportDiagnosticsLastLocalAttempts=null;
 let supportDiagnosticsDurableGeneration=0,supportDiagnosticsLastAckGeneration=0;
 let supportDiagnosticsServerAck="unobserved",supportDiagnosticsServerAckAt=null,supportDiagnosticsServerRevision=null;
 let supportDiagnosticsActivePushCalls=0,supportDiagnosticsPushOutcome="unobserved";
@@ -4960,6 +4966,8 @@ function supportDiagnosticsBuildReport(options={}){
       localDurability:supportDiagnosticsField(saveStatus,saveStatus==="unobserved"?"unobserved":saveStatus==="pending"?"pending":saveStatus==="failed"?"failed":"observed",supportDiagnosticsLastLocalAt),
       durableThroughRequest:supportDiagnosticsField(supportDiagnosticsDurableGeneration,durableThroughStatus,supportDiagnosticsLastLocalAt),
       localFailureCode:supportDiagnosticsField(supportDiagnosticsLastLocalCode,"observed",supportDiagnosticsLastLocalAt),
+      localFailureStage:supportDiagnosticsField(supportDiagnosticsLastLocalStage,"observed",supportDiagnosticsLastLocalAt),
+      localFailureAttempts:supportDiagnosticsField(supportDiagnosticsLastLocalAttempts,supportDiagnosticsLastLocalAttempts===null?"unobserved":"observed",supportDiagnosticsLastLocalAt),
       serverAcknowledgement:supportDiagnosticsField(serverStatus,serverStatus==="unobserved"?"unobserved":serverStatus==="pending"?"pending":serverStatus==="failed"?"failed":serverStatus==="stale"?"stale":serverStatus==="cancelled"?"cancelled":serverStatus==="unavailable"?"unavailable":"observed",supportDiagnosticsServerAckAt),
       serverRevision:supportDiagnosticsField(supportDiagnosticsServerRevision,supportDiagnosticsServerRevision===null?"unobserved":"observed",supportDiagnosticsServerAckAt),
       pushOutcome:supportDiagnosticsField(supportDiagnosticsPushOutcome,
@@ -5120,20 +5128,22 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
     let result;try{result=await run;}finally{deviceSavesInFlight.delete(run);}
     const at=supportDiagnosticsNow();
     if(result===true){
-      supportDiagnosticsLastLocalStatus="durable";supportDiagnosticsLastLocalCode="unknown";
+      supportDiagnosticsLastLocalStatus="durable";supportDiagnosticsLastLocalCode="unknown";supportDiagnosticsLastLocalStage="unknown";supportDiagnosticsLastLocalAttempts=null;
       supportDiagnosticsDurableGeneration=Math.max(supportDiagnosticsDurableGeneration,requestGeneration);
       supportDiagnosticsObserve("persist","durable","current",null,startedAt===null||at===null?null:at-startedAt,null,null,null,null,null,null,null,"unknown");
     }else{
       const changedIssue=lastDeviceSaveIssue!==priorIssue;
       supportDiagnosticsLastLocalStatus=changedIssue?"failed":"unavailable";
       supportDiagnosticsLastLocalCode=changedIssue?supportDiagnosticsSafeErrorCode(lastDeviceSaveIssue?.code):"unknown";
+      supportDiagnosticsLastLocalStage=changedIssue&&SUPPORT_DIAGNOSTICS_SAVE_STAGES.has(lastDeviceSaveIssue?.stage)?lastDeviceSaveIssue.stage:"unknown";
+      supportDiagnosticsLastLocalAttempts=changedIssue&&Number.isSafeInteger(lastDeviceSaveIssue?.attempts)?lastDeviceSaveIssue.attempts:null;
       supportDiagnosticsObserve("persist",changedIssue?"failed":"unavailable","current",null,startedAt===null||at===null?null:at-startedAt,null,null,null,null,null,null,null,supportDiagnosticsLastLocalCode);
     }
     supportDiagnosticsLastLocalAt=at;
     return result;
   }catch(error){
     const at=supportDiagnosticsNow();supportDiagnosticsLastLocalStatus="failed";
-    supportDiagnosticsLastLocalCode=supportDiagnosticsSafeErrorCode(error?.code);
+    supportDiagnosticsLastLocalCode=supportDiagnosticsSafeErrorCode(error?.code);supportDiagnosticsLastLocalStage="unknown";supportDiagnosticsLastLocalAttempts=null;
     supportDiagnosticsLastLocalAt=at;
     supportDiagnosticsObserve("persist","failed","current",null,startedAt===null||at===null?null:at-startedAt,null,null,null,null,null,null,null,supportDiagnosticsLastLocalCode);
     throw error;
