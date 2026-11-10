@@ -4337,6 +4337,169 @@ test('RISK chain start: the FAQ and current Changelog explain both options, the 
  assert.match(current,/Chain starts with/);assert.match(current,/Most likely/);assert.match(current,/Oldest eligible/);
 });
 
+// #2304 (spec #2298, story 58): one run tries every new feature on a synthetic
+// board, then does ordinary work on that same board. The expected board at the
+// end is written out by hand below, not read back from the app.
+const WORKS_LIKE_NORMAL_AT=Date.parse('2026-11-10T15:00:00Z');
+const WORKS_LIKE_NORMAL_SETTINGS={showPostpone:true,cantMin:12,horizonMin:90,dateFormat:'ymd'};
+function worksLikeNormalBoard2304(){
+ return syncState({tasks:[{...syncTask('normal-oldest','Oldest errand'),createdAt:1,mu:20},{...syncTask('normal-likely','Likely errand'),createdAt:2,mu:32},
+  {...syncTask('normal-middle','Middle errand'),createdAt:3,mu:26},{...syncTask('normal-newest','Newest errand'),createdAt:4,mu:22}],
+  settings:{scanMode:'descending',horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:8,theme:'system'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+}
+const worksLikeNormalHistory2304=app=>{
+ if(!app.ctx.state.histOpen)app.ctx.onAction('toggle-hist',{});
+ return [...app.shim.document.getElementById('histPanel').innerHTML.matchAll(/<span class="dt[^"]*">([^<]+)/g)].map(match=>match[1].trim());
+};
+const worksLikeNormalTasks2304=board=>board.tasks.map(task=>[task.title,task.done===true]);
+async function worksLikeNormalJourney2304(t,{beforeJourney,afterPublish}={}){
+ const {IDBFactory}=await import('fake-indexeddb');
+ const initial=worksLikeNormalBoard2304(),raw=JSON.stringify(initial),h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}),factory=new IDBFactory(),deviceDbName='works-like-normal-'+Date.now()+'-'+Math.random();
+ // The real cloud backend reports the signed-in identity a file restore checks; this harness stands in for it.
+ const cloudSyncFactory=()=>{const CS=h.factory();CS.recoveryIdentity=()=>'works-like-normal:e@example.com';CS.recoveryEvidence=async()=>({identity:CS.recoveryIdentity(),epoch:1,pending:false});return CS;};
+ let clock=WORKS_LIKE_NORMAL_AT;
+ const open=async()=>{clock+=60000;const opened=await loadAppAtTime(clock,{seed:2304,sharedStorage:storage,indexedDBProvider:factory,deviceDbName,cloudSyncFactory});t.after(()=>closeLegacyApp173(opened));return opened;};
+ const reload=async current=>{await closeLegacyApp173(current);return open();};
+ const publish=async(current,stage)=>{assert.equal(await current.ctx.persist(),true,stage);await current.ctx.cloudPull();await current.ctx.cloudPushNow();await settleSavedViewPublication(current,h,stage);if(afterPublish)await afterPublish({h,stage});};
+ const noRecoveryPrompt=async(current,stage)=>{
+  assert.equal(current.ctx.window.CloudSync.status==='error',false,stage+': no sync hold ('+current.ctx.window.CloudSync.errorCode+')');
+  assert.equal(vm.runInContext('cloudAdoptionHeld||openingRecoveryHeld',current.ctx),false,stage+': nothing is held for recovery');
+  assert.doesNotMatch(current.shim.document.getElementById('syncBtn').textContent,/error|hold/i,stage+': the sync control shows no recovery prompt');
+  current.ctx.closeModal();await syncSettle(5);
+  assert.equal(current.shim.document.getElementById('modalRoot').innerHTML,'',stage+': no recovery dialog opens');
+ };
+ let app=await open();await app.ctx.cloudPull();
+ if(beforeJourney)await beforeJourney({h,raw});
+
+ // Both Chain starts with options, then back to the default.
+ chooseChainStart(app,'mostLikely');app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-likely'],'Most likely starts with the highest chance');
+ await publish(app,'Most likely start');
+ app.ctx.onAction('undo',{});assert.deepEqual(Array.from(app.ctx.state.chain),[],'Undo takes the Most likely Start back');
+ chooseChainStart(app,'oldest');assert.equal(app.ctx.state.settings.chainStartsWith,undefined,'switching back restores the default option');
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'Oldest eligible starts with the oldest task again');
+ app.ctx.onAction('undo',{});assert.deepEqual(Array.from(app.ctx.state.chain),[],'Undo takes the Oldest eligible Start back');
+ await publish(app,'both chain start options');
+
+ // Settings save as they are committed and survive a reload; the ? menu opens closed.
+ app.ctx.openSettings();for(const [id,value] of [['stShowPostpone',true],['stCantMin',12],['stHorizon',90],['stDateFormat','ymd']])commitSetting(app.shim,id,value);app.ctx.closeModal();
+ await publish(app,'committed settings');
+ app=await reload(app);await app.ctx.cloudPull();await noRecoveryPrompt(app,'settings reload');
+ const pick=settings=>Object.fromEntries(Object.keys(WORKS_LIKE_NORMAL_SETTINGS).map(key=>[key,settings[key]]));
+ assert.deepEqual(pick(app.ctx.state.settings),WORKS_LIKE_NORMAL_SETTINGS,'every committed setting survives the reload');
+ assert.equal('chainStartsWith' in app.ctx.state.settings,false,'the default option leaves no saved key');
+ app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<option value="oldest" selected>Oldest eligible<\/option>/);app.ctx.closeModal();
+ assert.deepEqual(helpMenuSections2302(app),['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups'].map(title=>({title,open:false})),'the ? menu opens with Changelog first and every section closed');
+ app.ctx.closeModal();
+
+ // Ordinary work: scan, dot, Done, Undo, Done again, resume.
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'Start dots the oldest task');
+ assert.equal(app.ctx.state.candidateId,'normal-likely','the highest-chance task is offered first');assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="yes"/);
+ app.ctx.onAction('yes',{dataset:{candidate:'normal-likely',benchmark:'normal-oldest'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest','normal-likely'],'Yes dots the candidate');
+ app.ctx.onAction('start-working',{});assert.equal(app.ctx.state.mode,'work','Pause starts working on the last dot');
+ app.ctx.onAction('bench-done',{});
+ assert.equal(app.ctx.state.tasks.find(task=>task.id==='normal-likely').done,true,'Done marks the task being worked on');
+ assert.deepEqual(worksLikeNormalHistory2304(app),['Likely errand'],'History lists the task marked Done');
+ app.ctx.onAction('undo',{});
+ assert.equal(app.ctx.state.tasks.find(task=>task.id==='normal-likely').done,false,'Undo reverses Done');
+ assert.deepEqual(worksLikeNormalHistory2304(app),[],'Undo takes it out of History');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest','normal-likely'],'Undo puts the dot back');
+ app.ctx.onAction('bench-done',{});assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'Done again leaves the earlier dot');
+ app.ctx.onAction('resume-scan',{dataset:{mode:'descending'}});assert.equal(app.ctx.state.mode,'scan','resume returns to scanning');
+ assert.equal(app.ctx.state.candidateId,'normal-middle','resuming offers the next task');
+ await publish(app,'ordinary work');
+
+ // A backup before going offline; its restore preview comes after reconnecting.
+ await app.ctx.onAction('make-manual-backup',{});for(let n=0;n<100&&!/class="mgr backup-row"/.test(app.shim.document.getElementById('modalRoot').innerHTML);n++)await flush();
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/class="mgr backup-row"/,'Make backup lists the new backup');app.ctx.closeModal();
+ const files=captureDownloads(app);await app.ctx.onAction('download-recovery-file',{});for(let n=0;n<100&&!files.length;n++)await flush();
+ assert.equal(files.length,1,'Download backup saves one file');const backupText=await downloadedText(files[0]),backup=JSON.parse(backupText);
+ assert.equal(backup.manifest.status,'complete','the backup is complete');
+ assert.deepEqual(worksLikeNormalTasks2304(backup.currentBoard),[['Oldest errand',false],['Likely errand',true],['Middle errand',false],['Newest errand',false]],'the backup holds the board');
+
+ // Offline: a No, then a reload with the cloud unreachable, then reconnect.
+ h.failPull=true;app.ctx.window.CloudSync.ready=false;
+ app.ctx.onAction('no',{dataset:{candidate:'normal-middle',benchmark:'normal-oldest'}});assert.equal(app.ctx.state.considered['normal-middle'],'no');
+ app=await reload(app);
+ assert.equal(app.ctx.state.considered['normal-middle'],'no','the offline No survives the offline reload');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'the chain survives the offline reload');
+ assert.deepEqual(pick(app.ctx.state.settings),WORKS_LIKE_NORMAL_SETTINGS,'settings survive the offline reload');
+ assert.notEqual(h.remoteState().considered['normal-middle'],'no','the cloud has not seen the No while offline');
+ h.failPull=false;await publish(app,'reconnect');await noRecoveryPrompt(app,'reconnect');
+ assert.equal(h.remoteState().considered['normal-middle'],'no','reconnecting publishes the offline No');
+
+ // A restore preview of the earlier backup, cancelled, leaves the newer board as it was.
+ const before=JSON.stringify({tasks:app.ctx.state.tasks,chain:app.ctx.state.chain,considered:app.ctx.state.considered,settings:app.ctx.state.settings});
+ app.ctx.openSettings();await app.ctx.onAction('restore-backup',{});await app.ctx.onAction('open-paste-recovery',{});
+ const box=app.shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=backupText;app.shim.document.dispatchEvent({type:'input',target:box});
+ assert.equal(await app.ctx.onAction('preview-pasted-recovery',{}),true,'Restore previews the backup ('+app.shim.document.getElementById('toast').textContent+')');
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Preview backup file<\/h2>/,'the protected preview opens');
+ await app.ctx.onAction('cancel-file-restore',{});app.ctx.closeModal();
+ assert.equal(JSON.stringify({tasks:app.ctx.state.tasks,chain:app.ctx.state.chain,considered:app.ctx.state.considered,settings:app.ctx.state.settings}),before,'a cancelled preview changes nothing');
+ await publish(app,'after restore preview');
+
+ // The board, on this device and in the cloud, is the expected one.
+ const expectedTasks=[['Oldest errand',false],['Likely errand',true],['Middle errand',false],['Newest errand',false]];
+ for(const [label,board] of [['device',app.ctx.state],['cloud',h.remoteState()]]){
+  assert.deepEqual(worksLikeNormalTasks2304(board),expectedTasks,label+': tasks');
+  assert.deepEqual(Array.from(board.chain),['normal-oldest'],label+': chain');
+  assert.deepEqual(pick(board.settings),WORKS_LIKE_NORMAL_SETTINGS,label+': settings');
+  assert.equal('chainStartsWith' in board.settings,false,label+': default chain start');
+  assert.equal(board.considered['normal-middle'],'no',label+': the offline No');
+ }
+ assert.deepEqual(worksLikeNormalHistory2304(app),['Likely errand'],'History');
+ await noRecoveryPrompt(app,'final board');
+ return {app,h};
+}
+
+test('RISK works like normal: after both chain start options, committed Settings with a reload and the ? menu, ordinary scanning, Done, Undo, resume, offline reload, reconnect, backup and restore preview leave the expected board',async t=>{
+ await worksLikeNormalJourney2304(t);
+});
+
+// #2304: Stable, the released client (main at cb48e3c when this run was written),
+// stays open on the same cloud board while the run above uses every new feature.
+const WORKS_LIKE_NORMAL_RELEASED='cb48e3cee0cebfa2d8f126f5a0b75d124d555c15';
+test('RISK BACKWARD COMPATIBILITY: the released client with the same board open keeps syncing through the works-like-normal run, with no recovery prompt and no lost setting',async t=>{
+ const released=spawnSync('git',['show',WORKS_LIKE_NORMAL_RELEASED+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
+ let stable;
+ const stableClear=stage=>{
+  assert.equal(stable.ctx.window.CloudSync.status==='error',false,stage+': no hold on Stable ('+stable.ctx.window.CloudSync.errorCode+')');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',stable.ctx),false,stage+': Stable does not hold the board');
+  assert.doesNotMatch(stable.shim.document.getElementById('syncBtn').textContent,/error|hold/i,stage+': no recovery prompt on the Stable sync control');
+  assert.equal(stable.shim.document.getElementById('modalRoot').innerHTML,'',stage+': no recovery dialog opens on Stable');
+ };
+ const {app,h}=await worksLikeNormalJourney2304(t,{async beforeJourney({h,raw}){
+  stable=await loadAppAtTime(WORKS_LIKE_NORMAL_AT,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+  t.after(()=>closeLegacyApp173(stable));await stable.ctx.cloudPull();
+ },async afterPublish({h,stage}){
+  // Stable pulls each time the run publishes, and keeps every setting the board carries.
+  await stable.ctx.cloudPull();await syncSettle(20);stableClear('Stable after '+stage);
+  for(const [key,value] of Object.entries(h.remoteState().settings))assert.equal(JSON.stringify(stable.ctx.state.settings[key]),JSON.stringify(value),'Stable after '+stage+': setting '+key+' is kept');
+  assert.deepEqual(Array.from(stable.ctx.state.chain),h.remoteState().chain,'Stable after '+stage+': same chain');
+ }});
+ const settings=JSON.parse(JSON.stringify(app.ctx.state.settings));
+ const sameSettings=(board,stage)=>{for(const [key,value] of Object.entries(settings))assert.equal(JSON.stringify(board.settings[key]),JSON.stringify(value),stage+': setting '+key+' is kept');};
+ await stable.ctx.cloudPull();await syncSettle(30);stableClear('Stable reads the board');
+ assert.deepEqual(worksLikeNormalTasks2304(stable.ctx.state),[['Oldest errand',false],['Likely errand',true],['Middle errand',false],['Newest errand',false]],'Stable shows the same tasks');
+ assert.deepEqual(Array.from(stable.ctx.state.chain),['normal-oldest'],'Stable shows the same chain');
+ sameSettings(stable.ctx.state,'Stable reads the board');
+ hydrateUnchangedEditorDraft(stable,'normal-newest');stable.shim.document.getElementById('etTitle').value='Newest errand, edited on Stable';stable.ctx.onAction('save-edit',{dataset:{id:'normal-newest'}});
+ assert.equal(await stable.ctx.persist(),true);await stable.ctx.cloudPull();await stable.ctx.cloudPushNow();
+ for(let n=0;n<160&&h.remoteState().tasks.find(row=>row.id==='normal-newest').title!=='Newest errand, edited on Stable';n++)await syncSettle(5);
+ stableClear('Stable writes the board');
+ assert.equal(h.remoteState().tasks.find(row=>row.id==='normal-newest').title,'Newest errand, edited on Stable','Stable keeps syncing');
+ sameSettings(h.remoteState(),'Stable writes the board');
+ await app.ctx.cloudPull();await syncSettle(30);
+ assert.equal(app.ctx.window.CloudSync.status==='error',false,'the candidate reads the Stable write without a hold ('+app.ctx.window.CloudSync.errorCode+')');
+ assert.equal(vm.runInContext('cloudAdoptionHeld||openingRecoveryHeld',app.ctx),false,'the candidate holds nothing for recovery');
+ assert.equal(app.ctx.state.tasks.find(row=>row.id==='normal-newest').title,'Newest errand, edited on Stable','the candidate receives the Stable edit');
+ sameSettings(app.ctx.state,'the candidate after the Stable write');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'the chain is unchanged');
+});
+
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
  const at=Date.parse('2026-10-18T03:00:00Z'),ids=['quiet-first','quiet-second'];
  const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Quiet task '+(i+1)),createdAt:i+1})),mode:'work',scanMode:'descending',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}});

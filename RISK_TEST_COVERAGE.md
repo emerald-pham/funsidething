@@ -204,6 +204,8 @@ its RISK test; the map follows.
 - RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button
 - RISK chain start: Quick start and the immediate-save FAQ describe the dropdown
 - RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox
+- RISK works like normal: after both chain start options, committed Settings with a reload and the ? menu, ordinary scanning, Done, Undo, resume, offline reload, reconnect, backup and restore preview leave the expected board
+- RISK BACKWARD COMPATIBILITY: the released client with the same board open keeps syncing through the works-like-normal run, with no recovery prompt and no lost setting
 - RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption
 - RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup
 - RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet
