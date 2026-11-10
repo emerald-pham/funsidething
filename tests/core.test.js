@@ -12476,6 +12476,28 @@ test("UI #221 guidance: the mounted FAQ and Settings changelog say a chain pill 
   assert.match(notes, /Return as candidate now also takes a dotted task off the chain/i);
 });
 
+test("UI #221: returning a dot that also carries a hold takes only the dot; a later press of the same button ends the hold", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2225 });
+  ctx.addTask("First dot", true);
+  const resting = ctx.addTask("Resting evergreen dot", true, [], {}, { evergreen: true, evergreenHours: 18 });
+  ctx.addTask("Benchmark dot", true);
+  const doneAt = realNow(ctx) - 60000;
+  resting.lastDoneAt = doneAt;   // prior state: an evergreen rest that began while the task was dotted
+  ctx.render();
+
+  returnFromPill(ctx, shim, "Resting evergreen dot");
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["First dot"], "the dot is returned");
+  assert.equal(ctx.state.tasks.find(task => task.id === resting.id).lastDoneAt, doneAt, "its rest is left alone");
+  assert.equal(ctx.pool().some(task => task.id === resting.id), false, "so it is not dealt while it rests");
+
+  ctx.onAction("edit", { dataset: { id: resting.id } });
+  keepEditorValues(ctx, shim, resting.id);
+  assert.doesNotMatch(returnButton(shim.elements.get("modalRoot").innerHTML), /\bdisabled\b/, "the button still offers to end the rest");
+  ctx.onAction("return-candidate", { dataset: { id: resting.id } });
+  assert.equal(ctx.state.tasks.find(task => task.id === resting.id).lastDoneAt, null, "the later press ends the rest");
+  assert.equal(ctx.pool().some(task => task.id === resting.id), true);
+});
+
 test("UI #221: a repeated Return is one return and one Undo step, and a stale Return for a task that has left the chain changes nothing", async () => {
   const { ctx, shim } = await loadApp({ seed: 2224 });
   ctx.addTask("First dot", true);
@@ -14931,7 +14953,12 @@ test('RISK opening board presentation: shared markup retains released cards cont
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
  const old=await loadAppPinningNewDate(at,{...options,appSource:extractAppScript(baseline.stdout)}),current=await loadAppPinningNewDate(at,options);
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
- for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
+ // #221 deliberately changed one thing here: a chain pill opens its task's
+ // editor (data-act="edit", with a name saying so) instead of revealing it.
+ // Everything else keeps the released markup byte for byte.
+ const releasedWith221Pills=markup=>markup.replace(/<button class="crumb" data-act="reveal" (data-id="[^"]*")([^>]*?) title="([^"]*)">/g,'<button class="crumb" data-act="edit" $1$2 title="$3" aria-label="Open $3 to edit it">');
+ assert.match(old.shim.document.getElementById('scan').innerHTML,/<button class="crumb" data-act="reveal"/,'the released scan panel has a trail pill to compare');
+ for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith221Pills(old.shim.document.getElementById(id).innerHTML),id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
  assert.equal(current.shim.document.getElementById('listBody').innerHTML,old.shim.document.getElementById('listBody').innerHTML,'the shared row facts retain next-dot placement');
  const before=JSON.stringify(current.ctx.state),keys=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY],stored=keys.map(key=>current.shim.localStorage.getItem(key));
@@ -15415,23 +15442,6 @@ test("list filter: undoing the mark a filter points at takes the filter with it"
   ctx.undo();                          // takes the 'no' mark back off
   assert.deepEqual(litTags(shim), [], "with nothing marked no, the button and its filter both go");
   assert.equal(rowTitles(shim).length, 2, "and the full list comes back rather than showing nothing");
-});
-
-/* ---------- revealing a task has to beat the filter ---------- */
-
-test("revealTask: clears the list filters so the task it reveals is actually visible", async () => {
-  const { ctx, shim } = await loadApp({ seed: 967 });
-  const a = ctx.addTask("Shunted aside", false);
-  const scene = ctx.addTask("Write the scene", false);
-  ctx.state.considered[a.id] = "dislodged";
-  openList(ctx);
-  clickTag(ctx, "s:dislodged");
-  ctx.setListQuery("shunt");
-  assert.ok(!rowTitles(shim).includes("Write the scene"), "precondition: the scene is filtered out");
-
-  ctx.revealTask(scene.id);
-  assert.ok(rowTitles(shim).includes("Write the scene"),
-    "revealing a task you can't see is a no-op — the filters have to give way");
 });
 
 /* ---------- the surrounding chrome ---------- */
@@ -23636,19 +23646,6 @@ test('Animation layering: all water visitors draw back to front regardless of ar
  }
 });
 
-test('Animation controls: revealing a task respects app and device reduced motion',()=>{
- const start=html.indexOf('function revealTask(id){');
- const end=html.indexOf('function commit(',start);
- assert.ok(end>start,'the revealTask snippet ends before the commit helper');
- const code=html.slice(start,end);
- for(const [preference,osReduced,expected] of [['normal',false,'smooth'],['reduced',false,'instant'],['normal',true,'instant'],[undefined,false,'instant']]){
-  const calls=[],viewCalls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
-  const ctx=vm.createContext({state:{listOpen:false},allTasksView:{setListOpen(value){viewCalls.push(value);}},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelectorAll(){return [Object.assign(row,{dataset:{row:'task'}})];}},window:{matchMedia(){return {matches:osReduced};}}});
-  vm.runInContext(code+';revealTask("task");',ctx);
-  assert.equal(calls[0].behavior,expected,`${preference}/${osReduced} must choose ${expected}`);
-  assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);assert.deepEqual(viewCalls,[true]);
- }
-});
 
 test('Animation state: flapping birds do not change the stroke caps of later scenery',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
