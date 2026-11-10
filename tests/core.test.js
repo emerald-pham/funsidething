@@ -12441,12 +12441,13 @@ test("UI #221 guidance: the mounted FAQ and Settings changelog say a chain pill 
   assert.match(notes, /Tapping a task in the chain opens its editor/i, "the changelog announces the change");
   assert.match(notes, /Return as candidate now also takes a dotted task off the chain/i);
   // #221 review: where focus goes when that editor closes, and the double tap.
-  assert.match(notes, /Closing that editor gives keyboard focus back to the scanner/i, "the changelog says where focus goes");
-  assert.match(notes, /a quick second tap on Return as candidate no longer answers the task underneath/i);
+  assert.match(notes, /Closing that editor gives keyboard focus back to the scanner once Enter is released/i, "the changelog says where focus goes");
+  assert.match(notes, /for a moment after Return as candidate closes it, a second tap or key press does nothing, wherever it lands/i);
   const keyboard = help.match(/<dt>How do keyboard decisions work\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
-  assert.match(keyboard, /An editor opened from a task in the chain or a card’s Edit gives focus back to that button when it closes, or to Edit on the benchmark card when the button is gone/);
+  assert.match(keyboard, /An editor opened from a task in the chain or a card’s Edit gives focus back to that button, or to the benchmark’s Edit if it is gone/);
+  assert.match(keyboard, /After Enter, focus waits for the key’s release, so holding Enter presses nothing/);
   const secondTap = help.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
-  assert.match(secondTap, /ignored for a moment after a new task appears, or after Return as candidate closes the editor/);
+  assert.match(secondTap, /For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/);
 });
 
 test("UI #221: returning a dot that also carries a hold takes only the dot; a later press of the same button ends the hold", async () => {
