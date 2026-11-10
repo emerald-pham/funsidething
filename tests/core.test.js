@@ -33953,9 +33953,9 @@ test('RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from a
 });
 
 test('Device save settle guidance: the FAQ and changelog say saves on one device settle by themselves (#2324)',()=>{
- assert.match(html,/<dt>What if the app is open twice on this device\?<\/dt><dd>Saves on this device run one at a time\. If another open copy of the app saves at the same moment, this tab combines both boards and keeps trying for up to five seconds before it warns you\.<\/dd>/);
+ assert.match(html,/<dt>What if the app is open twice on this device\?<\/dt><dd>Each copy recognizes its own saves, so quick edits in one copy never clash with each other\. If another open copy of the app saves at the same moment, this copy combines both boards and keeps trying for up to five seconds before it warns you\.<\/dd>/);
  const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
- assert.match(current,/<h3>November 10, 2026<\/h3><ul><li>Ordinary edits no longer fail to save on this device with “The saved board changed again while this tab was merging it”\./);
+ assert.match(current,/<h3>November 10, 2026<\/h3><ul><li>Ordinary edits no longer fail to save on this device with “The saved board changed again while this tab was merging it”\. On a phone, saving can take longer than the pause between taps, and the app then mistook its own earlier save for a change from elsewhere\. It now recognizes its own saves and saves on top of them\./);
 });
 
 test('Firestore rules: production cleanup resumes deleting tombstones and protects active previous pending and young staging generations', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{

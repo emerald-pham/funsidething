@@ -1459,6 +1459,7 @@ its RISK test; the map follows.
 - RISK cloud source recovery: preliminary inspection bounds large device task lists without changing saved work
 - RISK rapid action durability: ten distinct actions remain pending through a held cloud acknowledgement then reach peer and cold reopen
 - RISK device save settle: ordinary signed-out edits during slow device commits never collide with the same tab saving
+- RISK device save settle: repeated edits of one task during slow device commits keep the newest edit
 - RISK device save settle: a second copy saving once during a save leaves both edits on the saved board
 - RISK device save settle: a second copy saving repeatedly but finitely during a save still settles with the work of every copy
 - RISK device save settle: a board that never stops changing still ends in a bounded refusal with no retry loop

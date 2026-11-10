@@ -802,6 +802,20 @@ test('RISK device save settle: ordinary signed-out edits during slow device comm
  for(const [i,id] of ids.entries())assert.equal(reopened.ctx.state.tasks.find(task=>task.id===id).title,'Edited '+i);
 });
 
+test('RISK device save settle: repeated edits of one task during slow device commits keep the newest edit',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-same',tasks:[syncTask('settle-same-anchor','Anchor'),syncTask('settle-same-task','Version 0')]});
+ assert.equal(await f.ctx.persist(),true);
+ f.commitDelayMs=400;
+ const shown=[];
+ for(let i=1;i<=6;i++){f.edit('settle-same-task','Version '+i);await new Promise(resolve=>setTimeout(resolve,400));shown.push(f.ctx.state.tasks.find(task=>task.id==='settle-same-task').title);}
+ const head=await f.settled('same-task saves');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:/,'no save failure is shown');
+ assert.deepEqual(shown,['Version 1','Version 2','Version 3','Version 4','Version 5','Version 6'],'an earlier save of this tab never puts an older title back on screen');
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='settle-same-task').title,'Version 6','the newest edit is the saved one');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-same-task').title,'Version 6');
+ assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'no edit of this tab is set aside as a displaced draft');
+});
+
 // A second same-origin copy of the app (a Safari tab beside the installed app)
 // on the same device database and browser storage.
 async function deviceSaveSettlePeer2324(t,f){
