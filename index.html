@@ -4925,6 +4925,17 @@ function debugLogLinkRecordBackupSizes(rows){
     localStorage.setItem(BACKUP_SIZES_KEY,JSON.stringify({characters,at:supportDiagnosticsNow()}));
   }catch{ /* Diagnostic size notes never affect saving. */ }
 }
+// Undo frames share their pieces (#2311), so each distinct piece counts once.
+// Reading a copy through String() would rebuild a whole board per frame.
+function supportDiagnosticsUndoCharacters(frames){
+  const pieces=new Set(),add=value=>{
+    if(typeof value==="string")pieces.add(value);
+    else if(value instanceof UndoBoardCopy)for(const part of value.parts)if(Array.isArray(part))for(const row of part)pieces.add(row);else pieces.add(part);
+  };
+  for(const frame of frames){add(frame?.snapshot);add(frame?.after);}
+  let characters=0;for(const piece of pieces)characters+=piece.length;
+  return characters;
+}
 function supportDiagnosticsSavedDataReport(){
   const now=supportDiagnosticsNow(),held=deviceStorageAuthority&&deviceBackupCacheReadable,recorded=held?null:debugLogLinkReadBackupSizes();
   const frames=Array.isArray(undoStack)?undoStack:[];
@@ -4936,7 +4947,7 @@ function supportDiagnosticsSavedDataReport(){
     },
     undo:{
       frames:supportDiagnosticsField(frames.length,"observed",now),
-      characters:supportDiagnosticsField(frames.reduce((sum,frame)=>sum+(typeof frame?.snapshot==="string"?frame.snapshot.length:0)+(typeof frame?.after==="string"?frame.after.length:0),0),"observed",now)
+      characters:supportDiagnosticsField(supportDiagnosticsUndoCharacters(frames),"observed",now)
     }
   };
 }

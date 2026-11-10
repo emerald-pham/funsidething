@@ -38412,11 +38412,14 @@ test('RISK debug log link #2309: the report gains backup and Undo counts and siz
  // for a later opening that must not read them.
  const normal=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage});t.after(()=>normal.dispose());
  for(const title of ['PRIVATE undo one 2309','PRIVATE undo two 2309','PRIVATE undo three 2309']){normal.shim.document.getElementById('addInput').value=title;normal.ctx.onAction('add',{});}
+ const rebuilt=vm.runInContext('(()=>{const seen={count:0},original=UndoBoardCopy.prototype.toString;UndoBoardCopy.prototype.toString=function(){seen.count++;return original.call(this);};return seen;})()',normal.ctx);
  const boardChars=JSON.stringify(normal.ctx.state).length,running=normal.ctx.buildSupportDiagnosticsReport().savedData;
+ assert.equal(rebuilt.count,0,'measuring Undo never rebuilds a whole board');
  assert.equal(running.backups.count.value,device.expectedBackups,'a running app reports its held backup rows');
  assert.equal(running.backups.totalCharacters.value,device.expectedCharacters,'a running app reports their held text size');
  assert.equal(running.undo.frames.value,3,'three additions hold three Undo frames');
- assert.ok(running.undo.characters.value>=2*boardChars/3,'Undo size counts the held board copies');
+ assert.ok(running.undo.characters.value>boardChars/2,'Undo size counts what the frames hold');
+ assert.ok(running.undo.characters.value<3*boardChars,'text shared between frames is counted once');
  assert.doesNotMatch(normal.ctx.supportDiagnosticsText(),/PRIVATE/,'no task text in the running report');
  await normal.dispose();
  const linked=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>linked.dispose());
