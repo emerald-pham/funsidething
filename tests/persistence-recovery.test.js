@@ -29,6 +29,7 @@ import { createDeviceBudgetClock, expireDeviceBudget } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
 import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDGET_MS, coldRelaunch2198, refuseNextRecoveryTransaction255,
   exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
+import { fillEditPane } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -10313,4 +10314,65 @@ test('RISK debug log link #2309: an installed offline shell opens the log from t
   }finally{await browser.close();}
  }
  assert.deepEqual(failures,[],'the held opening raises no page errors');
+});
+
+/* ---------- #221: a returned dot across devices ----------
+   Two app instances against the fake cloud, under a controlled clock. The
+   return is made the way a person makes it: the chain pill (or the benchmark
+   card's Edit) opens the editor and Return as candidate is pressed. Expected
+   chains are written from the spec, never read back from the projection. */
+function returnDotFromBoard221(app,id,at){
+ setFakeTime(app.ctx,at);app.ctx.renderScan();
+ const scan=app.shim.document.getElementById('scan').innerHTML;
+ const pill=[...scan.matchAll(/<button\b[^>]*class="crumb"[^>]*>/g)].map(match=>match[0]).find(button=>button.includes('data-id="'+id+'"'));
+ const bench=scan.match(/<div class="card bench">[\s\S]*?<button\b[^>]*data-act="edit" data-id="([^"]+)"/);
+ const act=pill?pill.match(/data-act="([^"]+)"/)[1]:bench?.[1]===id?'edit':null;
+ assert.ok(act,'the chain trail or the benchmark card offers '+id);
+ app.ctx.onAction(act,{dataset:{id}});
+ const task=app.ctx.state.tasks.find(row=>row.id===id);
+ fillEditPane(app.ctx,app.shim,{title:task.title,url:task.url||'',due:task.due||'',start:task.startsAt||'',evergreen:task.evergreen,ctxIds:task.ctx});
+ app.shim.document.getElementById('etEverReset').checked=task.evergreenResetAtDay!==false;
+ app.ctx.onAction('return-candidate',{dataset:{id}});
+}
+// undo-base is dotted; Yes on undo-local then undo-peer makes three real dots.
+async function threeDotClients221(t){
+ const clients=await scopedUndoClients();const {local,peer,at}=clients;
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ setFakeTime(local.ctx,at+150);local.ctx.onAction('yes',{dataset:{candidate:'undo-peer',benchmark:'undo-local'}});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-local','undo-peer'],'precondition: three dots');
+ await publish221(local);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await syncSettle(20);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['undo-base','undo-local','undo-peer'],'precondition: the other device sees them');
+ // Both devices stop syncing until a test publishes, so a stale copy stays stale.
+ local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ return clients;
+}
+async function publish221(app){app.ctx.window.CloudSync.ready=true;assert.equal(await app.ctx.persist(),true);await app.ctx.cloudPushNow();await syncSettle(35);}
+const reopen221=async(app,h,at,t)=>{
+ const raw=app.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+ t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});
+ return cold;
+};
+
+test('RISK chain return sync: a returned dot stays returned through cloud acknowledgement, a stale device save and reload',async t=>{
+ const {local,peer,h,at}=await threeDotClients221(t);
+ returnDotFromBoard221(local,'undo-local',at+200);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer']);
+ await publish221(local);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer'],'the cloud holds the board with the return');
+ assert.equal(local.ctx.state.syncDirty,false,'confirmed only once the cloud acknowledged that board');
+ assert.equal(h.doc.payload,local.ctx.cloudPayload());
+
+ // The other device still shows the old chain and saves an unrelated edit.
+ await saveEditorChoice(peer,'undo-base',at+300,{title:'Benchmark renamed on the stale device'});
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['undo-base','undo-local','undo-peer'],'precondition: the stale copy still has the dot');
+ await publish221(peer);await peer.ctx.cloudPull();await syncSettle(20);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer'],'the stale save cannot bring the dot back');
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['undo-base','undo-peer'],'the stale device converges on the return');
+ assert.equal(h.remoteState().tasks.find(task=>task.id==='undo-base').title,'Benchmark renamed on the stale device','its unrelated edit is kept');
+
+ await local.ctx.cloudPull();await syncSettle(20);
+ const cold=await reopen221(local,h,at+400,t);await cold.ctx.cloudPull();await syncSettle(20);
+ assert.deepEqual(Array.from(cold.ctx.state.chain),['undo-base','undo-peer'],'reopening keeps it returned');
+ assert.equal(cold.ctx.state.syncDirty,false);
 });
