@@ -12579,7 +12579,12 @@ function closeModal(){
   cloudSourceRecoveryInspection=false;
   cloudSourceRecoveryPreview=null;cloudSourceRecoverySettingsDraft=null;
   finishActiveApologyNotice();decisionRecoveryReviewSerial++;decisionRecoveryPreview=null;allTasksView.cancelBulkEdit(); woopDraft=null; overdueWoopSession=null; document.getElementById("modalRoot").innerHTML=""; setTimeout(()=>{ resumeDeferredBrowserCopy(); resumeDeferredCloudPull(); showAppUpdateNotice(); window.applyPendingAppUpdate?.(); retryAutomaticApologyNotice(); }, 0);
-  if(sourceSettingsDraft||diagnosticsSettingsDraft){openSettings();restoreSettingsDraft(sourceSettingsDraft||diagnosticsSettingsDraft);}
+  // Every Settings field saves when committed (#2303), so returning from a
+  // recovery review shows the saved values: a repainted draft could show values
+  // from before the recovery that were never saved. The debug log keeps its
+  // draft because nothing it does can change the board.
+  if(sourceSettingsDraft)openSettings();
+  else if(diagnosticsSettingsDraft){openSettings();restoreSettingsDraft(diagnosticsSettingsDraft);}
   return true;
 }
 function modalShell(inner){
@@ -17039,7 +17044,8 @@ function closePasteDialog(){
   if(fileRestoreBusy){fileRestoreConsentGeneration++;fileRestoreBusy=false;}
   pasteEditorSession=null;
   document.getElementById("modalRoot").innerHTML="";
-  if(session.settingsDraft!==null&&session.settingsDraft!==undefined){openSettings();restoreSettingsDraft(session.settingsDraft);}
+  // Saved values, not the draft: see closeModal (#2303).
+  if(session.settingsDraft!==null&&session.settingsDraft!==undefined)openSettings();
   else setTimeout(()=>{resumeDeferredBrowserCopy();resumeDeferredCloudPull();showAppUpdateNotice();window.applyPendingAppUpdate?.();},0);
   return true;
 }
@@ -17668,7 +17674,8 @@ async function confirmFileRestore(){
     const payload=await commitFileRestoreLocally(p);
     installFileRestoreState(p,payload);
     const settingsDraft=p.settingsDraft;fileRestorePreview=null;fileRestoreBusy=false;pasteEditorSession=null;pasteDraftBuffer=null;closeModal();
-    if(settingsDraft!==null){openSettings();restoreSettingsDraft(settingsDraft);}
+    // The restored board's settings, never the ones from before it (#2303).
+    if(settingsDraft!==null)openSettings();
     toast(p.unacceptedSource?"The board was restored on this device. Cloud recovery is still pending; review Data and backups in Settings.":p.accountBound?"The exact board was confirmed by cloud and saved on this device.":"The board was restored on this device.",6000);
     return true;
   }catch(error){
@@ -17684,7 +17691,7 @@ function cancelFileRestore(){
   const snapshot=fileRestorePreview?.settingsDraft,pasteDraft=fileRestorePreview?.pasteDraft;
   fileRestoreConsentGeneration++;fileRestorePreview=null;fileRestoreBusy=false;pasteEditorSession=null;closeModal();
   if(pasteDraft)openPasteDialog(pasteDraft.raw,snapshot??pasteDraft.settingsDraft??null);
-  else if(snapshot!==null&&snapshot!==undefined){openSettings();restoreSettingsDraft(snapshot);}
+  else if(snapshot!==null&&snapshot!==undefined)openSettings();
   return true;
 }
 let resetInFlight=false;

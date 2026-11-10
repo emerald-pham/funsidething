@@ -39124,21 +39124,72 @@ test('RISK cloud source recovery metadata: native preview distinguishes server s
  assert.match(preview,/Upload creation time \(device clock\):/);assert.match(preview,/Decision time for missing or unrecorded changes: unavailable/);assert.match(preview,/does not establish which board is newer/);
 });
 
-test('RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery',async t=>{
+// A browser builds new Settings controls from the markup on every render, while
+// the Node shim keeps one object per id. Mount fresh ones the way a page would,
+// so a repaint after the render is what the person would actually see.
+function mountSettingsControls(shim){
+ const root=shim.document.getElementById('modalRoot');let html=String(root.innerHTML??''),generation=0,mounted=null;
+ Object.defineProperty(root,'innerHTML',{get:()=>html,set:value=>{html=String(value);generation++;},configurable:true});
+ const attr=(text,name)=>(text.match(new RegExp('\\b'+name+'="([^"]*)"'))||[])[1];
+ const build=()=>{
+  const controls=[];
+  for(const [,id,rest] of html.matchAll(/<input id="(st[A-Za-z]+)"([^>]*)>/g))controls.push(Object.assign(makeFakeElement(),{id,type:attr(rest,'type')||'text',value:attr(rest,'value')??'',checked:/\bchecked\b/.test(rest)}));
+  for(const [,id,body] of html.matchAll(/<select id="(st[A-Za-z]+)"[^>]*>(.*?)<\/select>/g)){
+   const options=[...body.matchAll(/<option value="([^"]*)"([^>]*)>/g)],selected=Math.max(0,options.findIndex(option=>/\bselected\b/.test(option[2])));
+   controls.push(Object.assign(makeFakeElement(),{id,value:options[selected]?.[1]??'',selectedIndex:selected}));
+  }
+  return controls;
+ };
+ root.querySelectorAll=selector=>{
+  if(!html.includes('<h2>Settings</h2>')||!/input|select|textarea/.test(String(selector)))return [];
+  if(mounted?.generation!==generation)mounted={generation,controls:build()};
+  return mounted.controls;
+ };
+ return id=>root.querySelectorAll('input,select,textarea').find(control=>control.id===id);
+}
+
+test('RISK Settings after Restore: a confirmed restore, a cancelled preview and a closed paste all show the saved values',async t=>{
+ for(const outcome of ['confirm','cancel','close paste'])await t.test(outcome,async sub=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'settings-after-restore-'+Math.random()}),{ctx,shim}=app;sub.after(()=>closeLegacyApp173(app));
+  ctx.addTask('Current task');assert.equal(await ctx.persist(),true);
+  const source=JSON.parse(JSON.stringify(ctx.state));source.tasks=[{id:'restored',title:'Restored task',ctx:[],mu:25,sigma:8.333333333333334,createdAt:1}];
+  source.settings={...source.settings,horizonMin:200,dateFormat:'ymd',chainStartsWith:'mostLikely',evergreenResetAtDay:false};
+  const shown=mountSettingsControls(shim);ctx.openSettings();
+  // Shown but never saved: with no Save button, Settings must not bring this back.
+  shown('stWorkedHrs').value='37';
+  await ctx.onAction('restore-backup',{});await ctx.onAction('open-paste-recovery',{});
+  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=JSON.stringify(source);shim.document.dispatchEvent({type:'input',target:box});
+  if(outcome==='close paste')ctx.onAction('close-paste-recovery',{});
+  else{
+   assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);
+   if(outcome==='confirm'){assert.equal(await ctx.onAction('confirm-file-restore',{}),true);for(let n=0;n<50;n++)await flush();}
+   else{ctx.onAction('cancel-file-restore',{});ctx.onAction('close-paste-recovery',{});}
+  }
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'the person returns to Settings');
+  const saved=ctx.state.settings;
+  assert.equal(saved.horizonMin,outcome==='confirm'?200:60);
+  assert.deepEqual({horizon:shown('stHorizon').value,dateFormat:shown('stDateFormat').value,chainStartsWith:shown('stChainStartsWith').value,reset:shown('stEverReset').checked,worked:shown('stWorkedHrs').value},
+   {horizon:String(saved.horizonMin),dateFormat:saved.dateFormat,chainStartsWith:saved.chainStartsWith||'oldest',reset:saved.evergreenResetAtDay,worked:String(saved.workedHours)},outcome+': Settings shows the saved values');
+ });
+});
+
+test('RISK cloud source recovery drafts: Settings shows the saved values after native review cancel delayed reads and confirmed recovery',async t=>{
  for(const outcome of ['cancel','cancel during read','confirm'])await t.test(outcome,async sub=>{
   const app=await divergentCloudSourceApp187(sub),{ctx,shim}=app;
-  ctx.onAction('settings',{});const root=shim.document.getElementById('modalRoot'),control=shim.document.getElementById('stWorkedHrs');control.id='stWorkedHrs';control.type='number';control.value='37';
-  root.querySelectorAll=()=>root.innerHTML.includes('<h2>Settings</h2>')?[control]:[];
+  const shown=mountSettingsControls(shim);ctx.onAction('settings',{});const root=shim.document.getElementById('modalRoot');
+  // Shown but never saved: with no Save button (#2303), Settings must not bring this back.
+  shown('stWorkedHrs').value='37';
   let release;if(outcome==='cancel during read'){const gate=new Promise(resolve=>release=resolve);sub.after(()=>release());app.faults.serverRead=async()=>gate;}
   const reviewing=ctx.onAction('review-cloud-source-recovery',{});
   if(outcome==='cancel during read'){
-   for(let n=0;n<100&&!root.innerHTML.includes('Reading the separate');n++)await flush();control.value='16';ctx.onAction('close-modal',{});delete app.faults.serverRead;release();assert.equal(await reviewing,false);
+   for(let n=0;n<100&&!root.innerHTML.includes('Reading the separate');n++)await flush();ctx.onAction('close-modal',{});delete app.faults.serverRead;release();assert.equal(await reviewing,false);
   }else{
-   assert.equal(await reviewing,true);control.value='16';
+   assert.equal(await reviewing,true);
    if(outcome==='confirm'){await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);}else ctx.onAction('close-modal',{});
   }
   assert.match(root.innerHTML,/<h2>Settings<\/h2>/,'review returns to the originating Settings pane');
-  assert.equal(control.value,'37','the actual unsaved Settings value is restored instead of being silently discarded');assert.equal(ctx.state.settings.workedHours,16,'restoring the draft never saves it implicitly');
+  assert.equal(shown('stWorkedHrs').value,'16','Settings shows the saved value, not one that was never saved');assert.equal(ctx.state.settings.workedHours,16,'the unsaved value is not saved implicitly');
  });
 });
 
