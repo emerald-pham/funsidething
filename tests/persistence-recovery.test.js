@@ -5382,7 +5382,7 @@ for(const skewMs of [3000,45000,90000])for(const [input,answer] of [['keyboard p
   await ctx.cloudPull();
   assert.equal(ctx.state.candidateId,'later','positive control: the other device’s candidate was adopted');
   assert.equal(ctx.state.presentedAt,ahead,'positive control: its presentation time is in this device’s future');
-  await new Promise(resolve=>setTimeout(resolve,350));
+  await new Promise(resolve=>setTimeout(resolve,240));
   answer(shim,'later');
   assert.equal(ctx.state.considered.later,'no','the answer counts');
  });

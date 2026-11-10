@@ -21720,14 +21720,14 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
 });
 
 // With the row pinned, a second tap lands on the button of the next candidate
-// before anyone could have read it, so a physical answer inside the same 300 ms
-// that recordDecisionTime already treats as no real decision is dropped.
+// before anyone could have read it, so a physical press inside 200 ms of the new
+// task appearing is dropped.
 test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   for(const input of ['two touch taps 60 ms apart','two touch taps 180 ms apart','mouse double click','two key presses']){
+   for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){
     const label=`${engineName} ${input}`,touch=input.includes('touch');
     const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:390,height:844,touch});
     try{
@@ -21735,7 +21735,7 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
      const first=await steadyScannerControls(page),at=steadyScannerCenter(first.no);
      if(input==='mouse double click')await page.mouse.click(at.x,at.y,{clickCount:2,delay:15});
      else if(input==='two key presses'){await page.keyboard.press('n');await page.waitForTimeout(40);await page.keyboard.press('n');}
-     else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('180')?180:60);await page.touchscreen.tap(at.x,at.y);}
+     else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('120')?120:60);await page.touchscreen.tap(at.x,at.y);}
      await page.waitForFunction(prior=>state.candidateId!==prior,first.candidate,{timeout:5000});
      await page.waitForTimeout(40);
      const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
@@ -25117,7 +25117,7 @@ test('RISK PWA updates: a scanner gesture commits durably without an automatic s
  shim.document.dispatchEvent({type:'pointerdown'});await handlers.controllerchange();
  assert.equal(reloads.length,0,'a ready worker cannot replace the page between pointerdown and the scanner click');
  const noButton={dataset:{act:'no'},disabled:false};
- await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
+ await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'finishing a response does not end the active session');
@@ -25146,7 +25146,7 @@ test('RISK PWA updates: a gesture beginning during an update save preserves the 
  assert.equal(reloads.length,0,'a gesture that begins before save resolution still blocks page replacement');
  const noButton={dataset:{act:'no'},disabled:false};
  shim.document.dispatchEvent({type:'pointerup'});
- await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
+ await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'the downloaded update keeps the used document open after the real scanner click');
@@ -32059,7 +32059,7 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   const {ctx,shim}=await loadApp({seed:618});const bench=ctx.addTask('Synthetic benchmark'),candidate=ctx.addTask('Synthetic candidate'),next=ctx.addTask('Synthetic next');
   Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',scanMode,snooze:100});ctx.render();
   const initial=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
-  await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
+  await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
   assert.equal(ctx.state.candidateId,next.id,'the ordinary first press advances to the next candidate');
   if(key==='y')assert.ok(candidate.mu>25&&bench.mu<25,'Yes retains candidate-over-benchmark orientation');
@@ -32069,7 +32069,7 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   for(let repeat=0;repeat<3;repeat++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
   assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a held key cannot act on the replacement or record another observation');
   assert.equal(vm.runInContext('undoStack.length',ctx),undoDepth,'ignored repeats add no Undo frame');
-  await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
+  await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
   assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a repeat after the read window still cannot act');
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
@@ -32079,6 +32079,34 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),initial,'Undo restores exact original ratings');
  }
 });
+
+// The owner set the window at 200 ms. The clock is the page's own, held still so
+// the boundary is exact; a real timer could not land on either side reliably.
+for(const [name,press,setup] of [
+ ['the Yes key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'y',repeat:false})],
+ ['the No key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'n',repeat:false})],
+ ["the Can't key",({shim})=>shim.document.dispatchEvent({type:'keydown',key:'c',repeat:false})],
+ ['the Done key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'d',repeat:false})],
+ ...['yes','no','cant','postpone','cand-done','bench-done'].map(act=>[`a click on ${act}`,({shim})=>{
+  const tag=shim.elements.get('scan').innerHTML.match(new RegExp('<button[^>]*data-act="'+act+'"[^>]*>'))?.[0];assert.ok(tag,act+' is on the scanner');
+  const dataset=Object.fromEntries([...tag.matchAll(/data-([a-z-]+)="([^"]*)"/g)].map(([,key,value])=>[key.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()),value]));
+  const button={dataset};button.closest=()=>button;shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>button}});
+ }])]){
+ test(`RISK press guard: ${name} inside 200 ms of a new task is dropped and just after it is accepted`,async t=>{
+  const app=await loadApp({seed:2841}),{ctx}=app;t.after(()=>app.dispose?.());
+  ctx.state.settings.showPostpone=true;
+  ctx.addTask('Dotted task',true);for(const title of ['Second','Third','Fourth','Fifth','Sixth'])ctx.addTask(title,false);ctx.render();
+  let clock=50000;ctx.performance={now:()=>clock};
+  const undo=()=>vm.runInContext('undoStack.length',ctx);
+  // An answer draws a new task at this clock.
+  ctx.onAction('no',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});
+  const drawn=ctx.state.candidateId,before=undo();assert.ok(drawn,'a new task is showing');
+  clock+=199;press(app);
+  assert.equal(undo(),before,`${name} at 199 ms is dropped`);assert.equal(ctx.state.candidateId,drawn);
+  clock+=2;press(app);
+  assert.equal(undo(),before+1,`${name} at 201 ms is accepted`);
+ });
+}
 
 test('RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
@@ -32094,7 +32122,7 @@ test('RISK Squared Weighting held keys: real keyboard repeats preserve the newly
   const {ctx,shim}=await loadApp({seed:959});ctx.addTask('Oldest synthetic task');ctx.addTask('Synthetic one');ctx.addTask('Synthetic two');ctx.addTask('Synthetic three');
   const el=makeFakeElement();el.dataset={act:'start-scan',mode:'squared'};el.closest=()=>el;shim.document.dispatchEvent({type:'click',detail:1,target:el});ctx.state.snooze=100;
   assert.equal(ctx.state.scanMode,'squared');const first=ctx.state.candidateId,original=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
-  await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
+  await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});assert.notEqual(ctx.state.candidateId,first);
   const after=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
   for(let i=0;i<3;i++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
