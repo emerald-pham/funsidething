@@ -22804,6 +22804,7 @@
       "tests/persistence-recovery.test.js:-app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;",
       "tests/persistence-recovery.test.js:-assert.doesNotMatch(section,/Separate recovery archives kept by a storage upgrade remain intact/,'Settings no longer says that copy stays');",
       "tests/persistence-recovery.test.js:-assert.doesNotMatch(settings,/data-act=\"choose-backup-file\"|data-act=\"open-paste-recovery\"/,'the board-data area has no competing file or paste action');",
+      "tests/persistence-recovery.test.js:-assert.equal(observed.length,36,'every engine, view, theme and viewport was measured');",
       "tests/persistence-recovery.test.js:-assert.equal(pickerOpened,1,'the Settings action opens the native file picker');",
       "tests/persistence-recovery.test.js:-assert.match(answer,/Make manual backup still works, with no limit and no extra step\\./);",
       "tests/persistence-recovery.test.js:-assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup\\./);",
