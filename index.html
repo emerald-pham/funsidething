@@ -3929,6 +3929,9 @@ function deviceQuotaFailure(error){
    push callback in sendPush() has to record a revision without that counting
    as a change, or every write re-stamps the state and schedules the next one,
    a 2-second write loop with no edit behind it. */
+// #2324: conflict repair against another copy's saves. Waits double from 50 ms
+// up to 1 s between merges (3.55 s in all); the whole repair stops at 5 s.
+const DEVICE_REPAIR_ATTEMPTS=8,DEVICE_REPAIR_FIRST_WAIT_MS=50,DEVICE_REPAIR_MAX_WAIT_MS=1000,DEVICE_REPAIR_BUDGET_MS=5000;
 async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
   if(!liveBoardAccepted){
     const unreadableBackup=inspectBackupIndex().rows===null;
@@ -4014,8 +4017,17 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         }else result={conflict:true,hash:head.hash,head};
       }
       if(result?.conflict){
-        let latestHint=result?.head||null;
-        for(let repairAttempt=0;result?.conflict&&repairAttempt<3;repairAttempt++){
+        let latestHint=result?.head||null;const repairStarted=performance.now();
+        for(let repairAttempt=0;result?.conflict&&repairAttempt<DEVICE_REPAIR_ATTEMPTS;repairAttempt++){
+          if(repairAttempt>0){
+            // #2324: another copy of the app on this device is saving too.
+            // Give its save time to finish before merging again, within a
+            // fixed attempt and time budget, so the repair settles instead of
+            // losing three back-to-back races.
+            const wait=Math.min(DEVICE_REPAIR_MAX_WAIT_MS,DEVICE_REPAIR_FIRST_WAIT_MS*2**(repairAttempt-1));
+            if(performance.now()-repairStarted+wait>DEVICE_REPAIR_BUDGET_MS)break;
+            await new Promise(resolve=>setTimeout(resolve,wait));
+          }
           const latest=latestHint||await deviceStore.readHead();latestHint=null;
           const draft=JSON.stringify(state);
           if(!latest) return false;

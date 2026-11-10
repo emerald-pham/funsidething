@@ -797,6 +797,64 @@ test('RISK device save settle: ordinary signed-out edits during slow device comm
  for(const [i,id] of ids.entries())assert.equal(reopened.ctx.state.tasks.find(task=>task.id===id).title,'Edited '+i);
 });
 
+// A second same-origin copy of the app (a Safari tab beside the installed app)
+// on the same device database and browser storage.
+async function deviceSaveSettlePeer2324(t,f){
+ const peer=await loadAppAtTime(f.at,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});
+ t.after(async()=>{vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',peer.ctx);await peer.dispose();});
+ return {peer,async edit(id,title){
+  hydrateUnchangedEditorDraft(peer,id);peer.shim.document.getElementById('etTitle').value=title;peer.ctx.onAction('save-edit',{dataset:{id}});
+  vm.runInContext('clearTimeout(saveTimer)',peer.ctx);assert.equal(await peer.ctx.persist(),true,'the second copy saves its own edit');
+ }};
+}
+
+test('RISK device save settle: a second copy saving once during this tab\'s save leaves both edits on the saved board',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-peer-once',tasks:[syncTask('settle-once-anchor','Anchor'),syncTask('settle-once-mine','Mine'),syncTask('settle-once-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{if(++commits===1)await other.edit('settle-once-theirs','Saved by the other copy');};
+ f.edit('settle-once-mine','Saved by this tab');
+ const head=await f.settled('one peer write');
+ assert.ok(commits>=2,'the other copy\'s write made this save merge onto the newer board');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:/,'no save failure is shown');assert.equal(f.ctx.deviceSaveIssue(),null);
+ const durable=JSON.parse(head.payload);
+ assert.equal(durable.tasks.find(task=>task.id==='settle-once-mine').title,'Saved by this tab');
+ assert.equal(durable.tasks.find(task=>task.id==='settle-once-theirs').title,'Saved by the other copy');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-once-theirs').title,'Saved by the other copy','the screen shows the merged board');
+ const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows both edits');
+});
+
+test('RISK device save settle: a second copy saving repeatedly but finitely during this tab\'s save still settles with every copy\'s work',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-peer-repeat',tasks:[syncTask('settle-repeat-anchor','Anchor'),syncTask('settle-repeat-mine','Mine'),syncTask('settle-repeat-later','Later'),syncTask('settle-repeat-gone','Deleted by the other copy'),...Array.from({length:4},(_,i)=>syncTask('settle-repeat-theirs-'+i,'Theirs '+i))]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0,draft=null;
+ // Four writes land before this tab's first four head commits: the initial
+ // commit and three back-to-back repairs all find a newer board.
+ f.beforeCommit=async options=>{
+  const n=++commits;
+  // A conflicting attempt writes nothing; the merge that commits keeps its draft.
+  if(options.backup?.kind==='stale-tab-draft')draft=options.backup.payload;
+  if(n>4)return;
+  if(n===1){other.peer.ctx.onAction('delete-task',{dataset:{id:'settle-repeat-gone'}});vm.runInContext('clearTimeout(saveTimer)',other.peer.ctx);}
+  await other.edit('settle-repeat-theirs-'+(n-1),'Other copy write '+n);
+  if(n===2)f.edit('settle-repeat-later','Accepted while merging');
+ };
+ f.edit('settle-repeat-mine','Saved by this tab');
+ const head=await f.settled('finite peer writes');
+ assert.ok(commits>=5,'every peer write landed while this tab was saving');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:/,'no save failure is shown once the other copy stops');assert.equal(f.ctx.deviceSaveIssue(),null);
+ const durable=JSON.parse(head.payload),title=id=>durable.tasks.find(task=>task.id===id)?.title;
+ assert.equal(title('settle-repeat-mine'),'Saved by this tab');
+ assert.equal(title('settle-repeat-later'),'Accepted while merging','an edit accepted during the repair is saved');
+ for(let i=0;i<4;i++)assert.equal(title('settle-repeat-theirs-'+i),'Other copy write '+(i+1),'every write of the other copy is kept');
+ assert.equal(durable.tasks.some(task=>task.id==='settle-repeat-gone'),false,'a task deleted by the other copy stays deleted');
+ assert.ok(draft,'the repair kept a copy of this tab\'s draft');
+ assert.ok((await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft),'the exact superseded draft is kept as a backup');
+ const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows every copy\'s work');
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.
