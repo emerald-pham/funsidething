@@ -39704,6 +39704,36 @@ test('RISK support diagnostics: event retention and malformed observer input sta
  assert.doesNotThrow(()=>ctx.supportDiagnosticsText(),'a nonserializable clock cannot break local report generation');
 });
 
+// #2323 merge: the Debug log sheds its oldest events to fit 24 KiB. Main's
+// saved-data section and the device-save failure fields together pushed the
+// report over that cap one event earlier, and the record of why recovery
+// waited was the oldest event left, so it was the one dropped.
+test('RISK support diagnostics retention: a Debug log over its byte cap sheds routine events, oldest first, before the record of why recovery waited or ran',async t=>{
+ const app=await loadApp(),{ctx}=app;t.after(()=>app.dispose());
+ vm.runInContext('Date.now=()=>1000000',ctx);
+ const observe=ctx.window.__chainSupportDiagnosticsObserve,ROUTINE=60;
+ const budget=outcome=>observe('recovery-budget',outcome==='deferred'?'pending':'observed','current','source-1',null,null,null,null,null,null,null,null,'unknown',
+  null,null,null,null,null,{budgetOutcome:outcome,generationKiB:1967,boardKiB:2,decisionKiB:0,estimateKiB:1968,budgetKiB:1024});
+ // The opening waits, then routine saves run, then Retry sync runs deliberately, then more saves.
+ budget('deferred');
+ for(let i=1;i<=ROUTINE;i++)observe('persist',i%2?'started':'durable','current',null,i);
+ budget('deliberate');
+ for(let i=ROUTINE+1;i<=ROUTINE+4;i++)observe('persist',i%2?'started':'durable','current',null,i);
+ const text=ctx.supportDiagnosticsText(),report=JSON.parse(text);
+ // Positive controls: every event fits the count limit, so only the byte cap sheds them.
+ assert.ok(ROUTINE+6<=report.retention.eventLimit,'the count limit alone would keep every event');
+ assert.equal(report.retention.truncated.value,true,'the report had to shed events to fit its byte cap');
+ assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the report stays within its byte cap');
+ // Behaviour under test: both budget records stay, in order, and routine events go oldest first.
+ assert.deepEqual(report.events.filter(event=>event.stage==='recovery-budget').map(event=>event.metadata.budgetOutcome),['deferred','deliberate'],
+  'the record of why recovery waited outlasts later routine events');
+ const kept=report.events.filter(event=>event.stage==='persist').map(event=>event.durationMs.value);
+ assert.ok(kept.length>0&&kept.length<ROUTINE+4,'some routine events are kept and some shed');
+ assert.deepEqual(kept,Array.from({length:kept.length},(_,index)=>ROUTINE+4-kept.length+1+index),'the routine events kept are the newest ones');
+ const order=report.events.map(event=>event.stage!=='recovery-budget'?event.durationMs.value:event.metadata.budgetOutcome==='deferred'?0:ROUTINE+.5);
+ assert.deepEqual(order,[...order].sort((a,b)=>a-b),'the kept events stay in the order they happened');
+});
+
 test('RISK support diagnostics worker: controller reports only its fixed shell identity',()=>{
  const handlers={},shell=appShellContract(serviceWorkerSource()),responses=[];let cacheReads=0;
  vm.runInNewContext(serviceWorkerSource(),{

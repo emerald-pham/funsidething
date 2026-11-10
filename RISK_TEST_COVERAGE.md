@@ -1406,6 +1406,7 @@ its RISK test; the map follows.
 - RISK support diagnostics: report names only a safe origin and separates build from executing-script identity
 - RISK support diagnostics: root, chunk, and final-root SDK stalls retain the correct stage and report owner
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
+- RISK support diagnostics retention: a Debug log over its byte cap sheds routine events, oldest first, before the record of why recovery waited or ran
 - RISK support diagnostics worker: controller reports only its fixed shell identity
 - RISK support diagnostics: executing document and observed worker/cache identities remain distinct and bounded
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
