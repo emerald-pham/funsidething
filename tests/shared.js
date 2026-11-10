@@ -1,3 +1,4 @@
+import "./isolate-git-env.js";
 import { test as nodeTest } from "node:test";
 import assert from "node:assert/strict";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -376,6 +377,36 @@ async function automaticDefaultApp251(t,{prepare=null,assertAdopted=true}={}){
  if(assertAdopted){assert.equal(ctx.state.settings.workedHours,16,'the accepted device value is the reversible residual default');assert.ok(ctx.state.tasks.some(row=>row.id==='cloud-default-251'));
  assert.equal((await ctx.window.ScannerDeviceStore.getRecoveryCloudHold())?.automaticRecovery,true,'the setup reaches a real automatic guarded local adoption');}
  return app;
+}
+
+// #2294: controlled time for the device-storage budget. Each of these startup,
+// resume, activation and reentry tests sets a very short real budget and then
+// raced real IndexedDB fixture work against it, so a slow machine expired the
+// budget while storage was still working and the test failed by chance. Only
+// the configured budget's timers and clock are controlled here; every other
+// timer stays real. The budget now expires when, and only when, the test has
+// parked storage on a known stall and calls expireDeviceBudget.
+function createDeviceBudgetClock(budgetMs){
+ let now=0,serial=0;const timers=new Map();
+ return {
+  budgetMs,now:()=>now,get armed(){return timers.size;},
+  setTimeout(fn,delay,...args){const id={deviceBudgetClock:++serial};timers.set(id,{at:now+Number(delay),fn:()=>fn(...args)});return id;},
+  clearTimeout(id){timers.delete(id);},
+  async advance(ms=budgetMs){
+   const target=now+ms;
+   while(true){
+    const due=[...timers].filter(([,timer])=>timer.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!due)break;
+    now=due[1].at;timers.delete(due[0]);due[1].fn();await flush();
+   }
+   now=target;await flush();
+  },
+ };
+}
+// Spend exactly one budget, only once storage has reached the stall under test.
+async function expireDeviceBudget(clock,reached,message){
+ await fixtureDeadline(async wait=>{while(!reached())await wait();},message);
+ assert.ok(clock.armed>0,'No device budget timer was armed when '+message+': the budget no longer matches the configured delay, so it would run on a real timer');
+ await clock.advance();
 }
 
 function recoveryReadClock187(){
@@ -1166,7 +1197,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider } = {}) {
+async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false, locationHref, fetchProvider, budgetClock } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   const ownedTimers=new Set();let disposed=false,sandbox;
   const fixture={async dispose(){
@@ -1237,6 +1268,13 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     alert: () => {},
     prompt: () => null,
   };
+  if(budgetClock){
+    // Only the budget itself is controlled: one delay value and the clock read
+    // that the startup attempt compares against its deadline.
+    sandbox.performance={now:budgetClock.now};
+    sandbox.setTimeout=(fn,ms,...args)=>ms===deviceOpenTimeoutMs?budgetClock.setTimeout(()=>{if(!disposed)fn(...args);},ms):schedule(fn,ms,...args);
+    sandbox.clearTimeout=timer=>{budgetClock.clearTimeout(timer);cancel(timer);};
+  }
   vm.createContext(sandbox);
   vm.runInContext(lzStringSrc, sandbox, { filename: "vendor/lz-string-1.5.0.min.js" });
   if(indexedDBProvider){
@@ -3889,6 +3927,7 @@ async function replaceIndependentServerPayload263(app,id,payload){
  for(const chunk of encoded.chunks)app.backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
 }
 
+export { createDeviceBudgetClock, expireDeviceBudget };
 export {
   appFixtureScope, test, injectRecoveryDatabaseFailure187, editRawDevice187, deviceFaultProvider187,
   partialSavedBoard187, refuseNextRecoveryTransaction255, damagedAcknowledgedApp187,
