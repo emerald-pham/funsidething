@@ -271,8 +271,9 @@ and coverage limits. White paint, readable text and passing bounds alone do not
 establish a visual match. Unexplained drift is an actionable finding; fix it and
 repeat the affected final rendered comparison before approval.
 
-For executed visual assertions, theme verification and neighboring-control/scroll
-coverage, follow the mandatory visual policy in [CLAUDE.md](../../CLAUDE.md#review-and-release).
+For executed visual assertions and neighboring-control/scroll coverage, follow the
+[visual test requirements](rendered-evidence.md#visual-test-requirements). For
+theme verification, follow the theme capture rule in [CLAUDE.md](../../CLAUDE.md#review-and-release).
 
 ## Final-candidate timing
 

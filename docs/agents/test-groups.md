@@ -148,14 +148,9 @@ release or canonical evidence.
 
 ## Which groups a diff needs
 
-```sh
-npm run --silent test:group -- --changed-groups --comparison-base origin/main
-```
-
-This read-only mode prints one group per line and writes no evidence, so it takes
-no `--output-dir` or `--group`. Today it always prints all four required groups:
-CI keys each group on the complete checkout tree, so no changed file narrows the
-list, and a documentation-only diff needs the same groups as a scenery change.
+CI runs every group on any diff, because it keys each group on the complete
+checkout tree. No changed file narrows the list, and a documentation-only diff
+needs the same groups as a scenery change. Run all four before review.
 
 ## Reading a failed group
 
@@ -188,14 +183,24 @@ A row whose test has not landed declares its owning PR as `pendingOn: "#<number>
 and is pending; every other row is active. The run executes the active roots.
 With none it succeeds without starting a test process, records status
 `no_active_roots`, and annotates that 0 cross-engine cases ran, naming the
-pending roots. Every run's `result.json` carries `crossEngine` with the case
-count and the active and pending roots.
+pending roots. A nightly run that passes preflight records `crossEngine` in
+`result.json`, with the case count and the active and pending roots. A preflight
+failure records none.
 
 The run fails when no nightly root is declared at all, when an active root is
 not registered exactly once in its file (resolves to zero tests), when a pending
 root's test is registered (remove its `pendingOn` to move it to active), or when
-any nightly case fails, is skipped or is missing. `--describe` does not check
-whether nightly roots are registered, so required CI stays green while only the nightly run is red. It writes `result.json` and TAP like a group run, but it is not
+any nightly case fails, is skipped or is missing. Active and pending rows read a
+title the same way: a direct `test(...)` title written plainly, with escapes or
+as a template with no substitutions, or else any string in the file's code that
+spells the title, such as a constant or a table it registers from. A title built
+at run time by concatenation or substitution cannot be read statically, so a
+pending root with such a title stays pending after its test lands; write each
+nightly root's title as one whole literal.
+
+Neither `--describe` nor the `core` group checks whether nightly roots are
+registered; `core` only pins that the list is valid. Required CI therefore stays
+green when a pending root lands and only the nightly run is red. The nightly run writes `result.json` and TAP like a group run, but it is not
 a required group and cannot be described, covered or aggregated. When and how
 releases depend on it is in
 [release and review](release-and-review.md#nightly-cross-engine-native-checks).

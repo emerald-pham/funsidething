@@ -900,7 +900,7 @@ function reportHeaderValue(line, field) {
   return typeof line === 'string' && line.startsWith(prefix) ? line.slice(prefix.length).trim() : '';
 }
 
-function readReviewReport(reportDirectory, file, commitSha) {
+function readReviewReport(reportDirectory, file, commitSha, committedAt) {
   const evidencePath = path.resolve(reportDirectory, file);
   const bytes = fs.readFileSync(evidencePath);
   const [commitLine, verdictLine, completedLine] = bytes.toString('utf8').split('\n');
@@ -913,12 +913,24 @@ function readReviewReport(reportDirectory, file, commitSha) {
     throw new Error(file + ' needs the header line "Verdict: approved"; it has ' + (verdict || 'no verdict') + '.');
   }
   const completedAt = validTime(reportHeaderValue(completedLine, 'Completed'), file + ' header line Completed');
+  if (Date.parse(completedAt) < committedAt) {
+    throw new Error(file + ' header line Completed (' + completedAt + ') is before the candidate commit was made (' + new Date(committedAt).toISOString() + ').');
+  }
   return { completedAt, evidencePath, evidenceSha256: sha256(bytes) };
 }
 
+// The text below the three header lines, so a changed time cannot make one
+// review read as two.
+function reportBody(reportDirectory, file) {
+  return fs.readFileSync(path.resolve(reportDirectory, file), 'utf8').split('\n').slice(3).join('\n');
+}
+
 function committedFileBytes(repoRoot, commitSha, file) {
+  // Only a path absent from the commit is a deleted file; a failed read must not pass as one.
+  if (!gitRaw(repoRoot, ['ls-tree', '-z', commitSha, '--', file])) return null;
   const result = spawnSync('git', ['-C', repoRoot, 'cat-file', 'blob', commitSha + ':' + file], { maxBuffer: 64 * 1024 * 1024 });
-  return result.status === 0 ? result.stdout : null;
+  if (result.status !== 0) throw new Error('Could not read ' + file + ' from the candidate commit; its digest cannot be left out.');
+  return result.stdout;
 }
 
 // Digests come from the exact commit, so they cannot describe a different tree.
@@ -940,11 +952,13 @@ function candidateSources(repoRoot, commitSha, changedFiles) {
 // are left empty because record refuses an empty summary or rationale; any
 // placeholder text long enough to pass would become permanent in the receipt.
 export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirectory, issue) {
+  if (!/^[1-9]\d*$/.test(String(issue))) throw new Error('The issue must be a positive whole number, not ' + JSON.stringify(issue) + '.');
   const { root } = gitCommonDir(repoRoot);
   const plan = deriveReleaseReviewPlan(root, commitSha, baseSha);
   const treeSha = candidateTree(root, commitSha);
+  const committedAt = Number(gitRaw(root, ['show', '-s', '--format=%ct', commitSha]).trim()) * 1000;
   const review = (task, file) => {
-    const { completedAt, ...evidence } = readReviewReport(reportDirectory, file, commitSha);
+    const { completedAt, ...evidence } = readReviewReport(reportDirectory, file, commitSha, committedAt);
     return { task: task + ':' + issue, outcome: 'approved', reviewedSha: commitSha, completedAt, summary: '', evidence };
   };
   const withScope = ({ evidence, ...fields }, scope, details = {}) => ({ ...fields, scope, ...details, ...evidence });
@@ -970,6 +984,9 @@ export function prepareReleaseInput(repoRoot, commitSha, baseSha, reportDirector
         }),
     } : {}),
   };
+  if (plan.requiresCodeReview && reportBody(reportDirectory, 'owner-review.md') === reportBody(reportDirectory, 'independent-review.md')) {
+    throw new Error('owner-review.md and independent-review.md have the same body; the independent reviewer must write their own report.');
+  }
   const inputPath = path.resolve(reportDirectory, 'receipt-input.json');
   try {
     fs.writeFileSync(inputPath, JSON.stringify(input, null, 2) + '\n', { flag: 'wx' });

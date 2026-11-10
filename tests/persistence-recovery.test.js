@@ -448,6 +448,16 @@ test('RISK offline recovery reentry: settled own recovery writes permit fresh cu
  });
 });
 
+// A budget timer the clock did not capture runs on a real timer, so a test could
+// pass with a budget that no longer matches the configured delay.
+test('RISK offline startup budget: spending a budget no timer armed fails the test',async()=>{
+ const unarmed=createDeviceBudgetClock(35);
+ await assert.rejects(expireDeviceBudget(unarmed,()=>true,'the stall was reached'),/no device budget timer was armed/i);
+ const armed=createDeviceBudgetClock(35);let expired=false;armed.setTimeout(()=>{expired=true;},35);
+ await expireDeviceBudget(armed,()=>true,'the stall was reached');
+ assert.equal(expired,true,'an armed budget is spent exactly as before');
+});
+
 test('RISK offline startup budget: a stalled start stays pending until its one controlled budget expires',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-budget-clock-'+Math.random(),control={stallRawRead:true},inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
  const original=JSON.stringify(syncState({v:2,tasks:[syncTask('clock-original','Original before stalled start')]}));await inspector.commitHead({expectedHash:null,payload:original});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));

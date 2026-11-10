@@ -553,9 +553,17 @@ function writeReleaseReports(fixture,reports){
  return directory;
 }
 const sha256Of=text=>createHash('sha256').update(text).digest('hex');
+// Reports below are dated, and prepare refuses a report older than its commit,
+// so these candidates are committed at a fixed earlier moment.
+function atReleaseCommitDate(work){
+ const previous=process.env.GIT_COMMITTER_DATE;process.env.GIT_COMMITTER_DATE='2026-11-01T11:00:00Z';
+ try{return work();}
+ finally{if(previous===undefined)delete process.env.GIT_COMMITTER_DATE;else process.env.GIT_COMMITTER_DATE=previous;}
+}
+const datedReleaseFixture=options=>atReleaseCommitDate(()=>makeScaledReviewFixture(options));
 
 test('RISK repository process: release prepare writes receipt input that record accepts once a person adds the summaries',()=>{
- const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
  try{
   const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
   const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
@@ -590,11 +598,11 @@ test('RISK repository process: release prepare writes receipt input that record 
 
 // Prepares an ordinary tooling candidate whose owner report is fine and whose
 // independent report is the one under test.
-function prepareWithIndependentReport(independentReport){
- const fixture=makeScaledReviewFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+function prepareWithIndependentReport(independentReport,issue='2296'){
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independentReport(fixture)});
- const result=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+ const result=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,issue);
  const inputWritten=fs.existsSync(path.join(reports,'receipt-input.json'));
  cleanupReleaseGateFixture(fixture);
  return {result,inputWritten};
@@ -630,8 +638,34 @@ test('RISK repository process: release prepare refuses a report with a missing o
  assert.equal(future.inputWritten,false);
 });
 
+test('RISK repository process: release prepare refuses an issue that is not a positive whole number',()=>{
+ for(const issue of ['not-a-number','#2296','0','12a']){
+  const {result,inputWritten}=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n',issue);
+  assert.notEqual(result.status,0,issue+' cannot name a release task');
+  assert.match(result.stderr,/issue/i);
+  assert.equal(inputWritten,false);
+ }
+});
+
+test('RISK repository process: release prepare refuses a completion time before the candidate commit',()=>{
+ const early=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T10:59:59.000Z')+'A review dated before the commit existed.\n');
+ assert.notEqual(early.result.status,0,'a review cannot finish before the commit it reviews existed');
+ assert.match(early.result.stderr,/independent-review\.md.*before the candidate/i);
+ assert.equal(early.inputWritten,false);
+ const sameSecond=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:00:00.000Z')+'A review finished in the second of the commit.\n');
+ assert.equal(sameSecond.result.status,0,'the commit time itself is not earlier: '+sameSecond.result.stderr);
+});
+
+test('RISK repository process: release prepare refuses one report body used for both the owner and independent review',()=>{
+ // Only the owner report's own time differs, so a changed header cannot make one review look like two.
+ const {result,inputWritten}=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The owner read the exact diff.\n');
+ assert.notEqual(result.status,0,'the owner and the independent reviewer must each write their own report');
+ assert.match(result.stderr,/owner-review\.md.*independent-review\.md/);
+ assert.equal(inputWritten,false);
+});
+
 test('RISK repository process: release prepare needs only the reports the derived plan requires',()=>{
- const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ const fixture=datedReleaseFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
  try{
   const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
   const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
@@ -650,11 +684,11 @@ test('RISK repository process: release prepare needs only the reports the derive
 
 test('RISK repository process: release prepare takes specialist domains from the plan and source digests from the exact commit',()=>{
  const candidateText='export const cloudValue = 2;\n';
- const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':candidateText}});
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':candidateText}});
  try{
-  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
   const specialist=header('2026-11-01T12:05:26.000Z');
-  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
   const inputPath=path.join(reports,'receipt-input.json');
   const absent=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
   assert.notEqual(absent.status,0,'the plan requires a specialist, so its report cannot be absent');
@@ -689,10 +723,10 @@ test('RISK repository process: release prepare takes specialist domains from the
 });
 
 test('RISK repository process: release prepare refuses a source file that differs from the exact commit',()=>{
- const fixture=makeScaledReviewFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
  try{
-  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
-  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
    'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
   fs.writeFileSync(path.join(fixture.repo,'scripts/cloud-sync.mjs'),'export const cloudValue = 3;\n');
   const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
@@ -702,11 +736,44 @@ test('RISK repository process: release prepare refuses a source file that differ
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
-test('RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change',()=>{
- const fixture=makeScaledReviewFixture({candidate:{'src/feature.mjs':'export const value = 2;\n'}});
+test('RISK repository process: release prepare refuses a changed file it cannot read from the exact commit',()=>{
+ // A read that fails looks like a deleted file unless the two are told apart. A
+ // gitlink is in the commit but has no blob, so reading it fails.
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
  try{
-  const header=completed=>releaseReportHeader(fixture.candidateSha,'approved',completed)+'The review of the exact diff.\n';
-  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  fixture.candidateSha=atReleaseCommitDate(()=>{
+   releaseGateGit(fixture.repo,['update-index','--add','--cacheinfo','160000,'+fixture.baseSha+',scripts/cloud-module']);
+   releaseGateGit(fixture.repo,['commit','-q','-m','Add a gitlink']);
+   return releaseGateGit(fixture.repo,['rev-parse','HEAD']);
+  });
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(prepared.status,0,'a source the digest list silently omits is not fingerprinted');
+  assert.match(prepared.stderr,/scripts\/cloud-module/);
+  assert.equal(fs.existsSync(path.join(reports,'receipt-input.json')),false);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare leaves a file the candidate deleted out of the source digests',()=>{
+ const fixture=datedReleaseFixture({base:{'scripts/cloud-retired.mjs':'export const retired = 1;\n'},candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n','scripts/cloud-retired.mjs':null}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const {sources}=JSON.parse(fs.readFileSync(path.join(reports,'receipt-input.json'),'utf8')).specialistReview;
+  assert.deepEqual(sources.map(source=>path.basename(source.path)),['cloud-sync.mjs']);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change',()=>{
+ const fixture=datedReleaseFixture({candidate:{'src/feature.mjs':'export const value = 2;\n'}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
   const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
   assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
   const inputPath=path.join(reports,'receipt-input.json');
@@ -727,7 +794,7 @@ test('RISK repository process: release prepare leaves FAQ coverage for a person 
 });
 
 test('RISK repository process: release prepare keeps summaries a person already wrote',()=>{
- const fixture=makeScaledReviewFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ const fixture=datedReleaseFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
  try{
   const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
   const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
@@ -2288,7 +2355,7 @@ test('RISK repository process: a real git-fixture test cannot change the reposit
   const value={GIT_DIR:sacrificial.gitDir,GIT_WORK_TREE:sacrificial.root,GIT_INDEX_FILE:sacrificial.indexFile}[variable];
   const before=sacrificial.snapshot();
   const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+fixtureRoot+'$','tests/repository-process.test.js'],
-   {cwd:__dirname,encoding:'utf8',env:{...environmentWithoutGitLocation(),[variable]:value},maxBuffer:16*1024*1024});
+   {cwd:__dirname,encoding:'utf8',env:{...environmentWithoutGitLocation(),[variable]:value},maxBuffer:16*1024*1024,timeout:120000});
   outcomes[variable]={changed:changedSnapshotFields(before,sacrificial.snapshot()),exitStatus:child.status,passed:/^# pass (\d+)$/m.exec(child.stdout||'')?.[1]};
   expected[variable]={changed:[],exitStatus:0,passed:'1'};
  }
@@ -2322,7 +2389,7 @@ if(process.env.NODE_TEST_CONTEXT)process.on('exit',()=>{
   const sacrificial=sacrificialGitRepository(t);
   const fixtureRepository=path.join(workspace,file.replace(/\W/g,'-'));
   const before=sacrificial.snapshot();
-  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--import='+preload,'--test-name-pattern=^no test has this name$',file],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024,
+  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--import='+preload,'--test-name-pattern=^no test has this name$',file],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024,timeout:120000,
    env:{...environmentWithoutGitLocation(),GIT_DIR:sacrificial.gitDir,GIT_WORK_TREE:sacrificial.root,GIT_INDEX_FILE:sacrificial.indexFile,FIXTURE_PRELOAD_REPOSITORY:fixtureRepository}});
   const changed=changedSnapshotFields(before,sacrificial.snapshot());
   const ownFixtureWritten=fs.existsSync(path.join(fixtureRepository,'.git/refs/heads/preload-fixture'));
@@ -2332,25 +2399,23 @@ if(process.env.NODE_TEST_CONTEXT)process.on('exit',()=>{
 });
 
 // #2293: both Nightly cross-engine roots name tests that exist only on the #285
-// work, so the job used to stop at its preflight on every candidate and its red
-// result said nothing about that candidate. Until #285 lands the job must say
-// plainly that it ran nothing and name what it is waiting for. When #285 lands,
-// its roots move to active and this pin goes with them.
-test('RISK repository process: Nightly on this head reports zero cross-engine cases and names both roots pending on the WebKit work',()=>{
- const pending=['RISK repository process: native button gate detects errors raised by a real click','RISK repository process: required native button actions execute in Chromium and WebKit'];
- const parent=fs.mkdtempSync(path.join(os.tmpdir(),'chain-nightly-pending-')),output=path.join(parent,'run');
+// work. This runs in the required core group, so it pins the list itself and not
+// the state of those tests: a landed pending root fails Nightly preflight, never
+// required CI. The fixture cases in test-groups.test.mjs pin the zero-case run.
+test('RISK repository process: the Nightly root list stays valid whether or not its pending roots have landed',()=>{
+ const webkitRoots=['RISK repository process: native button gate detects errors raised by a real click','RISK repository process: required native button actions execute in Chromium and WebKit'];
+ const parent=fs.mkdtempSync(path.join(os.tmpdir(),'chain-nightly-list-')),output=path.join(parent,'run');
  try{
   const head=spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
-  const result=spawnSync(process.execPath,['scripts/test-groups.mjs','--group','nightly-cross-engine','--output-dir',output,'--repository','local/nightly','--event-policy','local','--run-id','1','--run-attempt','1','--source-sha',head,'--comparison-base',head],{cwd:__dirname,encoding:'utf8',timeout:60000});
-  assert.equal(result.status,0,'a dispatched candidate with only pending roots must succeed: '+result.stdout+result.stderr);
-  assert.match(result.stdout,/^::notice [^\n]*\b0 cross-engine cases ran\b/m,'the job must annotate that no cross-engine case ran');
-  const notice=result.stdout.split('\n').find(line=>line.startsWith('::notice'));
-  for(const root of pending)assert.ok(notice.includes(root),'the annotation must name the pending root: '+root);
-  const evidence=JSON.parse(fs.readFileSync(path.join(output,'result.json'),'utf8'));
-  assert.notEqual(evidence.status,'passed','zero cases must never be recorded as a pass');
-  assert.deepEqual(evidence.cases,[]);
-  assert.equal(evidence.crossEngine.casesRun,0);
-  assert.deepEqual(evidence.crossEngine.pendingRoots.map(entry=>[entry.root,entry.pendingOn]).sort(),pending.map(root=>[root,'#285']));
+  const described=spawnSync(process.execPath,['scripts/test-groups.mjs','--describe','--group','core','--output-dir',output,'--repository','local/nightly','--event-policy','local','--run-id','1','--run-attempt','1','--source-sha',head,'--comparison-base',head],{cwd:__dirname,encoding:'utf8',timeout:60000});
+  assert.equal(described.status,0,'the required cohort must accept the declared Nightly roots: '+described.stdout+described.stderr);
+  const {nightlyRoots}=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-assignments.json'),'utf8'));
+  assert.ok(nightlyRoots.length>0,'an empty list would fail every Nightly');
+  for(const root of webkitRoots)assert.ok(nightlyRoots.some(entry=>entry.root===root),'the WebKit root stays declared: '+root);
+  for(const entry of nightlyRoots){
+   assert.ok(fs.existsSync(path.join(__dirname,entry.file)),'each root names a file that exists: '+entry.root);
+   if(Object.hasOwn(entry,'pendingOn'))assert.match(entry.pendingOn,/^#[1-9]\d*$/,'a pending root names its owning PR: '+entry.root);
+  }
  }finally{fs.rmSync(parent,{recursive:true,force:true});}
 });
 

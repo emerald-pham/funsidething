@@ -63,7 +63,7 @@ function parseArgs(argv) {
     ['--cpu-load', 'cpuLoad'],
   ]);
   for (let index = 0; index < argv.length; index++) {
-    if (['--describe','--aggregate','--covered','--changed-groups'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
+    if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
     const key = keyMap.get(argv[index]);
     if (!key) fail(`Unknown argument: ${argv[index]}`);
     if (values[key] !== undefined) fail(`Argument ${argv[index]} was provided more than once.`);
@@ -82,7 +82,7 @@ function parseArgs(argv) {
   for (const [key, value] of Object.entries(defaults)) if (values[key] === undefined) values[key] = value;
   if (values.cpuLoad !== undefined) {
     // Evidence modes produce or read canonical results, which a load run is not.
-    const mode = ['describe', 'aggregate', 'covered', 'changed-groups'].find(name => values[name]);
+    const mode = ['describe', 'aggregate', 'covered'].find(name => values[name]);
     if (mode) fail(`--cpu-load cannot be used with --${mode}: a loaded run is never canonical evidence.`);
     const workers = Number(values.cpuLoad);
     if (!/^[1-9]\d*$/.test(values.cpuLoad) || workers > MAX_CPU_LOAD_WORKERS) fail(`--cpu-load must be a whole number of busy processes from 1 to ${MAX_CPU_LOAD_WORKERS}.`);
@@ -567,8 +567,21 @@ function countTestRegistrations(source, testName) {
   return literalTestRegistrations(source).get(testName) || 0;
 }
 function literalTestRegistrations(source) {
+  return scanTestTitles(source).plain;
+}
+// How often a nightly root is written in its file. Active and pending rows share
+// this, so a title that fails one way cannot pass the other. Beyond plain direct
+// calls it reads escaped and template titles, and a title kept in any literal in
+// code (a constant or a table the file then registers from). A title built at
+// run time (concatenated or interpolated) has no literal to read.
+function nightlyRootRegistrations(source, root) {
+  const { called, spelled } = scanTestTitles(source), title = normalizeTapIdentity(root);
+  return called.get(title) || spelled.get(title) || 0;
+}
+function scanTestTitles(source) {
   if (literalRegistrationCache.has(source)) return literalRegistrationCache.get(source);
-  const titles = new Map();
+  const plain = new Map(), called = new Map(), spelled = new Map();
+  const bump = (counts, title) => counts.set(title, (counts.get(title) || 0) + 1);
   let index = 0;
   let pendingTestCall = false;
   let awaitingTitle = false;
@@ -680,7 +693,12 @@ function literalTestRegistrations(source) {
     }
     if (character === "'" || character === '"') {
       const literal = readQuoted(index, character);
-      if (awaitingTitle && !literal.escaped) titles.set(literal.value, (titles.get(literal.value) || 0) + 1);
+      if (awaitingTitle && !literal.escaped) bump(plain, literal.value);
+      if (literal.value !== null) {
+        const decoded = decodeStringLiteral(source.slice(index + 1, literal.next - 1));
+        bump(spelled, decoded);
+        if (awaitingTitle) bump(called, decoded);
+      }
       awaitingTitle = false;
       pendingTestCall = false;
       previousToken = 'string';
@@ -688,7 +706,13 @@ function literalTestRegistrations(source) {
       continue;
     }
     if (character === '`') {
-      index = skipTemplate(index);
+      const next = skipTemplate(index), body = source.slice(index + 1, next - 1);
+      if (!/(?<!\\)(?:\\\\)*\$\{/.test(body)) {
+        const decoded = decodeStringLiteral(body);
+        bump(spelled, decoded);
+        if (awaitingTitle) bump(called, decoded);
+      }
+      index = next;
       awaitingTitle = false;
       pendingTestCall = false;
       previousToken = 'template';
@@ -721,8 +745,9 @@ function literalTestRegistrations(source) {
     previousToken = token;
     index += token.length;
   }
-  literalRegistrationCache.set(source, titles);
-  return titles;
+  const scan = { plain, called, spelled };
+  literalRegistrationCache.set(source, scan);
+  return scan;
 }
 
 // A root registered as a plain-string test(...) call at the start of a line
@@ -913,7 +938,7 @@ function nightlySelection(assignmentIndex) {
   const entries = [...assignmentIndex.nightlyRoots.values()];
   if (!entries.length) fail('No nightly cross-engine roots are declared in scripts/test-group-assignments.json.');
   const pending = entries.filter(entry => entry.pendingOn), active = entries.filter(entry => !entry.pendingOn);
-  const registrations = entry => countTestRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+  const registrations = entry => nightlyRootRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
   for (const entry of pending) {
     if (registrations(entry)) fail(`Pending nightly cross-engine root ${JSON.stringify(entry.root)} (${entry.pendingOn}) has landed in ${entry.file}; remove its pendingOn to move it to active so it runs.`);
   }
@@ -1232,23 +1257,6 @@ async function runChild(files, roots, outputDir, options, source, heapMb) {
   };
 }
 
-// The groups a diff needs, as CI routes them. Each CI gate is keyed on the
-// complete checkout tree, so a changed file of any kind runs every group CI's
-// cohort declares; GROUP_IDS is that cohort, handed to the router by --describe.
-// A retained pass for identical inputs only reuses a run CI already has.
-function listChangedGroups(options) {
-  for (const [key, flag] of [['group', '--group'], ['outputDir', '--output-dir'], ['describe', '--describe'], ['aggregate', '--aggregate'], ['covered', '--covered']]) {
-    if (options[key] !== undefined) fail(`--changed-groups writes no evidence, so it cannot take ${flag}.`);
-  }
-  if (!options.comparisonBase) fail('--changed-groups needs --comparison-base <commit> for the diff.');
-  if (requireGit(['rev-parse', '--verify', '--quiet', '--end-of-options', `${options.comparisonBase}^{commit}`], 'utf8').status !== 0) {
-    fail(`Unknown comparison base ${JSON.stringify(options.comparisonBase)}.`);
-  }
-  process.stdout.write(`${GROUP_IDS.join('\n')}\n`);
-  process.stderr.write('CI keys every group on the complete tree, so no file set narrows this list.\n');
-  return 0;
-}
-
 async function main() {
   if (process.argv.slice(2).includes('--help')) {
     process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha> [--cpu-load <busy-processes>]\n');
@@ -1259,7 +1267,6 @@ async function main() {
   const startedAt = new Date().toISOString();
   try {
     const parsed = parseArgs(process.argv.slice(2));
-    if (parsed['changed-groups']) return listChangedGroups(parsed);
     outputDir = validateOutputDirectory(parsed.outputDir);
     options = requiredIdentity(parsed);
   } catch (error) {

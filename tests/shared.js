@@ -405,6 +405,7 @@ function createDeviceBudgetClock(budgetMs){
 // Spend exactly one budget, only once storage has reached the stall under test.
 async function expireDeviceBudget(clock,reached,message){
  await fixtureDeadline(async wait=>{while(!reached())await wait();},message);
+ assert.ok(clock.armed>0,'No device budget timer was armed when '+message+': the budget no longer matches the configured delay, so it would run on a real timer');
  await clock.advance();
 }
 

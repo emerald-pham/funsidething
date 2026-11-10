@@ -49,10 +49,13 @@ Completed: <UTC ISO timestamp with milliseconds>
 With the exact candidate checked out, run
 `npm run release:prepare -- <candidate-sha> <base-sha> <report-directory> <issue-number>`.
 It writes `receipt-input.json` beside the reports, with digests, the plan's
-domains, each report's time, and source digests of the changed files in that
-exact commit. It refuses a report that names another commit, has no approved
-verdict, or has a missing or future time. It also refuses a changed file that
-differs on disk and an existing `receipt-input.json`. Task identities are `owner:<issue>`,
+domains and each report's time. It refuses a report that names another commit,
+has no approved verdict, or has a missing or future time or one earlier than the
+candidate commit. It also refuses one report body used for both the owner and
+independent review, an issue that is not a positive whole number, and an existing
+`receipt-input.json`. When the plan includes `memory-cloud-sync`, it also writes
+source digests of the changed files in that exact commit, and refuses a changed
+file that differs on disk or that it cannot read from the commit. Task identities are `owner:<issue>`,
 `independent-review:<issue>` and `specialist-review:<issue>`. A person then
 fills the fields left empty: every `summary`, the owner `scope.rationale`,
 `faqCoverage` and `memoryScope`. `release:record` refuses them while empty. An

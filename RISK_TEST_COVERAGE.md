@@ -1441,6 +1441,7 @@ its RISK test; the map follows.
 - RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay
 - RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits
 - RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected
+- RISK offline startup budget: spending a budget no timer armed fails the test
 - RISK offline startup budget: a stalled start stays pending until its one controlled budget expires
 - RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work
 - RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
@@ -1663,9 +1664,14 @@ its RISK test; the map follows.
 - RISK repository process: release prepare refuses a report naming another commit
 - RISK repository process: release prepare refuses a report with no approved verdict
 - RISK repository process: release prepare refuses a report with a missing or future completion time
+- RISK repository process: release prepare refuses an issue that is not a positive whole number
+- RISK repository process: release prepare refuses a completion time before the candidate commit
+- RISK repository process: release prepare refuses one report body used for both the owner and independent review
 - RISK repository process: release prepare needs only the reports the derived plan requires
 - RISK repository process: release prepare takes specialist domains from the plan and source digests from the exact commit
 - RISK repository process: release prepare refuses a source file that differs from the exact commit
+- RISK repository process: release prepare refuses a changed file it cannot read from the exact commit
+- RISK repository process: release prepare leaves a file the candidate deleted out of the source digests
 - RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change
 - RISK repository process: release prepare keeps summaries a person already wrote
 - RISK repository process: release recording classifies the tail of a complete large diff
@@ -1744,7 +1750,7 @@ its RISK test; the map follows.
 - RISK repository process: nested native fixture output stays isolated at the command boundary
 - RISK repository process: a real git-fixture test cannot change the repository an inherited git variable names
 - RISK repository process: every test file keeps inherited git variables away from the fixtures it spawns
-- RISK repository process: Nightly on this head reports zero cross-engine cases and names both roots pending on the WebKit work
+- RISK repository process: the Nightly root list stays valid whether or not its pending roots have landed
 - RISK test inventory: the group CPU-load option stays local, guided and off in every required entry point
 
 ## tests/scenery.test.js
