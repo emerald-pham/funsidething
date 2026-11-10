@@ -22056,5 +22056,77 @@
       "command": "A local helper script outside this repository, not retained, which served the worktree on an OS-assigned port, set LANDSCAPE_BROWSER_URL and LANDSCAPE_PLAYWRIGHT, and ran the test named RISK backup memory browser on the unchanged app at 3d78746. To repeat it, serve a checkout at a local URL, set those two variables and run node --test --test-name-pattern='RISK backup memory browser' tests/persistence-recovery.test.js. | None for these changes: adding a viewport and renaming titles fix test coverage and names, not app behavior. Run as LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK steady scanner browser' tests/core.test.js | LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK long scan memory browser' tests/persistence-recovery.test.js, three runs before the change | LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/index.html LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK manual backup reminder' tests/persistence-recovery.test.js",
       "failure": "chromium: 30 extra backups added 124 MiB at opening and 168 MiB at Settings; webkit: 30 extra backups added 104 MiB at opening and 412 MiB at Settings, against a 64 MiB margin. | No failure was observed: the tablet cases passed on their first run in Chromium and WebKit, 4 tests passing, so they record existing behavior at that size rather than a repaired fault. | All three runs failed on the old total-growth check. First run: 'chromium: 60 answers grew web process memory by 168 MiB, above the 117 MiB allowance' and 'webkit: 60 answers grew web process memory by 394 MiB, above the 117 MiB allowance'. Second run: 161 and 385 MiB. Third run: 166 and 379 MiB. No other assertion failed. | Before the wording changed: 'RISK manual backup reminder guidance' failed with: The input did not match the regular expression /keeping more than two takes up space on this device/, and the reminder tests failed with the reminder text still reading: Keeping more than two manual backups slows the app down."
     }
+  },
+  {
+    "baseCommit": "cb48e3cee0cebfa2d8f126f5a0b75d124d555c15",
+    "weakenedTestLines": [
+      "tests/core.test.js:-&&![...String(row.markup).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].some(match=>match[1]===doneId)),",
+      "tests/core.test.js:-'the actual reveal action records this device’s list-open choice and keeps it around newer cloud task data');",
+      "tests/core.test.js:-action as clicking a title in the list. The chain breadcrumb crumbs reuse",
+      "tests/core.test.js:-as-is. */",
+      "tests/core.test.js:-assert.deepEqual({afterReveal,adopted,repeatedPull,reloaded:{listOpen:reopened.ctx.state.listOpen,hidden:reopened.shim.document.getElementById('listBody').hidden}},",
+      "tests/core.test.js:-assert.doesNotMatch(scan,new RegExp(`data-act=\"reveal\" data-id=\"${task.id}\"`),'the completed task is not rendered as a dotted member');",
+      "tests/core.test.js:-assert.doesNotThrow(()=>ctx.revealTask(base.tasks[0].id));",
+      "tests/core.test.js:-assert.match(scanHtml, />First dot</, \"the crumb shows the task's own title, not the word Edit\");",
+      "tests/core.test.js:-assert.match(scanHtml, new RegExp(`class=\"crumb\" data-act=\"reveal\" data-id=\"${first.id}\"`));",
+      "tests/core.test.js:-await opened.ctx.cloudPull();",
+      "tests/core.test.js:-await opened.ctx.cloudPull();",
+      "tests/core.test.js:-const adopted={title:opened.ctx.state.tasks[0].title,listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden};",
+      "tests/core.test.js:-const afterReveal={listOpen:opened.ctx.state.listOpen,cachedListOpen:JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null')?.listOpen??null,hidden:opened.shim.document.getElementById('listBody').hidden};",
+      "tests/core.test.js:-const crumbs=[...row.querySelectorAll('[data-act=\"reveal\"]:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));",
+      "tests/core.test.js:-const dots=visible.filter(c=>c.matches('[data-act=\"reveal\"]')).map(dot=>{const style=getComputedStyle(dot);pen.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;return {id:dot.dataset.id,room:dot.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),natural:pen.measureText(dot.textContent).width};});",
+      "tests/core.test.js:-const ids=[...String(html).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]);",
+      "tests/core.test.js:-const local=syncState({tasks:[task],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});",
+      "tests/core.test.js:-const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});",
+      "tests/core.test.js:-const painted=[...String(value).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]);",
+      "tests/core.test.js:-const painted=[...String(value).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]);",
+      "tests/core.test.js:-const remote=syncState({tasks:[{...task}],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});",
+      "tests/core.test.js:-const reopened=await loadApp({sharedStorage:storage});",
+      "tests/core.test.js:-const repeatedPull={listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden,remoteListOpen:h.remoteState().listOpen};",
+      "tests/core.test.js:-const scanHtml = shim.elements.get(\"scan\").innerHTML;",
+      "tests/core.test.js:-const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)}),h=makeSyncHarness({remote,rev:5});",
+      "tests/core.test.js:-const task=syncTask('shared-reveal','Shared task');",
+      "tests/core.test.js:-const visible=[...String(value).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]),bench=String(value).match(/data-act=\"bench-done\" data-benchmark=\"([^\"]+)\"/);",
+      "tests/core.test.js:-const visible=[...String(value).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]),bench=String(value).match(/data-act=\"bench-done\" data-benchmark=\"([^\"]+)\"/);if(bench)visible.push(bench[1]);",
+      "tests/core.test.js:-const { ctx, shim } = await loadApp({ seed: 95 });",
+      "tests/core.test.js:-opened.ctx.onAction('reveal',{dataset:{id:'shared-reveal'}});",
+      "tests/core.test.js:-return {chain:[...state.chain],everyDot:[...row.querySelectorAll('[data-act=\"reveal\"]')].map(d=>d.dataset.id),dots,font,text:row.innerText,",
+      "tests/core.test.js:-shim.document.querySelector=selector=>{if(selector.includes('autofocus'))throw Error('invalid selector');return null;};",
+      "tests/core.test.js:-shim.document.querySelectorAll=selector=>{assert.equal(selector,'[data-row]');return [];};",
+      "tests/core.test.js:-test(\"UI: the chain breadcrumb still reveals-in-list (untouched by the Edit swap)\", async () => {",
+      "tests/core.test.js:-test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal',async()=>{",
+      "tests/core.test.js:-test('RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload',async()=>{",
+      "tests/core.test.js:-the old reveal-in-list behavior on purpose — they show the task's own",
+      "tests/core.test.js:-title, not a \"Reveal\" label, so they're a different affordance and stay",
+      "tests/core.test.js:-vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);",
+      "tests/core.test.js:-vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);",
+      "tests/core.test.js:-{afterReveal:{listOpen:true,cachedListOpen:true,hidden:false},adopted:{title:'Shared task',listOpen:true,hidden:false},repeatedPull:{listOpen:true,hidden:false,remoteListOpen:false},reloaded:{listOpen:true,hidden:false}},",
+      "tests/core.test.js:-});",
+      "tests/persistence-recovery.test.js:-const crumbs=[...String(html).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]);",
+      "tests/persistence-recovery.test.js:-const painted=[...String(value).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]);",
+      "tests/persistence-recovery.test.js:-const visible=[...String(value).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].map(match=>match[1]),bench=String(value).match(/data-act=\"bench-done\" data-benchmark=\"([^\"]+)\"/);if(bench)visible.push(bench[1]);",
+      "tests/shared.js:-&&![...String(row.markup).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].some(match=>match[1]===doneId)),",
+      "tests/shared.js:-&&![...String(row.markup).matchAll(/data-act=\"reveal\" data-id=\"([^\"]+)\"/g)].some(match=>match[1]===doneId)),"
+    ],
+    "reason": "#221 changes what a chain trail pill does: it now opens that task's editor (the same edit action as the benchmark card's Edit) instead of revealing the task in All Tasks. Nothing else used the reveal action, so the spec retires it with revealTask, its diagnostics entry and the row flash highlight. Tests that pinned the pill's old data-act=\"reveal\" markup, the reveal-in-list contract and the reveal action itself are migrated to the new pill markup or retired.",
+    "previousBehavior": "Each pill in the chain trail was <button class=\"crumb\" data-act=\"reveal\">; pressing it cleared list filters, opened All Tasks and scrolled to and flashed the task row, and the open-list choice was saved per device. Many sync and completion tests read the rendered chain order from the regular expression data-act=\"reveal\" data-id=\"…\", and two browser geometry tests selected pills with [data-act=\"reveal\"]. The import-rendering RISK test called ctx.revealTask with an injected identifier.",
+    "intendedBehavior": "Each pill is <button class=\"crumb\" data-act=\"edit\"> with an accessible name saying it opens that task; pressing it opens the task editor and leaves All Tasks closed, so Return as candidate is one tap away. Chain-order readers match class=\"crumb\" data-act=\"edit\" data-id=\"…\" (or the .crumb selector in the browser tests), which still excludes the benchmark card's own Edit button. The import-rendering RISK test now opens the editor for the injected identifier through the real edit action and checks the editor markup instead of calling the retired revealTask.",
+    "preservedCoverage": [
+      "Every test that read chain order from the trail keeps its assertions; only the selector moved from data-act=\"reveal\" to class=\"crumb\" data-act=\"edit\", which matches only trail pills. Before migration three of them failed and the rest matched nothing in the trail, so the selector change restores what they check rather than loosening it.",
+      "The completion-lifecycle check that a completed task is not rendered as a dotted member still asserts that no trail pill names it, using the new pill markup.",
+      "The benchmark and candidate card tests still assert that no data-act=\"reveal\" control appears anywhere on the scan panel.",
+      "RISK saved view cloud adoption still proves through the real All Tasks toggle that this device keeps its open list through cloud adoption and reload; only the reveal action that also opened the list is gone.",
+      "RISK IMPORT RENDERING still checks that restored identifiers cannot inject attributes into the context panel, quick-add row, scan panel, list and Settings, and now also that opening the task cannot.",
+      "The two steady-scanner browser tests keep every geometry assertion; they select pills by .crumb."
+    ],
+    "replacementTests": [
+      "UI #221: tapping a pill in the chain trail opens that task's editor and leaves All Tasks as it was",
+      "UI #221: each chain pill is a native button whose accessible name says it opens that task",
+      "RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break opening the task"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"UI #221: tapping a pill in the chain trail opens\" tests/core.test.js on the unchanged app (record .git/agent-test-runs/issue-221/2026-11-10T19-47-47-615Z-847ef78f-c386-4e02-b091-c1354ca096ea.json) | after the pill change: node --test --test-name-pattern=\"UI: the chain breadcrumb still reveals-in-list\" tests/core.test.js (record .git/agent-test-runs/issue-221/2026-11-10T19-48-05-118Z-03e5229c-73c1-4329-922b-11c1a7232543.json) | after retiring reveal: node --test --test-name-pattern=\"RISK saved view reveal|RISK IMPORT RENDERING: restored identifiers\" tests/core.test.js (record .git/agent-test-runs/issue-221/2026-11-10T19-48-31-675Z-b5b25081-d60e-446e-9ae9-80cce69a6f23.json) | before migrating chain-order readers: the scoped Undo, deletion, completion lifecycle and completion boundary tests in tests/core.test.js and tests/persistence-recovery.test.js (records .git/agent-test-runs/issue-221/2026-11-10T19-49-29-604Z-2f20ce87-dba3-43cf-81de-682e5c5f2fbe.json and .git/agent-test-runs/issue-221/2026-11-10T19-49-31-821Z-346716ff-65fc-42f8-8858-cd81ab5b836b.json)",
+      "failure": "New pill test on the unchanged app: AssertionError \"the pill opens the task editor\" (pressing the reveal pill left the modal on the first-run FAQs, no editor). | Old pill test after the change: \"The input did not match the regular expression /class=\"crumb\" data-act=\"reveal\" data-id=\"…\"/\" because the pill now carries data-act=\"edit\". | After retiring reveal: RISK saved view reveal failed \"the actual reveal action records this device’s list-open choice and keeps it around newer cloud task data\"; RISK IMPORT RENDERING failed \"Got unwanted exception. TypeError: ctx.revealTask is not a function\". | Chain-order readers before migration: \"every post-Undo stale replay paint retains the restored target membership\", \"every pre-Undo recovery paint retains the valid informed return\" and \"done-0: the rendered benchmark and crumbs match the live chain\"; the other readers passed only because their reveal selector matched nothing in the trail."
+    }
   }
 ]

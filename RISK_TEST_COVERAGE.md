@@ -1680,6 +1680,16 @@ its RISK test; the map follows.
 - RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice
 - RISK debug log link #2309: Download debug log delivers the file while the link holds the opening
 - RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read
+- RISK chain return sync: a returned dot stays returned through cloud acknowledgement, a stale device save and reload
+- RISK chain return sync: a return on one device and a Dot of another task on the other are both honored in either publication order
+- RISK chain return sync: another device completing the returned task keeps it completed in either publication order
+- RISK chain return sync: a later explicit Dot of the returned task on the other device puts it back on the chain everywhere
+- RISK chain return Undo: Undo puts the dot back in place and keeps a Dot the other device made since, through stale delivery and reopen
+- RISK chain return offline: a return made offline is saved on this device, reaches the cloud on reconnect, and a duplicate delivery changes nothing
+- RISK chain return device save failure: a failed save warns honestly, keeps the earlier saved board and holds the cloud until a save succeeds
+- RISK chain return compatibility: a client from before #221 cannot push a returned dot back and keeps the return intact through its own saves
+- RISK chain return compatibility: a board saved before #221 opens with the same chain and saved bytes, and its dots can be returned
+- RISK chain return sync: returning the only dot Start placed leaves an empty chain through a peer merge and reload, with no replacement dot
 
 ## tests/repository-process.test.js
 
