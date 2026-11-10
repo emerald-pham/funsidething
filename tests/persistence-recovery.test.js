@@ -706,6 +706,47 @@ test('RISK rapid action durability: ten distinct actions remain pending through 
  const head=await store.readHead();await app.dispose();const reopened=await loadAppAtTime(at,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off',async pull(){return{error:true};},async push(){return{error:true};}})});apps.push(reopened);assertFacts(reopened.ctx.state);assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload);
 });
 
+// #2306: a save that had to be repaired over a head moved by another page merges
+// both pages' choices, and projecting the merged Start cleared the candidate. The
+// repaired board was drawn without dealing, leaving a chain with nothing to decide.
+test('RISK rapid action durability: answers repaired over another saved copy mid-sync still offer the next candidate with no extra tap',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='rapid-repair-'+Math.random(),at=Date.parse('2026-10-20T15:00:00Z');
+ const board=syncState({tasks:Array.from({length:24},(_,i)=>Object.assign(syncTask('repair-'+i,'Task '+i),{mu:50-i,sigma:5})),chain:[],candidateId:null,mode:'scan',scanMode:'descending',passId:'repair-pass',passStartedAt:0,snooze:100,syncAccount:'e@example.com',syncRev:4,syncDirty:false,updatedAt:at-HOUR,settings:{horizonMin:60,thresholdPct:0,samples:50,cantMin:30,workedHours:8,theme:'system'}}),raw=JSON.stringify(board),h=makeSyncHarness({remote:board,rev:4,delayMs:2});
+ const open=options=>loadAppAtTime(at,{indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:h.factory,...options});
+ const first=await open({seed:2306,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx,shim}=first,apps=[first];
+ t.after(async()=>{for(const item of apps){item.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',item.ctx);await item.dispose();}});
+ const until=async(predicate,label)=>{const end=performance.now()+10000;do{if(await predicate())return;await syncSettle(15);}while(performance.now()<end);assert.fail(label);};
+ const control=app=>({dataset:{candidate:app.ctx.state.candidateId,benchmark:app.ctx.state.chain.at(-1)}});
+ await ctx.cloudPull();ctx.onAction('start-scan',{dataset:{}});assert.equal(ctx.state.chain.length,1,'a real Start seeds this pass');ctx.cloudPushNow();await settleSavedViewPublication(first,h,'Start reaches the cloud');
+ const second=await open({seed:2307,sharedStorage:shim.localStorage});apps.push(second);await second.ctx.cloudPull();await settleSavedViewPublication(second,h,'second page matches the cloud');
+ const otherAnswer=control(second);second.ctx.onAction('no',otherAnswer);assert.equal(await second.ctx.persist(),true,'the other page moves the saved head');second.ctx.suspendCloudSync();
+ const events=()=>ctx.state.decisionEvents.filter(row=>row.kind!=='current-choice'),noControl=control(first);
+ ctx.onAction('no',noControl);const yesControl=control(first);assert.notEqual(yesControl.dataset.candidate,noControl.dataset.candidate,'the first answer deals the next candidate');
+ ctx.onAction('yes',yesControl);const mine=events().map(row=>row.id);assert.equal(mine.length,2,'both answers are accepted before the repair');
+ await until(()=>{const head=vm.runInContext('!cloudPushInFlight&&!pulling',ctx);return head&&events().length===3&&h.doc.payload===ctx.cloudPayload();},'the repaired board reaches the cloud');
+ const scan=shim.document.getElementById('scan').innerHTML,offered=ctx.state.candidateId;
+ assert.ok(offered,'tasks remain, so a candidate is dealt without any further action');
+ assert.ok(ctx.pool().some(row=>row.id===offered),'the dealt candidate is one the pass can still offer');
+ assert.match(scan,new RegExp('data-act="yes" data-candidate="'+offered+'"'),'its Yes control is on screen');
+ assert.match(scan,new RegExp('data-act="no" data-candidate="'+offered+'"'),'its No control is on screen');
+ assert.deepEqual(events().map(row=>row.id).filter(id=>mine.includes(id)).sort(),[...mine].sort(),'each accepted answer is kept exactly once');
+ assert.equal(new Set(ctx.state.decisionEvents.map(row=>row.id)).size,ctx.state.decisionEvents.length,'no answer is duplicated by the repair');
+ assert.equal(ctx.state.considered[otherAnswer.dataset.candidate],'no','the other page\'s answer survives the repair');
+ assert.equal(ctx.state.chain.includes(yesControl.dataset.candidate),true,'the Yes remains on the chain');
+ const dealt=JSON.stringify(ctx.state);ctx.onAction('no',noControl);assert.equal(JSON.stringify(ctx.state),dealt,'an answer aimed at an already-replaced candidate does nothing');
+ const pushes=h.calls.filter(call=>call==='push').length;ctx.render();await syncSettle(60);
+ assert.equal(JSON.stringify(ctx.state),dealt,'redrawing a dealt candidate changes nothing');assert.equal(h.calls.filter(call=>call==='push').length,pushes,'dealing is not a cloud write of its own');
+ await until(async()=>(await ctx.window.ScannerDeviceStore.readHead())?.payload===JSON.stringify(ctx.state)||await ctx.persist()&&(await ctx.window.ScannerDeviceStore.readHead())?.payload===JSON.stringify(ctx.state),'the repaired board is durable');
+ const reopened=await open({sharedStorage:shim.localStorage});apps.push(reopened);
+ assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.decisionEvents)).map(row=>row.id).sort(),JSON.parse(JSON.stringify(ctx.state.decisionEvents)).map(row=>row.id).sort(),'reload keeps every accepted answer once');
+ assert.match(reopened.shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'reload still offers a candidate');
+ await ctx.onAction('undo',{});
+ assert.equal(ctx.state.chain.includes(yesControl.dataset.candidate),false,'Undo reverses only the latest answer');
+ assert.equal(ctx.state.considered[noControl.dataset.candidate],'no','Undo keeps the earlier answer');
+ assert.equal(ctx.state.considered[otherAnswer.dataset.candidate],'no','Undo keeps the other page\'s answer');
+ assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'Undo still leaves a candidate to decide');
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.
