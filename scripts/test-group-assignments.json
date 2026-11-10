@@ -640,7 +640,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "root": "RISK downloads visual browser: Download backup, Download board only beside a partial backup, the Restore choices and Troubleshooting render like their neighbours, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -732,7 +732,7 @@
     },
     {
       "baselineRoot": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
-      "currentRoot": "RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore",
+      "currentRoot": "RISK backup and Restore consolidation: Settings keeps one Download backup and one guarded Restore",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
@@ -740,7 +740,7 @@
     },
     {
       "baselineRoot": "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable",
-      "currentRoot": "RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable",
+      "currentRoot": "RISK backup format browser: enlarged unreadable Settings keeps the Restore choices and the backup safety text readable",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
@@ -788,7 +788,7 @@
     },
     {
       "baselineRoot": "RISK support diagnostics: Settings names the existing board export for its contents",
-      "currentRoot": "RISK support diagnostics: Settings names the board and recovery downloads for their contents",
+      "currentRoot": "RISK support diagnostics: Settings names Download backup and the FAQ names what each download holds",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
@@ -961,6 +961,102 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation",
+      "currentRoot": "RISK Settings hierarchy: moved Changelog leaves no Save settings button and committed fields keep their validation",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save",
+      "currentRoot": "RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and saving as you change",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: cantMin is read, clamped [5,480], and persisted independently of horizonMin",
+      "currentRoot": "committed settings: cantMin saves on its own and leaves horizonMin alone",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: cantMin below 5 clamps up to 5, above 480 clamps down to 480",
+      "currentRoot": "committed settings: an out-of-range cantMin returns to its last valid value instead of clamping",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a blank/non-numeric cantMin falls back to 30, not to horizonMin's default",
+      "currentRoot": "committed settings: a blank or non-numeric cantMin returns to its last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a literal 0 is falsy and falls back to the default rather than clamping to the minimum (shared quirk with horizonMin/thresholdPct)",
+      "currentRoot": "committed settings: 0 for horizonMin or cantMin returns to the last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: workedHours is read, clamped [1,720], and persisted independently of the other fields",
+      "currentRoot": "committed settings: workedHours saves on its own and leaves the other fields alone",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: workedHours below 1 clamps up to 1, above 720 clamps down to 720",
+      "currentRoot": "committed settings: an out-of-range workedHours returns to its last valid value instead of clamping",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a blank or non-numeric workedHours falls back to the default",
+      "currentRoot": "committed settings: a blank or non-numeric workedHours returns to its last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a literal 0 workedHours is falsy and takes the default, not a clamp to 1",
+      "currentRoot": "committed settings: 0 workedHours returns to the last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks",
+      "currentRoot": "RISK Squared Weighting consumer transitions: actual Settings changes switch modes without changing ratings or pass marks",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK cloud current choices: Save settings retains changed shared preferences as one action",
+      "currentRoot": "RISK cloud current choices: each committed shared preference is retained as its own action",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }

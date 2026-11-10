@@ -201,7 +201,7 @@ its RISK test; the map follows.
 - RISK chain start: the choice follows the board to another device beside an independent peer edit
 - RISK chain start: a started Most likely pass publishes reloads and resumes with its saved draw
 - RISK chain start: synced Undo reverses the option and the Start it enabled without learning
-- RISK chain start: Save settings alone persists the Chain starts with transition
+- RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button
 - RISK chain start: Quick start and the immediate-save FAQ describe the dropdown
 - RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox
 - RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption
@@ -294,8 +294,9 @@ its RISK test; the map follows.
 - RISK context sync: concurrent clients offline reload reconnect and remote completion preserve revisioned filters and recovery
 - RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate
 - RISK changelog dates: direct FAQ notes combine repeated dates in descending order without losing history categories or links
-- RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation
-- RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save
+- RISK Settings hierarchy: moved Changelog leaves no Save settings button and committed fields keep their validation
+- RISK Settings help: every control has at most one short line of help and no repeated save or sync phrases
+- RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and saving as you change
 - RISK context and Settings browser: touch keyboard filter counts disclosure scrolling and saved controls work on Chrome and WebKit
 - RISK context marker browser: green checks and red exclusions retain readable symbols in both themes
 - RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect
@@ -399,9 +400,12 @@ its RISK test; the map follows.
 - RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
-- RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore
+- RISK Data and backups layout: one status line, Make backup, Download backup, Restore, the backup list, closed Troubleshooting and Reset everything, with Clear history only in History
+- RISK Settings install: Install this app on your phone sits outside Scanning and recurrence
+- RISK backup and Restore consolidation: Settings keeps one Download backup and one guarded Restore
 - RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board
-- RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable
+- RISK backup format browser: enlarged unreadable Settings keeps the Restore choices and the backup safety text readable
+- RISK committed settings: every remaining Settings field saves when committed, survives a reload and takes effect
 - RISK quick Add: retired Add and dot is absent while ordinary Add preserves contexts and the current chain
 - RISK quick Add: retired add-dot actions cannot create a task or discard an unsaved draft
 - RISK quick Add: help removes the retired shortcut and retains participating editor Dot as a rank decision
@@ -516,10 +520,10 @@ its RISK test; the map follows.
 - RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguous deletion
 - RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab
 - RISK LOCAL BACKUPS: concurrent backup append survives a confirmed manual delete
-- RISK JSON COPY PASTE: Download board saves the exact board JSON without saving, and pasting it restores through the guarded preview
-- RISK JSON COPY PASTE: Quick start explains Download board, copying the file and guarded paste
+- RISK JSON COPY PASTE: a partial Download backup offers Download board only, which saves the exact board JSON without saving, and pasting it restores through the guarded preview
+- RISK JSON COPY PASTE: Quick start explains Download backup, copying the file and guarded paste
 - RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact saved sources and repair metadata without writes
-- RISK DOWNLOADS: Settings offers exactly one board export and one recovery export, and both files round-trip through Restore
+- RISK DOWNLOADS: Settings offers one Download backup, and the backup and the board-only file both round-trip through Restore
 - RISK DOWNLOADS: Restore still accepts every earlier export format: board JSON, compact and pretty recovery archives and repair exports
 - RISK DOWNLOADS: a board edit while the saved rows are read marks the recovery file partial
 - RISK DOWNLOADS: Download recovery file says it is preparing while it runs, and says so when a protected recovery action stops it
@@ -535,6 +539,7 @@ its RISK test; the map follows.
 - RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without inventing a current board
 - RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diagnostics and partial-report limits
 - RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the recovery file for repairs
+- RISK storage-failure messages: a failed device save names Download backup, or Download board only once a backup has come out partial
 - RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage
 - RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file
 - RISK MANUAL JSON EXPORT: unreadable, unsupported, changing and hydration-placeholder sources make a recovery file marked partial, never a complete one
@@ -932,7 +937,8 @@ its RISK test; the map follows.
 - RISK daily backup retention adoption copy: in browser storage, the board a device had before taking another device’s newer cloud board stays restorable for seven calendar days, even when that day’s daily backup already holds the same board
 - RISK daily backup retention adoption copy: in browser storage, a large board a device had before taking another device’s newer cloud board stays restorable on that day
 - RISK daily backup retention adoption copy: a manual backup of the same board does not stand in for the copy kept before taking a newer cloud board, so deleting it keeps the earlier board restorable for seven calendar days
-- RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted
+- RISK simpler Settings guidance: the Data and backups FAQ holds the moved sync, retention and error explanations within 130 words, and the current changelog describes the simpler Settings
+- RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted
 - RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering
 - RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections
 - RISK fresh Halving default: new clients use Halving while legacy normalization and saved choices survive
@@ -942,7 +948,7 @@ its RISK test; the map follows.
 - RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights
 - RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo
 - RISK Squared Weighting joins: newly eligible tasks share one frozen scale regardless of input ordering
-- RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks
+- RISK Squared Weighting consumer transitions: actual Settings changes switch modes without changing ratings or pass marks
 - RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds
 - RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance
 - RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work
@@ -1274,7 +1280,7 @@ its RISK test; the map follows.
 - RISK cloud current choices: scan mode preference records an explicit timed choice
 - RISK cloud current choices: Resume scanning records an explicit active-pass mode change
 - RISK cloud current choices: explicit Start scanning mode records its new active pass
-- RISK cloud current choices: Save settings retains changed shared preferences as one action
+- RISK cloud current choices: each committed shared preference is retained as its own action
 - RISK cloud current choices: immediate preference controls retain their action times
 - RISK cloud current choices: Start scanning pass root and frozen draw survive a fresh client reopen
 - RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions
@@ -1378,7 +1384,7 @@ its RISK test; the map follows.
 - RISK recovery identity consumers: signed-in Add clears its captured draft after recovery
 - RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery
 - RISK recovery identity consumers: verified cloud adoption rebases independent saved extension fields for the same UID
-- RISK support diagnostics: Settings names the board and recovery downloads for their contents
+- RISK support diagnostics: Settings names Download backup and the FAQ names what each download holds
 - RISK debug log: FAQ distinguishes an idle preview from accepted recovery verification
 - RISK debug log: shared storage capacity belongs to accepted board saves before diagnostics
 - RISK debug log: shared device capacity preserves mandatory backups before restart metadata
@@ -1517,7 +1523,7 @@ its RISK test; the map follows.
 - RISK large board deliberate recovery browser: Retry sync rebuilds a large board whose automatic recovery waits onto an intact earlier generation and publishes it, within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
 - RISK large board diagnostics export browser: while cloud recovery waits, every export the Debug log offers is the metadata-only report and stays within a memory margin of the open Debug log without a long stall, in Chromium and WebKit
 - RISK large board recovery file browser: while cloud recovery waits, Download recovery file saves one lossless file without a long stall, and its memory does not grow with more saved copies, in Chromium and WebKit
-- RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
+- RISK downloads visual browser: Download backup, Download board only beside a partial backup, the Restore choices and Troubleshooting render like their neighbours, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK large board acknowledged recovery browser: Retry sync recovers a large board whose acknowledged copy is the intact earlier generation within a regression ceiling over opening it locally, publishing it and keeping every decision, draft and newer edit, and reports its peak against the pending 200 MiB target, in Chromium and WebKit
 - RISK large board recovery wait visual browser: the recovery waiting cloud button and Settings notice render like the older-copy button and notice beside them in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit
 - RISK AUTH HYDRATION: a broken device board stays quiet until protected local recovery is visible
@@ -1548,6 +1554,7 @@ its RISK test; the map follows.
 - RISK SCALABLE RECOVERY: clean cloud adoption releases its IndexedDB proof only after shared legacy conflicts become durable
 - RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority never revives or uploads its stale legacy shell
 - RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes
+- RISK backup delete keeps its place: deleting a backup leaves Settings open with Data and backups open and the list in view, whether the delete succeeds or is refused
 - RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once
 - RISK backup list memory: a first opening does not measure backups before the board is open, lists them all, and learns their measures afterwards
 - RISK backup list memory: Restore stays disabled on an empty-cloud evidence copy listed without its text, including from facts learned by an earlier build
@@ -1687,7 +1694,7 @@ its RISK test; the map follows.
 - RISK acknowledged recovery trim: the recovery file holds only what the device keeps after the trim
 - RISK acknowledged recovery trim: a note the trim kept still lets the check of earlier sources reconcile that generation once it can be read, and the trim after its acknowledgement clears the note
 - RISK acknowledged recovery trim: an adoption the cloud acknowledges while the app opens is trimmed without a further save, once the check of earlier sources has run or when a phone over its work budget leaves that check for a deliberate run
-- RISK acknowledged recovery trim guidance: Settings, mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays
+- RISK acknowledged recovery trim guidance: the mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays
 - RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice
 - RISK debug log link #2309: Download debug log delivers the file while the link holds the opening
 - RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read
