@@ -12747,6 +12747,97 @@ test("UI #221: the second tap of a double tap on Return as candidate cannot answ
   });
 });
 
+// #221 release review: what the closing editor uncovers depends on how far it
+// was scrolled, the screen and the text size, so the pause after Return as
+// candidate has to cover every press, wherever it lands.
+const tapControl221 = (shim, control) => shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: () => false }, closest: () => control } });
+const settledBoard221 = () => new Promise(resolve => setTimeout(resolve, 240));   // longer than the pause, as a person reading takes
+test("UI #221: for a moment after Return as candidate closes the editor, a press does nothing wherever it lands, and a moment later it works, Undo included", async t => {
+  const uncovered = [
+    ["done adding for now in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "start-working")],
+    ["the list toggle in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "toggle-list")],
+    ["a pill in the chain", ({ panel, first }) => panel.find(control => control.classList.contains("crumb") && control.dataset.id === first.id)],
+    ["Done on the benchmark card", ({ panel }) => panel.find(control => control.dataset.act === "bench-done")],
+    ["Edit on the candidate card", ({ panel, ctx }) => panel.find(control => control.dataset.act === "edit" && control.dataset.id === ctx.state.candidateId)],
+    ["Undo in the header", () => editorControl221("undo")],
+    ["a task's title in All Tasks", ({ waiting }) => editorControl221("edit", waiting.id)],
+  ];
+  for (const [where, locate] of uncovered) await t.test(where, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2239 });
+    const first = ctx.addTask("First dot", true), middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    const waiting = ctx.addTask("Waiting candidate", false);
+    ctx.addTask("Second candidate", false);
+    ctx.render();
+    await settledBoard221();
+    const panel = scanPanelDom221(shim), found = () => locate({ panel, ctx, first, waiting });
+    tapControl221(shim, panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+    keepEditorValues(ctx, shim, middle.id);
+    tapControl221(shim, editorControl221("return-candidate", middle.id));
+    assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: the first tap returned the dot");
+    assert.ok(found(), `precondition: the page shows ${where}`);
+    const returned = JSON.stringify(ctx.state);
+
+    tapControl221(shim, found());
+    assert.equal(JSON.stringify(ctx.state), returned, `the second tap, on ${where}, changes nothing`);
+    assert.equal(shim.elements.get("modalRoot").innerHTML, "", "and opens nothing");
+
+    await settledBoard221();
+    tapControl221(shim, found());
+    assert.ok(JSON.stringify(ctx.state) !== returned || shim.elements.get("modalRoot").innerHTML !== "", `a moment later a press on ${where} works`);
+    if (where === "Undo in the header") assert.equal(ctx.state.chain.includes(middle.id), true, "Undo puts the dot back");
+  });
+});
+
+test("UI #221: for a moment after Return as candidate takes the only dot off, a press on Start scanning places no first dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2240 });
+  addTaskAged(ctx, "Oldest task", 900000);
+  addTaskAged(ctx, "Newer task", 1000);
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const only = ctx.state.chain[0];
+  assert.equal(ctx.state.chain.length, 1, "precondition: Start placed one dot");
+  await settledBoard221();
+  const panel = scanPanelDom221(shim);
+  tapControl221(shim, panel.find(control => control.dataset.act === "edit" && control.dataset.id === only));
+  keepEditorValues(ctx, shim, only);
+  tapControl221(shim, editorControl221("return-candidate", only));
+  assert.deepEqual(Array.from(ctx.state.chain), [], "precondition: the only dot is off");
+  const start = () => panel.find(control => control.dataset.act === "start-scan");
+  assert.ok(start(), "precondition: the empty scan panel offers Start scanning");
+
+  tapControl221(shim, start());
+  assert.deepEqual(Array.from(ctx.state.chain), [], "the second press places no automatic first dot");
+
+  await settledBoard221();
+  tapControl221(shim, start());
+  assert.equal(ctx.state.chain.length, 1, "a moment later Start scanning works");
+});
+
+test("UI #221: for a moment after Return as candidate closes the editor, the scanner's keys do nothing either", async t => {
+  for (const [key, label] of [["w", "Worked on it (w)"], ["z", "Undo (z)"]]) await t.test(label, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2241 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    await settledBoard221();
+    const panel = scanPanelDom221(shim);
+    tapControl221(shim, panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+    keepEditorValues(ctx, shim, middle.id);
+    tapControl221(shim, editorControl221("return-candidate", middle.id));
+    const returned = JSON.stringify(ctx.state);
+    const press = () => shim.document.dispatchEvent({ type: "keydown", key, target: { matches: () => false } });
+
+    press();
+    assert.equal(JSON.stringify(ctx.state), returned, `${label} right after the return changes nothing`);
+
+    await settledBoard221();
+    press();
+    assert.notEqual(JSON.stringify(ctx.state), returned, `a moment later ${label} works`);
+  });
+});
+
 // #221 release review (independent F3): two cases that already behaved.
 test("UI #221: a dialog that opens as the editor closes keeps focus; the scan panel does not take it", async () => {
   const { ctx, shim } = await loadApp({ seed: 2237 });
