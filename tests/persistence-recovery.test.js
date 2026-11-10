@@ -1248,6 +1248,63 @@ async function backupMemoryStaysFlat(t){
  assert.deepEqual(failures,[],JSON.stringify(observed));
 }
 test('RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>backupMemoryStaysFlat(t));
+// #2310 re-review: every updating device passes through one opening with no
+// learned facts. Measuring must not stack on the opening's own memory, even if
+// the person saves in the first seconds. A device with learned facts is the
+// reference; the margin allows the measuring itself and sampler noise.
+const FIRST_OPENING_MEASURE_MARGIN_MIB=130;
+test('RISK backup memory browser: the first opening with no learned facts stays close to an ordinary opening while every backup is measured, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),failures=[],mib=bytes=>Math.round(bytes/1048576);
+ const FACTS='fvp:chain-scanner:backup-facts';
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2310-first-'+engineName+'-')),tag=`chain-2310-first-${engineName}-${process.pid}-${Date.now()}`;
+  const launch=async(runTag,forget)=>{
+   const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+    env:webProcessMemoryEnv(runTag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await context.addInitScript(({payload,forget,FACTS})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    if(forget)localStorage.removeItem(FACTS);
+    if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',payload);},{payload:fixture.payload,forget,FACTS});
+   return context;
+  };
+  const ready=page=>page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state!=='undefined'&&state,null,{timeout:90000});
+  const measuredAll=page=>page.waitForFunction(({FACTS,count})=>(JSON.parse(localStorage.getItem(FACTS)||'{"rows":[]}').rows||[]).filter(([,fact])=>fact.facts?.incomplete!==true).length>=count,{FACTS,count:BACKUP_MEMORY_EXTRA},{timeout:90000});
+  try{
+   let context=await launch(tag+'-seed',false);
+   try{
+    const page=context.pages()[0]||await context.newPage();
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(1500);
+    const saved=await page.evaluate(async count=>{let ok=0;for(let i=0;i<count;i++){state.updatedAt=Date.now()+i;if((await saveDurableBackup('manual',JSON.stringify(state),{account:null}))?.id)ok++;}return ok;},BACKUP_MEMORY_EXTRA);
+    assert.equal(saved,BACKUP_MEMORY_EXTRA,`${engineName}: every extra backup was saved`);
+    await page.waitForTimeout(800);
+   }finally{await context.close();}
+   // An ordinary opening of the same data, once its facts are learned.
+   context=await launch(tag+'-learn',false);
+   try{const page=context.pages()[0]||await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await measuredAll(page);await page.waitForTimeout(500);}
+   finally{await context.close();}
+   context=await launch(tag+'-ordinary',false);let ordinary;
+   try{const page=context.pages()[0]||await context.newPage(),sampler=webProcessMemorySampler(tag+'-ordinary');
+    try{await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(4000);}finally{ordinary=await sampler.stop();}
+   }finally{await context.close();}
+   context=await launch(tag+'-first',true);let first,errors=[];
+   try{const page=context.pages()[0]||await context.newPage(),sampler=webProcessMemorySampler(tag+'-first');page.on('pageerror',error=>errors.push(error.message));
+    try{
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);
+     await page.waitForTimeout(1500);
+     assert.equal(await page.evaluate(async()=>{state.updatedAt=Date.now();return await persist(true);}),true,`${engineName}: the early save succeeds`);
+     await measuredAll(page);await page.waitForTimeout(1000);
+    }finally{first=await sampler.stop();}
+   }finally{await context.close();}
+   t.diagnostic(JSON.stringify({engine:engineName,ordinaryMiB:mib(ordinary.peakBytes),firstMiB:mib(first.peakBytes)}));
+   assert.ok(first.samples>5&&ordinary.samples>5,`${engineName}: web-process memory was sampled`);
+   assert.ok(mib(first.peakBytes)<=mib(ordinary.peakBytes)+FIRST_OPENING_MEASURE_MARGIN_MIB,`${engineName}: the first opening peaked at ${mib(first.peakBytes)} MiB, the ordinary opening at ${mib(ordinary.peakBytes)} MiB`);
+   assert.deepEqual(errors,[],`${engineName}: no page errors`);
+  }catch(error){failures.push(error.message.split('\n')[0]);}finally{fs.rmSync(profile,{recursive:true,force:true});}
+ }
+ assert.deepEqual(failures,[]);
+});
 test('RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'reduced'));
 // #2228 review (story 19): the same opening guarantee with normal motion,
 // where the scenery animates. Both scenarios share the motion choice, so the
@@ -1326,7 +1383,7 @@ test('RISK long scan memory browser: 60 answers on a large saved board stay unde
        assert.ok(before.candidate,`${engineName} ${label}: the scan offers a candidate at answer ${answered}`);
        const act=before.length%5?'no':'yes';
        last={act,candidate:before.candidate};
-       await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+       await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
        await page.locator(`[data-act="${act}"]`).click();
        await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
        answered++;
@@ -5079,15 +5136,19 @@ test('RISK backup list memory: a first opening does not measure backups before t
  assert.equal(hashes.size,4,'four distinct saved boards');
  await first.dispose?.();
  storage.removeItem('fvp:chain-scanner:backup-facts');
- let boardOpen=()=>false;const early=[],original=IDBObjectStore.prototype.get;
- IDBObjectStore.prototype.get=function(key){if(this.name==='snapshots'&&hashes.has(key)&&!boardOpen())early.push(key);return original.call(this,key);};
+ let boardOpen=()=>false,saveDone=false;const measuringStarted=()=>saveDone,early=[],saveReads=[],original=IDBObjectStore.prototype.get;
+ IDBObjectStore.prototype.get=function(key){if(this.name==='snapshots'&&hashes.has(key)&&!measuringStarted())(boardOpen()?saveReads:early).push(key);return original.call(this,key);};
  t.after(()=>{IDBObjectStore.prototype.get=original;});
  const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,awaitStartup:false});
  t.after(()=>reopened.dispose?.());
  boardOpen=()=>vm.runInContext('!!state',reopened.ctx);
- const until=async(check,what)=>{for(let i=0;i<400;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail(what);};
+ const until=async(check,what)=>{for(let i=0;i<1800;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail(what);};
  await until(boardOpen,'the board opens');
  assert.deepEqual(early,[],'no backup was measured before the board opened');
+ // A save soon after opening lists its backups again, and must not measure them all at once either.
+ reopened.ctx.addTask('Answered in the first seconds');assert.equal(await reopened.ctx.persist(),true);
+ assert.deepEqual(saveReads,[],'an early save measures no backup');
+ saveDone=true;
  assert.equal(vm.runInContext('deviceStorageAuthority',reopened.ctx),true,'device storage opened with authority');
  const listed=()=>JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx));
  assert.deepEqual(listed().filter(row=>row.id.startsWith('first-open-')).map(row=>row.id).sort(),['first-open-0','first-open-1','first-open-2','first-open-3'],'every backup is listed as soon as the board opens');
@@ -5118,7 +5179,9 @@ test('RISK backup list memory: Restore stays disabled on an empty-cloud evidence
  const old=saved();old.version=1;for(const entry of old.rows)if(entry[0]===row.payloadHash)delete entry[1].facts.emptyCloud;
  storage.setItem('fvp:chain-scanner:backup-facts',JSON.stringify(old));
  const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
- await vm.runInContext('refreshDeviceBackupCache()',reopened.ctx);
+ assert.match(backupRestoreMarkup(reopened,'evidence-empty'),/\sdisabled/,'before it is measured, Restore renders disabled');
+ for(let i=0;i<1500&&vm.runInContext('deviceBackupMeasuringOwed',reopened.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(vm.runInContext('deviceBackupMeasuringOwed',reopened.ctx),false,'positive control: the copy was measured');
  assert.match(backupRestoreMarkup(reopened,'evidence-empty'),/\sdisabled/,'measured again, Restore renders disabled');
 });
 test('RISK backup list memory: a saved verdict of unreadable is measured again, so a later build that can read the copy lists it as readable',async t=>{
@@ -5130,7 +5193,7 @@ test('RISK backup list memory: a saved verdict of unreadable is measured again, 
  const old=saved();for(const entry of old.rows)if(entry[0]===row.payloadHash)entry[1].facts.readable=false;
  storage.setItem('fvp:chain-scanner:backup-facts',JSON.stringify(old));
  const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
- await vm.runInContext('refreshDeviceBackupCache()',reopened.ctx);
+ for(let i=0;i<1500&&vm.runInContext('deviceBackupMeasuringOwed',reopened.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10));
  const listed=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx)).find(entry=>entry.id==='verdict-copy');
  assert.equal(listed.payloadFacts.readable,true,'the stale verdict did not stick');
 });
@@ -5307,6 +5370,22 @@ test('RISK sync dealt candidate: a board with unsaved changes still publishes wh
  ctx.state.syncDirty=true;
  await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
  assert.ok(sync.calls.includes('push'),'a dirty board is not the clean redraw this skip is for');
+});
+// #2308 re-review: presentedAt travels in the cloud payload, so a device with a
+// faster clock dealt a time that is still in this device's future. The window
+// that stops a double tap is timed here, from when this device showed the task.
+test('RISK sync dealt candidate: a candidate adopted from a device 3, 45 or 90 seconds ahead can be answered by keyboard and by click',async t=>{
+ for(const skewMs of [3000,45000,90000])for(const [input,answer] of [['keyboard press',(shim)=>shim.document.dispatchEvent({type:'keydown',key:'n',repeat:false})],
+ ['delegated click',(shim,candidate)=>{const button={dataset:{act:'no',candidate,benchmark:'bench'}};button.closest=()=>button;shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>button}});}]]){
+  const ahead=Date.now()+skewMs;
+  const app=await cleanDealtBoard2308(t,doc=>{const other=JSON.parse(doc.payload);other.candidateId='later';other.presentedAt=ahead;return {...doc,rev:doc.rev+1,payload:JSON.stringify(other)};}),{ctx,shim}=app;
+  await ctx.cloudPull();
+  assert.equal(ctx.state.candidateId,'later','positive control: the other device’s candidate was adopted');
+  assert.equal(ctx.state.presentedAt,ahead,'positive control: its presentation time is in this device’s future');
+  await new Promise(resolve=>setTimeout(resolve,240));
+  answer(shim,'later');
+  assert.equal(ctx.state.considered.later,'no',`${skewMs/1000} s ahead by ${input}: the answer counts`);
+ }
 });
 test('RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered',async t=>{
  const app=await cleanDealtBoard2308(t),{ctx,sync}=app;

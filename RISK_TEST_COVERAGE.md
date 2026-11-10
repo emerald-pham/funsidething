@@ -599,9 +599,16 @@ its RISK test; the map follows.
 - RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit
 - RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit
 - RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit
-- RISK steady scanner browser: the candidate title is visible when presented on short screens, and a stable layout does not move between answers in Chromium and WebKit
+- RISK steady scanner browser: Yes No and Cant answer a saved candidate whose presentation time is 45 seconds ahead of this device in Chromium and WebKit
+- RISK steady scanner browser: a double tap on Postpone or Done acts once and leaves the next task alone in Chromium and WebKit
+- RISK steady scanner browser: a mouse press on a control partly under the pinned row still clicks it in Chromium and WebKit
+- RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit
 - RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit
 - RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit
+- RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit
+- RISK steady scanner browser: the trail fits again when web fonts finish loading in Chromium and WebKit
+- RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit
+- RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit
 - RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit
 - RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
@@ -955,6 +962,7 @@ its RISK test; the map follows.
 - RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds
 - RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance
 - RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work
+- RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new task are dropped and just after it are accepted
 - RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision
 - RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work
 - RISK context editor visibility: real contexts govern requirements and filters without mutating assignments
@@ -1509,6 +1517,7 @@ its RISK test; the map follows.
 - RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return
 - RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit
 - RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit
+- RISK backup memory browser: the first opening with no learned facts stays close to an ordinary opening while every backup is measured, in Chromium and WebKit
 - RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit
 - RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit
 - RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit
@@ -1565,6 +1574,7 @@ its RISK test; the map follows.
 - RISK sync dealt candidate: a same-revision copy differing in anything else still publishes this board
 - RISK sync dealt candidate: a same-revision copy with a different candidate of its own still publishes this board
 - RISK sync dealt candidate: a board with unsaved changes still publishes when only the candidate differs
+- RISK sync dealt candidate: a candidate adopted from a device 3, 45 or 90 seconds ahead can be answered by keyboard and by click
 - RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered
 - RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board
 - RISK CLOUD LATENCY: ordinary edits retain the two-second debounce and stay dirty until server acknowledgement
