@@ -12747,6 +12747,56 @@ test("UI #221: the second tap of a double tap on Return as candidate cannot answ
   });
 });
 
+// #221 release review (independent F3): two cases that already behaved.
+test("UI #221: a dialog that opens as the editor closes keeps focus; the scan panel does not take it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2237 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+
+  closeEditor221(ctx, shim, "Cancel", middle.id);
+  ctx.onAction("help", {});   // in the same moment another dialog opens, and focus goes into it
+  const inDialog = editorControl221("close-modal");
+  shim.document.activeElement = inDialog;
+  await flush();
+
+  assert.match(shim.elements.get("modalRoot").innerHTML, /FAQs/, "precondition: the other dialog is open");
+  assert.equal(shim.document.activeElement, inDialog, "focus stays in that dialog");
+  assert.equal(panel.controls().includes(shim.document.activeElement), false, "nothing in the scan panel takes it");
+});
+
+test("UI #221: the pause after Return as candidate also follows a return of a task that is not dotted", async t => {
+  for (const hold of ["a No mark", "a postponement", "an evergreen rest"]) await t.test(hold, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2238 });
+    ctx.addTask("First dot", true);
+    ctx.addTask("Benchmark dot", true);
+    const held = ctx.addTask("Held task", false, [], {}, hold === "an evergreen rest" ? { evergreen: true, evergreenHours: 18 } : {});
+    ctx.addTask("Waiting candidate", false);
+    if (hold === "a No mark") ctx.state.considered[held.id] = "no";
+    else if (hold === "a postponement") ctx.postponeTask(held.id);
+    else held.lastDoneAt = realNow(ctx) - 60000;
+    ctx.render();
+    assert.equal(ctx.pool().some(task => task.id === held.id), false, `precondition: ${hold} keeps it out of the scan`);
+    await new Promise(resolve => setTimeout(resolve, 240));   // the board has been on screen long enough to read
+    const panel = scanPanelDom221(shim);
+    const tap = control => shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: () => false }, closest: () => control } });
+    tap(editorControl221("edit", held.id));   // its title in All Tasks
+    keepEditorValues(ctx, shim, held.id);
+
+    tap(editorControl221("return-candidate", held.id));
+    assert.equal(ctx.pool().some(task => task.id === held.id), true, "precondition: the first tap returned it");
+    const board = ctx.cloudPayload();
+    tap(panel.find(control => control.dataset.act === "yes"));
+    assert.equal(ctx.cloudPayload(), board, "the second tap does not answer the candidate the editor uncovered");
+
+    await new Promise(resolve => setTimeout(resolve, 240));
+    tap(panel.find(control => control.dataset.act === "yes"));
+    assert.notEqual(ctx.cloudPayload(), board, "a moment later Yes answers as usual");
+  });
+});
+
 test("UI #221: an editor opened from All Tasks or with the e shortcut leaves focus where it was when it closes", async t => {
   for (const opener of ["All Tasks", "the e shortcut"]) await t.test(opener, async () => {
     const { ctx, shim } = await loadApp({ seed: 2229 });
