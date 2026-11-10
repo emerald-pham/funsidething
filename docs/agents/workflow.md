@@ -30,8 +30,10 @@ carry genuinely missing product decisions back to the parent/user.
 When the maintainer is obviously asleep, such as overnight Eastern time with a
 question already unanswered, and the work is waiting on them, take the
 recommended decision and continue. Record each decision and its reason in the
-issue or PR so they can reverse it on waking. Task holds, the approval
-AGENTS.md requires for new process, and permission prompts still wait for them.
+issue or PR so they can reverse it on waking. This never changes which
+authorization, holds, test-first, review or release requirements apply: task
+holds, every approval or confirmation AGENTS.md or release and review reserves
+for the maintainer, and permission prompts still wait for them.
 
 ## Subagent lifecycle
 
