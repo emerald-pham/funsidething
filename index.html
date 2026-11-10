@@ -1204,6 +1204,7 @@ function setDeviceSaveIssue(stage,code,attempts){ lastDeviceSaveIssue=Number.isS
 function clearDeviceSaveIssue(){
   const recovered=lastDeviceSaveIssue;
   lastDeviceSaveIssue=null;
+  releaseToast();
   renderSync();
   // A browser-capacity failure can prevent the cloud operation that would
   // normally replace an earlier error status. Once the exact board is durable
@@ -1215,9 +1216,11 @@ function clearDeviceSaveIssue(){
 function deviceSaveIssue(){ return lastDeviceSaveIssue ? {...lastDeviceSaveIssue} : null; }
 function reportDeviceSaveFailure(stage,code,help="Keep this tab open and try again.",{plain=false,attempts}={}){
   setDeviceSaveIssue(stage,code,attempts);
-  // A plain message stands alone; its stage, code and attempt count stay in
-  // the save issue record and the Debug log for whoever is helping (#2325).
-  toast(plain?help:"Couldn't save this edit on this device (device-save:"+stage+"/"+code+"). "+help,9000);
+  // A plain message stands alone and stays until a verified save clears this
+  // issue; its stage, code and attempt count stay in the save issue record
+  // and the Debug log for whoever is helping (#2325).
+  if(plain) holdToast(help);
+  else{ releaseToast(); toast("Couldn't save this edit on this device (device-save:"+stage+"/"+code+"). "+help,9000); }
   return false;
 }
 // #2325: persistImpl()'s device conflict repair has run out of attempts or time against a
@@ -9030,6 +9033,9 @@ function importSummary(added, skipped, completed){
   return msg + ".";
 }
 let toastTimer = null;
+// #2325: a message that stays until its save issue clears after a verified
+// save. Other notices still show for their own time, then it returns.
+let stickyToastMessage = null;
 function toast(msg, duration = 2600){
   let el = document.getElementById("toast");
   if(!el){ el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
@@ -9037,7 +9043,19 @@ function toast(msg, duration = 2600){
   el.textContent = msg;
   requestAnimationFrame(()=> el.classList.add("show"));
   if(toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=> el.classList.remove("show"), duration);
+  toastTimer = msg===stickyToastMessage ? null : setTimeout(()=>{
+    toastTimer = null;
+    if(stickyToastMessage!==null) toast(stickyToastMessage);
+    else el.classList.remove("show");
+  }, duration);
+}
+function holdToast(msg){ stickyToastMessage = msg; toast(msg); }
+function releaseToast(){
+  const held = stickyToastMessage;
+  if(held===null) return;
+  stickyToastMessage = null;
+  const el = document.getElementById("toast");
+  if(el && el.textContent===held){ if(toastTimer) clearTimeout(toastTimer); toastTimer = null; el.classList.remove("show"); }
 }
 
 

@@ -951,6 +951,43 @@ test('RISK device save settle: a save that runs out of repairs keeps its stage, 
  assert.equal(report.localFailureAttempts.value,attempts,'the Debug log counts the commit attempts');
 });
 
+test('RISK device save settle: the plain message stays until a later save verifiably succeeds, and the next change saves the kept edit',{timeout:60000},async t=>{
+ const {f,stop}=await deviceSaveExhausted2325(t,'stays-exhausted');
+ const toast=f.shim.document.getElementById('toast'),shown=()=>toast.classList.contains('show')?toast.textContent:null,frame=()=>f.alive(new Promise(resolve=>setTimeout(resolve,30)));
+ await frame();assert.equal(shown(),deviceSaveExhaustedMessage2325,'the plain message is on screen');
+ // An ordinary notice lasts 9 s at most; this one outlasts it.
+ await f.alive(new Promise(resolve=>setTimeout(resolve,9500)));
+ assert.equal(shown(),deviceSaveExhaustedMessage2325,'the message is still on screen while the edit is unsaved');
+ // Another notice can take the slot for its own time, then the message returns.
+ vm.runInContext("toast('A short unrelated notice.',50)",f.ctx);
+ await frame();assert.equal(toast.textContent,'A short unrelated notice.');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,200)));
+ assert.equal(shown(),deviceSaveExhaustedMessage2325,'the message comes back after a shorter notice');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','the save issue is still open');
+ // A change while the other copy is still saving starts a save that cannot
+ // finish either; the message stays through it, not just after it.
+ f.edit('stays-exhausted-anchor','Change while the other copy saves');
+ const seen=new Set(),end=performance.now()+15000;
+ while(vm.runInContext('!!saveTimer||deviceSavesInFlight.size>0',f.ctx)||!seen.size){
+  seen.add(shown());assert.ok(performance.now()<end,'the attempt finishes');await frame();
+ }
+ seen.add(shown());
+ assert.deepEqual([...seen],[deviceSaveExhaustedMessage2325],'the message never leaves the screen while no save has succeeded');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','the save issue is still open after another refused attempt');
+ // The next action the message names: the other copy closes, then any change here.
+ stop();
+ f.edit('stays-exhausted-anchor','Next change here');
+ const head=await f.settled('next change after the other copy closed');
+ assert.equal(f.ctx.deviceSaveIssue(),null,'the save issue clears after the verified save');
+ assert.equal(shown(),null,'the message is gone once the save is verified');
+ const durable=JSON.parse(head.payload),title=id=>durable.tasks.find(task=>task.id===id).title;
+ assert.equal(title('stays-exhausted-mine'),'Kept in this tab','the kept edit is saved');
+ assert.equal(title('stays-exhausted-anchor'),'Next change here','the next change is saved');
+ assert.match(title('stays-exhausted-theirs'),/^Other copy write \d+$/,'the other copy\'s save is kept');
+ const reopened=await loadAppAtTime(f.at+20000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows the saved edits');
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.
