@@ -5076,7 +5076,7 @@ function debugLogLinkClearFragment(){
 // The opening resumes from here; a reload now opens the ordinary board.
 function debugLogLinkLeave(){
   debugLogLinkHeld=window.__chainDebugLogLinkHeld=false;document.getElementById("modalRoot").innerHTML="";debugLogLinkClearFragment();
-  debugLogLinkRelease?.();debugLogLinkRelease=null;return true;
+  debugLogLinkRelease?.();debugLogLinkRelease=null;window.dispatchEvent?.(new Event("chain-debug-log-closed"));return true;
 }
 // An ordinary opening knows each backup's size from its listed facts, so it
 // notes the total here for a later link opening. Counts only.

@@ -1628,6 +1628,13 @@
     dialog.showModal();
     dialog.querySelector('[data-landscape-motion="reduced"]').focus();
   }
+  // The Debug log link holds the opening with no end of its own, and a modal
+  // dialog over it would block the only way out, so the check waits its turn.
+  function offerMotionCheck(){
+    if(preference!==null||dialog.open)return;
+    if(window.__chainDebugLogLinkHeld){window.addEventListener('chain-debug-log-closed',offerMotionCheck,{once:true});return;}
+    openMotion();
+  }
   const timeDialog=document.getElementById('sceneTimeDialog'),timeInput=document.getElementById('sceneTimeInput'),timeStatus=document.getElementById('sceneTimeStatus'),seasonInput=document.getElementById('sceneSeasonInput');
   let timeReturnFocus=null;
   function sceneTimeInputValue(){
@@ -1729,7 +1736,7 @@
   document.addEventListener('visibilitychange',()=>{
     // Hidden tabs do no rendering. Returning reconstructs only the current
     // UTC scene; missed arrivals are never animated as a catch-up burst.
-    if(document.hidden)stop();else {preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();}
+    if(document.hidden)stop();else {preference=S.readMotion(storage);updateMotion();offerMotionCheck();}
   });
   // A board adoption reapplies its saved location on every open. Only a
   // location that actually changed repaints; the same one cost a full paint
@@ -1754,11 +1761,11 @@
     try{localStorage.setItem('fvp:chain-scanner:scene-placeholder',JSON.stringify({v:1,at:Date.now(),sky:p.sky.slice(0,3)}));}catch{}
   }
   window.addEventListener('pagehide',stop);
-  window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
+  window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();offerMotionCheck();});
   openingPaint={opening:true,due:false};
   // A sized opaque canvas is black until painted (#2194 review F8).
   back.style.visibility='hidden';
-  resize();updateMotion();if(preference===null)openMotion();
+  resize();updateMotion();offerMotionCheck();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
   document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));

@@ -10036,6 +10036,53 @@ test('RISK acknowledged recovery trim guidance: Settings, mounted FAQ and change
  }
 });
 
+// #2309 review: the opening is held behind the log with no end of its own, so
+// anything else that opens during the hold must not trap the person there.
+async function debugLogLinkHeldPage2309(engine,engineName,seed){
+ const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL});
+ const url=process.env.LANDSCAPE_BROWSER_URL,origin=new URL(url).origin;
+ const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,hasTouch:true,serviceWorkers:'block',acceptDownloads:true});
+ await context.addInitScript(()=>Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false}));
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(url);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+ await page.evaluate(async seed=>{
+  closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;addTask('Held link task');await persist();
+  if(seed.motionAgeDays===null)localStorage.removeItem('fvp:chain-scanner:landscape-motion');
+  else localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()-seed.motionAgeDays*24*3600000}));
+ },seed);
+ await page.goto('about:blank');await page.goto(origin+'/#debug-log');
+ await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+ await page.waitForTimeout(900);
+ return {browser,page,errors};
+}
+const debugLogLinkEngines2309=async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ return [['chromium',chromium],...(process.env.CI==='true'?[]:[['webkit',webkit]])];
+};
+test('RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice',async t=>{
+ await openingBoardFixture(t);
+ const failures=[];
+ for(const [engineName,engine] of await debugLogLinkEngines2309())for(const [label,motionAgeDays] of [['first visit',null],['eight-day-old choice',8]]){
+  const name=`${engineName} ${label}`;
+  const {browser,page,errors}=await debugLogLinkHeldPage2309(engine,engineName,{motionAgeDays});
+  try{
+   const top=await page.evaluate(()=>{const b=document.querySelector('#modalRoot [data-act="close-modal"]').getBoundingClientRect(),hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return {onTheLog:!!hit?.closest?.('#modalRoot'),hit:hit?.tagName+'#'+(hit?.id||'')};});
+   assert.ok(top.onTheLog,`${name}: nothing covers the log's Close button: ${top.hit}`);
+   await page.locator('#modalRoot [data-act="close-modal"]').click({timeout:3000});
+   await page.waitForFunction(()=>state?.tasks?.some(task=>task.title==='Held link task'),null,{timeout:15000});
+   assert.equal(await page.evaluate(()=>location.hash),'',`${name}: a reload now opens the ordinary board`);
+   // The check is still owed, and now it answers.
+   await page.waitForFunction(()=>document.getElementById('motionDialog')?.open===true,null,{timeout:5000}).catch(()=>{throw new Error(`${name}: the motion check still comes up after the log closes`);});
+   await page.locator('#motionDialog [data-landscape-motion="reduced"]').click({timeout:3000});
+   await page.waitForFunction(()=>document.getElementById('motionDialog')?.open===false,null,{timeout:5000});
+   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('fvp:chain-scanner:landscape-motion')||'{}').choice),'reduced',`${name}: the answer is saved`);
+   assert.deepEqual(errors,[],`${name}: no page errors`);
+  }catch(error){failures.push(`${name}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read',async t=>{
  await openingBoardFixture(t);
  const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
