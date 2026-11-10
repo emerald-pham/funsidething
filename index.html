@@ -3932,6 +3932,28 @@ function deviceQuotaFailure(error){
 // #2324: conflict repair against another copy's saves. Waits double from 50 ms
 // up to 1 s between merges (3.55 s in all); the whole repair stops at 5 s.
 const DEVICE_REPAIR_ATTEMPTS=8,DEVICE_REPAIR_FIRST_WAIT_MS=50,DEVICE_REPAIR_MAX_WAIT_MS=1000,DEVICE_REPAIR_BUDGET_MS=5000;
+/* #2324: one device head commit at a time in this tab. On a phone a commit
+   can outlast the 350 ms edit debounce; two saves of the same tab then
+   committed against the same head, and each conflict repair kept losing to
+   the other save until the owner, signed out on one iPhone, saw "The saved
+   board changed again while this tab was merging it". A save takes its turn
+   after its own checks, so a save that must refuse (an older tab's copy that
+   cannot be verified yet) still refuses at once, and it snapshots the board
+   only when its turn comes. A save's retry or follow-up releases its turn
+   first, so it never waits for itself. */
+let deviceCommitHeld=false;const deviceCommitWaiting=[];
+function deviceCommitTurn(){
+  if(!deviceCommitHeld){deviceCommitHeld=true;return null;}
+  return new Promise(resolve=>deviceCommitWaiting.push(resolve));
+}
+function deviceCommitRelease(){
+  let released=false;
+  return ()=>{
+    if(released)return;released=true;
+    const next=deviceCommitWaiting.shift();
+    if(next)next();else deviceCommitHeld=false;
+  };
+}
 async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
   if(!liveBoardAccepted){
     const unreadableBackup=inspectBackupIndex().rows===null;
@@ -3964,7 +3986,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
     state.protectedBackupIds=completionProtection;
   }
   if(ambiguousLegacyCompletion(state))return reportDeviceSaveFailure("completion-upgrade","ambiguous-legacy-completion","This older board has a saved Start and completion whose order cannot be proved. Its exact source stays protected; keep this tab open while sync waits for compatible recovery.");
-  const ancestorRaw=lastPersistedRaw; // capture before any storage await can advance the marker
+  let ancestorRaw=lastPersistedRaw; // capture before any storage await can advance the marker
   projectLegacyPrerequisites(state);
   if(deviceStore&&!deviceStorageAuthority){
     const bootstrap=JSON.stringify(state);
@@ -3976,11 +3998,20 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
     const recovered=mergeUndeletedTasks(state, JSON.parse(lastPersistedRaw));
     if(recovered){ recomputeRanks(); render(); toast("A missing task was kept in the saved board.", 6000); }
   }
-  const chanceSeed = state.chance?.seed;
-  const requestGeneration = saveRequestGeneration;
-  const payload = JSON.stringify(state);
+  let chanceSeed = state.chance?.seed;
+  let requestGeneration = saveRequestGeneration;
+  let payload = JSON.stringify(state);
   if(deviceStorageAuthority){
+    let releaseDeviceCommit=()=>{};
     try{
+      const turn=deviceCommitTurn();releaseDeviceCommit=deviceCommitRelease();
+      if(turn){
+        await turn;
+        if(!deviceStorageAuthority||!liveBoardAccepted){releaseDeviceCommit();return persistImpl(backupAlreadySafe,preserveBackupId,deviceRetry);}
+        // Another save of this tab committed while this one waited, so
+        // snapshot the board as it is now, against the head that save left.
+        ancestorRaw=lastPersistedRaw;chanceSeed=state.chance?.seed;requestGeneration=saveRequestGeneration;payload=JSON.stringify(state);
+      }
       const commit=async options=>{
         let result;
         try{result=await deviceWriteBeforeDiagnostics("commitHead",options);}
@@ -4069,7 +4100,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           const at=Date.now();
           const saved=await deviceWriteBeforeDiagnostics("putBackup",{expectedHash:result.hash,
             backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:liveRaw}});
-          if(saved?.conflict && deviceRetry<3) return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1);
+          if(saved?.conflict && deviceRetry<3){releaseDeviceCommit();return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1);}
           if(!saved?.ok) return reportDeviceSaveFailure("device-store",saved?.code||"recovery-failed","The later draft could not be backed up; keep this tab open and try again.");
           if(JSON.stringify(state)===liveRaw) break;
           liveRaw=JSON.stringify(state);
@@ -4097,11 +4128,12 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         // snapshot succeeded. Unexplained churn keeps its bounded retry guard.
         const followUp=saveRequestGeneration!==requestGeneration;
         if(!followUp&&deviceRetry>=3) return reportDeviceSaveFailure("device-store","changed-during-save","The board kept changing while it was being saved; keep this tab open and try again.");
-        return persist(backupAlreadySafe,preserveBackupId,followUp?0:deviceRetry+1);
+        releaseDeviceCommit();return persist(backupAlreadySafe,preserveBackupId,followUp?0:deviceRetry+1);
       }
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
       clearDeviceSaveIssue();if(pendingDeviceCloudBackup)await acknowledgeDeviceCloudBackupSave(result.hash,committedPayload);return true;
     }catch(e){return reportDeviceSaveFailure("device-store","write-failed","The previous durable board remains unchanged; keep this tab open and try again.");}
+    finally{releaseDeviceCommit();}
   }
   if(useLocal){
     let expectedHead, expectedStore;
@@ -5072,33 +5104,7 @@ async function deviceSavesSettled(stillCurrent,limitMs=5000){
   }
   return stillCurrent();
 }
-/* #2324: one device save at a time in this tab. On a phone a head commit can
-   outlast the 350 ms edit debounce; two saves of the same tab then committed
-   against the same head, and each conflict repair kept losing to the other
-   save until the owner, signed out on one iPhone, saw "The saved board changed
-   again while this tab was merging it". A new request waits for the running
-   save and then snapshots the newest board. A save's own retry and follow-up
-   (the third argument) belong to the running save and never wait for it.
-   Waiting requests with the same arguments share one save: it starts after
-   all of them and so carries every edit they asked for. */
-let deviceSaveTail=null,deviceSaveWaiting=null;
-function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry){
-  if(deviceRetry!==undefined)return persistAttempt(backupAlreadySafe,preserveBackupId,deviceRetry);
-  const waiting=deviceSaveWaiting;
-  if(waiting&&waiting.backupAlreadySafe===backupAlreadySafe&&waiting.preserveBackupId===preserveBackupId)return waiting.run;
-  const prior=deviceSaveTail,entry={backupAlreadySafe,preserveBackupId,run:null};
-  if(!prior)entry.run=persistAttempt(backupAlreadySafe,preserveBackupId,0);
-  else{
-    deviceSaveWaiting=entry;
-    entry.run=prior.then(()=>{if(deviceSaveWaiting===entry)deviceSaveWaiting=null;return persistAttempt(backupAlreadySafe,preserveBackupId,0);});
-    // deviceSavesSettled() counts a waiting save as a save in flight.
-    deviceSavesInFlight.add(entry.run);entry.run.then(()=>deviceSavesInFlight.delete(entry.run),()=>deviceSavesInFlight.delete(entry.run));
-  }
-  const tail=Promise.resolve(entry.run).then(()=>{},()=>{}).then(()=>{if(deviceSaveTail===tail)deviceSaveTail=null;});
-  deviceSaveTail=tail;
-  return entry.run;
-}
-async function persistAttempt(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
+async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
   const startedAt=supportDiagnosticsNow(),requestGeneration=saveRequestGeneration,priorIssue=lastDeviceSaveIssue;
   supportDiagnosticsPersistCalls++;
   if(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)supportDiagnosticsRetryAttempts++;
@@ -15842,7 +15848,7 @@ function openHelp(){
     + '<dt>What does the debug log contain?</dt><dd>The local metadata report never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text. Opening or refreshing it does not start a cloud read or change saved data. Opening it clears an idle, unverified source-review preview; review sources again before choosing. While an accepted recovery action is being verified in the existing preview, the log also opens inline and leaves that work running. During an accepted source save, you can view and select the report inside the existing recovery preview; diagnostics never cancels that publication. It stays on this device and is never uploaded. Copy debug log and Download debug log share only this bounded report. The log alone does not create a board backup. Download recovery file includes its bounded metadata.</dd>'
     + '<dt>Why did the app reload?</dt><dd>Choose Settings → Data and backups → View debug log, then Copy debug log or Download debug log. It holds metadata only, so it stays small. Download recovery file adds the board and saved sources for repair; unreadable sources are labeled partial. The restart record retains four recent documents and eight steps each, within 8 KiB and one hour. It records app-requested reload reasons, actions, recovery stages and lifecycle observations without task values or account IDs. Other tabs may contribute. An unfinished step or missing record does not prove a crash or cause. Unavailable storage stays explicit. If a save needs space, the restart record is removed and stays unavailable for that document; board and recovery copies take priority. Diagnostics chooses no recovery source.</dd>'
     + '<dt>What does the debug log measure?</dt><dd>It records the safe app origin, embedded build fingerprint, separately labeled running-script SHA, observed worker/cache identities, recent safe error codes, and bounded save and recovery-read stages. Device observations identify which saved-data read failed using fixed error categories and temporary connection numbers. This does not repair saved data or confirm that recovery succeeded. Source generations show observed encoding, declared and received counts, and validation/completeness status. Byte totals that were not already measured stay unavailable. The report keeps at most 80 one-hour events of 512 bytes each, 8 source operations, and 24 KiB total. Missing observations stay explicitly unavailable or unobserved; a pending read does not confirm an empty source. Read stages include the effective cloud-read deadline. Recovery-copy availability and matching reflect existing checks only. Account changes clear current acknowledgement observations.</dd>'
-    + '<dt>What can I do if a save or sync fails?</dt><dd>Keep the tab open if the latest edit could not save locally. Download board includes accepted unsaved edits; Download recovery file also keeps the saved sources. Device-save warnings name a stage and code. The cloud error button offers Retry sync, Reload app, and Sign out; reload waits for edits to save. After a lost reply, Retry sync checks the current saved cloud board before trying again; an error alone does not confirm the save. Recent sync errors keeps safe timestamped codes for one hour, without task content or account details. Recorded errors describe failed attempts and can remain after a later successful sync. Interrupted cloud cleanup resumes without changing your current or previous synced board. Synced requires server acknowledgement of the latest save. Saves on this device run one at a time. If another open copy of the app saves at the same moment, this tab combines both boards and keeps trying for up to five seconds before it warns you.</dd><dt>Can I keep working with a damaged cloud save?</dt><dd>The app can rebuild a damaged cloud save from an exact verified copy. If no exact copy matches, ordinary tasks remain saved locally and pending; they do not download that same source for every edit. Once a finished check finds a cloud copy unreadable, opening or returning to the app checks only whether the cloud has changed, even after a restart or a failed connection, instead of downloading that copy again. Retry sync, signing in again or a newer cloud update checks everything again; so do an interrupted check, a changed board base or device storage that cannot open. Incomplete earlier copies kept after an older copy opens are separate: reconnecting checks them. Supported saved sources are reconciled automatically; unsafe or unsupported recovery can still need your review.</dd><dt>Can I use my board while cloud recovery starts?</dt><dd>Yes. When the current cloud copy cannot be read, the board shows and takes typing and taps before cloud recovery starts reading cloud copies. While you type in a field, recovery waits until you leave it. Settings, the debug log, Review cloud recovery and Restore stay available while recovery runs.</dd><dt>What happens when an incomplete cloud copy becomes readable?</dt><dd>When another source was already protected as incomplete, reconnecting or returning to the app checks that exact generation again even if newer cloud saves rotated it out of the current slots. After Retry sync rebuilds a large board, only Retry sync checks it again. If its bytes are still incomplete, the open board remains saved and usable while a bounded retry may run; a later foreground check starts a fresh attempt. If the source becomes complete and supported, its changes are combined with the current accepted board and the existing guarded publisher waits for exact cloud confirmation. The old partial capture remains unchanged; retained pointers protect evidence but cannot recreate missing bytes. File and Paste Restore remain deliberate choices.</dd>'
+    + '<dt>What can I do if a save or sync fails?</dt><dd>Keep the tab open if the latest edit could not save locally. Download board includes accepted unsaved edits; Download recovery file also keeps the saved sources. Device-save warnings name a stage and code. The cloud error button offers Retry sync, Reload app, and Sign out; reload waits for edits to save. After a lost reply, Retry sync checks the current saved cloud board before trying again; an error alone does not confirm the save. Recent sync errors keeps safe timestamped codes for one hour, without task content or account details. Recorded errors describe failed attempts and can remain after a later successful sync. Interrupted cloud cleanup resumes without changing your current or previous synced board. Synced requires server acknowledgement of the latest save.</dd><dt>What if the app is open twice on this device?</dt><dd>Saves on this device run one at a time. If another open copy of the app saves at the same moment, this tab combines both boards and keeps trying for up to five seconds before it warns you.</dd><dt>Can I keep working with a damaged cloud save?</dt><dd>The app can rebuild a damaged cloud save from an exact verified copy. If no exact copy matches, ordinary tasks remain saved locally and pending; they do not download that same source for every edit. Once a finished check finds a cloud copy unreadable, opening or returning to the app checks only whether the cloud has changed, even after a restart or a failed connection, instead of downloading that copy again. Retry sync, signing in again or a newer cloud update checks everything again; so do an interrupted check, a changed board base or device storage that cannot open. Incomplete earlier copies kept after an older copy opens are separate: reconnecting checks them. Supported saved sources are reconciled automatically; unsafe or unsupported recovery can still need your review.</dd><dt>Can I use my board while cloud recovery starts?</dt><dd>Yes. When the current cloud copy cannot be read, the board shows and takes typing and taps before cloud recovery starts reading cloud copies. While you type in a field, recovery waits until you leave it. Settings, the debug log, Review cloud recovery and Restore stay available while recovery runs.</dd><dt>What happens when an incomplete cloud copy becomes readable?</dt><dd>When another source was already protected as incomplete, reconnecting or returning to the app checks that exact generation again even if newer cloud saves rotated it out of the current slots. After Retry sync rebuilds a large board, only Retry sync checks it again. If its bytes are still incomplete, the open board remains saved and usable while a bounded retry may run; a later foreground check starts a fresh attempt. If the source becomes complete and supported, its changes are combined with the current accepted board and the existing guarded publisher waits for exact cloud confirmation. The old partial capture remains unchanged; retained pointers protect evidence but cannot recreate missing bytes. File and Paste Restore remain deliberate choices.</dd>'
     + '<dt>How do I switch accounts?</dt><dd>Unsynced work stays in a protected local recovery copy before an account switch. Undo does not carry one account’s tasks into another. Restore warns before using a backup from a different account.</dd>'
     + '</dl>'
     + '</details>'

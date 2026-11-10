@@ -792,6 +792,9 @@ test('RISK device save settle: ordinary signed-out edits during slow device comm
  const head=await f.settled('own saves');
  assert.doesNotMatch(f.messages.join('\n'),/device-save:|changed again while this tab was merging it/,'no save failure is shown for work the app finished itself');
  assert.equal(f.ctx.deviceSaveIssue(),null);
+ // A merge with another copy keeps the displaced draft as a stale-tab backup.
+ // With one copy open there is nothing to merge, so none appears in Settings.
+ assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'this tab never has to merge with its own saves');
  const durable=JSON.parse(head.payload);
  for(const [i,id] of ids.entries())assert.equal(durable.tasks.find(task=>task.id===id).title,'Edited '+i,'every accepted edit is on the saved board');
  const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());

@@ -33953,8 +33953,7 @@ test('RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from a
 });
 
 test('Device save settle guidance: the FAQ and changelog say saves on one device settle by themselves (#2324)',()=>{
- const faq=html.slice(html.indexOf("<dt>What can I do if a save or sync fails?"),html.indexOf("<dt>How do I switch accounts?"));
- assert.match(faq,/Saves on this device run one at a time\. If another open copy of the app saves at the same moment, this tab combines both boards and keeps trying for up to five seconds before it warns you\./);
+ assert.match(html,/<dt>What if the app is open twice on this device\?<\/dt><dd>Saves on this device run one at a time\. If another open copy of the app saves at the same moment, this tab combines both boards and keeps trying for up to five seconds before it warns you\.<\/dd>/);
  const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
  assert.match(current,/<h3>November 10, 2026<\/h3><ul><li>Ordinary edits no longer fail to save on this device with “The saved board changed again while this tab was merging it”\./);
 });
