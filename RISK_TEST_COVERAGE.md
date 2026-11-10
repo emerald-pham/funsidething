@@ -1716,6 +1716,7 @@ its RISK test; the map follows.
 - RISK chain return sync: a return and a Postpone of a dot in a pass carried over the 2 AM reset reach the cloud and the other device, in either order
 - RISK chain return sync: a Postpone of a dot on the other device after it received the return reaches the cloud and the returning device
 - RISK chain return sync: once the postponement ends, the board with the return still syncs through an edit and the next answer, and the returned dot stays off
+- RISK chain return compatibility: a cloud board whose chain row in its own pass is anything but one dot leaving is held as unsupported
 - RISK chain return sync: a cloud board that still shows a returned dot with no later Yes or Dot is held, not adopted
 
 ## tests/repository-process.test.js

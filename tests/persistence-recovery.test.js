@@ -10678,6 +10678,26 @@ test('RISK chain return sync: once the postponement ends, the board with the ret
   assert.equal(chain.includes('carried-b'),false,label+': the returned dot stays off');
 });
 
+test('RISK chain return compatibility: a cloud board whose chain row in its own pass is anything but one dot leaving is held as unsupported',async t=>{
+ const shapes=[
+  ['two dots leave',row=>{row.before.value=[...row.before.value,'carried-a'];}],
+  ['one dot is swapped for another',row=>{row.value=['carried-a'];}],
+  ['no action names it',row=>{delete row.actionId;}],
+ ];
+ for(const [shape,reshape] of shapes)await t.test(shape,async t=>{
+  const {local,h,at}=await carriedPassClients221(t);
+  returnDotFromBoard221(local,'carried-b',at+100);await publish221(local);
+  const remote=h.remoteState(),row=returnFact221(remote)[0];
+  assert.ok(row,'precondition: the cloud holds the recorded return');
+  reshape(row);h.writeBehindBack(remote);
+  const cloud=h.doc.payload;
+  await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(35);
+  assert.equal(local.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','the row is not a return this app reads, so sync holds');
+  assert.equal(h.doc.payload,cloud,'nothing is written over the cloud copy');
+  assert.deepEqual(Array.from(local.ctx.state.chain),['carried-a','carried-c'],'this device keeps its own return');
+ });
+});
+
 test('RISK chain return sync: a cloud board that still shows a returned dot with no later Yes or Dot is held, not adopted',async t=>{
  const {local,h,at}=await carriedPassClients221(t);
  returnDotFromBoard221(local,'carried-b',at+100);await publish221(local);
