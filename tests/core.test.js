@@ -12231,9 +12231,18 @@ const renderedBoard = scanHtml => ({
   benchmark: String(scanHtml).match(/<div class="card bench"><span class="title">([^<]*)</)?.[1] ?? null,
   candidate: String(scanHtml).match(/<div class="card cand"><span class="title">([^<]*)</)?.[1] ?? null,
 });
+// The Node shim does not parse the editor's input values out of its markup,
+// so an untouched editor is given the task's own values, as a person sees them
+// (the same fields hydrateUnchangedEditorDraft fills).
+const keepEditorValues = (ctx, shim, id) => {
+  const task = ctx.state.tasks.find(row => row.id === id);
+  fillEditPane(ctx, shim, { title: task.title, url: task.url || "", due: task.due || "", start: task.startsAt || "", evergreen: task.evergreen, ctxIds: task.ctx });
+  shim.document.getElementById("etEverReset").checked = task.evergreenResetAtDay !== false;
+};
 const returnFromPill = (ctx, shim, title) => {
   const pill = chainPill(shim.elements.get("scan").innerHTML, title);
   ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  keepEditorValues(ctx, shim, pill.id);
   const button = returnButton(shim.elements.get("modalRoot").innerHTML);
   ctx.onAction("return-candidate", { dataset: { id: button.match(/data-id="([^"]+)"/)[1] } });
 };
@@ -12283,6 +12292,7 @@ const returnBenchmarkFromEdit = (ctx, shim) => {
   const edit = shim.elements.get("scan").innerHTML.match(/<div class="card bench">[\s\S]*?<button\b[^>]*data-act="edit" data-id="([^"]+)"/);
   assert.ok(edit, "the benchmark card offers Edit");
   ctx.onAction("edit", { dataset: { id: edit[1] } });
+  keepEditorValues(ctx, shim, edit[1]);
   const button = returnButton(shim.elements.get("modalRoot").innerHTML);
   assert.doesNotMatch(button, /\bdisabled\b/, "the benchmark's editor offers Return as candidate");
   ctx.onAction("return-candidate", { dataset: { id: edit[1] } });
@@ -12390,6 +12400,90 @@ test("UI #221: a returned dot keeps its rating, fields, completions and History,
   const newest = shim.elements.get("modalRoot").innerHTML.match(/<li class="rating-event">[\s\S]*?<\/li>/)?.[0] ?? "";
   assert.match(newest, /<summary><b>Return as candidate<\/b>/, "History shows the return");
   assert.doesNotMatch(newest, /Own rating changed/, "with no rating change");
+});
+
+test("UI #221: a returned dot is dealt again in the same pass, but a returned task that is not yet eligible stays out of the scan", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2221 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Returned dot", true);
+  ctx.addTask("Future dot", true, [], { startsAt: "2999-01-01" });
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  assert.equal(renderedBoard(shim.elements.get("scan").innerHTML).candidate, null, "precondition: nothing left to deal");
+
+  returnFromPill(ctx, shim, "Returned dot");
+  assert.equal(renderedBoard(shim.elements.get("scan").innerHTML).candidate, "Returned dot", "the scanner deals it again this pass");
+
+  returnFromPill(ctx, shim, "Future dot");
+  const board = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual(board, { pills: ["First dot"], benchmark: "Benchmark dot", candidate: "Returned dot" },
+    "the future-dated task leaves the chain without becoming a candidate");
+  assert.equal(ctx.pool().some(task => task.title === "Future dot"), false, "its start date still keeps it out of the pool");
+});
+
+test("UI #221: Return as candidate saves the editor's unsaved edits with the return, like Done, Worked on it and Dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2222 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Middle dot");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  keepEditorValues(ctx, shim, pill.id);
+  fillEditPane(ctx, shim, { title: "Middle dot, renamed", url: "https://example.test/renamed" });
+
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });
+
+  const task = ctx.state.tasks.find(row => row.id === middle.id);
+  assert.deepEqual({ title: task.title, url: task.url }, { title: "Middle dot, renamed", url: "https://example.test/renamed" }, "the edits are saved");
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["First dot"], "and the dot is returned");
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the editor closes");
+});
+
+test("UI #221: header Undo puts a returned dot back in its original place in one step, edits included", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2223 });
+  ["Oldest task", "Second task", "Third task", "Fourth task", "Fifth task"].forEach((title, i) => addTaskAged(ctx, title, 900000 - i * 1000));
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const second = answerShownCandidate(ctx, "yes"), third = answerShownCandidate(ctx, "yes");
+  const before = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: before.pills, benchmark: before.benchmark }, { pills: ["Oldest task", second], benchmark: third }, "precondition");
+  const pill = chainPill(shim.elements.get("scan").innerHTML, second);
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  keepEditorValues(ctx, shim, pill.id);
+  fillEditPane(ctx, shim, { title: "Renamed on the way out" });
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["Oldest task"], "precondition: returned");
+
+  ctx.onAction("undo", {});
+
+  const after = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: after.pills, benchmark: after.benchmark }, { pills: ["Oldest task", second], benchmark: third }, "the dot is back between its neighbours");
+  assert.equal(ctx.state.tasks.find(task => task.id === pill.id).title, second, "the same Undo step reverses the edit saved with it");
+});
+
+test("UI #221: a repeated Return is one return and one Undo step, and a stale Return for a task that has left the chain changes nothing", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2224 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Middle dot", true);
+  const bench = ctx.addTask("Benchmark dot", true);
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Middle dot");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  keepEditorValues(ctx, shim, pill.id);
+  const steps = readConst(ctx, "undoStack.length");
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });
+  const once = ctx.cloudPayload();
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });   // the second tap of a double tap
+  assert.equal(ctx.cloudPayload(), once, "the repeat changes nothing");
+  assert.equal(readConst(ctx, "undoStack.length"), steps + 1, "one Undo step");
+
+  ctx.onAction("edit", { dataset: { id: bench.id } });
+  keepEditorValues(ctx, shim, bench.id);
+  assert.doesNotMatch(returnButton(shim.elements.get("modalRoot").innerHTML), /\bdisabled\b/, "precondition: the editor offers the return");
+  ctx.onAction("bench-done", { dataset: { benchmark: bench.id } });   // the task leaves the chain while that editor is open
+  const done = ctx.cloudPayload(), doneSteps = readConst(ctx, "undoStack.length");
+  ctx.onAction("return-candidate", { dataset: { id: bench.id } });
+  assert.equal(ctx.cloudPayload(), done, "the stale control neither reopens the finished task nor changes anything else");
+  assert.equal(readConst(ctx, "undoStack.length"), doneSteps);
+  assert.equal(ctx.state.tasks.find(task => task.id === bench.id).done, true);
 });
 
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
