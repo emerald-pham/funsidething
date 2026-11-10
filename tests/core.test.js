@@ -38726,6 +38726,12 @@ test('RISK debug log link #2309: inside a running app the Help link opens the lo
  const {ctx,shim}=app,before=JSON.stringify(ctx.state);
  ctx.onAction('help',{});
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<a href="#debug-log">/,'Help offers the link inside the installed window');
+ // #2308: the owner asked for the link at the bottom of Help, so only the OK button may follow it.
+ const help=shim.document.getElementById('modalRoot').innerHTML,linkLine='<p class="kv">If Settings will not open, <a href="#debug-log">open the Debug log</a> here instead.</p>';
+ assert.equal(help.split(linkLine).length,2,'Help shows the link once, with its wording');
+ assert.ok(help.indexOf(linkLine)>help.lastIndexOf('</details>'),'the link comes after every Help chapter, Changelog included');
+ assert.match(help.slice(help.indexOf(linkLine)+linkLine.length),/^<div class="mbtns"><button class="btn done" data-act="ok-quickstart">OK<\/button><\/div>/,'nothing but the OK button follows the link');
+ assert.match(help,/How do I open the debug log if Settings will not open\?<\/dt><dd>Help has a link at the bottom that opens the Debug log directly/,'the FAQ says where the link is');
  let replacedUrl=null;shim.window.history={replaceState(_state,_title,url){replacedUrl=url;shim.window.location=new URL(url,shim.window.location.href);}};
  shim.window.location=new URL('https://scanner.example/#debug-log');shim.window.dispatchEvent({type:'hashchange'});
  const modal=shim.document.getElementById('modalRoot').innerHTML;
