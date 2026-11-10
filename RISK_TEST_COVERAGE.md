@@ -183,6 +183,7 @@ its RISK test; the map follows.
 - RISK chain start: Most likely ties go to the older task then the task id, with no randomness
 - RISK chain start: Most likely draws only from the eligible pool, including a task done before
 - RISK chain start: the row preview, empty-chain notice and percentage explanation follow the selected option
+- RISK chain start: the saved preview marks the same first dot on a detached board with no scan mode
 - RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag
 - RISK chain start: a board saved mid-pass with an empty chain and the old checkbox on starts with Oldest eligible
 - RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting

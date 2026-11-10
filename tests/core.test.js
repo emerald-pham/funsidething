@@ -4065,6 +4065,15 @@ const savedSkipBoard=(extra={})=>{
  const board=syncState({tasks:[{...syncTask('skip-saved-oldest','Saved oldest'),createdAt:1},{...syncTask('skip-saved-likely','Saved likely'),createdAt:2,mu:32}],...extra});
  board.settings={...board.settings,skipOldestFirstDot:true,...extra.settings};return JSON.stringify(board);
 };
+test('RISK chain start: the saved preview marks the same first dot on a detached board with no scan mode',async()=>{
+ const {ctx}=await loadApp({seed:2325});
+ Object.assign(ctx.addTask('Detached oldest',false),{id:'detached-oldest',createdAt:1,mu:20});Object.assign(ctx.addTask('Detached likely',false),{id:'detached-likely',createdAt:2,mu:32});
+ const board=JSON.parse(JSON.stringify(ctx.state));board.settings.chainStartsWith='mostLikely';delete board.scanMode;
+ assert.equal(vm.runInContext('boardPresentation.rowContext',ctx)(board).nextDotted.id,'detached-likely','the preview reads the detached board, not live state');
+ assert.match(vm.runInContext('boardPresentation.startNotice',ctx)(board),/highest overall chance/);
+ delete board.settings.chainStartsWith;assert.equal(vm.runInContext('boardPresentation.rowContext',ctx)(board).nextDotted.id,'detached-oldest');
+});
+
 test('RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag',async()=>{
  const raw=savedSkipBoard(),{ctx,shim}=await loadApp({seed:2310,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
  assert.match(shim.document.getElementById('scan').innerHTML,/starts on the oldest eligible task/,'the notice promises the oldest task, not an unpaired choice');
@@ -4092,7 +4101,7 @@ test('RISK chain start: changing the option leaves existing dots alone and Undo 
  chooseChainStart(app,'mostLikely');
  assert.equal(ctx.state.settings.chainStartsWith,'mostLikely');assert.deepEqual(Array.from(ctx.state.chain),chain,'the dot already on the chain stays');
  assert.equal(ctx.state.candidateId,candidate,'the current candidate stays');assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'ratings stay');
- ctx.onAction('undo',{});assert.equal(ctx.state.settings.chainStartsWith,'oldest','Undo restores the prior option');assert.deepEqual(Array.from(ctx.state.chain),chain,'Undo leaves the chain');
+ ctx.onAction('undo',{});assert.equal(ctx.state.settings.chainStartsWith,undefined,'Undo restores the default option');assert.deepEqual(Array.from(ctx.state.chain),chain,'Undo leaves the chain');
 });
 
 test('RISK chain start: replacing the head of a started chain is the same under either option',async()=>{
@@ -4125,6 +4134,8 @@ test('RISK BACKWARD COMPATIBILITY: a board carrying Chain starts with and a reco
   assert.equal(older.ctx.window.CloudSync.status==='error',false,'older client: no hold on the published board ('+older.ctx.window.CloudSync.errorCode+')');
   assert.equal(vm.runInContext('cloudAdoptionHeld',older.ctx),false,'older client: adoption is not held');
   assert.equal(older.ctx.state.settings.chainStartsWith,'mostLikely','older client: the field is retained');
+  assert.doesNotMatch(older.shim.document.getElementById('syncBtn').textContent,/error|hold/i,'older client: no recovery prompt on the sync control');
+  assert.deepEqual(Array.from(older.ctx.state.protectedBackupIds||[]),[],'older client: no recovery copy was kept for this routine read');
   hydrateUnchangedEditorDraft(older,'compat-older');older.shim.document.getElementById('etTitle').value='Edited by the older client';older.ctx.onAction('save-edit',{dataset:{id:'compat-older'}});
   assert.equal(await older.ctx.persist(),true);await older.ctx.cloudPull();await older.ctx.cloudPushNow();
   for(let n=0;n<160&&JSON.parse(h.doc.payload).tasks.find(row=>row.id==='compat-older').title!=='Edited by the older client';n++)await syncSettle(5);
@@ -4168,8 +4179,9 @@ test('RISK chain start: Settings change and reopen retain Most likely and unrela
  const app=await loadApp({seed:2316}),{ctx,shim}=app;
  Object.assign(ctx.addTask('Reopen older',false),{id:'reopen-older',createdAt:1,privateFutureTask:'retained'});
  Object.assign(ctx.addTask('Reopen likely',false),{id:'reopen-likely',createdAt:2,mu:32});
- ctx.state.settings.privateFutureSetting={retained:7};chooseChainStart(app,'mostLikely');assert.equal(await ctx.persist(),true);
- const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(raw);assert.equal(JSON.parse(raw).settings.chainStartsWith,'mostLikely','the choice is saved with the board');
+ ctx.state.settings.privateFutureSetting={retained:7};chooseChainStart(app,'mostLikely');
+ for(let n=0;n<40&&JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)||'{}').settings?.chainStartsWith!=='mostLikely';n++)await syncSettle(5);
+ const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(raw);assert.equal(JSON.parse(raw).settings.chainStartsWith,'mostLikely','the change event alone saves the choice with the board');
  const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
  reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/<option value="mostLikely" selected>Most likely<\/option>/);
  reopened.ctx.closeModal();reopened.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(reopened.ctx.state.chain),['reopen-likely']);
@@ -4208,7 +4220,8 @@ test('RISK chain start: missing invalid and legacy values start with Oldest elig
   const initial=syncState({tasks:[{...syncTask('value-oldest','Oldest value task'),createdAt:1},{...syncTask('value-likely','Likely value task'),createdAt:2,mu:32}],settings:{scanMode:mode}});
   if(value!==undefined)initial.settings.chainStartsWith=value;
   const raw=JSON.stringify(initial),{ctx}=await loadApp({seed:2320,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
-  assert.equal(ctx.state.settings.chainStartsWith,value==='mostLikely'?'mostLikely':'oldest','only the saved string mostLikely selects Most likely');
+  assert.equal(ctx.state.settings.chainStartsWith,value==='mostLikely'?'mostLikely':undefined,'only the saved string mostLikely selects Most likely; anything else reads as the default');
+  if(value===undefined)assert.equal(JSON.stringify(ctx.state.settings).includes('chainStartsWith'),false,'a default board gains no new key, so an update never changes its saved payload');
   const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));ctx.onAction('start-scan',{dataset:{mode:mode==='both'?'descending':mode}});
   assert.deepEqual(Array.from(ctx.state.chain),[value==='mostLikely'?'value-likely':'value-oldest'],String(value)+'/'+mode);
   assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'Start remains neutral');
@@ -4265,14 +4278,14 @@ test('RISK chain start: synced Undo reverses the option and the Start it enabled
  chooseChainStart(app,'mostLikely');await publish('option');assert.equal(h.remoteState().settings.chainStartsWith,'mostLikely');
  app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await publish('Most likely Start');assert.deepEqual(h.remoteState().chain,['undo-likely']);
  app.ctx.onAction('undo',{});await publish('Undo Start');assert.deepEqual(h.remoteState().chain,[]);assert.equal(h.remoteState().settings.chainStartsWith,'mostLikely','Undo reversed only the Start');
- app.ctx.onAction('undo',{});await publish('Undo option');assert.equal(h.remoteState().settings.chainStartsWith,'oldest','Undo restores the prior option on the cloud board');
+ app.ctx.onAction('undo',{});await publish('Undo option');assert.equal(h.remoteState().settings.chainStartsWith,undefined,'Undo restores the default option on the cloud board');
  assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-older',25],['undo-likely',30]],'every reversal stays neutral');
 });
 
 test('RISK chain start: Save settings alone persists the Chain starts with transition',async()=>{
  const app=await loadApp({seed:2324}),{ctx,shim}=app;
  Object.assign(ctx.addTask('Save older',false),{id:'save-older',createdAt:1});Object.assign(ctx.addTask('Save likely',false),{id:'save-likely',createdAt:2,mu:32});
- ctx.openSettings();assert.equal(ctx.state.settings.chainStartsWith,'oldest');
+ ctx.openSettings();assert.equal(ctx.state.settings.chainStartsWith,undefined);
  shim.document.getElementById('stChainStartsWith').value='mostLikely';ctx.onAction('save-settings',{});
  assert.equal(ctx.state.settings.chainStartsWith,'mostLikely','Save must read the selected draft even without an immediate change event');
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),['save-likely']);
@@ -7854,8 +7867,8 @@ test('RISK AUTH HYDRATION: real Auth and native resume wait for the durable boar
   const release=new Promise(resolve=>{releaseOpen=resolve;}),entered=new Promise(resolve=>{openEntered=resolve;});
   try{
    warm=await loadAppAtTime(at,{sharedStorage:storage,indexedDBProvider:factory,deviceDbName:dbName});
-   warm.ctx.setSkipOldestFirstDotPreference(!skipFirstDot);
-   warm.ctx.setSkipOldestFirstDotPreference(skipFirstDot);
+   warm.ctx.setShowPostponePreference(false);
+   warm.ctx.setShowPostponePreference(true);
    assert.equal(await warm.ctx.persist(true),true,'the saved board and its pending local choices have an authoritative device head');
    const durable=warm.shim.window.ScannerDeviceStore,initialHead=await durable.readHead();
    const expectedState=JSON.parse(initialHead.payload),expectedEventIds=expectedState.decisionEvents.map(event=>event.id);
@@ -12101,7 +12114,7 @@ test("UI: Quick start displays four essential steps in order", async () => {
   assert.deepEqual(steps, [
   "Add tasks. Optionally assign contexts, then enable the contexts needed for those tasks.",
   "Choose Start scanning.",
-  "With no dot, Yes chooses the first task and No skips it for this pass. Once a dot exists, compare each candidate with the newest dot: Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
+  "Start scanning adds the first dot, chosen by Chain starts with in Settings: by default the oldest eligible task. Once a dot exists, compare each candidate with the newest dot: Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
   "Choose done scanning when ready. Work the chain from the newest dot upward, using Done for finished tasks, Worked on it for progress, or Dislodge to set a task aside."
 ]);
 });
