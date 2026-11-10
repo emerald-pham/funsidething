@@ -184,9 +184,12 @@ its RISK test; the map follows.
 - RISK chain start: Most likely ties go to the older task then the task id, with no randomness
 - RISK chain start: Most likely draws only from the eligible pool, including a task done before
 - RISK chain start: the row preview, empty-chain notice and percentage explanation follow the selected option
+- RISK chain start: the preview, the percentage explanation, the notice and Start agree on the scan mode Most likely reads
+- RISK chain start: Most likely ties compare the percentages people see, so <0.01% beats 0% in Halving
 - RISK chain start: the saved preview marks the same first dot on a detached board with no scan mode
 - RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag
 - RISK chain start: a board saved mid-pass with an empty chain and the old checkbox on starts with Oldest eligible
+- RISK chain start: the old checkbox saved on mid-pass deals no hidden candidate for d, c or Delete to act on
 - RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting
 - RISK chain start: replacing the head of a started chain is the same under either option
 - RISK BACKWARD COMPATIBILITY: a board carrying Chain starts with and a recorded settings decision syncs through an older released client
@@ -1380,7 +1383,8 @@ its RISK test; the map follows.
 - RISK cloud source recovery: an empty preview cannot overwrite a legacy root published at the transaction boundary
 - RISK cloud source recovery: native restored-device hold clears only after exact cloud ACK and durable current-head recovery
 - RISK cloud source recovery metadata: native preview distinguishes server save time upload clock and missing decision time
-- RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery
+- RISK Settings after Restore: a confirmed restore, a cancelled preview and a closed paste all show the saved values
+- RISK cloud source recovery drafts: Settings shows the saved values after native review cancel delayed reads and confirmed recovery
 - RISK cloud source recovery prepared sources: earlier choices are disclosed and must stay exact before a replacement publishes
 - RISK cloud source recovery publication: a device peer change during the SDK read invalidates consent before cloud mutation
 - RISK recovery identity consumers: signed-in Add clears its captured draft after recovery
@@ -1557,6 +1561,7 @@ its RISK test; the map follows.
 - RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority never revives or uploads its stale legacy shell
 - RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes
 - RISK backup delete keeps its place: deleting a backup leaves Settings open with Data and backups open and the list in view, whether the delete succeeds or is refused
+- RISK backup delete keeps its place guidance: the mounted FAQ says making or deleting a backup keeps Settings open at the backup list
 - RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once
 - RISK backup list memory: a first opening does not measure backups before the board is open, lists them all, and learns their measures afterwards
 - RISK backup list memory: Restore stays disabled on an empty-cloud evidence copy listed without its text, including from facts learned by an earlier build
