@@ -12306,6 +12306,92 @@ test("UI #221: returning the benchmark while its intervention is showing clears 
   assert.ok(["Pool task", "Benchmark dot"].includes(board.candidate), `the scan deals a candidate against the new benchmark, got ${board.candidate}`);
 });
 
+test("UI #221: returning the benchmark with dots remaining keeps the showing candidate, now weighed against the newest remaining dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2217 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Second dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Showing candidate", false);
+  ctx.render();
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML),
+    { pills: ["First dot", "Second dot"], benchmark: "Benchmark dot", candidate: "Showing candidate" }, "precondition");
+
+  returnBenchmarkFromEdit(ctx, shim);
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: ["First dot"], benchmark: "Second dot", candidate: "Showing candidate" });
+  const yes = scan.match(/<button\b[^>]*data-act="yes"[^>]*>/)?.[0] ?? "";
+  assert.match(yes, new RegExp(`data-benchmark="${ctx.state.tasks.find(task => task.title === "Second dot").id}"`), "Yes now weighs the candidate against the new benchmark");
+});
+
+test("UI #221: in work mode, returning an older dot keeps work mode on the same benchmark, and returning the benchmark works on from the newest remaining dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2218 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Second dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.onAction("start-working", {});
+  assert.match(shim.elements.get("scan").innerHTML, /Scanning paused/, "precondition: working the chain");
+
+  returnFromPill(ctx, shim, "Second dot");
+  let scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: ["First dot"], benchmark: "Benchmark dot", candidate: null });
+  assert.match(scan, /Scanning paused/, "still working, on the same benchmark");
+
+  returnBenchmarkFromEdit(ctx, shim);
+  scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: [], benchmark: "First dot", candidate: null });
+  assert.match(scan, /Scanning paused/, "still working, now from the newest remaining dot");
+  assert.equal(ctx.state.mode, "work");
+});
+
+test("UI #221: returning the only dot leaves the existing empty-chain state with no replacement dot, with the oldest-first setting on or off", async t => {
+  for (const skipOldestFirstDot of [false, true]) await t.test(`skipOldestFirstDot ${skipOldestFirstDot}`, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2219 });
+    ctx.state.settings.skipOldestFirstDot = skipOldestFirstDot;
+    addTaskAged(ctx, "Oldest pool task", 900000);
+    addTaskAged(ctx, "Newer pool task", 1000);
+    ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+    if (skipOldestFirstDot) answerShownCandidate(ctx, "yes");
+    const only = renderedBoard(shim.elements.get("scan").innerHTML).benchmark;
+    assert.ok(only, "precondition: one dot");
+
+    returnBenchmarkFromEdit(ctx, shim);
+
+    const scan = shim.elements.get("scan").innerHTML, board = renderedBoard(scan);
+    assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: [], benchmark: null }, "no dot is chosen in its place");
+    assert.deepEqual(Array.from(ctx.state.chain), []);
+    if (skipOldestFirstDot) assert.ok(board.candidate, "with the setting on, the scan offers a first candidate as it does with no dot");
+    else {
+      assert.equal(board.candidate, null);
+      assert.match(scan, /Nothing dotted yet/, "with the setting off, the board waits for Start");
+      assert.match(scan, /data-act="start-scan"/);
+    }
+  });
+});
+
+test("UI #221: a returned dot keeps its rating, fields, completions and History, and History records Return as candidate with no rating change", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2220 });
+  ["Oldest task", "Second task", "Third task", "Fourth task"].forEach((title, i) => addTaskAged(ctx, title, 900000 - i * 1000));
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const second = answerShownCandidate(ctx, "yes");
+  answerShownCandidate(ctx, "yes");
+  const task = ctx.state.tasks.find(row => row.title === second);
+  const kept = row => JSON.stringify([row.id, row.title, row.url, row.due, row.startsAt, row.ctx, row.evergreen, row.evergreenHours, row.done, row.completedAt, row.lastDoneAt, row.createdAt, row.prerequisiteIds]);
+  const before = { ratings: JSON.stringify(ctx.state.tasks.map(row => [row.id, row.mu, row.sigma])), fields: ctx.state.tasks.map(kept), history: JSON.stringify(task.ratingHistory || []) };
+
+  returnFromPill(ctx, shim, second);
+
+  assert.equal(JSON.stringify(ctx.state.tasks.map(row => [row.id, row.mu, row.sigma])), before.ratings, "no rating moves, unlike Dislodge");
+  assert.deepEqual(ctx.state.tasks.map(kept), before.fields, "not completed, deleted or edited");
+  assert.equal(ctx.state.considered[task.id], undefined, "no skip mark or hold is added");
+  assert.ok(JSON.stringify(task.ratingHistory).startsWith(before.history.slice(0, -1)), "earlier History rows are kept as they were");
+  ctx.onAction("edit", { dataset: { id: task.id } });
+  const newest = shim.elements.get("modalRoot").innerHTML.match(/<li class="rating-event">[\s\S]*?<\/li>/)?.[0] ?? "";
+  assert.match(newest, /<summary><b>Return as candidate<\/b>/, "History shows the return");
+  assert.doesNotMatch(newest, /Own rating changed/, "with no rating change");
+});
+
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
    The card already reads as the benchmark (purple fill, "Done" checkbox, its
    position in the layout), so the little filled circle beside the title was

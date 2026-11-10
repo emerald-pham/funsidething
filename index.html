@@ -8940,7 +8940,7 @@ const taskActionOwnerBundle=(()=>{
       const choices=[...(change?[change]:[]),...(returningDot?[{target:{type:"pass",id:choiceGesture.passId,property:"chain"},
         value:[],after:{present:true},before:{present:true,value:[id]}}]:[])];
       appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
-      finishRatingObservation(observation);commit();
+      finishRatingObservation(observation,false,returningDot);commit();
       return true;
     }
     return false;
@@ -11201,7 +11201,7 @@ function ratingMetricsChanged(a,b,oldBasis,basis){
   return ["mu","sigma","likelihood","eligible","fallback","n","samples"].some(key=>a[key]!==b[key])
     || oldBasis!==basis && a.topK!==b.topK;
 }
-function finishRatingObservation(event,snapshot=false){
+function finishRatingObservation(event,snapshot=false,record=false){
   const stats=chanceDisplayStats("chance"),basis=ratingObservationBasis(stats);
   let id=null;
   for(const taskId of event.ids){
@@ -11209,7 +11209,9 @@ function finishRatingObservation(event,snapshot=false){
     const after=ratingObservationValues(t,stats),before=event.before.get(taskId);
     const rows=t.ratingHistory||[],last=rows.find(row=>row?.id===t.ratingHistoryHead&&validRatingHistoryRow(row)) || rows.filter(validRatingHistoryRow).at(-1);
     const changed=before&&ratingMetricsChanged(before,after,event.basis,basis);
-    if(!changed && (!snapshot || last&&!ratingMetricsChanged(last.after,after,last.basis,basis)))continue;
+    // `record` keeps a deliberate action in History even when nothing it
+    // measures moved: a returned dot (#221) changes membership, not ratings.
+    if(!record && !changed && (!snapshot || last&&!ratingMetricsChanged(last.after,after,last.basis,basis)))continue;
     id ||= event.id || uid();
     const rating=before&&(before.mu!==after.mu||before.sigma!==after.sigma);
     const row={v:1,id,at:event.at,seq:rows.reduce((n,r)=>Number.isSafeInteger(r?.seq)?Math.max(n,r.seq):n,0)+1,kind:event.kind,
