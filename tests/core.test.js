@@ -9992,6 +9992,48 @@ test("RISK rating bounds: hydration and frozen chance opponents normalize extrem
   assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
 });
 
+// #2303 (owner spec #2298 and decisions of 2026-11-09): the Data section is, in
+// order, one status line, Make backup, Download backup, Restore, the backup
+// list, a closed Troubleshooting section and Reset everything. Housekeeping is
+// gone; Clear history stays in the History panel.
+test("RISK Data and backups layout: one status line, Make backup, Download backup, Restore, the backup list, closed Troubleshooting and Reset everything, with Clear history only in History", async () => {
+  const { ctx, shim } = await loadApp();
+  const done = ctx.addTask("Finished layout task", false); ctx.addTask("Open layout task", false);
+  ctx.state.chain = [done.id]; ctx.pushUndo(); ctx.completeTask(done); await ctx.persist();
+  ctx.onAction("make-manual-backup", {}); for (let i = 0; i < 50 && !ctx.readLocalBackups().some(row => row.kind === "manual"); i++) await flush();
+  ctx.openSettings();
+  const markup = shim.document.getElementById("modalRoot").innerHTML;
+  const data = markup.split("<summary>Data and backups</summary>")[1] || "";
+  assert.ok(data, "positive control: Settings has Data and backups");
+  assert.equal((data.match(/class="statusdot"/g) || []).length, 1, "one status line");
+  const order = [/class="statusdot"/, /data-act="make-manual-backup">Make backup</, /data-act="download-recovery-file">Download backup</,
+    /data-act="restore-backup"[^>]*>Restore</, /class="mgr backup-row"/, /<details class="settings-troubleshooting"><summary>Troubleshooting<\/summary>/,
+    /data-act="wipe">Reset everything</];
+  const at = order.map(pattern => data.search(pattern));
+  assert.ok(at.every(index => index >= 0), "every item is in the Data section: " + JSON.stringify(at));
+  assert.deepEqual(at.slice().sort((a, b) => a - b), at, "the items appear in the approved order: " + JSON.stringify(at));
+  const troubleshooting = data.split('<details class="settings-troubleshooting">')[1]?.split("</details>")[0] || "";
+  assert.match(troubleshooting, /data-act="view-support-diagnostics">View debug log</, "Troubleshooting holds the Debug log");
+  assert.match(troubleshooting, /data-act="review-decision-recovery">Review saved decisions</, "Troubleshooting holds Review saved decisions");
+  assert.doesNotMatch(markup, /<details class="settings-troubleshooting" open/, "Troubleshooting is closed when Settings opens");
+  assert.doesNotMatch(markup, /Housekeeping|data-act="clear-done"|History panel/, "Settings no longer repeats Clear history");
+  ctx.closeModal(); ctx.state.histOpen = true; ctx.render();
+  assert.match(shim.document.getElementById("histPanel").innerHTML, /data-act="clear-done">Clear history</, "Clear history stays in the History panel");
+});
+
+// #2303: the install action moves out of Scanning and recurrence.
+test("RISK Settings install: Install this app on your phone sits outside Scanning and recurrence", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openSettings();
+  const markup = shim.document.getElementById("modalRoot").innerHTML;
+  const scanning = markup.split("<summary>Scanning and recurrence</summary>")[1]?.split("</details>")[0] || "";
+  assert.ok(scanning.includes('id="stChainStartsWith"'), "positive control: the Scanning section is read");
+  assert.doesNotMatch(scanning, /data-act="install-app"/, "the install action is not a scanning setting");
+  assert.equal((markup.match(/data-act="install-app">Install this app on your phone</g) || []).length, 1, "Settings still offers it once");
+  ctx.onAction("install-app", {});
+  assert.match(shim.document.getElementById("modalRoot").innerHTML, /iPhone|Android|Install/, "it still opens the install help");
+});
+
 test("RISK backup and Restore consolidation: Settings keeps one Download backup and one guarded Restore", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openSettings();
@@ -17913,20 +17955,26 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
-test('RISK JSON COPY PASTE: Download backup saves the exact board JSON without saving, and pasting it restores through the guarded preview',async t=>{
+test('RISK JSON COPY PASTE: a partial Download backup offers Download board only, which saves the exact board JSON without saving, and pasting it restores through the guarded preview',async t=>{
   const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
   t.after(()=>app.dispose());
   const task=ctx.addTask('Copy <board> & keep 🌿');await ctx.persist();
   task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};
   const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),writes=[];
   const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{writes.push(key);return set(key,value);};
-  // #2303: Download backup is the one download; the person copies the file's text.
+  // #2303 (owner decision of 2026-11-10): Download backup is the one download.
+  // With no device database here it comes out partial, which Restore refuses,
+  // so Download board only appears beside it; the person copies that file's text.
   const files=captureDownloads(app);ctx.openSettings();
   const download=shim.document.getElementById('modalRoot').innerHTML.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download backup<\/button>/);
   assert.ok(download,'Settings offers Download backup');
   assert.equal(await ctx.onAction(download[1],{}),true);for(let i=0;i<100&&!files.length;i++)await flush();assert.equal(files.length,1);assert.equal(files[0].name,'chain-scanner-recovery-file.json');
-  const copied=await downloadedText(files[0]);
-  const board=JSON.parse(copied).currentBoard;
+  assert.equal(JSON.parse(await downloadedText(files[0])).manifest.status,'partial','fixture: this backup comes out partial');
+  const boardOnly=shim.document.getElementById('settingsDownloads').innerHTML.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download board only<\/button>/);
+  assert.ok(boardOnly,'Download board only appears beside the partial backup');
+  assert.equal(await ctx.onAction(boardOnly[1],{}),true);assert.equal(files.length,2);assert.equal(files[1].name,'chain-scanner-current-board.json');
+  const copied=await downloadedText(files[1]);
+  const board=JSON.parse(copied);
   assert.equal(board.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
   assert.equal(board.futureCopyBoardField.retain,true);
   assert.equal(JSON.stringify(ctx.state),before,'downloading leaves accepted unsaved fields untouched');
