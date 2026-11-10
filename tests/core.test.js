@@ -4113,6 +4113,20 @@ test('RISK chain start: a board saved mid-pass with an empty chain and the old c
  }
 });
 
+test('RISK chain start: the old checkbox saved on mid-pass deals no hidden candidate for d, c or Delete to act on',async()=>{
+ for(const key of ['d','c','Delete']){
+  const raw=savedSkipBoard({mode:'scan',scanMode:'descending',passId:'saved-hidden-pass',passStartedAt:Date.now()-60000,considered:{}}),{ctx,shim}=await loadApp({seed:2311,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  // Long after the board was drawn, so the press guard cannot be what stops the key.
+  let now=0;ctx.performance={now:()=>now};ctx.render();now+=60000;
+  assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/,key+': Start is the visible action');
+  const dealt=ctx.state.candidateId,before=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.done,t.lastDoneAt??null,t.mu,t.sigma]));
+  shim.document.dispatchEvent({type:'keydown',key,repeat:false,preventDefault(){}});
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.done,t.lastDoneAt??null,t.mu,t.sigma])),before,key+': the key cannot mark Done, answer or delete a task nobody can see');
+  assert.equal(dealt,null,key+': no candidate is dealt behind the Start notice');
+  assert.equal(ctx.state.settings.skipOldestFirstDot,true,key+': an older client still reads the saved flag');
+ }
+});
+
 test('RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting',async()=>{
  const app=await loadApp({seed:2312}),{ctx}=app;
  Object.assign(ctx.addTask('Existing oldest dot',false),{id:'keep-oldest',createdAt:1,mu:20});

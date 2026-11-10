@@ -8822,7 +8822,10 @@ function ensureCandidate(){
    is made here, and the sweeps in ensureCandidate() stay with their own callers. */
 function dealMissingCandidate(){
   if(state.mode!=="scan"||state.interventionActive||state.candidateId) return;
-  if(chainStart()&&(state.settings.skipOldestFirstDot!==true||!state.passStartedAt)) return;
+  // An empty chain waits for Start, whatever the retired skipOldestFirstDot
+  // says: that flag is kept only for older clients (#2300), and a candidate
+  // dealt here would sit behind the Start notice where d, c and Delete reach it.
+  if(chainStart()) return;
   const pick=candidateOrder(pool())[0];
   if(pick){state.candidateId=pick.id;state.presentedAt=Date.now();}
 }
