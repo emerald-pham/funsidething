@@ -445,6 +445,101 @@
     // exactly, instead of holding a second copy of every saved board. On the
     // phone each refresh held every prepared recovery choice twice.
     const verifiedBackupPayloads=new WeakMap();
+    // Rows as listBackups returns them, keeping only what a listing shows: the
+    // exact text and any retained file bytes stay in device storage.
+    const backupRowFacts=(row,payloadHash,fact)=>{
+      const {payload,payloadHash:unused,restoreFile,...visible}=row;
+      if(restoreFile&&typeof restoreFile==="object"){const {bytesBase64,...kept}=restoreFile;visible.restoreFile=kept;}
+      return {...visible,payloadHash,payloadChars:fact.chars,payloadFacts:fact.facts};
+    };
+    // #2310: every backup as identity and display facts, without its text.
+    // Only a snapshot not yet in {facts} (the caller's map of hash to what its
+    // bytes measured) is read, one at a time in its own transaction, then let
+    // go; snapshots are immutable by hash, so a recorded measure stays true of
+    // those bytes. {onFactsChanged} fires after each change, so a caller that
+    // saves them makes lasting progress even if the page is killed part way
+    // through a first listing. Rows of {textKinds} keep their verified text,
+    // as listBackups returns them, for the few callers that must inspect it
+    // synchronously. Exact text always comes from the snapshot (readBackups).
+    async function listBackupFacts({describe=null,textKinds=[],facts=new Map(),onFactsChanged=null}={}){
+      ensureOpen();
+      const tx=await beginTransaction(["backups","snapshots","opaque"],"readonly"),done=transactionDone(tx),backupStore=tx.objectStore("backups");
+      const [rows,keys,snapshotKeys,opaqueKeys]=await Promise.all([requestResult(backupStore.getAll()),requestResult(backupStore.getAllKeys()),requestResult(tx.objectStore("snapshots").getAllKeys()),requestResult(tx.objectStore("opaque").getAllKeys())]);
+      await done;
+      const presentSnapshots=new Set(snapshotKeys),keepText=new Set(textKinds),result=[],current=new Set();
+      const factsChanged=()=>{try{onFactsChanged?.();}catch{}};
+      let protectedRaw=null;
+      const isProtected=async(...args)=>(protectedRaw??=await protectedRawReaderFromOriginals(opaqueKeys))(...args);
+      // A row whose snapshot is not stored under its hash takes the full scan,
+      // which also finds a snapshot carrying that hash under another key.
+      const scanned=rows.some(row=>row&&typeof row==="object"&&!Array.isArray(row)&&typeof row.payloadHash==="string"&&!presentSnapshots.has(row.payloadHash))
+        ? new Map((await listBackups()).map(row=>[row.id,row])) : null;
+      for(const [index,row]of rows.entries()){
+        if(!row||typeof row!=="object"||Array.isArray(row)||typeof row.id!=="string"||row.id!==keys[index]||typeof row.payloadHash!=="string"){
+          if(await isProtected("backups",keys[index],row))continue;
+          throw new Error("Durable recovery row is corrupt or unprotected");
+        }
+        const hash=row.payloadHash;current.add(hash);
+        let payload;
+        if(scanned){
+          if(!scanned.has(row.id))continue;
+          payload=scanned.get(row.id).payload;
+        }else if(!facts.has(hash)||keepText.has(row.kind)||facts.get(hash).facts?.incomplete===true&&row.kind!=="latest"){
+          const read=await beginTransaction(["backups","snapshots"],"readonly"),readDone=transactionDone(read);
+          const [stillListed,snapshot]=await Promise.all([requestResult(read.objectStore("backups").getKey(row.id)),requestResult(read.objectStore("snapshots").get(hash))]);
+          await readDone;
+          // Removed since the rows were read: a later listing owns that change.
+          if(stillListed===undefined)continue;
+          if(typeof snapshot?.payload!=="string"||await sha(snapshot.payload)!==hash){
+            if(await isProtected("backups",keys[index],row)&&await isProtected("snapshots",hash,snapshot))continue;
+            throw new Error("Durable recovery snapshot is corrupt");
+          }
+          payload=snapshot.payload;
+        }
+        let fact=facts.get(hash);
+        // Measured from an automatic latest copy, whose full description was
+        // skipped, then needed by another row of the same board.
+        if(!fact||fact.facts?.incomplete===true&&row.kind!=="latest"){
+          let described;
+          try{described=typeof describe==="function"?describe(payload,row):undefined;}catch{described={readable:false};}
+          fact={chars:payload.length,facts:described&&typeof described==="object"?described:{}};
+          facts.set(hash,fact);
+          factsChanged();
+        }
+        if(keepText.has(row.kind)){const {payloadHash,...visible}=row;result.push({...visible,payload});}
+        else result.push(backupRowFacts(row,hash,fact));
+      }
+      // The measures of a board no backup refers to any more are of no use.
+      const stale=[...facts.keys()].filter(hash=>!current.has(hash));
+      if(stale.length){for(const hash of stale)facts.delete(hash);factsChanged();}
+      return result.sort((a,b)=>(b.at||0)-(a.at||0)||String(a.id).localeCompare(String(b.id)));
+    }
+    // #2310: the named backups with their exact text, verified against each
+    // row's hash just as a full listing is, read by key and let go afterwards.
+    async function readBackups(ids){
+      ensureOpen();
+      const wanted=[...new Set(Array.isArray(ids)?ids:[])];
+      if(!wanted.length)return [];
+      const tx=await beginTransaction(["backups","snapshots"],"readonly"),done=transactionDone(tx),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots");
+      const found=await Promise.all(wanted.map(id=>requestResult(backupStore.get(id)).then(row=>{
+        if(!row||typeof row!=="object"||typeof row.payloadHash!=="string")return {row};
+        return requestResult(snapshotStore.get(row.payloadHash)).then(snapshot=>({row,snapshot}));
+      })));
+      await done;
+      const result=[];
+      for(const {row,snapshot} of found){
+        if(!row)continue;
+        // Anything unexpected takes the full scan, which keeps its own refusal
+        // and its allowance for a row that exact originals protect.
+        if(typeof row!=="object"||typeof row.payloadHash!=="string"||snapshot?.hash!==row.payloadHash||typeof snapshot.payload!=="string"||await sha(snapshot.payload)!==row.payloadHash){
+          const named=new Set(wanted);
+          return (await listBackups()).filter(item=>named.has(item.id));
+        }
+        const {payloadHash,...visible}=row;result.push({...visible,payload:snapshot.payload});
+      }
+      return result;
+    }
+
     // #2281: the snapshots are read one at a time with a cursor in the same
     // readonly transaction as the backup rows, and only the opaque keys are
     // read: every saved archive (each several times the board's size after a
@@ -1046,7 +1141,7 @@
       openEpoch++;reconnectAllowed=false;cancelOpen?.();cancelOpen=null;opening=null;
       if(db){db.close();db=null;}
     }
-    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
+    const api={open,close,readRawExportSnapshot,readRawExportRows,readRawFingerprint,readRawRows,readHead,withCurrentHead,listBackups,listBackupFacts,readBackups,listOpaqueArchives,listOpaqueArchiveKeys,readOpaqueArchive,readCloudRecoverySummary,saveCloudRecoverySummaries,protectRecoverySource,repairHeadSnapshot,writeRecoveredSource,getRecoveryCloudHold,clearRecoveryCloudHold,clearRecoveryCloudHoldIfCurrent:clearRecoveryCloudHold,migrateLegacy,commitHead,commitHeadIfCurrent:commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,setPendingUploadIfCurrent,clearPendingUpload,clearPendingUploadIfCurrent,setLegacyFingerprint,
       getRecoveryTrim,beginRecoveryTrim,continueRecoveryTrim};
     return api;

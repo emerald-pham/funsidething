@@ -21,7 +21,7 @@ import {
   deletionEvidence, loadStorageV2, exerciseCompletionEditorBoundaries, liveScanSyncClients,
   liveDoneDeliverySnapshot, ordinaryEditDebounceControl, settleRecovery188,
   settleRecoveryOperations188, divergentCloudSourceApp187, replaceIndependentServerPayload263,
-  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
+  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler, backupRowsWithText,
   largeSignedInBoardFixture,
 } from "./shared.js";
 import { rewriteGenerationFixture } from "./shared.js";
@@ -823,7 +823,7 @@ test('RISK resilient sync recovery: unsupported unverifiable and foreign sources
   }else assert.ok(JSON.stringify(originalNamespace)===original,'unproved recovery performs no mutation in the original account');
   if(control==='foreign identity'){
    assert.equal(ctx.state.tasks.length,0,'an empty different authenticated identity never inherits the old board; '+JSON.stringify({identity:backend.CS.recoveryIdentity(),localIdentity:ctx.state.syncIdentity,localRevision:ctx.state.syncRev,otherPaths:[...backend.docs.keys()].filter(key=>!key.startsWith('users/owner'))}));
-   assert.ok(ctx.readLocalBackups().some(row=>row.payload===local),'the displaced account source remains exact and recoverable');
+   assert.ok((await backupRowsWithText(ctx)).some(row=>row.payload===local),'the displaced account source remains exact and recoverable');
    const foreign=await backend.CS.pull();
    if(foreign.payload)assert.equal(JSON.parse(foreign.payload).tasks.length,0,'an explicit ordinary sync under the new identity cannot publish old-account tasks');
   }else if(!supportedFallback)assert.ok(JSON.stringify(ctx.state)===local,'unproved source never replaces the accepted board');
@@ -1106,6 +1106,64 @@ async function largeBoardOpeningWithinMargin(t,motion){
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 }
+// #2310 (spec #2308 slice 2): memory is compared on one board with and without
+// extra saved backups, never against an absolute byte count, so the same page
+// work cancels out. 30 extra backups measured about 400 MB at opening and
+// 260 MB at Settings before this; the margin only absorbs engine noise.
+const BACKUP_MEMORY_EXTRA=30,BACKUP_MEMORY_MARGIN=64*1024*1024;
+async function backupMemoryStaysFlat(t){
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),observed=[],failures=[],mib=bytes=>Math.round(bytes/1048576);
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const measure=async extra=>{
+   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2310-'+engineName+'-'+extra+'-'));
+   const launch=async tag=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({payload})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',payload);},{payload:fixture.payload});
+    return context;
+   };
+   const ready=page=>page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state!=='undefined'&&state,null,{timeout:90000});
+   try{
+    const tag=`chain-2310-${engineName}-${extra}-${process.pid}-${Date.now()}`;
+    let context=await launch(tag+'-seed');
+    let saved;
+    try{
+     const page=context.pages()[0]||await context.newPage();
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(1500);
+     // Each extra backup is a distinct board copy saved through the app's own path.
+     saved=await page.evaluate(async count=>{let ok=0;for(let i=0;i<count;i++){state.updatedAt=Date.now()+i;if((await saveDurableBackup('manual',JSON.stringify(state),{account:null}))?.id)ok++;}return ok;},extra);
+     await page.waitForTimeout(800);
+    }finally{await context.close();}
+    assert.equal(saved,extra,`${engineName}: every extra backup was saved`);
+    context=await launch(tag);
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const opening=webProcessMemorySampler(tag);let open;
+     try{await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(4000);}
+     finally{open=await opening.stop();}
+     const settingsSampler=webProcessMemorySampler(tag);let settings,listed;
+     try{await page.locator('[data-act="settings"]').first().click();await page.locator('.backup-row').first().waitFor({state:'attached',timeout:60000});await page.waitForTimeout(2500);listed=await page.locator('.backup-row').count();}
+     finally{settings=await settingsSampler.stop();}
+     return {open,settings,listed,errors};
+    }finally{await context.close();}
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const few=await measure(0),many=await measure(BACKUP_MEMORY_EXTRA);
+  const summary={engine:engineName,openFewMiB:mib(few.open.peakBytes),openManyMiB:mib(many.open.peakBytes),settingsFewMiB:mib(few.settings.peakBytes),settingsManyMiB:mib(many.settings.peakBytes),listed:[few.listed,many.listed]};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  assert.ok(few.open.processes>0&&many.open.processes>0&&few.settings.samples>5&&many.settings.samples>5,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
+  assert.equal(many.listed-few.listed,BACKUP_MEMORY_EXTRA,`${engineName}: every extra backup is still listed in Settings`);
+  assert.deepEqual([few.errors,many.errors],[[],[]],`${engineName}: no page errors`);
+  if(many.open.peakBytes-few.open.peakBytes>BACKUP_MEMORY_MARGIN)failures.push(`${engineName}: ${BACKUP_MEMORY_EXTRA} extra backups added ${mib(many.open.peakBytes-few.open.peakBytes)} MiB at opening`);
+  if(many.settings.peakBytes-few.settings.peakBytes>BACKUP_MEMORY_MARGIN)failures.push(`${engineName}: ${BACKUP_MEMORY_EXTRA} extra backups added ${mib(many.settings.peakBytes-few.settings.peakBytes)} MiB at Settings`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+}
+test('RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>backupMemoryStaysFlat(t));
 test('RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'reduced'));
 // #2228 review (story 19): the same opening guarantee with normal motion,
 // where the scenery animates. Both scenarios share the motion choice, so the
@@ -4739,6 +4797,67 @@ test('RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority ne
  reopened.ctx.cloudPushNow();await syncSettle(PAST_DEBOUNCE+40);
  assert.equal(pushes.length,0,'an unavailable durable authority cannot upload a default or stale board');
  assert.equal(storage.getItem(SYNC_STORE_KEY),legacyRaw,'the last legacy recovery bytes stay untouched');
+});
+
+test('RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-'+Date.now()+'-'+Math.random();
+ const loaded=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=loaded,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Saved in the manual copy');assert.equal(await ctx.persist(),true);
+ const manualBoard=JSON.stringify(ctx.state),manual=await ctx.saveDurableBackup('manual',manualBoard);assert.ok(manual?.id);
+ // A copy of bytes the app cannot read back as a board, written straight to device storage.
+ const head=await store.readHead(),unreadable='{"tasks":';
+ assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id:'device-unreadable',kind:'other-browser-copy',day:'2026-10-01',at:Date.parse('2026-10-01T12:00:00Z'),payload:unreadable}})).ok);
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ const cached=()=>JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx));
+ const rows=cached();assert.ok(rows.length>=3,'the fixture holds several device copies');
+ assert.deepEqual(rows.filter(row=>'payload' in row).map(row=>row.kind),[],'the in-memory backup list holds no backup text');
+ assert.deepEqual(rows.filter(row=>JSON.stringify(row).includes('Saved in the manual copy')).map(row=>row.id),[],'no row carries board contents');
+ assert.ok(rows.every(row=>typeof row.id==='string'&&typeof row.kind==='string'&&typeof row.day==='string'&&Number.isFinite(row.at)&&/^[0-9a-f]{64}$/.test(row.payloadHash)&&Number.isSafeInteger(row.payloadChars)),'identity and display facts are kept');
+ assert.equal(rows.find(row=>row.id===manual.id).payloadChars,manualBoard.length,'its size is the exact saved length');
+ assert.equal(rows.find(row=>row.id==='device-unreadable').payloadFacts.readable,false,'an unreadable copy is known as one');
+ // Settings lists both device copies; the unreadable one stays visible and cannot be restored.
+ ctx.openSettings();
+ let view=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(view,/Unreadable backup · device-unreadable/);
+ assert.match(view,/data-act="restore-local-backup" data-id="device-unreadable"[^>]*disabled/);
+ assert.match(view,new RegExp('data-act="restore-local-backup" data-id="'+manual.id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"(?![^>]*disabled)'));
+ assert.equal(Array.from(vm.runInContext('backupRowsShown',ctx)).some(row=>row.payload!==undefined),false,'the shown list holds no text either');
+ // Restore rewrites the board from the exact stored copy, read for this action.
+ ctx.addTask('Added after the manual copy');assert.equal(await ctx.persist(),true);
+ const reads=[],readBackups=store.readBackups;store.readBackups=function(ids){reads.push(ids);return readBackups.call(this,ids);};
+ assert.equal(await ctx.restoreDurableBackupById('device-unreadable'),false,'the unreadable copy is refused');
+ ctx.openSettings();
+ assert.equal(await ctx.restoreDurableBackupById(manual.id),true,'Restore reads the exact device copy');
+ assert.deepEqual(reads.map(ids=>Array.from(ids)),[['device-unreadable'],[manual.id]],'each backup text is read only by the action that needs it');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved in the manual copy'));
+ assert.equal((await store.listBackups()).find(row=>row.id===manual.id).payload,manualBoard,'the copy keeps its exact bytes');
+ assert.equal((await store.listBackups()).find(row=>row.id==='device-unreadable').payload,unreadable,'the unreadable copy keeps its exact bytes');
+ // Delete checks the exact stored row and removes only it.
+ const others=(await store.listBackups()).filter(row=>row.id!==manual.id).map(row=>row.id);
+ ctx.openSettings();
+ const removed=await ctx.onAction('delete-local-backup',{dataset:{id:manual.id}});
+ assert.equal(removed,true,'the listed copy is deleted after its exact bytes are checked');
+ assert.deepEqual(Array.from(await store.listBackups(),row=>row.id).sort(),[...others].sort(),'every other copy stays');
+ await loaded.dispose?.();
+});
+
+test('RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-reopen-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Saved on this device');assert.equal(await first.ctx.persist(),true);
+ const manual=await first.ctx.saveDurableBackup('manual',JSON.stringify(first.ctx.state));assert.ok(manual?.id);
+ const store=first.shim.window.ScannerDeviceStore,exact=(await store.readBackups([manual.id]))[0];
+ assert.equal(exact.payload,JSON.stringify(first.ctx.state),'the exact read returns the stored text');
+ // Damage the stored bytes under their hash, leaving the row and its learned facts alone.
+ await new Promise((resolve,reject)=>{const open=indexedDB.open(dbName);open.onerror=()=>reject(open.error);open.onsuccess=()=>{const db=open.result,tx=db.transaction(['backups','snapshots'],'readwrite'),request=tx.objectStore('backups').get(manual.id);
+  request.onsuccess=()=>tx.objectStore('snapshots').put({hash:request.result.payloadHash,payload:'{"damaged":true}'},request.result.payloadHash);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};});
+ await assert.rejects(store.readBackups([manual.id]),/corrupt/,'damaged bytes cannot be returned as the backup');
+ await first.dispose?.();
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ const shown=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx));
+ assert.ok(shown.some(row=>row.id===manual.id),'the listing comes from what was already learned, without reading the text');
+ assert.equal(await reopened.ctx.restoreDurableBackupById(manual.id),false,'Restore still refuses the damaged copy');
+ await reopened.dispose?.();
 });
 
 test('RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board',async()=>{
@@ -8794,7 +8913,7 @@ test('RISK manual backup reminder: the reminder counts this account’s manual b
  assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'one backup of this account does not bring the reminder');
  await makeManualBackup2254(app);await makeManualBackup2254(app);
  assert.equal(manualRows(ctx).length,4,'positive control: four manual backups are on this device');
- const parses=countBackupParses2254(t,ctx,new Set(manualRows(ctx).map(row=>row.payload)));
+ const parses=countBackupParses2254(t,ctx,new Set((await backupRowsWithText(ctx)).filter(row=>row.kind==='manual').map(row=>row.payload)));
  for(let render=0;render<3;render++){
   const rendered=reminderRender2254(ctx,parses);
   assert.equal(rendered.reminder?.text,MANUAL_BACKUP_REMINDER,'this account’s backups bring the reminder on render '+render);
@@ -8826,10 +8945,11 @@ test('RISK manual backup reminder: manual backups saved before they named an acc
  const rows=manualRows(ctx).filter(row=>row.id.startsWith('older-'));
  assert.equal(rows.length,4,'fixture: four older manual backups are listed');
  assert.ok(rows.every(row=>!Object.hasOwn(row,'account')),'fixture: the older backups name no account');
- const parses=countBackupParses2254(t,ctx,new Set(rows.map(row=>row.payload)));
+ assert.deepEqual(Array.from(rows,row=>row.payloadFacts.boardAccount).sort(),['me@example.test','me@example.test','other@example.test','other@example.test'],'each older backup names its account from one read when it was first listed');
+ const parses=countBackupParses2254(t,ctx,new Set((await backupRowsWithText(ctx)).filter(row=>row.id.startsWith('older-')).map(row=>row.payload)));
  const first=reminderRender2254(ctx,parses);
  assert.equal(first.reminder?.text,MANUAL_BACKUP_REMINDER,'two older backups of this account bring the reminder');
- assert.ok(first.parsed>=1&&first.parsed<=rows.length,'each older backup is read at most once on the first render ('+first.parsed+')');
+ assert.equal(first.parsed,0,'the first render reads no older backup: its account was read once when it was first listed');
  ctx.openSettings();
  assert.equal(manualBackupReminderIn(settingsMarkup(app))?.text,MANUAL_BACKUP_REMINDER,'Settings shows the reminder');
  for(let render=0;render<3;render++){
@@ -8854,7 +8974,7 @@ test('RISK manual backup reminder: Make manual backup stays enabled past two and
  await makeManualBackup2254(app);
  assert.equal(confirms,0,'no confirmation is asked');
  assert.equal(manualRows(ctx).length,3,'one press saves a third manual backup');
- assert.ok(manualRows(ctx).some(row=>row.payload.includes('Only in the third backup')),'the third backup holds the current board');
+ assert.ok((await backupRowsWithText(ctx)).some(row=>row.kind==='manual'&&row.payload.includes('Only in the third backup')),'the third backup holds the current board');
  assert.match(app.shim.document.getElementById('toast').textContent,/Manual backup saved on this device\./);
  assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button is still enabled after the third');
  assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder is still shown after the third');

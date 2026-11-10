@@ -1967,10 +1967,18 @@ function readLegacyBackups(){
     return Array.isArray(rows) ? rows.filter(row=>row && typeof row.id==="string" && typeof row.day==="string" && (!automaticBackupKinds.has(row.kind) || row.day>=keptFrom(row) || protectedIds.has(row.id)) && typeof row.payload==="string") : [];
   }catch(e){ return []; }
 }
+// #2310: a device row here has no text unless it is a prepared choice. Callers
+// that need a device backup's text read it (deviceBackupsWithText).
 function readLocalBackups(){
   if(!deviceStorageAuthority) return readLegacyBackups();
-  const rows=[...deviceBackupCache,...readLegacyBackups()],seen=new Set(),out=[];
-  for(const row of rows){
+  return mergedBackupRows(deviceBackupCache,readLegacyBackups());
+}
+function mergedBackupRows(deviceRows,legacyRows){
+  const seen=new Set(),out=[];
+  // A browser row that mirrors a device row is the one with its text in hand.
+  const browserCopy=new Set(legacyRows.map(row=>String(row?.id||"")+"\u0000"+String(row?.kind||"")));
+  for(const row of [...deviceRows,...legacyRows]){
+    if(typeof row?.payload!=="string"&&browserCopy.has(String(row?.id||"")+"\u0000"+String(row?.kind||"")))continue;
     const key=String(row?.id||"")+"\u0000"+String(row?.kind||"")+"\u0000"+String(row?.payload||"");
     if(!seen.has(key)){seen.add(key);out.push(row);}
   }
@@ -2550,9 +2558,9 @@ function reclassifyCloudRecoveryBackup(id,payload,kind){
 async function reclassifyDurableCloudRecoveryBackup(id,payload,kind,allowFreshDurable=false){
   let matched=false;
   try{
-    const deviceMatches=deviceStorageAuthority&&deviceBackupCacheReadable
-      ? deviceBackupCache.filter(row=>row.id===id&&row.payload===payload) : [];
     if(deviceStorageAuthority&&!deviceBackupCacheReadable) return false;
+    const deviceMatches=deviceStorageAuthority&&deviceBackupCache.some(row=>row.id===id)
+      ? (await deviceBackupsWithText([id])).filter(row=>row.payload===payload) : [];
     if(deviceMatches.length){
       matched=true;
       if(deviceMatches.some(row=>!automaticBackupKinds.has(row.kind))&&!allowFreshDurable){}
@@ -2995,9 +3003,98 @@ async function refreshDeviceBackupCache(current=()=>true){
   if(!deviceStore) return [];
   // #2281: the cached rows are passed back, so a payload that is still stored
   // exactly keeps its cached text instead of a second copy of every backup.
-  try{const rows=await deviceStore.listBackups({reuse:deviceBackupCache});if(current()){deviceBackupCache=rows;deviceBackupCacheReadable=true;}}
+  // #2310: the list holds identity and display facts only. Full text is read
+  // from device storage by the action that needs it (deviceBackupsWithText).
+  try{
+    const rows=typeof deviceStore.listBackupFacts==="function"
+      ? await deviceStore.listBackupFacts({describe:deviceBackupDisplayFacts,textKinds:DEVICE_BACKUP_TEXT_KINDS,facts:knownDeviceBackupFacts(),onFactsChanged:saveDeviceBackupFacts})
+      : await deviceStore.listBackups();
+    if(current()){deviceBackupCache=rows;deviceBackupCacheReadable=true;await rememberLegacyBackupHashes();}
+  }
   catch(e){if(current()){deviceBackupCache=[];deviceBackupCacheReadable=false;}}
   return deviceBackupCache;
+}
+// A prepared recovery choice is read by every recovery guard, synchronously,
+// and is the one kind of backup that stays in memory with its text. It exists
+// only while a recovery decision is pending, so it does not grow with backups.
+const DEVICE_BACKUP_TEXT_KINDS=["decision-recovery-choice"];
+// What each saved board's bytes measured, by hash, kept beside the app's other
+// small browser settings. It is only a cache: nothing recovers data from it,
+// and losing it means the measures are taken again from the exact snapshots.
+// Keeping it out of device storage leaves those raw stores exactly as recovery
+// checks and read-only comparisons expect them.
+const DEVICE_BACKUP_FACTS_KEY="fvp:chain-scanner:backup-facts";
+let deviceBackupFactsMemory=null;
+function knownDeviceBackupFacts(){
+  if(deviceBackupFactsMemory)return deviceBackupFactsMemory;
+  const known=new Map();
+  try{
+    const saved=JSON.parse(localStorage.getItem(DEVICE_BACKUP_FACTS_KEY)||"null");
+    if(saved?.version===1&&Array.isArray(saved.rows))for(const [hash,fact] of saved.rows)
+      if(typeof hash==="string"&&Number.isSafeInteger(fact?.chars)&&fact.facts&&typeof fact.facts==="object")known.set(hash,fact);
+  }catch(e){}
+  return deviceBackupFactsMemory=known;
+}
+function saveDeviceBackupFacts(){
+  try{localStorage.setItem(DEVICE_BACKUP_FACTS_KEY,JSON.stringify({version:1,rows:[...knownDeviceBackupFacts()]}));}catch(e){}
+}
+// What Settings shows about a saved board's text, learned once per board
+// (listBackupFacts). An automatic latest copy is this tab's own committed board,
+// replaced on every save, so it is not parsed unless another backup shares it.
+function deviceBackupDisplayFacts(payload,row){
+  if(row?.kind==="latest")return {readable:true,incomplete:true};
+  const facts={readable:validSavedPayload(payload)};
+  try{facts.boardAccount=backupBoardAccount(JSON.parse(payload));}catch(e){}
+  return facts;
+}
+// The exact saved text of these backups, read only when an action needs it.
+// A row with no text means it has gone; a read that fails throws, as a listing did.
+async function deviceBackupsWithText(ids){
+  if(typeof deviceStore?.readBackups==="function")return deviceStore.readBackups(ids);
+  const wanted=new Set(ids);return (await deviceStore.listBackups()).filter(row=>wanted.has(row.id));
+}
+// The device backups that hold exactly this text: found by hash, then confirmed
+// against the stored bytes. A copy that cannot be read counts as not holding it.
+async function deviceBackupsHoldingPayload(payload){
+  const payloadHash=await ChainStorageV2.hashPayload(payload),ids=deviceBackupCache.filter(row=>row.payload===payload||row.payloadHash===payloadHash).map(row=>row.id);
+  if(!ids.length)return [];
+  try{return (await deviceBackupsWithText(ids)).filter(row=>row.payload===payload);}catch(e){return [];}
+}
+// #2310: the metadata of a device row, comparable without its text. Compared
+// with the text hash (backupRowsSamePayload) it stands in for backupRowIdentity.
+function backupRowMetadataIdentity(row){
+  if(!row||typeof row!=="object")return null;
+  const {payload,payloadHash,payloadChars,payloadFacts,restoreFile,...metadata}=row;
+  if(restoreFile&&typeof restoreFile==="object"){const {bytesBase64,...kept}=restoreFile;metadata.restoreFile=kept;}
+  return backupRowIdentity(metadata);
+}
+function shownBackupRowIdentity(row){return typeof row?.payload==="string"?backupRowIdentity(row):backupRowMetadataIdentity(row);}
+function shownBackupRowReadable(row){
+  if(typeof row?.payload==="string")return readableBackupRow(row);
+  return !!(row && typeof row.id==="string" && row.id && typeof row.day==="string" &&
+    typeof row.kind==="string" && Number.isFinite(row.at) && row.payloadFacts?.readable===true);
+}
+// Exact text hashes of the older browser backup list, so a device row can be
+// compared with its browser mirror while Settings draws without reading text.
+// Keyed by the browser row's own text, whose size that list's quota bounds.
+let legacyBackupHashes={raw:undefined,byText:new Map()};
+async function rememberLegacyBackupHashes(){
+  try{
+    const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
+    if(raw===legacyBackupHashes.raw)return;
+    const byText=new Map(),rows=raw===null?[]:parseBackupIndex(raw);
+    if(Array.isArray(rows))for(const row of rows)
+      if(typeof row?.payload==="string"&&!byText.has(row.payload))byText.set(row.payload,await ChainStorageV2.hashPayload(row.payload));
+    legacyBackupHashes={raw,byText};
+  }catch(e){}
+}
+// Whether two rows hold the same bytes. Without a known hash it answers no,
+// so an unmatched browser row simply stays listed.
+function backupRowsSamePayload(a,b){
+  if(typeof a?.payload==="string"&&typeof b?.payload==="string")return a.payload===b.payload;
+  const hashOf=row=>row?.payloadHash??(typeof row?.payload==="string"?legacyBackupHashes.byText.get(row.payload):undefined);
+  const left=hashOf(a),right=hashOf(b);
+  return typeof left==="string"&&left===right;
 }
 function hasDeviceStorageAuthorityMarker(){
   try{return localStorage.getItem(DEVICE_AUTHORITY_KEY)==="1";}catch(e){return false;}
@@ -3484,7 +3581,7 @@ function reusableLocalCompletionBackup(payload){
 }
 async function reusableDeviceCompletionBackup(payload){
   let rows;
-  try{rows=await deviceStore.listBackups({reuse:deviceBackupCache});}
+  try{rows=await deviceStore.listBackups();}
   catch(e){return null;}
   const index=inspectBackupIndex();
   if(!Array.isArray(index.rows))return null;
@@ -3497,7 +3594,7 @@ async function reusableDeviceCompletionBackup(payload){
        mirrors.length>1||(mirrors.length===1&&backupRowIdentity(mirrors[0])!==backupRowIdentity(record)))continue;
     try{if(localStorage.getItem(LOCAL_BACKUPS_KEY)!==index.raw)return null;}
     catch(e){return null;}
-    deviceBackupCache=rows;deviceBackupCacheReadable=true;
+    await refreshDeviceBackupCache();
     return record;
   }
   return null;
@@ -3511,7 +3608,7 @@ async function verifyCompletionBackupReadback(row,payload){
   if(!Array.isArray(index.rows))return false;
   if(deviceStorageAuthority&&deviceStore){
     let rows;
-    try{rows=await deviceStore.listBackups({reuse:deviceBackupCache});}
+    try{rows=await deviceStore.listBackups();}
     catch(e){return false;}
     const matches=rows.filter(candidate=>candidate?.id===record.id);
     const mirrors=(index.rows||[]).filter(candidate=>candidate?.id===record.id);
@@ -3519,7 +3616,7 @@ async function verifyCompletionBackupReadback(row,payload){
        (mirrors.length===1&&backupRowIdentity(mirrors[0])!==identity))return false;
     try{if(localStorage.getItem(LOCAL_BACKUPS_KEY)!==index.raw)return false;}
     catch(e){return false;}
-    deviceBackupCache=rows;deviceBackupCacheReadable=true;
+    await refreshDeviceBackupCache();
     return true;
   }
   if(index.raw===null||!uniqueBackupIndexRecord(index.rows,record))return false;
@@ -3555,8 +3652,11 @@ async function saveDurableBackup(kind,payload,metadata=null){
       .sort((a,b)=>b.at-a.at)[0]||true : null;
   const backend=window.CloudSync,account=backend?.user,cloudBackup=["before-cloud-local-edit","before-cloud-adoption"].includes(kind);
   try{
-    const existing=deviceBackupCache.find(row=>row.kind===kind&&row.payload===payload);
-    if(existing&&["before-account-switch","before-cloud-local-edit","before-cloud-adoption"].includes(kind)) return existing;
+    if(["before-account-switch","before-cloud-local-edit","before-cloud-adoption"].includes(kind)){
+      // Compared by hash first, then confirmed against the exact stored text.
+      const existing=(await deviceBackupsHoldingPayload(payload)).find(row=>row.kind===kind);
+      if(existing)return existing;
+    }
     // #2254: a manual backup names its board's account (manualBackupReminderHtml).
     const at=Date.now(),backup={id:deviceBackupId(kind),day:backupDay(at),at,kind,payload,
       ...(kind==="manual"&&metadata&&Object.hasOwn(metadata,"account")?{account:metadata.account}:{}),
@@ -5426,7 +5526,8 @@ function cloudPushNow(){
 }
 function adoptionSafetyStored(proof){
   if(!useLocal || !proof || lastPersistedRaw!==proof.raw) return false;
-  if(deviceStorageAuthority)return deviceBackupCache.some(row=>row.id===proof.backupId&&row.kind!=="latest"&&row.payload===proof.priorBoard);
+  if(deviceStorageAuthority)return deviceBackupCache.some(row=>row.id===proof.backupId&&row.kind!=="latest"&&
+    (typeof row.payload==="string"?row.payload===proof.priorBoard:typeof proof.priorBoardHash==="string"&&row.payloadHash===proof.priorBoardHash));
   try{
     if(localStorage.getItem(LOCAL_HEAD_KEY)!==proof.raw || localStorage.getItem(STORE_KEY)!==proof.raw) return false;
     return readLocalBackups().some(row=>row.id===proof.backupId && row.kind!=="latest" && row.payload===proof.priorBoard);
@@ -5458,7 +5559,7 @@ async function releasableCloudRecoveryIds(ids,confirmedPayload){
   const released=[];
   for(const id of ids){
     try{
-      let deviceRows=deviceStorageAuthority?deviceBackupCache.filter(row=>row.id===id):[];
+      let deviceRows=deviceStorageAuthority&&deviceBackupCache.some(row=>row.id===id)?await deviceBackupsWithText([id]):[];
       if(deviceRows.some(row=>!readableBackupRow(row)))continue;
       let matching=[...legacyRows.filter(row=>row.id===id),...deviceRows];
       if(!matching.length){ released.push(id); continue; }
@@ -5476,7 +5577,7 @@ async function releasableCloudRecoveryIds(ids,confirmedPayload){
       // Once their exact user data is represented by the confirmed cloud and
       // durable head, remove only those redundant automatic references so
       // immutable snapshot storage cannot grow without bound.
-      deviceRows=deviceStorageAuthority?deviceBackupCache.filter(row=>row.id===id):[];
+      deviceRows=deviceStorageAuthority&&deviceBackupCache.some(row=>row.id===id)?await deviceBackupsWithText([id]):[];
       let retired=true;
       for(const row of deviceRows){
         if(!automaticBackupKinds.has(row.kind)||!recoveryBoardRepresented(row.payload,confirmedBoard))continue;
@@ -7399,7 +7500,7 @@ async function cloudPull(){
     }
     const priorBoard = remoteWins ? safetyBoard : null;
     const stablePrior = remoteWins && useLocal
-      ? (remoteSafetyCopy&&typeof remoteSafetyCopy==="object" ? remoteSafetyCopy : readLocalBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard)) : null;
+      ? (remoteSafetyCopy&&typeof remoteSafetyCopy==="object" ? remoteSafetyCopy : deviceStorageAuthority&&deviceStore ? (await deviceBackupsHoldingPayload(priorBoard)).find(row=>row.kind!=="latest")??readLegacyBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard) : readLocalBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard)) : null;
     if(remoteWins && useLocal && !stablePrior){
       cloudAdoptionHeld=true;
       toast("Cloud copy held: the previous board has no restorable local copy.", 7000);
@@ -7605,7 +7706,7 @@ async function cloudPull(){
           if(adoptedRelease.length && await releaseStoredCloudRecoveryPins(adoptedRelease))
             releaseCloudRecoveryPins(adoptedRelease);
           adoptedSafety=state.protectedBackupIds?.includes(stablePrior.id)
-            ? {raw:JSON.stringify(state),account:acct,backupId:stablePrior.id,priorBoard}
+            ? {raw:JSON.stringify(state),account:acct,backupId:stablePrior.id,priorBoard,...(deviceStorageAuthority?{priorBoardHash:await ChainStorageV2.hashPayload(priorBoard)}:{})}
             : null;
         }
         if(!useLocal) persist();
@@ -11978,7 +12079,8 @@ async function completeDecisionRecoveryHolds(confirmed,superseded){
     // even when a later change fails or throws.
     try{for(const {row,kind} of rows)if(!await deviceWriteBeforeDiagnostics("updateBackupKind",[row.id,row.payload,kind]))return false;}
     finally{await refreshDeviceBackupCache();}
-    const visible=readLocalBackups();
+    let verified;try{verified=await deviceBackupsWithText(rows.map(({row})=>row.id));}catch(e){return false;}
+    const visible=[...verified,...readLocalBackups()];
     return rows.every(({row,kind})=>visible.some(copy=>copy.id===row.id&&copy.payload===row.payload&&copy.kind===kind));
   }
   for(const {row,kind} of rows){
@@ -15409,7 +15511,14 @@ async function applyCloudSourceRecovery(){
   // It stops before any cloud write instead, as it did when such a copy also
   // stopped every new one.
   const protect=async(kind,payload,message)=>{const row=await saveDurableBackup(kind,payload,{reportFailure:true});if(!row?.id)fail(row?.quota?deviceFull:message);
-    if(deviceStorageAuthority&&!deviceBackupCacheReadable)fail("This device’s saved copies could not all be read back, so nothing was applied. Every original stays protected; read sources again once the saved copies can be read.");return row;};
+    if(deviceStorageAuthority){
+      // #2310: the list no longer reads each copy's text, so Apply reads them
+      // all here, once per protection, and lets them go.
+      let allReadable=deviceBackupCacheReadable;
+      if(allReadable)try{await deviceStore.listBackups();}catch(e){allReadable=false;}
+      if(!allReadable)fail("This device’s saved copies could not all be read back, so nothing was applied. Every original stays protected; read sources again once the saved copies can be read.");
+    }
+    return row;};
   const recheck=async()=>{const now=await cloudSourceRecoverySources();if(!cloudSourceRecoveryOpen(p)||!cloudSourceRecoverySame(p,now))fail("The board, draft, account, pending upload or cloud source changed. Read sources again and make a fresh choice.");return now;};
   try{
     renderCloudSourceRecovery("Verifying protected originals before applying…");await recheck();
@@ -15993,6 +16102,8 @@ let manualBackupReminderShownFor;
 const manualBackupAccountById=new Map();
 function manualBackupAccount(row,deviceRows){
   if(Object.hasOwn(row,"account"))return typeof row.account==="string"?row.account:null;
+  // #2310: a device row without text carries the account its board named.
+  if(typeof row.payload!=="string")return row.payloadFacts&&"boardAccount" in row.payloadFacts?row.payloadFacts.boardAccount:undefined;
   const remembered=deviceRows.has(row)?manualBackupAccountById.get(row.id):undefined;
   if(remembered&&remembered.at===row.at&&remembered.length===row.payload.length)return remembered.account;
   let account;try{account=backupBoardAccount(JSON.parse(row.payload));}catch(e){return undefined;}
@@ -16034,25 +16145,30 @@ function openSettings(){
   for(const row of deviceRows){const matches=deviceById.get(row?.id)||[];matches.push(row);deviceById.set(row?.id,matches);}
   for(const row of legacyRows)legacyIdCounts.set(row?.id,(legacyIdCounts.get(row?.id)||0)+1);
   const visibleBackupRows=deviceRows.slice();
+  // #2310: drawn from identity and display facts. The text of a device backup
+  // is neither read nor copied here, and each row is judged once (readableRows).
   for(const row of legacyRows){
-    const matches=deviceById.get(row?.id)||[],identity=backupRowIdentity(row);
+    const matches=deviceById.get(row?.id)||[];
     // Only one identical copy in each store is a migration mirror. Repeated
     // IDs within one store, even identical ones, remain ambiguous recovery data.
-    if(readableBackupRow(row) && matches.length===1 && legacyIdCounts.get(row.id)===1 &&
-       identity!==null && identity===backupRowIdentity(matches[0])) continue;
+    if(matches.length===1 && legacyIdCounts.get(row?.id)===1 && readableBackupRow(row)){
+      const identity=backupRowMetadataIdentity(row);
+      if(identity!==null && identity===backupRowMetadataIdentity(matches[0]) && backupRowsSamePayload(row,matches[0])) continue;
+    }
     visibleBackupRows.push(row);
   }
-  backupRowsShown=visibleBackupRows.map(row=>({id:row?.id,kind:row?.kind,day:row?.day,at:row?.at,payload:row?.payload,identity:backupRowIdentity(row)}));
+  const readableRows=new Map(visibleBackupRows.map(row=>[row,shownBackupRowReadable(row)]));
+  backupRowsShown=visibleBackupRows.map(row=>({id:row?.id,kind:row?.kind,day:row?.day,at:row?.at,payload:row?.payload,payloadHash:row?.payloadHash,readable:readableRows.get(row),identity:shownBackupRowIdentity(row)}));
   const idCounts=new Map();
   for(const row of visibleBackupRows) if(typeof row?.id==="string") idCounts.set(row.id,(idCounts.get(row.id)||0)+1);
   const backups=visibleBackupRows.slice().sort((a,b)=>(a.at||0)-(b.at||0)).reverse(),manualListed=[];
   const backupHtml=backups.map(entry=>{
-    const readable=readableBackupRow(entry),pendingDecision=entry?.kind==="decision-recovery-choice",evidenceOnly=decisionRecoveryEvidenceOnly(entry);
+    const readable=readableRows.get(entry),pendingDecision=entry?.kind==="decision-recovery-choice",evidenceOnly=decisionRecoveryEvidenceOnly(entry);
     if(readable&&entry.kind==="manual")manualListed.push(entry);
     const old=Number.isFinite(entry?.at)&&Date.now()-entry.at>7*24*3600000;
     const unique=typeof entry?.id==="string" && !!entry.id && idCounts.get(entry.id)===1;
     const samePayload=typeof entry?.id==="string" && !!entry.id &&
-      backups.filter(row=>row?.id===entry.id).every(row=>readableBackupRow(row) && row.payload===entry.payload);
+      backups.filter(row=>row?.id===entry.id).every(row=>readableRows.get(row) && backupRowsSamePayload(row,entry));
     const label=readable
       ? esc(formatCalendarDate(entry.day,{year:true}))+' · '+esc(new Date(entry.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))+' · '+esc(entry.kind.replaceAll('-', ' '))
       : 'Unreadable backup'+(typeof entry?.id==="string" && entry.id ? ' · '+esc(entry.id) : ' · missing ID');
@@ -16070,7 +16186,7 @@ function openSettings(){
     ? backupIndex.raw===null
       ? '<p class="kv">Backup storage is unavailable right now. No backup was changed; try again when this device allows storage access.</p>'
       : '<p class="kv">Backup list cannot be read. Its original data is still on this device; view or download the raw backup data for recovery.</p>'
-    : backups.some(row=>!readableBackupRow(row))
+    : backups.some(row=>!readableRows.get(row))
       ? '<p class="kv">An unreadable backup is still stored here. View or download the raw backup data before choosing whether to delete that entry. New backups and cloud adoption may pause until it is resolved.</p>'
       : '';
   const rawBackupActions=backupIndex.raw===null ? ''
@@ -16200,11 +16316,19 @@ async function importDecisionBoard(next,sourcePayload,box){
   initializeReplacedScan();recomputeRanks();closeModal();commit();return true;
 }
 async function restoreDurableBackupById(id){
-  const rows=readLocalBackups(),matches=rows.filter(row=>row?.id===id);
+  // #2310: the exact bytes come from device storage now, one backup at a time.
+  let deviceCopies=[];
+  if(deviceStorageAuthority&&deviceStore&&deviceBackupCache.some(row=>row?.id===id)){
+    try{deviceCopies=await deviceBackupsWithText([id]);}
+    catch(e){toast("Backup list changed or this copy cannot be restored. Check Settings again.",7000);return false;}
+  }
+  const rows=deviceStorageAuthority?mergedBackupRows(deviceCopies,readLegacyBackups()):readLocalBackups(),matches=rows.filter(row=>row?.id===id);
   const entry=matches.length&&matches.every(row=>readableBackupRow(row)&&row.payload===matches[0].payload)?matches[0]:null;
   const shown=(backupRowsShown||rows).filter(row=>row?.id===id);
   if(decisionRecoveryEvidenceOnly(entry)){toast("This copy protects recovery evidence. Use Review saved decisions to choose a supported board value.",7000);return false;}
-  if(!entry||!shown.length||shown.some(row=>!readableBackupRow(row)||row.payload!==entry.payload)){
+  let entryHash=null;
+  if(entry&&shown.some(row=>typeof row?.payload!=="string"))try{entryHash=await ChainStorageV2.hashPayload(entry.payload);}catch(e){}
+  if(!entry||!shown.length||shown.some(row=>row?.readable===false||(typeof row?.payload==="string"?row.payload!==entry.payload:row?.payloadHash!==entryHash))){
     toast("Backup list changed or this copy cannot be restored. Check Settings again.",7000);return false;
   }
   try{
@@ -17324,13 +17448,25 @@ function onAction(act, el){
         const legacyMatches=Array.isArray(index.rows)?index.rows.filter(row=>row?.id===id):[];
         const identity=shown.length===1?shown[0].identity:null;
         if(shown.length!==1||deviceMatches.length!==1||!index.rows||index.raw!==backupIndexShownRaw||
-           identity===null||!readableBackupRow(deviceMatches[0])||backupRowIdentity(deviceMatches[0])!==identity||
-           legacyMatches.length>1||legacyMatches.some(row=>!readableBackupRow(row)||backupRowIdentity(row)!==identity)){
+           identity===null||!shownBackupRowReadable(deviceMatches[0])||shownBackupRowIdentity(deviceMatches[0])!==identity||
+           legacyMatches.length>1){
           toast("Backup could not be identified safely. Check Settings again.",7000);break;
         }
-        const row=deviceMatches[0];
+        const listed=deviceMatches[0];
         if(!confirm("Delete this local backup? The current board will stay."))break;
         return (async()=>{
+          // #2310: the exact row is read only now, and is what gets checked.
+          let row=null,exactIdentity=null;
+          try{
+            [row]=await deviceBackupsWithText([listed.id]);
+            if(row&&readableBackupRow(row)&&(typeof listed.payload==="string"?listed.payload===row.payload:listed.payloadHash===await ChainStorageV2.hashPayload(row.payload))&&
+               backupRowMetadataIdentity(row)===backupRowMetadataIdentity(listed)){
+              exactIdentity=backupRowIdentity(row);
+            }
+          }catch(e){}
+          if(exactIdentity===null||legacyMatches.some(item=>!readableBackupRow(item)||backupRowIdentity(item)!==exactIdentity)){
+            await refreshDeviceBackupCache();openSettings();toast("Backup could not be identified safely. Check Settings again.",7000);return false;
+          }
           let removedLegacy=false,nextLegacy=null,checked=false;
           const restoreLegacy=()=>{
             // The stores cannot commit together. A failed device transaction
@@ -17342,7 +17478,7 @@ function onAction(act, el){
             const removed=await deviceStore.deleteBackup(row.id,{payload:row.payload,allowedKinds:[row.kind],beforeDelete:stored=>{
               checked=true;
               const {payloadHash,...metadata}=stored;
-              if(backupRowIdentity({...metadata,payload:row.payload})!==identity ||
+              if(backupRowIdentity({...metadata,payload:row.payload})!==exactIdentity ||
                  localStorage.getItem(LOCAL_BACKUPS_KEY)!==index.raw) return false;
               if(!legacyMatches.length) return true;
               const target=index.rows.indexOf(legacyMatches[0]),remaining=index.rows.filter((_,i)=>i!==target);
