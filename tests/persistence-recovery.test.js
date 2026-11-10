@@ -10483,3 +10483,47 @@ test('RISK chain return device save failure: a failed save warns honestly, keeps
  assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer'],'once a save succeeds the return reaches the cloud');
  assert.equal(local.ctx.state.syncDirty,false);
 });
+
+// The released app from just before #221 (origin/main when the work began).
+// Pinned, never the candidate: it stands for every tab still running it.
+const BEFORE_CHAIN_RETURN_RELEASE='cb48e3cee0cebfa2d8f126f5a0b75d124d555c15';
+function beforeChainReturnApp221(){
+ const released=spawnSync('git',['show',BEFORE_CHAIN_RETURN_RELEASE+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:64*1024*1024});
+ assert.equal(released.status,0,released.stderr);
+ return extractAppScript(released.stdout);
+}
+const returnFact221=board=>(board.decisionEvents||[]).filter(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='chain'&&event.target.id===event.passId);
+
+test('RISK chain return compatibility: a client from before #221 cannot push a returned dot back and keeps the return intact through its own saves',async t=>{
+ const {local,h,at}=await threeDotClients221(t);
+ const oldSource=beforeChainReturnApp221(),seed=local.shim.localStorage.getItem(SYNC_STORE_KEY);
+ const old=await loadAppAtTime(at+150,{appSource:oldSource,seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:h.factory});
+ t.after(()=>{old.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',old.ctx);});
+ await old.ctx.cloudPull();await syncSettle(20);old.ctx.window.CloudSync.ready=false;
+ assert.deepEqual(Array.from(old.ctx.state.chain),['undo-base','undo-local','undo-peer'],'precondition: the older tab shows the three dots');
+
+ returnDotFromBoard221(local,'undo-local',at+200);await publish221(local);
+ const cloud=h.doc.payload,fact=JSON.stringify(returnFact221(JSON.parse(cloud)));
+ assert.equal(returnFact221(JSON.parse(cloud)).length,1,'precondition: the cloud holds the recorded return');
+
+ // The stale older tab edits a title and tries to sync its old chain.
+ await saveEditorChoice(old,'undo-peer',at+300,{title:'Edited in the older tab'});
+ old.ctx.window.CloudSync.ready=true;await old.ctx.cloudPushNow();await syncSettle(35);await old.ctx.cloudPull();await old.ctx.cloudPushNow();await syncSettle(35);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer'],'the older client cannot push the returned dot back');
+ assert.equal(JSON.stringify(returnFact221(h.remoteState())),fact,'and the recorded return stays exact in the cloud');
+
+ // An older client that opens the newer saved board keeps the return through its own save.
+ const newer=local.shim.localStorage.getItem(SYNC_STORE_KEY);
+ const reopened=await loadAppAtTime(at+400,{appSource:oldSource,seedStorage:{[SYNC_STORE_KEY]:newer,[LOCAL_HEAD_KEY]:newer},cloudSyncFactory:h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ reopened.ctx.window.CloudSync.ready=false;
+ assert.deepEqual(Array.from(reopened.ctx.state.chain),['undo-base','undo-peer'],'the older client opens it without the dot');
+ await saveEditorChoice(reopened,'undo-base',at+450,{title:'Saved by the older client'});
+ const ownSave=JSON.parse(reopened.shim.localStorage.getItem(SYNC_STORE_KEY));
+ assert.equal(JSON.stringify(returnFact221(ownSave)),fact,'its own save keeps the recorded return exactly');
+ assert.deepEqual(ownSave.chain,['undo-base','undo-peer']);
+ reopened.ctx.window.CloudSync.ready=true;await reopened.ctx.cloudPull();await reopened.ctx.cloudPushNow();await syncSettle(35);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer'],'and it cannot push the dot back either');
+ assert.equal(JSON.stringify(returnFact221(h.remoteState())),fact);
+ for(const app of [old,reopened])assert.equal(app.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','the older tab shows a held sync, never a confirmed one');
+});
