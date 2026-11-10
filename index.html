@@ -2401,6 +2401,8 @@ async function downloadRecoveryFile(){
     link.href=url;link.download="chain-scanner-recovery-file.json";document.body.appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),30000);
   }catch(error){toast("Download is unavailable here. No recovery file was saved.",7000);return false;}
+  lastBackupDownloadPartial=built.partial===true;
+  const downloads=document.getElementById("settingsDownloads");if(downloads)downloads.innerHTML=settingsDownloadButtonsHtml();
   toast(built.partial?"Recovery file saved. It is partial: the sources it could not read are listed in it, and it cannot be restored as a complete backup.":"Recovery file saved.",built.partial?9000:4000);
   return true;
 }
@@ -4346,13 +4348,13 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
       lastPersistedRaw=payload; persistedChanceSeed = chanceSeed; clearDeviceSaveIssue(); return true;
     }
-    if(quota) return reportDeviceSaveFailure("primary-write","quota-exhausted","The protected board copies do not fit in local storage. Keep this tab open and use Download board in Settings before choosing whether to delete an older backup.");
+    if(quota) return reportDeviceSaveFailure("primary-write","quota-exhausted","The protected board copies do not fit in local storage. Keep this tab open and use "+boardDownloadName()+" in Settings before choosing whether to delete an older backup.");
     if(writeFailure?.name==="RestoreSafetyError")
       return reportDeviceSaveFailure("restore-safety","changed-during-write","The board that Restore replaced changed during saving, so the protected board was left unchanged.");
     if(writeFailure?.name==="ConcurrentWriteError")
       return reportDeviceSaveFailure("primary-write","concurrent-change","Another tab changed the protected board during saving. Keep this tab open; its draft remains here.");
     const denied=writeFailure?.name==="SecurityError" ? "storage-denied" : "write-failed";
-    return reportDeviceSaveFailure("primary-write",denied,"Keep this tab open and use Download board in Settings before closing it.");
+    return reportDeviceSaveFailure("primary-write",denied,"Keep this tab open and use "+boardDownloadName()+" in Settings before closing it.");
   }
   if(!window.storage) return false;
   if(!saveLocalBackup("daily", payload)) toast("Saved board, but local backup storage is unavailable.", 7000);
@@ -16705,8 +16707,18 @@ function settingsDataStatusText(){
     :"sign in from the header to sync";
   return local+" \u00b7 "+cloud+".";
 }
+// #2303 (owner decision of 2026-11-10): Download backup saves the recovery file.
+// Restore refuses a partial one, so once a backup comes out partial, Download
+// board only (ordinary board JSON) appears beside it and the storage-failure
+// messages point there. A backup that comes out complete hides it again.
+let lastBackupDownloadPartial=false;
+function boardOnlyDownloadOffered(){
+  return lastBackupDownloadPartial&&liveBoardAccepted&&!!state&&!emptyNewWorkWorkspace();
+}
+function boardDownloadName(){return boardOnlyDownloadOffered()?"Download board only":"Download backup";}
 function settingsDownloadButtonsHtml(){
-  return '<button class="btn subtle" data-act="download-recovery-file">Download backup</button>';
+  return '<button class="btn subtle" data-act="download-recovery-file">Download backup</button>'
+    +(boardOnlyDownloadOffered()?'<button class="btn subtle" data-act="download-current-board">Download board only</button>':'');
 }
 function openSettings(){
   refreshSyncErrorLog();
@@ -16773,7 +16785,7 @@ function openSettings(){
   const rawBackupActions=backupIndex.raw===null ? ''
     : '<div class="mbtns"><button class="btn subtle" data-act="view-raw-backups">View raw backup data</button><button class="btn subtle" data-act="download-raw-backups">Download raw backup data</button></div>';
   const deviceIssue=lastDeviceSaveIssue
-    ? '<p class="kv"><b>Last device save issue:</b> <code>device-save:'+esc(lastDeviceSaveIssue.stage)+'/'+esc(lastDeviceSaveIssue.code)+'</code>. The board still open in this tab is available in Download backup below.</p>'
+    ? '<p class="kv"><b>Last device save issue:</b> <code>device-save:'+esc(lastDeviceSaveIssue.stage)+'/'+esc(lastDeviceSaveIssue.code)+'</code>. The board still open in this tab is available in '+boardDownloadName()+' below.</p>'
     : '';
   let ctxMgr = "";
   for(const c of state.contexts){
