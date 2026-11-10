@@ -904,7 +904,7 @@ test('RISK device save settle: a board that never stops changing still ends in a
 // every pin and the confirmed revision the live board holds are kept. A pin the
 // live board released after the earlier save stays released, exactly as the
 // ordinary save that follows a finished commit would write it.
-test('RISK device save settle: saving on top of this tab\'s own save keeps the live board\'s protected backups, and a released pin stays released',{timeout:60000},async t=>{
+test('RISK device save settle: saving on top of an earlier save of this tab keeps the protected backups of the live board, and a released pin stays released',{timeout:60000},async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-own-pins',tasks:[syncTask('settle-pins-anchor','Anchor'),syncTask('settle-pins-a','A'),syncTask('settle-pins-b','B')]});
  f.ctx.state.protectedBackupIds=['pin-kept-2323','pin-released-2323'];
  assert.equal(await f.ctx.persist(),true);
@@ -993,7 +993,7 @@ test('RISK device save settle: repairs of both kinds share one bounded attempt c
 // #2323 review: support can tell which writer each repair met. Before commit n
 // this fixture wrote another writer's board when n is odd and bytes equal to
 // this tab's last save when n is even; each later commit repaired onto that head.
-test('RISK device save settle: the Debug log counts repairs onto this tab\'s own save and onto another writer\'s, with no board content',{timeout:60000},async t=>{
+test('RISK device save settle: the Debug log counts repairs onto saves of this tab and onto saves of another writer, with no board content',{timeout:60000},async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-repair-kinds',tasks:[syncTask('settle-kinds-anchor','Anchor'),syncTask('settle-kinds-mine','PRIVATE-KINDS-2323')]});
  assert.equal(await f.ctx.persist(),true);
  const saved=vm.runInContext('lastPersistedRaw',f.ctx);let commits=0;
@@ -1119,7 +1119,7 @@ test('RISK device save settle: the plain message stays until a later save verifi
 
 // The message asks for another change; that change must not wipe the support
 // record of the failure it is trying to repair.
-test('RISK device save settle: the Debug log keeps the failed save\'s stage, code and attempts through the next change until a save is verified',{timeout:60000},async t=>{
+test('RISK device save settle: the Debug log keeps the stage, code and attempts of a failed save through the next change until a save is verified',{timeout:60000},async t=>{
  const {f,stop,commits}=await deviceSaveExhausted2325(t,'diagnostics-kept');
  const attempts=commits(),report=()=>f.ctx.buildSupportDiagnosticsReport().save;
  f.ctx.onAction('view-support-diagnostics',{});
@@ -1177,7 +1177,7 @@ test('RISK device save settle: a message cleared by a verified save while the ta
 // The FAQ says: "If both copies changed the same thing, the saved board keeps
 // one version and Settings backups keep this tab's." Which version the board
 // keeps is the existing merge's choice; either way this tab's exact draft stays.
-test('RISK device save settle: when both copies changed the same task, the board keeps one version and a backup keeps this tab\'s',{timeout:60000},async t=>{
+test('RISK device save settle: when both copies changed the same task, the board keeps one version and a backup keeps the version from this tab',{timeout:60000},async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'same-field',tasks:[syncTask('same-field-anchor','Anchor'),syncTask('same-field-mine','Mine')]});
  assert.equal(await f.ctx.persist(),true);
  const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
