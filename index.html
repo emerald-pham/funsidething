@@ -367,7 +367,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .modal .mtop{display:flex;align-items:center}
 .modal .x{margin-left:auto;color:var(--mut);font-size:18px;padding:2px 8px}
 .frow{display:flex;gap:10px;align-items:center;margin:9px 0;flex-wrap:wrap}
-.frow select,#backupRestoreSource{min-width:0;max-width:100%}
+.frow select{min-width:0;max-width:100%}
 .dependency-row select{flex:1;min-width:min(180px,100%)}
 .dependency-row{flex-wrap:wrap}
 .dependency-hard-heading{font-size:12px;font-weight:600;text-align:right}
@@ -410,6 +410,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .settings-section{border:1px solid var(--line);border-radius:10px;margin:12px 0;padding:0 12px 12px;background:var(--subtle)}
 .settings-section:not([open]){padding-bottom:0}
 .settings-section>summary{cursor:pointer;font-weight:700;padding:11px 2px;list-style-position:inside}
+.settings-troubleshooting{margin:12px 0 0}
+.settings-troubleshooting>summary{cursor:pointer;font-weight:700;padding:8px 2px;list-style-position:inside}
 /* Retained release words must reflow even in narrow enlarged list items. */
 .help-faq[data-help-changelog] .kv{overflow-wrap:anywhere}
 .settings-section .frow input[type=number]{min-width:0;max-width:100%}
@@ -787,7 +789,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
     if(window.__chainDebugLogLinkHeld&&event.target?.closest?.('#modalRoot'))return;
     if(recoveryHeld){
       const target=event.target,modal=target?.closest?.('#modalRoot');
-      const settingEdit=['input','change'].includes(type)&&target?.closest?.('.settings-section')&&!['restoreBackupFile','backupRestoreSource'].includes(target.id);
+      const settingEdit=['input','change'].includes(type)&&target?.closest?.('.settings-section')&&target.id!=='restoreBackupFile';
       if(!settingEdit&&(modal||target?.closest?.('#syncBtn,[data-act="settings"]')))return;
     }else if(ready)return;
     event.preventDefault();event.stopImmediatePropagation();
@@ -5287,6 +5289,7 @@ function viewSupportDiagnostics(){
   supportDiagnosticsInline=false;
   const settingsDraft=captureSettingsDraft();if(settingsDraft)supportDiagnosticsSettingsDraft=settingsDraft;
   supportDiagnosticsStartBackgroundCapture();
+  refreshSyncErrorLog();
   const raw=supportDiagnosticsText();
   const canReturnToSettings=supportDiagnosticsSettingsDraft!==null||cloudSourceRecoverySettingsDraft!==null;
   // #2246: this dialog's exports are the bounded (24 KiB) metadata report only.
@@ -5297,6 +5300,9 @@ function viewSupportDiagnostics(){
     +'<p class="kv">A local debug log for sync and unexpected reloads. Copy or download it here to share it. It contains no task or recovery-source contents, so it stays small however large the board is. The log alone is not a board backup and cannot restore tasks, and it is never uploaded.</p>'
     +'<textarea id="supportDiagnosticsData" readonly aria-label="Debug log" style="width:100%;min-height:12rem;max-height:55vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere">'+esc(raw)+'</textarea>'
     +'<p class="kv">Worker, cache, clock, or device details may be unavailable. Refresh after a moment to include any bounded background observations.</p>'
+    // #2303: recent sync errors moved here from Settings, under Troubleshooting.
+    +'<h3>Recent sync errors</h3><p class="kv">Errors from the past hour, newest first, including attempts that later recovered. Each code appears at most once every ten minutes. Entries expire one hour after they appear. Stored only in this browser; task content and account details are excluded.</p>'
+    +'<div id="syncErrorLog">'+syncErrorLogHtml()+'</div>'
     +'<div class="mbtns"><button class="btn subtle" data-act="copy-support-diagnostics">Copy debug log</button><button class="btn subtle" data-act="download-support-diagnostics">Download debug log</button><button class="btn subtle" data-act="select-support-diagnostics">Select all</button><button class="btn subtle" data-act="refresh-support-diagnostics">Refresh log</button>'
     +(canReturnToSettings?'<button class="btn subtle" data-act="return-support-diagnostics">Return to Settings</button>':'')+'</div>');
   return true;
@@ -12576,7 +12582,7 @@ function modalShell(inner){
   if(activeApologyNotice && !inner.includes('data-apology-notice="'+APOLOGY_NOTICE_ID+'"')) finishActiveApologyNotice();
   document.getElementById("modalRoot").innerHTML =
     '<div class="mback" data-act="mback"><div class="modal" role="dialog" aria-modal="true">'+inner+'</div></div>';
-  if(openingRecoveryHeld){const root=document.getElementById('modalRoot');for(const element of root.querySelectorAll('[data-act]'))if(!OPENING_RECOVERY_ACTIONS.has(element.dataset.act))element.disabled=true;for(const element of root.querySelectorAll('.settings-section input,.settings-section select,.settings-section textarea'))if(!['restoreBackupFile','backupRestoreSource'].includes(element.id))element.disabled=true;}
+  if(openingRecoveryHeld){const root=document.getElementById('modalRoot');for(const element of root.querySelectorAll('[data-act]'))if(!OPENING_RECOVERY_ACTIONS.has(element.dataset.act))element.disabled=true;for(const element of root.querySelectorAll('.settings-section input,.settings-section select,.settings-section textarea'))if(element.id!=='restoreBackupFile')element.disabled=true;}
 }
 /* A held setting is not an old decision to reconstruct. This small recovery
    path grants authority only to a fresh, explicit appearance choice. Exact
@@ -16686,6 +16692,22 @@ function manualBackupReminderHtml(manualRows){
   const announce=manualBackupReminderShownFor!==account;manualBackupReminderShownFor=account;
   return '<p id="manualBackupReminder" class="kv manual-backup-reminder"'+(announce?' role="status"':'')+'>'+esc(MANUAL_BACKUP_REMINDER_TEXT)+'</p>';
 }
+// #2303: the one status line of Data and backups names where the board saves and
+// whether cloud sync is on; the mechanics are in the Data and backups FAQ.
+function settingsDataStatusText(){
+  const local=!liveBoardAccepted?"Saved source protected; choose a recovery board before saving"
+    :storageOK?(useLocal?(deviceStorageAuthority?"Saving in this browser\u2019s durable storage":"Saving in this browser\u2019s local storage"):"Saving in this artifact\u2019s storage")
+    :"Storage unavailable here; keep this tab open until it returns";
+  const cloud=!window.CloudSync||!window.CloudSync.configured?"this device only"
+    :deviceRecoveryCloudHold?"cloud recovery pending"
+    :cloudReady()?"cloud sync on as "+window.CloudSync.user
+    :!window.CloudSync.ready?"restoring cloud sign-in"
+    :"sign in from the header to sync";
+  return local+" \u00b7 "+cloud+".";
+}
+function settingsDownloadButtonsHtml(){
+  return '<button class="btn subtle" data-act="download-recovery-file">Download backup</button>';
+}
 function openSettings(){
   refreshSyncErrorLog();
   const s = state.settings;
@@ -16693,7 +16715,6 @@ function openSettings(){
   // writes; button states must describe the sky that was actually adopted.
   const locationSet=!!s.scene?.location?.enabled;
   const sceneTimeSet=!!s.scene?.time;
-  const histCount = historyRows().length;
   const backupIndex=inspectBackupIndex();
   backupIndexShownRaw=backupIndex.raw;
   // Settings is also the recovery surface for malformed or expired legacy
@@ -16752,7 +16773,7 @@ function openSettings(){
   const rawBackupActions=backupIndex.raw===null ? ''
     : '<div class="mbtns"><button class="btn subtle" data-act="view-raw-backups">View raw backup data</button><button class="btn subtle" data-act="download-raw-backups">Download raw backup data</button></div>';
   const deviceIssue=lastDeviceSaveIssue
-    ? '<p class="kv"><b>Last device save issue:</b> <code>device-save:'+esc(lastDeviceSaveIssue.stage)+'/'+esc(lastDeviceSaveIssue.code)+'</code>. The board still open in this tab is available in Download board below.</p>'
+    ? '<p class="kv"><b>Last device save issue:</b> <code>device-save:'+esc(lastDeviceSaveIssue.stage)+'/'+esc(lastDeviceSaveIssue.code)+'</code>. The board still open in this tab is available in Download backup below.</p>'
     : '';
   let ctxMgr = "";
   for(const c of state.contexts){
@@ -16782,7 +16803,6 @@ function openSettings(){
     + '<div class="frow"><label>Location</label><button data-act="location-settings" class="btn setting-choice '+(locationSet?'setting-set':'setting-unset')+'">Choose location</button><span id="settingsLocationStatus" class="kv">'+(locationSet?'Sky location set.':'Using the default sky.')+'</span></div>'
     + '</details>'
     + '<details class="settings-section"><summary>Scanning and recurrence</summary>'
-    + '<div class="frow"><label>On your phone</label><button class="btn subtle" data-act="install-app">Install this app on your phone</button><span class="kv">Add a home-screen icon and open Chain Scanner like an app.</span></div>'
     + '<div class="frow"><label for="stChainStartsWith">Chain starts with</label><select id="stChainStartsWith">'+[['oldest','Oldest eligible'],['mostLikely','Most likely']].map(([value,label])=>'<option value="'+value+'"'+((s.chainStartsWith||'oldest')===value?' selected':'')+'>'+label+'</option>').join('')+'</select></div>'
     + '<label class="cbox"><input id="stLastTaskWoop" type="checkbox"'+(s.lastTaskWoop?' checked':'')+'/> Last task WOOP</label><p class="kv">Plan the last dot after two dislodgements.</p>'
     + '<label class="cbox"><input id="stFloatingHeader" type="checkbox"'+(s.floatingHeader?' checked':'')+'/> Keep the header visible while scrolling</label>'
@@ -16807,38 +16827,28 @@ function openSettings(){
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
     + '</details>'
     + '<details class="settings-section"><summary>Data and backups</summary>'
-    + '<div class="mbtns"><button class="btn subtle" data-act="review-decision-recovery">Review saved decisions</button></div>'
-    + '<h3>Housekeeping</h3>'
-    + '<div class="kv">'+(histCount ? (histCount+' history entr'+(histCount===1?'y':'ies')+' sitting in the History panel.') : 'Nothing in the History panel right now.')+'</div>'
-    + (histCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear history</button></div>' : '')
-    + '<h3>Backup</h3>'
-    + '<div class="kv"><span class="statusdot" style="background:'+(storageOK?"var(--good)":"var(--no)")+'"></span>'
-    + (!liveBoardAccepted?"The saved source is protected; choose a supported recovery board before saving.":storageOK ? (useLocal ? (deviceStorageAuthority ? "Saving automatically in this browser\u2019s durable storage." : "Saving automatically in this browser\u2019s local storage.") : "Saving automatically in this artifact\u2019s storage.") : "Persistent storage unavailable here. Keep this tab open until storage returns.")+'</div>'
+    // #2303 (owner spec #2298, decisions of 2026-11-09 and 2026-11-10): one status
+    // line, Make backup, Download backup, Restore, the backup list, a closed
+    // Troubleshooting section and Reset everything, in that order. Every
+    // conditional recovery, hold and storage message above and below still shows
+    // when it applies; the retention and sync explanations are in the Data and
+    // backups FAQ.
+    + '<p class="kv settings-data-status" role="status"><span class="statusdot" style="background:'+(storageOK&&liveBoardAccepted?"var(--good)":"var(--no)")+'"></span>'+esc(settingsDataStatusText())+'</p>'
     + deviceIssue
-    + '<div class="kv" style="margin-top:6px"><span class="statusdot" style="background:'+(cloudReady()?"var(--good)":"var(--mut)")+'"></span>'
-    + (!window.CloudSync || !window.CloudSync.configured
-        ? "Cloud sync not configured \u2014 this device only."
-        : deviceRecoveryCloudHold?"Cloud recovery pending; this device's saved board is not yet confirmed by cloud."
-        : cloudReady() ? ("Cloud sync on, as " + esc(window.CloudSync.user) + ". Refreshes on load, when you return, and when another device saves. Independent decisions combine; conflicting current choices use when each choice was made. Drafts and pressed controls wait until you finish.")
-        : !window.CloudSync.ready ? "Cloud sync is restoring your sign-in session."
-        : "Cloud sync configured \u2014 sign in from the header to link this device.")+'</div>'
-    + '<div class="mbtns"><button class="btn danger" data-act="wipe">Reset everything</button></div>'
-    + '<h3>Download</h3><p class="kv">'+(liveBoardAccepted&&!emptyNewWorkWorkspace()?'Download board saves the board open in this tab as ordinary board JSON, including accepted edits that may not have saved on this device. Download recovery file saves that board together with every readable saved source on this device, storage format, build details and the Debug log, for recovery and repair.'
-      :'Download recovery file saves every readable saved source on this device, storage format, build details and the Debug log. This tab has no accepted board, so the file has none: it is marked partial and cannot be restored as a board.')
-    +' A source that cannot be read is listed in the file, which then says it is partial. Downloads never save, sync or replay pending work.</p>'
-    + '<div class="mbtns">'+(liveBoardAccepted&&!emptyNewWorkWorkspace()?'<button class="btn subtle" data-act="download-current-board">Download board</button>':'')+'<button class="btn subtle" data-act="download-recovery-file">Download recovery file</button></div>'
-    + '<h3>Restore</h3><p class="kv">Choose a JSON file or paste board data for the same protected preview. Supported inputs include ordinary board JSON, a complete recovery file or older recovery archive, or a raw backup list with a deliberate supported-board choice. The exact selected source and current board are protected before preview; Cancel keeps them unchanged. An archive applies only its current board, and its recovery sources are never replayed.</p>'
-    + '<div class="mbtns"><label for="backupRestoreSource">Restore source</label><select id="backupRestoreSource" aria-label="Restore source"><option value="file">Choose a JSON file</option><option value="paste">Paste JSON</option></select><button class="btn subtle" data-act="restore-backup">Restore</button><input id="restoreBackupFile" type="file" accept=".json,application/json" hidden aria-label="Choose a board backup JSON file"/></div>'
-    + '<h3>Debug log</h3><p class="kv">Inspect, copy or download a local metadata report for sync and unexpected reloads; it stays small however large the board is. Download recovery file above includes this log with the readable saved data. Recent app steps survive reopening for up to one hour when browser storage is available. The log alone is not a board backup, cannot restore tasks, and is never uploaded.</p>'
-    + '<div class="mbtns"><button class="btn subtle" data-act="view-support-diagnostics">View debug log</button></div>'
-    + '<h3>Recent sync errors</h3><p class="kv">Errors from the past hour, newest first, including attempts that later recovered. Each code appears at most once every ten minutes. Entries expire one hour after they appear. Stored only in this browser; task content and account details are excluded.</p>'
-    + '<div id="syncErrorLog">'+syncErrorLogHtml()+'</div>'
-    + '<h3>Daily local backups</h3><p class="kv">Daily copies stay on this device for today and the two calendar days before it, so at most three; other automatic copies stay for up to seven calendar days, and older automatic copies may retire sooner as new ones arrive or storage fills. While cloud recovery waits or holds your board, before the cloud confirms it, daily copies keep the seven days. Daily copies saved before this update, or holding another account’s board, also keep seven days. Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them or clear browser site data. Each restore first saves the current board. Expired automatic entries retained from a storage upgrade are removed permanently from the active backup list after a successful save. Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept. Manual and protected recovery, unreadable, unknown or ambiguous copies remain. Cleanup waits if the board or backup list changes or storage refuses the write.</p>'
-    + '<div class="mbtns"><button class="btn subtle" data-act="make-manual-backup">Make manual backup</button></div>'
+    + '<div class="mbtns"><button class="btn subtle" data-act="make-manual-backup">Make backup</button></div>'
     + manualBackupReminderHtml(manualListed)
-    + backupIssue + rawBackupActions
-    + (backupHtml || '<p class="kv">No local backups yet.</p>')
+    + '<div class="mbtns" id="settingsDownloads">'+settingsDownloadButtonsHtml()+'</div>'
+    + (liveBoardAccepted&&!emptyNewWorkWorkspace()?'':'<p class="kv">This tab has no accepted board, so the file has none: it is marked partial and cannot be restored as a board.</p>')
+    + '<div class="mbtns"><button class="btn subtle" data-act="restore-backup" aria-expanded="false" aria-controls="restoreChoices">Restore</button></div>'
+    + '<div id="restoreChoices" class="mbtns" hidden><button class="btn subtle" data-act="choose-backup-file">Choose a file</button><button class="btn subtle" data-act="open-paste-recovery">Paste board data</button><input id="restoreBackupFile" type="file" accept=".json,application/json" hidden aria-label="Choose a board backup JSON file"/></div>'
+    + '<div id="settingsBackupList">'+backupIssue + rawBackupActions
+    + (backupHtml || '<p class="kv">No local backups yet.</p>')+'</div>'
+    + '<details class="settings-troubleshooting"><summary>Troubleshooting</summary>'
+    + '<div class="mbtns"><button class="btn subtle" data-act="view-support-diagnostics">View debug log</button><button class="btn subtle" data-act="review-decision-recovery">Review saved decisions</button></div>'
     + '</details>'
+    + '<div class="mbtns"><button class="btn danger" data-act="wipe">Reset everything</button></div>'
+    + '</details>'
+    + '<div class="mbtns settings-install"><button class="btn subtle" data-act="install-app">Install this app on your phone</button></div>'
   );
 }
 
@@ -17853,9 +17863,12 @@ function onAction(act, el){
       pasteDraftBuffer=null;openPasteDialog(raw,settingsDraft);break;
     }
     case "restore-backup": {
-      const source=document.getElementById("backupRestoreSource")?.value;
-      if(source==="paste")return onAction("open-paste-recovery",el);
-      if(source==="file"||!source)return onAction("choose-backup-file",el);
+      // #2303: one Restore button; a file or pasted board is chosen inside the
+      // same protected flow, which then shows the same preview as before.
+      const choices=document.getElementById("restoreChoices");
+      if(!choices)return onAction("choose-backup-file",el);
+      choices.hidden=false;el?.setAttribute?.("aria-expanded","true");
+      try{choices.querySelector?.('[data-act="choose-backup-file"]')?.focus?.();}catch{}
       break;
     }
     case "preview-pasted-recovery": {
