@@ -468,7 +468,7 @@ its RISK test; the map follows.
 - RISK LOCAL BACKUPS: automatic history has a byte budget before browser quota
 - RISK LOCAL BACKUPS: a single stable new copy fits when its duplicate latest does not
 - RISK LOCAL BACKUPS: the non-actionable backup-full warning is absent from save UI
-- RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies
+- RISK LOCAL BACKUPS: the Data and backups FAQ explains automatic early retirement while preserving chosen copies
 - RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched
 - RISK LOCAL BACKUPS: parseable but unrestorable history cannot be retired for quota
 - RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota
@@ -862,7 +862,7 @@ its RISK test; the map follows.
 - RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint
 - RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls
 - RISK live scan sync: the second physical click of one double-click cannot complete the newly rendered candidate
-- RISK live scan sync: Settings describes live revision refresh while retaining draft protection
+- RISK live scan sync: the Data and backups FAQ describes live revision refresh while retaining draft protection
 - RISK multiple dependencies: ten links require every prerequisite while completion deletion and Undo retain their rules
 - RISK multiple dependencies: old single links migrate and legacy edits preserve the other selected dependencies
 - RISK multiple dependencies: concurrent additions removals repeated readds and replacement Undo reconcile causally
@@ -1310,7 +1310,7 @@ its RISK test; the map follows.
 - RISK cloud current choices: fresh pass projection installs the exact frozen mode draw
 - RISK cloud current choices: final outcome projection does not erase later pass comparisons
 - RISK cloud current choices: projected Can’t and Return preserve the original hold then clear it
-- RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence
+- RISK independent decision guidance: the rendered FAQ distinguishes retained decisions targeted Undo and held evidence
 - RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times
 - RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo
 - RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate

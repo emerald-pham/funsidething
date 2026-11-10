@@ -1057,6 +1057,38 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "openSettings: shows the housekeeping copy and Clear history button when only work-log entries exist",
+      "currentRoot": "History: offers Clear history when only work-log entries exist, and Settings does not repeat it",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies",
+      "currentRoot": "RISK LOCAL BACKUPS: the Data and backups FAQ explains automatic early retirement while preserving chosen copies",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK live scan sync: Settings describes live revision refresh while retaining draft protection",
+      "currentRoot": "RISK live scan sync: the Data and backups FAQ describes live revision refresh while retaining draft protection",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence",
+      "currentRoot": "RISK independent decision guidance: the rendered FAQ distinguishes retained decisions targeted Undo and held evidence",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }
