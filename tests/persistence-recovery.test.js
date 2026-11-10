@@ -10463,3 +10463,23 @@ test('RISK chain return offline: a return made offline is saved on this device, 
  assert.equal(JSON.stringify(local.ctx.state.decisionEvents),facts,'records no second return');
  assert.equal(JSON.stringify(local.ctx.state.tasks.find(task=>task.id==='undo-local').ratingHistory),history,'and no second History row');
 });
+
+test('RISK chain return device save failure: a failed save warns honestly, keeps the earlier saved board and holds the cloud until a save succeeds',async t=>{
+ const {local,h,at}=await threeDotClients221(t);
+ const storage=local.shim.localStorage,setItem=storage.setItem,saved=storage.getItem(SYNC_STORE_KEY),cloud=h.doc.payload;
+ storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)throw Object.assign(Error('device write refused'),{name:'QuotaExceededError'});return setItem.call(storage,key,value);};
+ t.after(()=>{storage.setItem=setItem;});
+ returnDotFromBoard221(local,'undo-local',at+200);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'the chain updates on the same tap');
+ assert.equal(await local.ctx.persist(),false,'the failed save is reported as failed');
+ assert.match(local.shim.document.getElementById('toast').textContent,/Couldn't save this edit/,'with the existing warning');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),saved,'the earlier saved board is untouched');
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(35);
+ assert.equal(h.doc.payload,cloud,'the cloud write never outruns the device copy');
+ assert.notEqual(local.ctx.state.syncDirty,false,'and sync is not shown as confirmed');
+
+ storage.setItem=setItem;
+ await publish221(local);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer'],'once a save succeeds the return reaches the cloud');
+ assert.equal(local.ctx.state.syncDirty,false);
+});
