@@ -595,7 +595,7 @@ its RISK test; the map follows.
 - RISK landscape metropolis: gardens and patios both skip towers with lightning rods
 - RISK landscape city and aircraft: current changelog names the skyline and plane details
 - RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit
-- RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone widths in Chromium and WebKit
+- RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit
 - RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit
 - RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
@@ -1369,6 +1369,7 @@ its RISK test; the map follows.
 - RISK debug log: app reload reasons and lifecycle observations survive without private error text
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK debug log link #2309: the link opens the read-only log at opening without Settings or reading any backup text
+- RISK debug log link #2309: counting backups loads no backup rows, so a cold opening stays clear of retained file bytes
 - RISK debug log link #2309: the report gains backup and Undo counts and sizes, and never their contents
 - RISK debug log link #2309: leaving the log returns to the ordinary board, and selecting the log still works
 - RISK debug log link #2309: an ordinary opening, or another fragment, loads the board and shows no log
@@ -1396,6 +1397,8 @@ its RISK test; the map follows.
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
 - RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams
 - RISK numeric responsiveness: a rank refresh reusing the previous refresh arrays returns exactly what new arrays would
+- RISK numeric responsiveness: an answer whose next candidates plainly clear the threshold skips the full better-task integration, and one that may not still runs it
+- RISK forecast caller preservation: the better-task check decides every board and threshold exactly as the full integration does
 - RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements
 - RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration
 - RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary
@@ -1480,7 +1483,7 @@ its RISK test; the map follows.
 - RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit
 - RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit
 - RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit
-- RISK long scan memory browser: Undo adds no more than a small multiple of the board size to 60 answers on a large saved board, keeps 30 steps, and still reverses the newest answer, in Chromium and WebKit
+- RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit
 - RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit
 - RISK large board recovery browser: a deliberate run of the automatic recovery default from Retry sync reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
 - RISK BACKUP FILE RESTORE: a signed-in large board file asks a board with no account to sign in first instead of failing, and changes nothing
@@ -1521,6 +1524,15 @@ its RISK test; the map follows.
 - RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority never revives or uploads its stale legacy shell
 - RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes
 - RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once
+- RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back
+- RISK backup list memory: the older browser backup list is compared by hash without keeping its text, so a mirrored row merges and a different one stays listed
+- RISK backup read back: a brief device read failure during an account switch is retried, keeps its diagnostics and still adopts the new board
+- RISK backup read back: a device read that keeps failing holds the switch honestly within its budget and leaves the board alone
+- RISK backup read back: a sign-out during the retry budget stops reading
+- RISK backup read back: an edit made while the safety copy is being read back holds the account switch instead of being lost
+- RISK sync dealt candidate: a candidate dealt by a redraw on a clean board does not queue a cloud write
+- RISK sync dealt candidate: a same-revision copy differing in anything else still publishes this board
+- RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered
 - RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board
 - RISK CLOUD LATENCY: ordinary edits retain the two-second debounce and stay dirty until server acknowledgement
 - RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership
