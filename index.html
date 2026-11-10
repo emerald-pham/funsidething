@@ -550,8 +550,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 
   <section class="panel listwrap" id="listWrap">
     <button class="lhead" data-act="toggle-list"><span id="listCaret">▸</span> All tasks <span id="listCount" class="mono"></span></button>
-    <!-- Lives outside #listBody on purpose: renderList() rebuilds that body wholesale
-         on every commit, which would blow away a focused input mid-keystroke. -->
+    <!-- Lives outside #listBody on purpose: renderList() rewrites that body on every
+         commit, which would blow away a focused input mid-keystroke. -->
     <div class="lfilters" id="listFilters" hidden>
       <input id="listSearch" type="search" placeholder="Search tasks by name…" aria-label="Search tasks by name" autocomplete="off"/>
       <div class="ltags" id="listEligibilityRow" aria-label="Task eligibility"></div>
@@ -971,15 +971,20 @@ function pJudged(a, b){ // one Yes/No preference uses the same BETA performance 
 }
 /* Monte-Carlo rank distributions over a set of items with {id, mu, sigma}.
    Returns Map id -> {hist:Float32Array(n) of P(rank=i+1), cdf, topK, n} */
-function rankStats(items, S){
+function rankStats(items, S, reusable=null){
   const n = items.length;
   const out = new Map();
   if(n === 0) return out;
   S = S || 250;
   const ratings=items.map(normalizeRating);
-  const hists = items.map(()=> new Float32Array(n));
-  const idx = new Array(n); const score = new Float64Array(n);
-  const byScore=(a,b)=>score[b]-score[a];
+  // #2313: two n-long arrays per task is about 1.6 MB per answer on a 447-task
+  // board, and the engine frees it long after the answer. A refresh of the same
+  // size overwrites the previous refresh's arrays instead; every value below is
+  // rewritten, so the result is exactly what fresh arrays would hold.
+  const earlier=reusable?.size===n?[...reusable.values()]:null;
+  const buffers=(i,key)=>earlier?.[i]?.[key]?.length===n?earlier[i][key]:null;
+  const hists = items.map((_,i)=> buffers(i,"hist")?.fill(0) || new Float32Array(n));
+  let idx = new Int32Array(n), merged = new Int32Array(n); const score = new Float64Array(n);
   // The hot loop keeps the same Box–Muller draws and shared spare, without
   // repeated global lookups for every sample. Resolve this invocation's Math
   // methods (and their receiver) so seeded callers retain the exact stream.
@@ -997,13 +1002,24 @@ function rankStats(items, S){
       }
       score[i] = ratings[i].mu + ratings[i].sigma*normal; idx[i]=i;
     }
-    idx.sort(byScore);
+    // #2313: a descending stable merge, the order sort() gave with score[b]-score[a].
+    // A comparator boxed each difference, about 10 MB of garbage per answer.
+    for(let width=1;width<n;width*=2){
+      for(let start=0;start<n;start+=2*width){
+        const mid=start+width<n?start+width:n, end=start+2*width<n?start+2*width:n;
+        let left=start,right=mid,out=start;
+        while(left<mid&&right<end) merged[out++]=score[idx[right]]-score[idx[left]]>0?idx[right++]:idx[left++];
+        while(left<mid) merged[out++]=idx[left++];
+        while(right<end) merged[out++]=idx[right++];
+      }
+      const swapped=idx; idx=merged; merged=swapped;
+    }
     for(let r=0;r<n;r++) hists[idx[r]][r]++;
   }
   if(inlineGaussian)_spare=spare;
   const min=Math.min.bind(Math);
   for(let i=0;i<n;i++){
-    const h = hists[i]; const cdf = new Float32Array(n); let acc=0;
+    const h = hists[i]; const cdf = buffers(i,"cdf") || new Float32Array(n); let acc=0;
     for(let r=0;r<n;r++){ h[r]/=S; acc+=h[r]; cdf[r]=min(1,acc); }
     // "arcane" stopping stat: smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K
     let topK = n;
@@ -1174,7 +1190,7 @@ window.refreshScannerDeviceRecoveryHold=async()=>{
   renderSync();return deviceRecoveryCloudHold;
 };
 let rankCache = new Map();     // id -> {hist,cdf,topK,n}
-let sparkCache = new Map();    // id:WxH -> memoized sparkline SVG string; cleared whenever rankCache changes
+let sparkCache = new Map();    // id:WxH -> memoized sparkline {svg,area,line}; cleared whenever rankCache changes
 let undoStack = [];
 let chanceGeneration = 0; // local provenance: only deliberate scan/day boundaries advance it
 let quickAddCtx = [];          // context ids currently picked in the quick-add bar — UI-only, sticky across adds, not synced
@@ -8250,7 +8266,7 @@ function decisionsPerMinute(){
   return 60/sec;
 }
 function recomputeRanks(){
-  rankCache = rankStats(openTasks().map(t=>({id:t.id, mu:t.mu, sigma:t.sigma})), state.settings.samples);
+  rankCache = rankStats(openTasks().map(t=>({id:t.id, mu:t.mu, sigma:t.sigma})), state.settings.samples, rankCache);
   sparkCache.clear();
 }
 function chainStart(){ return state.chain.length === 0; }
@@ -8765,7 +8781,9 @@ const taskActionOwnerBundle=(()=>{
       state.candidateId=null;
       if(decisionEvent||kind==="cand-done")projectDecisionEvents(state,null,{refreshRanks:false});
       recomputeRanks();finishRatingObservation(observation);maybeIntervene();
+      listRanksDeferred=true;
       commit(true,kind==="yes"||kind==="cand-done");
+      listRanksDeferred=false;
       return true;
     }
     if(command.type==="benchmark"){
@@ -9411,21 +9429,30 @@ function fmtWhen(ts,preference=normalizeDateFormat(state?.settings?.dateFormat))
   if(diffDays<0 && diffDays>-7 && !otherYear) return WD[d.getDay()];
   return WD[d.getDay()] + " " + formatCalendarDate(d,{preference});
 }
-function sparkSVG(id, w, hgt){
+// One pair per bin count, overwritten by each drawing: a list redraw would
+// otherwise allocate two arrays for every task (#2313).
+const sparkBinBuffers = new Map();
+function sparkBuffers(B){
+  let pair = sparkBinBuffers.get(B);
+  if(!pair){ pair = {bins:new Float32Array(B), sm:new Float32Array(B)}; sparkBinBuffers.set(B,pair); }
+  pair.bins.fill(0);
+  return pair;
+}
+function sparkSVG(id, w, hgt){ return sparkParts(id, w, hgt).svg; }
+function sparkParts(id, w, hgt){
   w = w||84; hgt = hgt||20;
   const key = id+":"+w+"x"+hgt;
   const cached = sparkCache.get(key);
   if(cached !== undefined) return cached;
   const st = rankCache.get(id);
-  let svg;
+  let svg, area = null, line = null;
   if(!st){
     svg = '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'"></svg>';
   }else{
     const n = st.n, hist = st.hist;
     const B = Math.max(2, Math.min(n, 44));
-    const bins = new Float32Array(B);
+    const {bins, sm} = sparkBuffers(B);
     for(let r=0;r<n;r++) bins[Math.min(B-1, Math.floor(r*B/n))] += hist[r];
-    const sm = new Float32Array(B);
     for(let i=0;i<B;i++) sm[i] = (bins[i-1]||0)*0.25 + bins[i]*0.5 + (bins[i+1]||0)*0.25;
     let max = 1e-9; for(let i=0;i<B;i++) if(sm[i]>max) max=sm[i];
     const pts = [];
@@ -9434,12 +9461,13 @@ function sparkSVG(id, w, hgt){
       const y = hgt-1 - (sm[i]/max)*(hgt-3);
       pts.push(x.toFixed(1)+","+y.toFixed(1));
     }
-    const line = "M"+pts.join(" L");
-    const area = line + " L"+w+","+(hgt-0.5)+" L0,"+(hgt-0.5)+" Z";
+    line = "M"+pts.join(" L");
+    area = line + " L"+w+","+(hgt-0.5)+" L0,"+(hgt-0.5)+" Z";
     svg = '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'" aria-hidden="true"><path class="area" d="'+area+'"/><path class="line" d="'+line+'"/></svg>';
   }
-  sparkCache.set(key, svg);
-  return svg;
+  const parts = {svg, area, line};
+  sparkCache.set(key, parts);
+  return parts;
 }
 function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK : ""; }
 
@@ -9970,7 +9998,8 @@ function appendDecisionEvent(event,board=state){
   }
   const rows=Array.isArray(board.decisionEvents)?board.decisionEvents:[];
   const key=JSON.stringify(event);
-  if(rows.some(row=>JSON.stringify(row)===key))return false;
+  // Equal text needs an equal ID, so the rest of a long log is not serialized.
+  if(rows.some(row=>row?.id===event.id&&JSON.stringify(row)===key))return false;
   board.decisionEvents=[...rows,JSON.parse(key)];return true;
 }
 function decisionEventOrder(board,baseline,lifecycle=false){
@@ -11955,6 +11984,86 @@ function bulkResultHTML(result){
   if(!result)return '';
   return '<p class="kv" role="status">Bulk edit requested for '+result.requested+' tasks: '+result.matched+' currently match in this tab; '+result.changed+' have different values or are no longer open. This is not a server save confirmation; check the sync status. '+(result.changed?'Check Settings recovery backups for displaced values. ':'')+'Header Undo reverses your last action and keeps unrelated progress.</p>';
 }
+/* #2313: rebuilding every row on every answer made thousands of elements per
+   answer for the engine to free later, the largest part of a long scan's memory
+   growth. An unchanged list keeps its elements: a changed row is redrawn alone,
+   a rank refresh only rewrites the rank column's values and rows only move when
+   their order changes. Anything else, such as bulk selection or a list that no
+   longer holds what was last drawn, redraws the whole list as before. */
+let listRowsDrawn=null;
+function rememberListRows(body,wanted,selecting){
+  const byId=new Map(wanted.map(row=>[row.id,row])),rows=new Map();
+  for(const element of body.children){
+    const row=byId.get(element.dataset.row);
+    if(row)rows.set(row.id,{rest:row.rest,spark:row.spark,summary:row.summary,element});
+  }
+  listRowsDrawn={body,selecting,rows};
+}
+function listRowsStillDrawn(body,selecting){
+  const drawn=listRowsDrawn;
+  if(selecting||!drawn||drawn.selecting||drawn.body!==body||!drawn.rows.size||drawn.rows.size!==body.childElementCount)return false;
+  for(const row of drawn.rows.values())if(row.element.parentNode!==body)return false;
+  return true;
+}
+function patchListRowRank(element,drawn,row){
+  if(!!drawn.spark!==!!row.spark||!!drawn.summary!==!!row.summary)return false;
+  if(row.spark&&drawn.spark.svg!==row.spark.svg){
+    const area=element.querySelector(".spark .area"),line=element.querySelector(".spark .line");
+    if(!area||!line||row.spark.area===null)return false;
+    area.setAttribute("d",row.spark.area);line.setAttribute("d",row.spark.line);
+  }
+  if(row.summary&&(drawn.summary.title!==row.summary.title||drawn.summary.label!==row.summary.label||drawn.summary.fill!==row.summary.fill)){
+    const tk=element.querySelector(".tk"),label=element.querySelector(".tkl"),bar=element.querySelector(".tkbar i");
+    if(!tk||!label||!bar)return false;
+    tk.setAttribute("title",row.summary.title);label.textContent=row.summary.label;bar.setAttribute("style","width:"+row.summary.fill+"%");
+  }
+  return true;
+}
+/* A rank refresh after an answer only redraws noise: fresh Monte Carlo samples
+   for every row and reshuffled ties. Scanning fast is when that piles up, so
+   while answers keep coming the rows an answer really changed are drawn at once
+   and the rank column and order catch up at most once a second. */
+const LIST_RANK_REFRESH_MS=1000;
+let listRanksDeferred=false,listRankRefreshTimer=null;
+function refreshListRanks(){
+  listRankRefreshTimer=null;
+  if(state?.listOpen&&!openingRecoveryHeld)renderList();
+}
+function drawListRows(body,wanted,selecting,deferRanks,emptyHTML){
+  if(!deferRanks&&listRankRefreshTimer!==null){clearTimeout(listRankRefreshTimer);listRankRefreshTimer=null;}
+  if(!wanted.length||!listRowsStillDrawn(body,selecting)){
+    body.innerHTML=wanted.map(row=>row.html).join("")||emptyHTML;
+    rememberListRows(body,wanted,selecting);
+    return;
+  }
+  const rows=listRowsDrawn.rows,ids=new Set(wanted.map(row=>row.id)),parser=document.createElement("template");
+  for(const [id,row] of rows)if(!ids.has(id)){row.element.remove();rows.delete(id);}
+  if(deferRanks){
+    for(const row of wanted){
+      if(row.unchanged)continue;
+      parser.innerHTML=row.html;
+      const element=parser.content.firstElementChild,drawn=rows.get(row.id);
+      if(drawn)drawn.element.replaceWith(element);else body.appendChild(element);
+      rows.set(row.id,{rest:row.rest,spark:row.spark,summary:row.summary,element});
+    }
+    if(listRankRefreshTimer===null)listRankRefreshTimer=setTimeout(refreshListRanks,LIST_RANK_REFRESH_MS);
+    return;
+  }
+  let cursor=body.firstElementChild;
+  for(const row of wanted){
+    const drawn=rows.get(row.id);
+    let element=drawn?.element;
+    if(!drawn||drawn.rest!==row.rest||!patchListRowRank(element,drawn,row)){
+      parser.innerHTML=row.html;
+      const next=parser.content.firstElementChild;
+      if(element){element.replaceWith(next);if(cursor===element)cursor=next;}
+      element=next;
+    }
+    element.classList.remove("flash");   // a redrawn row never kept its highlight
+    if(element===cursor)cursor=cursor.nextElementSibling;else body.insertBefore(element,cursor);
+    rows.set(row.id,{rest:row.rest,spark:row.spark,summary:row.summary,element});
+  }
+}
 function renderList(){
   const view=allTasksView.read();
   const open=view.openTasks,shown=view.visibleTasks,selectedIds=new Set(view.selectedIds),selecting=view.selecting;
@@ -11971,7 +12080,7 @@ function renderList(){
   const savedScroll = body.scrollTop;   // every commit() rebuilds this from scratch — without this, any
   body.hidden = !state.listOpen;        // unrelated action (dotting, toggling a context) snaps it to the top
   toolbar.hidden = !state.listOpen;
-  if(!state.listOpen){ body.innerHTML=""; toolbar.innerHTML=""; return; }
+  if(!state.listOpen){ body.innerHTML=""; toolbar.innerHTML=""; listRowsDrawn=null; return; }
 
   const listMetric=state.settings.listMetric;
   const selectionStats=listMetric==="chance"?chanceDisplayStats():null;
@@ -12007,25 +12116,31 @@ function renderList(){
   const showTopK = featureEnabled("topKLanguage");
   const byId=new Map(state.tasks.map(t=>[t.id,t]));
   const rankColumns = showSparklines ? (showTopK ? "rank-both" : "rank-spark") : (showTopK ? "rank-topk" : "rank-none");
-  let html = "";
+  const showRank = showSparklines||showTopK;
+  // An answer changes a few rows; rank noise changes all of them (#2313).
+  const deferRanks = listRanksDeferred&&listRowsStillDrawn(body,selecting);
+  const wanted = [];
   for(const t of rows){
-    const summary=showTopK?taskSelectionSummary(t,selectionStats,listMetric):null;
     const facts=boardPresentation.rowFacts(state,t,{inChain,act,byId,nextDotted});
     const selected=selectedIds.has(t.id),rankTag=selecting?'span':'div';
     const selectionAttrs=' data-act="bulk-toggle" data-id="'+esc(t.id)+'" aria-pressed="'+selected+'" aria-label="'+(selected?'Deselect ':'Select ')+esc(t.title)+'"';
-    const rankContent=(showSparklines ? sparkSVG(t.id, 88, 22) : '')
+    const fields={task:t,rankColumns,...facts,
+      titleAttrs:selecting&&!showRank?selectionAttrs:' data-act="edit" data-id="'+esc(t.id)+'"',url:safeUrl(t.url),chips:chipHTML(t)};
+    const rest=boardPresentation.taskRow(fields);
+    if(deferRanks&&listRowsDrawn.rows.get(t.id)?.rest===rest){wanted.push({id:t.id,rest,unchanged:true});continue;}
+    const summary=showTopK?taskSelectionSummary(t,selectionStats,listMetric):null;
+    const spark=showSparklines ? sparkParts(t.id, 88, 22) : null;
+    const rankContent=(spark ? spark.svg : '')
       +(showTopK ? '<'+rankTag+' class="tk" title="'+esc(summary.title)+'"><span class="tkl">'+esc(summary.label)+'</span><'+rankTag+' class="tkbar"><i style="width:'+summary.fill+'%"></i></'+rankTag+'></'+rankTag+'>' : '');
     const rankSummary=(showSparklines||showTopK)
       ? selecting
         ? '<button type="button" class="rank-summary bulk-rank-toggle"'+selectionAttrs+'><span class="bulk-rank-original" aria-hidden="'+selected+'">'+rankContent+'</span>'+(selected?'<span class="tk bulk-rank-selected"><span class="tkl">Selected</span></span>':'')+'</button>'
         : '<div class="rank-summary">'+rankContent+'</div>'
       : '';
-    html += boardPresentation.taskRow({task:t,rankColumns,rankSummary,...facts,
-      titleAttrs:selecting&&!rankSummary?selectionAttrs:' data-act="edit" data-id="'+esc(t.id)+'"',url:safeUrl(t.url),chips:chipHTML(t),
-    });
+    wanted.push({id:t.id,html:boardPresentation.taskRow({...fields,rankSummary}),rest,spark,summary});
   }
   // "nothing here" and "nothing matching" are different problems with different fixes
-  body.innerHTML = html || (open.length
+  drawListRows(body,wanted,selecting,deferRanks,open.length
     ? '<div class="emptystate">No tasks match.<div style="margin-top:12px"><button class="btn subtle" data-act="clear-list-filters">Clear filters</button></div></div>'
     : '<div class="emptystate">No open tasks.</div>');
   // Separate from the task scroller so actions remain at the pane bottom at any row.

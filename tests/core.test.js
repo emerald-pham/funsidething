@@ -39262,6 +39262,24 @@ test('RISK numeric responsiveness: optimized sampling and cold display preserve 
  const tasks=[{id:'a',mu:25,sigma:8},{id:'b',mu:26,sigma:7}];ctx.chanceWeight=task=>task.id==='a'?.25:.75;assert.deepEqual([...ctx.chanceDisplayWeights(tasks)].map(([id,weight])=>[id,weight]),[['a',.25],['b',.75]],'a replacement calculator retains its existing fallback');
 });
 
+// #2313: a rank refresh overwrites the previous refresh's arrays. Whatever those
+// arrays held, the result is the one a refresh with new arrays would return, and
+// a refresh of a different size cannot reuse them.
+test('RISK numeric responsiveness: a rank refresh reusing the previous refresh arrays returns exactly what new arrays would',async t=>{
+ const app=await loadApp({seed:2313});t.after(()=>app.dispose());const {ctx}=app;
+ const draw=(items,reuse)=>{
+  vm.runInContext('globalThis.refreshDraws=0;globalThis.refreshSequence=[.125,.625,.25,.875,.375,.75];Math.random=function(){return refreshSequence[refreshDraws++%refreshSequence.length];};_spare=null',ctx);
+  return ctx.rankStats(items,7,reuse);
+ };
+ const view=stats=>[...stats].map(([id,row])=>({id,hist:[...row.hist],cdf:[...row.cdf],topK:row.topK,n:row.n}));
+ const items=Array.from({length:5},(_,i)=>({id:'refresh-'+i,mu:25+i*2,sigma:3+i}));
+ const earlier=draw(items.map((item,i)=>({...item,mu:40-i*7,sigma:1+i})));
+ assert.notDeepEqual(view(earlier),view(draw(items)),'the earlier refresh left different values in its arrays');
+ assert.deepEqual(view(draw(items,earlier)),view(draw(items)),'reused arrays hold exactly the new refresh');
+ const fewer=items.slice(0,4);
+ assert.deepEqual(view(draw(fewer,draw(items))),view(draw(fewer)),'a different task count gets arrays of its own size');
+});
+
 test('RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements',async t=>{
  const app=await loadApp({seed:317});t.after(()=>app.dispose());const {ctx}=app;
  const texts=['','a','history:[["task-a",25,8,true],250]','\u0000😀café\ud800','history:'+('task-25,8,true;'.repeat(4096))];

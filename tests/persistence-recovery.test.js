@@ -1163,12 +1163,14 @@ test('RISK large board opening browser: with normal motion, a large saved board 
 // multiple of the board size. Growth compares each run against its own settled
 // scanning board, so a machine's absolute baseline does not matter.
 const LONG_SCAN_ANSWERS=60,LONG_SCAN_PACE_MS=150,LONG_SCAN_FIXED_MARGIN=80*1024*1024,LONG_SCAN_BYTES_FACTOR=16;
+const LONG_SCAN_ROWS_PER_ANSWER=4,LONG_SCAN_RANK_BUFFERS_PER_ANSWER=8;
 test('RISK long scan memory browser: Undo adds no more than a small multiple of the board size to 60 answers on a large saved board, keeps 30 steps, and still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fixture=await largeBoardFixture(),{stats}=fixture,allowance=LONG_SCAN_FIXED_MARGIN+LONG_SCAN_BYTES_FACTOR*stats.serializedBytes;
  assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
  const mib=bytes=>Math.round(bytes/1048576),observed=[],failures=[];
  for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  let longScanWork=null,longScanStarted=0,longScanSeconds=0;
   const scan=async undoCaptured=>{
    const label=undoCaptured?'undo':'control',profile=fs.mkdtempSync(path.join(os.tmpdir(),`chain-2311-${engineName}-${label}-`)),tag=`chain-2311-${engineName}-${label}-${process.pid}-${Date.now()}`;
    const launch=async(runTag,seed)=>{
@@ -1198,6 +1200,15 @@ test('RISK long scan memory browser: Undo adds no more than a small multiple of 
      await page.waitForFunction(()=>!!state.candidateId,null,{timeout:30000});
      await page.waitForTimeout(3000);
      const settledSampler=webProcessMemorySampler(tag);await page.waitForTimeout(3000);const settled=await settledSampler.stop();
+     // #2313: counted at the platform boundary, so the assertion is about work
+     // the page does rather than how the app arranges it. A row element counts
+     // once, the first time it joins the list; a row that only moves is not new.
+     if(undoCaptured)await page.evaluate(()=>{
+      const work=window.__longScanWork={rows:0,placed:0,floatArrays:0},seen=new WeakSet(document.querySelectorAll('#listBody [data-row]'));
+      new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1&&node.matches('[data-row]')){work.placed++;if(!seen.has(node)){seen.add(node);work.rows++;}}}).observe(document.getElementById('listBody'),{childList:true});
+      window.Float32Array=new Proxy(window.Float32Array,{construct(target,args,newTarget){work.floatArrays++;return Reflect.construct(target,args,newTarget);}});
+     });
+     if(undoCaptured)longScanStarted=Date.now();
      const sampler=webProcessMemorySampler(tag);let memory,answered=0,last=null;
      try{
       for(let guard=0;answered<LONG_SCAN_ANSWERS&&guard<LONG_SCAN_ANSWERS*3;guard++){
@@ -1215,6 +1226,13 @@ test('RISK long scan memory browser: Undo adds no more than a small multiple of 
      }finally{memory=await sampler.stop();}
      assert.equal(answered,LONG_SCAN_ANSWERS,`${engineName} ${label}: every answer was accepted`);
      if(undoCaptured){
+      longScanSeconds=(Date.now()-longScanStarted)/1000;
+      longScanWork=await page.evaluate(()=>new Promise(resolve=>setTimeout(()=>resolve({...window.__longScanWork}),0)));
+      // What the kept rows now show is exactly what a fresh list would draw.
+      const list=()=>page.evaluate(()=>document.getElementById('listBody').innerHTML);
+      const kept=await list();
+      await page.evaluate(()=>{onAction('toggle-list',{dataset:{}});onAction('toggle-list',{dataset:{}});});
+      assert.equal(await list(),kept,`${engineName}: the list kept through 60 answers matches a freshly drawn list`);
       // Undo still reaches its limit and reverses only the newest answer.
       assert.equal(await page.evaluate(()=>undoStack.length),30,`${engineName}: 60 answers keep the 30-step Undo limit`);
       await page.evaluate(()=>undo());
@@ -1231,6 +1249,17 @@ test('RISK long scan memory browser: Undo adds no more than a small multiple of 
   const summary={engine:engineName,controlGrowthMiB:mib(control.growth),undoGrowthMiB:mib(undo.growth),addedByUndoMiB:mib(added),allowanceMiB:mib(allowance),settledPeakMiB:mib(undo.settled),answersPeakMiB:mib(undo.peak)};
   observed.push(summary);t.diagnostic(JSON.stringify(summary));
   if(added>allowance)failures.push(`${engineName}: Undo added ${mib(added)} MiB to 60 answers, above the ${mib(allowance)} MiB allowance`);
+  // #2313 (seam agreed in #2308): the whole scan, not only Undo's part of it.
+  if(undo.growth>allowance)failures.push(`${engineName}: 60 answers grew web process memory by ${mib(undo.growth)} MiB, above the ${mib(allowance)} MiB allowance`);
+  // Each answer changes a few tasks: only those rows may be drawn from scratch,
+  // and a rank refresh reuses its per-task buffers instead of allocating more.
+  t.diagnostic(JSON.stringify({engine:engineName,work:longScanWork}));
+  if(longScanWork.rows>LONG_SCAN_ANSWERS*LONG_SCAN_ROWS_PER_ANSWER)failures.push(`${engineName}: 60 answers drew ${longScanWork.rows} list rows from scratch, above ${LONG_SCAN_ANSWERS*LONG_SCAN_ROWS_PER_ANSWER}`);
+  // Rows reshuffled by a rank refresh: at most about one whole-list pass per
+  // second of scanning, however fast the answers come. A rate of work, not a speed.
+  const placedAllowed=Math.ceil(LARGE_BOARD_SHAPE.tasks*(longScanSeconds+2));
+  if(longScanWork.placed>placedAllowed)failures.push(`${engineName}: 60 answers placed ${longScanWork.placed} list rows, above ${placedAllowed} for a ${Math.round(longScanSeconds)} second scan`);
+  if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 });
