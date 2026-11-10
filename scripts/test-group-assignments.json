@@ -1089,6 +1089,14 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery",
+      "currentRoot": "RISK cloud source recovery drafts: Settings shows the saved values after native review cancel delayed reads and confirmed recovery",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 review round (parent #2298): with no Save settings button every field saves when committed, so returning to Settings from a recovery review shows the saved values rather than a repainted draft; the same three outcomes run, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }
