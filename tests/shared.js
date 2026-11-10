@@ -2309,6 +2309,27 @@ function hydrateUnchangedEditorDraft(app,id){
  return task;
 }
 
+// #221 review: the Node shim keeps the scan panel as markup text. This gives
+// it the part of a DOM that focus moves through: the buttons the app drew
+// last, in order, each a control that can take focus. A control stays the
+// same object until the panel is drawn again, and any selector returns every
+// button, as the panel's controls are all buttons.
+function scanPanelDom221(shim){
+ const scan=shim.document.getElementById('scan');
+ let drawn=null,controls=[];
+ const parse=markup=>[...String(markup).matchAll(/<button\b([^>]*)>/g)].map(([,attributes])=>{
+  const bare=attributes.replace(/"[^"]*"/g,'""'),flag=name=>new RegExp('\\s'+name+'(?=[\\s=]|$)').test(bare);
+  const classes=(attributes.match(/\sclass="([^"]*)"/)?.[1]||'').split(/\s+/).filter(Boolean),dataset={};
+  for(const [,name,value] of attributes.matchAll(/\sdata-([a-z-]+)="([^"]*)"/g))dataset[name.replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase())]=value;
+  const control={tagName:'BUTTON',dataset,disabled:flag('disabled'),hidden:flag('hidden'),
+   classList:{contains:name=>classes.includes(name)},closest:()=>control,focus(){shim.document.activeElement=control;}};
+  return control;
+ });
+ const current=()=>{if(scan.innerHTML!==drawn){drawn=scan.innerHTML;controls=parse(drawn);}return controls;};
+ scan.querySelectorAll=()=>current();
+ return {controls:current,find:predicate=>current().find(predicate)};
+}
+
 /* The weeks-old copy sitting in the stale browser. */
 const STALE_CHAIN = ["t_old"];
 const staleState = (updatedAt) => syncState({
@@ -3991,3 +4012,4 @@ export {
   settleRecoveryOperations188, retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
   replaceIndependentServerPayload263,
 };
+export { scanPanelDom221 };

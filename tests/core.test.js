@@ -58,6 +58,7 @@ import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
 import { backupRowsWithText } from "./shared.js";
+import { scanPanelDom221 } from "./shared.js";
 
 // #2281 CI: node:test keeps every finished test with its subtests and hooks,
 // so a hook or subtest that closed over an app kept that app's realm until the
@@ -12522,6 +12523,154 @@ test("UI #221: a repeated Return is one return and one Undo step, and a stale Re
   assert.equal(ctx.cloudPayload(), done, "the stale control neither reopens the finished task nor changes anything else");
   assert.equal(readConst(ctx, "undoStack.length"), doneSteps);
   assert.equal(ctx.state.tasks.find(task => task.id === bench.id).done, true);
+});
+
+// #221 review: where focus goes when the editor closes. A person presses a
+// control in the scan panel, which takes focus, and the editor opens; then a
+// control in the editor takes focus, and closing the editor removes it.
+const openFromScan221 = (ctx, shim, predicate, what) => {
+  const panel = scanPanelDom221(shim), control = panel.find(predicate);
+  assert.ok(control, `the scan panel offers ${what}`);
+  shim.document.activeElement = control;
+  ctx.onAction(control.dataset.act, control);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /Edit task/, `${what} opens the editor`);
+  return panel;
+};
+const editorControl221 = (act, id) => ({ dataset: { act, id }, classList: { contains: () => false }, matches: () => false });
+const closeEditor221 = (ctx, shim, route, id) => {
+  const pressed = editorControl221(route === "Save" ? "save-edit" : "close-modal", id);
+  shim.document.activeElement = pressed;
+  if (route === "Cancel") ctx.onAction("close-modal", pressed);
+  else if (route === "the backdrop") shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: name => name === "mback" } } });
+  else if (route === "Escape") {
+    const query = shim.document.querySelector;
+    shim.document.querySelector = selector => selector === ".mback" ? (shim.elements.get("modalRoot").innerHTML ? {} : null) : query(selector);
+    try { shim.document.dispatchEvent({ type: "keydown", key: "Escape", target: pressed }); } finally { shim.document.querySelector = query; }
+  } else {
+    keepEditorValues(ctx, shim, id);
+    ctx.onAction("save-edit", { dataset: { id } });
+  }
+};
+const pressInEditor221 = (ctx, shim, act, id) => {
+  keepEditorValues(ctx, shim, id);
+  const pressed = editorControl221(act, id);
+  shim.document.activeElement = pressed;
+  ctx.onAction(act, pressed);
+};
+const focusedScanControl221 = (shim, panel) => {
+  const focused = shim.document.activeElement;
+  return { inPanel: panel.controls().includes(focused), act: focused?.dataset?.act, id: focused?.dataset?.id, pill: !!focused?.classList?.contains("crumb") };
+};
+
+test("UI #221: closing the editor a chain pill opened gives focus back to that pill, however the editor closes", async t => {
+  for (const route of ["Cancel", "the backdrop", "Escape", "Save"]) await t.test(route, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2226 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+
+    closeEditor221(ctx, shim, route, middle.id);
+    await flush();
+
+    assert.equal(shim.elements.get("modalRoot").innerHTML, "", "precondition: the editor closed");
+    assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: middle.id, pill: true }, "the pill the editor came from has focus");
+  });
+});
+
+test("UI #221: when the control the editor came from is gone, focus goes to Edit on the benchmark card, and with no dot left to the first control of the scan panel", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2227 });
+  const first = ctx.addTask("First dot", true), middle = ctx.addTask("Middle dot", true), bench = ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+
+  let panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+  pressInEditor221(ctx, shim, "return-candidate", middle.id);
+  await flush();
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: bench.id, pill: false }, "a returned older dot has no pill, so Edit on the benchmark card");
+
+  const benchmarkEdit = id => control => control.dataset.act === "edit" && control.dataset.id === id && !control.classList.contains("crumb");
+  panel = openFromScan221(ctx, shim, benchmarkEdit(bench.id), "Edit on the benchmark card");
+  pressInEditor221(ctx, shim, "return-candidate", bench.id);
+  await flush();
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: first.id, pill: false }, "a returned benchmark's card now shows the newest remaining dot: its Edit");
+
+  panel = openFromScan221(ctx, shim, benchmarkEdit(first.id), "Edit on the benchmark card");
+  pressInEditor221(ctx, shim, "return-candidate", first.id);
+  await flush();
+  const offered = panel.controls().find(control => !control.disabled && !control.hidden);
+  assert.equal(offered?.dataset.act, "start-scan", "precondition: with no dot left the scan panel offers Start scanning first");
+  assert.equal(shim.document.activeElement, offered, "the first control the scan panel offers has focus");
+});
+
+test("UI #221: when Done or Delete in the editor a pill opened takes the pill away, Edit on the benchmark card has focus", async t => {
+  for (const [route, act] of [["Done", "done-task"], ["Delete", "delete-task"]]) await t.test(route, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2230 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true), bench = ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+
+    pressInEditor221(ctx, shim, act, middle.id);
+    await flush();
+
+    assert.equal(ctx.state.chain.includes(middle.id), false, `precondition: ${route} took the dot off the chain`);
+    assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: bench.id, pill: false });
+  });
+});
+
+test("UI #221: an editor opened from the candidate card gives focus back to its Edit, and after Dot to Edit on the benchmark card", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2228 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.addTask("Another candidate", false);
+  ctx.render();
+  const candidate = ctx.state.candidateId;
+  assert.ok(candidate, "precondition: a candidate is showing");
+  const candidateEdit = control => control.dataset.act === "edit" && control.dataset.id === candidate && !control.classList.contains("crumb");
+
+  let panel = openFromScan221(ctx, shim, candidateEdit, "Edit on the candidate card");
+  closeEditor221(ctx, shim, "Cancel", candidate);
+  await flush();
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: candidate, pill: false }, "Edit on the candidate card has focus again");
+
+  panel = openFromScan221(ctx, shim, candidateEdit, "Edit on the candidate card");
+  pressInEditor221(ctx, shim, "dot-task", candidate);
+  await flush();
+  assert.equal(ctx.state.chain.at(-1), candidate, "precondition: Dot made the candidate the benchmark");
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: candidate, pill: false }, "the candidate card's Edit is gone, so Edit on the benchmark card");
+  assert.notEqual(ctx.state.candidateId, candidate);
+});
+
+test("UI #221: an editor opened from All Tasks or with the e shortcut leaves focus where it was when it closes", async t => {
+  for (const opener of ["All Tasks", "the e shortcut"]) await t.test(opener, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2229 });
+    ctx.addTask("First dot", true);
+    const bench = ctx.addTask("Benchmark dot", true);
+    ctx.render();
+    const panel = scanPanelDom221(shim);
+    if (opener === "All Tasks") {
+      const title = editorControl221("edit", bench.id);   // a task title in All Tasks, outside the scan panel
+      shim.document.activeElement = title;
+      ctx.onAction("edit", title);
+    } else {
+      shim.document.activeElement = null;
+      shim.document.dispatchEvent({ type: "keydown", key: "e", target: { matches: () => false } });
+    }
+    assert.match(shim.elements.get("modalRoot").innerHTML, /Edit task/, "precondition: the editor opens");
+
+    const pressed = editorControl221("close-modal", bench.id);
+    shim.document.activeElement = pressed;
+    ctx.onAction("close-modal", pressed);
+    await flush();
+
+    assert.equal(shim.document.activeElement, pressed, "focus is left as it was");
+    assert.equal(panel.controls().includes(shim.document.activeElement), false, "nothing in the scan panel takes it");
+  });
 });
 
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
