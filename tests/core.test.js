@@ -535,7 +535,7 @@ test('RISK offline repair guidance: help distinguishes a working workspace cloud
  assert.match(help,/original sources remain protected/i,'a new workspace is not described as a recovered empty board');
  assert.match(help,/repair a damaged cloud board from complete retained cloud copies/i);
  assert.match(help,/does not confirm edits still waiting on this device/i,'server repair and local edit acknowledgement remain separate');
- assert.match(help,/one Restore action: choose a JSON file or Paste JSON/i,'automatic repair retains the established deliberate Restore route');
+ assert.match(help,/one Restore action: choose a file or paste board data/i,'automatic repair retains the established deliberate Restore route');
 });
 
 test('RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving',async t=>{
@@ -32091,6 +32091,28 @@ test('RISK daily backup retention adoption copy: a manual backup of the same boa
 
 // #2254 (owner rule): Settings, Help and the November 6 changelog say what
 // the rule keeps. Every Help answer keeps the 130-word limit.
+// #2303: what left Settings is in the Data and backups FAQ, and the current
+// changelog describes the simpler Settings.
+test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved sync, retention and error explanations within 130 words, and the current changelog describes the simpler Settings',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const data=markup.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('</details>')[0]||'';
+ const answer=question=>data.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer('When does cloud sync check for changes?'),/Cloud sync refreshes on load, when you return, and when another device saves\. Independent decisions combine; conflicting current choices use when each choice was made\. Drafts and pressed controls wait until you finish\./);
+ assert.match(answer('How long do backups stay on this device?'),/Daily copies stay on this device for today and the two calendar days before it/);
+ assert.match(answer('When are old backups cleaned up?'),/Cleanup waits if the board or backup list changes or storage refuses the write\./);
+ assert.match(answer('How do Settings save?'),/Every setting saves as soon as you change it[\s\S]*returns to the last valid value/);
+ assert.match(answer('What can I do if a save or sync fails?'),/Recent sync errors, in the Debug log under Troubleshooting,/);
+ const words=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].filter(m=>m[2].replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length>130).map(m=>m[1]);
+ assert.deepEqual(words,[],'every Help answer stays within the 130-word limit');
+ assert.doesNotMatch(data,/Download recovery file|Save settings is at the bottom|Paste JSON/,'the FAQ names the controls Settings now shows');
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('</ul>')[0]||'';
+ assert.match(current,/<li>Settings is much shorter\./,'the newest changelog entry describes the simpler Settings');
+ assert.match(current,/Every setting now saves as soon as you change it, and a number out of range returns to the last valid one\./);
+ assert.match(current,/Download backup/);assert.match(current,/Download board only/);assert.match(current,/Troubleshooting/);
+});
+
 test('RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
@@ -38307,7 +38329,7 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
  const help=source.shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended Data and backups FAQ explains pasted recovery');
  assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ keeps its word limit');
- assert.match(faq,/Settings → Data and backups → Restore.*choose Paste JSON.*select Restore/,'the FAQ names the consolidated Settings route');
+ assert.match(faq,/Settings → Data and backups → Restore, then choose Paste board data/,'#2303: the FAQ names the consolidated Settings route, with paste chosen inside Restore');
  assert.match(faq,/separate from Review saved decisions.*combines device and cloud choices/,'the FAQ distinguishes snapshot restore from held-cloud choice merging');
 });
 

@@ -4055,7 +4055,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
     appSources:{localStorage:[],indexedDB:{database:'chain-scanner-v2',stores:{meta:[],snapshots:[],
       backups:[{key:{type:'string',value:'pending-upload'},value:{type:'object',value:{task:{id:'pending-queue-task',title:'Pending queue task'}}}}],opaque:[]}}}};
   const archiveBytes=new TextEncoder().encode(JSON.stringify(archive,null,2)),archiveFile=new File([archiveBytes],'recovery <archive>.json',{type:'application/json'});
-  await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,1);
+  await reopened.ctx.onAction(reopenedAction[1],{});await reopened.ctx.onAction('choose-backup-file',{});assert.equal(archivePickerOpens,1);
   let archivePreview;
   await t.test('file selection stays pending until its real exact-byte read completes',async()=>{
     const read=archiveFile.arrayBuffer.bind(archiveFile);
@@ -4091,7 +4091,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   const heldHead=await reopenedStore.readHead(),incomplete={...archive,manifest:{...archive.manifest,status:'partial',failures:[{source:'indexedDB.backups',status:'error'}]}};
   const incompleteFile=new File([JSON.stringify(incomplete)],'incomplete.json',{type:'application/json'});
-  const pickerBefore=archivePickerOpens;await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,pickerBefore+1);
+  const pickerBefore=archivePickerOpens;await reopened.ctx.onAction(reopenedAction[1],{});await reopened.ctx.onAction('choose-backup-file',{});assert.equal(archivePickerOpens,pickerBefore+1);
   const priorToast=reopened.shim.document.getElementById('toast').textContent;reopened.shim.document.getElementById('toast').textContent='';
   await selectReopenedFile(incompleteFile,{accepted:false});
   for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('toast').textContent.includes('incomplete');attempt++)await flush();
