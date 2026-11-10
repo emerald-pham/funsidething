@@ -5038,6 +5038,26 @@ test('RISK backup list memory: an ordinary save lists its own automatic copy fro
  assert.equal(manualRow.payloadFacts.readable,true);assert.notEqual(manualRow.payloadFacts.incomplete,true,'the skipped description is filled in when another row needs it');
 });
 
+test('RISK backup list memory: the older browser backup list is compared by hash without keeping its text, so a mirrored row merges and a different one stays listed',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-legacy-hashes-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage}),{ctx,shim}=app;t.after(()=>app.dispose?.());
+ ctx.addTask('Board in the mirrored backup');assert.equal(await ctx.persist(),true);
+ const board=JSON.stringify(ctx.state),manual=await ctx.saveDurableBackup('manual',board);assert.ok(manual?.id);
+ const conflict=await ctx.saveDurableBackup('manual',board+' ');assert.ok(conflict?.id);
+ const identity=row=>({id:row.id,day:row.day,at:row.at,kind:row.kind});
+ const differentText=JSON.stringify({...JSON.parse(board),updatedAt:7});
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{...identity(manual),payload:board},{...identity(conflict),payload:differentText}]));
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ const held=vm.runInContext(`(()=>{const out=[],walk=value=>{if(typeof value==="string")out.push(value);else if(value instanceof Map)for(const [k,v]of value){walk(k);walk(v);}else if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==="object")Object.values(value).forEach(walk);};walk(legacyBackupHashes);return out;})()`,ctx);
+ assert.ok(held.length>0,'the comparison holds what it needs');
+ assert.deepEqual(Array.from(held).filter(text=>text.length>128).map(text=>text.length),[],'no raw index or backup text is kept');
+ ctx.openSettings();
+ const shown=Array.from(vm.runInContext('backupRowsShown',ctx));
+ assert.equal(shown.filter(row=>row.id===manual.id).length,1,'the exact mirror of a device backup is listed once');
+ assert.equal(shown.filter(row=>row.id===conflict.id).length,2,'a browser row with different bytes under the same ID stays listed beside the device row');
+ assert.equal(shim.document.getElementById('modalRoot').innerHTML.match(/Duplicate backup ID/g)?.length,2,'and both of those are shown as a duplicate');
+});
+
 // #2308 review: before an account switch replaces the board, cloudPull finds the
 // previous board's safety copy by hash and reads its exact bytes back. These
 // drive that real pull with a real device store; only the read is interfered with.

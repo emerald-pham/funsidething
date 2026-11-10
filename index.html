@@ -3127,23 +3127,31 @@ function shownBackupRowReadable(row){
 }
 // Exact text hashes of the older browser backup list, so a device row can be
 // compared with its browser mirror while Settings draws without reading text.
-// Keyed by the browser row's own text, whose size that list's quota bounds.
-let legacyBackupHashes={raw:undefined,byText:new Map()};
+// Settings can only reach a hash synchronously, so each is filed under a cheap
+// fingerprint of its row's text. Neither the list nor the text stays in memory.
+let legacyBackupHashes={token:undefined,byFingerprint:new Map()};
+function legacyBackupFingerprint(text){return text.length+":"+chanceHash(text);}
 async function rememberLegacyBackupHashes(){
   try{
-    const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
-    if(raw===legacyBackupHashes.raw)return;
-    const byText=new Map(),rows=raw===null?[]:parseBackupIndex(raw);
-    if(Array.isArray(rows))for(const row of rows)
-      if(typeof row?.payload==="string"&&!byText.has(row.payload))byText.set(row.payload,await ChainStorageV2.hashPayload(row.payload));
-    legacyBackupHashes={raw,byText};
+    // Runs after every save, so it looks at the end of the list, where changes
+    // land, rather than hashing it all. A rare miss only leaves a duplicate
+    // row listed: entries are filed by content, so a stale one can't mismatch.
+    const raw=localStorage.getItem(LOCAL_BACKUPS_KEY),token=raw===null?null:raw.length+"/"+legacyBackupFingerprint(raw.slice(-4096));
+    if(token===legacyBackupHashes.token)return;
+    const byFingerprint=new Map(),rows=raw===null?[]:parseBackupIndex(raw);
+    if(Array.isArray(rows))for(const row of rows)if(typeof row?.payload==="string"){
+      const fingerprint=legacyBackupFingerprint(row.payload),hash=await ChainStorageV2.hashPayload(row.payload);
+      // Two different texts sharing a fingerprint are left unknown, not guessed.
+      byFingerprint.set(fingerprint,byFingerprint.has(fingerprint)&&byFingerprint.get(fingerprint)!==hash?null:hash);
+    }
+    legacyBackupHashes={token,byFingerprint};
   }catch(e){}
 }
 // Whether two rows hold the same bytes. Without a known hash it answers no,
 // so an unmatched browser row simply stays listed.
 function backupRowsSamePayload(a,b){
   if(typeof a?.payload==="string"&&typeof b?.payload==="string")return a.payload===b.payload;
-  const hashOf=row=>row?.payloadHash??(typeof row?.payload==="string"?legacyBackupHashes.byText.get(row.payload):undefined);
+  const hashOf=row=>row?.payloadHash??(typeof row?.payload==="string"?legacyBackupHashes.byFingerprint.get(legacyBackupFingerprint(row.payload)):undefined);
   const left=hashOf(a),right=hashOf(b);
   return typeof left==="string"&&left===right;
 }
