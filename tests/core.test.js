@@ -31223,17 +31223,17 @@ test('Delete red backups: Help, Settings and the changelog say what the button d
  assert.match(answer,/Delete N backups older than seven days appears beside Make manual backup/,'it names the button as drawn, with its count');
  assert.match(answer,/When at least one of them can be deleted this way/,'it does not promise the button for red backups it would leave');
  assert.match(answer,/asks once/);assert.match(answer,/how many were deleted and how many were kept, and why/);
- assert.match(answer,/leaves unreadable backups, pending choices and copies a recovery has pinned/);
+ assert.match(answer,/leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned/);
  assert.match(answer,/kept until you delete it is deleted like any other/,'it says the keep-until-deleted copies are included');
  assert.match(answer,/waits while a recovery is unsettled and stops if one begins/);
  assert.match(answer,/cannot be brought back/);assert.match(answer,/current board is not changed/);
  assert.doesNotMatch(answer,/every red backup|protected copies/,'the two inaccurate phrases are gone');
  const changelog=help.match(/<h3>November 10, 2026<\/h3><ul>(.*?)<\/ul>/)?.[1]||'';
  assert.match(changelog,/delete backups older than seven days with one button/);
- assert.match(changelog,/leaves unreadable backups, pending choices and copies a recovery has pinned/);
+ assert.match(changelog,/leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned/);
  assert.doesNotMatch(changelog,/delete every backup|protected copies/);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/When readable backups are older than seven days, one button here deletes them after a single confirmation\. It leaves unreadable backups, pending choices and copies a recovery has pinned\./);
+ assert.match(settings,/When readable backups are older than seven days, one button here deletes them after a single confirmation\. It leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned\./);
 });
 
 // Passed on its first run: the per-row Delete reads the stored backup again
@@ -31350,6 +31350,28 @@ test('RISK delete red backups: when the device store stays unreadable after a de
  store.listBackupFacts=list;
  assert.equal((await fixture.ids()).filter(id=>/-old$/.test(id)).length,1,'exactly one red backup was deleted');
  assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 1 backup was not deleted. The backup list could not be read, so deleting stopped.');
+});
+
+// Specialist review, blocking: a finished cloud recovery keeps a
+// decision-recovery-confirmed copy as its record. Later cloud saves read that
+// record to know the incident is over; with it deleted, every save re-read the
+// whole recovery archive. The copies a recovery keeps are its records and
+// originals, so none of them is deleted in bulk.
+test('RISK delete red backups: the records and originals a recovery keeps are not counted or deleted in bulk, however old',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),row=(id,kind,i)=>({id,kind,day:'2026-09-06',at:old-i*HOUR,payload});
+ const kept=['decision-recovery-confirmed','decision-recovery-superseded','decision-recovery-pending','decision-recovery-cloud','decision-recovery-device'].map((kind,i)=>row(kind,kind,i));
+ const asked=[];ctx.confirm=message=>{asked.push(message);return true;};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(kept));ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML),null,'recovery records alone offer no button');
+ const rows=[kept[0],kept[1],row('mine','manual',9),kept[2],kept[3],kept[4]];
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 1 backup older than seven days');
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(asked.length,1);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),JSON.stringify(kept),'every recovery record and original keeps its exact bytes and order');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days from this device.');
 });
 
 // Coverage limit: each recovery state is set on the loaded app directly, not

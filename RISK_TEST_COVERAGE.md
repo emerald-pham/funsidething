@@ -887,6 +887,7 @@ its RISK test; the map follows.
 - RISK delete red backups: a backup something else removes during the run is not reported as kept
 - RISK delete red backups: while the device store cannot be listed no button is offered, so a mirrored backup never loses only its older-list copy
 - RISK delete red backups: when the device store stays unreadable after a deletion the message does not claim the rest are still listed
+- RISK delete red backups: the records and originals a recovery keeps are not counted or deleted in bulk, however old
 - RISK delete red backups: while a recovery is unsettled the button is unavailable with its reason, a forced press deletes nothing, and each row keeps its own Delete
 - RISK fireworks occurrence: standalone sampled starts are exactly four times the original interval while duration odds budgets and festival timing stay intact
 - RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade
