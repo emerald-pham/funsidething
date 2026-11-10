@@ -991,6 +991,32 @@ test('RISK device save settle: the plain message stays until a later save verifi
  assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows the saved edits');
 });
 
+// A hidden tab runs no animation frames, yet its saves still finish. The frame
+// that would show the message can then arrive after a verified save cleared it.
+test('RISK device save settle: a message cleared by a verified save while the tab was hidden does not appear when it is shown again',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'hidden-clear',tasks:[syncTask('hidden-clear-anchor','Anchor'),syncTask('hidden-clear-mine','Mine'),syncTask('hidden-clear-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ const toast=f.shim.document.getElementById('toast'),shown=()=>toast.classList.contains('show')?toast.textContent:null;
+ const paused=[],running=vm.runInContext('requestAnimationFrame',f.ctx);
+ f.ctx.requestAnimationFrame=fn=>{paused.push(fn);return paused.length;};
+ t.after(()=>{f.ctx.requestAnimationFrame=running;});
+ f.beforeCommit=async()=>{commits++;await other.edit('hidden-clear-theirs','Other copy write '+commits);};
+ f.edit('hidden-clear-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false,'the save runs out of repairs while the tab is hidden');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save');
+ f.beforeCommit=null;
+ f.edit('hidden-clear-anchor','Next change here');
+ await f.settled('a verified save while hidden');
+ assert.equal(f.ctx.deviceSaveIssue(),null,'the verified save cleared the issue');
+ // The tab is shown again: the frames it missed run now.
+ f.ctx.requestAnimationFrame=running;for(const fn of paused.splice(0))fn();
+ await f.alive(new Promise(resolve=>setTimeout(resolve,50)));
+ assert.equal(shown(),null,'no save message appears once the save has been verified');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,9500)));
+ assert.equal(shown(),null,'nor later');
+});
+
 // The FAQ says: "If both copies changed the same thing, the saved board keeps
 // one version and Settings backups keep this tab's." Which version the board
 // keeps is the existing merge's choice; either way this tab's exact draft stays.
