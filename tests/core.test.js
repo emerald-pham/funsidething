@@ -12604,6 +12604,24 @@ test("UI #221: a later Yes on a returned task puts it back on the chain as the n
   assert.deepEqual(Array.from(reopened.ctx.state.chain), Array.from(ctx.state.chain), "and after a reload");
 });
 
+test("UI #221: Undo of a return shows in the task's History as Undo with no rating change, as Undo of a Yes does", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2236 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  returnFromPill(ctx, shim, "Middle dot");
+
+  ctx.onAction("undo", {});
+
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["First dot", "Middle dot"], "precondition: Undo put the dot back");
+  ctx.onAction("edit", { dataset: { id: middle.id } });
+  const rows = [...shim.elements.get("modalRoot").innerHTML.matchAll(/<li class="rating-event">[\s\S]*?<\/li>/g)].map(match => match[0]);
+  assert.match(rows[0] ?? "", /<summary><b>Undo<\/b>/, "the newest History row is the Undo");
+  assert.doesNotMatch(rows[0] ?? "", /Own rating changed/, "with no rating change");
+  assert.match(rows[1] ?? "", /<summary><b>Return as candidate<\/b>/, "and the return it reversed is the row before it");
+});
+
 // #221 review: where focus goes when the editor closes. A person presses a
 // control in the scan panel, which takes focus, and the editor opens; then a
 // control in the editor takes focus, and closing the editor removes it.
