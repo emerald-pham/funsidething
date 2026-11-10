@@ -819,7 +819,7 @@
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
-      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used the reveal action) retired the action this root exercised; the list-open choice through cloud adoption and reload stays covered by RISK saved view cloud adoption through the real All Tasks toggle, and the pill's new role is pinned by this root, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used the reveal action) retired the reveal action this root exercised, and no test replaces it: nothing reveals a task any more. This row only keeps the baseline root assigned in the core group; the current root it names does not test what the old root tested. The list-open choice the reveal also saved stays covered through cloud adoption and reload by RISK saved view cloud adoption, through the real All Tasks toggle."
     },
     {
       "baselineRoot": "RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal",
@@ -835,7 +835,7 @@
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
-      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired revealTask, whose filter clearing this root tested; reaching a task from the trail is now the pill-to-editor route this root pins, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired revealTask, whose filter clearing this root tested, and no test replaces it: nothing reveals a task any more, so no list filter has to give way. This row only keeps the baseline root assigned in the core group; the current root it names does not test what the old root tested."
     },
     {
       "baselineRoot": "Animation controls: revealing a task respects app and device reduced motion",
@@ -843,7 +843,7 @@
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
-      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired the reveal scroll whose motion choice this root tested; the trail pill's action is now the editor route and the return this root pins, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired the reveal scroll whose motion choice this root tested, and no test replaces it: nothing scrolls to a task any more. This row only keeps the baseline root assigned in the core group; the current root it names does not test what the old root tested."
     }
   ]
 }
