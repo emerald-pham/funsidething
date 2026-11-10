@@ -1289,6 +1289,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   // own. It's never reassigned though, so a one-time copy is fine here.
   vm.runInContext("this.esc = esc;", sandbox);
   await flush(); // let the boot IIFE's `await loadState()` resolve before returning
+  // #2309: a Debug log link holds the opening, so state stays null by design.
+  if(arguments[0]?.awaitStartup===false)return { ctx: sandbox, shim, dispose:fixture.dispose };
   if(indexedDBProvider){
     // Hashing and IndexedDB completion are not bounded by an event-loop count.
     // Await readiness with an explicit deadline so slowness cannot masquerade

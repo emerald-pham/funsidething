@@ -706,6 +706,47 @@ test('RISK rapid action durability: ten distinct actions remain pending through 
  const head=await store.readHead();await app.dispose();const reopened=await loadAppAtTime(at,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off',async pull(){return{error:true};},async push(){return{error:true};}})});apps.push(reopened);assertFacts(reopened.ctx.state);assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload);
 });
 
+// #2306: a save that had to be repaired over a head moved by another page merges
+// both pages' choices, and projecting the merged Start cleared the candidate. The
+// repaired board was drawn without dealing, leaving a chain with nothing to decide.
+test('RISK rapid action durability: answers repaired over another saved copy mid-sync still offer the next candidate with no extra tap',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='rapid-repair-'+Math.random(),at=Date.parse('2026-10-20T15:00:00Z');
+ const board=syncState({tasks:Array.from({length:24},(_,i)=>Object.assign(syncTask('repair-'+i,'Task '+i),{mu:50-i,sigma:5})),chain:[],candidateId:null,mode:'scan',scanMode:'descending',passId:'repair-pass',passStartedAt:0,snooze:100,syncAccount:'e@example.com',syncRev:4,syncDirty:false,updatedAt:at-HOUR,settings:{horizonMin:60,thresholdPct:0,samples:50,cantMin:30,workedHours:8,theme:'system'}}),raw=JSON.stringify(board),h=makeSyncHarness({remote:board,rev:4,delayMs:2});
+ const open=options=>loadAppAtTime(at,{indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:h.factory,...options});
+ const first=await open({seed:2306,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx,shim}=first,apps=[first];
+ t.after(async()=>{for(const item of apps){item.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',item.ctx);await item.dispose();}});
+ const until=async(predicate,label)=>{const end=performance.now()+10000;do{if(await predicate())return;await syncSettle(15);}while(performance.now()<end);assert.fail(label);};
+ const control=app=>({dataset:{candidate:app.ctx.state.candidateId,benchmark:app.ctx.state.chain.at(-1)}});
+ await ctx.cloudPull();ctx.onAction('start-scan',{dataset:{}});assert.equal(ctx.state.chain.length,1,'a real Start seeds this pass');ctx.cloudPushNow();await settleSavedViewPublication(first,h,'Start reaches the cloud');
+ const second=await open({seed:2307,sharedStorage:shim.localStorage});apps.push(second);await second.ctx.cloudPull();await settleSavedViewPublication(second,h,'second page matches the cloud');
+ const otherAnswer=control(second);second.ctx.onAction('no',otherAnswer);assert.equal(await second.ctx.persist(),true,'the other page moves the saved head');second.ctx.suspendCloudSync();
+ const events=()=>ctx.state.decisionEvents.filter(row=>row.kind!=='current-choice'),noControl=control(first);
+ ctx.onAction('no',noControl);const yesControl=control(first);assert.notEqual(yesControl.dataset.candidate,noControl.dataset.candidate,'the first answer deals the next candidate');
+ ctx.onAction('yes',yesControl);const mine=events().map(row=>row.id);assert.equal(mine.length,2,'both answers are accepted before the repair');
+ await until(()=>{const head=vm.runInContext('!cloudPushInFlight&&!pulling',ctx);return head&&events().length===3&&h.doc.payload===ctx.cloudPayload();},'the repaired board reaches the cloud');
+ const scan=shim.document.getElementById('scan').innerHTML,offered=ctx.state.candidateId;
+ assert.ok(offered,'tasks remain, so a candidate is dealt without any further action');
+ assert.ok(ctx.pool().some(row=>row.id===offered),'the dealt candidate is one the pass can still offer');
+ assert.match(scan,new RegExp('data-act="yes" data-candidate="'+offered+'"'),'its Yes control is on screen');
+ assert.match(scan,new RegExp('data-act="no" data-candidate="'+offered+'"'),'its No control is on screen');
+ assert.deepEqual(events().map(row=>row.id).filter(id=>mine.includes(id)).sort(),[...mine].sort(),'each accepted answer is kept exactly once');
+ assert.equal(new Set(ctx.state.decisionEvents.map(row=>row.id)).size,ctx.state.decisionEvents.length,'no answer is duplicated by the repair');
+ assert.equal(ctx.state.considered[otherAnswer.dataset.candidate],'no','the other page\'s answer survives the repair');
+ assert.equal(ctx.state.chain.includes(yesControl.dataset.candidate),true,'the Yes remains on the chain');
+ const dealt=JSON.stringify(ctx.state);ctx.onAction('no',noControl);assert.equal(JSON.stringify(ctx.state),dealt,'an answer aimed at an already-replaced candidate does nothing');
+ const pushes=h.calls.filter(call=>call==='push').length;ctx.render();await syncSettle(60);
+ assert.equal(JSON.stringify(ctx.state),dealt,'redrawing a dealt candidate changes nothing');assert.equal(h.calls.filter(call=>call==='push').length,pushes,'dealing is not a cloud write of its own');
+ await until(async()=>(await ctx.window.ScannerDeviceStore.readHead())?.payload===JSON.stringify(ctx.state)||await ctx.persist()&&(await ctx.window.ScannerDeviceStore.readHead())?.payload===JSON.stringify(ctx.state),'the repaired board is durable');
+ const reopened=await open({sharedStorage:shim.localStorage});apps.push(reopened);
+ assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.decisionEvents)).map(row=>row.id).sort(),JSON.parse(JSON.stringify(ctx.state.decisionEvents)).map(row=>row.id).sort(),'reload keeps every accepted answer once');
+ assert.match(reopened.shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'reload still offers a candidate');
+ await ctx.onAction('undo',{});
+ assert.equal(ctx.state.chain.includes(yesControl.dataset.candidate),false,'Undo reverses only the latest answer');
+ assert.equal(ctx.state.considered[noControl.dataset.candidate],'no','Undo keeps the earlier answer');
+ assert.equal(ctx.state.considered[otherAnswer.dataset.candidate],'no','Undo keeps the other page\'s answer');
+ assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'Undo still leaves a candidate to decide');
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.
@@ -9651,4 +9692,57 @@ test('RISK acknowledged recovery trim guidance: Settings, mounted FAQ and change
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
   assert.doesNotMatch(text,/recovers on its own|rebuilds on its own|on its own, once/,question+': no wording the guidance tests retired');
  }
+});
+
+test('RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read',async t=>{
+ await openingBoardFixture(t);
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const url=process.env.LANDSCAPE_BROWSER_URL,origin=new URL(url).origin,failures=[];
+ // CI installs only Chromium; the local run covers WebKit, the iPhone engine.
+ for(const [engineName,engine] of [['chromium',chromium],...(process.env.CI==='true'?[]:[['webkit',webkit]])]){
+  const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL});
+  try{
+   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3});
+   await context.addInitScript(()=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    if(location.protocol==='about:')return;
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    window.__snapshotReads=[];
+    for(const method of ['get','getAll','openCursor']){const original=IDBObjectStore.prototype[method];IDBObjectStore.prototype[method]=function(...args){if(this.name==='snapshots')window.__snapshotReads.push(method);return original.apply(this,args);};}
+   });
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage();page.on('pageerror',error=>failures.push(engineName+': '+error.message));
+   await page.goto(url);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   const expected=await page.evaluate(async()=>{
+    closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;addTask('PRIVATE offline link task');await persist();
+    const store=window.ScannerDeviceStore,head=await store.readHead();
+    for(let i=0;i<4;i++)await store.putBackup({expectedHash:head.hash,backup:{id:'native-link-'+i,kind:'manual',at:i+1,day:'2026-11-0'+(i+1),payload:head.payload+' '.repeat(i)}});
+    return (await store.listBackups()).length;
+   });
+   await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+   await page.goto('about:blank');
+   if(engineName==='webkit'){
+    // Playwright WebKit cannot navigate offline at all (internal error), so its
+    // run proves the held opening online; Chromium proves the offline shell.
+    await page.goto(origin+'/#debug-log');
+   }else{await context.setOffline(true);await page.goto(origin+'/#debug-log');}
+   await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+   await page.waitForFunction(()=>JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData?.backups?.count?.status==='observed');
+   const linked=await page.evaluate(()=>({board:state,hash:location.hash,reads:window.__snapshotReads,settings:!!document.querySelector('#modalRoot [data-act="save-settings"]'),count:JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData.backups.count.value,text:document.getElementById('supportDiagnosticsData').value}));
+   assert.equal(linked.board,null,engineName+': the board has not opened behind the log');
+   assert.deepEqual(linked.reads,[],engineName+': no saved board or backup text was read');
+   assert.equal(linked.settings,false,engineName+': Settings did not open');
+   assert.equal(linked.count,expected,engineName+': live backup count');
+   assert.doesNotMatch(linked.text,/PRIVATE|native-link-/,engineName+': metadata only');
+   assert.equal(await page.locator('#supportDiagnosticsData').isVisible(),true,engineName+': the log is visible during opening');
+   await page.locator('#modalRoot [data-act="close-modal"]').click();
+   await page.waitForFunction(()=>state?.tasks?.some(task=>task.title==='PRIVATE offline link task'));
+   assert.equal(await page.evaluate(()=>location.hash),'',engineName+': a reload now opens the ordinary board');
+   await page.locator('[data-act="help"]').first().click();await page.locator('#modalRoot a[href="#debug-log"]').click();
+   await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+   assert.equal(await page.evaluate(()=>location.hash),'',engineName+': the in-window link can be followed again');
+   await context.setOffline(false);
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[],'the held opening raises no page errors');
 });
