@@ -865,10 +865,16 @@ its RISK test; the map follows.
 - RISK delete red backups: cancelling the one confirmation leaves every backup byte and the board unchanged
 - RISK delete red backups: when storage refuses a write part-way the remaining backups stay intact and the message reports what was kept
 - RISK delete red backups: a backup list another tab changed after Settings drew it is not deleted from; the person is asked nothing and told to check again
-- RISK delete red backups: a device-store backup rewritten elsewhere after the press was confirmed is kept, even once the list has redrawn
+- RISK delete red backups: a device-store backup rewritten elsewhere since Settings drew it is kept, even after the backups before it are deleted
 - RISK delete red backups: the press is acknowledged at once and a second press while it runs asks and deletes nothing more
 - RISK delete red backups: a compressed backup list from an earlier version loses only its red backups and stays compressed
 - RISK delete red backups: the Delete of a single row pressed while a bulk deletion runs still asks its own question and is honoured
+- RISK delete red backups: a red copy a recovery has pinned is not counted or deleted in bulk, in the older backup list or the device store
+- RISK delete red backups: no button is offered while the older backup list cannot be read, because no row could be deleted
+- RISK delete red backups: a recovery that begins during the run stops it; the backups not yet deleted stay and the message says why
+- RISK delete red backups: a copy a recovery pins after Settings drew it makes the press refuse before asking, like any other change to the list
+- RISK delete red backups: when the device store cannot be listed part-way the run stops, no backup is half-deleted, and the message counts only what was removed
+- RISK delete red backups: a device-store backup rewritten elsewhere while the run is under way is kept
 - RISK delete red backups: while a recovery is unsettled the button is unavailable with its reason, a forced press deletes nothing, and each row keeps its own Delete
 - RISK fireworks occurrence: standalone sampled starts are exactly four times the original interval while duration odds budgets and festival timing stay intact
 - RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade
