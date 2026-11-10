@@ -5120,6 +5120,36 @@ test('RISK backup list memory: backups stay out of memory while Settings lists e
  await loaded.dispose?.();
 });
 
+// #2303: deleting a backup rebuilt Settings from scratch, which closed Data and
+// backups and lost the place in the list. Whether the delete succeeds or is
+// refused, Settings now stays open with Data and backups open and the list in view.
+test('RISK backup delete keeps its place: deleting a backup leaves Settings open with Data and backups open and the list in view, whether the delete succeeds or is refused',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-delete-place-'+Date.now()+'-'+Math.random();
+ const loaded=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=loaded,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('First copy task');assert.equal(await ctx.persist(),true);
+ const first=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(first?.id);
+ ctx.addTask('Second copy task');assert.equal(await ctx.persist(),true);
+ const second=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(second?.id);
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ const list=shim.document.getElementById('settingsBackupList');let broughtIntoView=0;list.scrollIntoView=()=>{broughtIntoView++;};
+ const place=()=>{const markup=shim.document.getElementById('modalRoot').innerHTML;
+  return {settings:/<h2>Settings<\/h2>/.test(markup),dataOpen:/<details class="settings-section" open><summary>Data and backups<\/summary>/.test(markup),listed:markup.includes('id="settingsBackupList"')};};
+ ctx.openSettings();assert.deepEqual(place(),{settings:true,dataOpen:false,listed:true},'positive control: Data and backups starts closed when Settings opens');
+ assert.equal(await ctx.onAction('delete-local-backup',{dataset:{id:first.id}}),true,'the delete succeeds');
+ assert.deepEqual(place(),{settings:true,dataOpen:true,listed:true},'after a delete Settings stays open with Data and backups open');
+ assert.ok(broughtIntoView>=1,'the backup list is brought into view');
+ assert.equal((await store.listBackups()).some(row=>row.id===first.id),false,'positive control: the copy was deleted');
+ ctx.closeModal();ctx.openSettings();broughtIntoView=0;
+ const deleteBackup=store.deleteBackup;store.deleteBackup=async()=>false;
+ try{assert.equal(await ctx.onAction('delete-local-backup',{dataset:{id:second.id}}),false,'the delete is refused');}
+ finally{store.deleteBackup=deleteBackup;}
+ assert.match(shim.document.getElementById('toast').textContent,/Backup list changed/,'positive control: the refusal is reported');
+ assert.deepEqual(place(),{settings:true,dataOpen:true,listed:true},'after a refused delete Settings stays open with Data and backups open');
+ assert.ok(broughtIntoView>=1,'the backup list is brought into view after a refusal too');
+ assert.ok((await store.listBackups()).some(row=>row.id===second.id),'the refused copy stays');
+ await loaded.dispose?.();
+});
+
 test('RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once',async()=>{
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-reopen-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
  const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
