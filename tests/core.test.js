@@ -4348,7 +4348,7 @@ function worksLikeNormalBoard2304(){
   settings:{scanMode:'descending',horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:8,theme:'system'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
 }
 const worksLikeNormalHistory2304=app=>{
- if(!app.ctx.state.histOpen)app.ctx.onAction('toggle-hist',{});
+ if(app.ctx.state.histOpen)app.ctx.render();else app.ctx.onAction('toggle-hist',{});
  return [...app.shim.document.getElementById('histPanel').innerHTML.matchAll(/<span class="dt[^"]*">([^<]+)/g)].map(match=>match[1].trim());
 };
 const worksLikeNormalTasks2304=board=>board.tasks.map(task=>[task.title,task.done===true]);
@@ -4385,18 +4385,20 @@ async function worksLikeNormalJourney2304(t,{beforeJourney,afterPublish}={}){
  // Settings save as they are committed and survive a reload; the ? menu opens closed.
  app.ctx.openSettings();for(const [id,value] of [['stShowPostpone',true],['stCantMin',12],['stHorizon',90],['stDateFormat','ymd']])commitSetting(app.shim,id,value);app.ctx.closeModal();
  await publish(app,'committed settings');
- app=await reload(app);await app.ctx.cloudPull();await noRecoveryPrompt(app,'settings reload');
+ // The reloaded board is checked before the cloud is read, so the cloud copy cannot mask a lost setting.
+ app=await reload(app);
  const pick=settings=>Object.fromEntries(Object.keys(WORKS_LIKE_NORMAL_SETTINGS).map(key=>[key,settings[key]]));
  assert.deepEqual(pick(app.ctx.state.settings),WORKS_LIKE_NORMAL_SETTINGS,'every committed setting survives the reload');
  assert.equal('chainStartsWith' in app.ctx.state.settings,false,'the default option leaves no saved key');
- app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<option value="oldest" selected>Oldest eligible<\/option>/);app.ctx.closeModal();
+ await app.ctx.cloudPull();await noRecoveryPrompt(app,'settings reload');
+ app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<option value="oldest" selected>Oldest eligible<\/option>/,'Settings shows Oldest eligible after the reload');app.ctx.closeModal();
  assert.deepEqual(helpMenuSections2302(app),['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups'].map(title=>({title,open:false})),'the ? menu opens with Changelog first and every section closed');
  app.ctx.closeModal();
 
  // Ordinary work: scan, dot, Done, Undo, Done again, resume.
  app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
  assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'Start dots the oldest task');
- assert.equal(app.ctx.state.candidateId,'normal-likely','the highest-chance task is offered first');assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="yes"/);
+ assert.equal(app.ctx.state.candidateId,'normal-likely','the highest-chance task is offered first');assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'the scanner offers Yes');
  app.ctx.onAction('yes',{dataset:{candidate:'normal-likely',benchmark:'normal-oldest'}});
  assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest','normal-likely'],'Yes dots the candidate');
  app.ctx.onAction('start-working',{});assert.equal(app.ctx.state.mode,'work','Pause starts working on the last dot');
