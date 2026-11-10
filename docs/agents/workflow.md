@@ -27,6 +27,12 @@ external services or activate accounts does not grant authorization for it.
 Use the current task brief as the spec when it supplies the agreed requirements;
 carry genuinely missing product decisions back to the parent/user.
 
+When the maintainer is obviously asleep, such as overnight Eastern time with a
+question already unanswered, and the work is waiting on them, take the
+recommended decision and continue. Record each decision and its reason in the
+issue or PR so they can reverse it on waking. Task holds, the approval
+AGENTS.md requires for new process, and permission prompts still wait for them.
+
 ## Subagent lifecycle
 
 For each distinct repository-improvement task, start a fresh subagent unless
