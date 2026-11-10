@@ -12838,6 +12838,47 @@ test("UI #221: for a moment after Return as candidate closes the editor, the sca
   });
 });
 
+// #221 release review: a held Enter. Browsers press a focused button as Enter
+// goes down, and a held key repeats to whatever has focus; the Node shim has
+// no native button presses, so this test makes them itself: each Enter keydown
+// clicks whichever control has focus. The app's own key handler ignores Enter.
+test("UI #221: a held Enter that pressed Return as candidate cannot press the control focus goes back to; focus moves there once the key is released", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2242 });
+  addTaskAged(ctx, "Oldest task", 900000);
+  addTaskAged(ctx, "Newer task", 1000);
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const only = ctx.state.chain[0];
+  await settledBoard221();
+  const panel = openFromScan221(ctx, shim, control => control.dataset.act === "edit" && control.dataset.id === only, "Edit on the benchmark card");
+  keepEditorValues(ctx, shim, only);
+  const page = { classList: { contains: () => false }, closest: () => null, matches: () => false };   // has focus once the editor's button leaves the page
+  const enter = repeat => {
+    const focused = shim.document.activeElement || page;
+    shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat, target: focused });
+    if (focused.dataset?.act) tapControl221(shim, focused);
+  };
+
+  shim.document.activeElement = editorControl221("return-candidate", only);
+  enter(false);
+  shim.document.activeElement = page;   // the editor closes, and Return with it
+  await flush();
+  assert.deepEqual(Array.from(ctx.state.chain), [], "precondition: Enter returned the only dot");
+  assert.equal(panel.controls().includes(shim.document.activeElement), false, "while Enter is still down, no control in the scan panel has focus");
+
+  await settledBoard221();   // held past the pause
+  enter(true);
+  enter(true);
+  assert.deepEqual(Array.from(ctx.state.chain), [], "the held key places no first dot");
+
+  shim.document.dispatchEvent({ type: "keyup", key: "Enter", target: shim.document.activeElement || page });
+  await flush();
+  assert.equal(shim.document.activeElement?.dataset?.act, "start-scan", "once Enter is released, focus goes back to Start scanning");
+  assert.ok(panel.controls().includes(shim.document.activeElement));
+
+  enter(false);
+  assert.equal(ctx.state.chain.length, 1, "a fresh press of Enter starts the scan");
+});
+
 // #221 release review (independent F3): two cases that already behaved.
 test("UI #221: a dialog that opens as the editor closes keeps focus; the scan panel does not take it", async () => {
   const { ctx, shim } = await loadApp({ seed: 2237 });
