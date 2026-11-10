@@ -9767,31 +9767,49 @@ function chanceDisplayWeights(tasks){
   chanceDisplayWeightCache=retain?{rows,weights,calculator:chanceWeight,pairProbability:pBeats}:null;
   return new Map(rows.map((row,i)=>[row.id,weights[i]]));
 }
-function displayedChancePercent(entry){
-  // The percentage a person reads. Rounding decides ties, so two rows showing
-  // the same number count as tied and float noise cannot pick the newer one.
-  // Rows showing "scanned after" rank below every percentage.
-  if(!entry?.available||entry.fallback)return -1;
-  const pct=entry.probability*100;
-  return pct<.01?0:Number(pct.toFixed(2));
+function chancePercentText(pct,mode){
+  // Halving can show an exact 0%; the other modes show any share under 0.01%
+  // as <0.01%. taskSelectionSummary and Most likely both read this text.
+  return (mode==="halving"?pct>0&&pct<.01:pct<.01)?"<0.01%":Number(pct.toFixed(2))+"%";
 }
-function mostLikelyFirst(p,stats){
+function displayedChanceRank(entry,mode){
+  // Most likely ranks the percentage a person reads, so two rows showing the
+  // same text tie and float noise cannot pick the newer one, while <0.01%
+  // still beats a Halving 0%. Rows showing no percentage rank below them all.
+  if(!entry?.available||entry.fallback||mode!=="halving"&&entry.passFallback)return -1;
+  const text=chancePercentText(entry.probability*100,mode);
+  return text==="<0.01%"?.005:parseFloat(text);
+}
+function mostLikelyFirst(p,stats,mode){
   if(!p.length)return null;
   return p.reduce((best,t)=>{
-    const chance=displayedChancePercent(stats.get(t.id))-displayedChancePercent(stats.get(best.id));
+    const chance=displayedChanceRank(stats.get(t.id),mode)-displayedChanceRank(stats.get(best.id),mode);
     if(chance)return chance>0?t:best;
     const age=(t.createdAt||0)-(best.createdAt||0);
     if(age)return age<0?t:best;
     return t.id<best.id?t:best;
   });
 }
-function firstDotTask(board=state){
-  // Every first-dot consumer asks this one rule, so a preview cannot promise
-  // one task and Start dot another.
-  const p=pool(board);
-  return board.settings.chainStartsWith==="mostLikely"?mostLikelyFirst(p,chanceDisplayStats(board.scanMode||board.settings.scanMode,board)):oldestFirst(p);
+function firstDotScanMode(board=state){
+  // Start applies the Settings scan preference before it dots (startScan), and
+  // the empty-chain notice has always named that preference. A saved pass can
+  // still carry another mode after Undo or sync, so every first-dot consumer
+  // reads the preference. "both" picks a mode per Start; the pass mode is the
+  // best guess, and a board with neither scans in descending order.
+  const preferred=board.settings?.scanMode;
+  return ["descending","chance","squared","halving"].includes(preferred)?preferred
+    :["chance","squared","halving"].includes(board.scanMode)?board.scanMode:"descending";
 }
-function chanceDisplayStats(mode=state.scanMode,board=state){
+function firstDotTask(board=state,shown=null){
+  // Every first-dot consumer asks this one rule, so a preview cannot promise
+  // one task and Start dot another. `shown` lets chanceDisplayStats lend the
+  // shares it just computed when they are for the same scan mode.
+  const p=pool(board);
+  if(board.settings.chainStartsWith!=="mostLikely")return oldestFirst(p);
+  const mode=firstDotScanMode(board);
+  return mostLikelyFirst(p,shown?.mode===mode?shown.stats:chanceDisplayStats(mode,board,false),mode);
+}
+function chanceDisplayStats(mode=state.scanMode,board=state,markFirstDot=true){
   const automaticStart=!board.chain.length;
   const open=board.tasks.filter(t=>!t.done),available=new Set(eligibleTasks(board).map(t=>t.id)),draw=automaticStart?null:board.chance,stats=new Map();
   // Overall shares use the existing weight formula on current ratings and the
@@ -9819,10 +9837,11 @@ function chanceDisplayStats(mode=state.scanMode,board=state){
   // merely because adding several tiny weights underflowed the denominator.
   const sum=max?[...stats.values()].reduce((n,s)=>n+(s.available&&!s.fallback?s.weight/max:0),0):0;
   for(const entry of stats.values())if(entry.available&&!entry.fallback&&sum)entry.probability=(entry.weight/max)/sum;
-  // Marked last: Most likely reads the finished percentages. It reuses this
-  // pass instead of calling firstDotTask, which would recurse through it.
-  if(automaticStart){
-    const p=pool(board),first=board.settings.chainStartsWith==="mostLikely"?mostLikelyFirst(p,stats):oldestFirst(p),entry=stats.get(first?.id);
+  // Marked last, by the one first-dot rule: Most likely reads the finished
+  // percentages. firstDotTask's own call passes markFirstDot=false, so this
+  // cannot recurse.
+  if(automaticStart&&markFirstDot){
+    const entry=stats.get(firstDotTask(board,{mode,stats})?.id);
     if(entry)entry.firstDot=true;
   }
   return stats;
@@ -11296,12 +11315,12 @@ function taskSelectionSummary(task,stats,metric=["chance","squared"].includes(st
   const entry=(stats||chanceDisplayStats()).get(task.id);
   if(state.scanMode==="halving"){
     const pct=entry?.available&&!entry.fallback?entry.probability*100:0;
-    const text=pct>0&&pct<.01?"<0.01%":Number(pct.toFixed(2))+"%";
+    const text=chancePercentText(pct,"halving");
     return {label:(entry?.available&&entry.fallback?"Unavailable":text)+" likelihood",title:"Underlying full eligible-pool Chance-mode share from current ratings, not the Halving weighting selection probability. Halving draws use remaining rank positions with 50%, 25%, then 12.5%, and the last gets the remainder.",fill:Number(pct.toFixed(2))};
   }
   if(!entry?.available)return {label:"0% overall",title:"Outside the full eligible task pool: completed, blocked, resting, not started, or outside active contexts.",fill:0};
   const pct=entry.probability*100;
-  const text=pct<.01?"<0.01%":Number(pct.toFixed(2))+"%";
+  const text=chancePercentText(pct,state.scanMode);
   if(entry.fallback)return {label:"scanned after",title:"Scanned after weighted candidates in descending likelihood order. Its current numerical weight cannot draw, even with the most favorable supported random sample.",fill:0};
   if(entry.passFallback)return {label:"scanned after",title:"The saved pass uses descending fallback for this task. Its current full-pool share is "+text+" overall; current ratings affect the next fresh ordering, while this pass stays fixed.",fill:0};
   const age=state.settings.chainStartsWith==="mostLikely"?(entry.firstDot?" The first dot goes to the highest overall chance; ties go to the older task.":" The first dot goes to the highest overall chance; the saved pass order stays fixed.")
@@ -11653,7 +11672,7 @@ const boardPresentation=Object.freeze({
   chrome(board){const pass=passPresentation(board);return {theme:themePresentation(normalizeTheme(board.settings.theme)),passLabel:pass.label,passWidth:pass.width};},
   rowContext(board){const inChain=new Set(board.chain),byId=new Map(board.tasks.map(t=>[t.id,t]));return {inChain,byId,act:activeCtxSet(board),nextDotted:!inChain.size?firstDotTask(board):null};},
   // Shared by the live scanner and the saved preview so both describe the same first dot.
-  startNotice(board){const mode=board.settings.scanMode||board.scanMode,label=mode==="halving"?"Halving weighting":mode==="squared"?"Squared Weighting":mode==="chance"?"Chance mode":mode==="descending"?"Descending mode":"Scanning";return label+(board.settings.chainStartsWith==="mostLikely"?" starts on the eligible task with the highest overall chance, or the older task on a tie.":" starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before.");},
+  startNotice(board){const mode=board.settings.scanMode==="both"?"both":firstDotScanMode(board),label=mode==="halving"?"Halving weighting":mode==="squared"?"Squared Weighting":mode==="chance"?"Chance mode":mode==="descending"?"Descending mode":"Scanning";return label+(board.settings.chainStartsWith==="mostLikely"?" starts on the eligible task with the highest overall chance, or the older task on a tie.":" starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before.");},
   rowFacts(board,task,{inChain,byId,act,nextDotted}){return {dim:!isEligible(task,act,byId,board),inChain:inChain.has(task.id),nextDotted:nextDotted?.id===task.id,blockerTitles:unresolvedPrerequisites(task,byId,board).map(t=>t.title),skipLabel:board.considered[task.id]&&board.considered[task.id]!=="done"?skippedLabel(task.id,board.considered[task.id],board):''};},
   eligibilityFilters(view){return '<span class="ltaglabel">Eligibility</span>'+[["all","All"],["eligible","Eligible"],["ineligible","Ineligible"]].map(([id,label])=>'<button type="button" class="ltag'+(view.eligibility===id?' on':'')+'" data-act="list-eligibility" data-id="'+id+'" aria-pressed="'+(view.eligibility===id)+'">'+label+'</button>').join('');},
   tagFilters(view){return !view.tagOptions.length?'':'<span class="ltaglabel">Filter</span>'+view.tagOptions.map(o=>'<button type="button" class="ltag'+(o.key.startsWith('c:')?' task-context':'')+(view.tagFilter===o.key?' on':'')+'" data-act="list-tag" data-id="'+esc(o.key)+'" aria-pressed="'+(view.tagFilter===o.key?'true':'false')+'">'+esc(o.label)+'</button>').join('');},

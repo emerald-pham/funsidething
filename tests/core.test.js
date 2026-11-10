@@ -4085,6 +4085,43 @@ const savedSkipBoard=(extra={})=>{
  const board=syncState({tasks:[{...syncTask('skip-saved-oldest','Saved oldest'),createdAt:1},{...syncTask('skip-saved-likely','Saved likely'),createdAt:2,mu:32}],...extra});
  board.settings={...board.settings,skipOldestFirstDot:true,...extra.settings};return JSON.stringify(board);
 };
+// Most likely compares displayed percentages, so these weights are chosen to
+// round differently under each scan mode's display. The weights are the seam:
+// the real ones come from ratings and cannot be pinned to a rounding edge.
+async function mostLikelyBoard(seed,{settingsMode,passMode,weights,considered={}}){
+ const tasks=Object.keys(weights).map((id,i)=>({...syncTask(id,'Task '+id),createdAt:i+1}));
+ const raw=JSON.stringify(syncState({tasks,scanMode:passMode,considered,listOpen:true,settings:{...syncState().settings,scanMode:settingsMode,squaredDefaultVersion:1,listMetric:'chance',chainStartsWith:'mostLikely'}}));
+ const app=await loadApp({seed,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ app.ctx.chanceWeight=task=>weights[task.id];app.ctx.render();
+ const marked=()=>[...app.shim.document.getElementById('listBody').innerHTML.matchAll(/chainind"[^>]*>→ <\/span>[^\n]{0,120}?Task (\w+)/g)].map(m=>m[1]);
+ const explained=()=>app.ctx.state.tasks.filter(task=>!(task.id in considered)).filter(task=>/first dot goes to the highest overall chance; ties/.test(app.ctx.taskSelectionSummary(task,app.ctx.chanceDisplayStats()).title)).map(task=>task.id);
+ const label=id=>app.ctx.taskSelectionSummary(app.ctx.state.tasks.find(task=>task.id===id),app.ctx.chanceDisplayStats(),'chance').label;
+ const start=()=>{app.ctx.onAction('start-scan',{});return Array.from(app.ctx.state.chain);};
+ return {...app,marked,explained,label,start,notice:()=>app.shim.document.getElementById('scan').innerHTML};
+}
+
+test('RISK chain start: the preview, the percentage explanation, the notice and Start agree on the scan mode Most likely reads',async()=>{
+ // Under Chance these show 50.00% and 50.00% (a tie, so the older A); squared they show 49.99% and 50.01%.
+ const board=await mostLikelyBoard(2330,{settingsMode:'squared',passMode:'chance',weights:{A:.99984,B:1}});
+ assert.equal(board.ctx.state.scanMode,'chance','the saved pass still carries the last pass mode');
+ assert.match(board.notice(),/Squared Weighting starts on the eligible task with the highest overall chance/,'the notice names the scan preference Start applies');
+ const preview={marked:board.marked(),explained:board.explained()};
+ assert.deepEqual(board.start(),['B'],'Start applies the Squared Weighting preference and dots its most likely task');
+ assert.deepEqual(preview,{marked:['B'],explained:['B']},'the row marker and the percentage explanation promised the task Start dots');
+});
+
+test('RISK chain start: Most likely ties compare the percentages people see, so <0.01% beats 0% in Halving',async()=>{
+ // C has been scanned this pass, so only A and B can start the chain. A's share underflows to exactly 0.
+ const weights={A:1e-300,B:1e-15,C:1e308};
+ const halving=await mostLikelyBoard(2331,{settingsMode:'halving',passMode:'halving',weights,considered:{C:'no'}});
+ assert.deepEqual([halving.label('A'),halving.label('B')],['0% likelihood','<0.01% likelihood'],'Halving shows these two differently');
+ assert.deepEqual(halving.marked(),['B'],'the higher shown percentage is previewed');
+ assert.deepEqual(halving.start(),['B'],'the higher shown percentage starts the chain');
+ const chance=await mostLikelyBoard(2332,{settingsMode:'chance',passMode:'chance',weights,considered:{C:'no'}});
+ assert.deepEqual([chance.label('A'),chance.label('B')],['<0.01% overall','<0.01% overall'],'Chance mode shows them the same');
+ assert.deepEqual(chance.start(),['A'],'the same shown percentage is a tie, which goes to the older task');
+});
+
 test('RISK chain start: the saved preview marks the same first dot on a detached board with no scan mode',async()=>{
  const {ctx}=await loadApp({seed:2325});
  Object.assign(ctx.addTask('Detached oldest',false),{id:'detached-oldest',createdAt:1,mu:20});Object.assign(ctx.addTask('Detached likely',false),{id:'detached-likely',createdAt:2,mu:32});
