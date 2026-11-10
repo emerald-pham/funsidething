@@ -10552,3 +10552,24 @@ test('RISK chain return compatibility: a board saved before #221 opens with the 
  const reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:opened.shim.localStorage.getItem(SYNC_STORE_KEY)}});
  assert.deepEqual(Array.from(reopened.ctx.state.chain),[savedChain[0],savedChain[2]]);
 });
+
+test('RISK chain return sync: returning the only dot Start placed leaves an empty chain through a peer merge and reload, with no replacement dot',async t=>{
+ const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.chain=[];initial.candidateId=null;});
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ const first=local.ctx.state.chain[0];assert.equal(local.ctx.state.chain.length,1,'precondition: Start placed one dot');
+ await publish221(local);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await syncSettle(20);peer.ctx.window.CloudSync.ready=false;local.ctx.window.CloudSync.ready=false;
+ assert.deepEqual(Array.from(peer.ctx.state.chain),[first],'precondition: the other device has the same dot');
+
+ returnDotFromBoard221(local,first,at+200);
+ assert.deepEqual(Array.from(local.ctx.state.chain),[],'no replacement dot');
+ await saveEditorChoice(peer,first,at+300,{title:'Renamed while dotted elsewhere'});
+ await publish221(local);await publish221(peer);await local.ctx.cloudPull();await syncSettle(20);
+ for(const [label,board] of [['cloud',h.remoteState()],['returning device',local.ctx.state],['other device',peer.ctx.state]]){
+  assert.deepEqual(Array.from(board.chain),[],label+': replaying the pass from its Start does not bring the dot back');
+  assert.equal(board.tasks.find(task=>task.id===first).title,'Renamed while dotted elsewhere',label+': the other device’s edit is kept');
+ }
+ const cold=await reopen221(local,h,at+400,t);await cold.ctx.cloudPull();await syncSettle(20);
+ assert.deepEqual(Array.from(cold.ctx.state.chain),[]);
+ cold.ctx.renderScan();assert.match(cold.shim.document.getElementById('scan').innerHTML,/Nothing dotted yet/,'the board waits for the next Start');
+});
