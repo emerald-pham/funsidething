@@ -21753,7 +21753,7 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
 });
 
 // A short page can leave the task being decided on entirely under the pinned row.
-test('RISK steady scanner browser: the candidate title is visible when presented on short screens, and a stable layout does not move between answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+test('RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
@@ -21765,8 +21765,12 @@ test('RISK steady scanner browser: the candidate title is visible when presented
     try{
      await page.waitForSelector('[data-act="yes"]',{timeout:15000});await page.waitForTimeout(200);
      const read=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect(),yes=document.querySelector('[data-act="yes"]').getBoundingClientRect();return {titleTop:t.top,titleBottom:t.bottom,rowTop:row.top,y:scrollY,yesTop:yes.top,candidate:state.candidateId};});
+     const opened=await read();
+     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+     await page.keyboard.press('n');
+     await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await page.waitForTimeout(60);
      const shown=await read();
-     assert.ok(shown.titleBottom<=shown.rowTop&&shown.titleTop>=0,`${label}: the title is clear of the pinned row: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}, scrolled ${Math.round(shown.y)}`);
+     assert.ok(shown.titleBottom<=shown.rowTop&&shown.titleTop>=0,`${label}: the next title is clear of the pinned row: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}, scrolled ${Math.round(shown.y)}`);
      let previous=shown;
      for(let answer=0;answer<3;answer++){
       await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
@@ -21878,6 +21882,108 @@ test('RISK steady scanner browser: the dot trail shows only the dots that fit wi
     assert.equal(wide.dots.length,2,`${label}: the dots come back with the room`);
     assert.deepEqual(errors,[],`${label}: no page errors`);
    }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// The count and "this ↓" are the trail's fixed words. Pills give up width for
+// them, so a label must not lose so much as a letter while a pill is showing.
+// A clone with no flex constraint is the label's real width, in the same engine.
+test('RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const width of [320,375,390,393,402,414,430,480])for(const dots of [3,9]){
+    const label=`${engineName} ${width}px ${dots} dots`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard({dots}),{width,height:844,touch:false});
+    try{
+     await page.waitForSelector('.crumbs',{timeout:15000});await page.evaluate(()=>document.fonts?.ready);await page.waitForTimeout(120);
+     const seen=await page.evaluate(()=>{
+      const row=document.querySelector('.crumbs'),labels=[...row.querySelectorAll('.lbl,.arrow')].filter(el=>!el.hidden);
+      return {pills:row.querySelectorAll('.crumb:not([hidden])').length,overflow:row.scrollWidth-row.clientWidth,clipped:labels.flatMap(el=>{
+       const copy=el.cloneNode(true);copy.style.cssText+=';position:absolute;visibility:hidden;flex:none;overflow:visible;max-width:none';row.append(copy);
+       const whole=copy.getBoundingClientRect().width,has=el.getBoundingClientRect().width;copy.remove();
+       return has+.01<whole?[`${el.textContent}: ${has.toFixed(3)} of ${whole.toFixed(3)}`]:[];
+      })};
+     });
+     if(seen.pills)assert.deepEqual(seen.clipped,[],`${label}: no label is cut beside ${seen.pills} dot(s)`);
+     assert.ok(seen.overflow<=1,`${label}: the row still fits: ${seen.overflow}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n').slice(0,6).join(' ')}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// A web font arriving late changes the labels without changing the row's size,
+// so nothing else tells the trail to fit again. The wider label stands in for
+// the swapped font, and the browser's own event is what the trail listens to.
+test('RISK steady scanner browser: the trail fits again when web fonts finish loading in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const {page,context}=await steadyScannerPage(browser,steadyTrailBoard({dots:3}),{width:768,height:1024,touch:false});
+  try{
+   await page.waitForSelector('.crumbs',{timeout:15000});await page.waitForTimeout(120);
+   const pills=()=>page.evaluate(()=>document.querySelectorAll('.crumbs .crumb:not([hidden])').length);
+   assert.equal(await pills(),2,`${engineName}: both dots fit before the font arrives`);
+   await page.addStyleTag({content:'.crumbs .lbl{letter-spacing:32px}'});await page.waitForTimeout(80);
+   await page.evaluate(()=>document.fonts.dispatchEvent(new Event('loadingdone')));await page.waitForTimeout(80);
+   assert.ok(await pills()<2,`${engineName}: the trail refits for the new label width`);
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// The reveal belongs to answering. Undo and context changes are pressed from
+// above the scanner, and moving the page would carry that control off-screen.
+test('RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:320,height:568},{width:844,height:390},{width:390,height:664}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{...viewport,touch:false});
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});await page.waitForTimeout(200);
+     const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+     const title=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return {bottom:t.bottom,rowTop:row.top,y:scrollY,candidate:state.candidateId};});
+     const clickOn=async selector=>{const box=await page.locator(selector).first().boundingBox();await page.mouse.click(box.x+box.width/2,box.y+box.height/2);};
+     // Answering from the top of the page reveals the next title.
+     await page.evaluate(()=>scrollTo(0,0));await settle();
+     const opened=await title();
+     assert.ok(opened.bottom>opened.rowTop,`${label}: positive control: the title starts covered: ends ${Math.round(opened.bottom)}, row ${Math.round(opened.rowTop)}`);
+     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+     await page.keyboard.press('n');
+     await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await settle();
+     const answered=await title();
+     assert.ok(answered.bottom<=answered.rowTop,`${label}: the answer reveals the next title: ends ${Math.round(answered.bottom)}, row ${Math.round(answered.rowTop)}`);
+     // Undo, pressed from the header at the top of the page, stays under the finger.
+     await page.evaluate(()=>scrollTo(0,0));await settle();
+     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+     const beforeUndo=await title();
+     await clickOn('[data-act="undo"]');
+     await page.waitForFunction(prior=>state.candidateId!==prior,beforeUndo.candidate,{timeout:5000});await settle();await page.waitForTimeout(60);
+     const undone=await page.evaluate(()=>({y:scrollY,undoTop:document.querySelector('[data-act="undo"]').getBoundingClientRect().top}));
+     assert.equal(undone.y,beforeUndo.y,`${label}: Undo does not move the page`);
+     assert.ok(undone.undoTop>=0,`${label}: Undo stays on screen: top ${Math.round(undone.undoTop)}`);
+     // A context change replaces the candidate from the panel above the scanner.
+     await page.evaluate(()=>{state.contexts=[{id:'c1',name:'Home',active:true},{id:'c2',name:'Errands',active:true}];for(const task of state.tasks)if(task.id===state.candidateId)task.ctx=['c1'];state.ctxOpen=true;render();});await settle();
+     const item='[data-act="cycle-context"][data-ctx="c1"]';
+     await page.locator(item).first().scrollIntoViewIfNeeded();await settle();
+     const beforeContext=await title(),itemBefore=await page.locator(item).first().boundingBox();
+     await clickOn(item);
+     await page.waitForFunction(prior=>state.candidateId!==prior,beforeContext.candidate,{timeout:5000});await settle();await page.waitForTimeout(60);
+     assert.equal(await page.evaluate(()=>scrollY),beforeContext.y,`${label}: a context change does not move the page`);
+     assert.equal(Math.round((await page.locator(item).first().boundingBox()).y),Math.round(itemBefore.y),`${label}: the context control stays under the finger`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
   }finally{await browser.close();}
  }
  assert.deepEqual(failures,[]);

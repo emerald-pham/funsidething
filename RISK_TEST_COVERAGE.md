@@ -599,9 +599,12 @@ its RISK test; the map follows.
 - RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit
 - RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit
 - RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit
-- RISK steady scanner browser: the candidate title is visible when presented on short screens, and a stable layout does not move between answers in Chromium and WebKit
+- RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit
 - RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit
 - RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit
+- RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit
+- RISK steady scanner browser: the trail fits again when web fonts finish loading in Chromium and WebKit
+- RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit
 - RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit
 - RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
