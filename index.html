@@ -211,7 +211,6 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .decide>.btn{flex:1 1 auto;min-height:44px}
 .decide>[data-act="run-woop"]{flex-basis:100%}
 @media (min-width:761px){.decide{border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0}}
-@media (max-width:420px){.decide>.btn{padding-left:8px;padding-right:8px}}
 .wrap:has(.decide){padding-bottom:calc(var(--pinned-decide-height,110px) + 24px)}
 :root:has(.decide) .toast{bottom:calc(var(--pinned-decide-height,110px) + 12px)}
 .decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 100%;justify-content:flex-end}
@@ -449,6 +448,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 /* Keep constrained scanner cards and the finish group readable when enlarged.
    Wrapping preserves every action; clipping would hide a choice. */
 @media (max-width:420px){
+  .decide>.btn{padding-left:8px;padding-right:8px}
   .crumb{max-width:min(190px,100%)}
   .card{flex-wrap:wrap}
   .card .title{flex:1 1 160px;min-width:0}
