@@ -12256,6 +12256,56 @@ test("UI #221: returning an older dot from its pill takes only that dot off; the
   assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the editor closes behind the action");
 });
 
+const dotTitleOf = (ctx, id) => ctx.state.tasks.find(task => task.id === id)?.title;
+const answerShownCandidate = (ctx, answer) => {
+  const candidate = ctx.state.candidateId, benchmark = ctx.state.chain.at(-1);
+  assert.ok(candidate, "a candidate is showing");
+  ctx.onAction(answer, { dataset: { candidate, benchmark } });
+  return dotTitleOf(ctx, candidate);
+};
+
+test("UI #221: a returned dot stays off when later answers rebuild the chain from the recorded decisions", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2215 });
+  ["Oldest task", "Second task", "Third task", "Fourth task", "Fifth task"].forEach((title, i) => addTaskAged(ctx, title, 900000 - i * 1000));
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const second = answerShownCandidate(ctx, "yes"), third = answerShownCandidate(ctx, "yes");
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["Oldest task", second], "precondition: three dots made by Start and two Yes answers");
+
+  returnFromPill(ctx, shim, second);
+  const fourth = answerShownCandidate(ctx, "yes");
+
+  const board = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: ["Oldest task", third], benchmark: fourth },
+    "the returned dot does not come back when the next Yes replays the pass");
+});
+
+const returnBenchmarkFromEdit = (ctx, shim) => {
+  const edit = shim.elements.get("scan").innerHTML.match(/<div class="card bench">[\s\S]*?<button\b[^>]*data-act="edit" data-id="([^"]+)"/);
+  assert.ok(edit, "the benchmark card offers Edit");
+  ctx.onAction("edit", { dataset: { id: edit[1] } });
+  const button = returnButton(shim.elements.get("modalRoot").innerHTML);
+  assert.doesNotMatch(button, /\bdisabled\b/, "the benchmark's editor offers Return as candidate");
+  ctx.onAction("return-candidate", { dataset: { id: edit[1] } });
+};
+
+test("UI #221: returning the benchmark while its intervention is showing clears that intervention and the scan deals against the new benchmark", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2216 });
+  ctx.addTask("Earlier dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.state.interventionActive = true; ctx.state.interventionP = 0.1; ctx.state.candidateId = null;
+  ctx.render();
+  assert.match(shim.elements.get("scan").innerHTML, /Only 10% chance of finding a better task/, "precondition: the intervention about this benchmark is showing");
+
+  returnBenchmarkFromEdit(ctx, shim);
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.doesNotMatch(scan, /chance of finding a better task/, "the intervention about the returned benchmark is gone");
+  const board = renderedBoard(scan);
+  assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: [], benchmark: "Earlier dot" }, "the newest remaining dot is the benchmark");
+  assert.ok(["Pool task", "Benchmark dot"].includes(board.candidate), `the scan deals a candidate against the new benchmark, got ${board.candidate}`);
+});
+
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
    The card already reads as the benchmark (purple fill, "Done" checkbox, its
    position in the layout), so the little filled circle beside the title was

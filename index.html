@@ -6235,8 +6235,9 @@ function conflictingDecisionEvidence(...boards){
 }
 function decisionStartIssue(board){
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[];
+  // A #221 Return is a lone chain row inside its own pass, not a Start root.
   const fresh=rows.filter(event=>event?.kind==="current-choice" && event.target?.type==="pass"
-    && (event.target.property==="chain" || event.target.property==="scanMode" && event.target.id!==event.passId)
+    && (event.target.property==="chain" && currentChoiceChainReturnId(event)===null || event.target.property==="scanMode" && event.target.id!==event.passId)
     && !attestedDecisionEvent(board.decisionBaseline,event));
   for(const event of fresh){
     const group=rows.filter(row=>row?.kind==="current-choice" && row.actionId===event.actionId
@@ -8921,11 +8922,24 @@ const taskActionOwnerBundle=(()=>{
       if(supportedPostponeEvidence(task)&&Date.now()<taskPostponeUntil(task))writeTaskPostpone(task,0);
       // #221: membership only. The rest of the chain keeps its order, and the
       // task keeps its fields, rating and History; no skip mark is added.
-      if(returningDot)state.chain=state.chain.filter(c=>c!==id);
+      if(returningDot){
+        // An intervention weighed the returned benchmark; it says nothing
+        // about the newest remaining dot, which becomes the benchmark.
+        if(benchmark()?.id===id)state.interventionActive=false;
+        state.chain=state.chain.filter(c=>c!==id);
+      }
       delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
       const change=currentChoiceDispositionChange(id,beforeDisposition);
       const observedCtx=beforeChoice?.ctx?.value??task.ctx;
-      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
+      // The chain is rebuilt from this pass's recorded decisions, where the
+      // earlier Yes or Dot still adds the task. So the return is recorded in
+      // that same ordered stream, as this pass's membership going from [id]
+      // to [], or every replay, reload and merge would put the dot back.
+      // Older clients cannot read this shape and hold sync rather than push
+      // their stale chain (see currentChoiceChainReturnId).
+      const choices=[...(change?[change]:[]),...(returningDot?[{target:{type:"pass",id:choiceGesture.passId,property:"chain"},
+        value:[],after:{present:true},before:{present:true,value:[id]}}]:[])];
+      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
       finishRatingObservation(observation);commit();
       return true;
     }
@@ -10407,6 +10421,14 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
         const index=chain.indexOf(event.target.id);if(index>=0)chain.splice(index,1);
         continue;
       }
+      const returned=currentChoiceChainReturnId(event);
+      if(returned!==null){
+        // #221 Return as candidate removes only this membership, in decision
+        // order: a later explicit Yes/Dot adds the task again, while ending a
+        // hold or replaying the earlier Yes/Dot cannot.
+        const index=chain.indexOf(returned);if(index>=0)chain.splice(index,1);
+        continue;
+      }
       const id=event.kind==="no"?null:event.kind==="comparison"&&event.action!=="dislodge"?event.taskId:null;
       if(event.kind==="no"){
         // No is also a current candidate exclusion. Its observation still
@@ -10559,9 +10581,22 @@ function currentChoicePassModeValueSupported(value,requireDraw=true){
   if(value.mode==="descending")return value.chance===null;
   return value.chance===null?!requireDraw:currentChoiceChanceSnapshotSupported(value.chance);
 }
-function currentChoicePassChainValueSupported(value,evidence=false){
+function currentChoicePassChainValueSupported(value){
+  // One task's membership: [] or [id]. supportedCurrentChoiceEvent pins which
+  // way round each recorded shape may go (Start root [] → [id], #221 Return [id] → []).
   return Array.isArray(value)&&value.every(id=>typeof id==="string"&&id.length>0&&!Object.hasOwn(Object.prototype,id))&&
-    new Set(value).size===value.length&&value.length===(evidence?0:1);
+    new Set(value).size===value.length&&value.length<=1;
+}
+function currentChoiceChainReturnId(event){
+  // #221 Return as candidate on a dot: this pass's own membership of one task
+  // going from [id] to []. Clients from before #221 reject the shape (their
+  // Start-root check sees a lone chain row), report unprojectable decision
+  // evidence and hold both pull and push, so none of them can replay the
+  // earlier Yes/Dot and push the removed dot back to the cloud.
+  return event?.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain"&&
+    event.target.id===event.passId&&event.actionId!==undefined&&event.after?.present===true&&event.before?.present===true&&
+    Array.isArray(event.value)&&event.value.length===0&&Array.isArray(event.before.value)&&event.before.value.length===1&&
+    supportedCurrentChoiceEvent(event)?event.before.value[0]:null;
 }
 function currentChoiceDispositionValueSupported(value){
   if(value?.kind==="no"&&Object.keys(value).length===1)return true;
@@ -10629,7 +10664,7 @@ function currentChoiceValueSupported(type,property,value,present=true,evidence=f
   if(type==="setting"&&property==="scanMode")return ["descending","chance","squared","halving","both"].includes(value);
   if(type==="pass"&&property==="mode")return ["work","scan"].includes(value);
   if(type==="pass"&&property==="scanMode")return currentChoicePassModeValueSupported(value,!evidence);
-  if(type==="pass"&&property==="chain")return currentChoicePassChainValueSupported(value,evidence);
+  if(type==="pass"&&property==="chain")return currentChoicePassChainValueSupported(value);
   if(type==="setting"){
     if(/^hourlyQuote:(?:[01]\d|2[0-3])$/.test(property))return Array.isArray(value)&&value.length>0&&value.length<=12&&
       value.every(line=>typeof line==="string"&&line.trim()===line&&line.length>0&&line.length<=180)&&new Set(value).size===value.length;
@@ -10717,8 +10752,9 @@ function supportedCurrentChoiceEvent(event){
   if(target.type==="pass"&&target.property==="mode"&&
       (target.id!==event.passId||event.after.present!==true||event.before.present!==true))return false;
   if(target.type==="pass"&&target.property==="chain"&&
-      (event.actionId===undefined||target.id===event.passId||event.after.present!==true||event.before.present!==true||
-       event.before.value.length!==0||event.value.length!==1))return false;
+      (event.actionId===undefined||event.after.present!==true||event.before.present!==true||
+       !(target.id!==event.passId&&event.before.value.length===0&&event.value.length===1||   // Start root into a new pass
+         target.id===event.passId&&event.before.value.length===1&&event.value.length===0)))return false;   // #221 Return of a dot
   if(Object.keys(event.before).some(key=>key!=="present"&&key!=="value"))return false;
   if(event.taskContextIds!==undefined){
     if(!event.taskContextIds||typeof event.taskContextIds!=="object"||Array.isArray(event.taskContextIds)||
