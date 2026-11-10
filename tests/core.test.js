@@ -12195,6 +12195,16 @@ test("UI #221: tapping a pill in the chain trail opens that task's editor and le
   assert.equal(ctx.state.listOpen, false, "the pill no longer opens All Tasks to reveal the row");
 });
 
+test("UI #221: each chain pill is a native button whose accessible name says it opens that task", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2212 });
+  ctx.addTask("Water the ferns", true);
+  ctx.addTask("Call the bank", true);
+  ctx.render();
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Water the ferns");
+  assert.match(pill.markup, /^<button\b/, "a native button, reachable by keyboard");
+  assert.match(pill.markup, /aria-label="Open Water the ferns to edit it"/, "its name says what pressing it does");
+});
+
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
    The card already reads as the benchmark (purple fill, "Done" checkbox, its
    position in the layout), so the little filled circle beside the title was
