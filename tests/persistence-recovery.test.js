@@ -5133,7 +5133,7 @@ test('RISK backup delete keeps its place: deleting a backup leaves Settings open
  await vm.runInContext('refreshDeviceBackupCache()',ctx);
  const list=shim.document.getElementById('settingsBackupList');let broughtIntoView=0;list.scrollIntoView=()=>{broughtIntoView++;};
  const place=()=>{const markup=shim.document.getElementById('modalRoot').innerHTML;
-  return {settings:/<h2>Settings<\/h2>/.test(markup),dataOpen:/<details class="settings-section" open><summary>Data and backups<\/summary>/.test(markup),listed:markup.includes('id="settingsBackupList"')};};
+  return {settings:/<h2>Settings<\/h2>/.test(markup),dataOpen:/<details class="settings-section"[^>]*\sopen\b[^>]*><summary>Data and backups<\/summary>/.test(markup),listed:markup.includes('id="settingsBackupList"')};};
  ctx.openSettings();assert.deepEqual(place(),{settings:true,dataOpen:false,listed:true},'positive control: Data and backups starts closed when Settings opens');
  assert.equal(await ctx.onAction('delete-local-backup',{dataset:{id:first.id}}),true,'the delete succeeds');
  assert.deepEqual(place(),{settings:true,dataOpen:true,listed:true},'after a delete Settings stays open with Data and backups open');

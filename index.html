@@ -16754,16 +16754,18 @@ function settingsDownloadButtonsHtml(){
 // Data and backups and lost the place in the list. Re-rendering after a backup
 // action keeps every open section open, keeps the scroll position and brings
 // the backup list into view, whether the action succeeded or was refused.
-function settingsSectionOpen(options,name,openByDefault){
-  const open=options?.openSections instanceof Set?options.openSections.has(name):openByDefault;
-  return open?' open':'';
+function settingsSectionOpen(options,id,openByDefault){
+  // Sections are named by data-settings-section, not by their summary text,
+  // so rewording a heading cannot stop a section from reopening.
+  const open=options?.openSections instanceof Set?options.openSections.has(id):openByDefault;
+  return ' data-settings-section="'+id+'"'+(open?' open':'');
 }
 function reopenSettingsAtBackups(){
   const root=document.getElementById("modalRoot");
   let open=[];
-  try{open=Array.from(root?.querySelectorAll?.("details.settings-section[open]>summary")||[],summary=>summary.textContent);}catch{}
+  try{open=Array.from(root?.querySelectorAll?.("details.settings-section[open][data-settings-section]")||[],section=>section.dataset.settingsSection);}catch{}
   const top=root?.querySelector?.(".modal")?.scrollTop;
-  renderSettings({openSections:new Set([...open,"Data and backups"])});
+  renderSettings({openSections:new Set([...open,"data"])});
   const modal=root?.querySelector?.(".modal");if(modal&&Number.isFinite(top))modal.scrollTop=top;
   try{document.getElementById("settingsBackupList")?.scrollIntoView?.({block:"nearest"});}catch{}
 }
@@ -16855,14 +16857,14 @@ function renderSettings(options={}){
         +(!window.CloudSync.ready&&window.CloudSync.status!=="error"?'<p class="kv">Restoring your sign-in session…</p>'
           :window.CloudSync.user?'<p class="kv">Signed in as '+esc(window.CloudSync.user)+'.</p><div class="mbtns"><button class="btn subtle" data-act="sync-signout">Sign out to change account</button></div>'
           :'<div class="mbtns"><button class="btn subtle" data-act="sync">Sign in to review recovery</button></div>'):'')
-    + '<details class="settings-section"'+settingsSectionOpen(options,"Scene and appearance",true)+'><summary>Scene and appearance</summary>'
+    + '<details class="settings-section"'+settingsSectionOpen(options,"scene",true)+'><summary>Scene and appearance</summary>'
     + '<label class="cbox"><input id="stPatternedIndicators" type="checkbox"'+(s.patternedIndicators?' checked':'')+'/> Patterned active indicators</label><p class="kv">Adds light diagonal stripes to colored states.</p>'
     + '<div class="frow"><label for="stDateFormat">Date format</label><select id="stDateFormat">'+[['system','System'],['mdy','MM/DD/YYYY'],['dmy','DD/MM/YYYY'],['ymd','YYYY-MM-DD']].map(([value,label])=>'<option value="'+value+'"'+(s.dateFormat===value?' selected':'')+'>'+label+'</option>').join('')+'</select><span id="stDatePreview" class="kv">'+esc(formatCalendarDate(new Date(Date.now()),{year:true}))+'</span></div>'
     + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button></div>'
     + '<div class="frow"><label>Scene time</label><button data-act="scene-time-settings" class="btn setting-choice '+(sceneTimeSet?'setting-unset':'setting-set')+'">Choose scene time</button><span id="settingsSceneTimeStatus" class="kv">'+(sceneTimeSet?'A scene time is selected.':'Following live time.')+'</span></div>'
     + '<div class="frow"><label>Location</label><button data-act="location-settings" class="btn setting-choice '+(locationSet?'setting-set':'setting-unset')+'">Choose location</button><span id="settingsLocationStatus" class="kv">'+(locationSet?'Sky location set.':'Using the default sky.')+'</span></div>'
     + '</details>'
-    + '<details class="settings-section"'+settingsSectionOpen(options,"Scanning and recurrence",false)+'><summary>Scanning and recurrence</summary>'
+    + '<details class="settings-section"'+settingsSectionOpen(options,"scanning",false)+'><summary>Scanning and recurrence</summary>'
     + '<div class="frow"><label for="stChainStartsWith">Chain starts with</label><select id="stChainStartsWith">'+[['oldest','Oldest eligible'],['mostLikely','Most likely']].map(([value,label])=>'<option value="'+value+'"'+((s.chainStartsWith||'oldest')===value?' selected':'')+'>'+label+'</option>').join('')+'</select></div>'
     + '<label class="cbox"><input id="stLastTaskWoop" type="checkbox"'+(s.lastTaskWoop?' checked':'')+'/> Last task WOOP</label><p class="kv">Plan the last dot after two dislodgements.</p>'
     + '<label class="cbox"><input id="stFloatingHeader" type="checkbox"'+(s.floatingHeader?' checked':'')+'/> Keep the header visible while scrolling</label>'
@@ -16883,10 +16885,10 @@ function renderSettings(options={}){
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
     + '<span class="kv">'+(featureEnabled("rankSparklines") ? 'more = smoother sparklines' : 'more = steadier estimates')+'</span></div>'
     + '</details>'
-    + '<details class="settings-section"'+settingsSectionOpen(options,"Contexts",false)+'><summary>Contexts</summary><h3>Contexts</h3>'+ctxMgr
+    + '<details class="settings-section"'+settingsSectionOpen(options,"contexts",false)+'><summary>Contexts</summary><h3>Contexts</h3>'+ctxMgr
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
     + '</details>'
-    + '<details class="settings-section"'+settingsSectionOpen(options,"Data and backups",false)+'><summary>Data and backups</summary>'
+    + '<details class="settings-section"'+settingsSectionOpen(options,"data",false)+'><summary>Data and backups</summary>'
     // #2303 (owner spec #2298, decisions of 2026-11-09 and 2026-11-10): one status
     // line, Make backup, Download backup, Restore, the backup list, a closed
     // Troubleshooting section and Reset everything, in that order. Every
