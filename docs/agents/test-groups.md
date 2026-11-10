@@ -6,10 +6,49 @@
 npm test
 ```
 
+## Test files
+
+Tests live in per-area files under `tests/`, one per group plus the
+repository-process tooling tests: `core.test.js`, `scenery.test.js`,
+`persistence-recovery.test.js`, `native-process.test.js` and
+`repository-process.test.js`. Shared fixtures and helpers live in
+`tests/shared.js`; area files import what they use from it. Add a test to the
+file of its group: a plain-string `test('…', …)` registered at the start of a
+line takes that file's group from `fileGroups` in
+`scripts/test-group-assignments.json` (#2232). Add a `rootAssignments` row to
+override that group, and for every title the runner's scanner cannot read: a
+computed title (`registration: "dynamic"`), a registration that does not start
+at column 0 (indented, for example inside an `if`), a title with an escape such
+as `\'` or written `\u2192` for `→`, or a registration after a regular
+expression literal the tokenizer reads as division (for example the one after
+the `/Couldn't…/` regex at `tests/core.test.js` 26028). Such a root without a
+row fails the core registration guard rather than running unclassified. A file
+with no `fileGroups` entry places nothing, so its new roots still need rows.
+Tests
+that read or spawn their own file use `fileURLToPath(import.meta.url)`.
+`npm test` runs two files at a time, because the long core file's 5 s fixture
+deadlines expire when every file runs at once.
+
+A branch that still edits the old single `tests.js` ports by moving each new or
+changed test into the area file of its group, adding any new helper to
+`tests/shared.js` with an export, prefixing relative dynamic imports and
+`new URL(..., import.meta.url)` paths with `../`, and pointing its catalog rows
+at the new file. A recreated `tests.js` cannot merge: the test-first gate rejects
+a diff that adds or changes it, and `npm test` and the group
+runner no longer run it.
+
 The additional `test:group` entry point runs one explicitly classified group in
 its own Node process. Group identifiers are stable: `core`, `scenery`,
 `persistence-recovery`, and `native-process`. Each process runs its selected
-roots serially. Keep each output directory empty and unique, outside the
+roots serially. A group that needs more than Node's default heap declares
+`nodeMaxOldSpaceSizeMb` (512 to 12288 MB; each group runs alone on a 16 GB
+runner), and the runner starts its test process, and so every per-file child,
+with that `--max-old-space-size` (#2232). Raise the group's heap rather than
+moving roots out of it. `scenery` and `persistence-recovery` run with 8192 MB:
+`persistence-recovery` ran out of Node's default heap on CI in PR #2222, which
+is why 19 heavy recovery roots were moved to `scenery`, where they stay. The
+8192 MB figure is about twice the 4144 MB default observed locally and has not
+been measured against the groups' actual peak; check it on the first CI run. Keep each output directory empty and unique, outside the
 checkout, and allocate separate native ports or other shared resources when
 groups run concurrently.
 
@@ -72,7 +111,10 @@ process registrations. Case outcomes, accepted skips, native registration
 checks, artifact hashes, and process exit status are recorded in the same
 result. Missing required cases, unclassified roots, overlapping assignments,
 empty groups, unregistered native children, additional skips, or process
-failures return nonzero.
+failures return nonzero. Every mode, `--describe` included, also fails when a
+declared required root resolves to zero tests in its file; a
+`registration: "dynamic"` row has no literal title to find, so only its group
+run checks that it executes.
 
 The independently captured inventory is rooted at Data safety run
 `40150306422` (source and checkout `d224107e5e56e5455a16e670dad6bdbc951940b5`):
@@ -86,6 +128,35 @@ full-versus-grouped result reconciliation.
 This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
+
+## Nightly cross-engine cohort
+
+`scripts/test-group-assignments.json` lists cross-engine native roots under
+`nightlyRoots` (root title, source file, reason). They belong to no required
+group: `--describe`, the four group runs, the unclassified-root guard and
+`--aggregate` neither run nor require them. A nightly root cannot also be a
+required root or process control, and the Chromium installed-client cases
+(the owner root and its signed-out and reconcile-held children) can never be
+declared nightly. To move a case to nightly, add a `nightlyRoots` row (and
+remove any `rootAssignments` override); a nightly root never takes its file's
+group; a baseline root cannot move because the baseline
+must stay fully assigned.
+
+The `Nightly` workflow runs them with Chromium and WebKit installed:
+
+```sh
+npm run test:group -- --group nightly-cross-engine --output-dir <new-empty-dir> \
+  --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> \
+  --source-sha <sha> --comparison-base <sha>
+```
+
+The run fails when no nightly root is declared, when a declared root is not
+registered exactly once in its file (resolves to zero tests), or when any
+nightly case fails, is skipped or is missing. `--describe` does not check
+nightly roots, so required CI stays green while only the nightly run is red. It writes `result.json` and TAP like a group run, but it is not
+a required group and cannot be described, covered or aggregated. When and how
+releases depend on it is in
+[release and review](release-and-review.md#nightly-cross-engine-native-checks).
 
 ## Parallel Actions aggregation
 

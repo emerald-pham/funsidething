@@ -32,7 +32,9 @@ function gitRaw(repoRoot, args) {
 }
 
 function gitShow(repoRoot, commitSha, file) {
-  const result = spawnSync('git', ['-C', repoRoot, 'show', `${commitSha}:${file}`], { encoding: 'utf8' });
+  // index.html is over 1 MiB; spawnSync's default buffer silently returned null
+  // for it, which made line classification fail open (#2234 review).
+  const result = spawnSync('git', ['-C', repoRoot, 'show', `${commitSha}:${file}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   return result.status === 0 ? result.stdout : null;
 }
 
@@ -220,8 +222,14 @@ function stripSourceComments(source, extension) {
   return output.trimEnd();
 }
 
+// The test surface is the per-area tests/ directory (#2213). The root tests.js
+// stays here because receipts are re-derived for their own base and candidate:
+// a pre-split candidate that edited tests.js must keep the plan it was recorded
+// with.
+const isTestSurfacePath = file => file === 'tests.js' || file.startsWith('tests/');
+
 function commentOnlyDiff(repoRoot, baseSha, commitSha, file) {
-  if (!commentReviewExtensions.test(file) || file === 'tests.js' || isReleaseProcessPath(file)) return false;
+  if (!commentReviewExtensions.test(file) || isTestSurfacePath(file) || isReleaseProcessPath(file)) return false;
   const extension = path.extname(file).toLowerCase();
   const before = gitShow(repoRoot, baseSha, file);
   const after = gitShow(repoRoot, commitSha, file);
@@ -239,10 +247,33 @@ function isDocumentationOnlyPath(file) {
   return !riskDocumentationPath.test(normalized);
 }
 
-function reviewDomainsForPath(file) {
+// Spec #2205: the scaled review policy is switched on only by this committed
+// AGENTS.md wording. Whitespace is normalized so rewrapping the paragraph does
+// not silently revert a candidate to the older policy.
+const scaledReviewPolicyMarker = 'Release reviews scale to the exact diff.';
+
+function hasScaledReviewPolicy(repoRoot, sha) {
+  return (gitShow(repoRoot, sha, 'AGENTS.md') || '').replace(/\s+/g, ' ').includes(scaledReviewPolicyMarker);
+}
+
+// Spec #2230 (#2234): this sentence narrows content classification to changed
+// code and the code near it. Like the scaled policy it must be committed at both base and head, so
+// every receipt recorded under the earlier classification still verifies.
+const changedLinePolicyMarker = 'Review plans classify changed code, not prose.';
+
+function hasChangedLinePolicy(repoRoot, sha) {
+  return (gitShow(repoRoot, sha, 'AGENTS.md') || '').replace(/\s+/g, ' ').includes(changedLinePolicyMarker);
+}
+
+function reviewDomainsForPath(file, scaled = false) {
   const normalized = file.toLowerCase().replaceAll('\\', '/');
   const domains = new Set();
-  if (isReleaseProcessPath(file)) domains.add('release-process');
+  // Under the scaled policy, process files (test map, rationales, guidance)
+  // keep the independent code review but no longer summon a specialist.
+  if (isReleaseProcessPath(file) && !scaled) domains.add('release-process');
+  // The receipt verifier, Pages deployment check and pre-push gate are
+  // deployment infrastructure, so they keep a specialist under the scaled policy.
+  if (scaled && /^scripts\/(?:release-evidence|install-release-hook)\.mjs$/.test(normalized)) domains.add('security-deployment');
   if (/(?:cloud|firestore|sync|storage|persist|backup|recovery|migration|indexeddb|localstorage|local-storage|account)/.test(normalized)) {
     domains.add('memory-cloud-sync');
   }
@@ -254,23 +285,244 @@ function reviewDomainsForPath(file) {
   return [...domains].sort();
 }
 
-function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file) {
+// Each added or removed line with its side and line number (#2234).
+function changedDiffLines(repoRoot, baseSha, commitSha, file) {
+  const patch = gitRaw(repoRoot, ['diff', '--unified=0', '--no-renames', baseSha, commitSha, '--', file]);
+  const lines = [];
+  let inHunk = false;
+  let oldLine = 0;
+  let newLine = 0;
+  let enclosing = '';
+  for (const line of patch.split(/\r?\n/)) {
+    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$/);
+    if (hunk) {
+      inHunk = true;
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      enclosing = hunk[3];
+      continue;
+    }
+    const side = line[0];
+    if (!inHunk || (side !== '+' && side !== '-')) continue;
+    lines.push({ side, number: side === '+' ? newLine++ : oldLine++, text: line.slice(1), enclosing });
+  }
+  return lines;
+}
+
+// Every app change adds a changelog entry and refreshes the app fingerprint
+// inside the changelog block plus the worker CACHE_NAME. That bookkeeping is
+// prose and hashes, so it never decides which reviewers a change needs (#2234).
+const shellCacheNameLine = /^\s*const\s+CACHE_NAME\s*=\s*["']chain-scanner-shell-[a-f0-9]+["'];?\s*$/;
+function changelogLines(text) {
+  const inside = new Set();
+  if (text === null) return inside;
+  let open = false;
+  text.split(/\r?\n/).forEach((line, index) => {
+    if (line.includes('<!-- changelog:start -->')) open = true;
+    if (open) inside.add(index + 1);
+    if (line.includes('<!-- changelog:end -->')) open = false;
+  });
+  return inside;
+}
+function releaseBookkeepingFilter(repoRoot, baseSha, commitSha, file) {
+  const changelog = { '-': changelogLines(gitShow(repoRoot, baseSha, file)), '+': changelogLines(gitShow(repoRoot, commitSha, file)) };
+  // Moving a changelog marker could pull script lines into the excluded block,
+  // so a diff that touches a marker gets no changelog exclusion. Changelog
+  // markup is injected into Settings, so code-running lines there still count.
+  const markerMoved = changedDiffLines(repoRoot, baseSha, commitSha, file).some(line => /<!-- changelog:(?:start|end) -->/.test(line.text));
+  return line => (markerMoved || !changelog[line.side].has(line.number) || htmlRunsCode.test(line.text)) && !shellCacheNameLine.test(line.text);
+}
+
+// Persistence, session and auth patterns describe code, so under the
+// changed-line policy they read only script code: script files and inline
+// scripts. Help and changelog prose about cloud recovery, comments, and Node's
+// synchronous file/process APIs (readFileSync, spawnSync, ...) used to make
+// tooling and copy edits look like storage changes (#2234). App identifiers
+// such as renderSync are not Node APIs and still count.
+const scriptFilePattern = /\.(?:js|mjs|cjs|jsx|ts|tsx)$/i;
+const nodeSyncApi = /\b(?:readFile|writeFile|appendFile|copyFile|exists|mkdir|mkdtemp|readdir|rm|rmdir|unlink|rename|stat|lstat|fstat|realpath|access|chmod|chown|symlink|readlink|cp|open|close|read|write|fsync|fdatasync|truncate|ftruncate|utimes|opendir|spawn|exec|execFile)Sync\b/g;
+// Only a line that is wholly a comment is skipped. A line that merely starts
+// with a comment marker, or a '*' continuation, may still carry code, so it
+// stays classified (fail closed).
+// HTML outside an inline script body still loads or runs code: script tags
+// (including src= loads and one-line scripts), event-handler attributes and
+// javascript: URLs. Those lines are code (#2234 review).
+const htmlRunsCode = /<\/?script\b|\bon[a-z]+\s*=|javascript:/i;
+const nearbyCodeLines = 3;
+const commentOnlyLine = /^\s*(?:\/\/.*|\/\*(?:(?!\*\/).)*\*\/\s*|<!--(?:(?!-->).)*-->\s*)$/;
+function scriptCodeFilter(repoRoot, baseSha, commitSha, file) {
+  // SVG files can carry <script> elements and event handlers just like HTML.
+  const html = /\.(?:html?|svg)$/i.test(file);
+  if (!html && !scriptFilePattern.test(file)) return () => false;
+  // A side with changed lines that cannot be read is treated as all code, so
+  // a read failure fails closed instead of hiding every line.
+  const readable = text => text === null ? null : inlineScriptLines(text);
+  const scripts = html
+    ? { '-': readable(gitShow(repoRoot, baseSha, file)), '+': readable(gitShow(repoRoot, commitSha, file)) }
+    : null;
+  return line => (!scripts || scripts[line.side] === null || scripts[line.side].has(line.number) || htmlRunsCode.test(line.text)) &&
+    !commentOnlyLine.test(line.text);
+}
+
+function reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled = false, changedLines = false) {
   const normalized = file.toLowerCase().replaceAll('\\', '/');
   const domains = new Set();
-  const patch = gitRaw(repoRoot, ['diff', '--unified=2', '--no-renames', baseSha, commitSha, '--', file]);
-  const context = patch.split(/\r?\n/).filter(line =>
-    line && !line.startsWith('+++') && !line.startsWith('---') && !line.startsWith('@@')).join('\n');
+  // The earlier classification also read two unchanged lines around each change,
+  // so editing a line beside storage code made the diff a storage change.
+  const context = changedLines
+    ? (() => {
+      const bookkeeping = releaseBookkeepingFilter(repoRoot, baseSha, commitSha, file);
+      const code = scriptCodeFilter(repoRoot, baseSha, commitSha, file);
+      // A changed code line is read with the function git names in its hunk
+      // header, so an edit inside cloudPull is a sync change even when the line
+      // itself only compares revisions (#2234 review).
+      const kept = changedDiffLines(repoRoot, baseSha, commitSha, file).filter(line => bookkeeping(line) && code(line));
+      // A changed guard is persistence code because of the storage calls beside
+      // it (tx.get, expectedHash, runTransaction), so nearby code lines on the
+      // same side are read too; prose, comments and bookkeeping stay excluded.
+      const sides = { '-': gitShow(repoRoot, baseSha, file), '+': gitShow(repoRoot, commitSha, file) };
+      const sideLines = { '-': sides['-']?.split(/\r?\n/) ?? [], '+': sides['+']?.split(/\r?\n/) ?? [] };
+      const nearby = kept.flatMap(line => {
+        const around = [];
+        for (let number = Math.max(1, line.number - nearbyCodeLines); number <= line.number + nearbyCodeLines; number++) {
+          const text = sideLines[line.side][number - 1];
+          if (text === undefined || number === line.number) continue;
+          const candidate = { side: line.side, number, text };
+          if (bookkeeping(candidate) && code(candidate)) around.push(text);
+        }
+        return around;
+      });
+      return [...new Set(kept.map(line => line.enclosing)), ...kept.map(line => line.text), ...nearby]
+        .map(text => text.replace(nodeSyncApi, '')).join('\n');
+    })()
+    : gitRaw(repoRoot, ['diff', '--unified=2', '--no-renames', baseSha, commitSha, '--', file]).split(/\r?\n/).filter(line =>
+      line && !line.startsWith('+++') && !line.startsWith('---') && !line.startsWith('@@')).join('\n');
   // Opaque persistence objects and their mutating methods carry data-safety risk.
   if (/(?:localstorage|sessionstorage|indexeddb|firestore|cloud(?:pull|push|sync|data)?|sync(?:hroniz|ing|ed)?|persist\w*|backup|recover|hydrate\w*|reconcil|revision|serverUpdatedAt|save\w*|load\w*|store\w*|storage\w*|snapshot\w*|serialize\w*|deserialize\w*|boardStore)/i.test(context) || genericPersistenceCallPattern.test(context)) {
     domains.add('memory-cloud-sync');
   }
+  // Revision ordering decides which copy wins a sync. Under the changed-line
+  // policy, short revision names (remote.rev, localRev) count too; the earlier
+  // classification is left unchanged so its receipts still verify.
+  if (changedLines && /(?:\.rev\b|\brevs?\b|[a-z]Rev\b)/.test(context)) domains.add('memory-cloud-sync');
+  // The device store is persistence code throughout, but it sits indented in an
+  // IIFE, so git names no enclosing function and many guard lines carry no
+  // storage word; the cloud store is already caught by its path (#2234 review).
+  if (changedLines && /(?:^|\/)device-store/.test(normalized)) domains.add('memory-cloud-sync');
+  if (changedLines && /schema_version/i.test(context)) domains.add('data-migration');
   if (/(?:session|sharedState|currentUser|userId|accountId|BroadcastChannel)/i.test(context)) domains.add('shared-session-state');
   if (/(?:auth|firebase|callable|onCall|onRequest|httpsCallable|https\.on(?:Call|Request)|signIn|signOut|token|credential|ownerUid|firestore\.rules|authorization|claims|permission|provider|login|\b(?:role|owner|admin|privilege)\w*\b)/i.test(context)) {
     domains.add('security-deployment');
   }
   if (/(?:migration|migrat|schemaVersion|schema version|upgradeDatabase|versionchange)/i.test(context)) domains.add('data-migration');
-  if (/(?:^|\/)\.github\/workflows\//.test(normalized)) domains.add('release-process');
+  if (/(?:^|\/)\.github\/workflows\//.test(normalized) && !scaled) domains.add('release-process');
   return [...domains].sort();
+}
+
+// Typography review follows rendered markup and styling, not logic. Script
+// lines count when they build markup or classes/styles, because most of the
+// app's markup is rendered from template strings inside index.html scripts.
+const markupLinePattern = /<\/?[a-z][a-z0-9-]*(?:[\s>/]|$)|\b(?:class|style)\s*=|\.style\b|classList|className|(?:inner|outer)HTML|insertAdjacentHTML/i;
+
+function inlineScriptLines(text) {
+  const inside = new Set();
+  if (text === null) return inside;
+  let open = false;
+  text.split(/\r?\n/).forEach((line, index) => {
+    if (open) {
+      if (/<\/script\s*>/i.test(line)) open = false;
+      else inside.add(index + 1);
+      return;
+    }
+    const start = line.match(/<script\b([^>]*)>/i);
+    if (start && !/\bsrc\s*=/i.test(start[1]) && !/<\/script\s*>/i.test(line.slice(start.index + start[0].length))) open = true;
+  });
+  return inside;
+}
+
+const unrenderedSegments = new Set(['.git', '.github', '.claude', 'audits', 'docs', 'node_modules', 'scripts']);
+
+// Product behavior is what users run: the app's runtime files and the Firestore
+// rules. Tests, tooling and workflows change no control, default or saved data
+// the extended FAQ describes, so only product files call for owner FAQ coverage.
+const productFilePattern = /\.(?:html?|js|mjs|cjs|jsx|ts|tsx|css|scss|webmanifest|svg|png|jpe?g|webp|avif)$/i;
+function isProductPath(file) {
+  const normalized = file.replaceAll('\\', '/');
+  if (normalized === 'firestore.rules') return true;
+  if (isTestSurfacePath(normalized) || /\.test\.[cm]?js$/i.test(normalized) ||
+      normalized.split('/').some(segment => unrenderedSegments.has(segment))) return false;
+  return productFilePattern.test(normalized);
+}
+
+// Lines inside inline <style> blocks are stylesheet rules: they carry no tags
+// yet always change rendering, so a rule edit is never treated as rewording.
+function inlineStyleLines(text) {
+  const inside = new Set();
+  if (text === null) return inside;
+  let open = false;
+  text.split(/\r?\n/).forEach((line, index) => {
+    if (open) {
+      if (/<\/style\s*>/i.test(line)) open = false;
+      else inside.add(index + 1);
+      return;
+    }
+    const start = line.match(/<style\b[^>]*>/i);
+    if (start && !/<\/style\s*>/i.test(line.slice(start.index + start[0].length))) open = true;
+  });
+  return inside;
+}
+
+function changesTypography(repoRoot, baseSha, commitSha, file, changedLines = false) {
+  const normalized = file.replaceAll('\\', '/');
+  // Tests and tooling assert on markup strings but are never shown to users.
+  if (isTestSurfacePath(normalized) || /\.test\.[cm]?js$/i.test(normalized) ||
+      normalized.split('/').some(segment => unrenderedSegments.has(segment))) return false;
+  const extension = path.extname(file).toLowerCase();
+  if (['.css', '.scss'].includes(extension)) return true;
+  const html = ['.html', '.htm'].includes(extension);
+  if (!html && !['.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx'].includes(extension)) return false;
+  const patch = gitRaw(repoRoot, ['diff', '--unified=0', '--no-renames', baseSha, commitSha, '--', file]);
+  const scripts = html
+    ? { '-': inlineScriptLines(gitShow(repoRoot, baseSha, file)), '+': inlineScriptLines(gitShow(repoRoot, commitSha, file)) }
+    : null;
+  const bookkeeping = changedLines ? releaseBookkeepingFilter(repoRoot, baseSha, commitSha, file) : null;
+  const styles = html && changedLines
+    ? { '-': inlineStyleLines(gitShow(repoRoot, baseSha, file)), '+': inlineStyleLines(gitShow(repoRoot, commitSha, file)) }
+    : null;
+  let inHunk = false;
+  let oldLine = 0;
+  let newLine = 0;
+  // Under the changed-line policy a hunk that rewords text but keeps every tag
+  // and attribute renders with the same markup, so it is copy, not typography
+  // (#2234). Removed and added HTML lines must pair up with equal tag skeletons.
+  const markup = { '-': [], '+': [] };
+  const tagSkeleton = text => (text.match(/<[^>]*>/g) || []).join('');
+  const rewordsOnly = () => markup['-'].length === markup['+'].length &&
+    markup['-'].every((text, index) => tagSkeleton(text) === tagSkeleton(markup['+'][index]));
+  for (const line of patch.split(/\r?\n/)) {
+    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      if (!rewordsOnly()) return true;
+      markup['-'] = [];
+      markup['+'] = [];
+      inHunk = true;
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
+      continue;
+    }
+    const side = line[0];
+    if (!inHunk || (side !== '+' && side !== '-')) continue;
+    const number = side === '+' ? newLine++ : oldLine++;
+    if (bookkeeping && !bookkeeping({ side, number, text: line.slice(1) })) continue;
+    // Outside inline scripts, every HTML line is markup or inline stylesheet.
+    if (html && !scripts[side].has(number)) {
+      if (!changedLines || styles[side].has(number)) return true;
+      markup[side].push(line.slice(1));
+      continue;
+    }
+    if (markupLinePattern.test(line.slice(1))) return true;
+  }
+  return !rewordsOnly();
 }
 
 export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = {}) {
@@ -284,15 +536,26 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     : [];
   const changedFiles = gitRaw(repoRoot, ['diff', '--name-only', '--no-renames', '-z', baseSha, commitSha, '--'])
     .split('\0').filter(Boolean).sort();
+  // The policy is read at the exact head, but a candidate whose base predates
+  // it keeps the old policy: the diff that introduces the lighter plan cannot
+  // approve itself under that plan.
+  const scaled = hasScaledReviewPolicy(repoRoot, commitSha) && hasScaledReviewPolicy(repoRoot, baseSha);
+  const changedLines = scaled && hasChangedLinePolicy(repoRoot, commitSha) && hasChangedLinePolicy(repoRoot, baseSha);
   let requiresCodeReview = false;
+  let changesProduct = false;
+  let requiresTypographyReview = false;
   const specialistDomains = new Set();
   for (const file of changedFiles) {
     const documentationOnly = isDocumentationOnlyPath(file);
     const commentsOnly = commentOnlyDiff(repoRoot, baseSha, commitSha, file);
     if (!documentationOnly && !commentsOnly) requiresCodeReview = true;
+    if (!documentationOnly && !commentsOnly && isProductPath(file)) changesProduct = true;
+    if (scaled && !commentsOnly && !requiresTypographyReview) {
+      requiresTypographyReview = changesTypography(repoRoot, baseSha, commitSha, file, changedLines);
+    }
     if (!commentsOnly) {
-      for (const domain of reviewDomainsForPath(file)) specialistDomains.add(domain);
-      for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file)) specialistDomains.add(domain);
+      for (const domain of reviewDomainsForPath(file, scaled)) specialistDomains.add(domain);
+      for (const domain of reviewDomainsFromDiff(repoRoot, baseSha, commitSha, file, scaled, changedLines)) specialistDomains.add(domain);
     }
   }
   for (const domain of additionalSpecialistDomains) specialistDomains.add(domain);
@@ -301,6 +564,22 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
   const mode = requiresCodeReview && requiresSpecialistReview ? 'dual-review' :
     requiresCodeReview ? 'independent-review' :
     requiresSpecialistReview ? 'specialist-review' : 'owner-self-review';
+  if (scaled) {
+    // Plan schema 2 marks the scaled policy. FAQ coverage moves into the owner
+    // review for product behavior instead of a separate FAQ reviewer. Schema 1
+    // (every pre-policy receipt) is untouched.
+    return {
+      schemaVersion: 2,
+      changedFiles,
+      mode,
+      requiresCodeReview,
+      requiresFaqReview: false,
+      requiresOwnerFaqCoverage: changesProduct,
+      requiresSpecialistReview,
+      requiresTypographyReview,
+      specialistDomains: domains,
+    };
+  }
   return {
     schemaVersion: 1,
     changedFiles,
@@ -322,6 +601,14 @@ function evidenceFile(repoRoot, sourcePath, expectedSha, label) {
   return fs.readFileSync(resolved);
 }
 
+// Schema-1 receipts remain valid only for candidates from before the FAQ and
+// scaled policies; both later policies require schema-2 review objects.
+function schemaVersionOneConflict(plan) {
+  if (plan.schemaVersion === 2) return 'Scaled review policy requires schemaVersion 2 evidence.';
+  if (plan.requiresFaqReview) return 'FAQ coverage policy requires schemaVersion 2 evidence.';
+  return null;
+}
+
 function validateInput(repoRoot, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Release evidence input must be a JSON object.');
   if (input.schemaVersion !== 1) throw new Error('Release evidence input must use schemaVersion 1.');
@@ -331,7 +618,8 @@ function validateInput(repoRoot, input) {
   const actualTree = candidateTree(repoRoot, commitSha);
   if (!SHA1.test(treeSha || '') || actualTree !== treeSha) throw new Error('Candidate tree SHA does not match the exact commit.');
   assertAncestor(repoRoot, baseSha, commitSha);
-  if(deriveReleaseReviewPlan(repoRoot,commitSha,baseSha).requiresFaqReview)throw new Error('FAQ coverage policy requires schemaVersion 2 evidence.');
+  const legacyPlanError = schemaVersionOneConflict(deriveReleaseReviewPlan(repoRoot, commitSha, baseSha));
+  if (legacyPlanError) throw new Error(legacyPlanError);
   const ownerTask = taskId(input.ownerTask, 'ownerTask');
   const auditorTask = taskId(input.memoryAudit?.task, 'memoryAudit.task');
   const reviewerTask = taskId(input.independentReview?.task, 'independentReview.task');
@@ -421,6 +709,20 @@ function validatedMemorySources(sources, field, verifyNow) {
   });
 }
 
+// Scaled policy: the owner records the extended-FAQ coverage result for product
+// behavior, replacing the separate FAQ reviewer of the October 2026 policy.
+const faqCoverageResults = new Set(['updated', 'no-user-facing-change']);
+
+function ownerFaqCoverage(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !faqCoverageResults.has(value.result)) {
+    throw new Error('Owner review FAQ coverage must record a result of updated or no-user-facing-change.');
+  }
+  if (typeof value.summary !== 'string' || value.summary.trim().length < 20) {
+    throw new Error('Owner review FAQ coverage must record a specific summary.');
+  }
+  return { result: value.result, summary: value.summary.trim() };
+}
+
 function validateRiskBasedInput(repoRoot, input) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || input.schemaVersion !== 2) {
     throw new Error('Risk-based release evidence input must use schemaVersion 2.');
@@ -446,6 +748,9 @@ function validateRiskBasedInput(repoRoot, input) {
   if (!owner.scope || owner.scope.fullDiff !== true || typeof owner.scope.rationale !== 'string' || owner.scope.rationale.trim().length < 20) {
     throw new Error('Owner review must attest to the full exact diff and record a specific risk rationale.');
   }
+  let faqCoverage;
+  if (reviewPlan.requiresOwnerFaqCoverage) faqCoverage = ownerFaqCoverage(owner.faqCoverage);
+  else if (owner.faqCoverage !== undefined) throw new Error('This exact diff has no product behavior; omit the owner review FAQ coverage.');
   const ownerBytes = evidenceFile(repoRoot, owner.evidencePath, owner.evidenceSha256, 'Owner exact-diff review');
   const identities = [ownerTask];
   let independentReview;
@@ -532,6 +837,7 @@ function validateRiskBasedInput(repoRoot, input) {
       completedAt: ownerTime,
       summary: owner.summary.trim(),
       scope: { fullDiff: true, rationale: owner.scope.rationale.trim() },
+      ...(faqCoverage ? { faqCoverage } : {}),
       evidence: { file: 'owner-review.md', sha256: sha256(ownerBytes) },
     },
     ...(independentReview ? { independentReview } : {}),
@@ -627,6 +933,15 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
   if (typeof owner?.summary !== 'string' || owner.summary.trim().length < 20 ||
       owner?.scope?.fullDiff !== true || typeof owner?.scope?.rationale !== 'string' || owner.scope.rationale.trim().length < 20) {
     errors.push('Owner exact-diff review summary or full-diff risk rationale is incomplete.');
+  }
+  if (plan?.requiresOwnerFaqCoverage) {
+    try {
+      ownerFaqCoverage(owner?.faqCoverage);
+    } catch (error) {
+      errors.push(error.message);
+    }
+  } else if (owner && Object.hasOwn(owner, 'faqCoverage')) {
+    errors.push('Owner review FAQ coverage is not part of this exact-diff plan.');
   }
   const identities = [];
   try {
@@ -746,7 +1061,12 @@ export function verifyReleaseEvidence(repoRoot, commitSha) {
     return { ok: false, errors: ['Missing or malformed exact-SHA release receipt: ' + error.message], receiptPath };
   }
   if (receipt?.schemaVersion === 2) return verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath);
-  try{if(deriveReleaseReviewPlan(repoRoot,commitSha,receipt?.candidate?.baseSha).requiresFaqReview)errors.push('FAQ coverage policy requires schemaVersion 2 evidence.');}catch(error){errors.push(error.message);}
+  try {
+    const legacyPlanError = schemaVersionOneConflict(deriveReleaseReviewPlan(repoRoot, commitSha, receipt?.candidate?.baseSha));
+    if (legacyPlanError) errors.push(legacyPlanError);
+  } catch (error) {
+    errors.push(error.message);
+  }
   if (!receipt || typeof receipt !== 'object' || receipt.schemaVersion !== 1) errors.push('Release receipt schemaVersion must be 1.');
   if (receipt?.candidate?.commitSha !== commitSha) errors.push('Release receipt is stale or names a different candidate SHA.');
   if (receipt?.candidate?.commitSha && SHA1.test(receipt.candidate.commitSha)) {
@@ -819,9 +1139,16 @@ export function parsePrePushUpdates(input) {
   return updates;
 }
 
+// Only main is released. Work branches push without a receipt so CI can run
+// before reviews; reviews then sign the CI-green candidate once. Requiring a
+// receipt for every branch push made each CI fix, rebind or fingerprint refresh
+// need fresh reviews (#2234). The main ruleset's required review statuses and the
+// Pages deployment verifier still bind the exact reviewed head.
+const releasedRef = 'refs/heads/main';
+
 export function validatePrePushUpdates(repoRoot, updates) {
   const errors = [];
-  const outgoing = updates.filter(update => update && update.localSha !== '0'.repeat(40));
+  const outgoing = updates.filter(update => update && update.localSha !== '0'.repeat(40) && update.remoteRef === releasedRef);
   if (outgoing.length === 0) return errors;
   const status = git(repoRoot, ['status', '--porcelain', '--untracked-files=all']);
   if (status) errors.push('Release push blocked: the worktree must be clean while validating the exact candidate.');
@@ -843,6 +1170,14 @@ export function validatePrePushUpdates(repoRoot, updates) {
   return errors;
 }
 
+// Status binding versions: v=2 is the original risk-based plan, v=3 the
+// October 2026 FAQ-reviewer policy, and v=4 the scaled policy (plan schema 2).
+// Each verifier accepts a binding only for candidates carrying its own policy.
+function statusBindingVersion(reviewPlan) {
+  if (reviewPlan.schemaVersion === 2) return ';v=4';
+  return reviewPlan.requiresFaqReview ? ';v=3' : ';v=2';
+}
+
 export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
   const result = verifyReleaseEvidence(repoRoot, commitSha);
   if (!result.ok) throw new Error('Cannot publish release statuses without a valid exact-SHA receipt: ' + result.errors.join(' '));
@@ -852,7 +1187,7 @@ export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
     ? 'r=' + result.receipt.receiptSha256 + ';b=' + result.receipt.candidate.baseSha +
       ';p=' + sha256(Buffer.from(canonicalJson(result.receipt.reviewPlan))).slice(0, 12) +
       ';c=' + (result.receipt.reviewPlan.requiresCodeReview ? '1' : '0') +
-      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
+      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + statusBindingVersion(result.receipt.reviewPlan)
     : 'receipt-sha256=' + result.receipt.receiptSha256 + ';base=' + result.receipt.candidate.baseSha;
   const targetUrl = 'https://github.com/' + git(repoRoot, ['remote', 'get-url', 'origin']).replace(/^.*github\.com[:/]/, '').replace(/\.git$/, '') + '/commit/' + commitSha;
   const base = result.receipt.candidate.baseSha;
@@ -922,7 +1257,11 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
       localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
       if(!localHead)throw new Error('Exact review head remains unavailable after fetching its PR ref.');
     }
-    const faqPolicy=localHead ? !!deriveReleaseReviewPlan(repoRoot,headSha,baseSha).requiresFaqReview : false;
+    const headPlan=localHead ? deriveReleaseReviewPlan(repoRoot,headSha,baseSha) : null;
+    const faqPolicy=!!headPlan?.requiresFaqReview;
+    // The v=4 binding is honored only when the exact head and base carry the
+    // scaled policy; an unreadable head can never claim it (fails closed).
+    const scaledPolicy=headPlan?.schemaVersion===2;
     const reviewedCommit = await githubJson(fetchImpl, api + '/commits/' + headSha, token);
     if (!treeSha || reviewedCommit.commit?.tree?.sha !== treeSha) {
       throw new Error('The reviewed pull request head tree does not exactly match the deployed main tree.');
@@ -937,12 +1276,14 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
     const riskBasedDescription = latest.get('funsidething/specialist-review')?.status?.description ||
       latest.get('funsidething/independent-review')?.status?.description || '';
     if(faqPolicy&&!/;v=3$/.test(riskBasedDescription))throw new Error('FAQ coverage policy requires FAQ-approved exact-head deployment evidence.');
-    if (/;v=[23]$/.test(riskBasedDescription)) {
+    if (scaledPolicy && !/;v=4$/.test(riskBasedDescription)) throw new Error('Scaled review policy requires v=4 exact-head deployment evidence.');
+    if (!scaledPolicy && /;v=4$/.test(riskBasedDescription)) throw new Error('The v=4 review binding is accepted only for scaled-policy candidates.');
+    if (/;v=[234]$/.test(riskBasedDescription)) {
       const statusPlan = new Map();
       for (const context of RISK_BASED_RELEASE_STATUS_CONTEXTS) {
         const status = latest.get(context)?.status;
         if (!status || status.state !== 'success') throw new Error('Latest exact-head status is missing or unsuccessful: ' + context + '.');
-        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=([23])$/);
+        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=([234])$/);
         if (!match || match[2] !== baseSha) throw new Error('Risk-based exact-head status is not bound to the deployed base and receipt: ' + context + '.');
         statusPlan.set(context, match.slice(1));
       }
@@ -1019,9 +1360,12 @@ async function main() {
   }
   if (command === 'pre-push') {
     const input = fs.readFileSync(0, 'utf8');
-    const errors = validatePrePushUpdates(repoRoot, parsePrePushUpdates(input));
+    const updates = parsePrePushUpdates(input);
+    const errors = validatePrePushUpdates(repoRoot, updates);
     if (errors.length) throw new Error(errors.join('\n'));
-    process.stdout.write('Every outgoing commit tip has valid exact-SHA release evidence.\n');
+    process.stdout.write(updates.some(update => update?.remoteRef === 'refs/heads/main' && update.localSha !== '0'.repeat(40))
+      ? 'Every commit pushed to main has valid exact-SHA release evidence.\n'
+      : 'No push to refs/heads/main; no release receipt checked.\n');
     return;
   }
   if (command === 'publish') {

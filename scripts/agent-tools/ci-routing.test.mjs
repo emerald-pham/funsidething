@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -128,6 +128,9 @@ function publishedInputPass(f, plan, gates = ['core']) {
   return github;
 }
 
+// #2232: the retained original artifact must be unexpired whatever today's
+// date is; a literal 2030 expiry made these reuse fixtures fail from 2030 on.
+const retainedArtifactExpiry=()=>new Date(Date.now()+90*86400000).toISOString();
 function attachInputArtifacts(f,github,jobs){
   const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
   for(const job of jobs)for(const marker of job.steps.filter(step=>step.name.startsWith('Completed CI gate '))){
@@ -143,7 +146,7 @@ function attachInputArtifacts(f,github,jobs){
     marker.name=marker.name.replace(/result [a-f0-9]{64}$/,`result ${hash(bytes)}`);
     const archive=directory+'.zip';const result=spawnSync('zip',['-qr',archive,'.'],{cwd:directory,encoding:'utf8'});assert.equal(result.status,0,result.stderr);
     const content=readFileSync(archive);github.artifacts||=[];github.artifacts=github.artifacts.filter(a=>a.name!==name);
-    github.artifacts.push({id:900+github.artifacts.length,name,expired:false,created_at:'2026-10-27T10:00:45Z',expires_at:'2030-01-01T00:00:00Z',digest:'sha256:'+hash(content),size_in_bytes:content.length,workflow_run:{id:job.run_id,head_sha:job.head_sha},fixturePath:archive});
+    github.artifacts.push({id:900+github.artifacts.length,name,expired:false,created_at:'2026-10-27T10:00:45Z',expires_at:retainedArtifactExpiry(),digest:'sha256:'+hash(content),size_in_bytes:content.length,workflow_run:{id:job.run_id,head_sha:job.head_sha},fixturePath:archive});
   }
 }
 
@@ -530,15 +533,20 @@ test('workflow fails instead of claiming completion when the routing record cann
 });
 
 
-test('metadata-only PR edits reuse completed full merge coverage without treating pending as success', t => {
+// #2232: the workflow no longer fires on PR edits, so the router keeps no
+// metadata-edit reuse path. An edited event that still reaches it (a manual or
+// future trigger) executes its own cohort like any other fresh PR event.
+test('a routed pull request edited event executes its own cohort instead of reusing the head producer', t => {
   const f=fixture(t);
   const producer=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge});
   published(f,producer.record);
-  const result=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,action:'edited',changes:{body:{from:'prior evidence'}}});
-  assert.equal(result.status,0,result.stdout+result.stderr);
-  assert.equal(executions(f).length,1,'an unchanged exact PR context must not repeat the complete cohort for body metadata');
-  assert.equal(result.record?.decision,'reuse');
-  assert.equal(result.record.coveredBy.runAttempt,'2');
+  for (const changes of [{body:{from:'prior evidence'}},{title:{from:'earlier title'}}]) {
+    const result=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,action:'edited',changes});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.equal(result.record?.decision,'full',result.stdout);
+    assert.equal(result.record.observations.some(item=>item.url.includes('/pulls')),false,'an edited event must not wait on or reuse a canonical PR producer');
+  }
+  assert.equal(executions(f).length,3);
 });
 
 
@@ -592,19 +600,284 @@ test('grouped routing reuses only an exact completed reconciled producer and pre
   });
 });
 
-test('grouped metadata-only edited PR reuses only its completed exact merge context', t => {
+test('grouped routing of a pull request edited event executes its own cohort', t => {
   const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);publishedGroups(f,first.record);
   const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{body:{from:'previous evidence'}},environment:descriptorFor(f,f.merge)});
-  assert.equal(edited.status,0,edited.stdout+edited.stderr);assert.equal(edited.record.decision,'reuse');assert.equal(executions(f).length,1);
+  assert.equal(edited.status,0,edited.stdout+edited.stderr);assert.equal(edited.record.decision,'full',edited.stdout);assert.equal(executions(f).length,2);
   const baseEdit=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{base:{ref:{from:'previous-base'}}},environment:descriptorFor(f,f.merge)});
-  assert.equal(baseEdit.status,0,baseEdit.stderr);assert.equal(baseEdit.record.decision,'full');assert.equal(executions(f).length,2);
+  assert.equal(baseEdit.status,0,baseEdit.stderr);assert.equal(baseEdit.record.decision,'full');assert.equal(executions(f).length,3);
 });
 
 
-test('metadata edits continue past verified covered runs to the original full producer', t => {
+// A covered (reuse-mode) run is never itself a producer; the router continues to
+// the original full run. Migrated from the removed metadata-edit path (#2232) to
+// the outgoing branch push, which still routes through canonical producers.
+test('routing continues past verified covered runs to the original full producer', t => {
   const f=fixture(t,true),first=invoke(f,{event:'pull_request',checkout:f.merge,environment:descriptorFor(f,f.merge)});assert.equal(first.status,0,first.stderr);
   const github=publishedGroups(f,first.record),covered=github.jobs.map(job=>({...job,run_id:72,run_attempt:1,steps:job.name==='scanner-tests'?[{name:`Verified complete cohort ${first.record.contextSha256} report ${'9'.repeat(64)} mode reuse`,conclusion:'success'}]:job.steps}));
   github.jobsByRun={'71':github.jobs,'72':covered};github.runs.unshift({...github.runs[0],id:72,run_attempt:1});writeFileSync(f.external,JSON.stringify(github));
-  const edited=invoke(f,{event:'pull_request',checkout:f.merge,action:'edited',changes:{title:{from:'earlier title'}},environment:descriptorFor(f,f.merge)});
-  assert.equal(edited.status,0,edited.stderr);assert.equal(edited.record.decision,'reuse',edited.stdout);assert.equal(edited.record.coveredBy.runId,'71');assert.equal(edited.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
+  const pushed=invoke(f,{environment:descriptorFor(f,f.head)});
+  assert.equal(pushed.status,0,pushed.stderr);assert.equal(pushed.record.decision,'reuse',pushed.stdout);assert.equal(pushed.record.coveredBy.runId,'71');assert.equal(pushed.record.coveredBy.runAttempt,'2');assert.equal(executions(f).length,1);
+});
+
+// GitHub decides triggers, concurrency and job conditions before any repository
+// code runs, so these helpers interpret the workflow the way GitHub does instead
+// of matching its exact spelling. Only the expression subset the workflow uses is
+// supported; anything else fails loudly rather than silently evaluating to false.
+function workflowBlock(text, key, indent = '') {
+  const lines = text.split('\n'), start = lines.findIndex(line => line === `${indent}${key}:` || line.startsWith(`${indent}${key}: `));
+  if (start < 0) return null;
+  const inline = lines[start].slice(indent.length + key.length + 1).trim(), body = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() && !line.startsWith(indent + ' ')) break;
+    body.push(line);
+  }
+  return { inline, body: body.join('\n') };
+}
+function workflowList(value) {
+  const match = value.match(/^\[(.*)\]$/);
+  if (!match) throw new Error(`Unsupported workflow list ${JSON.stringify(value)}.`);
+  return match[1].split(',').map(item => item.trim().replace(/^'(.*)'$/, '$1')).filter(Boolean);
+}
+function evaluateWorkflowExpression(expression, context) {
+  const lookup = name => name.split('.').slice(1).reduce((value, key) => value?.[key], context.github) ?? null;
+  const tokens = expression.match(/'(?:[^']|'')*'|github(?:\.[A-Za-z_][\w-]*)+|format\(|==|!=|&&|\|\||[!(),]|[^\s!(),=&|]+/g) || [];
+  const js = tokens.map(token => {
+    if (token.startsWith("'")) return JSON.stringify(token.slice(1, -1).replaceAll("''", "'"));
+    if (token.startsWith('github.')) return JSON.stringify(lookup(token));
+    if (token === 'format(') return 'format(';
+    if (['==', '!=', '&&', '||', '!', '(', ')', ',', 'true', 'false', 'null'].includes(token)) return token;
+    throw new Error(`Unsupported workflow expression token ${JSON.stringify(token)} in ${JSON.stringify(expression)}.`);
+  }).join(' ');
+  const format = (pattern, ...values) => pattern.replace(/\{(\d+)\}/g, (_, index) => String(values[Number(index)] ?? ''));
+  return Function('format', `return (${js});`)(format);
+}
+function interpolateWorkflowValue(value, context) {
+  // A value that is exactly one expression keeps its type (booleans for
+  // cancel-in-progress); mixed text interpolates each expression as a string.
+  const whole = value.match(/^\$\{\{((?:(?!\}\}).)*)\}\}$/s);
+  if (whole) return evaluateWorkflowExpression(whole[1].trim(), context);
+  return value.replace(/\$\{\{(.*?)\}\}/g, (_, expression) => String(evaluateWorkflowExpression(expression.trim(), context) ?? ''));
+}
+function workflowTriggers(workflow, context) {
+  const on = workflowBlock(workflow, 'on');
+  assert.ok(on, 'the workflow must declare its triggers');
+  const event = workflowBlock(on.body, context.github.event_name, '  ');
+  if (!event) return false;
+  if (context.github.event_name === 'push') {
+    const branches = workflowBlock(event.body, 'branches', '    ');
+    if (!branches) return true;
+    return workflowList(branches.inline).some(branch => {
+      if (/[*?[\]!]/.test(branch)) throw new Error(`Unsupported branch filter ${branch}.`);
+      return context.github.ref === `refs/heads/${branch}`;
+    });
+  }
+  const types = workflowBlock(event.body, 'types', '    ');
+  return types ? workflowList(types.inline).includes(context.github.event.action) : true;
+}
+function workflowJobRuns(workflow, job, context) {
+  const jobs = workflowBlock(workflow, 'jobs'), block = workflowBlock(jobs.body, job, '  ');
+  assert.ok(block, `the workflow must keep its ${job} job`);
+  const condition = workflowBlock(block.body, 'if', '    ');
+  return condition ? Boolean(interpolateWorkflowValue(condition.inline.startsWith('${{') ? condition.inline : `\${{ ${condition.inline} }}`, context)) : true;
+}
+// GitHub concurrency: runs sharing a group are serialized; a new run with
+// cancel-in-progress cancels the group's in-progress and pending runs, and even
+// without it a newer pending run replaces an older pending one. A run alone in
+// its group can therefore never be cancelled by concurrency.
+function workflowConcurrency(workflow, context) {
+  const block = workflowBlock(workflow, 'concurrency');
+  if (!block) return { group: null, cancelInProgress: false };
+  if (block.inline) return { group: String(interpolateWorkflowValue(block.inline, context)), cancelInProgress: false };
+  const group = workflowBlock(block.body, 'group', '  '), cancel = workflowBlock(block.body, 'cancel-in-progress', '  ');
+  assert.ok(group?.inline, 'a concurrency block must name its group');
+  return { group: String(interpolateWorkflowValue(group.inline, context)), cancelInProgress: cancel ? Boolean(interpolateWorkflowValue(cancel.inline, context)) : false };
+}
+function laterRunCancelsEarlier(workflow, earlier, later) {
+  const first = workflowConcurrency(workflow, earlier), second = workflowConcurrency(workflow, later);
+  const shared = first.group !== null && first.group === second.group;
+  return { shared, inProgress: shared && second.cancelInProgress, pending: shared };
+}
+const workflowContext = (event_name, ref, extra = {}) => ({ github: { workflow: 'Data safety', event_name, ref, run_id: '9001', sha: 'a'.repeat(40), ...extra, event: { action: undefined, ...extra.event } } });
+
+test('workflow runs once per pull request commit and keeps push validation on main', () => {
+  const workflow = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  const branchPush = workflowContext('push', 'refs/heads/topic'), mainPush = workflowContext('push', 'refs/heads/main');
+  assert.equal(workflowTriggers(workflow, branchPush), false, 'a PR branch push must not start a second run beside its pull_request run');
+  assert.equal(workflowTriggers(workflow, workflowContext('push', 'refs/heads/main-backup')), false, 'only the exact main branch keeps push validation');
+  assert.equal(workflowTriggers(workflow, mainPush), true, 'deployment must still follow a verified main push build');
+  for (const action of ['opened', 'synchronize', 'reopened'])
+    assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action } })), true, `pull_request ${action} must keep its run`);
+  assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'labeled' } })), false, 'unrelated PR activity stays outside CI');
+  for (const job of ['release-evidence', 'deploy-pages']) {
+    assert.equal(workflowJobRuns(workflow, job, mainPush), true, `${job} must still run for a push to main`);
+    assert.equal(workflowJobRuns(workflow, job, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })), false, `${job} must never run for a pull request`);
+  }
+});
+
+// #2232: an automated PR-description update fired a second full run on the same
+// SHA. Nothing in the workflow re-reads the PR body, so an edited event (body,
+// title or base) starts no run and executes no test group; the next push does.
+test('workflow starts no run and no test group for a pull request edited event', () => {
+  const workflow = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  for (const changes of [{ body: { from: 'earlier evidence' } }, { title: { from: 'earlier title' } }, { base: { ref: { from: 'old-base' } } }]) {
+    const edited = workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'edited', changes } });
+    assert.equal(workflowTriggers(workflow, edited), false, `a PR edit (${Object.keys(changes)[0]}) must not start a Data safety run`);
+  }
+  assert.equal(workflowTriggers(workflow, workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })), true, 'a pushed commit still gets its run');
+});
+
+test('workflow cancels superseded non-main runs and never cancels main', () => {
+  const workflow = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  const pr = (action, run_id, sha, number = 17, workflowName = 'Data safety') => workflowContext('pull_request', `refs/pull/${number}/merge`, { workflow: workflowName, run_id, sha, event: { action } });
+  const older = pr('synchronize', '101', 'b'.repeat(40)), newer = pr('synchronize', '102', 'c'.repeat(40));
+  assert.deepEqual(laterRunCancelsEarlier(workflow, older, newer), { shared: true, inProgress: true, pending: true }, 'a newer commit on the same PR must cancel the superseded run');
+  assert.deepEqual(laterRunCancelsEarlier(workflow, older, pr('reopened', '102', 'c'.repeat(40))), { shared: true, inProgress: true, pending: true }, 'a reopened PR candidate supersedes the earlier run too');
+  assert.equal(laterRunCancelsEarlier(workflow, older, pr('synchronize', '103', 'd'.repeat(40), 18)).shared, false, 'another PR must never cancel this one');
+  assert.equal(laterRunCancelsEarlier(workflow, older, pr('synchronize', '104', 'd'.repeat(40), 17, 'Other workflow')).shared, false, 'the group is keyed by workflow as well as ref');
+  const mainRun = (run_id, sha) => workflowContext('push', 'refs/heads/main', { run_id, sha });
+  assert.deepEqual(laterRunCancelsEarlier(workflow, mainRun('201', 'e'.repeat(40)), mainRun('202', 'f'.repeat(40))), { shared: false, inProgress: false, pending: false }, 'a later main push must never cancel or replace an earlier main run or its deploy');
+  assert.equal(workflowConcurrency(workflow, mainRun('201', 'e'.repeat(40))).cancelInProgress, false, 'main runs never cancel in-progress work');
+});
+
+// #2210: the cross-engine (Chromium + WebKit) native button checks leave the
+// per-push required cohort for a scheduled and manually dispatchable job. Every
+// workflow file is read, so the pin holds wherever that job lives.
+function workflowJobIds(workflow) {
+  const jobs = workflowBlock(workflow, 'jobs');
+  return jobs ? [...jobs.body.matchAll(/^  ([A-Za-z_][\w-]*):\s*$/gm)].map(match => match[1]) : [];
+}
+function workflowJobText(workflow, job) {
+  return workflowBlock(workflowBlock(workflow, 'jobs').body, job, '  ').body;
+}
+function workflowsRunningNightlyCohort(context) {
+  const directory = path.join(repo, '.github/workflows'), running = [];
+  for (const name of readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort()) {
+    const workflow = readFileSync(path.join(directory, name), 'utf8');
+    const workflowName = workflow.match(/^name: (.+)$/m)?.[1]?.trim();
+    const scoped = { github: { ...context.github, workflow: workflowName } };
+    if (!workflowTriggers(workflow, scoped)) continue;
+    for (const job of workflowJobIds(workflow)) {
+      if (/--group nightly-cross-engine\b/.test(workflowJobText(workflow, job)) && workflowJobRuns(workflow, job, scoped)) running.push({ name, job, text: workflowJobText(workflow, job) });
+    }
+  }
+  return running;
+}
+
+function requiredCohortDescriptor() {
+  const output = path.join(mkdtempSync(path.join(os.tmpdir(), 'chain-required-cohort-')), 'describe');
+  try {
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
+    const result = spawnSync(process.execPath, ['scripts/test-groups.mjs', '--describe', '--group', 'core', '--output-dir', output, '--repository', 'local/describe',
+      '--event-policy', 'local', '--run-id', '1', '--run-attempt', '1', '--source-sha', head, '--comparison-base', head], { cwd: repo, encoding: 'utf8', timeout: 60000 });
+    assert.equal(result.status, 0, 'the required cohort must describe: ' + result.stdout + result.stderr);
+    return JSON.parse(readFileSync(path.join(output, 'descriptor.json'), 'utf8'));
+  } finally { rmSync(path.dirname(output), { recursive: true, force: true }); }
+}
+
+test('workflow runs the cross-engine native checks nightly and on dispatch outside the required cohort', () => {
+  const scheduled = workflowsRunningNightlyCohort(workflowContext('schedule', 'refs/heads/main'));
+  assert.equal(scheduled.length, 1, 'a scheduled run on main must execute the nightly cross-engine cohort exactly once');
+  const dispatched = workflowsRunningNightlyCohort(workflowContext('workflow_dispatch', 'refs/heads/release-candidate'));
+  assert.equal(dispatched.length, 1, 'a manual dispatch on a release candidate must execute the nightly cross-engine cohort');
+  for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
+    assert.deepEqual(workflowsRunningNightlyCohort(context), [], `${context.github.event_name} runs must not wait on the nightly cross-engine cohort`);
+  const { text } = scheduled[0];
+  assert.match(text, /playwright install --with-deps (?:chromium webkit|webkit chromium)\b/, 'the nightly job must install both named engines');
+  assert.doesNotMatch(text, /continue-on-error/, 'a failing nightly case must fail the scheduled workflow visibly');
+
+  const required = readFileSync(path.join(repo, '.github/workflows/data-safety.yml'), 'utf8');
+  assert.doesNotMatch(required, /nightly-cross-engine/, 'the required Data safety workflow must not run or aggregate the nightly cohort');
+  const matrix = workflowBlock(workflowBlock(workflowJobText(required, 'regression'), 'matrix', '      ').body, 'group', '        ');
+  assert.deepEqual(workflowList(matrix.inline), ['core', 'scenery', 'persistence-recovery', 'native-process'], 'the required group matrix stays the four stable groups');
+
+  const catalog = JSON.parse(readFileSync(path.join(repo, 'scripts/test-group-assignments.json'), 'utf8'));
+  const crossEngine = ['RISK repository process: required native button actions execute in Chromium and WebKit', 'RISK repository process: native button gate detects errors raised by a real click'];
+  const nightlyRoots = (catalog.nightlyRoots || []).map(entry => entry.root);
+  // Rows now hold only overrides (#2232): a root with no row takes its file's
+  // group. The runner's own descriptor is the effective required cohort.
+  const groups = requiredCohortDescriptor().groups, groupOf = root => groups.filter(group => group.roots.includes(root)).map(group => group.id);
+  for (const root of crossEngine) {
+    assert.ok(nightlyRoots.includes(root), `cross-engine case must be declared nightly: ${root}`);
+    assert.deepEqual(groupOf(root), [], `cross-engine case must be absent from the required groups: ${root}`);
+  }
+  assert.deepEqual(groupOf('RISK repository process: required installed-client native outcomes and artifacts execute exactly once'), ['native-process'], 'the Chromium installed-client cases stay in the required native group');
+});
+
+// #2216: the live main ruleset is GitHub-side state the repository cannot pin by
+// itself, so a nightly job compares its required checks with the set committed
+// here. Today's set was read from the live ruleset on 2026-11-04: the CI
+// aggregate bound to the GitHub Actions app plus the three receipt contexts.
+function workflowsRunningRulesetDrift(context) {
+  const directory = path.join(repo, '.github/workflows'), running = [];
+  for (const name of readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort()) {
+    const workflow = readFileSync(path.join(directory, name), 'utf8');
+    const scoped = { github: { ...context.github, workflow: workflow.match(/^name: (.+)$/m)?.[1]?.trim() } };
+    if (!workflowTriggers(workflow, scoped)) continue;
+    for (const job of workflowJobIds(workflow)) {
+      const text = workflowJobText(workflow, job);
+      if (/scripts\/agent-tools\/ruleset-drift\.mjs\b/.test(text) && workflowJobRuns(workflow, job, scoped)) running.push({ name, job, text });
+    }
+  }
+  return running;
+}
+
+test('workflow checks the live main ruleset against the committed required checks every night', () => {
+  const scheduled = workflowsRunningRulesetDrift(workflowContext('schedule', 'refs/heads/main'));
+  assert.equal(scheduled.length, 1, 'a scheduled run on main must run the ruleset drift check exactly once');
+  assert.equal(workflowsRunningRulesetDrift(workflowContext('workflow_dispatch', 'refs/heads/main')).length, 1, 'a manual dispatch must run the ruleset drift check too');
+  for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
+    assert.deepEqual(workflowsRunningRulesetDrift(context), [], `${context.github.event_name} runs must not depend on GitHub-side ruleset state`);
+
+  const { name, job, text } = scheduled[0];
+  assert.doesNotMatch(text, /--group nightly-cross-engine\b/, 'the drift check must be its own job so a cross-engine failure never hides drift');
+  assert.doesNotMatch(text, /continue-on-error/, 'a ruleset mismatch must fail the nightly run visibly');
+  assert.match(text, /--branch main\b/, 'the check must read the rules that apply to main');
+  assert.match(text, /GITHUB_TOKEN: \$\{\{ (?:github\.token|secrets\.GITHUB_TOKEN) \}\}/, 'the check must authenticate with the workflow token');
+  const permissions = workflowBlock(text, 'permissions', '    ');
+  assert.ok(permissions, `${name} ${job} must declare its own job-level permissions`);
+  assert.doesNotMatch(permissions.body + permissions.inline, /write/, 'reading the ruleset never needs write access');
+
+  const expectedPath = text.match(/--expected (\S+)/)?.[1];
+  assert.ok(expectedPath && existsSync(path.join(repo, expectedPath)), 'the expected required-check set must be committed in the repository');
+  const expected = JSON.parse(readFileSync(path.join(repo, expectedPath), 'utf8'));
+  assert.deepEqual(expected.requiredStatusChecks.map(check => check.context).sort(), ['funsidething/independent-review', 'funsidething/memory-audit', 'funsidething/specialist-review', 'scanner-tests'], 'the committed set matches the live main ruleset as read on 2026-11-04');
+  assert.equal(expected.requiredStatusChecks.find(check => check.context === 'scanner-tests').integrationId, 15368, 'scanner-tests stays bound to the GitHub Actions app');
+});
+
+// #2217: the weekly velocity report runs from the nightly schedule as its own
+// job, so a stall alert never hides (or is hidden by) a cross-engine failure,
+// and it holds only the permissions it needs to read activity and file one
+// deduplicated needs-triage issue.
+function workflowJobsRunning(context, pattern) {
+  const directory = path.join(repo, '.github/workflows'), running = [];
+  for (const name of readdirSync(directory).filter(file => /\.ya?ml$/.test(file)).sort()) {
+    const workflow = readFileSync(path.join(directory, name), 'utf8');
+    const scoped = { github: { ...context.github, workflow: workflow.match(/^name: (.+)$/m)?.[1]?.trim() } };
+    if (!workflowTriggers(workflow, scoped)) continue;
+    for (const job of workflowJobIds(workflow)) {
+      const text = workflowJobText(workflow, job);
+      if (pattern.test(text) && workflowJobRuns(workflow, job, scoped)) running.push({ name, job, text });
+    }
+  }
+  return running;
+}
+
+test('workflow runs the weekly velocity report nightly with only the permissions its alert needs', () => {
+  const report = /node scripts\/agent-tools\/ci-monitor\.mjs velocity-report\b/;
+  const scheduled = workflowJobsRunning(workflowContext('schedule', 'refs/heads/main'), report);
+  assert.equal(scheduled.length, 1, 'a scheduled run on main must produce the velocity report exactly once');
+  assert.equal(workflowJobsRunning(workflowContext('workflow_dispatch', 'refs/heads/main'), report).length, 1, 'the maintainer can run the report on demand');
+  for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
+    assert.deepEqual(workflowJobsRunning(context, report), [], `${context.github.event_name} runs must not file velocity alerts`);
+  const { text } = scheduled[0];
+  assert.doesNotMatch(text, /--group nightly-cross-engine/, 'the report is a sibling job, so one nightly failure never hides the other');
+  assert.match(text, /velocity-report --repo (?:"\$GITHUB_REPOSITORY"|\$\{\{ github\.repository \}\})/, 'the report reads the repository the workflow runs in');
+  assert.doesNotMatch(text, /--dry-run/, 'the nightly report must actually file its alert issue');
+  assert.doesNotMatch(text, /continue-on-error/, 'an alert must fail the nightly run visibly');
+  assert.match(text, /GH_TOKEN: \$\{\{ (?:github\.token|secrets\.GITHUB_TOKEN) \}\}/, 'gh needs the job token');
+  const permissions = workflowBlock(text, 'permissions', '    ');
+  assert.ok(permissions && !permissions.inline, 'the job must declare its own permissions');
+  const granted = Object.fromEntries(permissions.body.split('\n').filter(line => line.trim()).map(line => line.trim().split(/:\s*/)));
+  assert.deepEqual(granted, { contents: 'read', actions: 'read', 'pull-requests': 'read', issues: 'write' }, 'issues: write is the only write the report needs');
 });

@@ -6,9 +6,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { parseTap } from '../test-groups.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const runner = path.join(repository, 'scripts/test-groups.mjs');
+// Fixtures use the per-area tests/ layout the runner groups (#2213). A legacy
+// single tests.js fixture exists only as a pre-split comparison base.
+const suiteFile = 'tests/core.test.js';
+const suiteCommand = 'node --test --test-concurrency=2 tests/*.test.js scripts/agent-tools/*.test.mjs';
 const groups = ['core', 'scenery', 'persistence-recovery', 'native-process'];
 const fixtureRoots = {
   core: 'fixture core baseline root',
@@ -92,12 +97,13 @@ function inventory(coreTitle = fixtureRoots.core, additionalCoreRoots = [], nati
 }
 
 function assignments(coreTitle = fixtureRoots.core, options = {}) {
+  const file = options.legacyLayout ? 'tests.js' : suiteFile;
   const rootAssignments = [
-    { root: coreTitle, group: 'core', file: 'tests.js' },
-    ...(options.additionalCoreRoots || []).map(root => ({ root, group: 'core', file: 'tests.js' })),
-    { root: fixtureRoots.scenery, group: 'scenery', file: 'tests.js' },
-    { root: fixtureRoots['persistence-recovery'], group: 'persistence-recovery', file: 'tests.js' },
-    { root: options.nativeTitle || fixtureRoots['native-process'], group: 'native-process', file: 'tests.js' },
+    { root: coreTitle, group: 'core', file },
+    ...(options.additionalCoreRoots || []).map(root => ({ root, group: 'core', file })),
+    { root: fixtureRoots.scenery, group: 'scenery', file },
+    { root: fixtureRoots['persistence-recovery'], group: 'persistence-recovery', file },
+    { root: options.nativeTitle || fixtureRoots['native-process'], group: 'native-process', file },
     { root: fixtureScriptRoot, group: 'native-process', file: 'scripts/agent-tools/fixture.test.mjs' },
   ];
   return {
@@ -117,7 +123,7 @@ function assignments(coreTitle = fixtureRoots.core, options = {}) {
     processControls: options.processControl ? [{
       id: 'fixture native controlled child outcome',
       group: 'native-process',
-      file: 'tests.js',
+      file,
       ownerRoot: fixtureRoots['native-process'],
       expectedExecutions: 1,
     }] : [],
@@ -135,9 +141,10 @@ function createFixture(t, options = {}) {
   const coreTitle = options.coreTitle || fixtureRoots.core;
   writeJson(path.join(root, 'package.json'), {
     type: 'module',
-    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: 'node --test tests.js scripts/agent-tools/*.test.mjs' },
+    scripts: { 'test:group': 'node scripts/test-groups.mjs', test: options.legacyLayout ? 'node --test tests.js scripts/agent-tools/*.test.mjs' : suiteCommand },
   });
-  fs.writeFileSync(path.join(root, 'tests.js'), suiteSource({ ...options, coreTitle, runtimeCoreTitle: options.runtimeCoreTitle || coreTitle }));
+  fs.mkdirSync(path.join(root, 'tests'), { recursive: true });
+  fs.writeFileSync(path.join(root, options.legacyLayout ? 'tests.js' : suiteFile), suiteSource({ ...options, coreTitle, runtimeCoreTitle: options.runtimeCoreTitle || coreTitle }));
   fs.writeFileSync(path.join(root, 'scripts/agent-tools/fixture.test.mjs'),
     `import { test } from 'node:test';\ntest(${JSON.stringify(fixtureScriptRoot)}, () => {});\n`);
   writeJson(path.join(root, 'scripts/test-group-inventory.json'), inventory(coreTitle, options.additionalCoreRoots || [], options.nativeTitle));
@@ -325,7 +332,7 @@ test('test group runner reconciles complete full and grouped fixture cohorts', t
   const outerNativeOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-test-group-outer-native-'));
   fs.rmSync(outerNativeOutput, { recursive: true });
   fixture.outputs.push(outerNativeOutput);
-  const fixtureArgs = ['--test', '--test-reporter=tap', 'tests.js', 'scripts/agent-tools/fixture.test.mjs'];
+  const fixtureArgs = ['--test', '--test-reporter=tap', suiteFile, 'scripts/agent-tools/fixture.test.mjs'];
   const callerEnv = {
     ...process.env,
     CHAIN_NATIVE_OUTPUT: outerNativeOutput,
@@ -368,21 +375,21 @@ test('test group runner reconciles a renamed root and preserves baseline case id
   const oldRoot = 'fixture core historical title';
   const newRoot = `${oldRoot} with isolated contexts`;
   const fixture = createFixture(t, { coreTitle: oldRoot });
-  fs.writeFileSync(path.join(fixture.root, 'tests.js'), suiteSource({ coreTitle: newRoot }));
+  fs.writeFileSync(path.join(fixture.root, suiteFile), suiteSource({ coreTitle: newRoot }));
   const groupAssignments = JSON.parse(fs.readFileSync(path.join(fixture.root, 'scripts/test-group-assignments.json'), 'utf8'));
   groupAssignments.rootAssignments = groupAssignments.rootAssignments.filter(item => item.root !== oldRoot);
-  groupAssignments.rootAssignments.push({ root: newRoot, group: 'core', file: 'tests.js' });
+  groupAssignments.rootAssignments.push({ root: newRoot, group: 'core', file: suiteFile });
   groupAssignments.rootAssignments.sort((a, b) => a.root.localeCompare(b.root));
   groupAssignments.rootReplacements = [{
     baselineRoot: oldRoot,
     currentRoot: newRoot,
     baselineGroup: 'core',
     group: 'core',
-    file: 'tests.js',
+    file: suiteFile,
     reason: 'The renamed fixture title preserves its historical child assertions and case identities.',
   }];
   writeJson(path.join(fixture.root, 'scripts/test-group-assignments.json'), groupAssignments);
-  git(fixture.root, 'add', 'tests.js', 'scripts/test-group-assignments.json');
+  git(fixture.root, 'add', suiteFile, 'scripts/test-group-assignments.json');
   git(fixture.root, 'commit', '-qm', 'classify a preserved renamed root');
   fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
   fixture.comparisonBase = fixture.sourceSha;
@@ -403,7 +410,7 @@ test('test group runner rejects overlapping and unclassified registrations', t =
   assert.match(overlap.evidence?.issues?.join('\n') || '', /overlapping group assignments/);
 
   const unclassifiedFixture = createFixture(t);
-  fs.appendFileSync(path.join(unclassifiedFixture.root, 'tests.js'), "\ntest('new unclassified root', () => {});\n");
+  fs.appendFileSync(path.join(unclassifiedFixture.root, suiteFile), "\ntest('new unclassified root', () => {});\n");
   const unclassified = invoke(unclassifiedFixture);
   assert.notEqual(unclassified.status, 0);
   assert.match(unclassified.evidence?.issues?.join('\n') || '', /New top-level test.*no explicit group assignment/);
@@ -416,11 +423,55 @@ test('test group runner rejects unexpected skips and missing required cases', t 
   assert.match(skipped.evidence?.issues?.join('\n') || '', /unexpectedly skipped/);
 
   const missingFixture = createFixture(t);
-  fs.writeFileSync(path.join(missingFixture.root, 'tests.js'), suiteSource().replace(
+  fs.writeFileSync(path.join(missingFixture.root, suiteFile), suiteSource().replace(
     "  await t.test('fixture accepted environment skip', { skip: 'baseline skip' }, () => {});", ''));
   const missing = invoke(missingFixture);
   assert.notEqual(missing.status, 0);
   assert.match(missing.evidence?.issues?.join('\n') || '', /Required baseline case.*missing/);
+});
+
+// #2194 CI (PR #2222): an added browser root gated on an environment variable
+// skips in CI. It is accepted only through an explicit environmentSkips
+// declaration that names the variable its registration actually skips on,
+// only for a root the baseline inventory does not already own, and only while
+// that variable is absent from the runner's environment.
+test('RISK test inventory: the group runner accepts an added environment-gated skip only when declared and its variable is absent', t => {
+  const addedRoot = 'fixture added environment-gated browser root';
+  const reason = 'Needs a served app plus installed Chromium and WebKit, which CI groups do not provide.';
+  const add = (fixture, { declare = true, environment = 'FIXTURE_BROWSER_URL', root = addedRoot } = {}) => {
+    fs.appendFileSync(path.join(fixture.root, suiteFile), `\ntest(${JSON.stringify(addedRoot)},{skip:!process.env.FIXTURE_BROWSER_URL},()=>{});\n`);
+    const file = path.join(fixture.root, 'scripts/test-group-assignments.json'), value = JSON.parse(fs.readFileSync(file, 'utf8'));
+    value.rootAssignments.push({ root: addedRoot, group: 'core', file: suiteFile });
+    if (declare) value.environmentSkips = [{ root, environment, reason }];
+    writeJson(file, value);
+  };
+  const issues = result => result.evidence?.issues?.join('\n') || `${result.stdout}\n${result.stderr}`;
+  const undeclared = createFixture(t); add(undeclared, { declare: false });
+  const rejected = invoke(undeclared);
+  assert.notEqual(rejected.status, 0);
+  assert.match(issues(rejected), /unexpectedly skipped: fixture added environment-gated browser root/);
+
+  const declared = createFixture(t); add(declared);
+  const accepted = invoke(declared);
+  assert.equal(accepted.status, 0, issues(accepted));
+  assert.deepEqual(accepted.evidence?.environmentSkips, [{ root: addedRoot, environment: 'FIXTURE_BROWSER_URL', status: 'skipped' }],
+    'the result records the declared environment skip it accepted');
+
+  const running = createFixture(t); add(running);
+  const executed = invoke(running, { env: { FIXTURE_BROWSER_URL: 'http://127.0.0.1:1/' } });
+  assert.equal(executed.status, 0, issues(executed));
+  assert.deepEqual(executed.evidence?.environmentSkips, [{ root: addedRoot, environment: 'FIXTURE_BROWSER_URL', status: 'passed' }],
+    'with its variable set the declared root runs and passes');
+
+  const mismatched = createFixture(t); add(mismatched, { environment: 'OTHER_BROWSER_URL' });
+  const wrongVariable = invoke(mismatched);
+  assert.notEqual(wrongVariable.status, 0);
+  assert.match(issues(wrongVariable), /Environment skip .* is not registered with \{skip:!process\.env\.OTHER_BROWSER_URL\}/);
+
+  const baseline = createFixture(t); add(baseline, { root: fixtureRoots.scenery });
+  const baselineDeclared = invoke(baseline);
+  assert.notEqual(baselineDeclared.status, 0);
+  assert.match(issues(baselineDeclared), /Environment skip .* must name an added root/);
 });
 
 test('test group runner removes only its process temp files after failure', t => {
@@ -464,7 +515,7 @@ test('RISK test group runner preserves hash identities and counts only executabl
     const nativeFixture = isolatedFixtureNativeOutput(fixture);
     const fullEnv = { ...nativeFixture.env };
     delete fullEnv.NODE_TEST_CONTEXT;
-    const full = run(process.execPath, ['--test', '--test-reporter=tap', 'tests.js'], fixture.root, fullEnv);
+    const full = run(process.execPath, ['--test', '--test-reporter=tap', suiteFile], fixture.root, fullEnv);
     assert.equal(full.status, 0, `${full.stdout}\n${full.stderr}`);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(nativeFixture.output, 'candidate-identity.json'), 'utf8')),
       { sha: fixture.sourceSha, tree: fullEnv.CHAIN_NATIVE_CANDIDATE_TREE }, 'the nested full fixture writes its own candidate identity');
@@ -536,12 +587,12 @@ test('test group selection executes every uncertain routing scenario under its a
 });
 
 test('test group preflight rejects a passing dynamic row added at an unchanged registration site', t => {
-  const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+  const fixture=createFixture(t),file=path.join(fixture.root,suiteFile);
   fs.appendFileSync(file,"\nconst futureDynamicRows=[];for(const title of futureDynamicRows)test(title,()=>{});\n");
-  git(fixture.root,'add','tests.js');git(fixture.root,'commit','-qm','existing dynamic registration site');
+  git(fixture.root,'add',suiteFile);git(fixture.root,'commit','-qm','existing dynamic registration site');
   fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
   fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('futureDynamicRows=[]','futureDynamicRows=["unclassified future dynamic row"]'));
-  git(fixture.root,'add','tests.js');git(fixture.root,'commit','-qm','add an unclassified data row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  git(fixture.root,'add',suiteFile);git(fixture.root,'commit','-qm','add an unclassified data row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
   const result=invoke(fixture);
   assert.notEqual(result.status,0,'a passing unknown runtime root must not disappear from the required grouped cohort');
   assert.match(result.stderr,/unclassified.*dynamic|dynamic.*unclassified/i);
@@ -593,6 +644,241 @@ test('test group aggregate rejects corrupt outcomes identities jobs and native e
   for(const [name,mutate]of scenarios)await parent.test(name,t=>{const result=aggregateCopy(t,fixture,mutate);assert.notEqual(result.status,0,'aggregate must reject '+name);});
 });
 
+// Cross-engine (Chromium + WebKit) native checks run in the scheduled and
+// manually dispatched nightly job instead of the per-push required cohort, so an
+// engine-specific failure cannot block unrelated fixes (#2210). A declared
+// nightly root stays out of every required group, never executes there, and is
+// never needed by the required aggregate.
+const installedClientRoot='RISK repository process: required installed-client native outcomes and artifacts execute exactly once';
+const nightlyFixtureRoot='fixture cross-engine native button root';
+function nightlyFixture(t,{body='()=>{if(process.env.CHAIN_NIGHTLY_SENTINEL)fs.writeFileSync(process.env.CHAIN_NIGHTLY_SENTINEL,"executed");}',nightlyRoots=[{root:nightlyFixtureRoot,file:suiteFile,reason:'Fixture cross-engine case runs in the nightly job only.'}]}={}){
+  const fixture=createFixture(t,{nativeTitle:installedClientRoot,nativeReports:true});
+  fs.appendFileSync(path.join(fixture.root,suiteFile),`\ntest(${JSON.stringify(nightlyFixtureRoot)},${body});\n`);
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));catalog.nightlyRoots=nightlyRoots;writeJson(file,catalog);
+  git(fixture.root,'add','.');git(fixture.root,'commit','-qm','nightly cross-engine root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group required cohort passes without nightly cross-engine cases and never executes them', t => {
+  const fixture=nightlyFixture(t),sentinel=path.join(fixture.root,'nightly-executed');
+  const description=invoke(fixture,{args:['--describe']});
+  assert.equal(description.status,0,description.stdout+description.stderr);
+  const descriptor=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'),'utf8'));
+  assert.ok(descriptor.groups.every(group=>!group.roots.includes(nightlyFixtureRoot)&&!group.requiredCaseIds.some(id=>id===nightlyFixtureRoot||id.startsWith(nightlyFixtureRoot+' > '))),'the required cohort must exclude nightly cross-engine cases');
+  assert.ok(descriptor.groups.find(group=>group.id==='native-process').roots.includes(installedClientRoot),'the installed-client cases stay in the required cohort');
+  fixture.originals=new Map();
+  for(const group of groups){const result=invoke(fixture,{group,env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+  const result=aggregateCopy(t,fixture);
+  assert.equal(result.status,0,'the required aggregate must pass without the nightly cases: '+result.stdout+result.stderr);
+  assert.equal(fs.existsSync(sentinel),false,'no required group or registration guard may execute a nightly case');
+  const report=JSON.parse(fs.readFileSync(path.join(result.outputDir,'aggregate.json'),'utf8'));
+  assert.equal(report.status,'passed');assert.equal(report.groups.length,4);assert.equal(report.caseCount,6);
+});
+test('test group nightly declarations cannot remove required or installed-client cases from the required cohort', async parent => {
+  const nightly=root=>({root,file:suiteFile,reason:'Attempted move of a required case to the nightly job.'});
+  const scenarios=[
+    ['installed-client owner root',installedClientRoot],
+    ['installed-client signed-out case','RISK native installed-client delivery: signed-out'],
+    ['installed-client reconcile-held case','RISK native installed-client delivery: reconcile-held'],
+    ['required group root',fixtureRoots.scenery],
+  ];
+  for(const [name,root]of scenarios)await parent.test(name,t=>{
+    const fixture=nightlyFixture(t);fixture.originals=new Map();
+    for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+    const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+    catalog.nightlyRoots.push(nightly(root));writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','declare a required case nightly');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'describing the required cohort must refuse a nightly '+name);
+    assert.match(description.stderr,/nightly/i);
+    const aggregate=aggregateCopy(t,fixture);
+    assert.notEqual(aggregate.status,0,'the required aggregate must refuse a nightly '+name);
+    assert.match(aggregate.stderr,/nightly/i,'the aggregate must name the nightly declaration, not an unrelated identity mismatch');
+  });
+});
+test('test group aggregate with nightly roots still fails closed on missing duplicate skipped failed groups and installed-client reports', async parent => {
+  const fixture=nightlyFixture(parent);fixture.originals=new Map();
+  for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+  const scenarios=[
+    ['missing required group',root=>fs.rmSync(path.join(root,'native-process'),{recursive:true,force:true})],
+    ['duplicate required group',root=>fs.cpSync(path.join(root,'core'),path.join(root,'core-copy'),{recursive:true})],
+    ['nightly results offered as a required group',root=>fs.cpSync(path.join(root,'native-process'),path.join(root,'nightly-cross-engine'),{recursive:true})],
+    ['skipped required job',(_root,file)=>{const needs=JSON.parse(fs.readFileSync(file));needs.regression.result='skipped';writeJson(file,needs);}],
+    ['failed required group',root=>{const f=path.join(root,'scenery/result.json'),x=JSON.parse(fs.readFileSync(f));x.status='failed';writeJson(f,x);}],
+    ['missing installed-client signed-out report',root=>fs.rmSync(path.join(root,'native-process/native/signed-out.json'))],
+    ['missing installed-client reconcile-held report',root=>fs.rmSync(path.join(root,'native-process/native/reconcile-held.json'))],
+  ];
+  for(const [name,mutate]of scenarios)await parent.test(name,t=>{const result=aggregateCopy(t,fixture,mutate);assert.notEqual(result.status,0,'aggregate must reject '+name);});
+});
+test('test group nightly cohort runs only the declared cross-engine cases and fails visibly', async parent => {
+  await parent.test('passing nightly case',t=>{
+    const fixture=nightlyFixture(t),sentinel=path.join(fixture.root,'nightly-executed');
+    const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.equal(result.evidence.status,'passed');
+    assert.deepEqual(result.evidence.cases.map(item=>[item.id,item.status]),[[nightlyFixtureRoot,'passed']],'only the declared nightly case executes');
+    assert.equal(fs.existsSync(sentinel),true,'the nightly cohort must actually execute its case');
+  });
+  const failures=[
+    ['failing engine case',{body:'()=>{throw new Error("webkit pageerror")}'},/failed/i],
+    ['skipped engine case',{body:'{skip:"webkit unavailable"},()=>{}'},/skipped/i],
+    ['declared case that is not registered',{nightlyRoots:[{root:nightlyFixtureRoot,file:suiteFile,reason:'Fixture cross-engine case runs in the nightly job only.'},{root:'fixture absent cross-engine root',file:suiteFile,reason:'Declared but missing from the source.'}]},/fixture absent cross-engine root/],
+    ['no declared nightly cases',{nightlyRoots:[]},/no nightly cross-engine roots/i],
+  ];
+  for(const [name,options,message]of failures)await parent.test(name,t=>{
+    const fixture=nightlyFixture(t,options);
+    if(!options.nightlyRoots?.some(entry=>entry.root===nightlyFixtureRoot)&&options.nightlyRoots){
+      // Without a declaration the appended root is unclassified; keep the fixture valid by assigning it to core.
+      const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:suiteFile});writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','assign root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    }
+    const result=invoke(fixture,{group:'nightly-cross-engine'});
+    assert.notEqual(result.status,0,'a nightly '+name+' must fail the nightly run');
+    assert.notEqual(result.evidence?.status,'passed');
+    assert.match(result.stderr,message);
+  });
+});
+
+// #2232: a declared root that resolves to zero tests must fail visibly. Describe
+// checks every required root against its file before any group runs; a declared
+// nightly root that resolves to nothing fails the nightly run's own preflight,
+// while describe (required CI) stays green, as on main until #2248 lands.
+test('test group describe and nightly preflight fail when a declared required or nightly root resolves to zero tests', async parent => {
+  const absentNightlyRoot='fixture absent cross-engine root';
+  await parent.test('required root removed from its file fails describe and its group run',t=>{
+    const fixture=createFixture(t),file=path.join(fixture.root,suiteFile),registration=`test(${JSON.stringify(fixtureRoots.scenery)}, () => {});`;
+    assert.ok(fs.readFileSync(file,'utf8').includes(registration),'fixture registers the scenery root');
+    fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace(registration,''));
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','drop a required registration');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'describe must not validate a required root that resolves to zero tests: '+description.stdout);
+    assert.match(description.stderr,/fixture scenery baseline root.*resolves to zero tests/);
+    const run=invoke(fixture,{group:'scenery'});
+    assert.notEqual(run.status,0,'the group run must fail when its declared root executes nothing');
+  });
+  await parent.test('only declared nightly root resolves to zero tests',t=>{
+    const fixture=nightlyFixture(t,{nightlyRoots:[{root:absentNightlyRoot,file:suiteFile,reason:'Declared but not registered on this branch.'}]});
+    const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+    catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:suiteFile});writeJson(file,catalog);
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','assign root');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const description=invoke(fixture,{args:['--describe']});
+    assert.equal(description.status,0,'required CI must stay green while only a nightly root is unresolved: '+description.stdout+description.stderr);
+    const nightly=invoke(fixture,{group:'nightly-cross-engine'});
+    assert.notEqual(nightly.status,0,'the nightly run must fail when its declared root resolves to zero tests');
+    assert.notEqual(nightly.evidence?.status,'passed');
+    assert.match(nightly.stderr,/fixture absent cross-engine root.*registered 0 times/);
+  });
+});
+
+// #2232: every new root needed a hand-written row. A root with no row now takes
+// its file's group from fileGroups; rows remain for overrides, dynamic titles and
+// nightly roots. The cohort still binds every root, and a file with no default
+// still rejects an unrowed root.
+// Rewrites one collected group's TAP and keeps its hash and case report in
+// step, as a consistent forgery would.
+function rewriteGroupTap(root,group,edit){
+  const resultFile=path.join(root,group,'result.json'),record=JSON.parse(fs.readFileSync(resultFile,'utf8'));
+  const tapFile=path.join(root,group,record.process.stdout.path),tap=edit(fs.readFileSync(tapFile,'utf8'));
+  fs.writeFileSync(tapFile,tap);
+  record.process.stdout.sha256=createHash('sha256').update(tap).digest('hex');
+  record.cases=parseTap(tap).map(({id,root:caseRoot,status,skipReason})=>({id,root:caseRoot,status,skipReason}));
+  writeJson(resultFile,record);
+}
+function rootBlock(tap,title){
+  const lines=tap.split('\n'),start=lines.indexOf('# Subtest: '+title);
+  const result=lines.findIndex((line,index)=>index>start&&/^(?:not )?ok \d+ - /.test(line)&&line.endsWith(' - '+title));
+  assert.ok(start>=0&&result>start,'the fixture TAP holds the root '+title);
+  const end=lines[result+1]==='  ---'?lines.indexOf('  ...',result):result;
+  return {lines,start,result,end};
+}
+const removeRootBlock=(tap,title)=>{const {lines,start,end}=rootBlock(tap,title);lines.splice(start,end-start+1);return lines.join('\n');};
+const duplicateRootBlock=(tap,title)=>{const {lines,start,end}=rootBlock(tap,title);lines.splice(end+1,0,...lines.slice(start,end+1));return lines.join('\n');};
+const editRootResult=(tap,title,edit)=>{const {lines,result}=rootBlock(tap,title);lines[result]=edit(lines[result]);return lines.join('\n');};
+const defaultRoot='fixture root placed by its file',overrideRoot='fixture root overriding its file group';
+function defaultByFileFixture(t,{fileGroups={[suiteFile]:'core','scripts/agent-tools/*.test.mjs':'native-process'}}={}){
+  const fixture=createFixture(t,{nativeTitle:installedClientRoot,nativeReports:true});
+  fs.appendFileSync(path.join(fixture.root,suiteFile),`\ntest(${JSON.stringify(defaultRoot)}, () => {});\ntest(${JSON.stringify(overrideRoot)}, () => {});\n`);
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+  catalog.fileGroups=fileGroups;
+  catalog.rootAssignments=catalog.rootAssignments.filter(entry=>entry.root!==fixtureRoots.core&&entry.root!==fixtureScriptRoot);
+  catalog.rootAssignments.push({root:overrideRoot,group:'scenery',file:suiteFile});
+  writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','default roots by file');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group roots without a row take their file group and rows override it', async parent => {
+  await parent.test('describe groups and aggregate',t=>{
+    const fixture=defaultByFileFixture(t);
+    const description=invoke(fixture,{args:['--describe']});
+    assert.equal(description.status,0,'unrowed roots must be classified by their file: '+description.stdout+description.stderr);
+    const descriptor=JSON.parse(fs.readFileSync(path.join(description.outputDir,'descriptor.json'),'utf8')),roots=id=>descriptor.groups.find(group=>group.id===id).roots;
+    assert.deepEqual(roots('core'),[defaultRoot,fixtureRoots.core].sort(),'a root with no row takes its file group');
+    assert.ok(roots('scenery').includes(overrideRoot)&&!roots('core').includes(overrideRoot),'a row overrides the file group');
+    assert.ok(roots('native-process').includes(fixtureScriptRoot),'a file matched by a pattern takes that group');
+    fixture.originals=new Map();
+    for(const group of groups){const result=invoke(fixture,{group});assert.equal(result.status,0,group+': '+result.stdout+result.stderr);fixture.originals.set(group,result.outputDir);}
+    assert.ok(readEvidence(fixture.originals.get('core')).cases.some(item=>item.id===defaultRoot&&item.status==='passed'),'the defaulted root executes in its file group');
+    assert.ok(readEvidence(fixture.originals.get('scenery')).cases.some(item=>item.id===overrideRoot&&item.status==='passed'),'the override executes in its row group');
+    const aggregate=aggregateCopy(t,fixture);
+    assert.equal(aggregate.status,0,aggregate.stdout+aggregate.stderr);
+    // Each forgery keeps the group's TAP, its hash and its case report
+    // consistent, so the aggregate must reject it at the named check rather than
+    // at an earlier report/TAP mismatch.
+    const label=title=>JSON.stringify(title).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    for(const [name,mutate,message] of [
+      ['missing defaulted case',root=>rewriteGroupTap(root,'core',tap=>removeRootBlock(tap,defaultRoot)),new RegExp(`Assigned root ${label(defaultRoot)} did not execute`)],
+      ['skipped defaulted case',root=>rewriteGroupTap(root,'core',tap=>editRootResult(tap,defaultRoot,line=>line+' # SKIP forged')),new RegExp(`unexpectedly skipped: ${defaultRoot}`)],
+      ['failed override case',root=>rewriteGroupTap(root,'scenery',tap=>editRootResult(tap,overrideRoot,line=>'not '+line)),new RegExp(`Test case failed: ${overrideRoot}`)],
+      ['duplicate defaulted case',root=>rewriteGroupTap(root,'core',tap=>duplicateRootBlock(tap,defaultRoot)),new RegExp(`Root ${label(defaultRoot)} executed more than once`)],
+      ['missing installed-client report',root=>{const f=path.join(root,'native-process/result.json'),x=JSON.parse(fs.readFileSync(f,'utf8'));fs.rmSync(path.join(root,'native-process/native/signed-out.json'));x.artifacts=x.artifacts.filter(item=>item.path!=='native/signed-out.json');writeJson(f,x);},/Both required distinct native reports must be present/],
+    ]){
+      const rejected=aggregateCopy(t,fixture,mutate);
+      assert.notEqual(rejected.status,0,'aggregate must reject '+name);
+      assert.match(rejected.stderr,message,'aggregate must reject '+name+' at its own check');
+      assert.doesNotMatch(rejected.stderr,/case report differs from actual TAP|Artifact missing or wrong size/,'the forgery for '+name+' must stay internally consistent');
+    }
+  });
+  await parent.test('a root in a file without a default group still needs a row',t=>{
+    const fixture=defaultByFileFixture(t,{fileGroups:{[suiteFile]:'core'}});
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'a file without a default group cannot place its roots');
+    assert.match(description.stderr,/fixture agent-tools baseline root/);
+  });
+  await parent.test('an unrowed dynamic title in a defaulted file still fails the registration guard',t=>{
+    const fixture=defaultByFileFixture(t),file=path.join(fixture.root,suiteFile);
+    fs.appendFileSync(file,'\nfor(const title of ["fixture unrowed dynamic root"])test(title,()=>{});\n');
+    git(fixture.root,'add','.');git(fixture.root,'commit','-qm','dynamic root without a row');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+    const result=invoke(fixture);
+    assert.notEqual(result.status,0,'a computed title cannot be placed by its file and must not run unclassified');
+    assert.match(result.stderr,/fixture unrowed dynamic root/);
+  });
+});
+
+// #2232: heavy roots were hand-moved between groups to stay under Node's default
+// heap. A group may declare its heap instead; the runner passes it to the group's
+// Node test process, whose per-file children inherit it.
+const heapProbeRoot='fixture heap probe root';
+function heapFixture(t,heap){
+  const fixture=createFixture(t);
+  fs.appendFileSync(path.join(fixture.root,suiteFile),`\ntest(${JSON.stringify(heapProbeRoot)}, async () => { if (process.env.CHAIN_HEAP_PROBE) fs.writeFileSync(process.env.CHAIN_HEAP_PROBE, String((await import('node:v8')).default.getHeapStatistics().heap_size_limit)); });\n`);
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+  catalog.groups.find(group=>group.id==='scenery').nodeMaxOldSpaceSizeMb=heap;
+  catalog.rootAssignments.push({root:heapProbeRoot,group:'scenery',file:suiteFile});
+  writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','group heap');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group runs a group with its declared Node heap and rejects an invalid heap', async parent => {
+  await parent.test('declared heap reaches the test process',t=>{
+    const fixture=heapFixture(t,1536),probe=path.join(fixture.root,'heap-limit');
+    const result=invoke(fixture,{group:'scenery',env:{CHAIN_HEAP_PROBE:probe}});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    const limitMb=Number(fs.readFileSync(probe,'utf8'))/1048576;
+    assert.ok(Math.abs(limitMb-1536)<128,`the scenery test process must run with its declared 1536 MB old space, observed ${limitMb.toFixed(0)} MB heap limit`);
+    assert.equal(result.evidence.process.nodeMaxOldSpaceSizeMb,1536,'the result records the heap the group ran with');
+  });
+  for(const [name,heap] of [['too small',64],['not a whole number',2048.5],['larger than the runner',65536],['not a number','8192']])await parent.test('invalid heap: '+name,t=>{
+    const fixture=heapFixture(t,heap),result=invoke(fixture,{args:['--describe']});
+    assert.notEqual(result.status,0,'an invalid group heap must fail closed');
+    assert.match(result.stderr,/heap/i);
+  });
+});
+
 test('test group workflow scanner command rejects missing parallel group evidence', t => {
   const fixture=createFixture(t),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'chain-workflow-aggregate-'));
   t.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));fs.mkdirSync(path.join(temporary,'groups'));
@@ -624,9 +910,9 @@ test('test group covered references preserve producer provenance without executi
 });
 
 test('test group registration guard binds names to files and distinguishes empty wrappers', async parent => {
-  const scenarios=[['same name assigned in another file',JSON.stringify(fixtureScriptRoot)],['file wrapper title','"tests.js"'],['unknown skipped root','"unclassified skipped root"']];
+  const scenarios=[['same name assigned in another file',JSON.stringify(fixtureScriptRoot)],['file wrapper title',JSON.stringify(suiteFile)],['unknown skipped root','"unclassified skipped root"']];
   for(const [name,title]of scenarios)await parent.test(name,t=>{
-    const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+    const fixture=createFixture(t),file=path.join(fixture.root,suiteFile);
     fs.appendFileSync(file,`\nfor(const title of [])test(title,${name==='unknown skipped root'?"{skip:'unexpected'},":''}()=>{});\n`);
     git(fixture.root,'add','.');git(fixture.root,'commit','-qm','existing dynamic site');fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
     fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('of []','of ['+title+']'));
@@ -645,11 +931,11 @@ test('test group covered mode rejects a different producer source even with a va
 });
 
 test('test group explicitly assigned dynamic roots execute in their declared file and group', t => {
-  const fixture=createFixture(t),file=path.join(fixture.root,'tests.js');
+  const fixture=createFixture(t),file=path.join(fixture.root,suiteFile);
   fs.appendFileSync(file,'\nfor(const title of [])test(title,()=>{});\n');git(fixture.root,'add','.');git(fixture.root,'commit','-qm','existing dynamic site');
   fixture.comparisonBase=git(fixture.root,'rev-parse','HEAD');
   fs.writeFileSync(file,fs.readFileSync(file,'utf8').replace('of []','of ["explicit future dynamic root"]'));
-  const catalog=JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/test-group-assignments.json')));catalog.rootAssignments.push({root:'explicit future dynamic root',file:'tests.js',group:'scenery',registration:'dynamic'});writeJson(path.join(fixture.root,'scripts/test-group-assignments.json'),catalog);
+  const catalog=JSON.parse(fs.readFileSync(path.join(fixture.root,'scripts/test-group-assignments.json')));catalog.rootAssignments.push({root:'explicit future dynamic root',file:suiteFile,group:'scenery',registration:'dynamic'});writeJson(path.join(fixture.root,'scripts/test-group-assignments.json'),catalog);
   git(fixture.root,'add','.');git(fixture.root,'commit','-qm','explicit dynamic assignment');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
   const result=invoke(fixture,{group:'scenery'});assert.equal(result.status,0,result.stdout+result.stderr);assert.ok(result.evidence.cases.some(item=>item.id==='explicit future dynamic root'&&item.status==='passed'));
 });
@@ -669,7 +955,7 @@ function inputCoverage(fixture, group = 'core') {
   const inputs = {policy:'complete-ci-inputs-v1',repository:identity.repository,checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,
     runtime:{node:process.versions.node,platform:process.platform,arch:process.arch,imageOS:'ubuntu24',imageVersion:'20261022.1.0'}};
   const pass = {kind:'ci-input-pass-v1',inputs,gate:group,inputKey:createHash('sha256').update(JSON.stringify({...inputs,gate:group})).digest('hex'),
-    coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:'a'.repeat(40),checkoutSha:'b'.repeat(40),checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,resultSha256:'8'.repeat(64),artifactId:'901',artifactName:'regression-71-2-'+group,artifactSha256:'7'.repeat(64),artifactExpiresAt:'2030-01-01T00:00:00Z'}};
+    coveredBy:{runId:'71',runAttempt:'2',jobId:'701',sourceSha:'a'.repeat(40),checkoutSha:'b'.repeat(40),checkoutTree:identity.checkoutTree,comparisonBase:identity.comparisonBase,resultSha256:'8'.repeat(64),artifactId:'901',artifactName:'regression-71-2-'+group,artifactSha256:'7'.repeat(64),artifactExpiresAt:new Date(Date.now()+90*86400000).toISOString() /* #2232: unexpired on any date */}};
   const proof = {decision:'full',runId:identity.runId,runAttempt:identity.runAttempt,validationContext:identity,inputContext:inputs,inputPasses:{[group]:pass}};
   const file = path.join(description.outputDir,'input-proof.json');writeJson(file,proof);
   return {file,proof};
@@ -804,23 +1090,39 @@ test('test group covered aggregate requires four honest references and fresh ori
   });
 });
 
+// The runner's --describe output for this repository: the effective required
+// cohort, with each root placed by its row or its file (#2232).
+function describeRepository() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'chain-required-cohort-')), output = path.join(directory, 'describe');
+  try {
+    const head = git(repository, 'rev-parse', 'HEAD'), env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+    const result = spawnSync(process.execPath, [runner, '--describe', '--group', 'core', '--output-dir', output, '--repository', 'local/describe', '--event-policy', 'local',
+      '--run-id', '1', '--run-attempt', '1', '--source-sha', head, '--comparison-base', head], { cwd: repository, env, encoding: 'utf8', timeout: 60_000 });
+    assert.equal(result.status, 0, 'the real required cohort must describe: ' + result.stdout + result.stderr);
+    return JSON.parse(fs.readFileSync(path.join(output, 'descriptor.json'), 'utf8'));
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+}
+
 test('test group catalog routes real declarations despite matching quoted fixture text', t => {
   const fixture = createFixture(t);
   const titles = [
     'Landscape location: visible default-sky copy does not name Orlando',
     'RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections',
   ];
-  const candidateCatalog = JSON.parse(fs.readFileSync(path.join(repository, 'scripts/test-group-assignments.json'), 'utf8'));
+  const realCohort = describeRepository();
   const selected = titles.map(title => {
-    const rows = candidateCatalog.rootAssignments.filter(row => row.root === title);
-    assert.equal(rows.length, 1, 'each known real case needs exactly one catalog row');
-    assert.equal(rows[0].group, 'native-process', 'retain the historical group membership');
-    return rows[0];
+    // Rows now hold only overrides (#2232): the runner's descriptor of the real
+    // repository is the effective placement, by row or by the case's file.
+    const placement = realCohort.groups.filter(group => group.roots.includes(title)).map(group => group.id);
+    assert.deepEqual(placement, ['native-process'], 'retain the historical group membership');
+    // The real case lives in its own area file (#2213); this fixture appends
+    // the declarations below to its one suite file.
+    return { root: title, group: 'native-process', file: suiteFile };
   });
   const journal = path.join(fixture.root, 'real-case-executions.jsonl');
   const declarations = titles.map(title => `test(${JSON.stringify(title)}, () => { fs.appendFileSync(process.env.CHAIN_REAL_CASE_JOURNAL, ${JSON.stringify(title + '\n')}); });`).join('\n');
   const quoted = `const quotedFixtureSource = ${JSON.stringify(declarations)};\n`;
-  fs.appendFileSync(path.join(fixture.root, 'tests.js'), '\n' + quoted + declarations + '\n');
+  fs.appendFileSync(path.join(fixture.root, suiteFile), '\n' + quoted + declarations + '\n');
   fs.writeFileSync(path.join(fixture.root, 'scripts/agent-tools/preflight.test.mjs'), "import { test } from 'node:test';\n" + quoted + "test('fixture preflight real owner root', () => {});\n");
   const catalog = JSON.parse(fs.readFileSync(path.join(fixture.root, 'scripts/test-group-assignments.json'), 'utf8'));
   catalog.rootAssignments.push(...selected, { root: 'fixture preflight real owner root', group: 'native-process', file: 'scripts/agent-tools/preflight.test.mjs' });
@@ -839,4 +1141,117 @@ test('test group catalog routes real declarations despite matching quoted fixtur
     assert.equal(executed.filter(item => item === title).length, 1, 'execute each actual declaration exactly once');
     assert.equal(native.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1);
   }
+});
+
+// #2213 moved tests.js into per-area files under tests/ with one shared helper
+// module. The runner must treat that directory as the full suite: every root
+// resolves to its split file, groups run across files, and a root registered
+// in a second file is still caught.
+function convertToSplitLayout(fixture, { duplicateCoreRoot = false } = {}) {
+  const source = fs.readFileSync(path.join(fixture.root, 'tests.js'), 'utf8');
+  const header = "import assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport path from 'node:path';\nimport { test } from 'node:test';\nimport { sharedMarker } from './shared.js';\n";
+  const body = source.slice(source.indexOf('test('));
+  const sceneryAt = body.indexOf(`test(${JSON.stringify(fixtureRoots.scenery)}`);
+  fs.mkdirSync(path.join(fixture.root, 'tests'), { recursive: true });
+  fs.writeFileSync(path.join(fixture.root, 'tests/shared.js'), "export const sharedMarker = 'shared';\n");
+  fs.writeFileSync(path.join(fixture.root, 'tests/core.test.js'), header + "assert.equal(sharedMarker, 'shared');\n" + body.slice(0, sceneryAt));
+  fs.writeFileSync(path.join(fixture.root, 'tests/other.test.js'), header + body.slice(sceneryAt) +
+    (duplicateCoreRoot ? `\ntest(${JSON.stringify(fixtureRoots.core)}, () => {});\n` : ''));
+  fs.rmSync(path.join(fixture.root, 'tests.js'));
+  const packagePath = path.join(fixture.root, 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  packageJson.scripts.test = suiteCommand;
+  writeJson(packagePath, packageJson);
+  const catalogPath = path.join(fixture.root, 'scripts/test-group-assignments.json');
+  const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+  for (const row of catalog.rootAssignments) if (row.file === 'tests.js') row.file = row.root === fixtureRoots.core ? 'tests/core.test.js' : 'tests/other.test.js';
+  writeJson(catalogPath, catalog);
+  git(fixture.root, 'add', '--all');
+  git(fixture.root, 'commit', '-qm', 'split tests.js into per-area files');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+}
+
+// Moving tests into new files makes every registration an added line, so a
+// title written with string escapes must match its assignment by value. The
+// catalog stores TAP identities, where # is escaped as \#.
+test('test group runner matches added root titles written with string escapes', t => {
+  const fixture = createFixture(t);
+  const titles = ['fixture Settings → Import root', "fixture today's escaped root", 'fixture #hash root'];
+  fs.appendFileSync(path.join(fixture.root, suiteFile),
+    "\ntest(\"fixture Settings \\u2192 Import root\", () => {});\ntest('fixture today\\'s escaped root', () => {});\ntest('fixture #hash root', () => {});\n");
+  const catalogPath = path.join(fixture.root, 'scripts/test-group-assignments.json');
+  const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+  catalog.rootAssignments.push(...titles.map(root => ({ root: root.replace('#', '\\#'), group: 'core', file: suiteFile })));
+  writeJson(catalogPath, catalog);
+  git(fixture.root, 'add', '--all');
+  git(fixture.root, 'commit', '-qm', 'add roots with escaped titles');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.equal(described.status, 0, described.stdout + described.stderr);
+  const core = invoke(fixture);
+  assert.equal(core.status, 0, core.stdout + core.stderr);
+  for (const title of titles) assert.equal(core.evidence.cases.filter(item => item.id === title && item.status === 'passed').length, 1, title);
+});
+
+// A moved registration is not a new root. Env-gated registrations (such as
+// the installed-client sensitivity controls) have no group because they never
+// register in ordinary runs, and moving them into a split file keeps that.
+test('test group runner treats registrations moved into split files as existing', t => {
+  const fixture = createFixture(t, { legacyLayout: true });
+  fs.appendFileSync(path.join(fixture.root, 'tests.js'), "\nif (process.env.CHAIN_FIXTURE_GATED === '1') {\n  test('fixture env-gated sensitivity root', () => {});\n}\n");
+  git(fixture.root, 'add', 'tests.js');
+  git(fixture.root, 'commit', '-qm', 'baseline env-gated registration');
+  const head = git(fixture.root, 'rev-parse', 'HEAD');
+  const inventoryPath = path.join(fixture.root, 'scripts/test-group-inventory.json');
+  const baselineInventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+  Object.assign(baselineInventory.baseline, { sourceSha: head, sourceTree: git(fixture.root, 'rev-parse', 'HEAD^{tree}'), checkoutSha: head, checkoutTree: git(fixture.root, 'rev-parse', 'HEAD^{tree}'), comparisonBase: head });
+  writeJson(inventoryPath, baselineInventory);
+  git(fixture.root, 'add', 'scripts/test-group-inventory.json');
+  git(fixture.root, 'commit', '-qm', 'rebind inventory to the gated baseline');
+  fixture.comparisonBase = git(fixture.root, 'rev-parse', 'HEAD');
+  convertToSplitLayout(fixture);
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.equal(described.status, 0, described.stdout + described.stderr);
+  fs.appendFileSync(path.join(fixture.root, 'tests/other.test.js'), "\ntest('fixture genuinely new root', () => {});\n");
+  git(fixture.root, 'add', '--all');
+  git(fixture.root, 'commit', '-qm', 'add an unassigned root');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  const rejected = invoke(fixture, { args: ['--describe'] });
+  assert.notEqual(rejected.status, 0, 'a genuinely new root still needs an assignment');
+  assert.match(rejected.stderr, /fixture genuinely new root/);
+});
+
+test('test group runner resolves every root across split per-area test files', t => {
+  const fixture = createFixture(t, { legacyLayout: true });
+  convertToSplitLayout(fixture);
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.equal(described.status, 0, described.stdout + described.stderr);
+  const descriptor = JSON.parse(fs.readFileSync(path.join(described.outputDir, 'descriptor.json'), 'utf8'));
+  const describedRoots = descriptor.groups.flatMap(group => group.roots);
+  assert.equal(new Set(describedRoots).size, describedRoots.length, 'every root is described once');
+  for (const root of [...Object.values(fixtureRoots), fixtureScriptRoot]) assert.ok(describedRoots.includes(root), `${root} resolves after the split`);
+  for (const group of groups) {
+    const result = invoke(fixture, { group });
+    assert.equal(result.status, 0, `${group}: ${result.stdout}\n${result.stderr}`);
+    assert.equal(result.evidence.status, 'passed');
+  }
+  const core = invoke(fixture);
+  assert.deepEqual(core.evidence.unclassifiedRootGuard.files.map(item => item.file).sort(),
+    ['scripts/agent-tools/fixture.test.mjs', 'tests/core.test.js', 'tests/other.test.js'],
+    'the guard covers every split test file and not the shared helper module');
+
+  const duplicate = createFixture(t, { legacyLayout: true });
+  convertToSplitLayout(duplicate, { duplicateCoreRoot: true });
+  const rejected = invoke(duplicate);
+  assert.notEqual(rejected.status, 0, 'a root registered again in another split file must fail closed');
+  assert.match(rejected.evidence.issues.join('\n'), /tests\/other\.test\.js/);
+});
+
+// Nothing runs a root tests.js since #2213, so a checkout whose npm test still
+// names it is not the suite this runner groups.
+test('test group runner refuses the retired single tests.js suite command', t => {
+  const fixture = createFixture(t, { legacyLayout: true });
+  const described = invoke(fixture, { args: ['--describe'] });
+  assert.notEqual(described.status, 0, 'the single-file layout must not group: ' + described.stdout + described.stderr);
+  assert.match(described.stderr, /full npm test entry point changed/);
 });

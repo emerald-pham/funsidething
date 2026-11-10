@@ -47,7 +47,12 @@ function childEnvironment(transport) {
   return { ...process.env, GODEBUG: [...new Set(godebug)].join(',') };
 }
 
-async function ghOutput(args, { options, transport, requestsPath, kind, maxBuffer, deadline }) {
+// action names the read in errors; the CI observer's run and log reads keep
+// their established wording. requestsPath is optional: the velocity report has
+// no evidence directory, so it keeps no request log.
+async function ghOutput(args, { options, transport, requestsPath, kind, maxBuffer, deadline, action }) {
+  const failedAction = action ?? (kind === 'run' ? 'observe CI run' : 'read full CI logs for run');
+  const waitedAction = action ?? (kind === 'run' ? 'observe CI run' : 'read full CI logs');
   let retries = 0;
   let retryDelayMs = options.retryDelayMs;
   const attempts = [];
@@ -79,17 +84,17 @@ async function ghOutput(args, { options, transport, requestsPath, kind, maxBuffe
       observedAt: new Date().toISOString(),
     };
     attempts.push(attempt);
-    await appendFile(requestsPath, `${JSON.stringify(attempt)}\n`, { mode: 0o600 });
+    if (requestsPath) await appendFile(requestsPath, `${JSON.stringify(attempt)}\n`, { mode: 0o600 });
     if (!problem) return { stdout: result.stdout, attempts, transportFallbackUsed: transport.fallbackUsed };
     if (retries >= options.maxRetries) {
-      const error = new Error(`Could not ${kind === 'run' ? 'observe CI run' : 'read full CI logs for run'}: ${problem}`);
+      const error = new Error(`Could not ${failedAction}: ${problem}`);
       error.attempts = attempts;
       error.transportFallbackUsed = transport.fallbackUsed;
       throw error;
     }
     const remainingBeforeRetry = deadline - Date.now();
     if (remainingBeforeRetry <= 0) {
-      const error = new Error(`Interactive wait limit reached while attempting to ${kind === 'run' ? 'observe CI run' : 'read full CI logs'}: ${problem}`);
+      const error = new Error(`Interactive wait limit reached while attempting to ${waitedAction}: ${problem}`);
       error.attempts = attempts;
       error.transportFallbackUsed = transport.fallbackUsed;
       throw error;
@@ -443,7 +448,137 @@ async function main() {
   process.exitCode = 2;
 }
 
-main().catch((error) => {
+// Weekly velocity report (#2217). Merges fell from 60 a week to none for a week
+// before anyone noticed (#2205), while every CI run stayed green. The nightly
+// workflow runs this over a rolling 7-day window so a stall or an issue
+// explosion is visible within a week rather than after a month.
+const VELOCITY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+// One open issue with this exact title carries every alert.
+const VELOCITY_ALERT_TITLE = 'Weekly velocity alert';
+
+function parseVelocityArguments(args) {
+  const options = { dryRun: false };
+  for (let index = 0; index < args.length; index += 1) {
+    const name = args[index];
+    if (name === '--dry-run') { options.dryRun = true; continue; }
+    if (!['--repo', '--now'].includes(name)) throw new Error(`Unknown velocity-report option: ${name}.`);
+    const value = args[index + 1];
+    if (!value || value.startsWith('--')) throw new Error(`Missing value for ${name}.`);
+    options[name.slice(2)] = value;
+    index += 1;
+  }
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(options.repo ?? '')) throw new Error('--repo must be OWNER/REPOSITORY.');
+  options.now = options.now === undefined ? new Date() : new Date(options.now);
+  if (Number.isNaN(options.now.getTime())) throw new Error('--now must be an ISO 8601 timestamp.');
+  return options;
+}
+
+// The velocity report uses the CI observer's bounded gh retry (TLS fallback
+// included) for reads. Issue writes are not idempotent, so a failed write is
+// never retried: a retry after a lost response could file a second alert.
+async function velocityGh(args, { write = false } = {}) {
+  const { stdout } = await ghOutput(args, {
+    options: { maxRetries: write ? 0 : 2, retryDelayMs: 500, maxRetryDelayMs: 4000, requestTimeoutMs: 60000 },
+    transport: { disableHttp2: false, fallbackUsed: false },
+    kind: 'velocity',
+    maxBuffer: 50 * 1024 * 1024,
+    deadline: Date.now() + 5 * 60000,
+    action: `run gh ${args.slice(0, 2).join(' ')}`,
+  });
+  return stdout;
+}
+const velocityJson = async (args) => JSON.parse(await velocityGh(args));
+
+const isoSeconds = (date) => date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+const minutes = (ms) => `${(ms / 60000).toFixed(1)} min`;
+// Nearest-rank percentile: always an observed run duration, never interpolated.
+const percentile = (sorted, p) => sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+async function readVelocity(options) {
+  const end = options.now, start = new Date(end.getTime() - VELOCITY_WINDOW_MS), since = isoSeconds(start);
+  const inWindow = (stamp) => { const time = Date.parse(stamp); return time >= start.getTime() && time <= end.getTime(); };
+  // GitHub search filters are only a pre-filter; the exact window is applied here.
+  const merged = (await velocityJson(['pr', 'list', '--repo', options.repo, '--state', 'merged', '--base', 'main', '--search', `merged:>=${since}`, '--limit', '500', '--json', 'number,title,mergedAt']))
+    .filter((pr) => inWindow(pr.mergedAt)).sort((a, b) => Date.parse(b.mergedAt) - Date.parse(a.mergedAt));
+  const open = (await velocityJson(['pr', 'list', '--repo', options.repo, '--state', 'open', '--limit', '500', '--json', 'number,title,createdAt,isDraft,baseRefName']))
+    .map((pr) => ({ ...pr, ageDays: Math.floor((end.getTime() - Date.parse(pr.createdAt)) / 86400000) }))
+    .sort((a, b) => b.ageDays - a.ageDays);
+  // Only runs that ran to a verdict measure CI cost; cancelled (superseded) and
+  // unfinished runs would understate it.
+  const durations = (await velocityJson(['run', 'list', '--repo', options.repo, '--workflow', 'data-safety.yml', '--created', `>=${since}`, '--limit', '1000', '--json', 'databaseId,startedAt,updatedAt,status,conclusion']))
+    .filter((run) => run.status === 'completed' && ['success', 'failure'].includes(run.conclusion) && inWindow(run.startedAt))
+    .map((run) => Date.parse(run.updatedAt) - Date.parse(run.startedAt)).sort((a, b) => a - b);
+  const issueSearch = await velocityJson(['api', '-X', 'GET', 'search/issues', '-f', `q=repo:${options.repo} is:issue created:>=${since}`, '-f', 'per_page=1']);
+  return { start, end, merged, open, durations, issuesOpened: issueSearch.total_count };
+}
+
+function velocitySummary(report) {
+  const { start, end, merged, open, durations, issuesOpened } = report;
+  // Every list line starts with "- " so a PR title can never begin a line with
+  // "::" and be read as a workflow command when this is printed to the run log.
+  return [
+    '## Weekly velocity report',
+    '',
+    `Window: ${isoSeconds(start)} to ${isoSeconds(end)}`,
+    '',
+    '| Measure | Value |',
+    '| --- | --- |',
+    `| Merged PRs to main | ${merged.length} |`,
+    `| Median CI duration | ${durations.length ? minutes(percentile(durations, 0.5)) : 'n/a'} (${plural(durations.length, 'finished Data safety run')}) |`,
+    `| p90 CI duration | ${durations.length ? minutes(percentile(durations, 0.9)) : 'n/a'} |`,
+    `| Issues opened | ${issuesOpened} |`,
+    `| Open PRs | ${open.length} |`,
+    '',
+    '### Merged PRs',
+    ...(merged.length ? merged.map((pr) => `- #${pr.number} ${pr.title} (${pr.mergedAt.slice(0, 10)})`) : [`- None since ${isoSeconds(start)}`]),
+    '',
+    '### Open PR ages',
+    ...(open.length ? open.map((pr) => `- #${pr.number} ${pr.title}: ${plural(pr.ageDays, 'day')}${pr.isDraft ? ' (draft)' : ''}${pr.baseRefName && pr.baseRefName !== 'main' ? ` (into ${pr.baseRefName})` : ''}`) : ['- None']),
+    '',
+  ].join('\n');
+}
+
+async function velocityReport(args) {
+  const options = parseVelocityArguments(args);
+  const report = await readVelocity(options);
+  const summary = velocitySummary(report);
+  process.stdout.write(summary);
+  if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, summary);
+  const alerts = velocityAlerts(report);
+  if (!alerts.length) return;
+  for (const alert of alerts) process.stdout.write(`::error title=${alert.title}::${alert.message}\n`);
+  const body = [...alerts.map((alert) => `- **${alert.title}**: ${alert.message}`), '', summary].join('\n');
+  // One open alert issue at a time: the nightly run comments on it while the
+  // alert persists instead of adding to the issue pile it is meant to warn about.
+  // Title search is fuzzy, so only an exact title match counts. Any label
+  // counts: triage replaces needs-triage, and a triaged alert is still open.
+  const existing = (await velocityJson(['issue', 'list', '--repo', options.repo, '--state', 'open', '--search', `"${VELOCITY_ALERT_TITLE}" in:title`, '--limit', '100', '--json', 'number,title']))
+    .filter((issue) => issue.title === VELOCITY_ALERT_TITLE).sort((a, b) => a.number - b.number)[0];
+  // A dry run reads the real repository but never writes, for local checks.
+  if (options.dryRun) process.stdout.write(`Velocity dry run: would ${existing ? `comment on #${existing.number}` : `create "${VELOCITY_ALERT_TITLE}" labelled needs-triage`}.\n`);
+  else if (existing) await velocityGh(['issue', 'comment', String(existing.number), '--repo', options.repo, '--body', body], { write: true });
+  else await velocityGh(['issue', 'create', '--repo', options.repo, '--title', VELOCITY_ALERT_TITLE, '--label', 'needs-triage', '--body', body], { write: true });
+  // The alert is a visible failure of the nightly job, not just a log line.
+  process.exitCode = 1;
+}
+
+// The atomic-issue rule produced 1,594 issues in its first week (#2205); planning
+// had replaced shipping. More than 100 in a week is the agreed early warning.
+const VELOCITY_ISSUE_LIMIT = 100;
+
+function velocityAlerts({ merged, open, issuesOpened }) {
+  const alerts = [];
+  // Only ready PRs into main can be waiting on a merge to main: drafts are not
+  // asking to merge, and ticket PRs into an integration branch merge elsewhere.
+  const waiting = open.filter((pr) => !pr.isDraft && pr.baseRefName === 'main');
+  if (!merged.length && waiting.length) alerts.push({ title: 'Velocity stall', message: `No PR merged to main in 7 days while ${plural(waiting.length, 'open PR')} wait.` });
+  if (issuesOpened > VELOCITY_ISSUE_LIMIT) alerts.push({ title: 'Issue spike', message: `${issuesOpened} issues opened in 7 days (limit ${VELOCITY_ISSUE_LIMIT}).` });
+  return alerts;
+}
+
+
+(process.argv[2] === 'velocity-report' ? velocityReport(process.argv.slice(3)) : main()).catch((error) => {
   process.stderr.write(`ci-monitor: ${error.message}\n`);
   process.exitCode = 1;
 });

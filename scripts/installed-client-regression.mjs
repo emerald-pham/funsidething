@@ -43,7 +43,7 @@ async function nativeAdd(page,title){
   await page.waitForFunction(()=>document.getElementById('addInput').value==='');
 }
 
-// The only caller is tests.js's required native child. No product behavior switches.
+// The only caller is tests/native-process.test.js's required native child. No product behavior switches.
 export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommit,candidateTree,outputDir,port=0,timeoutMs=180000,control=null}){
   assert.ok(['signed-out','reconcile-held'].includes(mode));
   assert.ok(control===null||['wrong-candidate','stale-byte','unsafe-quiescence','source-loss'].includes(control),'known explicit sensitivity control');

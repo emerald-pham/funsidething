@@ -1,0 +1,94 @@
+name: Nightly
+
+# Checks that are too slow or too engine-specific to block every change run
+# here, outside the required Data safety cohort (#2205). The cross-engine
+# native button checks failed a branch 12 runs in a row at 50-66 minutes each,
+# blocking unrelated fixes; nightly they still catch WebKit regressions before a
+# Stable release. A failing job fails this run, which GitHub reports to the
+# maintainer. Before a Stable release, start it with "Run workflow" on the
+# release candidate ref.
+#
+# Add further nightly checks (ruleset drift, velocity report) as sibling jobs
+# so one failure never hides another, and grant each job only the permissions
+# it needs.
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-engine-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium and WebKit
+        run: npx --no-install playwright install --with-deps chromium webkit
+      - name: Resolve comparison base
+        id: base
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          echo "sha=$(git merge-base origin/main HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Cross-engine native button checks
+        run: npm run test:group -- --group nightly-cross-engine --output-dir "$RUNNER_TEMP/nightly-cross-engine" --repository "$GITHUB_REPOSITORY" --event-policy "$GITHUB_EVENT_NAME" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --source-sha "$GITHUB_SHA" --comparison-base "${{ steps.base.outputs.sha }}"
+      - name: Preserve nightly cross-engine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-cross-engine-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/nightly-cross-engine
+          if-no-files-found: error
+
+  # Branch protection lives in GitHub, not in the repository, so a ruleset edit
+  # could silently drop a required check (#2216). This compares the rules that
+  # apply to main with the committed set and fails the run naming any missing or
+  # extra check. The branch-rules endpoint needs only repository read access, so
+  # the default token with contents: read is enough.
+  ruleset-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compare live main ruleset with committed required checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/agent-tools/ruleset-drift.mjs --repository "$GITHUB_REPOSITORY" --branch main --expected .github/required-status-checks.json
+
+  # Weekly velocity report (#2217). Merges stopped for a week before anyone
+  # noticed while CI stayed green, so each night this summarizes the last 7 days
+  # (merged PRs, CI duration, issues opened, open PR ages) in the step summary.
+  # No merge to main while PRs are open, or more than 100 new issues, fails the
+  # job with an annotation and files (or comments on) one needs-triage issue.
+  velocity-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Weekly velocity report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/agent-tools/ci-monitor.mjs velocity-report --repo "$GITHUB_REPOSITORY"

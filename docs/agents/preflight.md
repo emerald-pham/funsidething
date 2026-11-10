@@ -6,7 +6,7 @@ From the repository root, run this before shell packaging and the expensive fina
 node scripts/agent-tools/preflight.mjs [--base <ref>]
 ```
 
-The command runs the existing default-sky wording test and Quick start FAQ brevity test from `tests.js`, then invokes the existing `scripts/test-first-gate.mjs` validator for each distinct comparison commit. Each selected copy check runs once. `--help` and invalid arguments launch no children. It prints each selected result and the validator output, names a failing comparison, exits nonzero on a failure, and fails closed if either named test is missing. The validator keeps its current commit-diff behavior.
+The command runs the existing default-sky wording test and Quick start FAQ brevity test from the `tests/` area files, then invokes the existing `scripts/test-first-gate.mjs` validator for each distinct comparison commit. Each selected copy check runs once. `--help` and invalid arguments launch no children. It prints each selected result and the validator output, names a failing comparison, exits nonzero on a failure, and fails closed if either named test is missing. The validator keeps its current commit-diff behavior.
 
 With no `--base`, the command uses the first available merge base from `origin/main`, `main`, or `master`. Pass `--base <ref>` to choose the comparison explicitly.
 
