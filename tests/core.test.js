@@ -12205,6 +12205,25 @@ test("UI #221: each chain pill is a native button whose accessible name says it 
   assert.match(pill.markup, /aria-label="Open Water the ferns to edit it"/, "its name says what pressing it does");
 });
 
+const returnButton = modalHtml => {
+  const button = String(modalHtml).match(/<button\b[^>]*data-act="return-candidate"[^>]*>[^<]*<\/button>/)?.[0];
+  assert.ok(button, `expected a Return as candidate button in: ${modalHtml}`);
+  return button;
+};
+
+test("UI #221: Return as candidate is enabled in the editor a chain pill opens, and its tooltip names the chain", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2213 });
+  ctx.addTask("Older dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Older dot");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  const button = returnButton(shim.elements.get("modalRoot").innerHTML);
+  assert.doesNotMatch(button, /\bdisabled\b/, "a dotted task can be returned");
+  assert.match(button, new RegExp(`data-id="${pill.id}"`));
+  assert.match(button, /title="[^"]*chain[^"]*"/i, "the tooltip says it takes the dot off the chain");
+});
+
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
    The card already reads as the benchmark (purple fill, "Done" checkbox, its
    position in the layout), so the little filled circle beside the title was

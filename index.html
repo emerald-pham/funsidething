@@ -8422,7 +8422,9 @@ function isSkipped(t){ // has a no/can't/dislodged/worked mark — same set resc
   return v==="no" || v==="cant" || v==="dislodged" || v==="worked";
 }
 function canReturnAsCandidate(t){
-  return !t.done && (isSkipped(t) || !!(t.evergreen && t.lastDoneAt && Date.now()<evergreenUntil(t)) || supportedPostponeEvidence(t) && Date.now()<taskPostponeUntil(t));
+  // #221: a dot on the current chain can be taken back as well, alongside
+  // the skip marks, postponements and evergreen rests it always cleared.
+  return !t.done && (state.chain.includes(t.id) || isSkipped(t) ||!!(t.evergreen && t.lastDoneAt && Date.now()<evergreenUntil(t)) || supportedPostponeEvidence(t) && Date.now()<taskPostponeUntil(t));
 }
 function canDotTask(t){
   // Manual Dot overrides context/date/dependency holds, but completion and
@@ -16499,7 +16501,7 @@ function openEdit(id){
     + '<button class="btn done" data-act="done-task" data-id="'+esc(t.id)+'" title="Cross it off \u2014 completes the task and closes this pane">\u2713 Done</button>'
     + '<button class="btn worked" data-act="worked-task" data-id="'+esc(t.id)+'" title="Started it \u2014 cross it off and send it back to the bottom of the list (rule 7)">\u21bb Worked on it</button>'
     + (dottable ? '<button class="btn dot" data-act="dot-task" data-id="'+esc(t.id)+'" title="Put it on the chain now \u2014 it becomes the benchmark, the task you do next">\u25cf Dot</button>' : '')
-    + '<button class="btn subtle" data-act="return-candidate" data-id="'+esc(t.id)+'" title="Clear its skip mark, postponement or evergreen rest period so the scanner can deal it as a candidate again"'+(returnable ? '' : ' disabled')+'>Return as candidate</button>'
+    + '<button class="btn subtle" data-act="return-candidate" data-id="'+esc(t.id)+'" title="'+(state.chain.includes(t.id) ? 'Take this dot off the chain so the scanner can deal it as a candidate again' : 'Clear its skip mark, postponement or evergreen rest period so the scanner can deal it as a candidate again')+'"'+(returnable ? '' : ' disabled')+'>Return as candidate</button>'
     + '</div>'
     + '<div class="mbtns formacts">'
     + '<button class="btn primary" data-act="save-edit" data-id="'+esc(t.id)+'">Save</button>'
