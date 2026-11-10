@@ -593,6 +593,8 @@ test('RISK cloud generation recovery: Use my board from before recovery succeeds
  const button=declineButton2194();
  shim.document.dispatchEvent({type:'pointerdown',target:button});shim.document.dispatchEvent({type:'click',detail:1,target:button});
  await fixtureDeadline(async wait=>{await wait(5);while(!idle()||((await store.getRecoveryCloudHold())&&!shim.document.getElementById('toast').textContent))await wait(20);},'the decline settles',CAPTURED_RESULT_BUDGET_MS+20000);
+ // The device commit releases the hold a moment before the app swaps the board in memory.
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticRecoveryDeclineBusy',ctx))await wait(20);},'the decline finishes',CAPTURED_RESULT_BUDGET_MS+20000);
  const message=shim.document.getElementById('toast').textContent;
  assert.doesNotMatch(message,/save or edit is running/i,'the Settings modal the decline is pressed from is not an active editor: '+message);
  assert.equal(await store.getRecoveryCloudHold(),null,'the decline releases the pending automatic default: '+message);

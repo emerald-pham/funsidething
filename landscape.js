@@ -1623,6 +1623,9 @@
   }
   function openMotion(){
     if(dialog.open)return;
+    // The Debug log link holds the opening with no end of its own, and a modal
+    // dialog over it would block the only way out, so the check waits its turn.
+    if(window.__chainDebugLogLinkHeld){window.__chainDebugLogLinkOnClose=()=>{if(preference===null)openMotion();};return;}
     returnFocus=document.activeElement;
     if(!returnFocus || returnFocus===document.body) returnFocus=document.querySelector('#modalRoot button')||motionButton;
     dialog.showModal();
