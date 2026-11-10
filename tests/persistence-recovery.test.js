@@ -918,7 +918,10 @@ test('RISK device save settle: an account change during the repair is still refu
 
 // #2325: once the repair budget is genuinely spent, the person reads what
 // happened, what is protected and what to do, not an internal code.
-const deviceSaveExhaustedMessage2325="This edit isn't saved yet: the saved board kept changing, probably because Chain Scanner is open in another tab or window. Your edit is still in this tab, and the saved board was not overwritten. Close the other copy and keep this one open; your next change here saves this edit too.";
+// The message claims only what the code guarantees: when the other copy changed
+// the same field, the existing merge may keep its value on the board and this
+// tab's version only as a stale-tab-draft backup (#2323 review).
+const deviceSaveExhaustedMessage2325="This edit isn't saved yet. Chain Scanner is probably open in another tab. Close that one, then make any change here to save again.";
 async function deviceSaveExhausted2325(t,name){
  const f=await deviceSaveSettleApp2324(t,{name,tasks:[syncTask(name+'-anchor','Anchor'),syncTask(name+'-mine','Mine'),syncTask(name+'-theirs','Theirs')]});
  assert.equal(await f.ctx.persist(),true);
@@ -986,6 +989,26 @@ test('RISK device save settle: the plain message stays until a later save verifi
  assert.match(title('stays-exhausted-theirs'),/^Other copy write \d+$/,'the other copy\'s save is kept');
  const reopened=await loadAppAtTime(f.at+20000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
  assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows the saved edits');
+});
+
+// The FAQ says: "If both copies changed the same thing, the saved board keeps
+// one version and Settings backups keep this tab's." Which version the board
+// keeps is the existing merge's choice; either way this tab's exact draft stays.
+test('RISK device save settle: when both copies changed the same task, the board keeps one version and a backup keeps this tab\'s',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'same-field',tasks:[syncTask('same-field-anchor','Anchor'),syncTask('same-field-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{commits++;await other.edit('same-field-mine','Other copy write '+commits);};
+ f.edit('same-field-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false,'the other copy kept saving the same task until the repair ran out');
+ const theirs='Other copy write '+commits;
+ f.beforeCommit=null;
+ f.edit('same-field-anchor','Next change here');
+ const head=await f.settled('next change after a same-task clash');
+ const board=JSON.parse(head.payload).tasks.find(task=>task.id==='same-field-mine').title;
+ assert.ok(board==='Kept in this tab'||board===theirs,'the saved board keeps one of the two versions: '+board);
+ const drafts=(await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').map(row=>JSON.parse(row.payload).tasks.find(task=>task.id==='same-field-mine')?.title);
+ assert.ok(drafts.includes('Kept in this tab'),'a stale-tab-draft backup, listed in Settings, keeps this tab\'s version');
 });
 
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{

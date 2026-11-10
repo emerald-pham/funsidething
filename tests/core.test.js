@@ -33959,12 +33959,12 @@ test('Device save settle guidance: the FAQ and changelog say saves on one device
 });
 
 test('Device save plain message guidance: the FAQ and changelog explain the message for a save that ran out of repairs (#2325)',()=>{
- assert.match(html,/<\/dd><dt>What if this copy still cannot save\?<\/dt><dd>If the other copy keeps saving for longer than that, a message says your edit is still in this tab and the saved board was not overwritten\. Close the other copy and keep this one open; your next change here saves the kept edit too\. The message stays until a save succeeds\. Settings shows Last device save issue, and the Debug log counts the save attempts\.<\/dd>/);
+ assert.match(html,/<\/dd><dt>What if this copy still cannot save\?<\/dt><dd>If the other copy keeps saving for longer than that, a message says this edit isn’t saved yet\. Close the other copy, then make any change here to save again\. If both copies changed the same thing, the saved board keeps one version and Settings backups keep this tab’s\. The message stays until a save succeeds\. Settings shows Last device save issue, and the Debug log counts the save attempts\.<\/dd>/);
  const faq=html.slice(html.indexOf('<dt>What can I do if a save or sync fails?'),html.indexOf('<dt>What if the app is open twice on this device?'));
  assert.match(faq,/Settings keeps each device-save warning’s stage and code\./);
  assert.doesNotMatch(faq,/Device-save warnings name a stage and code\./,'the plain message does not lead with a code');
  const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
- assert.match(current,/<li>When a save on this device still cannot finish because another open copy keeps saving, the message now says plainly what happened: your edit is still in this tab, the saved board was not overwritten, and closing the other copy lets your next change save it\. The message stays on screen until a save succeeds\. The support code moves to Settings → Last device save issue, and the Debug log also counts the save attempts\.<\/li>/);
+ assert.match(current,/<li>When a save on this device still cannot finish because another open copy keeps saving, the message now says plainly that the edit isn’t saved yet and that closing the other copy, then making any change here, saves again\. The message stays on screen until a save succeeds\. The support code moves to Settings → Last device save issue, and the Debug log also counts the save attempts\.<\/li>/);
 });
 
 test('Firestore rules: production cleanup resumes deleting tombstones and protects active previous pending and young staging generations', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
