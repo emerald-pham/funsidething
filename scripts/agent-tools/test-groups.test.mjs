@@ -1,6 +1,8 @@
+import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -490,6 +492,56 @@ test('test group runner removes only its process temp files after failure', t =>
   assert.ok(fs.existsSync(path.join(result.outputDir, 'test.tap')), 'failure output remains available for diagnosis');
 });
 
+test('test group runner names why a test failed in the job log', t => {
+  const fixture = createFixture(t, { failOnRequest: true });
+  const result = invoke(fixture, { env: {
+    CHAIN_GROUP_FIXTURE_FAILURE: '1',
+    CHAIN_GROUP_FOREIGN_SENTINEL: path.join(fixture.root, 'foreign-owner-data.txt'),
+  } });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /^Test case failed: fixture core baseline root: intentional fixture process failure$/m, 'the failed job log gives the assertion without downloading an artifact');
+});
+
+// Roots appended here throw exactly what their source says; the expected log
+// text below is written out by hand, not derived from the runner's own parsing.
+function failingRootsFixture(t, roots) {
+  const fixture = createFixture(t);
+  fs.appendFileSync(path.join(fixture.root, suiteFile), roots.map(([title, body]) => `\ntest(${JSON.stringify(title)}, () => { ${body} });\n`).join(''));
+  const file = path.join(fixture.root, 'scripts/test-group-assignments.json'), catalog = JSON.parse(fs.readFileSync(file, 'utf8'));
+  catalog.rootAssignments.push(...roots.map(([root]) => ({ root, group: 'core', file: suiteFile })));
+  writeJson(file, catalog);
+  git(fixture.root, 'add', '.'); git(fixture.root, 'commit', '-qm', 'failing assertion roots');
+  fixture.sourceSha = git(fixture.root, 'rev-parse', 'HEAD');
+  return fixture;
+}
+const failureLine = (stderr, title) => {
+  const lines = stderr.split('\n').filter(line => line.startsWith(`Test case failed: ${title}: `));
+  assert.equal(lines.length, 1, `exactly one log line names ${title}`);
+  return lines[0].slice(`Test case failed: ${title}: `.length);
+};
+
+test('test group runner keeps a failed test reason to one capped line of the first assertion', t => {
+  const fixture = failingRootsFixture(t, [
+    ['fixture long assertion root', 'assert.fail("x".repeat(5000));'],
+    ['fixture multi-line assertion root', 'throw new Error("first assertion line\\n\\nboard data stays out of the log\\n");'],
+    ['fixture long multi-line assertion root', 'throw new Error("y".repeat(5000) + "\\nsecond line");'],
+    ['fixture terminal escape assertion root', 'throw new Error("\\u001b[31mcolored first line\\u001b[0m\\nrest");'],
+  ]);
+  const result = invoke(fixture);
+  assert.notEqual(result.status, 0);
+  assert.equal(failureLine(result.stderr, 'fixture multi-line assertion root'), 'first assertion line');
+  assert.doesNotMatch(result.stderr, /board data stays out of the log/, 'only the first assertion line reaches the public log');
+  for (const [title, character] of [['fixture long assertion root', 'x'], ['fixture long multi-line assertion root', 'y']]) {
+    const reason = failureLine(result.stderr, title);
+    assert.ok(reason.length <= 200, `${title} stays within the 200 character cap: ${reason.length}`);
+    assert.ok(reason.startsWith(character.repeat(150)), `${title} keeps the start of its assertion`);
+  }
+  assert.doesNotMatch(result.stderr, /second line/);
+  const escaped = failureLine(result.stderr, 'fixture terminal escape assertion root');
+  assert.doesNotMatch(escaped, /\u001b/, 'terminal control characters do not reach the log');
+  assert.match(escaped, /colored first line/);
+});
+
 test('test group runner fails closed when a required native child registration is missing or duplicated', t => {
   const validFixture = createFixture(t, { processControl: true });
   const valid = invoke(validFixture, { group: 'native-process' });
@@ -734,6 +786,114 @@ test('test group nightly cohort runs only the declared cross-engine cases and fa
     assert.notEqual(result.evidence?.status,'passed');
     assert.match(result.stderr,message);
   });
+});
+
+// #2293: a root whose test has not landed is declared pending with its owning
+// PR. The job runs the active roots, and with none it succeeds while saying that
+// no cross-engine case ran and naming what it is waiting for.
+const pendingNightlyRoot='fixture pending cross-engine root';
+const pendingEntry=(root=pendingNightlyRoot)=>({root,file:suiteFile,pendingOn:'#285',reason:'Fixture root whose test has not landed.'});
+function pendingNightlyFixture(t,nightlyRoots){
+  // nightlyFixture always registers its appended root; assign it to core when the catalog does not declare it.
+  const fixture=nightlyFixture(t,{nightlyRoots});
+  if(nightlyRoots.some(entry=>entry.root===nightlyFixtureRoot))return fixture;
+  const file=path.join(fixture.root,'scripts/test-group-assignments.json'),catalog=JSON.parse(fs.readFileSync(file,'utf8'));
+  catalog.rootAssignments.push({root:nightlyFixtureRoot,group:'core',file:suiteFile});
+  writeJson(file,catalog);git(fixture.root,'add','.');git(fixture.root,'commit','-qm','pending nightly roots');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+test('test group nightly with only pending roots succeeds, runs nothing and names them', t => {
+  const fixture=pendingNightlyFixture(t,[pendingEntry()]),sentinel=path.join(fixture.root,'nightly-executed');
+  const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+  assert.equal(result.status,0,'only pending roots is not a broken run: '+result.stdout+result.stderr);
+  assert.match(result.stdout,/^::notice [^\n]*\b0 cross-engine cases ran\b[^\n]*fixture pending cross-engine root[^\n]*#285/m,'the job must annotate zero cases and name the pending root with its owner');
+  assert.equal(fs.existsSync(sentinel),false,'no test may execute when no root is active');
+  assert.notEqual(result.evidence.status,'passed','zero cases must never be recorded as a pass');
+  assert.deepEqual(result.evidence.cases,[]);
+  assert.deepEqual(result.evidence.crossEngine,{casesRun:0,activeRoots:[],pendingRoots:[{root:pendingNightlyRoot,file:suiteFile,pendingOn:'#285'}]});
+});
+test('test group nightly preflight fails a pending root whose test has landed until it is moved to active', t => {
+  const fixture=pendingNightlyFixture(t,[pendingEntry(nightlyFixtureRoot)]),sentinel=path.join(fixture.root,'nightly-executed');
+  const description=invoke(fixture,{args:['--describe']});
+  assert.equal(description.status,0,'required CI must not depend on the nightly pending state: '+description.stdout+description.stderr);
+  const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+  assert.notEqual(result.status,0,'a landed test must not go unrun behind a pending row');
+  assert.equal(result.evidence.status,'preflight_failed');
+  assert.match(result.stderr,/fixture cross-engine native button root.*#285.*active/,'the failure must name the root, its owner and the move to active');
+  assert.equal(fs.existsSync(sentinel),false,'preflight stops before any test runs');
+});
+function nightlyRootFormFixture(t,nightlyRoots,registration){
+  const fixture=pendingNightlyFixture(t,nightlyRoots);
+  fs.appendFileSync(path.join(fixture.root,suiteFile),`\n${registration}\n`);
+  git(fixture.root,'add','.');git(fixture.root,'commit','-qm','root registration form');fixture.sourceSha=git(fixture.root,'rev-parse','HEAD');
+  return fixture;
+}
+const escapedRegistration="test('fixture pending cross\\u002dengine root',()=>{});";
+const templateRegistration='test(`fixture pending cross-engine root`,()=>{});';
+test('test group nightly preflight catches a landed pending root however its title is written', async parent => {
+  for(const [name,registration]of [
+    ['escaped title',escapedRegistration],
+    ['template title',templateRegistration],
+    ['title in a constant',"const landedTitle='fixture pending cross-engine root';test(landedTitle,()=>{});"],
+    ['title in a table',"for(const landedTitle of ['fixture pending cross-engine root'])test(landedTitle,()=>{});"],
+  ])await parent.test(name,t=>{
+    const result=invoke(nightlyRootFormFixture(t,[pendingEntry()],registration),{group:'nightly-cross-engine'});
+    assert.notEqual(result.status,0,'a landed test must not go unrun behind a pending row: '+result.stdout);
+    assert.equal(result.evidence.status,'preflight_failed');
+    assert.match(result.stderr,/fixture pending cross-engine root.*#285.*active/,'the failure must name the root, its owner and the move to active');
+  });
+});
+test('test group nightly reads an active root title the way it reads a pending one', async parent => {
+  for(const [name,registration]of [['escaped title',escapedRegistration],['template title',templateRegistration]])await parent.test(name,t=>{
+    const active={root:pendingNightlyRoot,file:suiteFile,reason:'Fixture active cross-engine root.'};
+    const result=invoke(nightlyRootFormFixture(t,[active],registration),{group:'nightly-cross-engine'});
+    assert.equal(result.status,0,'an active root that is registered once must run: '+result.stdout+result.stderr);
+    assert.deepEqual(result.evidence.cases.map(item=>[item.id,item.status]),[[pendingNightlyRoot,'passed']]);
+  });
+});
+test('test group nightly keeps a root pending when no literal in its file spells the title', async parent => {
+  for(const [name,registration]of [
+    ['a comment naming the title',"// test('fixture pending cross-engine root',()=>{});"],
+    ['a title built at run time',"const landedArea='cross-engine';test(`fixture pending ${landedArea} root`,()=>{});"],
+  ])await parent.test(name,t=>{
+    const result=invoke(nightlyRootFormFixture(t,[pendingEntry()],registration),{group:'nightly-cross-engine'});
+    assert.equal(result.status,0,result.stdout+result.stderr);
+    assert.equal(result.evidence.status,'no_active_roots');
+  });
+});
+test('test group nightly runs active roots beside pending ones and states the count', t => {
+  const active={root:nightlyFixtureRoot,file:suiteFile,reason:'Fixture active cross-engine root.'};
+  const fixture=pendingNightlyFixture(t,[active,pendingEntry()]),sentinel=path.join(fixture.root,'nightly-executed');
+  const result=invoke(fixture,{group:'nightly-cross-engine',env:{CHAIN_NIGHTLY_SENTINEL:sentinel}});
+  assert.equal(result.status,0,'a pending root must not stop the active ones: '+result.stdout+result.stderr);
+  assert.equal(result.evidence.status,'passed');
+  assert.deepEqual(result.evidence.cases.map(item=>[item.id,item.status]),[[nightlyFixtureRoot,'passed']]);
+  assert.equal(fs.existsSync(sentinel),true,'the active root must actually execute');
+  assert.deepEqual(result.evidence.crossEngine,{casesRun:1,activeRoots:[nightlyFixtureRoot],pendingRoots:[{root:pendingNightlyRoot,file:suiteFile,pendingOn:'#285'}]});
+  assert.match(result.stdout,/^::notice [^\n]*\b1 cross-engine case ran\b[^\n]*fixture pending cross-engine root[^\n]*#285/m);
+});
+test('test group nightly preflight still fails a missing active root beside a pending one', t => {
+  const missing={root:'fixture misspelled active root',file:suiteFile,reason:'A typo in an active root must stay loud.'};
+  const fixture=pendingNightlyFixture(t,[missing,pendingEntry()]);
+  const result=invoke(fixture,{group:'nightly-cross-engine'});
+  assert.notEqual(result.status,0,'a pending root must not excuse a missing active root');
+  assert.equal(result.evidence.status,'preflight_failed');
+  assert.match(result.stderr,/fixture misspelled active root.*registered 0 times/);
+});
+test('test group refuses a pending nightly root that names no owning PR', async parent => {
+  for(const [name,pendingOn]of [['free text','soon'],['empty','']])await parent.test(name,t=>{
+    const fixture=pendingNightlyFixture(t,[{...pendingEntry(),pendingOn}]);
+    const description=invoke(fixture,{args:['--describe']});
+    assert.notEqual(description.status,0,'a pending row without an owning PR must not validate');
+    assert.match(description.stderr,/fixture pending cross-engine root.*owning PR/);
+  });
+});
+
+test('test group nightly job log names why a cross-engine case failed', t => {
+  const fixture = nightlyFixture(t, { body: '()=>{throw new Error("webkit pageerror")}' });
+  const result = invoke(fixture, { group: 'nightly-cross-engine' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /^Nightly case failed: fixture cross-engine native button root: webkit pageerror$/m);
 });
 
 // #2232: a declared root that resolves to zero tests must fail visibly. Describe
@@ -1254,4 +1414,132 @@ test('test group runner refuses the retired single tests.js suite command', t =>
   const described = invoke(fixture, { args: ['--describe'] });
   assert.notEqual(described.status, 0, 'the single-file layout must not group: ' + described.stdout + described.stderr);
   assert.match(described.stderr, /full npm test entry point changed/);
+});
+
+// Loaded runs (#2294). The fixture's own test observes the busy processes from
+// inside the run; the runner's real command line is the seam under test.
+function loadObservingFixture(t) {
+  const fixture = createFixture(t);
+  const file = path.join(fixture.root, suiteFile);
+  const source = fs.readFileSync(file, 'utf8').replace("  await t.test('fixture accepted environment skip'", `  if (process.env.CHAIN_GROUP_FIXTURE_LOAD_SENTINEL) {
+    const { execFileSync } = await import('node:child_process');
+    const pids = (process.env.CHAIN_TEST_CPU_LOAD_PIDS || '').split(',').filter(Boolean);
+    const cpuSeconds = pid => { try { return execFileSync('ps', ['-o', 'time=', '-p', pid], { encoding: 'utf8' }).trim().split(':').reduce((sum, part) => sum * 60 + Number(part), 0); } catch { return -1; } };
+    const deadline = Date.now() + 8000; let burned = [];
+    while (Date.now() < deadline) { burned = pids.map(cpuSeconds); if (burned.length && burned.every(value => value >= 1)) break; await new Promise(resolve => setTimeout(resolve, 25)); }
+    fs.writeFileSync(process.env.CHAIN_GROUP_FIXTURE_LOAD_SENTINEL, JSON.stringify({ pids: pids.map(Number), burned, testPid: process.pid }));
+    if (process.env.CHAIN_GROUP_FIXTURE_HOLD === '1') await new Promise(resolve => setTimeout(resolve, 30000));
+    if (process.env.CHAIN_GROUP_FIXTURE_LOAD_FAIL === '1') assert.fail('intentional loaded failure');
+  }
+  await t.test('fixture accepted environment skip'`);
+  assert.notEqual(source, fs.readFileSync(file, 'utf8'), 'the load observer must be installed in the fixture test');
+  fs.writeFileSync(file, source);
+  const sentinel = path.join(os.tmpdir(), `chain-test-group-load-${process.pid}-${++outputSerial}.json`);
+  fixture.outputs.push(sentinel);
+  return { fixture, sentinel };
+}
+const processGone = pid => { try { process.kill(pid, 0); return false; } catch (error) { return error.code === 'ESRCH'; } };
+async function waitUntil(condition, message, ms = 10000) {
+  const deadline = Date.now() + ms;
+  while (!condition()) {
+    assert.ok(Date.now() < deadline, message);
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+}
+
+test('test group runner keeps the requested busy processes running and ends them after a pass and a failure', async parent => {
+  for (const scenario of ['pass', 'failure']) await parent.test(scenario, t => {
+    const { fixture, sentinel } = loadObservingFixture(t);
+    const result = invoke(fixture, { args: ['--cpu-load', '2'], env: { CHAIN_GROUP_FIXTURE_LOAD_SENTINEL: sentinel, ...(scenario === 'failure' ? { CHAIN_GROUP_FIXTURE_LOAD_FAIL: '1' } : {}) } });
+    assert.equal(result.status, scenario === 'pass' ? 0 : 1, result.stdout + result.stderr);
+    const observed = JSON.parse(fs.readFileSync(sentinel, 'utf8'));
+    assert.equal(observed.pids.length, 2, 'the run has exactly the requested busy processes');
+    assert.ok(observed.burned.every(seconds => seconds >= 1), `each busy process burns a full second of CPU during the run (an idle process does not): ${observed.burned}`);
+    for (const pid of observed.pids) assert.equal(processGone(pid), true, `busy process ${pid} ends with the run`);
+    assert.deepEqual(result.evidence.cpuLoad, { workers: 2 }, 'the result records how many busy processes ran');
+    assert.match(result.stderr, /CPU load: 2 busy processes/, 'the run says it is loaded');
+  });
+});
+
+test('test group runner ends its busy processes and test process when the run is interrupted or killed', async parent => {
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGKILL']) await parent.test(signal, async t => {
+    const { fixture, sentinel } = loadObservingFixture(t);
+    const outputDir = path.join(os.tmpdir(), `chain-test-group-output-${process.pid}-${++outputSerial}`);
+    fixture.outputs.push(outputDir);
+    const env = { ...process.env, CHAIN_GROUP_FIXTURE_LOAD_SENTINEL: sentinel, CHAIN_GROUP_FIXTURE_HOLD: '1' };
+    delete env.NODE_TEST_CONTEXT;
+    const child = spawn(process.execPath, ['scripts/test-groups.mjs', '--group', 'core', '--output-dir', outputDir,
+      '--repository', 'example/fixture', '--event-policy', 'local', '--run-id', 'fixture-run-1', '--run-attempt', '1',
+      '--source-sha', fixture.sourceSha, '--comparison-base', fixture.comparisonBase, '--cpu-load', '2'],
+    { cwd: fixture.root, env, stdio: 'ignore' });
+    const closed = new Promise(resolve => child.once('close', (code, childSignal) => resolve({ code, signal: childSignal })));
+    let observed;
+    t.after(() => {
+      if (!processGone(child.pid)) child.kill('SIGKILL');
+      for (const pid of observed ? [observed.testPid, ...observed.pids] : []) { if (!processGone(pid)) process.kill(pid, 'SIGKILL'); }
+    });
+    await waitUntil(() => fs.existsSync(sentinel), 'the loaded run must reach its held test');
+    observed = JSON.parse(fs.readFileSync(sentinel, 'utf8'));
+    assert.equal(observed.pids.length, 2, 'the requested busy processes are running before the interrupt');
+    child.kill(signal);
+    const exit = await closed;
+    assert.ok(exit.code !== 0 || exit.signal, 'an interrupted run never reports success');
+    await waitUntil(() => observed.pids.every(processGone), `busy processes must end after ${signal}`);
+    if (signal !== 'SIGKILL') {
+      await waitUntil(() => processGone(observed.testPid), `the test process must end after ${signal}`);
+      const evidence = readEvidence(outputDir);
+      assert.equal(evidence?.status, 'failed', 'an interrupted run is recorded as failed, not as any kind of pass');
+    }
+  });
+});
+
+test('test group runner refuses a CPU load count it cannot honour', async parent => {
+  for (const value of ['0', '-1', '1.5', 'many', '1000']) await parent.test(value, t => {
+    const fixture = createFixture(t);
+    const result = invoke(fixture, { args: ['--cpu-load', value] });
+    assert.notEqual(result.status, 0, 'an invalid load count must not run');
+    assert.match(result.stderr, /--cpu-load/, 'the refusal names the option');
+  });
+});
+
+test('RISK test inventory: a loaded group run records its load and every canonical evidence check refuses it', async parent => {
+  await parent.test('the passing loaded result is not a canonical pass', t => {
+    const result = invoke(createFixture(t), { args: ['--cpu-load', '1'] });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.deepEqual(result.evidence.cpuLoad, { workers: 1 });
+    assert.notEqual(result.evidence.status, 'passed', 'a loaded pass must never carry the canonical passed status');
+    assert.equal(result.evidence.resultIdentity.selectedGroup, 'core');
+  });
+  await parent.test('the aggregate refuses one loaded group among otherwise complete groups', t => {
+    const fixture = aggregateFixture(t);
+    const loaded = invoke(fixture, { group: 'scenery', args: ['--cpu-load', '1'] });
+    assert.equal(loaded.status, 0, loaded.stdout + loaded.stderr);
+    fixture.originals.set('scenery', loaded.outputDir);
+    const result = aggregateCopy(t, fixture);
+    assert.notEqual(result.status, 0, 'a loaded result cannot complete the required cohort');
+    const aggregate = path.join(result.outputDir, 'aggregate.json');
+    assert.match(result.stderr + (fs.existsSync(aggregate) ? fs.readFileSync(aggregate, 'utf8') : ''), /loaded run|busy process/i, 'the refusal names the load');
+  });
+  await parent.test('the CI consumer refuses a loaded execution', t => {
+    const fixture = createFixture(t);
+    const result = invoke(fixture, { consumer: true, args: ['--proof', path.join(fixture.root, 'absent-proof.json'), '--cpu-load', '1'] });
+    assert.notEqual(result.status, 0, 'the CI consumer must not run a loaded group');
+    assert.match(result.stderr, /--cpu-load/, 'the refusal names the option');
+    assert.equal(result.evidence, null, 'nothing is written as evidence');
+  });
+  for (const mode of ['--describe', '--aggregate', '--covered']) await parent.test(`${mode} takes no load`, t => {
+    const fixture = createFixture(t);
+    const result = invoke(fixture, { args: [mode, '--cpu-load', '1'] });
+    assert.notEqual(result.status, 0, `${mode} produces or reads evidence and cannot be loaded`);
+    assert.match(result.stderr, /--cpu-load/, 'the refusal names the option');
+  });
+});
+
+test('test group CPU load is never set by CI or required by any entry point', () => {
+  const workflows = path.join(repository, '.github/workflows');
+  for (const file of fs.readdirSync(workflows)) {
+    assert.doesNotMatch(fs.readFileSync(path.join(workflows, file), 'utf8'), /cpu-load/, `${file} must not set CPU load`);
+  }
+  const scripts = JSON.parse(fs.readFileSync(path.join(repository, 'package.json'), 'utf8')).scripts;
+  for (const [name, command] of Object.entries(scripts)) assert.doesNotMatch(command, /cpu-load/, `npm script ${name} must not require CPU load`);
 });

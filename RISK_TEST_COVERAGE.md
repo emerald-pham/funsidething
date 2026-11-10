@@ -1441,6 +1441,8 @@ its RISK test; the map follows.
 - RISK offline startup resume budget: fresh stalled captures stop and uncertain started writes never replay
 - RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits
 - RISK offline recovery reentry: settled own recovery writes permit fresh current work while changed holds stay protected
+- RISK offline startup budget: spending a budget no timer armed fails the test
+- RISK offline startup budget: a stalled start stays pending until its one controlled budget expires
 - RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work
 - RISK device connection startup: one internal server failure recovers the authoritative offline board within a bounded attempt
 - RISK device connection recovery: offline accepted work survives a lost handle and durable reopen
@@ -1657,6 +1659,21 @@ its RISK test; the map follows.
 - RISK repository process: persisting generic sessions requires both affected specialists
 - RISK repository process: TypeScript tooling directives cannot use comment-only exemption
 - RISK repository process: CSS comment removal cannot join selector tokens under owner-only review
+- RISK repository process: release plan prints the review plan the validator derives for a commit
+- RISK repository process: release prepare writes receipt input that record accepts once a person adds the summaries
+- RISK repository process: release prepare refuses a report naming another commit
+- RISK repository process: release prepare refuses a report with no approved verdict
+- RISK repository process: release prepare refuses a report with a missing or future completion time
+- RISK repository process: release prepare refuses an issue that is not a positive whole number
+- RISK repository process: release prepare refuses a completion time before the candidate commit
+- RISK repository process: release prepare refuses one report body used for both the owner and independent review
+- RISK repository process: release prepare needs only the reports the derived plan requires
+- RISK repository process: release prepare takes specialist domains from the plan and source digests from the exact commit
+- RISK repository process: release prepare refuses a source file that differs from the exact commit
+- RISK repository process: release prepare refuses a changed file it cannot read from the exact commit
+- RISK repository process: release prepare leaves a file the candidate deleted out of the source digests
+- RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change
+- RISK repository process: release prepare keeps summaries a person already wrote
 - RISK repository process: release recording classifies the tail of a complete large diff
 - RISK repository process: risk-based receipts require the derived exact-final reviewer roles
 - RISK repository process: caller-declared specialist domains can only raise the derived plan
@@ -1717,6 +1734,7 @@ its RISK test; the map follows.
 - RISK repository process: the repository AGENTS.md wording switches on the scaled review policy
 - RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
+- RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout
 - RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes
 - RISK repository process: large immutable installed assets retain exact bytes and reject a changed checkout
 - RISK repository process: event routing retains exact merge validation before avoiding a duplicate cohort
@@ -1726,9 +1744,14 @@ its RISK test; the map follows.
 - RISK repository process: CI admission enforces reuse before repeating a passed test child
 - RISK repository process: CI observer keeps honest reuse and fresh emulator fallback outcomes
 - RISK repository process: grouped runner stays covered at the default npm test boundary
+- RISK repository process: failed groups state a capped reason in the job log
 - RISK repository process: required parallel scanner aggregation rejects absent group evidence
 - RISK repository process: grouped catalog binds real declarations rather than quoted fixtures
 - RISK repository process: nested native fixture output stays isolated at the command boundary
+- RISK repository process: a real git-fixture test cannot change the repository an inherited git variable names
+- RISK repository process: every test file keeps inherited git variables away from the fixtures it spawns
+- RISK repository process: the Nightly root list stays valid whether or not its pending roots have landed
+- RISK test inventory: the group CPU-load option stays local, guided and off in every required entry point
 
 ## tests/scenery.test.js
 

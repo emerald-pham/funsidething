@@ -10,6 +10,16 @@ export const GROUP_IDS = ['core', 'scenery', 'persistence-recovery', 'native-pro
 // Not a required group: the scheduled/dispatched nightly job runs it alone.
 export const NIGHTLY_GROUP_ID = 'nightly-cross-engine';
 const TEST_NAME_PATTERN_ARGUMENT_BUDGET = 64 * 1024;
+const FAILURE_REASON_MAX_CHARS = 200;
+// A loaded run (#2294) reproduces a slow machine. It is never canonical evidence,
+// so a clean one writes this status rather than 'passed': every consumer of
+// group evidence accepts only 'passed' and so refuses it without a special case.
+const LOADED_PASS_STATUS = 'passed-under-load';
+const MAX_CPU_LOAD_WORKERS = 64;
+// One spin per event-loop turn: the loop must still run so stdin closing, which
+// happens however the runner dies, ends the worker with no second signal path.
+const BUSY_WORKER_SOURCE = `process.stdin.on('end',()=>process.exit(0)).on('close',()=>process.exit(0)).on('error',()=>process.exit(0)).resume();
+const spin=()=>{const until=Date.now()+50;while(Date.now()<until);setImmediate(spin);};spin();`;
 const MIN_GROUP_HEAP_MB = 512;
 const MAX_GROUP_HEAP_MB = 12288;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -50,6 +60,7 @@ function parseArgs(argv) {
     ['--group', 'group'], ['--output-dir', 'outputDir'], ['--repository', 'repository'],
     ['--event-policy', 'eventPolicy'], ['--run-id', 'runId'], ['--run-attempt', 'runAttempt'],
     ['--source-sha', 'sourceSha'], ['--comparison-base', 'comparisonBase'], ['--results-dir','resultsDir'], ['--needs-json','needsJson'], ['--proof','proof'],
+    ['--cpu-load', 'cpuLoad'],
   ]);
   for (let index = 0; index < argv.length; index++) {
     if (['--describe','--aggregate','--covered'].includes(argv[index])) { values[argv[index].slice(2)] = true; continue; }
@@ -69,6 +80,14 @@ function parseArgs(argv) {
     comparisonBase: process.env.CHAIN_TEST_COMPARISON_BASE,
   };
   for (const [key, value] of Object.entries(defaults)) if (values[key] === undefined) values[key] = value;
+  if (values.cpuLoad !== undefined) {
+    // Evidence modes produce or read canonical results, which a load run is not.
+    const mode = ['describe', 'aggregate', 'covered'].find(name => values[name]);
+    if (mode) fail(`--cpu-load cannot be used with --${mode}: a loaded run is never canonical evidence.`);
+    const workers = Number(values.cpuLoad);
+    if (!/^[1-9]\d*$/.test(values.cpuLoad) || workers > MAX_CPU_LOAD_WORKERS) fail(`--cpu-load must be a whole number of busy processes from 1 to ${MAX_CPU_LOAD_WORKERS}.`);
+    values.cpuLoad = workers;
+  }
   return values;
 }
 
@@ -392,6 +411,7 @@ function validateNightlyRoots(assignments, fileSet, assignmentsByRoot) {
     if (assignmentsByRoot.has(entry.root) || assignments.processControls.some(control => control.id === entry.root)) {
       fail(`Nightly root ${JSON.stringify(entry.root)} is also a required case; move it out of the required cohort instead of declaring it twice.`);
     }
+    if (Object.hasOwn(entry, 'pendingOn') && !/^#[1-9]\d*$/.test(entry.pendingOn)) fail(`Pending nightly root ${JSON.stringify(entry.root)} must name its owning PR as #<number>.`);
     if (nightlyRoots.has(entry.root)) fail(`Nightly root ${JSON.stringify(entry.root)} is declared more than once.`);
     nightlyRoots.set(entry.root, entry);
   }
@@ -547,8 +567,21 @@ function countTestRegistrations(source, testName) {
   return literalTestRegistrations(source).get(testName) || 0;
 }
 function literalTestRegistrations(source) {
+  return scanTestTitles(source).plain;
+}
+// How often a nightly root is written in its file. Active and pending rows share
+// this, so a title that fails one way cannot pass the other. Beyond plain direct
+// calls it reads escaped and template titles, and a title kept in any literal in
+// code (a constant or a table the file then registers from). A title built at
+// run time (concatenated or interpolated) has no literal to read.
+function nightlyRootRegistrations(source, root) {
+  const { called, spelled } = scanTestTitles(source), title = normalizeTapIdentity(root);
+  return called.get(title) || spelled.get(title) || 0;
+}
+function scanTestTitles(source) {
   if (literalRegistrationCache.has(source)) return literalRegistrationCache.get(source);
-  const titles = new Map();
+  const plain = new Map(), called = new Map(), spelled = new Map();
+  const bump = (counts, title) => counts.set(title, (counts.get(title) || 0) + 1);
   let index = 0;
   let pendingTestCall = false;
   let awaitingTitle = false;
@@ -660,7 +693,12 @@ function literalTestRegistrations(source) {
     }
     if (character === "'" || character === '"') {
       const literal = readQuoted(index, character);
-      if (awaitingTitle && !literal.escaped) titles.set(literal.value, (titles.get(literal.value) || 0) + 1);
+      if (awaitingTitle && !literal.escaped) bump(plain, literal.value);
+      if (literal.value !== null) {
+        const decoded = decodeStringLiteral(source.slice(index + 1, literal.next - 1));
+        bump(spelled, decoded);
+        if (awaitingTitle) bump(called, decoded);
+      }
       awaitingTitle = false;
       pendingTestCall = false;
       previousToken = 'string';
@@ -668,7 +706,13 @@ function literalTestRegistrations(source) {
       continue;
     }
     if (character === '`') {
-      index = skipTemplate(index);
+      const next = skipTemplate(index), body = source.slice(index + 1, next - 1);
+      if (!/(?<!\\)(?:\\\\)*\$\{/.test(body)) {
+        const decoded = decodeStringLiteral(body);
+        bump(spelled, decoded);
+        if (awaitingTitle) bump(called, decoded);
+      }
+      index = next;
       awaitingTitle = false;
       pendingTestCall = false;
       previousToken = 'template';
@@ -701,8 +745,9 @@ function literalTestRegistrations(source) {
     previousToken = token;
     index += token.length;
   }
-  literalRegistrationCache.set(source, titles);
-  return titles;
+  const scan = { plain, called, spelled };
+  literalRegistrationCache.set(source, scan);
+  return scan;
 }
 
 // A root registered as a plain-string test(...) call at the start of a line
@@ -744,13 +789,45 @@ function testNamePatternArguments(roots) {
   return argumentsForPatterns;
 }
 
+// Job logs are public and assertion text can come from any test, so only the
+// first assertion line is kept: later lines carry the compared values. It is
+// one line of printable text, capped in length.
+function publicFailureReason(text) {
+  const characters = Array.from(text.replace(/[\p{C}\p{Zl}\p{Zp}]+/gu, ' ').trim());
+  if (!characters.length) return null;
+  return characters.length > FAILURE_REASON_MAX_CHARS ? `${characters.slice(0, FAILURE_REASON_MAX_CHARS - 1).join('')}…` : characters.join('');
+}
+
+// Why a failed result failed, for the public job log: the error key of that
+// result's own YAML diagnostics, read at its exact indentation so assertion
+// text that resembles TAP cannot stand in for it.
+function tapFailureReason(lines, resultIndex, indentation) {
+  const indent = ' '.repeat(indentation + 2);
+  if (lines[resultIndex + 1] !== `${indent}---`) return null;
+  for (let index = resultIndex + 2; index < lines.length && lines[index] !== `${indent}...`; index++) {
+    if (!lines[index].startsWith(`${indent}error: `)) continue;
+    const value = lines[index].slice(indent.length + 'error: '.length).trim();
+    if (!/^[|>][-+]?$/.test(value)) return publicFailureReason(value.replace(/^(['"`])(.*)\1$/, '$2'));
+    const block = `${indent}  `;
+    for (let cursor = index + 1; cursor < lines.length && (lines[cursor].startsWith(block) || !lines[cursor].trim()); cursor++) {
+      const reason = publicFailureReason(lines[cursor]);
+      if (reason) return reason;
+    }
+    return null;
+  }
+  return null;
+}
+
+const failedCaseLabel = item => `${item.id}${item.failureReason ? `: ${item.failureReason}` : ''}`;
+
 function parseTap(text) {
   if (!/^TAP version \d+/m.test(text)) fail('The test process did not produce a TAP stream.');
   const stack = [];
   const cases = [];
   const resultLine = /^(\s*)(not )?ok \d+ - (.*?)(?: # (SKIP|TODO)(?:\s+(.*))?)?\s*$/;
   const subtestLine = /^(\s*)# Subtest: (.*)$/;
-  for (const line of text.split(/\r?\n/)) {
+  const lines = text.split(/\r?\n/);
+  for (const [lineIndex, line] of lines.entries()) {
     const subtest = line.match(subtestLine);
     if (subtest) {
       const indentation = subtest[1].length;
@@ -765,12 +842,14 @@ function parseTap(text) {
     if (!active.length) fail(`Could not associate TAP result with a test identity: ${line}`);
     const names = active.map(item => normalizeTapIdentity(item.name));
     const directive = result[4]?.toLowerCase();
+    const status = directive === 'skip' ? 'skipped' : directive === 'todo' ? 'todo' : result[2] ? 'failed' : 'passed';
     cases.push({
       id: names.join(' > '),
       root: names[0],
-      status: directive === 'skip' ? 'skipped' : directive === 'todo' ? 'todo' : result[2] ? 'failed' : 'passed',
+      status,
       skipReason: directive === 'skip' ? (result[5] || '').trim() : null,
       line,
+      ...(status === 'failed' ? { failureReason: tapFailureReason(lines, lineIndex, indentation) } : {}),
     });
   }
   return cases;
@@ -827,7 +906,7 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
     if (selectedRootSet.has(id) && !process.env[entry.environment]) acceptedSkips.add(id);
   }
   for (const item of cases) {
-    if (item.status === 'failed') errors.push(`Test case failed: ${item.id}`);
+    if (item.status === 'failed') errors.push(`Test case failed: ${failedCaseLabel(item)}`);
     else if (item.status === 'todo') errors.push(`Test case was unexpectedly marked TODO: ${item.id}`);
     else if (item.status === 'skipped' && !acceptedSkips.has(item.id)) errors.push(`Test case was unexpectedly skipped: ${item.id}`);
   }
@@ -851,16 +930,33 @@ function verifyResults({ cases, group, inventory, assignments, files, source }) 
 }
 
 // The nightly job exists so engine regressions stay visible before a Stable
-// release. An empty, missing, skipped or failed nightly case therefore fails
-// the run instead of passing quietly.
+// release. An empty list, a missing active root, or a skipped or failed nightly
+// case therefore fails the run instead of passing quietly. A pending root names
+// a test that has not landed (#2293): it runs nothing until its PR lands, and it
+// fails here as soon as its test appears so that landed test cannot go unrun.
 function nightlySelection(assignmentIndex) {
   const entries = [...assignmentIndex.nightlyRoots.values()];
   if (!entries.length) fail('No nightly cross-engine roots are declared in scripts/test-group-assignments.json.');
-  for (const entry of entries) {
-    const count = countTestRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+  const pending = entries.filter(entry => entry.pendingOn), active = entries.filter(entry => !entry.pendingOn);
+  const registrations = entry => nightlyRootRegistrations(fs.readFileSync(path.join(ROOT, entry.file), 'utf8'), entry.root);
+  for (const entry of pending) {
+    if (registrations(entry)) fail(`Pending nightly cross-engine root ${JSON.stringify(entry.root)} (${entry.pendingOn}) has landed in ${entry.file}; remove its pendingOn to move it to active so it runs.`);
+  }
+  for (const entry of active) {
+    const count = registrations(entry);
     if (count !== 1) fail(`Nightly cross-engine root ${JSON.stringify(entry.root)} is registered ${count} times in ${entry.file}; expected exactly one.`);
   }
-  return { files: [...new Set(entries.map(entry => entry.file))].sort(), roots: entries.map(entry => entry.root).sort() };
+  return { files: [...new Set(active.map(entry => entry.file))].sort(), roots: active.map(entry => entry.root).sort(), pending };
+}
+
+// A zero must read as a zero (#2293): the result and the run's annotation both
+// state how many cases ran and which roots still wait on their owning PR.
+function crossEngineReport(nightly, casesRun) {
+  return { casesRun, activeRoots: nightly.roots, pendingRoots: nightly.pending.map(({ root, file, pendingOn }) => ({ root, file, pendingOn })) };
+}
+function crossEngineNotice({ casesRun, pendingRoots }) {
+  const pending = pendingRoots.length ? ` Pending, not run: ${pendingRoots.map(entry => `${JSON.stringify(entry.root)} (${entry.pendingOn})`).join('; ')}.` : '';
+  return `::notice title=Nightly cross-engine coverage::${casesRun} cross-engine case${casesRun === 1 ? '' : 's'} ran on this head.${casesRun ? '' : ' This run is no cross-engine evidence.'}${pending}\n`;
 }
 
 function verifyNightlyResults(cases, roots) {
@@ -873,7 +969,7 @@ function verifyNightlyResults(cases, roots) {
   }
   for (const item of cases) {
     if (!rootSet.has(item.root)) errors.push(`Case ${JSON.stringify(item.id)} is outside the nightly cohort.`);
-    if (item.status === 'failed') errors.push(`Nightly case failed: ${item.id}`);
+    if (item.status === 'failed') errors.push(`Nightly case failed: ${failedCaseLabel(item)}`);
     else if (item.status === 'skipped') errors.push(`Nightly case was skipped: ${item.id}`);
     else if (item.status === 'todo') errors.push(`Nightly case was marked TODO: ${item.id}`);
   }
@@ -956,6 +1052,7 @@ function aggregateResults({options, outputDir, descriptor, inventory, assignment
       const root = path.resolve(options.resultsDir,id);
       if (fs.lstatSync(root).isSymbolicLink()) fail('Group evidence must be a real directory.');
       const record = readJson(path.join(root,'result.json'),`required result for ${id}`);
+      if (record.cpuLoad !== undefined) fail(`Required group ${id} is a loaded run (${record.cpuLoad?.workers} busy processes); a loaded run is never canonical evidence.`);
       const inputCovered=!covered&&reused.includes(id)&&record.status==='covered';
       if (record.status !== (covered||inputCovered?'covered':'passed') || record.issues?.length || !Array.isArray(record.issues)) fail(`Required group ${id} did not pass.`);
       const identity = record.resultIdentity;
@@ -1086,6 +1183,15 @@ async function unclassifiedRootGuard(files, assignments, outputDir) {
   return report;
 }
 
+function startCpuLoad(count) {
+  const workers = Array.from({ length: count }, () => spawn(process.execPath, ['-e', BUSY_WORKER_SOURCE], { stdio: ['pipe', 'ignore', 'ignore'] }));
+  // A pending worker pipe must not hold the runner open if its write side fails.
+  for (const worker of workers) worker.stdin.on('error', () => {});
+  const closed = workers.map(worker => new Promise(resolve => { worker.once('error', resolve); worker.once('close', resolve); }));
+  const stop = async () => { for (const worker of workers) worker.kill('SIGKILL'); await Promise.all(closed); };
+  return { pids: workers.map(worker => worker.pid), stop };
+}
+
 async function runChild(files, roots, outputDir, options, source, heapMb) {
   const runtimeTmp = path.join(outputDir, 'runtime-tmp');
   const nativeDir = path.join(outputDir, 'native');
@@ -1113,15 +1219,32 @@ async function runChild(files, roots, outputDir, options, source, heapMb) {
   };
   // The test runner passes this flag on to every per-file child process.
   const heapArguments = heapMb === undefined ? [] : [`--max-old-space-size=${heapMb}`];
-  const child = spawn(process.execPath, [...heapArguments, '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
-    cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  child.stdout.pipe(tap);
-  child.stderr.pipe(stderr);
-  const exit = await new Promise(resolve => {
-    child.once('error', error => resolve({ code: null, signal: null, error: error.message }));
-    child.once('close', (code, signal) => resolve({ code, signal, error: null }));
-  });
+  const load = options.cpuLoad ? startCpuLoad(options.cpuLoad) : null;
+  let exit, interrupted = null;
+  try {
+    if (load) {
+      if (load.pids.some(pid => !pid)) fail('--cpu-load could not start every busy process.');
+      env.CHAIN_TEST_CPU_LOAD_PIDS = load.pids.join(',');
+      process.stderr.write(`CPU load: ${options.cpuLoad} busy process${options.cpuLoad === 1 ? '' : 'es'} for this run (pids ${load.pids.join(', ')}). This result is not canonical evidence.\n`);
+    }
+    // A loaded run owns its test processes as a group, so an interrupt ends the
+    // whole run instead of leaving the test process working after the load is gone.
+    const child = spawn(process.execPath, [...heapArguments, '--test', '--test-reporter=tap', '--test-concurrency=1', ...patternArguments, ...files], {
+      cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], ...(load ? { detached: true } : {}),
+    });
+    child.stdout.pipe(tap);
+    child.stderr.pipe(stderr);
+    const forward = signal => { interrupted = signal; try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; } };
+    const signals = load ? ['SIGINT', 'SIGTERM'] : [];
+    for (const signal of signals) process.on(signal, forward);
+    try {
+      exit = await new Promise(resolve => {
+        child.once('error', error => resolve({ code: null, signal: null, error: error.message }));
+        child.once('close', (code, signal) => resolve({ code, signal, error: null }));
+      });
+    } finally { for (const signal of signals) process.off(signal, forward); }
+    if (interrupted) exit = { ...exit, error: `Interrupted by ${interrupted}.` };
+  } finally { await load?.stop(); }
   await Promise.all([new Promise(resolve => tap.end(resolve)), new Promise(resolve => stderr.end(resolve))]);
   const tapText = fs.readFileSync(tapPath, 'utf8');
   const stderrText = fs.readFileSync(stderrPath, 'utf8');
@@ -1136,7 +1259,7 @@ async function runChild(files, roots, outputDir, options, source, heapMb) {
 
 async function main() {
   if (process.argv.slice(2).includes('--help')) {
-    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha>\n');
+    process.stdout.write('Usage: npm run test:group -- --group <core|scenery|persistence-recovery|native-process|nightly-cross-engine> --output-dir <new-empty-dir> --repository <owner/name> --event-policy <policy> --run-id <id> --run-attempt <n> --source-sha <sha> --comparison-base <sha> [--cpu-load <busy-processes>]\n');
     return 0;
   }
   let outputDir;
@@ -1168,6 +1291,7 @@ async function main() {
     artifacts: [],
     process: null,
     issues: [],
+    ...(options.cpuLoad ? { cpuLoad: { workers: options.cpuLoad } } : {}),
   };
   let nativeDir;
   try {
@@ -1239,6 +1363,14 @@ async function main() {
     }
 
     const nightly = options.group === NIGHTLY_GROUP_ID ? nightlySelection(assignmentIndex) : null;
+    if (nightly && !nightly.roots.length) {
+      result.status = 'no_active_roots';
+      result.crossEngine = crossEngineReport(nightly, 0);
+      result.finishedAt = new Date().toISOString();
+      atomicWrite(path.join(outputDir, 'result.json'), result);
+      process.stdout.write(crossEngineNotice(result.crossEngine));
+      return 0;
+    }
     const selectedFiles = nightly ? nightly.files : [...new Set([
       ...files.filter(file => assignmentIndex.rootsPerGroup.get(options.group).some(root => assignmentIndex.assignmentsByRoot.get(root)?.file === file)),
     ])].sort();
@@ -1297,7 +1429,11 @@ async function main() {
         status: childResult.cases.find(item => item.id === normalizeTapIdentity(entry.root))?.status ?? 'missing' }));
     if (childResult.exit.code !== 0) result.issues.unshift(`Test process exited with ${childResult.exit.code ?? childResult.exit.signal ?? childResult.exit.error}.`);
     if (gitStatus.trim() && !source.dirty) result.issues.push('Checkout dirty state could not be reconciled with its identity.');
-    result.status = result.issues.length ? 'failed' : 'passed';
+    result.status = result.issues.length ? 'failed' : (options.cpuLoad ? LOADED_PASS_STATUS : 'passed');
+    if (nightly) {
+      result.crossEngine = crossEngineReport(nightly, childResult.cases.length);
+      process.stdout.write(crossEngineNotice(result.crossEngine));
+    }
   } catch (error) {
     result.issues.push(error.message);
     result.status = 'preflight_failed';
@@ -1307,11 +1443,13 @@ async function main() {
   }
   result.finishedAt = new Date().toISOString();
   atomicWrite(path.join(outputDir, 'result.json'), result);
-  if (result.status !== 'passed') {
+  if (result.status !== 'passed' && result.status !== LOADED_PASS_STATUS) {
     process.stderr.write(`${result.status}: ${result.issues.join('\n')}\n`);
     return 1;
   }
-  process.stdout.write(`${options.group}: ${result.cases.length} test cases passed; evidence: ${path.join(outputDir, 'result.json')}\n`);
+  process.stdout.write(result.status === LOADED_PASS_STATUS
+    ? `${options.group}: ${result.cases.length} test cases passed under ${options.cpuLoad} busy processes; not canonical evidence: ${path.join(outputDir, 'result.json')}\n`
+    : `${options.group}: ${result.cases.length} test cases passed; evidence: ${path.join(outputDir, 'result.json')}\n`);
   return 0;
 }
 
