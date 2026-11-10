@@ -21699,6 +21699,27 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
  assert.deepEqual(failures,[]);
 });
 
+// Past the phone widths the row stops reaching the screen edges, so it has to
+// line up with the panels above it. A row wider than them stuck out with square ends.
+test('RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,context}=await steadyScannerPage(browser,steadySeededBoard(),{width:744,height:1133,touch:false});
+   await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+   for(const width of [733,744,750,760,761,1000]){
+    await page.setViewportSize({width,height:1133});await page.waitForTimeout(60);
+    const seen=await page.evaluate(()=>{const row=document.querySelector('.decide'),a=row.getBoundingClientRect(),b=document.getElementById('listWrap').getBoundingClientRect();return {rowLeft:a.left,rowRight:a.right,panelLeft:b.left,panelRight:b.right,radius:parseFloat(getComputedStyle(row).borderTopLeftRadius)};});
+    if(Math.abs(seen.rowLeft-seen.panelLeft)>1||Math.abs(seen.rowRight-seen.panelRight)>1)failures.push(`${engineName} ${width}px: the row spans ${seen.rowLeft}-${seen.rowRight}, the panels ${seen.panelLeft}-${seen.panelRight}`);
+    if(!(seen.radius>0))failures.push(`${engineName} ${width}px: the row has square ends`);
+   }
+   await context.close();
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 // One row has no second line to fall back on, so a pill must never shrink below
 // a readable title. These views are the ones where pills emptied to a clipped
 // letter and the row ran off the panel: enlarged text, and page zoom, which
@@ -38755,6 +38776,7 @@ test('Help answers how the steady scanner, backup list, Debug log link and rank 
  for(const [topic,answer] of [
   [/stay at the bottom of the screen\?<\/dt>/,/Yes, No and Can’t stay in one place at the bottom of the screen/],
   [/How long can the dot trail get\?<\/dt>/,/stays on one row[^<]*a count such as \+3 earlier/],
+  [/How long can the dot trail get\?<\/dt>/,/up to two of the newest dots, only as many as fit with their titles readable/],
   [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
   [/Does Settings load every backup\?<\/dt>/,/read only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
   [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],
