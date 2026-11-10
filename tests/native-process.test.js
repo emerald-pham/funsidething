@@ -118,6 +118,7 @@ test('RISK rapid action durability: ten distinct mixed native actions progress t
  const reopened=await loadAppAtTime(at+10000,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:quietCloud});t.after(()=>reopened.dispose());
  assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'cold reopen retains the complete accepted sequence');
  assert.doesNotMatch(messages.join('\n'),/device-save:.*changed-during-save|board kept changing while it was being saved/,'successful snapshots plus later accepted input are normal work, never an interaction-stopping save failure');
+ assert.doesNotMatch(messages.join('\n'),/isn't saved yet/,'nor the plain message for a save that ran out of repairs (#2325)');
  assert.equal(ctx.deviceSaveIssue(),null);
 });
 

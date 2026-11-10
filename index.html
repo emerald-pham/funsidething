@@ -1213,11 +1213,18 @@ function clearDeviceSaveIssue(){
   if(recovered) retryCloudAfterDeviceRecovery();
 }
 function deviceSaveIssue(){ return lastDeviceSaveIssue ? {...lastDeviceSaveIssue} : null; }
-function reportDeviceSaveFailure(stage,code,help="Keep this tab open and try again."){
+function reportDeviceSaveFailure(stage,code,help="Keep this tab open and try again.",{plain=false}={}){
   setDeviceSaveIssue(stage,code);
-  toast("Couldn't save this edit on this device (device-save:"+stage+"/"+code+"). "+help,9000);
+  // A plain message stands alone; its stage and code stay in the save issue
+  // record, Settings and the Debug log for whoever is helping (#2325).
+  toast(plain?help:"Couldn't save this edit on this device (device-save:"+stage+"/"+code+"). "+help,9000);
   return false;
 }
+// #2325: the conflict repair below has run out of attempts or time against a
+// board that kept changing. Every commit was guarded by the head hash, so
+// none replaced a board it had not merged, and the refusal writes nothing
+// more; the live board in this tab still holds the edit.
+const DEVICE_SAVE_EXHAUSTED_MESSAGE="This edit isn't saved yet: the saved board kept changing, probably because Chain Scanner is open in another tab or window. Your edit is still in this tab, and the saved board was not overwritten. Close the other copy and keep this one open; your next change here saves this edit too.";
 // Chromium offers a one-shot, user-gesture-bound install event when this PWA
 // is eligible for a native install prompt. Keep it only until the user opens
 // that prompt; iPhone Safari has no equivalent event and gets the manual steps
@@ -4086,7 +4093,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           }
         }
         if(result?.conflict)
-          return reportDeviceSaveFailure("device-store","changed-during-save","The saved board changed again while this tab was merging it; keep this tab open and try again.");
+          return reportDeviceSaveFailure("device-store","changed-during-save",DEVICE_SAVE_EXHAUSTED_MESSAGE,{plain:true});
       }
       if(!result?.ok) return reportDeviceSaveFailure("device-store",result?.code||"write-failed","The previous durable board remains unchanged; keep this tab open and try again.");
       if(mergedState){

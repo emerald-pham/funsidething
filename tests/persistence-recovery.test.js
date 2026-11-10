@@ -791,6 +791,7 @@ test('RISK device save settle: ordinary signed-out edits during slow device comm
  for(const [i,id] of ids.entries()){f.edit(id,'Edited '+i);await new Promise(resolve=>setTimeout(resolve,400));}
  const head=await f.settled('own saves');
  assert.doesNotMatch(f.messages.join('\n'),/device-save:|changed again while this tab was merging it/,'no save failure is shown for work the app finished itself');
+ assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet/,'nor the plain message for a save that ran out of repairs (#2325)');
  assert.equal(f.ctx.deviceSaveIssue(),null);
  // A merge with another copy keeps the displaced draft as a stale-tab backup.
  // With one copy open there is nothing to merge, so none appears in Settings.
@@ -810,6 +811,7 @@ test('RISK device save settle: repeated edits of one task during slow device com
  for(let i=1;i<=6;i++){f.edit('settle-same-task','Version '+i);await new Promise(resolve=>setTimeout(resolve,400));shown.push(f.ctx.state.tasks.find(task=>task.id==='settle-same-task').title);}
  const head=await f.settled('same-task saves');
  assert.doesNotMatch(f.messages.join('\n'),/device-save:/,'no save failure is shown');
+ assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet/,'nor the plain message for a save that ran out of repairs (#2325)');
  assert.deepEqual(shown,['Version 1','Version 2','Version 3','Version 4','Version 5','Version 6'],'an earlier save of this tab never puts an older title back on screen');
  assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='settle-same-task').title,'Version 6','the newest edit is the saved one');
  assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-same-task').title,'Version 6');
@@ -912,6 +914,31 @@ test('RISK device save settle: an account change during the repair is still refu
  assert.equal(head.account,'someone-else@example.com','the other account\'s board is not merged with this one');
  assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='settle-account-mine').title,'Mine','the signed-out edit is not written into the other account\'s board');
  assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-account-mine').title,'Signed-out edit','the edit stays in this tab');
+});
+
+// #2325: once the repair budget is genuinely spent, the person reads what
+// happened, what is protected and what to do, not an internal code.
+const deviceSaveExhaustedMessage2325="This edit isn't saved yet: the saved board kept changing, probably because Chain Scanner is open in another tab or window. Your edit is still in this tab, and the saved board was not overwritten. Close the other copy and keep this one open; your next change here saves this edit too.";
+async function deviceSaveExhausted2325(t,name){
+ const f=await deviceSaveSettleApp2324(t,{name,tasks:[syncTask(name+'-anchor','Anchor'),syncTask(name+'-mine','Mine'),syncTask(name+'-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ // A second copy that never stops saving: it writes before every commit.
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{commits++;await other.edit(name+'-theirs','Other copy write '+commits);};
+ f.edit(name+'-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const result=await f.alive(f.ctx.persist());
+ return {f,other,result,commits:()=>commits,stop(){f.beforeCommit=null;}};
+}
+
+test('RISK device save settle: a save that runs out of repairs says plainly what happened, what is protected and what to do next',async t=>{
+ const {f,result,commits}=await deviceSaveExhausted2325(t,'plain-exhausted');
+ assert.equal(result,false,'the save is still refused');
+ assert.ok(commits()>1,'the repair genuinely ran out after several attempts');
+ assert.equal(f.messages.at(-1),deviceSaveExhaustedMessage2325,'the person reads the plain message');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:|changed-during-save|merging it/,'no internal code or old wording leads the message');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='plain-exhausted-mine').title,'Kept in this tab','the edit is still in this tab, as the message says');
+ const head=await f.store.readHead();
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='plain-exhausted-theirs').title,'Other copy write '+commits(),'the other copy\'s latest save was not overwritten, as the message says');
 });
 
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
