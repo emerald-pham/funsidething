@@ -5150,6 +5150,19 @@ test('RISK backup delete keeps its place: deleting a backup leaves Settings open
  await loaded.dispose?.();
 });
 
+test('RISK backup delete keeps its place guidance: the mounted FAQ says making or deleting a backup keeps Settings open at the backup list',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
+ const answer=answerTo('Does Settings close when I make or delete a backup?');
+ assert.match(answer,/^No\./);
+ assert.match(answer,/Make backup and deleting a backup keep Settings open/);
+ assert.match(answer,/Data and backups open and the backup list in view/);
+ assert.match(answer,/even when the backup cannot be deleted/);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+});
+
 test('RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once',async()=>{
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-reopen-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
  const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
