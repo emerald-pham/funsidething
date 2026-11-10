@@ -438,11 +438,13 @@
     {
       "root": "RISK repository process: required native button actions execute in Chromium and WebKit",
       "file": "tests/native-process.test.js",
+      "pendingOn": "#285",
       "reason": "#2210: cross-engine (Chromium + WebKit) native button check; runs in the Nightly workflow, not the per-push required cohort. Registered by the WebKit button-safety work (#285)."
     },
     {
       "root": "RISK repository process: native button gate detects errors raised by a real click",
       "file": "tests/native-process.test.js",
+      "pendingOn": "#285",
       "reason": "#2210: cross-engine (Chromium + WebKit) native button check; runs in the Nightly workflow, not the per-push required cohort. Registered by the WebKit button-safety work (#285)."
     }
   ],

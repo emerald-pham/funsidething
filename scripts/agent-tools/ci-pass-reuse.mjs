@@ -138,6 +138,7 @@ function main() {
   }
   if(command==='run-gate')return runGate(options);
   if(command!=='run-group')throw new Error('Expected run-group.');
+  if(options['--cpu-load'])throw new Error('--cpu-load is never used by the CI consumer: a loaded run is not canonical evidence (#2294).');
   if(!options['--proof']||!CI_GATES.slice(0,4).includes(options['--group']))throw new Error('run-group requires a routing proof and stable group.');
   const proof=selectRuntime(JSON.parse(readFileSync(options['--proof'],'utf8')));
   if(!['full','reuse'].includes(proof.decision))throw new Error('Routing did not admit required execution or verified coverage.');
