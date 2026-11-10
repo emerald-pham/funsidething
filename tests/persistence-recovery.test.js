@@ -748,10 +748,10 @@ test('RISK rapid action durability: ten distinct actions remain pending through 
  const head=await store.readHead();await app.dispose();const reopened=await loadAppAtTime(at,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off',async pull(){return{error:true};},async push(){return{error:true};}})});apps.push(reopened);assertFacts(reopened.ctx.state);assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload);
 });
 
-/* #2324: the owner's iPhone, signed out, showed "The saved board changed again
-   while this tab was merging it". These fixtures drive the loaded app against a
-   real device store; a phone's slower IndexedDB is modelled by holding each
-   head commit before it reaches the store. */
+// #2324: the owner's iPhone, signed out, showed "The saved board changed again
+// while this tab was merging it". These fixtures drive the loaded app against a
+// real device store; a phone's slower IndexedDB is modelled by holding each
+// head commit before it reaches the store.
 const settleQuietCloud2324=()=>({configured:false,ready:false,user:null,status:'off',async pull(){return {error:true};},async push(){return {error:true};}});
 async function deviceSaveSettleApp2324(t,{name,tasks,options={}}){
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=options.indexedDBProvider||new IDBFactory(),dbName=options.deviceDbName||name+'-'+Math.random(),at=Date.parse('2026-11-10T14:16:00Z');
@@ -854,10 +854,11 @@ test('RISK device save settle: a second copy saving repeatedly but finitely duri
   const n=++commits;
   // A conflicting attempt writes nothing; the merge that commits keeps its draft.
   if(options.backup?.kind==='stale-tab-draft')draft=options.backup.payload;
-  if(n>4)return;
-  if(n===1){other.peer.ctx.onAction('delete-task',{dataset:{id:'settle-repeat-gone'}});vm.runInContext('clearTimeout(saveTimer)',other.peer.ctx);}
-  await other.edit('settle-repeat-theirs-'+(n-1),'Other copy write '+n);
-  if(n===2)f.edit('settle-repeat-later','Accepted while merging');
+  if(n<=4){
+   if(n===1){other.peer.ctx.onAction('delete-task',{dataset:{id:'settle-repeat-gone'}});vm.runInContext('clearTimeout(saveTimer)',other.peer.ctx);}
+   await other.edit('settle-repeat-theirs-'+(n-1),'Other copy write '+n);
+   if(n===2)f.edit('settle-repeat-later','Accepted while merging');
+  }
  };
  f.edit('settle-repeat-mine','Saved by this tab');
  const head=await f.settled('finite peer writes');
@@ -899,9 +900,10 @@ test('RISK device save settle: an account change during the repair is still refu
  assert.equal(await f.ctx.persist(),true);
  let commits=0;
  f.beforeCommit=async()=>{
-  if(++commits!==1)return;
-  const head=await f.store.readHead(),next=JSON.parse(head.payload);next.syncAccount='someone-else@example.com';
-  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:'someone-else@example.com'})).ok,true);
+  if(++commits===1){
+   const head=await f.store.readHead(),next=JSON.parse(head.payload);next.syncAccount='someone-else@example.com';
+   assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:'someone-else@example.com'})).ok,true);
+  }
  };
  f.edit('settle-account-mine','Signed-out edit');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
  assert.equal(await f.alive(f.ctx.persist()),false,'the save is refused');
