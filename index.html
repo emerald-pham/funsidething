@@ -7657,6 +7657,8 @@ async function cloudPull(){
     // The read awaits, so the edit check below has to come after it.
     const stablePrior = remoteWins && useLocal
       ? (remoteSafetyCopy&&typeof remoteSafetyCopy==="object" ? remoteSafetyCopy : deviceStorageAuthority&&deviceStore ? (await deviceBackupsHoldingPayload(priorBoard,pullStillCurrent).catch(()=>{priorCopyUnread=true;return [];})).find(row=>row.kind!=="latest")??readLegacyBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard) : readLocalBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard)) : null;
+    // Superseded while reading: the pull that took over owns what happens next.
+    if(priorCopyUnread && !pullStillCurrent())return;
     if(remoteWins && JSON.stringify(state)!==safetyBoard){
       cloudAdoptionHeld=true;deferredCloudPull=true;return;
     }

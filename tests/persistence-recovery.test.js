@@ -5170,6 +5170,8 @@ test('RISK backup read back: a sign-out during the retry budget stops reading',a
  await pull;await syncSettle(400);
  assert.equal(realFail.reads,1,'no attempt starts once the sign-in it served is gone');
  assert.deepEqual(app.titles(),['Board of the previous account'],'nothing is adopted');
+ assert.doesNotMatch(app.toastText(),/held/i,'a pull nobody is waiting for says nothing');
+ assert.equal(vm.runInContext('syncErrorLog',app.ctx).some(row=>row.code==='recovery-unavailable'),false,'and reports no failure');
 });
 
 test('RISK backup read back: an edit made while the safety copy is being read back holds the account switch instead of being lost',async t=>{
