@@ -145,6 +145,7 @@ its RISK test; the map follows.
 - RISK cloud source recovery #2281: after failed attempts saved by the previous release on the large phone board, Apply and a later save read about the same device storage at once however many there were
 - RISK cloud source recovery #2281: a confirmed choice also completes the earlier attempts’ archives of the same cloud evidence, so later saves do not re-check them
 - RISK cloud source recovery #2281: while another saved copy cannot be read, Apply stops before any cloud write and changes no board
+- RISK cloud source recovery #2281: a saved copy damaged after its facts were learned still stops Apply before any cloud write
 - RISK cloud source recovery #2281: opening the app writes no archive summary by itself; only a review of cloud recovery sources does
 - RISK cloud source recovery #2281: a confirmed choice that names its archive still counts its originals as recovered once an older device collected them, and healthy edits save
 - RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write
@@ -597,6 +598,8 @@ its RISK test; the map follows.
 - RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit
 - RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit
 - RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit
+- RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit
+- RISK steady scanner browser: the candidate title is visible when presented on short screens, and a stable layout does not move between answers in Chromium and WebKit
 - RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit
 - RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit
 - RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit
@@ -1528,6 +1531,8 @@ its RISK test; the map follows.
 - RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes
 - RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once
 - RISK backup list memory: a first opening does not measure backups before the board is open, lists them all, and learns their measures afterwards
+- RISK backup list memory: Restore stays disabled on an empty-cloud evidence copy listed without its text, including from facts learned by an earlier build
+- RISK backup list memory: a saved verdict of unreadable is measured again, so a later build that can read the copy lists it as readable
 - RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back
 - RISK backup list memory: the older browser backup list is compared by hash without keeping its text, so a mirrored row merges and a different one stays listed
 - RISK backup read back: a brief device read failure during an account switch is retried, keeps its diagnostics and still adopts the new board
@@ -1536,6 +1541,8 @@ its RISK test; the map follows.
 - RISK backup read back: an edit made while the safety copy is being read back holds the account switch instead of being lost
 - RISK sync dealt candidate: a candidate dealt by a redraw on a clean board does not queue a cloud write
 - RISK sync dealt candidate: a same-revision copy differing in anything else still publishes this board
+- RISK sync dealt candidate: a same-revision copy with a different candidate of its own still publishes this board
+- RISK sync dealt candidate: a board with unsaved changes still publishes when only the candidate differs
 - RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered
 - RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board
 - RISK CLOUD LATENCY: ordinary edits retain the two-second debounce and stay dirty until server acknowledgement
@@ -1650,7 +1657,7 @@ its RISK test; the map follows.
 - RISK manual backup reminder: manual backups saved before they named an account are read at most once across Settings renders and still count only for their own account
 - RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step
 - RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit
-- RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works
+- RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works
 - RISK acknowledged recovery trim: nothing is trimmed while a later recovery waits on an unreadable copy, holds an older copy or saves without cloud confirmation, and the first acknowledged save after the cloud confirms trims
 - RISK acknowledged recovery trim: after an adoption the cloud confirms, the device clears the recovery archives and the migrated older backup list and keeps the board, the acknowledged copy, every backup, the older browser pair, headers-only records and a note naming what the earlier-source check still reports
 - RISK acknowledged recovery trim: the trim deletes by key in bounded batches without reading the whole store or a large archive, and a page closed mid-trim finishes on the next opening without the cloud
