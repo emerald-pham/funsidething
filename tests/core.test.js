@@ -12460,6 +12460,22 @@ test("UI #221: header Undo puts a returned dot back in its original place in one
   assert.equal(ctx.state.tasks.find(task => task.id === pill.id).title, second, "the same Undo step reverses the edit saved with it");
 });
 
+test("UI #221 guidance: the mounted FAQ and Settings changelog say a chain pill opens the task and Return as candidate takes one dot off", async t => {
+  const app = await loadApp(); t.after(() => app.dispose());
+  for (const id of ["appChangelogCurrent", "appChangelog"]) app.shim.document.getElementById(id).innerHTML = html.match(new RegExp('<template id="' + id + '">([\\s\\S]*?)<\\/template>'))[1];
+  await app.ctx.onAction("help", {});
+  const help = app.shim.document.getElementById("modalRoot").innerHTML;
+  const answer = help.match(/<dt>Can I return a task early\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
+  assert.match(answer, /tap (?:a|the) task in the chain/i, "the FAQ names the chain trail as a way to the editor");
+  assert.match(answer, /takes (?:just|only) that dot off the chain/i);
+  assert.match(answer, /other dots keep their order/i);
+  assert.match(answer, /no rating change/i);
+  assert.match(answer, /Undo[^.]*puts (?:the|a returned) dot back/i);
+  const notes = help.match(/<details class="help-faq" data-help-changelog>([\s\S]*?)<\/details>/)?.[1] ?? "";
+  assert.match(notes, /Tapping a task in the chain opens its editor/i, "the changelog announces the change");
+  assert.match(notes, /Return as candidate now also takes a dotted task off the chain/i);
+});
+
 test("UI #221: a repeated Return is one return and one Undo step, and a stale Return for a task that has left the chain changes nothing", async () => {
   const { ctx, shim } = await loadApp({ seed: 2224 });
   ctx.addTask("First dot", true);
