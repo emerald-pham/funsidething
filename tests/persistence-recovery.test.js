@@ -5012,6 +5012,32 @@ test('RISK backup list memory: a copy whose stored bytes were damaged is refused
  await reopened.dispose?.();
 });
 
+test('RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back',async t=>{
+ const {indexedDB,IDBObjectStore}=await import('fake-indexeddb'),dbName='chain-scanner-save-read-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;t.after(()=>app.dispose?.());
+ // The day's first save also writes its daily copy, which is measured once for that day.
+ for(const title of ['Saved first','Saved again']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ assert.ok(JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx)).some(row=>row.kind==='daily'),'the daily copy already exists');
+ const reads=[],original=IDBObjectStore.prototype.get;
+ // The listing's read pairs backups with snapshots in a read-only transaction; the save's commit does its own.
+ IDBObjectStore.prototype.get=function(...args){if(this.name==='snapshots'&&this.transaction.mode==='readonly'&&this.transaction.objectStoreNames.contains('backups'))reads.push(args[0]);return original.apply(this,args);};
+ t.after(()=>{IDBObjectStore.prototype.get=original;});
+ for(const title of ['Saved second','Saved third']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ assert.deepEqual(reads,[],'two saves read no saved board back');
+ const rows=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx)),board=JSON.stringify(ctx.state);
+ const latest=rows.filter(row=>row.kind==='latest');
+ assert.equal(latest.length,1,'the list still shows the automatic latest copy');
+ assert.equal(latest[0].payloadChars,board.length,'its size is the exact length of the board just saved');
+ assert.ok(!('payload' in latest[0]),'and it holds no text');
+ IDBObjectStore.prototype.get=original;
+ const stored=(await shim.window.ScannerDeviceStore.listBackups()).find(row=>row.id===latest[0].id);
+ assert.equal(stored.payload,board,'the copy on the device keeps the exact bytes');
+ // A manual copy of that same board is another row of the same bytes: it still gets a full description.
+ const manual=await ctx.saveDurableBackup('manual',board);assert.ok(manual?.id);
+ const manualRow=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx)).find(row=>row.id===manual.id);
+ assert.equal(manualRow.payloadFacts.readable,true);assert.notEqual(manualRow.payloadFacts.incomplete,true,'the skipped description is filled in when another row needs it');
+});
+
 // #2308 review: before an account switch replaces the board, cloudPull finds the
 // previous board's safety copy by hash and reads its exact bytes back. These
 // drive that real pull with a real device store; only the read is interfered with.

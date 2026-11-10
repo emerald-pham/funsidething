@@ -3069,6 +3069,12 @@ function knownDeviceBackupFacts(){
 function saveDeviceBackupFacts(){
   try{localStorage.setItem(DEVICE_BACKUP_FACTS_KEY,JSON.stringify({version:1,rows:[...knownDeviceBackupFacts()]}));}catch(e){}
 }
+// A save knows what it just wrote, so the automatic latest copy that came with
+// it is listed from that, without reading the new board back on every answer.
+function rememberSavedBoardFacts(hash,payload){
+  const known=knownDeviceBackupFacts();
+  if(!known.has(hash))known.set(hash,{chars:payload.length,facts:deviceBackupDisplayFacts(payload,{kind:"latest"})});
+}
 // What Settings shows about a saved board's text, learned once per board
 // (listBackupFacts). An automatic latest copy is this tab's own committed board,
 // replaced on every save, so it is not parsed unless another backup shares it.
@@ -4224,6 +4230,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         recomputeRanks();render();
       }
       deviceHeadHash=result.hash;lastPersistedRaw=committedPayload;persistedChanceSeed=JSON.parse(committedPayload).chance?.seed??null;
+      rememberSavedBoardFacts(result.hash,committedPayload);
       await refreshDeviceBackupCache();
       if(!backupAlreadySafe)await retireExpiredLegacyBackups(result.hash,committedPayload,legacyIndex?.raw,preserveBackupId);
       if(JSON.stringify(state)!==committedPayload){
