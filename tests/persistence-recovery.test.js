@@ -897,6 +897,42 @@ test('RISK device save settle: a board that never stops changing still ends in a
  const head=await f.store.readHead();assert.equal(JSON.parse(head.payload).futureChurn2324,attempts,'the newer saved board is not overwritten by the refused save');
 });
 
+// #2323 review: the time budget covers the whole save, slow commits included.
+// A commit already sent cannot be aborted, so the refusal can land up to one
+// commit after the five seconds.
+test('RISK device save settle: with slow commits the refusal still arrives about five seconds after the save began',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-slow-budget',tasks:[syncTask('settle-slow-anchor','Anchor'),syncTask('settle-slow-mine','Mine'),syncTask('settle-slow-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{commits++;await other.edit('settle-slow-theirs','Other copy write '+commits);};
+ const commitMs=1500;f.commitDelayMs=commitMs;
+ f.edit('settle-slow-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const started=performance.now(),result=await f.alive(f.ctx.persist()),elapsed=performance.now()-started;
+ f.beforeCommit=null;f.commitDelayMs=0;
+ assert.equal(result,false,'the save is refused');assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save');
+ assert.ok(elapsed<=5000+commitMs+500,'the refusal arrives within about five seconds plus the one commit already sent: '+Math.round(elapsed)+' ms after '+commits+' commits');
+});
+
+// #2323 review: repairs onto this tab's own save and onto another writer's share
+// one attempt cap. Here the head alternates between another writer's board and
+// bytes identical to this tab's last save, so both kinds of repair keep coming.
+test('RISK device save settle: repairs of both kinds share one bounded attempt count',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-mixed-churn',tasks:[syncTask('settle-mixed-anchor','Anchor'),syncTask('settle-mixed-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ const saved=vm.runInContext('lastPersistedRaw',f.ctx);let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead();let payload=saved;
+  if(commits%2){const next=JSON.parse(head.payload);next.futureChurn2323=commits;payload=JSON.stringify(next);}
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload,account:head.account??null})).ok,true);
+ };
+ f.edit('settle-mixed-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const result=await f.alive(f.ctx.persist());
+ f.beforeCommit=null;
+ assert.equal(result,false,'the save is refused');assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save');
+ assert.ok(commits>1&&commits<=12,'the repair made a bounded number of attempts: '+commits);
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-mixed-mine').title,'Kept in this tab','the accepted edit stays in this tab');
+});
+
 test('RISK device save settle: an account change during the repair is still refused',async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-account',tasks:[syncTask('settle-account-anchor','Anchor'),syncTask('settle-account-mine','Mine')]});
  assert.equal(await f.ctx.persist(),true);
