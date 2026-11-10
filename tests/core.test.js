@@ -21611,8 +21611,8 @@ test('RISK steady scanner browser: a long chain keeps the dot trail to one row o
     await page.waitForTimeout(40);
     const trail=await page.evaluate(()=>{
      const row=document.querySelector('.crumbs');if(!row)return null;
-     const crumbs=[...row.querySelectorAll('[data-act="reveal"]')],tops=[...row.children].map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
-     return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...[...row.children].map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),narrowest:Math.min(...crumbs.map(c=>c.getBoundingClientRect().width)),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
+     const crumbs=[...row.querySelectorAll('[data-act="reveal"]:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
+     return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),narrowest:Math.min(...crumbs.map(c=>c.getBoundingClientRect().width)),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
     });
     if(!trail)continue;
     assert.ok(trail.height<=trail.tallest+2&&trail.spread<=8,`${label}: ${trail.chain.length} dots stay on one row: the trail is ${Math.round(trail.height)} px tall`);

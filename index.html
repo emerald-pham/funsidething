@@ -11336,8 +11336,9 @@ function renderPass(){
   const facts=passPresentation(state);document.getElementById("passFill").style.width=facts.width;document.getElementById("passLabel").textContent=facts.label;
 }
 
-// A growing trail used to push the choices off the screen, so it stops at the
-// dots that fit on one phone-width row and counts the rest.
+// A growing trail used to push the choices off the screen, so it shows the dots
+// that fit on one phone-width row and counts the rest. Earlier dots stay in the
+// markup, hidden, so every rendered trail still names the whole chain.
 const CHAIN_TRAIL_NEWEST_DOTS=2;
 // Shared display helpers accept explicit boards and facts. They never write
 // storage, schedule work, focus, select sources or change authority.
@@ -11351,7 +11352,7 @@ const boardPresentation=Object.freeze({
   tagFilters(view){return !view.tagOptions.length?'':'<span class="ltaglabel">Filter</span>'+view.tagOptions.map(o=>'<button type="button" class="ltag'+(o.key.startsWith('c:')?' task-context':'')+(view.tagFilter===o.key?' on':'')+'" data-act="list-tag" data-id="'+esc(o.key)+'" aria-pressed="'+(view.tagFilter===o.key?'true':'false')+'">'+esc(o.label)+'</button>').join('');},
   candidateShowing(board,hasPool,benchmark,candidate){return !(board.interventionActive&&benchmark)&&board.mode!=="work"&&hasPool&&!!candidate;},
   card(classes,title,chips=''){return '<div class="card '+classes+'"><span class="title">'+title+'</span><span class="chiprow">'+chips+'</span></div>';},
-  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),shown=behind.slice(-CHAIN_TRAIL_NEWEST_DOTS),earlier=behind.length-shown.length;let html='<div class="crumbs">'+(earlier?'<span class="lbl" title="'+tasks.length+' dots in the chain; '+earlier+' earlier not shown">+'+earlier+' earlier</span>':'<span class="lbl">Chain · '+tasks.length+' dots:</span>');shown.forEach((t,i)=>{if(i>0)html+='<span class="arrow">→</span>';html+='<button class="crumb" data-act="reveal" data-id="'+esc(t.id)+'" title="'+esc(t.title)+'">'+esc(t.title)+'</button>';});return html+'<span class="arrow">→</span><span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
+  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),earlier=Math.max(0,behind.length-CHAIN_TRAIL_NEWEST_DOTS);let html='<div class="crumbs">'+(earlier?'<span class="lbl" title="'+tasks.length+' dots in the chain; '+earlier+' earlier not shown">+'+earlier+' earlier</span>':'<span class="lbl">Chain · '+tasks.length+' dots:</span>');behind.forEach((t,i)=>{if(i>earlier)html+='<span class="arrow">→</span>';html+='<button class="crumb" data-act="reveal" data-id="'+esc(t.id)+'"'+(i<earlier?' hidden':'')+' title="'+esc(t.title)+'">'+esc(t.title)+'</button>';});return html+'<span class="arrow">→</span><span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
   context(c,info,settings=false){return '<button type="button" class="ctxitem '+info.mode+'" data-act="'+(c?'cycle-context':'toggle-no-context')+'"'+(c?' data-id="'+esc(c.id)+'" data-ctx="'+esc(c.id)+'"':'')+' data-ctx-scope="'+(settings?'settings':'main')+'" data-filter-state="'+info.mode+'" aria-label="'+esc(info.label)+'" title="'+esc(info.label)+'">'+info.mark+(c&&settings?'':' '+esc(c?c.name:'No context'))+'</button>';},
   taskRow({task,rankColumns,dim=false,rankSummary='',inChain=false,nextDotted=false,titleAttrs='',url='',chips='',blockerTitles=[],skipLabel=''}){
     return '<div class="trow '+rankColumns+'" data-row="'+esc(task.id)+'" style="'+(dim?'opacity:.45':'')+'">'+rankSummary+'<div class="tmain">'
