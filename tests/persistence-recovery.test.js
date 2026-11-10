@@ -9541,3 +9541,56 @@ test('RISK acknowledged recovery trim guidance: Settings, mounted FAQ and change
   assert.doesNotMatch(text,/recovers on its own|rebuilds on its own|on its own, once/,question+': no wording the guidance tests retired');
  }
 });
+
+test('RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read',async t=>{
+ await openingBoardFixture(t);
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const url=process.env.LANDSCAPE_BROWSER_URL,origin=new URL(url).origin,failures=[];
+ // CI installs only Chromium; the local run covers WebKit, the iPhone engine.
+ for(const [engineName,engine] of [['chromium',chromium],...(process.env.CI==='true'?[]:[['webkit',webkit]])]){
+  const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL});
+  try{
+   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3});
+   await context.addInitScript(()=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    if(location.protocol==='about:')return;
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    window.__snapshotReads=[];
+    for(const method of ['get','getAll','openCursor']){const original=IDBObjectStore.prototype[method];IDBObjectStore.prototype[method]=function(...args){if(this.name==='snapshots')window.__snapshotReads.push(method);return original.apply(this,args);};}
+   });
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage();page.on('pageerror',error=>failures.push(engineName+': '+error.message));
+   await page.goto(url);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   const expected=await page.evaluate(async()=>{
+    closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;addTask('PRIVATE offline link task');await persist();
+    const store=window.ScannerDeviceStore,head=await store.readHead();
+    for(let i=0;i<4;i++)await store.putBackup({expectedHash:head.hash,backup:{id:'native-link-'+i,kind:'manual',at:i+1,day:'2026-11-0'+(i+1),payload:head.payload+' '.repeat(i)}});
+    return (await store.listBackups()).length;
+   });
+   await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+   await page.goto('about:blank');
+   if(engineName==='webkit'){
+    // Playwright WebKit cannot navigate offline at all (internal error), so its
+    // run proves the held opening online; Chromium proves the offline shell.
+    await page.goto(origin+'/#debug-log');
+   }else{await context.setOffline(true);await page.goto(origin+'/#debug-log');}
+   await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+   await page.waitForFunction(()=>JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData?.backups?.count?.status==='observed');
+   const linked=await page.evaluate(()=>({board:state,hash:location.hash,reads:window.__snapshotReads,settings:!!document.querySelector('#modalRoot [data-act="save-settings"]'),count:JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData.backups.count.value,text:document.getElementById('supportDiagnosticsData').value}));
+   assert.equal(linked.board,null,engineName+': the board has not opened behind the log');
+   assert.deepEqual(linked.reads,[],engineName+': no saved board or backup text was read');
+   assert.equal(linked.settings,false,engineName+': Settings did not open');
+   assert.equal(linked.count,expected,engineName+': live backup count');
+   assert.doesNotMatch(linked.text,/PRIVATE|native-link-/,engineName+': metadata only');
+   assert.equal(await page.locator('#supportDiagnosticsData').isVisible(),true,engineName+': the log is visible during opening');
+   await page.locator('#modalRoot [data-act="close-modal"]').click();
+   await page.waitForFunction(()=>state?.tasks?.some(task=>task.title==='PRIVATE offline link task'));
+   assert.equal(await page.evaluate(()=>location.hash),'',engineName+': a reload now opens the ordinary board');
+   await page.locator('[data-act="help"]').first().click();await page.locator('#modalRoot a[href="#debug-log"]').click();
+   await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+   assert.equal(await page.evaluate(()=>location.hash),'',engineName+': the in-window link can be followed again');
+   await context.setOffline(false);
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[],'the held opening raises no page errors');
+});

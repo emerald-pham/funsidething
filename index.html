@@ -761,6 +761,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   }
   // Even document-level shortcuts must wait for authoritative hydration.
   for(const type of ['click','dblclick','pointerdown','keydown','input','change','submit'])document.addEventListener(type,event=>{
+    // #2309: the Debug log link's view opens before the board and must still respond.
+    if(window.__chainDebugLogLinkHeld&&event.target?.closest?.('#modalRoot'))return;
     if(recoveryHeld){
       const target=event.target,modal=target?.closest?.('#modalRoot');
       const settingEdit=['input','change'].includes(type)&&target?.closest?.('.settings-section')&&!['restoreBackupFile','backupRestoreSource'].includes(target.id);
@@ -2995,7 +2997,7 @@ async function refreshDeviceBackupCache(current=()=>true){
   if(!deviceStore) return [];
   // #2281: the cached rows are passed back, so a payload that is still stored
   // exactly keeps its cached text instead of a second copy of every backup.
-  try{const rows=await deviceStore.listBackups({reuse:deviceBackupCache});if(current()){deviceBackupCache=rows;deviceBackupCacheReadable=true;}}
+  try{const rows=await deviceStore.listBackups({reuse:deviceBackupCache});if(current()){deviceBackupCache=rows;deviceBackupCacheReadable=true;debugLogLinkRecordBackupSizes(rows);}}
   catch(e){if(current()){deviceBackupCache=[];deviceBackupCacheReadable=false;}}
   return deviceBackupCache;
 }
@@ -4872,6 +4874,72 @@ function supportDiagnosticsRecentErrors(now){
         code:supportDiagnosticsField(supportDiagnosticsSafeErrorCode(row.code),"observed",row.at)}));
   }catch{return [];}
 }
+// #2309: Debug log link. When Settings cannot open, `#debug-log` still shows the
+// log; the opening waits behind it, so no backup text has been read. A fragment
+// stays in the manifest scope and the worker answers it from the `./` shell.
+const DEBUG_LOG_LINK_HASH="#debug-log",BACKUP_SIZES_KEY="fvp:chain-scanner:backup-sizes:v1";
+let debugLogLinkHeld=false,debugLogLinkRelease=null,debugLogLinkBackupCount=supportDiagnosticsField(null,"unobserved");
+function debugLogLinkRequested(){try{return window.location?.hash===DEBUG_LOG_LINK_HASH;}catch{return false;}}
+// Backup rows are small; their board text lives in the separate snapshots
+// store, which this reads by key only.
+async function debugLogLinkObserveBackupCount(){
+  if(window.storage||!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle)return;
+  let store=null;
+  try{
+    store=ChainStorageV2.createDeviceStore({indexedDB:window.indexedDB,crypto,dbName:window.CHAIN_STORAGE_DB_NAME||"chain-scanner-v2",
+      openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
+    await store.open();
+    const raw=await store.readRawFingerprint(),at=supportDiagnosticsNow();
+    debugLogLinkBackupCount=supportDiagnosticsField(raw.stores.backups.keys.length,"observed",at);
+  }catch{debugLogLinkBackupCount=supportDiagnosticsField(null,"unavailable",supportDiagnosticsNow());}
+  finally{try{await store?.close();}catch{}}
+}
+function debugLogLinkHoldOpening(){
+  debugLogLinkHeld=window.__chainDebugLogLinkHeld=true;viewSupportDiagnostics();
+  void debugLogLinkObserveBackupCount().then(()=>{
+    const box=document.getElementById("supportDiagnosticsData");
+    if(debugLogLinkHeld&&box&&box.selectionStart===box.selectionEnd)box.value=supportDiagnosticsText();
+  });
+  return new Promise(resolve=>{debugLogLinkRelease=resolve;});
+}
+function debugLogLinkClearFragment(){
+  try{window.history.replaceState(null,"",window.location.pathname+window.location.search);}catch{}
+}
+// The opening resumes from here; a reload now opens the ordinary board.
+function debugLogLinkLeave(){
+  debugLogLinkHeld=window.__chainDebugLogLinkHeld=false;document.getElementById("modalRoot").innerHTML="";debugLogLinkClearFragment();
+  debugLogLinkRelease?.();debugLogLinkRelease=null;return true;
+}
+// An ordinary opening holds every backup's text anyway, so it notes their size
+// here for a later link opening, which must not read that text. Counts only.
+function debugLogLinkReadBackupSizes(){
+  try{
+    const row=JSON.parse(localStorage.getItem(BACKUP_SIZES_KEY));
+    return Number.isSafeInteger(row?.characters)&&row.characters>=0&&(row.at===null||Number.isFinite(row.at))?row:null;
+  }catch{return null;}
+}
+function debugLogLinkRecordBackupSizes(rows){
+  try{
+    const characters=rows.reduce((sum,row)=>sum+(typeof row?.payload==="string"?row.payload.length:0),0);
+    if(debugLogLinkReadBackupSizes()?.characters===characters)return;
+    localStorage.setItem(BACKUP_SIZES_KEY,JSON.stringify({characters,at:supportDiagnosticsNow()}));
+  }catch{ /* Diagnostic size notes never affect saving. */ }
+}
+function supportDiagnosticsSavedDataReport(){
+  const now=supportDiagnosticsNow(),held=deviceStorageAuthority&&deviceBackupCacheReadable,recorded=held?null:debugLogLinkReadBackupSizes();
+  const frames=Array.isArray(undoStack)?undoStack:[];
+  return {
+    backups:{
+      count:held?supportDiagnosticsField(deviceBackupCache.length,"observed",now):debugLogLinkBackupCount,
+      totalCharacters:held?supportDiagnosticsField(deviceBackupCache.reduce((sum,row)=>sum+(typeof row?.payload==="string"?row.payload.length:0),0),"observed",now):
+        recorded?supportDiagnosticsField(recorded.characters,"observed",recorded.at):supportDiagnosticsField(null,"unobserved")
+    },
+    undo:{
+      frames:supportDiagnosticsField(frames.length,"observed",now),
+      characters:supportDiagnosticsField(frames.reduce((sum,frame)=>sum+(typeof frame?.snapshot==="string"?frame.snapshot.length:0)+(typeof frame?.after==="string"?frame.after.length:0),0),"observed",now)
+    }
+  };
+}
 function supportDiagnosticsBuildReport(options={}){
   supportDiagnosticsCheckIdentity();
   supportDiagnosticsTrimEvents();
@@ -4919,6 +4987,7 @@ function supportDiagnosticsBuildReport(options={}){
       acknowledgedThroughRequest:supportDiagnosticsField(supportDiagnosticsLastAckGeneration,
         supportDiagnosticsLastAckGeneration>0?"observed":"unobserved",supportDiagnosticsServerAckAt)
     },
+    savedData:supportDiagnosticsSavedDataReport(),
     recoverySources:supportDiagnosticsRecoveryReport(),recentErrors:supportDiagnosticsRecentErrors(now),
     events,sourceOperations:supportDiagnosticsSourceOperations(supportDiagnosticsEvents),
     retention:{
@@ -11902,6 +11971,7 @@ function renderHistory(){
    MODALS
    ================================================================ */
 function closeModal(){
+  if(debugLogLinkHeld)return debugLogLinkLeave();
   if(automaticRecoveryDeclineBusy){toast("Restoring your earlier board. Wait a moment.",6000);return false;}
   if(cloudSourceRecoveryPreview?.publishing){toast("A protected cloud save is in progress. Keep this preview open until confirmation finishes.",6000);return false;}
   if(fileRestorePreview?.irreversible){toast("A protected save is in progress. Keep this preview open until it finishes.",6000);return false;}
@@ -15672,6 +15742,7 @@ for(const event of ["input","change","focusout"]){document.addEventListener(even
 function openHelp(){
   modalShell(
     '<div class="mtop"><h2 id="faqsTitle">FAQs / Changelog</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
+    + '<p class="kv">If Settings will not open, <a href="#debug-log">open the Debug log</a> here instead.</p>'
     + '<div class="help"><details class="help-faq" open><summary>Quick start</summary><ol>'
     + '<li>Add tasks. Optionally assign contexts, then enable the contexts needed for those tasks.</li>'
     + '<li>Choose Start scanning.</li>'
@@ -17622,7 +17693,10 @@ function showOpeningSavedBoard(){
   const spark=featureEnabled('rankSparklines'),top=featureEnabled('topKLanguage'),rankColumns=spark?(top?'rank-both':'rank-spark'):(top?'rank-topk':'rank-none');
   try{if(window.SavedAppearance.showBoard(candidates[0].board,{presentation:boardPresentation,rankColumns,hasPool:pool(candidates[0].board).length>0}))renderSync();}catch{}
 }
+// An iPhone's installed app only follows this link from inside its own window.
+window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){debugLogLinkClearFragment();viewSupportDiagnostics();}});
 (async function init(){
+  if(debugLogLinkRequested())await debugLogLinkHoldOpening();
   showOpeningSavedBoard();
   const loaded = await loadState();
   // This inline script can resume before the deferred landscape modules run.

@@ -38305,6 +38305,138 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/supportDiagnosticsData/,'the report is viewable and selectable even when clipboard access is unavailable');
 });
 
+const sharedDebugLogStorage2309=()=>{const values=new Map();return {getItem:key=>values.has(key)?values.get(key):null,setItem(key,value){values.set(key,String(value));},removeItem(key){values.delete(key);},key:i=>[...values.keys()][i]??null,get length(){return values.size;}};};
+// #2309: a real device store holding saved backups, for opening through the
+// Debug log link. The counts come from the store's own listing, not the report.
+async function debugLogLinkDevice2309(){
+ const {IDBFactory}=await import('fake-indexeddb');
+ const indexedDBProvider=new IDBFactory(),deviceDbName='debug-log-link-'+Math.random();
+ const storage=sharedDebugLogStorage2309();
+ const seed=await loadApp({indexedDBProvider,deviceDbName,sharedStorage:storage});
+ seed.shim.document.getElementById('addInput').value='PRIVATE debug log link task 2309';
+ seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true,'the seeded board is durable');
+ const store=seed.ctx.window.ScannerDeviceStore,head=await store.readHead();
+ for(let i=0;i<5;i++)assert.equal((await store.putBackup({expectedHash:head.hash,
+  backup:{id:'link-backup-'+i,kind:'manual',at:i+1,day:'2026-11-0'+(i+1),payload:JSON.stringify({...JSON.parse(head.payload),padding:'PRIVATE backup text '+'x'.repeat(4096+i)})}})).ok,true);
+ const rows=await store.listBackups();
+ await seed.dispose();
+ return {indexedDBProvider,deviceDbName,storage,expectedBackups:rows.length,expectedCharacters:rows.reduce((sum,row)=>sum+row.payload.length,0)};
+}
+const debugLogLinkSnapshotReads2309=async t=>{
+ const {IDBObjectStore}=await import('fake-indexeddb'),reads=[];
+ for(const method of ['get','getAll','openCursor']){
+  const original=IDBObjectStore.prototype[method];
+  IDBObjectStore.prototype[method]=function(...args){if(this.name==='snapshots')reads.push(method);return original.apply(this,args);};
+  t.after(()=>{IDBObjectStore.prototype[method]=original;});
+ }
+ return reads;
+};
+const debugLogLinkReport2309=async app=>{
+ let report=app.ctx.buildSupportDiagnosticsReport();
+ for(let i=0;i<500&&report.savedData?.backups?.count?.status!=='observed';i++){await flush();report=app.ctx.buildSupportDiagnosticsReport();}
+ return report;
+};
+
+test('RISK debug log link #2309: the link opens the read-only log at opening without Settings or reading any backup text',async t=>{
+ const device=await debugLogLinkDevice2309(),reads=await debugLogLinkSnapshotReads2309(t);
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+ const report=await debugLogLinkReport2309(app),modal=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Debug log<\/h2>/,'the link shows the Debug log');
+ assert.match(modal,/readonly aria-label="Debug log"/,'the log stays selectable and read-only');
+ assert.doesNotMatch(modal,/<h2>Settings<\/h2>/,'the link does not go through Settings');
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups,'the live backup count comes from the rows');
+ assert.deepEqual(reads,[],'no saved board or backup text is read to open the log');
+});
+
+test('RISK debug log link #2309: the report gains backup and Undo counts and sizes, and never their contents',async t=>{
+ const device=await debugLogLinkDevice2309();
+ // The ordinary opening holds every backup anyway, so it can note their size
+ // for a later opening that must not read them.
+ const normal=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage});t.after(()=>normal.dispose());
+ for(const title of ['PRIVATE undo one 2309','PRIVATE undo two 2309','PRIVATE undo three 2309']){normal.shim.document.getElementById('addInput').value=title;normal.ctx.onAction('add',{});}
+ const boardChars=JSON.stringify(normal.ctx.state).length,running=normal.ctx.buildSupportDiagnosticsReport().savedData;
+ assert.equal(running.backups.count.value,device.expectedBackups,'a running app reports its held backup rows');
+ assert.equal(running.backups.totalCharacters.value,device.expectedCharacters,'a running app reports their held text size');
+ assert.equal(running.undo.frames.value,3,'three additions hold three Undo frames');
+ assert.ok(running.undo.characters.value>=2*boardChars/3,'Undo size counts the held board copies');
+ assert.doesNotMatch(normal.ctx.supportDiagnosticsText(),/PRIVATE/,'no task text in the running report');
+ await normal.dispose();
+ const linked=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>linked.dispose());
+ const report=await debugLogLinkReport2309(linked);
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups);
+ assert.equal(report.savedData.backups.totalCharacters.status,'observed');
+ assert.equal(report.savedData.backups.totalCharacters.value,device.expectedCharacters,'the size noted by the ordinary opening is reported without reading the text');
+ assert.equal(report.savedData.undo.frames.value,0,'an opening behind the link holds no Undo frames');
+ assert.equal(report.savedData.undo.characters.value,0);
+ const text=linked.ctx.supportDiagnosticsText();
+ assert.doesNotMatch(text,/PRIVATE|link-backup-/,'no task text, backup text or recovery-source identifiers in the report');
+ assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the report stays within its budget');
+ assert.match(linked.shim.document.getElementById('supportDiagnosticsData').value,/"totalCharacters"/,'the visible log carries the counts once they arrive');
+});
+
+test('RISK debug log link #2309: leaving the log returns to the ordinary board, and selecting the log still works',async t=>{
+ const device=await debugLogLinkDevice2309();
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false,navigatorProvider:{clipboard:{async writeText(){}}}});t.after(()=>app.dispose());
+ await debugLogLinkReport2309(app);
+ assert.equal(app.ctx.state,null,'the board stays unloaded while the log is open');
+ assert.equal(await app.ctx.onAction('copy-support-diagnostics',{}),true,'the log can be copied from this view');
+ assert.equal(await app.ctx.onAction('select-support-diagnostics',{}),true,'the log can be selected from this view');
+ assert.equal(app.ctx.state,null,'copying does not start the board');
+ let replacedUrl=null;app.shim.window.history={replaceState(_state,_title,url){replacedUrl=url;app.shim.window.location=new URL(url,app.shim.window.location.href);}};
+ await app.ctx.onAction('close-modal',{});
+ const deadline=Date.now()+5000;while(app.ctx.state===null&&Date.now()<deadline)await flush();
+ assert.notEqual(app.ctx.state,null,'leaving the log continues the ordinary opening');
+ assert.ok(app.ctx.state.tasks.some(task=>task.title==='PRIVATE debug log link task 2309'),'the ordinary saved board opens');
+ assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'the log closes');
+ assert.equal(replacedUrl,'/','the link is removed so a reload opens normally');
+ assert.equal(app.shim.window.location.hash,'');
+});
+
+test('RISK debug log link #2309: an ordinary opening, or another fragment, loads the board and shows no log',async t=>{
+ for(const locationHref of [undefined,'https://scanner.example/#other']){
+  const device=await debugLogLinkDevice2309();
+  const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref});t.after(()=>app.dispose());
+  assert.ok(app.ctx.state.tasks.some(task=>task.title==='PRIVATE debug log link task 2309'));
+  assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'an ordinary opening is unchanged');
+ }
+});
+
+test('RISK debug log link #2309: the link is safe with no prior state and when device storage cannot open',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const brokenIDB={open(){throw Object.assign(Error('PRIVATE broken device store'),{name:'UnknownError'});}};
+ for(const [label,options,count] of [['empty device',{indexedDBProvider:new IDBFactory(),deviceDbName:'debug-log-link-empty-'+Math.random()},{value:0,status:'observed'}],
+  ['no IndexedDB',{},{value:null,status:'unobserved'}],
+  ['broken IndexedDB',{indexedDBProvider:brokenIDB,deviceDbName:'debug-log-link-broken'},{value:null,status:'unavailable'}]]){
+  const app=await loadApp({...options,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+  for(let i=0;i<500&&app.ctx.buildSupportDiagnosticsReport().savedData.backups.count.status==='unobserved'&&count.status!=='unobserved';i++)await flush();
+  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,label+': the log opens');
+  const {count:reported,totalCharacters}=app.ctx.buildSupportDiagnosticsReport().savedData.backups;
+  assert.equal(reported.value,count.value,label+': backup count');assert.equal(reported.status,count.status,label+': backup count status');
+  assert.equal(totalCharacters.status,'unobserved',label+': no invented size');
+  assert.doesNotMatch(app.ctx.supportDiagnosticsText(),/PRIVATE/,label+': failure text stays out');
+  await app.ctx.onAction('close-modal',{});
+  const deadline=Date.now()+5000;while(app.ctx.state===null&&Date.now()<deadline)await flush();
+  assert.notEqual(app.ctx.state,null,label+': the ordinary opening continues');
+ }
+});
+
+test('RISK debug log link #2309: inside a running app the Help link opens the log without Settings, and can be used again',async t=>{
+ const device=await debugLogLinkDevice2309();
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/'});t.after(()=>app.dispose());
+ const {ctx,shim}=app,before=JSON.stringify(ctx.state);
+ ctx.onAction('help',{});
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<a href="#debug-log">/,'Help offers the link inside the installed window');
+ let replacedUrl=null;shim.window.history={replaceState(_state,_title,url){replacedUrl=url;shim.window.location=new URL(url,shim.window.location.href);}};
+ shim.window.location=new URL('https://scanner.example/#debug-log');shim.window.dispatchEvent({type:'hashchange'});
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Debug log<\/h2>/,'following the link shows the log');
+ assert.doesNotMatch(modal,/<h2>Settings<\/h2>/,'without Settings');
+ assert.equal(replacedUrl,'/','the fragment clears so the same link can open it again');
+ await ctx.onAction('close-modal',{});
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/);
+ assert.equal(JSON.stringify(ctx.state),before,'opening and leaving the log changes no board data');
+});
+
 test('RISK support diagnostics: real device retries count attempts while unexplained churn remains refused',async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostics-retry-'+Math.random()}),{ctx}=app,store=ctx.window.ScannerDeviceStore;
