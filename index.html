@@ -8421,7 +8421,7 @@ function ensureCandidate(){
    and nothing to decide. This is display state only: no decision, save or push
    is made here, and the sweeps in ensureCandidate() stay with their own callers. */
 function dealMissingCandidate(){
-  if(state.mode!=="scan"||state.interventionActive||taskById(state.candidateId)) return;
+  if(state.mode!=="scan"||state.interventionActive||state.candidateId) return;
   if(chainStart()&&(state.settings.skipOldestFirstDot!==true||!state.passStartedAt)) return;
   const pick=candidateOrder(pool())[0];
   if(pick){state.candidateId=pick.id;state.presentedAt=Date.now();}
