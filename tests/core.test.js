@@ -1796,8 +1796,8 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
 test('RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults',async t=>{
  const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
  const nativeSaves=observeQueuedNativeSaves(ctx,t);
- ctx.window.CloudSync.ready=false;ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});ctx.decide('yes');assert.equal(await ctx.persist(),true);
+ ctx.window.CloudSync.ready=false;
+ ctx.state.mode='scan';ctx.state.scanMode='descending';ctx.dotTask(ctx.candidateOrder(ctx.pool())[0].id);assert.equal(await ctx.persist(),true);
  assert.ok((await nativeSaves.settle('shared comparison setup')).results.every(result=>result===true));
  const shared=JSON.stringify(ctx.state),peer=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:shared,[LOCAL_HEAD_KEY]:shared}});t.after(()=>closeLegacyApp173(peer));const peerSaves=observeQueuedNativeSaves(peer.ctx,t);
  assert.equal(peer.ctx.state.candidateId,ctx.state.candidateId);assert.ok(ctx.state.candidateId);
@@ -3990,283 +3990,317 @@ test('RISK resilient sync recovery: a failed rebuild protects every source and r
  for(const row of preserved)assert.ok(retained.some(copy=>copy.key===row.key&&copy.raw===row.raw),'a later attempt never replaces the earlier exact evidence');
 });
 
-test('RISK optional oldest start: enabled Start offers a candidate without dotting or learning',async()=>{
- const {ctx,shim}=await loadApp({seed:182});
- Object.assign(ctx.addTask('Oldest optional-start task',false),{id:'optional-oldest',createdAt:1});
- Object.assign(ctx.addTask('Higher-ranked optional-start task',false),{id:'optional-higher',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;
- const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory]));
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.deepEqual(Array.from(ctx.state.chain),[],'the enabled preference must not automatically place the oldest task');
- assert.equal(ctx.state.candidateId,'optional-higher','an eligible candidate is offered using the selected mode');
- assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory])),ratings,'starting without a benchmark creates no learning');
- assert.match(shim.document.getElementById('scan').innerHTML,/Higher-ranked optional-start task/,'the first candidate is visible');
- assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'an existing affirmative action can choose the first dot');
+// #2300: Settings is the consumer. A helper or a fixture already set to the final value would not prove the control reaches the rule.
+function chooseChainStart(app,value){
+ app.ctx.openSettings();const select=app.shim.document.getElementById('stChainStartsWith');Object.assign(select,{id:'stChainStartsWith',value,matches:()=>false});
+ app.shim.document.dispatchEvent({type:'change',target:select});app.ctx.closeModal();
+}
+test('RISK chain start: Settings offers Oldest eligible and Most likely, defaulting to Oldest eligible, without the old checkbox',async()=>{
+ const {ctx,shim}=await loadApp({seed:2300});ctx.openSettings();const view=shim.document.getElementById('modalRoot').innerHTML;
+ const control=view.match(/<select id="stChainStartsWith"[^>]*>(.*?)<\/select>/);
+ assert.ok(control,'Settings has a Chain starts with dropdown');
+ assert.deepEqual([...control[1].matchAll(/<option value="([^"]+)"([^>]*)>([^<]+)<\/option>/g)].map(m=>[m[3],/selected/.test(m[2])]),[['Oldest eligible',true],['Most likely',false]]);
+ assert.match(view,/<label for="stChainStartsWith">Chain starts with<\/label>/);
+ assert.doesNotMatch(view,/stSkipOldestFirstDot|Skip automatically dotting the oldest task/);
 });
 
-test('RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally',async()=>{
- const {ctx}=await loadApp({seed:183});
- Object.assign(ctx.addTask('Older first-choice task',false),{id:'first-older',createdAt:1});
- Object.assign(ctx.addTask('First deliberate choice',false),{id:'first-chosen',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
- ctx.onAction('yes',{dataset:{candidate:'first-chosen',benchmark:''}});
- assert.deepEqual(Array.from(ctx.state.chain),['first-chosen'],'Yes explicitly establishes the first dot without a benchmark');
- assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'the unpaired choice leaves means and uncertainty unchanged');
- assert.equal(ctx.state.candidateId,'first-older');
- ctx.onAction('yes',{dataset:{candidate:'first-older',benchmark:'first-chosen'}});
- assert.deepEqual(Array.from(ctx.state.chain),['first-chosen','first-older']);
- assert.ok(ctx.state.tasks.find(t=>t.id==='first-older').mu>25,'a later real comparison still trains the chosen candidate');
- assert.ok(ctx.state.tasks.find(t=>t.id==='first-chosen').mu<30,'the first explicitly chosen task participates in later learning');
+test('RISK chain start: Most likely starts the chain with the highest displayed overall chance in every scan mode',async()=>{
+ for(const mode of ['descending','chance','squared','halving']){
+  const app=await loadApp({seed:2301}),{ctx}=app;
+  Object.assign(ctx.addTask('Oldest low chance',false),{id:'likely-oldest',createdAt:1,mu:20});
+  Object.assign(ctx.addTask('Highest chance',false),{id:'likely-high',createdAt:3,mu:32});
+  Object.assign(ctx.addTask('Middle chance',false),{id:'likely-middle',createdAt:2,mu:26});
+  chooseChainStart(app,'mostLikely');assert.equal(ctx.state.settings.chainStartsWith,'mostLikely',mode);
+  ctx.state.settings.scanMode=mode;ctx.onAction('start-scan',{dataset:{mode}});
+  assert.deepEqual(Array.from(ctx.state.chain),['likely-high'],mode+' starts with the most likely task, not the oldest');
+ }
 });
 
-test('RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it',async()=>{
- const {ctx}=await loadApp({seed:184});
- Object.assign(ctx.addTask('Later first choice',false),{id:'skip-next',createdAt:1});
- Object.assign(ctx.addTask('Skip this first choice',false),{id:'skip-first',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;
+test('RISK chain start: Most likely ties go to the older task then the task id, with no randomness',async()=>{
+ const started=async(seed,tasks)=>{
+  const app=await loadApp({seed});chooseChainStart(app,'mostLikely');
+  for(const [id,extra] of tasks)Object.assign(app.ctx.addTask(id,false),{id,...extra});
+  app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});return Array.from(app.ctx.state.chain);
+ };
+ assert.deepEqual(await started(2302,[['tie-newer',{createdAt:9}],['tie-older',{createdAt:1}]]),['tie-older'],'equal chances go to the older task');
+ assert.deepEqual(await started(2303,[['tie-b',{createdAt:5}],['tie-a',{createdAt:5}]]),['tie-a'],'equal chance and age go to the task id');
+ assert.deepEqual(await started(2304,[['near-newer',{createdAt:9,mu:25.0000001}],['near-older',{createdAt:1,mu:25}]]),['near-older'],'rows showing the same percentage are tied even if their unrounded chances differ');
+ for(const seed of [2305,2306,2307])assert.deepEqual(await started(seed,[['same-newer',{createdAt:9,mu:28}],['same-older',{createdAt:1,mu:24}]]),['same-newer'],'the seed never changes the choice');
+});
+
+test('RISK chain start: Most likely draws only from the eligible pool, including a task done before',async()=>{
+ const at=Date.parse('2026-10-18T12:00:00Z'),{ctx,shim}=await loadAppAtTime(at,{seed:2308});const app={ctx,shim};
+ ctx.state.contexts=[{id:'allowed-context',name:'Allowed',active:true},{id:'excluded-context',name:'Excluded',active:true,excluded:true}];
+ const add=(id,extra={})=>Object.assign(ctx.addTask(id,false),{id,createdAt:1,mu:60,...extra});
+ add('completed-ineligible',{done:true});add('future-ineligible',{startsAt:'2099-01-01'});add('context-ineligible',{ctx:['excluded-context']});
+ add('resting-ineligible',{evergreen:true,evergreenHours:24,evergreenResetAtDay:false,lastDoneAt:at});
+ add('dependency-ineligible',{prerequisiteId:'done-before',prerequisiteIds:['done-before']});
+ add('done-before',{createdAt:9,mu:40,lastDoneAt:at-3*86400000});add('never-done',{createdAt:2,mu:20});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(ctx.state.chain),['done-before'],'unlike Oldest eligible, the highest chance does not prefer never-done tasks; ineligible tasks stay out');
+});
+
+test('RISK chain start: the row preview, empty-chain notice and percentage explanation follow the selected option',async()=>{
+ const app=await loadApp({seed:2309}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Oldest preview task',false),{id:'preview-oldest',createdAt:1,mu:20});
+ Object.assign(ctx.addTask('Likely preview task',false),{id:'preview-likely',createdAt:2,mu:32});
+ ctx.state.settings.listMetric='chance';ctx.state.settings.scanMode='chance';ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.render();
+ const marker=title=>new RegExp('chainind"[^>]*>\\u2192 </span>[^\\n]{0,120}'+title);
+ const list=()=>shim.document.getElementById('listBody').innerHTML,scan=()=>shim.document.getElementById('scan').innerHTML;
+ assert.match(list(),marker('Oldest preview task'),'Oldest eligible previews the oldest task');
+ assert.doesNotMatch(list(),marker('Likely preview task'));
+ assert.match(scan(),/Chance mode starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before\./);
+ assert.match(list(),/The first dot is chosen by age/);
+ chooseChainStart(app,'mostLikely');ctx.render();
+ assert.match(list(),marker('Likely preview task'),'Most likely previews the same task Start will dot');
+ assert.doesNotMatch(list(),marker('Oldest preview task'));
+ assert.match(scan(),/Nothing dotted yet \u2014 Chance mode starts on the eligible task with the highest overall chance/);
+ assert.doesNotMatch(scan(),/oldest eligible/);
+ assert.match(list(),/The first dot goes to the highest overall chance/);
+ assert.doesNotMatch(list(),/chosen by age/);
+ ctx.onAction('start-scan',{dataset:{mode:'chance'}});assert.deepEqual(Array.from(ctx.state.chain),['preview-likely'],'Start keeps the promise the preview made');
+});
+
+const savedSkipBoard=(extra={})=>{
+ const board=syncState({tasks:[{...syncTask('skip-saved-oldest','Saved oldest'),createdAt:1},{...syncTask('skip-saved-likely','Saved likely'),createdAt:2,mu:32}],...extra});
+ board.settings={...board.settings,skipOldestFirstDot:true,...extra.settings};return JSON.stringify(board);
+};
+test('RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag',async()=>{
+ const raw=savedSkipBoard(),{ctx,shim}=await loadApp({seed:2310,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.match(shim.document.getElementById('scan').innerHTML,/starts on the oldest eligible task/,'the notice promises the oldest task, not an unpaired choice');
+ assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/choose the first dot/);
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory]));
- ctx.onAction('no',{dataset:{candidate:'skip-first',benchmark:''}});
- assert.equal(ctx.state.considered['skip-first'],'no','an unpaired No skips the candidate for this pass');
- assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,'skip-next');
- assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory])),ratings,'an unpaired skip creates no comparison observation or rating change');
+ assert.deepEqual(Array.from(ctx.state.chain),['skip-saved-oldest'],'Start dots the oldest eligible task');
+ assert.equal(ctx.state.settings.skipOldestFirstDot,true,'an older client still reads this flag, so the saved value stays');
+});
+
+test('RISK chain start: a board saved mid-pass with an empty chain and the old checkbox on starts with Oldest eligible',async()=>{
+ for(const mode of ['scan','work']){
+  const raw=savedSkipBoard({mode,scanMode:'descending',passId:'saved-empty-pass',passStartedAt:Date.now()-60000,candidateId:'skip-saved-likely',considered:{'skip-saved-gone':'no'}}),{ctx,shim}=await loadApp({seed:2311,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,mode+': no unpaired candidate is offered');
+  assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/,mode+': the visible action is Start, not Resume');
+  ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.deepEqual(Array.from(ctx.state.chain),['skip-saved-oldest'],mode+': the empty mid-pass chain starts with the oldest eligible task');
+ }
+});
+
+test('RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting',async()=>{
+ const app=await loadApp({seed:2312}),{ctx}=app;
+ Object.assign(ctx.addTask('Existing oldest dot',false),{id:'keep-oldest',createdAt:1,mu:20});
+ Object.assign(ctx.addTask('Existing candidate',false),{id:'keep-candidate',createdAt:2,mu:32});
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});const chain=Array.from(ctx.state.chain),candidate=ctx.state.candidateId,ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+ chooseChainStart(app,'mostLikely');
+ assert.equal(ctx.state.settings.chainStartsWith,'mostLikely');assert.deepEqual(Array.from(ctx.state.chain),chain,'the dot already on the chain stays');
+ assert.equal(ctx.state.candidateId,candidate,'the current candidate stays');assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'ratings stay');
+ ctx.onAction('undo',{});assert.equal(ctx.state.settings.chainStartsWith,'oldest','Undo restores the prior option');assert.deepEqual(Array.from(ctx.state.chain),chain,'Undo leaves the chain');
+});
+
+test('RISK chain start: replacing the head of a started chain is the same under either option',async()=>{
+ const heads={};
+ for(const choice of ['oldest','mostLikely']){
+  const app=await loadApp({seed:2313}),{ctx}=app;
+  for(const [id,createdAt,mu] of [['head-first',1,28],['head-low',2,20],['head-middle',3,24]])Object.assign(ctx.addTask(id,false),{id,createdAt,mu});
+  chooseChainStart(app,choice);ctx.dotTask('head-first');ctx.postponeTask('head-first');heads[choice]=Array.from(ctx.state.chain);
+ }
+ assert.deepEqual(heads,{oldest:['head-middle'],mostLikely:['head-middle']},'the option only decides a new chain, never its replacement head');
+});
+
+// #2300: an older client still open during a rollout cannot be changed, so a board carrying the new setting has to look ordinary to it.
+const CHAIN_START_OLDER_RELEASES=['3d787463d53f041e577ea37766417340cad6f2ad','7b9c92a41999a44a12f92b7d6d1c8d02758c635e'];
+test('RISK BACKWARD COMPATIBILITY: a board carrying Chain starts with and a recorded settings decision syncs through an older released client',async t=>{
+ for(const release of CHAIN_START_OLDER_RELEASES)await t.test(release.slice(0,7),async sub=>{
+  const released=spawnSync('git',['show',release+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
+  const at=Date.parse('2026-11-09T12:00:00Z'),initial=syncState({tasks:[{...syncTask('compat-older','Older compat task'),createdAt:1},{...syncTask('compat-likely','Likely compat task'),createdAt:2,mu:32}],settings:{scanMode:'descending',showPostpone:true},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),opts={seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory};
+  const current=await loadAppAtTime(at,opts);sub.after(()=>closeLegacyApp173(current));await current.ctx.cloudPull();
+  // Both decisions go through Settings so the board holds what a real save records.
+  chooseChainStart(current,'mostLikely');
+  current.ctx.openSettings();const postpone=current.shim.document.getElementById('stShowPostpone');Object.assign(postpone,{id:'stShowPostpone',checked:false,matches:()=>false});current.shim.document.dispatchEvent({type:'change',target:postpone});current.ctx.closeModal();
+  assert.equal(await current.ctx.persist(),true);await current.ctx.cloudPull();await current.ctx.cloudPushNow();await settleSavedViewPublication(current,h,'candidate publishes the setting and a recorded decision');
+  const published=JSON.parse(h.doc.payload);assert.equal(published.settings.chainStartsWith,'mostLikely','the cloud board carries the new setting');
+  assert.ok(published.decisionEvents.some(event=>event.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='showPostpone'),'the board carries a recorded settings decision');
+  const seen=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+  const older=await loadAppAtTime(at+1000,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:seen,[LOCAL_HEAD_KEY]:seen},cloudSyncFactory:h.factory});sub.after(()=>typeof older.ctx.suspendCloudSync==='function'?closeLegacyApp173(older):undefined);
+  await older.ctx.cloudPull();
+  assert.equal(older.ctx.window.CloudSync.status==='error',false,'older client: no hold on the published board ('+older.ctx.window.CloudSync.errorCode+')');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',older.ctx),false,'older client: adoption is not held');
+  assert.equal(older.ctx.state.settings.chainStartsWith,'mostLikely','older client: the field is retained');
+  hydrateUnchangedEditorDraft(older,'compat-older');older.shim.document.getElementById('etTitle').value='Edited by the older client';older.ctx.onAction('save-edit',{dataset:{id:'compat-older'}});
+  assert.equal(await older.ctx.persist(),true);await older.ctx.cloudPull();await older.ctx.cloudPushNow();
+  for(let n=0;n<160&&JSON.parse(h.doc.payload).tasks.find(row=>row.id==='compat-older').title!=='Edited by the older client';n++)await syncSettle(5);
+  assert.equal(older.ctx.window.CloudSync.status==='error',false,'older client: no hold after its own write ('+older.ctx.window.CloudSync.errorCode+')');
+  assert.equal(JSON.parse(h.doc.payload).settings.chainStartsWith,'mostLikely','the older write retains the field');
+  assert.equal(JSON.parse(h.doc.payload).tasks.find(row=>row.id==='compat-older').title,'Edited by the older client');
+  await current.ctx.cloudPull();await syncSettle(30);
+  assert.equal(current.ctx.window.CloudSync.status==='error',false,'candidate: no hold after reading the older write ('+current.ctx.window.CloudSync.errorCode+')');
+  assert.equal(current.ctx.state.settings.chainStartsWith,'mostLikely');assert.equal(current.ctx.state.settings.showPostpone,false);
+  current.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(current.ctx.state.chain),['compat-likely'],'the candidate still honors the retained choice');
+ });
+});
+
+test('RISK chain start: a chain started with Most likely compares and learns like any other chain',async()=>{
+ const app=await loadApp({seed:2314}),{ctx}=app;
+ Object.assign(ctx.addTask('Learning head',false),{id:'learn-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Learning candidate',false),{id:'learn-candidate',createdAt:1,mu:25});
+ Object.assign(ctx.addTask('Learning third',false),{id:'learn-third',createdAt:3,mu:24});
+ chooseChainStart(app,'mostLikely');const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(ctx.state.chain),['learn-head']);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'Start stays ranking-neutral');
+ assert.equal(ctx.state.candidateId,'learn-candidate');ctx.onAction('yes',{dataset:{candidate:'learn-candidate',benchmark:'learn-head'}});
+ assert.deepEqual(Array.from(ctx.state.chain),['learn-head','learn-candidate'],'Yes against the automatic head adds the candidate as usual');
+ assert.equal(ctx.state.candidateId,'learn-third');ctx.onAction('yes',{dataset:{candidate:'learn-third',benchmark:'learn-candidate'}});
+ assert.ok(ctx.state.tasks.find(t=>t.id==='learn-third').mu>24,'a real comparison trains the candidate');
+ assert.ok(ctx.state.tasks.find(t=>t.id==='learn-candidate').mu<25,'and the explicitly chosen benchmark');
+});
+
+test('RISK chain start: a No after a Most likely start skips for this pass and Undo restores it',async()=>{
+ const app=await loadApp({seed:2315}),{ctx}=app;
+ Object.assign(ctx.addTask('Skip head',false),{id:'skip-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Skip candidate',false),{id:'skip-candidate',createdAt:1,mu:25});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ ctx.onAction('no',{dataset:{candidate:'skip-candidate',benchmark:'skip-head'}});
+ assert.equal(ctx.state.considered['skip-candidate'],'no','No skips the candidate for this pass');assert.deepEqual(Array.from(ctx.state.chain),['skip-head']);
  ctx.onAction('undo',{});
- assert.equal(ctx.state.considered['skip-first'],undefined);assert.equal(ctx.state.candidateId,'skip-first');
- ctx.onAction('no',{dataset:{candidate:'skip-first',benchmark:''}});
- ctx.onAction('new-pass',{});
- assert.equal(ctx.state.considered['skip-first'],undefined,'a fresh pass clears the unpaired No');
- assert.equal(ctx.state.candidateId,'skip-first');assert.deepEqual(Array.from(ctx.state.chain),[]);
+ assert.equal(ctx.state.considered['skip-candidate'],undefined);assert.equal(ctx.state.candidateId,'skip-candidate');assert.deepEqual(Array.from(ctx.state.chain),['skip-head']);
 });
 
-test('RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data',async()=>{
- const app=await loadApp({seed:185}),{ctx,shim}=app;
- Object.assign(ctx.addTask('Settings oldest fixture',false),{id:'settings-oldest',createdAt:1,privateFutureTask:'retained'});
- Object.assign(ctx.addTask('Settings next fixture',false),{id:'settings-next',createdAt:2});
- ctx.state.settings.privateFutureSetting={retained:7};ctx.openSettings();
- const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});
- shim.document.dispatchEvent({type:'change',target:box});
- shim.document.getElementById('stScanMode').value='descending';ctx.onAction('save-settings',{});
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.deepEqual(Array.from(ctx.state.chain),[],'the real Settings save must enable an unseeded Start');
- assert.equal(ctx.state.settings.skipOldestFirstDot,true);ctx.openSettings();
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
- ctx.closeModal();assert.equal(await ctx.persist(),true);
- const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(raw);
+test('RISK chain start: Settings change and reopen retain Most likely and unrelated data',async()=>{
+ const app=await loadApp({seed:2316}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Reopen older',false),{id:'reopen-older',createdAt:1,privateFutureTask:'retained'});
+ Object.assign(ctx.addTask('Reopen likely',false),{id:'reopen-likely',createdAt:2,mu:32});
+ ctx.state.settings.privateFutureSetting={retained:7};chooseChainStart(app,'mostLikely');assert.equal(await ctx.persist(),true);
+ const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(raw);assert.equal(JSON.parse(raw).settings.chainStartsWith,'mostLikely','the choice is saved with the board');
  const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
- reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
- reopened.ctx.closeModal();reopened.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.deepEqual(Array.from(reopened.ctx.state.chain),[]);
- assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='settings-oldest').privateFutureTask,'retained');
+ reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/<option value="mostLikely" selected>Most likely<\/option>/);
+ reopened.ctx.closeModal();reopened.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(reopened.ctx.state.chain),['reopen-likely']);
+ assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='reopen-older').privateFutureTask,'retained');
  assert.equal(JSON.stringify(reopened.ctx.state.settings.privateFutureSetting),'{"retained":7}');
 });
 
-test('RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow',async()=>{
- const {ctx,shim}=await loadApp({seed:186});
- Object.assign(ctx.addTask('Marker oldest task',false),{id:'marker-oldest',createdAt:1});
- Object.assign(ctx.addTask('Marker next task',false),{id:'marker-next',createdAt:2});
- ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.listMetric='chance';ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.render();
- assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Will be added to the chain when you start scanning/,'the list must not promise a suppressed automatic first dot');
- assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/The first dot is chosen by age/);
- ctx.state.listOpen=false;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.match(shim.document.getElementById('scan').innerHTML,/Choose this task as the first dot/);
- for(let i=0;i<2;i++){const id=ctx.state.candidateId;assert.ok(id);ctx.onAction('no',{dataset:{candidate:id,benchmark:''}});}
- assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,null);
- assert.match(shim.document.getElementById('scan').innerHTML,/All eligible candidates have been scanned/);
- assert.match(shim.document.getElementById('scan').innerHTML,/data-act="rescan"/,'explicit rescan remains available with no first dot');
- ctx.onAction('rescan',{});assert.ok(ctx.state.candidateId);assert.deepEqual(Array.from(ctx.state.chain),[]);
+test('RISK chain start: a pass started with Most likely keeps its scan skips through a cold reopen',async()=>{
+ const app=await loadApp({seed:2317}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Cold head',false),{id:'cold-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Cold skipped',false),{id:'cold-skipped',createdAt:1,mu:25});
+ Object.assign(ctx.addTask('Cold next',false),{id:'cold-next',createdAt:3,mu:24});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});ctx.onAction('no',{dataset:{candidate:'cold-skipped',benchmark:'cold-head'}});
+ assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.equal(reopened.ctx.state.considered['cold-skipped'],'no');assert.deepEqual(Array.from(reopened.ctx.state.chain),['cold-head']);assert.equal(reopened.ctx.state.candidateId,'cold-next');
 });
 
-test('RISK optional oldest start: skips before the first choice survive that choice and cold reopen',async()=>{
- const app=await loadApp({seed:187}),{ctx,shim}=app;
- Object.assign(ctx.addTask('Keep for later',false),{id:'flow-later',createdAt:1});
- Object.assign(ctx.addTask('Skip before choosing',false),{id:'flow-skipped',createdAt:2,mu:30});
- Object.assign(ctx.addTask('Choose this first',false),{id:'flow-chosen',createdAt:3,mu:28});
- ctx.state.settings.skipOldestFirstDot=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- ctx.onAction('no',{dataset:{candidate:'flow-skipped',benchmark:''}});
- assert.equal(ctx.state.candidateId,'flow-chosen');ctx.onAction('yes',{dataset:{candidate:'flow-chosen',benchmark:''}});
- assert.equal(ctx.state.considered['flow-skipped'],'no','choosing the first dot must not begin a different pass and revive a skipped candidate');
- assert.equal(ctx.state.candidateId,'flow-later');assert.deepEqual(Array.from(ctx.state.chain),['flow-chosen']);
- assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY);
- const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
- assert.equal(reopened.ctx.state.considered['flow-skipped'],'no');assert.deepEqual(Array.from(reopened.ctx.state.chain),['flow-chosen']);
- assert.equal(reopened.ctx.state.candidateId,'flow-later');
-});
-
-test('RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary',async()=>{
- const at=+new Date(2026,9,18,1),{ctx}=await loadAppAtTime(at,{seed:188});
- Object.assign(ctx.addTask('Day boundary lower task',false),{id:'day-lower',createdAt:1});
- Object.assign(ctx.addTask('Day boundary first task',false),{id:'day-first',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- ctx.onAction('no',{dataset:{candidate:'day-first',benchmark:''}});assert.equal(ctx.state.candidateId,'day-lower');
- ctx.onAction('start-working',{});setFakeTime(ctx,at+2*60*60*1000);
+test('RISK chain start: scan marks still clear at the ordinary day boundary under Most likely',async()=>{
+ const at=+new Date(2026,9,18,1),{ctx,shim}=await loadAppAtTime(at,{seed:2318});const app={ctx,shim};
+ Object.assign(ctx.addTask('Day head',false),{id:'day-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Day skipped',false),{id:'day-skipped',createdAt:1,mu:25});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ ctx.onAction('no',{dataset:{candidate:'day-skipped',benchmark:'day-head'}});ctx.onAction('start-working',{});setFakeTime(ctx,at+2*60*60*1000);
  ctx.onAction('resume-scan',{dataset:{mode:'descending'}});
- assert.equal(ctx.state.considered['day-first'],undefined,'empty-chain passes still expire at the local day marker');
- assert.equal(ctx.state.candidateId,'day-first');assert.deepEqual(Array.from(ctx.state.chain),[]);
+ assert.equal(ctx.state.considered['day-skipped'],undefined,'the pass still expires at the local day marker');assert.deepEqual(Array.from(ctx.state.chain),['day-head']);
 });
 
-test('RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate',async()=>{
- const {ctx,shim}=await loadApp({seed:189});ctx.addTask('Wait for Start',false);ctx.openSettings();
- const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});
- shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
- assert.equal(ctx.state.candidateId,null,'changing a future-start preference must leave the initial scanner behind Start');
- assert.deepEqual(Array.from(ctx.state.chain),[]);assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/);
- assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/starts on the oldest/);
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.ok(ctx.state.candidateId);assert.deepEqual(Array.from(ctx.state.chain),[]);
+test('RISK chain start: changing the option waits for explicit Start before dotting',async()=>{
+ const app=await loadApp({seed:2319}),{ctx,shim}=app;ctx.addTask('Wait for Start',false);chooseChainStart(app,'mostLikely');
+ assert.equal(ctx.state.candidateId,null,'changing a future-start preference must leave the scanner behind Start');assert.deepEqual(Array.from(ctx.state.chain),[]);
+ assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/);
 });
 
-test('RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes',async()=>{
- for(const value of [undefined,false,true,null,0,1,'true','false',{},[]])for(const mode of ['descending','chance','squared','halving','both']){
-  const initial=syncState({tasks:[{...syncTask('default-oldest','Oldest default task'),createdAt:1},{...syncTask('default-next','Newer default task'),createdAt:2}],settings:{scanMode:mode}});
-  if(value!==undefined)initial.settings.skipOldestFirstDot=value;
-  const raw=JSON.stringify(initial),{ctx}=await loadApp({seed:190,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
-  assert.equal(ctx.state.settings.skipOldestFirstDot,value===true,'only a saved boolean true enables the option');
-  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
-  ctx.onAction('start-scan',{dataset:{mode:mode==='both'?'descending':mode}});
-  if(value===true){assert.deepEqual(Array.from(ctx.state.chain),[]);assert.ok(['default-oldest','default-next'].includes(ctx.state.candidateId));}
-  else assert.deepEqual(Array.from(ctx.state.chain),['default-oldest'],'older and invalid preferences preserve the oldest automatic first dot');
-  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'automatic or unseeded Start remains neutral');
+test('RISK chain start: missing invalid and legacy values start with Oldest eligible across all supported scan modes',async()=>{
+ for(const value of [undefined,'oldest','mostLikely',null,0,1,'true','mostlikely',{},[]])for(const mode of ['descending','chance','squared','halving','both']){
+  const initial=syncState({tasks:[{...syncTask('value-oldest','Oldest value task'),createdAt:1},{...syncTask('value-likely','Likely value task'),createdAt:2,mu:32}],settings:{scanMode:mode}});
+  if(value!==undefined)initial.settings.chainStartsWith=value;
+  const raw=JSON.stringify(initial),{ctx}=await loadApp({seed:2320,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  assert.equal(ctx.state.settings.chainStartsWith,value==='mostLikely'?'mostLikely':'oldest','only the saved string mostLikely selects Most likely');
+  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));ctx.onAction('start-scan',{dataset:{mode:mode==='both'?'descending':mode}});
+  assert.deepEqual(Array.from(ctx.state.chain),[value==='mostLikely'?'value-likely':'value-oldest'],String(value)+'/'+mode);
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'Start remains neutral');
  }
 });
 
-test('RISK optional oldest start: zero and one eligible tasks remain usable with either preference',async()=>{
- for(const enabled of [false,true]){
-  const {ctx,shim}=await loadApp({seed:191});ctx.state.settings.skipOldestFirstDot=enabled;
+test('RISK chain start: zero and one eligible tasks remain usable with either option',async()=>{
+ for(const option of ['oldest','mostLikely']){
+  const app=await loadApp({seed:2321}),{ctx,shim}=app;chooseChainStart(app,option);
   ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,null);
   assert.match(shim.document.getElementById('scan').innerHTML,/Nothing eligible to scan|Nothing on the list yet/);
-  const task=ctx.addTask('Sole eligible task',false),ratings=JSON.stringify([task.mu,task.sigma]);ctx.onAction('start-scan',{dataset:{mode:'descending'}});
-  if(enabled){
-   assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,task.id);
-   ctx.onAction('no',{dataset:{candidate:task.id,benchmark:''}});assert.equal(ctx.state.candidateId,null);assert.deepEqual(Array.from(ctx.state.chain),[]);
-   ctx.onAction('new-pass',{});assert.equal(ctx.state.candidateId,task.id);ctx.onAction('yes',{dataset:{candidate:task.id,benchmark:''}});
-  }
-  assert.deepEqual(Array.from(ctx.state.chain),[task.id]);assert.equal(JSON.stringify([ctx.state.tasks[0].mu,ctx.state.tasks[0].sigma]),ratings);
+  const task=ctx.addTask('Sole eligible task',false),ratings=JSON.stringify([task.mu,task.sigma]);
+  ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[task.id],option);
+  assert.equal(JSON.stringify([ctx.state.tasks[0].mu,ctx.state.tasks[0].sigma]),ratings);
  }
 });
 
-test('RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries',async()=>{
- const at=Date.parse('2026-10-18T12:00:00Z'),{ctx}=await loadAppAtTime(at,{seed:192});
- ctx.state.contexts=[{id:'allowed-context',name:'Allowed',active:true},{id:'excluded-context',name:'Excluded',active:true,excluded:true}];
- const add=(id,extra={})=>Object.assign(ctx.addTask(id,false),{id,createdAt:1,...extra});
- add('completed-ineligible',{done:true});add('future-ineligible',{startsAt:'2099-01-01'});add('context-ineligible',{ctx:['excluded-context']});
- add('resting-ineligible',{evergreen:true,evergreenHours:24,evergreenResetAtDay:false,lastDoneAt:at});
- add('dependency-ineligible',{prerequisiteId:'eligible-only',prerequisiteIds:['eligible-only']});add('eligible-only',{createdAt:9});add('postpone-first',{createdAt:10,mu:40});
- ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.showPostpone=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.equal(ctx.state.candidateId,'postpone-first');ctx.onAction('postpone',{dataset:{candidate:'postpone-first',benchmark:''}});
- assert.deepEqual(Array.from(ctx.state.chain),[],'postponing an unpaired candidate must not automatically dot its replacement');
- assert.equal(ctx.state.candidateId,'eligible-only','all existing ineligible tasks stay outside the empty-chain candidate pool');
- assert.deepEqual(Array.from(ctx.state.chain),[]);ctx.onAction('no',{dataset:{candidate:'eligible-only',benchmark:''}});assert.equal(ctx.state.candidateId,null);
- ctx.onAction('new-pass',{});assert.equal(ctx.state.candidateId,'eligible-only','a fresh pass clears No without ending an active postponement or rest');
-});
-
-test('RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged',async()=>{
- const {ctx,shim}=await loadApp({seed:193});const a=ctx.addTask('Existing automatic dot',false),b=ctx.addTask('Existing candidate',false);
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});const chain=Array.from(ctx.state.chain),ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
- ctx.openSettings();const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
- assert.deepEqual(Array.from(ctx.state.chain),chain);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
- ctx.onAction('undo',{});assert.equal(ctx.state.settings.skipOldestFirstDot,false);assert.deepEqual(Array.from(ctx.state.chain),chain);
- ctx.onAction('yes',{dataset:{candidate:b.id,benchmark:a.id}});assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'toggling does not retroactively make an automatic seed participate in learning');
- for(const enabled of [false,true]){
-  const app=await loadApp({seed:194}),task=app.ctx.addTask('Explicit manual first dot',false);app.ctx.state.settings.skipOldestFirstDot=enabled;
-  const before=JSON.stringify([task.mu,task.sigma]);app.ctx.dotTask(task.id);assert.deepEqual(Array.from(app.ctx.state.chain),[task.id]);assert.equal(JSON.stringify([task.mu,task.sigma]),before);
- }
-});
-
-test('RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit',async t=>{
+test('RISK chain start: the choice follows the board to another device beside an independent peer edit',async t=>{
  const at=Date.parse('2026-10-18T12:00:00Z');
- const initial=syncState({tasks:[{...syncTask('cloud-later','Cloud later task'),createdAt:1},{...syncTask('cloud-skipped','Cloud skipped task'),createdAt:2,mu:30},{...syncTask('cloud-chosen','Cloud chosen task'),createdAt:3,mu:28}],settings:{scanMode:'descending',skipOldestFirstDot:false},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const initial=syncState({tasks:[{...syncTask('cloud-older','Cloud older task'),createdAt:1},{...syncTask('cloud-likely','Cloud likely task'),createdAt:2,mu:30}],settings:{scanMode:'descending'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),opts={seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory};
  const a=await loadAppAtTime(at,opts),b=await loadAppAtTime(at,opts);t.after(()=>closeLegacyApp173(a));t.after(()=>closeLegacyApp173(b));await a.ctx.cloudPull();await b.ctx.cloudPull();a.ctx.window.CloudSync.ready=false;b.ctx.window.CloudSync.ready=false;
- setFakeTime(b.ctx,at+50);hydrateUnchangedEditorDraft(b,'cloud-later');b.shim.document.getElementById('etTitle').value='Independent peer title';b.ctx.onAction('save-edit',{dataset:{id:'cloud-later'}});assert.equal(await b.ctx.persist(),true);
- setFakeTime(a.ctx,at+100);a.ctx.openSettings();const box=a.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});a.shim.document.dispatchEvent({type:'change',target:box});a.ctx.closeModal();
- a.ctx.onAction('start-scan',{dataset:{mode:'descending'}});a.ctx.onAction('no',{dataset:{candidate:'cloud-skipped',benchmark:''}});a.ctx.onAction('yes',{dataset:{candidate:'cloud-chosen',benchmark:''}});assert.equal(await a.ctx.persist(),true);
- a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'unseeded first choices publication');
- b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await settleSavedViewPublication(b,h,'independent peer edit and unseeded choices');
- await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'unseeded peer acknowledgement');
+ setFakeTime(b.ctx,at+50);hydrateUnchangedEditorDraft(b,'cloud-older');b.shim.document.getElementById('etTitle').value='Independent peer title';b.ctx.onAction('save-edit',{dataset:{id:'cloud-older'}});assert.equal(await b.ctx.persist(),true);
+ setFakeTime(a.ctx,at+100);chooseChainStart(a,'mostLikely');assert.equal(await a.ctx.persist(),true);
+ a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'option publication');
+ b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await settleSavedViewPublication(b,h,'independent peer edit and option');
+ await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'peer acknowledgement');
  for(const app of [a,b]){
-  assert.equal(app.ctx.state.settings.skipOldestFirstDot,true);assert.deepEqual(Array.from(app.ctx.state.chain),['cloud-chosen']);
-  assert.equal(app.ctx.state.considered['cloud-skipped'],'no','sync keeps a first skip without a fabricated comparison');
-  assert.equal(app.ctx.state.tasks.find(row=>row.id==='cloud-later').title,'Independent peer title');
-  assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu]).sort())),[['cloud-chosen',28],['cloud-later',25],['cloud-skipped',30]],'independent first choices do not train any pair');
+  assert.equal(app.ctx.state.settings.chainStartsWith,'mostLikely','the choice follows the board');
+  assert.equal(app.ctx.state.tasks.find(row=>row.id==='cloud-older').title,'Independent peer title');
+  app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(app.ctx.state.chain),['cloud-likely'],'both devices start chains the same way');
  }
 });
 
-test('RISK optional oldest start: an empty started pass publishes and resumes with its saved draw',async t=>{
+test('RISK chain start: a started Most likely pass publishes reloads and resumes with its saved draw',async t=>{
  for(const mode of ['descending','chance','squared','halving']){
-  const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('resume-a','Resume older'),createdAt:1},{...syncTask('resume-b','Resume higher'),createdAt:2,mu:30}],settings:{scanMode:mode,skipOldestFirstDot:true},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
-  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seed:195,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+  const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('resume-a','Resume older'),createdAt:1},{...syncTask('resume-b','Resume higher'),createdAt:2,mu:30}],settings:{scanMode:mode,chainStartsWith:'mostLikely'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seed:2322,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
   await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;app.ctx.onAction('start-scan',{dataset:{mode}});
-  const candidate=app.ctx.state.candidateId,draw=JSON.stringify(app.ctx.state.chance);assert.ok(candidate);assert.deepEqual(Array.from(app.ctx.state.chain),[]);
+  assert.deepEqual(Array.from(app.ctx.state.chain),['resume-b'],mode);const draw=JSON.stringify(app.ctx.state.chance);
   app.ctx.onAction('start-working',{});assert.equal(await app.ctx.persist(),true);
-  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();
-  assert.notEqual(app.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','a started empty pass must be publishable before any explicit choice');
-  await settleSavedViewPublication(app,h,'empty started '+mode+' pass');
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'started '+mode+' pass');
   const saved=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
-  const reopened=await loadAppAtTime(at+1000,{seed:196,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(reopened));
+  const reopened=await loadAppAtTime(at+1000,{seed:2323,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(reopened));
   await reopened.ctx.cloudPull();reopened.ctx.onAction('resume-scan',{dataset:{mode}});
-  assert.equal(reopened.ctx.state.candidateId,candidate);assert.equal(JSON.stringify(reopened.ctx.state.chance),draw,'pause reload and resume keep the saved draw');assert.deepEqual(Array.from(reopened.ctx.state.chain),[]);
+  assert.equal(JSON.stringify(reopened.ctx.state.chance),draw,'pause reload and resume keep the saved draw');assert.deepEqual(Array.from(reopened.ctx.state.chain),['resume-b']);
  }
 });
 
-test('RISK optional oldest start: synced Undo reverses first choices Start and preference without learning',async t=>{
- const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('undo-first','Skip first'),createdAt:1,mu:30},{...syncTask('undo-second','Choose second'),createdAt:2,mu:28}],settings:{skipOldestFirstDot:false},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+test('RISK chain start: synced Undo reverses the option and the Start it enabled without learning',async t=>{
+ const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('undo-older','Undo older'),createdAt:1,mu:25},{...syncTask('undo-likely','Undo likely'),createdAt:2,mu:30}],settings:{scanMode:'descending'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));await app.ctx.cloudPull();
  const publish=async label=>{assert.equal(await app.ctx.persist(),true);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,label);};
- app.ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});app.ctx.closeModal();
- app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('no',{dataset:{candidate:'undo-first',benchmark:''}});await publish('first unpaired skip');
- assert.equal(h.remoteState().considered['undo-first'],'no');app.ctx.onAction('yes',{dataset:{candidate:'undo-second',benchmark:''}});await publish('first explicit dot');
- app.ctx.onAction('undo',{});await publish('Undo first explicit dot');assert.deepEqual(h.remoteState().chain,[]);assert.equal(h.remoteState().considered['undo-first'],'no');
- app.ctx.onAction('undo',{});await publish('Undo first skip');assert.equal(h.remoteState().considered['undo-first'],undefined);assert.equal(app.ctx.state.candidateId,'undo-first');
- app.ctx.onAction('undo',{});await publish('Undo empty Start');assert.equal(app.ctx.state.candidateId,null);assert.deepEqual(h.remoteState().chain,[]);
- app.ctx.onAction('undo',{});await publish('Undo optional-start preference');assert.equal(h.remoteState().settings.skipOldestFirstDot,false);
- assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-first',30],['undo-second',28]],'all synced reversals remain unpaired and neutral');
+ chooseChainStart(app,'mostLikely');await publish('option');assert.equal(h.remoteState().settings.chainStartsWith,'mostLikely');
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await publish('Most likely Start');assert.deepEqual(h.remoteState().chain,['undo-likely']);
+ app.ctx.onAction('undo',{});await publish('Undo Start');assert.deepEqual(h.remoteState().chain,[]);assert.equal(h.remoteState().settings.chainStartsWith,'mostLikely','Undo reversed only the Start');
+ app.ctx.onAction('undo',{});await publish('Undo option');assert.equal(h.remoteState().settings.chainStartsWith,'oldest','Undo restores the prior option on the cloud board');
+ assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-older',25],['undo-likely',30]],'every reversal stays neutral');
 });
 
-test('RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots',async()=>{
- const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
- const answer=question=>{const found=view.match(new RegExp('<dt>'+question.replace(/[?]/g,'\\?')+'</dt><dd>(.*?)</dd>'));assert.ok(found,'the mounted FAQ includes '+question);return found[1];};
- const choice=answer('Can I choose the first dot myself?');
- assert.match(choice,/Skip automatically dotting the oldest task/);assert.match(choice,/off by default/i);assert.match(choice,/saves immediately/i);assert.match(choice,/Yes.*first dot/);assert.match(choice,/No.*pass/);assert.match(choice,/rating|learning/);assert.match(choice,/existing dots/i);
- for(const question of ['What is Halving weighting?','What is Squared Weighting?','What is chance mode?','What happens to dots saved before this update?'])assert.match(answer(question),/unless.*skip|option.*off|by default/i,'automatic-first guidance accounts for the opt out: '+question);
- const current=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
- assert.match(current,/Settings.*choose the first dot yourself/);assert.match(current,/off by default/i);
-});
-
-test('RISK optional oldest start: Save settings alone persists the checkbox transition',async()=>{
- const {ctx,shim}=await loadApp({seed:197});ctx.addTask('Save-only eligible task',false);ctx.openSettings();
- assert.equal(ctx.state.settings.skipOldestFirstDot,false);
- shim.document.getElementById('stSkipOldestFirstDot').checked=true;
- ctx.onAction('save-settings',{});
- assert.equal(ctx.state.settings.skipOldestFirstDot,true,'Save must read the checked draft even without an immediate change event');
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[]);assert.ok(ctx.state.candidateId);
+test('RISK chain start: Save settings alone persists the Chain starts with transition',async()=>{
+ const app=await loadApp({seed:2324}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Save older',false),{id:'save-older',createdAt:1});Object.assign(ctx.addTask('Save likely',false),{id:'save-likely',createdAt:2,mu:32});
+ ctx.openSettings();assert.equal(ctx.state.settings.chainStartsWith,'oldest');
+ shim.document.getElementById('stChainStartsWith').value='mostLikely';ctx.onAction('save-settings',{});
+ assert.equal(ctx.state.settings.chainStartsWith,'mostLikely','Save must read the selected draft even without an immediate change event');
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),['save-likely']);
  assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
- reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
+ reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/<option value="mostLikely" selected>Most likely<\/option>/);
 });
 
-test('RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw',async()=>{
- for(const mode of ['descending','chance','squared','halving']){
-  const {ctx,shim}=await loadApp({seed:198});
-  for(let n=0;n<4;n++)Object.assign(ctx.addTask('Paused candidate '+n,false),{id:'pause-'+n,createdAt:n+1,mu:25+n});
-  ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.scanMode=mode;ctx.onAction('start-scan',{dataset:{mode}});
-  const skipped=ctx.state.candidateId;ctx.onAction('no',{dataset:{candidate:skipped,benchmark:''}});
-  const chosen=ctx.state.candidateId;ctx.onAction('yes',{dataset:{candidate:chosen,benchmark:''}});ctx.onAction('start-working',{});ctx.onAction('worked',{dataset:{benchmark:chosen}});
-  assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.mode,'work');
-  const before={passId:ctx.state.passId,draw:JSON.stringify(ctx.state.chance)},view=shim.document.getElementById('scan').innerHTML,action=view.match(/data-act="(start-scan|resume-scan)"/)?.[1];
-  assert.equal(action,'resume-scan','an already-started empty paused chain must offer Resume through its actual visible action');
-  ctx.onAction(action,{dataset:{mode}});assert.equal(ctx.state.passId,before.passId);assert.equal(JSON.stringify(ctx.state.chance),before.draw);assert.equal(ctx.state.considered[skipped],'no');assert.ok(ctx.state.candidateId);
- }
-});
-
-test('RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts',async()=>{
+test('RISK chain start: Quick start and the immediate-save FAQ describe the dropdown',async()=>{
  const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
  const quick=view.match(/<summary>Quick start<\/summary>([\s\S]*?)<\/details>/)[1];
- assert.match(quick,/With no dot, Yes chooses.*No skips.*this pass/,'Quick start must explain the initial unpaired choice');
+ assert.doesNotMatch(quick,/With no dot, Yes chooses/,'there is no unpaired first choice any more');
+ assert.match(quick,/Start scanning adds the first dot.*Chain starts with/,'Quick start explains the first dot comes from the setting');
  assert.match(quick,/Once a dot exists, compare each candidate/,'benchmark comparisons start only after a dot exists');
- const countdown=view.match(/<dt>What do the countdown tags mean\?<\/dt><dd>(.*?)<\/dd>/)[1];
- assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'timer cleanup does not promise automatic placement');
  const immediate=view.match(/<dt>Which settings save immediately\?<\/dt><dd>(.*?)<\/dd>/)[1];
- assert.match(immediate,/Skip automatically dotting the oldest task/,'the complete immediate-save inventory includes the new checkbox');
+ assert.match(immediate,/Chain starts with/,'the complete immediate-save inventory includes the dropdown');
+ assert.doesNotMatch(immediate,/Skip automatically dotting the oldest task/);
+});
+
+test('RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{const found=view.match(new RegExp('<dt>'+question.replace(/[?]/g,'\\?')+'</dt><dd>(.*?)</dd>'));assert.ok(found,'the mounted FAQ includes '+question);return found[1];};
+ const start=answer('What does Chain starts with do?');
+ for(const text of [/Oldest eligible.*default/i,/Most likely/,/highest overall chance/i,/older task.*task id|oldest task.*task id/i,/no randomness|never random/i,/Existing dots stay/i,/Undo/,/follows? your board/i,/Older versions/i])assert.match(start,text);
+ assert.match(start,/checkbox/i,'the FAQ says what happened to the old checkbox');assert.match(start,/starts? with Oldest eligible/i);
+ assert.doesNotMatch(view,/Can I choose the first dot myself|Skip automatically dotting the oldest task/,'nothing still describes the removed checkbox');
+ for(const question of ['What is Halving weighting?','What is Squared Weighting?','What is chance mode?'])assert.match(answer(question),/Chain starts with/,'mode FAQ points at the setting: '+question);
+ const current=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.match(current,/Chain starts with/);assert.match(current,/Most likely/);assert.match(current,/Oldest eligible/);
 });
 
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{

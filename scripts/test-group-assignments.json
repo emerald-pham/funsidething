@@ -707,6 +707,158 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2272 (spec acceptance criteria: a committedAt-only head refresh must not stop the review or use up the single fresh recheck) renamed this root: the review now completes in the first pair instead of spending its one fresh recheck on head metadata; the renamed test keeps the cancellable progress, preservation and no-write contracts, as recorded in the #2272 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "currentRoot": "RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "currentRoot": "RISK chain start: a chain started with Most likely compares and learns like any other chain",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "currentRoot": "RISK chain start: a No after a Most likely start skips for this pass and Undo restores it",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "currentRoot": "RISK chain start: Settings change and reopen retain Most likely and unrelated data",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "currentRoot": "RISK chain start: the row preview, empty-chain notice and percentage explanation follow the selected option",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "currentRoot": "RISK chain start: a pass started with Most likely keeps its scan skips through a cold reopen",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "currentRoot": "RISK chain start: scan marks still clear at the ordinary day boundary under Most likely",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "currentRoot": "RISK chain start: changing the option waits for explicit Start before dotting",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "currentRoot": "RISK chain start: missing invalid and legacy values start with Oldest eligible across all supported scan modes",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts",
+      "currentRoot": "RISK chain start: Quick start and the immediate-save FAQ describe the dropdown",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: Save settings alone persists the checkbox transition",
+      "currentRoot": "RISK chain start: Save settings alone persists the Chain starts with transition",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "currentRoot": "RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "currentRoot": "RISK chain start: zero and one eligible tasks remain usable with either option",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "currentRoot": "RISK chain start: Most likely draws only from the eligible pool, including a task done before",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "currentRoot": "RISK chain start: the choice follows the board to another device beside an independent peer edit",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "currentRoot": "RISK chain start: a started Most likely pass publishes reloads and resumes with its saved draw",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "currentRoot": "RISK chain start: synced Undo reverses the option and the Start it enabled without learning",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots",
+      "currentRoot": "RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw",
+      "currentRoot": "RISK chain start: a board saved mid-pass with an empty chain and the old checkbox on starts with Oldest eligible",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }
