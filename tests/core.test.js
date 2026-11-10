@@ -21629,6 +21629,107 @@ test('RISK steady scanner browser: a long chain keeps the dot trail to one row o
  assert.deepEqual(failures,[]);
 });
 
+const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';
+const steadySeededBoard=({floatingHeader=false,showPostpone=false,tasks=8}={})=>steadyScannerBoard({tasks,showPostpone,
+ taskOver:i=>i===2?{due:'2026-01-02'}:{},
+ over:{chain:['steady-0','steady-1'],candidateId:'steady-2',settings:{floatingHeader}}});
+test('RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const measure=page=>page.evaluate(()=>{
+  const box=el=>{if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+  const controls=['yes','no','cant','postpone','run-woop'].map(act=>[act,document.querySelector(`[data-act="${act}"]`)]).filter(([,el])=>el);
+  const scroller=document.scrollingElement;scroller.scrollTo(0,scroller.scrollHeight);
+  const foot=box(document.querySelector('.foot')),title=document.querySelector('.card.cand .title');
+  const atEnd={foot,scrollY:scrollY};scroller.scrollTo(0,0);
+  return {controls:Object.fromEntries(controls.map(([act,el])=>[act,{...box(el),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1}])),
+   titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,atEnd,header:box(document.getElementById('appHeader')),headerFloating:document.getElementById('appHeader').classList.contains('floating'),
+   overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
+ });
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone with enlarged text',width:320,height:568,enlarged:true},
+    {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
+    {name:'iPhone portrait with enlarged text and Postpone',width:390,height:844,enlarged:true,showPostpone:true},
+    {name:'iPhone portrait with floating header',width:390,height:844,floatingHeader:true},
+    {name:'short landscape',width:844,height:390},
+    {name:'short landscape with enlarged text',width:844,height:390,enlarged:true},
+    {name:'short landscape with floating header',width:844,height:390,floatingHeader:true},
+    {name:'desktop',width:1000,height:900,touch:false},
+   ]){
+    const label=`${engineName} ${spec.name}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    try{
+     if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('[data-act="run-woop"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate offers Run WOOP`);});
+     await page.waitForTimeout(80);
+     const shot=await measure(page);
+     const pinnedTop=Math.min(...Object.values(shot.controls).map(c=>c.top));
+     for(const [act,c] of Object.entries(shot.controls)){
+      assert.ok(c.top>=0&&c.bottom<=shot.viewportHeight&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} is on screen: ${JSON.stringify(c)}`);
+      assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
+      assert.ok(c.height>=44,`${label}: ${act} is ${Math.round(c.height)} px tall, too small to tap`);
+     }
+     assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
+     assert.ok(shot.atEnd.foot.bottom<=pinnedTop+1,`${label}: scrolled to the end, the footer clears the pinned row: footer ends ${Math.round(shot.atEnd.foot.bottom)}, the row starts ${Math.round(pinnedTop)}`);
+     assert.equal(shot.titleText,('Steady task 2 '+STEADY_SCANNER_FILLER).trim(),`${label}: the candidate title is shown in full`);
+     assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
+     if(spec.floatingHeader){assert.equal(shot.headerFloating,true,`${label}: the header floats`);assert.ok(shot.header.bottom<=pinnedTop,`${label}: the floating header and pinned row do not overlap`);}
+     // Run WOOP belongs to one candidate, so it must not move the choices when it goes.
+     const withWoop=await steadyScannerControls(page);
+     await page.evaluate(()=>document.scrollingElement.scrollTo(0,0));
+     const answerAt=steadyScannerCenter(withWoop.no);
+     if(spec.touch===false)await page.mouse.click(answerAt.x,answerAt.y);else await page.touchscreen.tap(answerAt.x,answerAt.y);
+     await page.waitForFunction(prior=>state.candidateId!==prior,withWoop.candidate,{timeout:10000});
+     const after=await steadyScannerControls(page);
+     assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the next candidate is not overdue`);
+     for(const act of ['yes','no','cant'])assert.ok(Math.abs(after[act].top-withWoop[act].top)<=1&&Math.abs(after[act].left-withWoop[act].left)<=1,`${label}: ${act} stays put when Run WOOP goes: ${Math.round(withWoop[act].top)} to ${Math.round(after[act].top)}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[],safeBottom=34;
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:4}));
+   try{
+    await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+    await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
+    const shown=await page.evaluate(()=>{const t=document.querySelector('.toast.show').getBoundingClientRect(),row=document.querySelector('[data-act="run-woop"],[data-act="yes"]').getBoundingClientRect();return {toastBottom:t.bottom,rowTop:row.top};});
+    assert.ok(shown.toastBottom<=shown.rowTop,`${engineName}: a toast sits above the pinned row: ends ${Math.round(shown.toastBottom)}, row starts ${Math.round(shown.rowTop)}`);
+    if(engineName==='chromium'){
+     const cdp=await context.newCDPSession(page);
+     await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:47,topMax:47,left:0,leftMax:0,bottom:safeBottom,bottomMax:safeBottom,right:0,rightMax:0}});
+     await page.waitForTimeout(80);
+     const clear=await page.evaluate(()=>({bottom:document.querySelector('[data-act="yes"]').getBoundingClientRect().bottom,height:innerHeight}));
+     assert.ok(clear.bottom<=clear.height-safeBottom,`${engineName}: Yes clears a ${safeBottom}px home indicator: ends ${Math.round(clear.bottom)} of ${clear.height}`);
+     await cdp.send('Emulation.clearSafeAreaInsetsOverride').catch(()=>{});
+    }
+    for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
+     const before=await steadyScannerControls(page);if(before.intervention)break;
+     await page.touchscreen.tap(steadyScannerCenter(before.no).x,steadyScannerCenter(before.no).y);
+     await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
+    }
+    await page.waitForTimeout(80);
+    const ended=await page.evaluate(()=>({text:document.getElementById('scan').textContent,fixedDescendants:[...document.querySelectorAll('#scan *')].filter(e=>getComputedStyle(e).position==='fixed').length,padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom)}));
+    assert.match(ended.text,/End of the list/,`${engineName}: the scan ended honestly: ${ended.text.slice(0,80)}`);
+    assert.equal(ended.fixedDescendants,0,`${engineName}: nothing stays pinned without a candidate`);
+    assert.ok(ended.padding<=62+(engineName==='chromium'?safeBottom:0),`${engineName}: the page gives back the room it reserved: ${ended.padding}`);
+    assert.deepEqual(errors,[],`${engineName}: no page errors`);
+   }catch(error){failures.push(error.message);}finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('Scanner emphasis clears when the candidate pool is exhausted without changing scan mode',async()=>{
  const {ctx,shim}=await loadApp({seed:2821});
  ctx.addTask('Dotted task',true);ctx.addTask('Next task',false);ctx.render();
