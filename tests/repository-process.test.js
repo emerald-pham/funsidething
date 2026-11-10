@@ -2283,13 +2283,13 @@ test('RISK repository process: grouped runner stays covered at the default npm t
  assert.match(result.stdout||'',/^# skipped 0$/m,'The runner contract cannot pass through a skip');
 });
 
-test('RISK repository process: failed groups state a capped reason and the group listing matches CI routing',t=>{
+test('RISK repository process: failed groups state a capped reason in the job log',t=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
- const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group (runner names why a test failed in the job log|runner keeps a failed test reason to one capped line of the first assertion|nightly job log names why a cross-engine case failed|listing gives the groups CI routes for a diff and writes nothing|listing needs a known base and takes no evidence options)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group (runner names why a test failed in the job log|runner keeps a failed test reason to one capped line of the first assertion|nightly job log names why a cross-engine case failed)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
  const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
- assert.equal(result.error,undefined,'The failure-line and listing contracts must start: '+(result.error?.message||output));
- assert.equal(result.status,0,'A failed group must state its reason within the cap and the listing must match CI routing: '+output);
- assert.match(result.stdout||'',/^# tests 12$/m,'Every failure-line and listing contract must run');
+ assert.equal(result.error,undefined,'The failure-line contracts must start: '+(result.error?.message||output));
+ assert.equal(result.status,0,'A failed group must state its reason within the cap: '+output);
+ assert.match(result.stdout||'',/^# tests 3$/m,'Every failure-line contract must run');
  assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
 });
 

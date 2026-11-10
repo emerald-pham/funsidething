@@ -21849,8 +21849,11 @@
       "tests/repository-process.test.js:-assert.deepEqual(evidence.cases,[]);",
       "tests/repository-process.test.js:-assert.deepEqual(evidence.crossEngine.pendingRoots.map(entry=>[entry.root,entry.pendingOn]).sort(),pending.map(root=>[root,'#285']));",
       "tests/repository-process.test.js:-assert.equal(evidence.crossEngine.casesRun,0);",
+      "tests/repository-process.test.js:-assert.equal(result.error,undefined,'The failure-line and listing contracts must start: '+(result.error?.message||output));",
+      "tests/repository-process.test.js:-assert.equal(result.status,0,'A failed group must state its reason within the cap and the listing must match CI routing: '+output);",
       "tests/repository-process.test.js:-assert.equal(result.status,0,'a dispatched candidate with only pending roots must succeed: '+result.stdout+result.stderr);",
       "tests/repository-process.test.js:-assert.match(result.stdout,/^::notice [^\\n]*\\b0 cross-engine cases ran\\b/m,'the job must annotate that no cross-engine case ran');",
+      "tests/repository-process.test.js:-assert.match(result.stdout||'',/^# tests 12$/m,'Every failure-line and listing contract must run');",
       "tests/repository-process.test.js:-assert.notEqual(evidence.status,'passed','zero cases must never be recorded as a pass');",
       "tests/repository-process.test.js:-const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--import='+preload,'--test-name-pattern=^no test has this name$',file],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024,",
       "tests/repository-process.test.js:-const evidence=JSON.parse(fs.readFileSync(path.join(output,'result.json'),'utf8'));",
@@ -21871,19 +21874,22 @@
       "tests/repository-process.test.js:-const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});",
       "tests/repository-process.test.js:-const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});",
       "tests/repository-process.test.js:-const result=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');",
+      "tests/repository-process.test.js:-const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group (runner names why a test failed in the job log|runner keeps a failed test reason to one capped line of the first assertion|nightly job log names why a cross-engine case failed|listing gives the groups CI routes for a diff and writes nothing|listing needs a known base and takes no evidence options)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});",
       "tests/repository-process.test.js:-const result=spawnSync(process.execPath,['scripts/test-groups.mjs','--group','nightly-cross-engine','--output-dir',output,'--repository','local/nightly','--event-policy','local','--run-id','1','--run-attempt','1','--source-sha',head,'--comparison-base',head],{cwd:__dirname,encoding:'utf8',timeout:60000});",
       "tests/repository-process.test.js:-for(const root of pending)assert.ok(notice.includes(root),'the annotation must name the pending root: '+root);",
       "tests/repository-process.test.js:-function prepareWithIndependentReport(independentReport){",
       "tests/repository-process.test.js:-test('RISK repository process: Nightly on this head reports zero cross-engine cases and names both roots pending on the WebKit work',()=>{",
+      "tests/repository-process.test.js:-test('RISK repository process: failed groups state a capped reason and the group listing matches CI routing',t=>{",
       "tests/repository-process.test.js:-{cwd:__dirname,encoding:'utf8',env:{...environmentWithoutGitLocation(),[variable]:value},maxBuffer:16*1024*1024});"
     ],
-    "reason": "Review findings on 95141350 (#2291): a pin in the required core group ran Nightly on the live head, so a landed pending root turned required CI red. The diff also dates the release-prepare fixtures, gives owner and reviewer distinct report bodies now that prepare refuses a shared body, and bounds the two git-isolation test spawns.",
-    "previousBehavior": "The core pin required the Nightly run on this head to report zero cases and both roots pending on the WebKit work. Release-prepare fixtures committed at the current time while their reports were dated earlier, and owner and independent reports shared one body. The two git-isolation spawns had no timeout.",
-    "intendedBehavior": "The core pin checks that the required cohort accepts the declared Nightly roots, that both WebKit roots stay declared, that each names an existing file and that each pending row names its owning PR, whether or not those tests have landed. Release-prepare fixtures commit at a fixed time before their reports and use distinct bodies. Both spawns are bounded at two minutes.",
+    "reason": "Review findings on 95141350 (#2291): a pin in the required core group ran Nightly on the live head, so a landed pending root turned required CI red. The diff also removes the --changed-groups contracts from the failure-line pin along with that mode, dates the release-prepare fixtures, gives owner and reviewer distinct report bodies now that prepare refuses a shared body, and bounds the two git-isolation test spawns.",
+    "previousBehavior": "The core pin required the Nightly run on this head to report zero cases and both roots pending on the WebKit work. A second pin required the failure-line and --changed-groups listing contracts to run. Release-prepare fixtures committed at the current time while their reports were dated earlier, and owner and independent reports shared one body. The two git-isolation spawns had no timeout.",
+    "intendedBehavior": "The core pin checks that the required cohort accepts the declared Nightly roots, that both WebKit roots stay declared, that each names an existing file and that each pending row names its owning PR, whether or not those tests have landed. The failure-line pin keeps its three contracts and drops the removed listing. Release-prepare fixtures commit at a fixed time before their reports and use distinct bodies. Both spawns are bounded at two minutes.",
     "preservedCoverage": [
       "Fixture tests in test-groups.test.mjs still pin the zero-case Nightly run: its annotation, status, empty cases and the named pending roots.",
       "A landed pending root still fails Nightly preflight, now for escaped, template, constant and table titles as well as plain ones.",
-      "Every release-prepare assertion on receipts, refusals and digests is unchanged apart from the fixture commit time and the owner report body."
+      "Every release-prepare assertion on receipts, refusals and digests is unchanged apart from the fixture commit time and the owner report body.",
+      "The three failed-group reason contracts still run from the required pin, with an exact test count and no skips."
     ],
     "replacementTests": [
       "RISK repository process: the Nightly root list stays valid whether or not its pending roots have landed",
