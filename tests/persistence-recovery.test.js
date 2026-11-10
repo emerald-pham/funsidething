@@ -760,7 +760,7 @@ async function deviceSaveSettleApp2324(t,{name,tasks,options={}}){
  const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),inFlight=new Set(),messages=[],toast=shim.document.getElementById('toast');
  let message=toast.textContent;
  Object.defineProperty(toast,'textContent',{configurable:true,get:()=>message,set(value){message=value;messages.push(value);}});
- const fixture={app,ctx,shim,store,indexedDB,dbName,at,messages,commitDelayMs:0,beforeCommit:null,
+ const fixture={app,ctx,shim,store,indexedDB,dbName,at,messages,commitDelayMs:0,beforeCommit:null,storeCommit:commit,
   async settled(label,limitMs=20000){
    const end=performance.now()+limitMs;let head;
    do{
@@ -770,6 +770,8 @@ async function deviceSaveSettleApp2324(t,{name,tasks,options={}}){
    }while(performance.now()<end);
    assert.fail(label+': device saves did not settle; issue '+JSON.stringify(ctx.deviceSaveIssue())+'; messages '+JSON.stringify(messages));
   },
+  // App timers are unref'd; keep Node's loop alive while a save waits on one.
+  async alive(promise){const timer=setInterval(()=>{},50);try{return await promise;}finally{clearInterval(timer);}},
   edit(id,title){hydrateUnchangedEditorDraft(app,id);shim.document.getElementById('etTitle').value=title;ctx.onAction('save-edit',{dataset:{id}});assert.equal(ctx.state.tasks.find(task=>task.id===id).title,title,'the edit is accepted on screen');},
  };
  store.commitHead=async options=>{
@@ -853,6 +855,44 @@ test('RISK device save settle: a second copy saving repeatedly but finitely duri
  assert.ok((await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft),'the exact superseded draft is kept as a backup');
  const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
  assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows every copy\'s work');
+});
+
+test('RISK device save settle: a board that never stops changing still ends in a bounded refusal with no retry loop',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-churn',tasks:[syncTask('settle-churn-anchor','Anchor'),syncTask('settle-churn-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ // Unexplained churn: something advances the saved board before every commit.
+ let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead(),next=JSON.parse(head.payload);next.futureChurn2324=commits;
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:head.account??null})).ok,true);
+ };
+ f.edit('settle-churn-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const started=performance.now(),result=await f.alive(f.ctx.persist()),elapsed=performance.now()-started;
+ assert.equal(result,false,'the save is refused');assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','the integrity refusal keeps its code');
+ assert.ok(elapsed<8000,'the refusal arrives within the fixed time budget: '+Math.round(elapsed)+' ms');
+ const attempts=commits;assert.ok(attempts>1&&attempts<=12,'the repair made a bounded number of attempts: '+attempts);
+ await new Promise(resolve=>setTimeout(resolve,1500));
+ assert.equal(commits,attempts,'no save keeps retrying after the refusal');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-churn-mine').title,'Kept in this tab','the accepted edit stays in this tab');
+ const head=await f.store.readHead();assert.equal(JSON.parse(head.payload).futureChurn2324,attempts,'the newer saved board is not overwritten by the refused save');
+});
+
+test('RISK device save settle: an account change during the repair is still refused',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-account',tasks:[syncTask('settle-account-anchor','Anchor'),syncTask('settle-account-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ let commits=0;
+ f.beforeCommit=async()=>{
+  if(++commits!==1)return;
+  const head=await f.store.readHead(),next=JSON.parse(head.payload);next.syncAccount='someone-else@example.com';
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:'someone-else@example.com'})).ok,true);
+ };
+ f.edit('settle-account-mine','Signed-out edit');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false,'the save is refused');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'account-changed');
+ const head=await f.store.readHead();
+ assert.equal(head.account,'someone-else@example.com','the other account\'s board is not merged with this one');
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='settle-account-mine').title,'Mine','the signed-out edit is not written into the other account\'s board');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-account-mine').title,'Signed-out edit','the edit stays in this tab');
 });
 
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
