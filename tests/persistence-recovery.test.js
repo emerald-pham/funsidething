@@ -10527,3 +10527,28 @@ test('RISK chain return compatibility: a client from before #221 cannot push a r
  assert.equal(JSON.stringify(returnFact221(h.remoteState())),fact);
  for(const app of [old,reopened])assert.equal(app.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','the older tab shows a held sync, never a confirmed one');
 });
+
+test('RISK chain return compatibility: a board saved before #221 opens with the same chain and saved bytes, and its dots can be returned',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const board=syncState({tasks:['Oldest task','Second task','Third task','Fourth task'].map((title,i)=>({...syncTask('before-'+i,title),createdAt:at-900000+i*1000})),
+  chain:[],candidateId:null,mode:'scan',scanMode:'descending',seenQuickStart:true,settings:{horizonMin:60,thresholdPct:0,samples:250}}),raw=JSON.stringify(board);
+ const old=await loadAppAtTime(at,{appSource:beforeChainReturnApp221(),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ old.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ for(const offset of [100,200]){setFakeTime(old.ctx,at+offset);old.ctx.onAction('yes',{dataset:{candidate:old.ctx.state.candidateId,benchmark:old.ctx.state.chain.at(-1)}});}
+ assert.equal(await old.ctx.persist(),true);
+ const saved=old.shim.localStorage.getItem(SYNC_STORE_KEY),savedChain=JSON.parse(saved).chain;
+ assert.equal(savedChain.length,3,'precondition: the older app saved three dots made by Start and two Yes answers');
+
+ const opened=await loadAppAtTime(at+300,{seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved}});
+ assert.deepEqual(Array.from(opened.ctx.state.chain),savedChain,'the same chain in the same order');
+ const titles=savedChain.map(id=>board.tasks.find(task=>task.id===id).title);
+ opened.ctx.renderScan();const scan=opened.shim.document.getElementById('scan').innerHTML;
+ assert.deepEqual([...scan.matchAll(/<button\b[^>]*class="crumb"[^>]*>([^<]*)<\/button>/g)].map(match=>match[1]),titles.slice(0,-1),'the same trail');
+ assert.equal(opened.shim.localStorage.getItem(SYNC_STORE_KEY),saved,'opening writes nothing: no migration of the saved board');
+
+ returnDotFromBoard221(opened,savedChain[1],at+400);
+ assert.deepEqual(Array.from(opened.ctx.state.chain),[savedChain[0],savedChain[2]],'its dots can be returned like any other');
+ assert.equal(await opened.ctx.persist(),true);
+ const reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:opened.shim.localStorage.getItem(SYNC_STORE_KEY)}});
+ assert.deepEqual(Array.from(reopened.ctx.state.chain),[savedChain[0],savedChain[2]]);
+});
