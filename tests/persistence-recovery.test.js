@@ -10573,3 +10573,129 @@ test('RISK chain return sync: returning the only dot Start placed leaves an empt
  assert.deepEqual(Array.from(cold.ctx.state.chain),[]);
  cold.ctx.renderScan();assert.match(cold.shim.document.getElementById('scan').innerHTML,/Nothing dotted yet/,'the board waits for the next Start');
 });
+
+// ---------- #221 review: a return in the same pass as a Postpone of a dot ----------
+// Postpone takes a dot off the chain without recording a decision, so a replay
+// of the pass still has that dot. The pass here is one carried over the 2 AM
+// reset: it has no Start root, so before #221 nothing in it compared the chain.
+async function carriedPassClients221(t){
+ // Local noon: the next 2 AM is hours away in any time zone.
+ const at=new Date(2026,9,17,12).getTime(),yesterday=at-24*HOUR;
+ const titles={'carried-a':'Oldest carried dot','carried-b':'Middle carried dot','carried-c':'Newest carried dot','carried-d':'Waiting candidate','carried-e':'Another pool task'};
+ const initial=syncState({tasks:Object.entries(titles).map(([id,title],i)=>({...syncTask(id,title),createdAt:yesterday-900000+i*1000})),
+  chain:['carried-a','carried-b','carried-c'],candidateId:'carried-d',mode:'scan',scanMode:'descending',passId:'yesterday-pass',passStartedAt:yesterday,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,postponeHours:1,showPostpone:true}});
+ const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const close=app=>t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ // Opening after 2 AM begins today's pass and keeps yesterday's chain.
+ const local=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});close(local);
+ await local.ctx.cloudPull();await publish221(local);
+ assert.notEqual(local.ctx.state.passId,'yesterday-pass','precondition: the 2 AM reset began a new pass');
+ assert.deepEqual(h.remoteState().chain,['carried-a','carried-b','carried-c'],'precondition: with the chain carried over');
+ const saved=local.shim.localStorage.getItem(SYNC_STORE_KEY);
+ const peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved},cloudSyncFactory:h.factory});close(peer);
+ await peer.ctx.cloudPull();await syncSettle(20);
+ assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: the other device is in the same pass');
+ local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ return {local,peer,h,at};
+}
+function postponeBenchmark221(app,at){
+ setFakeTime(app.ctx,at);app.ctx.renderScan();
+ const id=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="bench-postpone" data-benchmark="([^"]+)"/)?.[1];
+ assert.ok(id,'the benchmark card offers Postpone');
+ app.ctx.onAction('bench-postpone',{dataset:{benchmark:id}});
+ return id;
+}
+function confirmedSync221(app,h,chain,label){
+ assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+ assert.equal(app.ctx.state.syncDirty,false,label+': confirmed only once the cloud acknowledged the board');
+ assert.equal(h.doc.payload,app.ctx.cloudPayload(),label+': the cloud holds exactly this board');
+ assert.deepEqual(h.remoteState().chain,chain,label+': the cloud chain');
+}
+async function receive221(app){
+ app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await syncSettle(20);
+ assert.equal(app.ctx.window.CloudSync.errorCode??null,null,'the receiving device takes the board without a hold');
+}
+
+test('RISK chain return sync: a return and a Postpone of a dot in a pass carried over the 2 AM reset reach the cloud and the other device, in either order',async t=>{
+ for(const order of ['return, then Postpone','Postpone, then return','return, Dot again, then Postpone'])await t.test(order,async t=>{
+  const {local,peer,h,at}=await carriedPassClients221(t);
+  // An answer first, as in a scan: the replay of the pass then starts from
+  // the chain as it was before the Postpone.
+  setFakeTime(local.ctx,at+50);local.ctx.onAction('no',{dataset:{candidate:'carried-d',benchmark:'carried-c'}});
+  assert.equal(local.ctx.state.considered['carried-d'],'no','precondition: the answer is recorded in this pass');
+  let expected;
+  if(order==='return, then Postpone'){
+   returnDotFromBoard221(local,'carried-b',at+100);
+   assert.equal(postponeBenchmark221(local,at+200),'carried-c');
+   expected=['carried-a'];
+  }else if(order==='Postpone, then return'){
+   assert.equal(postponeBenchmark221(local,at+100),'carried-c');
+   returnDotFromBoard221(local,'carried-a',at+200);
+   expected=['carried-b'];
+  }else{
+   returnDotFromBoard221(local,'carried-b',at+100);
+   await dotFromEditor221(local,'carried-b',at+200);
+   assert.deepEqual(Array.from(local.ctx.state.chain),['carried-a','carried-c','carried-b'],'precondition: a later Dot put the returned task back as the newest dot');
+   assert.equal(postponeBenchmark221(local,at+300),'carried-b');
+   expected=['carried-a','carried-c'];
+  }
+  assert.deepEqual(Array.from(local.ctx.state.chain),expected,'precondition: both changes are on this device');
+  await publish221(local);
+  confirmedSync221(local,h,expected,'the device that made both changes');
+  await receive221(peer);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'the other device shows the same chain');
+ });
+});
+
+test('RISK chain return sync: a Postpone of a dot on the other device after it received the return reaches the cloud and the returning device',async t=>{
+ const {local,peer,h,at}=await carriedPassClients221(t);
+ returnDotFromBoard221(local,'carried-b',at+100);await publish221(local);local.ctx.window.CloudSync.ready=false;
+ confirmedSync221(local,h,['carried-a','carried-c'],'the returning device');
+ await receive221(peer);peer.ctx.window.CloudSync.ready=false;
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['carried-a','carried-c'],'precondition: the other device received the return');
+ assert.equal(postponeBenchmark221(peer,at+200),'carried-c');
+ await publish221(peer);
+ confirmedSync221(peer,h,['carried-a'],'the postponing device');
+ await receive221(local);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['carried-a'],'the returning device receives the Postpone');
+});
+
+test('RISK chain return sync: once the postponement ends, the board with the return still syncs through an edit and the next answer, and the returned dot stays off',async t=>{
+ const {local,peer,h,at}=await carriedPassClients221(t);
+ returnDotFromBoard221(local,'carried-b',at+100);postponeBenchmark221(local,at+200);
+ await publish221(local);
+ confirmedSync221(local,h,['carried-a'],'before the postponement ends');
+ // Postpone for (hrs) is 1 here, so a minute past the hour the hold has ended.
+ const later=at+200+HOUR+60000;
+ assert.equal(await saveEditorChoice(local,'carried-a',later,{title:'Renamed once the postponement ended'}),true);
+ assert.equal(local.ctx.pool().some(task=>task.id==='carried-c'),true,'precondition: the postponed task is eligible again');
+ await publish221(local);
+ confirmedSync221(local,h,Array.from(local.ctx.state.chain),'after the postponement ends');
+ // The next answer rebuilds the chain from the pass's recorded decisions.
+ setFakeTime(local.ctx,later+100);local.ctx.renderScan();
+ const yes=local.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+ assert.ok(yes,'precondition: a candidate is showing');
+ local.ctx.onAction('yes',{dataset:{candidate:yes[1],benchmark:yes[2]}});
+ await publish221(local);
+ confirmedSync221(local,h,Array.from(local.ctx.state.chain),'after the next answer');
+ setFakeTime(peer.ctx,later+200);   // the other device reads it at the same time, after the hold ended
+ await receive221(peer);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),Array.from(local.ctx.state.chain),'the other device shows the same chain');
+ for(const [label,chain] of [['cloud',h.remoteState().chain],['this device',local.ctx.state.chain],['other device',peer.ctx.state.chain]])
+  assert.equal(chain.includes('carried-b'),false,label+': the returned dot stays off');
+});
+
+test('RISK chain return sync: a cloud board that still shows a returned dot with no later Yes or Dot is held, not adopted',async t=>{
+ const {local,h,at}=await carriedPassClients221(t);
+ returnDotFromBoard221(local,'carried-b',at+100);await publish221(local);
+ confirmedSync221(local,h,['carried-a','carried-c'],'precondition');
+ // Another writer puts the returned dot back on the cloud chain without a Yes or Dot.
+ const incoherent=h.remoteState();incoherent.chain=['carried-a','carried-b','carried-c'];h.writeBehindBack(incoherent);
+ const cloud=h.doc.payload;
+ await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(35);
+ assert.equal(local.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','the chain disagrees with the recorded return, so sync holds');
+ assert.deepEqual(Array.from(local.ctx.state.chain),['carried-a','carried-c'],'this device keeps the return');
+ assert.equal(h.doc.payload,cloud,'and writes nothing over the cloud copy');
+});

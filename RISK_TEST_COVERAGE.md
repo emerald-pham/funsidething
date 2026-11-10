@@ -1713,6 +1713,10 @@ its RISK test; the map follows.
 - RISK chain return compatibility: a client from before #221 cannot push a returned dot back and keeps the return intact through its own saves
 - RISK chain return compatibility: a board saved before #221 opens with the same chain and saved bytes, and its dots can be returned
 - RISK chain return sync: returning the only dot Start placed leaves an empty chain through a peer merge and reload, with no replacement dot
+- RISK chain return sync: a return and a Postpone of a dot in a pass carried over the 2 AM reset reach the cloud and the other device, in either order
+- RISK chain return sync: a Postpone of a dot on the other device after it received the return reaches the cloud and the returning device
+- RISK chain return sync: once the postponement ends, the board with the return still syncs through an edit and the next answer, and the returned dot stays off
+- RISK chain return sync: a cloud board that still shows a returned dot with no later Yes or Dot is held, not adopted
 
 ## tests/repository-process.test.js
 
