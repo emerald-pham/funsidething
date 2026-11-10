@@ -48,6 +48,8 @@ offline, CI, and live results separately.
 
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
 to an app, PWA shell, or enforcement file is refused while no file under `tests/` has uncommitted changes.
+A file in an agent worktree under `.claude/worktrees/` is judged by its path
+inside that checkout, against that worktree's own `tests/` (#2321).
 Treat the block as correct and go write the test — do not work around it.
 A root `tests.js` is not a test file: nothing runs it, the hook refuses writing
 it, and the CI gate rejects a diff that adds or changes one. Port such edits as

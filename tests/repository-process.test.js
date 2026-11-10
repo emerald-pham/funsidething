@@ -302,6 +302,34 @@ test('RISK test-first gate: the edit hook treats the test directory as the test 
  assert.equal(hook('index.html'),false,'a staged split test change also counts');
 });
 
+test('RISK test-first gate: the edit hook guards app edits inside an agent worktree',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-worktree-hook-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(cwd,...args)=>{const r=spawnSync('git',args,{cwd,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ fs.mkdirSync(path.join(root,'tests'));fs.mkdirSync(path.join(root,'scripts'));fs.writeFileSync(path.join(root,'index.html'),'<p>old</p>\n');
+ fs.writeFileSync(path.join(root,'tests/core.test.js'),"test('core: one',()=>{});\n");fs.writeFileSync(path.join(root,'scripts/tool.mjs'),'export const one=1;\n');
+ fs.mkdirSync(path.join(root,'.claude/hooks'),{recursive:true});fs.writeFileSync(path.join(root,'.claude/hooks/test-first-guard.sh'),'exit 0\n');
+ git(root,'init','-q');git(root,'config','user.email','hook@example.invalid');git(root,'config','user.name','Hook fixture');git(root,'add','.');git(root,'commit','-qm','base');
+ // The Agent tool creates implementer worktrees under .claude/worktrees/, which
+ // is where implement-spec subagents edit the app (#2321).
+ const worktree=path.join(root,'.claude/worktrees/agent-fixture');
+ git(root,'worktree','add','-q','-b','agent-fixture',worktree);
+ const hook=file=>{
+  const r=spawnSync('bash',[path.join(__dirname,'.claude/hooks/test-first-guard.sh')],{input:JSON.stringify({tool_input:{file_path:file}}),encoding:'utf8'});
+  assert.equal(r.status,0,r.stderr);return /"permissionDecision": "deny"/.test(r.stdout);
+ };
+ assert.equal(hook(path.join(worktree,'index.html')),true,'an app edit in an agent worktree with no test written is refused');
+ assert.equal(hook(path.join(worktree,'.claude/hooks/test-first-guard.sh')),true,'the hook itself stays guarded in a worktree');
+ assert.equal(hook(path.join(worktree,'tests/core.test.js')),false,'writing a test in a worktree is never refused');
+ assert.equal(hook(path.join(worktree,'scripts/tool.mjs')),false,'tooling stays exempt in a worktree as in the primary checkout');
+ assert.equal(hook(path.join(worktree,'.claude/hooks/helper.mjs')),false,"the worktree's own .claude files stay exempt");
+ assert.equal(hook(path.join(root,'.claude/hooks/helper.mjs')),false,"the primary checkout's .claude files stay exempt");
+ fs.appendFileSync(path.join(root,'tests/core.test.js'),"test('core: two',()=>{});\n");
+ assert.equal(hook(path.join(worktree,'index.html')),true,"a test written in the primary checkout does not unlock a worktree's app edit");
+ fs.appendFileSync(path.join(worktree,'tests/core.test.js'),"test('core: three',()=>{});\n");
+ assert.equal(hook(path.join(worktree,'index.html')),false,"an uncommitted test change in the worktree lets its app edit through");
+});
+
 test('RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test',async t=>{
  const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-root-tests-hook-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
