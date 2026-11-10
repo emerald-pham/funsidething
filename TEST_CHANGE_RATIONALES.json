@@ -22049,7 +22049,6 @@
       "RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit",
       "RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit",
       "RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit",
-      "RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit",
       "RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit",
       "RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works"
     ],
