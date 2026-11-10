@@ -10316,11 +10316,11 @@ test('RISK debug log link #2309: an installed offline shell opens the log from t
  assert.deepEqual(failures,[],'the held opening raises no page errors');
 });
 
-/* ---------- #221: a returned dot across devices ----------
-   Two app instances against the fake cloud, under a controlled clock. The
-   return is made the way a person makes it: the chain pill (or the benchmark
-   card's Edit) opens the editor and Return as candidate is pressed. Expected
-   chains are written from the spec, never read back from the projection. */
+// ---------- #221: a returned dot across devices ----------
+// Two app instances against the fake cloud, under a controlled clock. The
+// return is made the way a person makes it: the chain pill (or the benchmark
+// card's Edit) opens the editor and Return as candidate is pressed. Expected
+// chains are written from the spec, never read back from the projection.
 function returnDotFromBoard221(app,id,at){
  setFakeTime(app.ctx,at);app.ctx.renderScan();
  const scan=app.shim.document.getElementById('scan').innerHTML;

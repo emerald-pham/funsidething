@@ -12166,11 +12166,11 @@ test("UI: clicking the benchmark's Edit button opens the edit pane for that task
   assert.match(html, /value="Dotted task"/);
 });
 
-/* ---------- #221: a chain pill opens its task's editor ----------
-   The trail's pills used to scroll All Tasks to the row. They now open the
-   same editor as Edit on the benchmark card, where Return as candidate can
-   take that one dot back off the chain. Each test presses the pill a person
-   would see: the action and id are read from the rendered trail. */
+// ---------- #221: a chain pill opens its task's editor ----------
+// The trail's pills used to scroll All Tasks to the row. They now open the
+// same editor as Edit on the benchmark card, where Return as candidate can
+// take that one dot back off the chain. Each test presses the pill a person
+// would see: the action and id are read from the rendered trail.
 const chainPill = (scanHtml, title) => {
   const button = [...String(scanHtml).matchAll(/<button\b[^>]*class="crumb"[^>]*>([^<]*)<\/button>/g)].find(match => match[1] === title)?.[0];
   assert.ok(button, `expected a pill titled ${title} in: ${scanHtml}`);
