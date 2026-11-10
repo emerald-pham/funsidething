@@ -1464,6 +1464,9 @@ its RISK test; the map follows.
 - RISK device save settle: a second copy saving repeatedly but finitely during a save still settles with the work of every copy
 - RISK device save settle: a board that never stops changing still ends in a bounded refusal with no retry loop
 - RISK device save settle: an account change during the repair is still refused
+- RISK device save settle: a save that runs out of repairs says plainly what happened, what is protected and what to do next
+- RISK device save settle: a save that runs out of repairs keeps its stage, code and attempt count for support
+- RISK device save settle: the plain message stays until a later save verifiably succeeds, and the next change saves the kept edit
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
 - RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads
 - RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK
