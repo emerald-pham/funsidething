@@ -133,10 +133,10 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 #scan,[data-preview-id="scan"]{margin-bottom:16px}
 .crumbs{display:flex;align-items:center;gap:6px;margin:2px 2px 10px;font-size:12.5px;color:var(--mut)}
 .crumbs .lbl{font-weight:600}
-.crumbs .lbl,.crumbs .arrow{flex:none;white-space:nowrap}
+.crumbs .lbl,.crumbs .arrow{flex:0 1 auto;min-width:0;white-space:nowrap;padding-block:3px;overflow:hidden;text-overflow:ellipsis}
 /* A flex-basis instead of a content base shares the row by title length: a
    short title keeps its full width while long ones ellipsize. */
-.crumbs .crumb{flex:0 1 190px;max-width:max-content}
+.crumbs .crumb{flex:0 999 190px;max-width:max-content}
 .crumb{background:light-dark(#eceafd,#272247);color:var(--accent);border:1px solid light-dark(#ddd7fb,#3a3268);border-radius:99px;padding:2px 10px;max-width:190px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crumb:hover{background:light-dark(#e0dcfb,#322a58)}
 .crumbs .arrow{color:light-dark(#b9b3e8,#5f5796)}
@@ -11508,7 +11508,30 @@ function renderPass(){
 // A growing trail used to push the choices off the screen, so it shows the dots
 // that fit on one phone-width row and counts the rest. Earlier dots stay in the
 // markup, hidden, so every rendered trail still names the whole chain.
-const CHAIN_TRAIL_NEWEST_DOTS=2;
+const CHAIN_TRAIL_NEWEST_DOTS=2,CHAIN_TRAIL_MIN_TITLE_EM=5;
+const chainTrailLabel=(dots,earlier)=>earlier?{text:'+'+earlier+' earlier',title:dots+' dots in the chain; '+earlier+' earlier not shown'}:{text:'Chain · '+dots+' dots:',title:''};
+// One row has no second line to fall back on, so when enlarged text or a narrow
+// screen would crush a title the trail shows fewer dots and counts more of them
+// as earlier. Runs from a ResizeObserver, after layout and before paint.
+function fitChainTrail(row){
+  const dots=[...row.querySelectorAll('.crumb')],label=row.querySelector('.lbl'),title=document.createRange();
+  const show=count=>{
+    const earlier=dots.length-count,text=chainTrailLabel(dots.length+1,earlier);
+    dots.forEach((dot,i)=>{dot.hidden=i<earlier;dot.nextElementSibling.hidden=i<earlier&&i<dots.length-1;});
+    label.textContent=text.text;label.title=text.title;
+  };
+  const readable=dot=>{
+    // A Range gives the title's own width; WebKit's scrollWidth stops counting
+    // text that overflows only into the padding.
+    const style=getComputedStyle(dot),padding=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight);
+    title.selectNodeContents(dot);
+    return dot.clientWidth-padding+1>=Math.min(title.getBoundingClientRect().width,parseFloat(style.fontSize)*CHAIN_TRAIL_MIN_TITLE_EM);
+  };
+  for(let count=Math.min(dots.length,CHAIN_TRAIL_NEWEST_DOTS);count>=0;count--){
+    show(count);
+    if(!count||(row.scrollWidth<=row.clientWidth+1&&dots.slice(dots.length-count).every(readable)))break;
+  }
+}
 // Shared display helpers accept explicit boards and facts. They never write
 // storage, schedule work, focus, select sources or change authority.
 const boardPresentation=Object.freeze({
@@ -11521,7 +11544,7 @@ const boardPresentation=Object.freeze({
   tagFilters(view){return !view.tagOptions.length?'':'<span class="ltaglabel">Filter</span>'+view.tagOptions.map(o=>'<button type="button" class="ltag'+(o.key.startsWith('c:')?' task-context':'')+(view.tagFilter===o.key?' on':'')+'" data-act="list-tag" data-id="'+esc(o.key)+'" aria-pressed="'+(view.tagFilter===o.key?'true':'false')+'">'+esc(o.label)+'</button>').join('');},
   candidateShowing(board,hasPool,benchmark,candidate){return !(board.interventionActive&&benchmark)&&board.mode!=="work"&&hasPool&&!!candidate;},
   card(classes,title,chips=''){return '<div class="card '+classes+'"><span class="title">'+title+'</span><span class="chiprow">'+chips+'</span></div>';},
-  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),earlier=Math.max(0,behind.length-CHAIN_TRAIL_NEWEST_DOTS);let html='<div class="crumbs">'+(earlier?'<span class="lbl" title="'+tasks.length+' dots in the chain; '+earlier+' earlier not shown">+'+earlier+' earlier</span>':'<span class="lbl">Chain · '+tasks.length+' dots:</span>');behind.forEach((t,i)=>{if(i>earlier)html+='<span class="arrow">→</span>';html+='<button class="crumb" data-act="reveal" data-id="'+esc(t.id)+'"'+(i<earlier?' hidden':'')+' title="'+esc(t.title)+'">'+esc(t.title)+'</button>';});return html+'<span class="arrow">→</span><span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
+  chain(tasks){if(tasks.length<=1)return '';const behind=tasks.slice(0,-1).filter(Boolean),earlier=Math.max(0,behind.length-CHAIN_TRAIL_NEWEST_DOTS),label=chainTrailLabel(tasks.length,earlier);let html='<div class="crumbs"><span class="lbl"'+(label.title?' title="'+label.title+'"':'')+'>'+label.text+'</span>';behind.forEach((t,i)=>{html+='<button class="crumb" data-act="reveal" data-id="'+esc(t.id)+'"'+(i<earlier?' hidden':'')+' title="'+esc(t.title)+'">'+esc(t.title)+'</button><span class="arrow"'+(i<earlier&&i<behind.length-1?' hidden':'')+'>→</span>';});return html+'<span class="lbl" style="color:var(--accent)">this ↓</span></div>';},
   context(c,info,settings=false){return '<button type="button" class="ctxitem '+info.mode+'" data-act="'+(c?'cycle-context':'toggle-no-context')+'"'+(c?' data-id="'+esc(c.id)+'" data-ctx="'+esc(c.id)+'"':'')+' data-ctx-scope="'+(settings?'settings':'main')+'" data-filter-state="'+info.mode+'" aria-label="'+esc(info.label)+'" title="'+esc(info.label)+'">'+info.mark+(c&&settings?'':' '+esc(c?c.name:'No context'))+'</button>';},
   taskRow({task,rankColumns,dim=false,rankSummary='',inChain=false,nextDotted=false,titleAttrs='',url='',chips='',blockerTitles=[],skipLabel=''}){
     return '<div class="trow '+rankColumns+'" data-row="'+esc(task.id)+'" style="'+(dim?'opacity:.45':'')+'">'+rankSummary+'<div class="tmain">'
@@ -11889,6 +11912,7 @@ function renderScan(){
   }
   el.innerHTML = html;
   trackPinnedDecide(el);
+  trackChainTrail(el);
 }
 
 // Enlarged text or a Run WOOP button makes the pinned row taller, so the page
@@ -11907,6 +11931,17 @@ function trackPinnedDecide(scan){
   pinnedDecideObserver.disconnect();
   const row=scan.querySelector?.(".decide");
   if(row)pinnedDecideObserver.observe(row);
+}
+
+// The trail is refitted when its width or text size changes, so rotation or a
+// zoom change needs no new answer. A fit never changes the row's own size.
+let chainTrailObserver=null;
+function trackChainTrail(scan){
+  if(typeof ResizeObserver!=="function")return;
+  chainTrailObserver??=new ResizeObserver(entries=>{for(const entry of entries)fitChainTrail(entry.target);});
+  chainTrailObserver.disconnect();
+  const row=scan.querySelector?.(".crumbs");
+  if(row)chainTrailObserver.observe(row);
 }
 
 // Scroll padding covers most focus moves, but the browser ignores it for WebKit

@@ -21699,6 +21699,82 @@ test('RISK steady scanner browser: pinned choices stay readable and clear of con
  assert.deepEqual(failures,[]);
 });
 
+// One row has no second line to fall back on, so a pill must never shrink below
+// a readable title. These views are the ones where pills emptied to a clipped
+// letter and the row ran off the panel: enlarged text, and page zoom, which
+// appears to the page as a smaller screen. Five em is about eight characters.
+const STEADY_LONG_TITLE='Renew the passport before the trip gets any closer to the deadline';
+const steadyTrailBoard=({dots,title=()=>STEADY_LONG_TITLE})=>steadyScannerBoard({tasks:dots+4,taskOver:i=>({title:title(i)}),over:{chain:Array.from({length:dots},(_,i)=>'steady-'+i),candidateId:'steady-'+dots}});
+const steadyReadTrail=page=>page.evaluate(()=>{
+ const row=document.querySelector('.crumbs'),box=row.getBoundingClientRect(),font=parseFloat(getComputedStyle(row).fontSize);
+ const visible=[...row.children].filter(c=>!c.hidden),pen=document.createElement('canvas').getContext('2d');
+ const dots=visible.filter(c=>c.matches('[data-act="reveal"]')).map(dot=>{const style=getComputedStyle(dot);pen.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;return {id:dot.dataset.id,room:dot.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),natural:pen.measureText(dot.textContent).width};});
+ const tops=visible.map(c=>{const r=c.getBoundingClientRect();return r.top+r.height/2;});
+ return {chain:[...state.chain],everyDot:[...row.querySelectorAll('[data-act="reveal"]')].map(d=>d.dataset.id),dots,font,text:row.innerText,
+  spread:Math.max(...tops)-Math.min(...tops),height:box.height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),
+  overflow:row.scrollWidth-row.clientWidth,furthest:Math.max(...visible.map(c=>c.getBoundingClientRect().right))-box.right,past:box.right-document.querySelector('.card.bench').getBoundingClientRect().right,
+  page:document.documentElement.scrollWidth-innerWidth};
+});
+function steadyAssertTrail(t,label){
+ const behind=t.chain.slice(0,-1),hidden=behind.length-t.dots.length;
+ assert.deepEqual(t.everyDot,behind,`${label}: every dot stays named in the trail`);
+ assert.deepEqual(t.dots.map(d=>d.id),behind.slice(hidden),`${label}: the dots shown are the newest ones`);
+ assert.ok(t.spread<=8&&t.height<=t.tallest+2,`${label}: one row: spread ${Math.round(t.spread)}, ${Math.round(t.height)} px tall`);
+ assert.ok(t.overflow<=1&&t.furthest<=1,`${label}: nothing runs past the trail's box: overflow ${t.overflow}, furthest ${t.furthest.toFixed(1)}`);
+ assert.ok(t.past<=1,`${label}: the trail stays inside the panel: ${t.past.toFixed(1)} past it`);
+ assert.ok(t.page<=0,`${label}: no sideways page scroll: ${t.page}`);
+ for(const dot of t.dots){const need=Math.min(dot.natural,t.font*5);assert.ok(dot.room+1>=need,`${label}: a shown dot has room for its title: ${dot.room.toFixed(1)} px, needs ${need.toFixed(1)}`);}
+ if(hidden>0)assert.match(t.text,new RegExp(`\\+${hidden} earlier`),`${label}: counts the ${hidden} earlier dots: ${t.text}`);
+ else{assert.doesNotMatch(t.text,/earlier/,`${label}: no count when nothing is hidden: ${t.text}`);assert.match(t.text,new RegExp(`${t.chain.length} dots`),`${label}: names the chain length: ${t.text}`);}
+}
+test('RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const view of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone enlarged',width:320,height:568,enlarged:true},
+    {name:'phone at 150%',width:260,height:563},
+    {name:'small phone at 150%',width:213,height:379},
+    {name:'phone at 200%',width:195,height:422},
+    {name:'short landscape enlarged',width:844,height:390,enlarged:true},
+    {name:'desktop',width:1280,height:800},
+   ])for(const trail of [
+    {name:'two dots',dots:2},
+    {name:'three dots',dots:3},
+    {name:'nine dots',dots:9},
+    {name:'short titles',dots:3,title:i=>['Do','Go'][i%2]},
+   ]){
+    const label=`${engineName} ${view.name} ${trail.name}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard(trail),{...view,touch:false});
+    try{
+     await page.waitForSelector('.crumbs',{timeout:15000});
+     if(view.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     await page.waitForTimeout(80);
+     steadyAssertTrail(await steadyReadTrail(page),label);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n').slice(0,8).join(' '));}finally{await context.close();}
+   }
+   // A rotated phone or a zoom change resizes the live trail without a new answer.
+   const label=`${engineName} resized`;
+   const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard({dots:3}),{width:1280,height:800,touch:false});
+   try{
+    await page.waitForSelector('.crumbs',{timeout:15000});await page.waitForTimeout(80);
+    assert.equal((await steadyReadTrail(page)).dots.length,2,`${label}: desktop has room for both dots`);
+    await page.setViewportSize({width:195,height:422});await page.waitForTimeout(120);
+    const narrow=await steadyReadTrail(page);steadyAssertTrail(narrow,`${label} to narrow`);
+    assert.ok(narrow.dots.length<2,`${label}: the narrow trail drops a dot rather than crushing both`);
+    await page.setViewportSize({width:1280,height:800});await page.waitForTimeout(120);
+    const wide=await steadyReadTrail(page);steadyAssertTrail(wide,`${label} back to wide`);
+    assert.equal(wide.dots.length,2,`${label}: the dots come back with the room`);
+    assert.deepEqual(errors,[],`${label}: no page errors`);
+   }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 // A fixed row sits over the page without the browser knowing, so a control under
 // it counted as already on screen: Tab stopped there and the focus ring was
 // invisible. Real key presses are the only way to observe the browser's choice.
