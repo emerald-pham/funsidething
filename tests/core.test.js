@@ -26207,6 +26207,64 @@ test('RISK RESET SAFETY: quota compaction makes room for the mandatory copy with
  for(const row of retained)assert.equal(rows.find(saved=>saved.id===row.id)?.payload,row.payload,'retained recovery stays exact: '+row.id);
 });
 
+// #2311: Undo frames no longer hold whole serialized boards, so this drives a
+// long scan through the real actions and checks each answer stays exactly once,
+// each of the 30 Undo steps reverses its own action, and the frame text still
+// reads back byte-for-byte for recovery. Expected values are recorded from the
+// board before each action, independent of how a frame stores it.
+test('RISK long scan Undo: every answer is kept exactly once through reload, each of 30 Undo steps reverses its own action, and frame text stays byte-exact',async()=>{
+ const start=Date.parse('2026-06-01T12:00:00Z');let now=start;
+ const seeded=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:80},(_,i)=>({...syncTask('long-scan-'+i,'Zoë ✓ 𝒳 task '+i),ctx:['home'],createdAt:start-(80-i)*3600000}))});
+ const app=await loadApp({seed:2311,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}}),{ctx}=app;
+ await ctx.__dataReady;
+ const at=()=>{now+=60000;setFakeTime(ctx,now);};at();
+ const facts=()=>JSON.stringify({chain:ctx.state.chain,considered:ctx.state.considered,ratings:ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])});
+ ctx.onAction('start-scan',{});
+ const history=[];let answers=0;
+ for(let guard=0;answers<40&&guard<120;guard++){
+  at();
+  const benchmark=ctx.state.chain.at(-1);
+  const before=facts(),depth=vm.runInContext('undoStack.length',ctx);
+  if(ctx.state.interventionActive){ctx.onAction('continue-scan',{dataset:{benchmark}});}
+  else{
+   assert.ok(ctx.state.candidateId,'the scan offers a candidate at answer '+answers);
+   ctx.onAction(ctx.state.chain.length%5?'no':'yes',{dataset:{candidate:ctx.state.candidateId,benchmark}});
+   answers++;
+  }
+  if(vm.runInContext('undoStack.length',ctx)!==depth||depth===30)history.push(before);
+ }
+ assert.equal(answers,40,'the scan takes 40 answers');
+ assert.equal(vm.runInContext('undoStack.length',ctx),30,'Undo keeps its 30-step limit');
+ assert.equal(await ctx.persist(),true);
+ const answersOnBoard=ctx.state.decisionEvents.filter(event=>event.kind==='no'||event.kind==='comparison');
+ const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
+ await reload.ctx.__dataReady;
+ const reloadedIds=reload.ctx.state.decisionEvents.map(event=>event.id);
+ assert.equal(new Set(reloadedIds).size,reloadedIds.length,'no decision is duplicated through reload');
+ for(const event of answersOnBoard)assert.equal(reload.ctx.state.decisionEvents.filter(row=>row.id===event.id).length,1,'each answer is kept exactly once through reload');
+ await reload.dispose();
+ for(let step=1;step<=30;step++){
+  at();
+  assert.ok(await ctx.onAction('undo',{}),'Undo step '+step+' is available');
+  assert.equal(facts(),history[history.length-step],'Undo step '+step+' restores the board before its own action');
+ }
+ assert.equal(vm.runInContext('undoStack.length',ctx),0,'30 steps used the whole stack');
+ assert.equal(await ctx.onAction('undo',{}),false,'a 31st Undo step is unavailable');
+ // A frame reads back exactly as JSON.stringify would write the board, for
+ // every value JSON treats specially, because recovery saves that text.
+ ctx.state.undoOddValues={absent:undefined,nan:NaN,text:'line\n"quote" ✓ 𝒳'};
+ ctx.state.undoOddRows=[1,undefined,()=>0,NaN,,'✓'];
+ ctx.state.undoOmitted=undefined;
+ vm.runInContext('pushUndo()',ctx);
+ assert.equal(String(vm.runInContext('undoStack.at(-1).snapshot',ctx)),JSON.stringify(ctx.state),'a frame reads back byte-for-byte');
+ ctx.state.tasks[0].title='Changed after the frame';
+ vm.runInContext('sealUndoFrame()',ctx);
+ assert.equal(String(vm.runInContext('undoStack.at(-1).after',ctx)),JSON.stringify(ctx.state),'the sealed side of a frame reads back byte-for-byte');
+ assert.notEqual(String(vm.runInContext('undoStack.at(-1).snapshot',ctx)),String(vm.runInContext('undoStack.at(-1).after',ctx)),'a frame keeps both sides apart');
+ await app.dispose();
+});
+
 test('RISK RESET SAFETY: failed primary reset preserves Undo and never restores an old account after switching',async()=>{
  const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
  ctx.addTask('Old account board');ctx.state.syncAccount='old@example.test';assert.equal(await ctx.persist(),true);
@@ -38306,6 +38364,141 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/supportDiagnosticsData/,'the report is viewable and selectable even when clipboard access is unavailable');
 });
 
+const sharedDebugLogStorage2309=()=>{const values=new Map();return {getItem:key=>values.has(key)?values.get(key):null,setItem(key,value){values.set(key,String(value));},removeItem(key){values.delete(key);},key:i=>[...values.keys()][i]??null,get length(){return values.size;}};};
+// #2309: a real device store holding saved backups, for opening through the
+// Debug log link. The counts come from the store's own listing, not the report.
+async function debugLogLinkDevice2309(){
+ const {IDBFactory}=await import('fake-indexeddb');
+ const indexedDBProvider=new IDBFactory(),deviceDbName='debug-log-link-'+Math.random();
+ const storage=sharedDebugLogStorage2309();
+ const seed=await loadApp({indexedDBProvider,deviceDbName,sharedStorage:storage});
+ seed.shim.document.getElementById('addInput').value='PRIVATE debug log link task 2309';
+ seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true,'the seeded board is durable');
+ const store=seed.ctx.window.ScannerDeviceStore,head=await store.readHead();
+ for(let i=0;i<5;i++)assert.equal((await store.putBackup({expectedHash:head.hash,
+  backup:{id:'link-backup-'+i,kind:'manual',at:i+1,day:'2026-11-0'+(i+1),payload:JSON.stringify({...JSON.parse(head.payload),padding:'PRIVATE backup text '+'x'.repeat(4096+i)})}})).ok,true);
+ const rows=await store.listBackups();
+ await seed.dispose();
+ return {indexedDBProvider,deviceDbName,storage,expectedBackups:rows.length,expectedCharacters:rows.reduce((sum,row)=>sum+row.payload.length,0)};
+}
+const debugLogLinkSnapshotReads2309=async t=>{
+ const {IDBObjectStore}=await import('fake-indexeddb'),reads=[];
+ for(const method of ['get','getAll','openCursor']){
+  const original=IDBObjectStore.prototype[method];
+  IDBObjectStore.prototype[method]=function(...args){if(this.name==='snapshots')reads.push(method);return original.apply(this,args);};
+  t.after(()=>{IDBObjectStore.prototype[method]=original;});
+ }
+ return reads;
+};
+const debugLogLinkReport2309=async app=>{
+ let report=app.ctx.buildSupportDiagnosticsReport();
+ for(let i=0;i<500&&report.savedData?.backups?.count?.status!=='observed';i++){await flush();report=app.ctx.buildSupportDiagnosticsReport();}
+ return report;
+};
+
+test('RISK debug log link #2309: the link opens the read-only log at opening without Settings or reading any backup text',async t=>{
+ const device=await debugLogLinkDevice2309(),reads=await debugLogLinkSnapshotReads2309(t);
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+ const report=await debugLogLinkReport2309(app),modal=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Debug log<\/h2>/,'the link shows the Debug log');
+ assert.match(modal,/readonly aria-label="Debug log"/,'the log stays selectable and read-only');
+ assert.doesNotMatch(modal,/<h2>Settings<\/h2>/,'the link does not go through Settings');
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups,'the live backup count comes from the rows');
+ assert.deepEqual(reads,[],'no saved board or backup text is read to open the log');
+});
+
+test('RISK debug log link #2309: the report gains backup and Undo counts and sizes, and never their contents',async t=>{
+ const device=await debugLogLinkDevice2309();
+ // The ordinary opening holds every backup anyway, so it can note their size
+ // for a later opening that must not read them.
+ const normal=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage});t.after(()=>normal.dispose());
+ for(const title of ['PRIVATE undo one 2309','PRIVATE undo two 2309','PRIVATE undo three 2309']){normal.shim.document.getElementById('addInput').value=title;normal.ctx.onAction('add',{});}
+ const rebuilt=vm.runInContext('(()=>{const seen={count:0},original=UndoBoardCopy.prototype.toString;UndoBoardCopy.prototype.toString=function(){seen.count++;return original.call(this);};return seen;})()',normal.ctx);
+ const boardChars=JSON.stringify(normal.ctx.state).length,running=normal.ctx.buildSupportDiagnosticsReport().savedData;
+ assert.equal(rebuilt.count,0,'measuring Undo never rebuilds a whole board');
+ assert.equal(running.backups.count.value,device.expectedBackups,'a running app reports its held backup rows');
+ assert.equal(running.backups.totalCharacters.value,device.expectedCharacters,'a running app reports their held text size');
+ assert.equal(running.undo.frames.value,3,'three additions hold three Undo frames');
+ assert.ok(running.undo.characters.value>boardChars/2,'Undo size counts what the frames hold');
+ assert.ok(running.undo.characters.value<3*boardChars,'text shared between frames is counted once');
+ assert.doesNotMatch(normal.ctx.supportDiagnosticsText(),/PRIVATE/,'no task text in the running report');
+ await normal.dispose();
+ const linked=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>linked.dispose());
+ const report=await debugLogLinkReport2309(linked);
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups);
+ assert.equal(report.savedData.backups.totalCharacters.status,'observed');
+ assert.equal(report.savedData.backups.totalCharacters.value,device.expectedCharacters,'the size noted by the ordinary opening is reported without reading the text');
+ assert.equal(report.savedData.undo.frames.value,0,'an opening behind the link holds no Undo frames');
+ assert.equal(report.savedData.undo.characters.value,0);
+ const text=linked.ctx.supportDiagnosticsText();
+ assert.doesNotMatch(text,/PRIVATE|link-backup-/,'no task text, backup text or recovery-source identifiers in the report');
+ assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the report stays within its budget');
+ assert.match(linked.shim.document.getElementById('supportDiagnosticsData').value,/"totalCharacters"/,'the visible log carries the counts once they arrive');
+});
+
+test('RISK debug log link #2309: leaving the log returns to the ordinary board, and selecting the log still works',async t=>{
+ const device=await debugLogLinkDevice2309();
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false,navigatorProvider:{clipboard:{async writeText(){}}}});t.after(()=>app.dispose());
+ await debugLogLinkReport2309(app);
+ assert.equal(app.ctx.state,null,'the board stays unloaded while the log is open');
+ assert.equal(await app.ctx.onAction('copy-support-diagnostics',{}),true,'the log can be copied from this view');
+ assert.equal(await app.ctx.onAction('select-support-diagnostics',{}),true,'the log can be selected from this view');
+ assert.equal(app.ctx.state,null,'copying does not start the board');
+ let replacedUrl=null;app.shim.window.history={replaceState(_state,_title,url){replacedUrl=url;app.shim.window.location=new URL(url,app.shim.window.location.href);}};
+ await app.ctx.onAction('close-modal',{});
+ const deadline=Date.now()+5000;while(app.ctx.state===null&&Date.now()<deadline)await flush();
+ assert.notEqual(app.ctx.state,null,'leaving the log continues the ordinary opening');
+ assert.ok(app.ctx.state.tasks.some(task=>task.title==='PRIVATE debug log link task 2309'),'the ordinary saved board opens');
+ assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'the log closes');
+ assert.equal(replacedUrl,'/','the link is removed so a reload opens normally');
+ assert.equal(app.shim.window.location.hash,'');
+});
+
+test('RISK debug log link #2309: an ordinary opening, or another fragment, loads the board and shows no log',async t=>{
+ for(const locationHref of [undefined,'https://scanner.example/#other']){
+  const device=await debugLogLinkDevice2309();
+  const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref});t.after(()=>app.dispose());
+  assert.ok(app.ctx.state.tasks.some(task=>task.title==='PRIVATE debug log link task 2309'));
+  assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'an ordinary opening is unchanged');
+ }
+});
+
+test('RISK debug log link #2309: the link is safe with no prior state and when device storage cannot open',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const brokenIDB={open(){throw Object.assign(Error('PRIVATE broken device store'),{name:'UnknownError'});}};
+ for(const [label,options,count] of [['empty device',{indexedDBProvider:new IDBFactory(),deviceDbName:'debug-log-link-empty-'+Math.random()},{value:0,status:'observed'}],
+  ['no IndexedDB',{},{value:null,status:'unobserved'}],
+  ['broken IndexedDB',{indexedDBProvider:brokenIDB,deviceDbName:'debug-log-link-broken'},{value:null,status:'unavailable'}]]){
+  const app=await loadApp({...options,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+  for(let i=0;i<500&&app.ctx.buildSupportDiagnosticsReport().savedData.backups.count.status==='unobserved'&&count.status!=='unobserved';i++)await flush();
+  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,label+': the log opens');
+  const {count:reported,totalCharacters}=app.ctx.buildSupportDiagnosticsReport().savedData.backups;
+  assert.equal(reported.value,count.value,label+': backup count');assert.equal(reported.status,count.status,label+': backup count status');
+  assert.equal(totalCharacters.status,'unobserved',label+': no invented size');
+  assert.doesNotMatch(app.ctx.supportDiagnosticsText(),/PRIVATE/,label+': failure text stays out');
+  await app.ctx.onAction('close-modal',{});
+  const deadline=Date.now()+5000;while(app.ctx.state===null&&Date.now()<deadline)await flush();
+  assert.notEqual(app.ctx.state,null,label+': the ordinary opening continues');
+ }
+});
+
+test('RISK debug log link #2309: inside a running app the Help link opens the log without Settings, and can be used again',async t=>{
+ const device=await debugLogLinkDevice2309();
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/'});t.after(()=>app.dispose());
+ const {ctx,shim}=app,before=JSON.stringify(ctx.state);
+ ctx.onAction('help',{});
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<a href="#debug-log">/,'Help offers the link inside the installed window');
+ let replacedUrl=null;shim.window.history={replaceState(_state,_title,url){replacedUrl=url;shim.window.location=new URL(url,shim.window.location.href);}};
+ shim.window.location=new URL('https://scanner.example/#debug-log');shim.window.dispatchEvent({type:'hashchange'});
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Debug log<\/h2>/,'following the link shows the log');
+ assert.doesNotMatch(modal,/<h2>Settings<\/h2>/,'without Settings');
+ assert.equal(replacedUrl,'/','the fragment clears so the same link can open it again');
+ await ctx.onAction('close-modal',{});
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/);
+ assert.equal(JSON.stringify(ctx.state),before,'opening and leaving the log changes no board data');
+});
+
 test('RISK support diagnostics: real device retries count attempts while unexplained churn remains refused',async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostics-retry-'+Math.random()}),{ctx}=app,store=ctx.window.ScannerDeviceStore;
@@ -38860,6 +39053,24 @@ test('RISK numeric responsiveness: optimized sampling and cold display preserve 
  const cases=[[],[{id:'sole',mu:NaN,sigma:0}],[{id:'a',mu:-1e5,sigma:-1},{id:'b',mu:1e5,sigma:1e5},{id:'c',mu:25,sigma:8}],[{id:'same',mu:1,sigma:3},{id:'same',mu:2,sigma:4},{id:'other',mu:3,sigma:5}]];
  for(const tasks of cases){vm.runInContext('chanceDisplayWeightCache=null',ctx);const actual=ctx.chanceDisplayWeights(tasks),expected=new Map(tasks.map(task=>[task.id,ctx.chanceWeight(task,tasks)]));for(const [id,weight] of expected)assert.equal(actual.get(id),weight,'cold normalized weights preserve ID exclusion, bounds and tails exactly');}
  const tasks=[{id:'a',mu:25,sigma:8},{id:'b',mu:26,sigma:7}];ctx.chanceWeight=task=>task.id==='a'?.25:.75;assert.deepEqual([...ctx.chanceDisplayWeights(tasks)].map(([id,weight])=>[id,weight]),[['a',.25],['b',.75]],'a replacement calculator retains its existing fallback');
+});
+
+// #2313: a rank refresh overwrites the previous refresh's arrays. Whatever those
+// arrays held, the result is the one a refresh with new arrays would return, and
+// a refresh of a different size cannot reuse them.
+test('RISK numeric responsiveness: a rank refresh reusing the previous refresh arrays returns exactly what new arrays would',async t=>{
+ const app=await loadApp({seed:2313});t.after(()=>app.dispose());const {ctx}=app;
+ const draw=(items,reuse)=>{
+  vm.runInContext('globalThis.refreshDraws=0;globalThis.refreshSequence=[.125,.625,.25,.875,.375,.75];Math.random=function(){return refreshSequence[refreshDraws++%refreshSequence.length];};_spare=null',ctx);
+  return ctx.rankStats(items,7,reuse);
+ };
+ const view=stats=>[...stats].map(([id,row])=>({id,hist:[...row.hist],cdf:[...row.cdf],topK:row.topK,n:row.n}));
+ const items=Array.from({length:5},(_,i)=>({id:'refresh-'+i,mu:25+i*2,sigma:3+i}));
+ const earlier=draw(items.map((item,i)=>({...item,mu:40-i*7,sigma:1+i})));
+ assert.notDeepEqual(view(earlier),view(draw(items)),'the earlier refresh left different values in its arrays');
+ assert.deepEqual(view(draw(items,earlier)),view(draw(items)),'reused arrays hold exactly the new refresh');
+ const fewer=items.slice(0,4);
+ assert.deepEqual(view(draw(fewer,draw(items))),view(draw(fewer)),'a different task count gets arrays of its own size');
 });
 
 test('RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements',async t=>{
