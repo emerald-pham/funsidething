@@ -470,12 +470,13 @@
     // through a first listing. Rows of {textKinds} keep their verified text,
     // as listBackups returns them, for the few callers that must inspect it
     // synchronously. Exact text always comes from the snapshot (readBackups).
-    async function listBackupFacts({describe=null,textKinds=[],facts=new Map(),onFactsChanged=null,deferUnknown=false}={}){
+    async function listBackupFacts({describe=null,textKinds=[],facts=new Map(),onFactsChanged=null,measureLimit=Infinity}={}){
       ensureOpen();
       const tx=await beginTransaction(["backups","snapshots","opaque"],"readonly"),done=transactionDone(tx),backupStore=tx.objectStore("backups");
       const [rows,keys,snapshotKeys,opaqueKeys]=await Promise.all([requestResult(backupStore.getAll()),requestResult(backupStore.getAllKeys()),requestResult(tx.objectStore("snapshots").getAllKeys()),requestResult(tx.objectStore("opaque").getAllKeys())]);
       await done;
       const presentSnapshots=new Set(snapshotKeys),keepText=new Set(textKinds),result=[],current=new Set();
+      let measured=0;
       const factsChanged=()=>{try{onFactsChanged?.();}catch{}};
       let protectedRaw=null;
       const isProtected=async(...args)=>(protectedRaw??=await protectedRawReaderFromOriginals(opaqueKeys))(...args);
@@ -489,10 +490,10 @@
           throw new Error("Durable recovery row is corrupt or unprotected");
         }
         const hash=row.payloadHash;current.add(hash);
-        // An opening needs only each row's identity. A board not measured yet
-        // is listed as pending; the caller lists again later to measure it.
+        // An opening needs only each row's identity. Past {measureLimit}, a board
+        // not measured yet is listed as pending, for the caller to measure later.
         const unmeasured=!facts.has(hash)||facts.get(hash).facts?.incomplete===true&&row.kind!=="latest";
-        if(deferUnknown&&unmeasured&&!scanned&&!keepText.has(row.kind)){result.push(backupRowFacts(row,hash,{chars:null,facts:{readable:true,pending:true}}));continue;}
+        if(unmeasured&&!scanned&&!keepText.has(row.kind)&&measured++>=measureLimit){result.push(backupRowFacts(row,hash,{chars:null,facts:{readable:true,pending:true}}));continue;}
         let payload;
         if(scanned){
           if(!scanned.has(row.id))continue;

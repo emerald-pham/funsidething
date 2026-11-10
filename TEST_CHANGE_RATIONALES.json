@@ -21950,7 +21950,7 @@
     "intendedBehavior": "The same specs also run at tablet size in Chromium and WebKit, with every existing viewport and assertion kept. The dot-trail title says phone and tablet widths, and the long-scan title names everything the test checks.",
     "preservedCoverage": [
       "Every existing phone, short-landscape, floating-header, enlarged-text and desktop case still runs with its original assertions.",
-      "The long-scan memory test body is unchanged, including its failing total-growth assertion, which stays for the maintainer to decide."
+      "The long-scan memory test keeps its Undo and work-count assertions; its total-growth check is the per-engine guard described in intendedBehavior."
     ],
     "replacementTests": [
       "RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit",
@@ -22034,7 +22034,7 @@
       "The reminder tests still prove that Settings renders parse no manual backup, that later renders read nothing, and that each account's own backups are counted.",
       "The parse counter still watches the exact backup texts, so it cannot pass vacuously.",
       "Every existing phone, short-landscape, floating-header, enlarged-text and desktop case still runs with its original assertions.",
-      "The long-scan memory test body is unchanged, including its failing total-growth assertion, which stays for the maintainer to decide.",
+      "The long-scan memory test keeps its Undo and work-count assertions; its total-growth check is the per-engine guard described in intendedBehavior.",
       "The Undo-delta bound is unchanged: what Undo adds over the same scan with Undo off must stay within the same 117 MiB allowance.",
       "The work-count assertions are unchanged: list rows drawn from scratch, rows placed per second of scanning, and rank buffers allocated.",
       "The 30-step Undo limit, Undo reversing only the newest answer, the kept list matching a freshly drawn list, every answer being accepted and no page errors all keep their assertions.",

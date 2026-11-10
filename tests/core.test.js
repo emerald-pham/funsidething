@@ -21584,7 +21584,7 @@ async function steadyScannerStart(page){
 // The answer that was tapped has to be the one that took effect, so the page
 // is asked for a new candidate (or the honest paused notice) each time.
 async function steadyScannerAnswer(page,point,prior){
- await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+ await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
  await page.touchscreen.tap(point.x,point.y);
  await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,prior,{timeout:10000});
 }
@@ -21752,6 +21752,68 @@ test('RISK steady scanner browser: a double tap or a repeated key answers only t
  assert.deepEqual(failures,[]);
 });
 
+// presentedAt syncs, so it can be ahead of this device's clock.
+test('RISK steady scanner browser: Yes No and Cant answer a saved candidate whose presentation time is 45 seconds ahead of this device in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const board=steadyScannerBoard({tasks:12,over:{chain:['steady-0','steady-1'],candidateId:'steady-2',presentedAt:Date.now()+45000}});
+  const {page,context}=await steadyScannerPage(browser,board,{width:390,height:844,touch:true});
+  try{
+   await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(500);
+   const now=await steadyScannerControls(page),at=steadyScannerCenter(now.no);
+   await page.touchscreen.tap(at.x,at.y);
+   await page.waitForFunction(prior=>state.candidateId!==prior,now.candidate,{timeout:3000}).catch(()=>{throw new Error('a real tap did nothing');});
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK steady scanner browser: a double tap on Postpone or Done acts once and leaves the next task alone in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const act of ['postpone','cand-done','bench-done']){
+    const label=`${engineName} ${act}`;
+    const board=steadyScannerBoard({tasks:12,showPostpone:true,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch:true});
+    try{
+     const selector=act==='postpone'?'.decide [data-act="postpone"]':`[data-act="${act}"]`;
+     await page.waitForSelector(selector,{timeout:15000});await page.waitForTimeout(500);
+     const before=await page.evaluate(()=>undoStack.length),box=await page.locator(selector).first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+     await page.touchscreen.tap(x,y);await page.waitForTimeout(60);await page.touchscreen.tap(x,y);
+     await page.waitForTimeout(450);
+     assert.equal(await page.evaluate(()=>undoStack.length),before+1,`${label}: the double tap took one action`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// Focus lands on mousedown, so a correction that scrolls then would move the
+// control away before mouseup and lose the click.
+test('RISK steady scanner browser: a mouse press on a control partly under the pinned row still clicks it in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const {page,context}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:1000,height:700,touch:false});
+  try{
+   await page.waitForSelector('.siderail [data-act="edit"]',{timeout:15000});await page.waitForTimeout(200);
+   const rects=()=>page.evaluate(()=>{const e=document.querySelector('.siderail [data-act="edit"]').getBoundingClientRect();return {left:e.left,width:e.width,top:e.top,bottom:e.bottom,rowTop:document.querySelector('.decide').getBoundingClientRect().top,y:scrollY};});
+   const start=await rects();
+   await page.evaluate(by=>scrollBy(0,by),start.top-(start.rowTop-13));await page.waitForTimeout(60);
+   const placed=await rects();
+   assert.ok(placed.top<placed.rowTop&&placed.bottom>placed.rowTop,`${engineName}: positive control: the control straddles the row: ${Math.round(placed.top)}-${Math.round(placed.bottom)}, row ${Math.round(placed.rowTop)}`);
+   await page.mouse.move(placed.left+placed.width/2,placed.top+6);await page.mouse.down();await page.waitForTimeout(90);await page.mouse.up();
+   await page.waitForFunction(()=>!!document.querySelector('#modalRoot [data-act="save-edit"],#modalRoot .frow'),null,{timeout:2000}).catch(()=>{throw new Error('Edit did not open');});
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 // A short page can leave the task being decided on entirely under the pinned row.
 test('RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const failures=[];
@@ -21766,14 +21828,14 @@ test('RISK steady scanner browser: an answer reveals a next title the pinned row
      await page.waitForSelector('[data-act="yes"]',{timeout:15000});await page.waitForTimeout(200);
      const read=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect(),yes=document.querySelector('[data-act="yes"]').getBoundingClientRect();return {titleTop:t.top,titleBottom:t.bottom,rowTop:row.top,y:scrollY,yesTop:yes.top,candidate:state.candidateId};});
      const opened=await read();
-     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      await page.keyboard.press('n');
      await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await page.waitForTimeout(60);
      const shown=await read();
      assert.ok(shown.titleBottom<=shown.rowTop&&shown.titleTop>=0,`${label}: the next title is clear of the pinned row: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}, scrolled ${Math.round(shown.y)}`);
      let previous=shown;
      for(let answer=0;answer<3;answer++){
-      await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
       await page.keyboard.press('n');
       await page.waitForFunction(prior=>state.candidateId!==prior,previous.candidate,{timeout:5000});await page.waitForTimeout(60);
       const now=await read();
@@ -21958,14 +22020,14 @@ test('RISK steady scanner browser: Undo and a context change leave the page wher
      await page.evaluate(()=>scrollTo(0,0));await settle();
      const opened=await title();
      assert.ok(opened.bottom>opened.rowTop,`${label}: positive control: the title starts covered: ends ${Math.round(opened.bottom)}, row ${Math.round(opened.rowTop)}`);
-     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      await page.keyboard.press('n');
      await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await settle();
      const answered=await title();
      assert.ok(answered.bottom<=answered.rowTop,`${label}: the answer reveals the next title: ends ${Math.round(answered.bottom)}, row ${Math.round(answered.rowTop)}`);
      // Undo, pressed from the header at the top of the page, stays under the finger.
      await page.evaluate(()=>scrollTo(0,0));await settle();
-     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      const beforeUndo=await title();
      await clickOn('[data-act="undo"]');
      await page.waitForFunction(prior=>state.candidateId!==prior,beforeUndo.candidate,{timeout:5000});await settle();await page.waitForTimeout(60);
@@ -22050,7 +22112,7 @@ test('RISK steady scanner browser: the pinned row exists only while a candidate 
     }
     for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
      const before=await steadyScannerControls(page);if(before.intervention)break;
-     await page.waitForFunction(()=>Date.now()-state.presentedAt>300,null,{timeout:5000});
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
      await page.touchscreen.tap(steadyScannerCenter(before.no).x,steadyScannerCenter(before.no).y);
      await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
     }
@@ -25055,7 +25117,7 @@ test('RISK PWA updates: a scanner gesture commits durably without an automatic s
  shim.document.dispatchEvent({type:'pointerdown'});await handlers.controllerchange();
  assert.equal(reloads.length,0,'a ready worker cannot replace the page between pointerdown and the scanner click');
  const noButton={dataset:{act:'no'},disabled:false};
- ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
+ await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'finishing a response does not end the active session');
@@ -25084,7 +25146,7 @@ test('RISK PWA updates: a gesture beginning during an update save preserves the 
  assert.equal(reloads.length,0,'a gesture that begins before save resolution still blocks page replacement');
  const noButton={dataset:{act:'no'},disabled:false};
  shim.document.dispatchEvent({type:'pointerup'});
- ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
+ await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'the downloaded update keeps the used document open after the real scanner click');
@@ -31997,7 +32059,7 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   const {ctx,shim}=await loadApp({seed:618});const bench=ctx.addTask('Synthetic benchmark'),candidate=ctx.addTask('Synthetic candidate'),next=ctx.addTask('Synthetic next');
   Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',scanMode,snooze:100});ctx.render();
   const initial=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
-  ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
+  await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
   assert.equal(ctx.state.candidateId,next.id,'the ordinary first press advances to the next candidate');
   if(key==='y')assert.ok(candidate.mu>25&&bench.mu<25,'Yes retains candidate-over-benchmark orientation');
@@ -32007,7 +32069,9 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   for(let repeat=0;repeat<3;repeat++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
   assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a held key cannot act on the replacement or record another observation');
   assert.equal(vm.runInContext('undoStack.length',ctx),undoDepth,'ignored repeats add no Undo frame');
-  ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
+  await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
+  shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
+  assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a repeat after the read window still cannot act');
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
   assert.notEqual(JSON.stringify(ctx.state),after,'a fresh keypress can judge the replacement');
   ctx.undo();assert.equal(ctx.state.candidateId,next.id,'one Undo reverses the second fresh decision');
@@ -32030,7 +32094,7 @@ test('RISK Squared Weighting held keys: real keyboard repeats preserve the newly
   const {ctx,shim}=await loadApp({seed:959});ctx.addTask('Oldest synthetic task');ctx.addTask('Synthetic one');ctx.addTask('Synthetic two');ctx.addTask('Synthetic three');
   const el=makeFakeElement();el.dataset={act:'start-scan',mode:'squared'};el.closest=()=>el;shim.document.dispatchEvent({type:'click',detail:1,target:el});ctx.state.snooze=100;
   assert.equal(ctx.state.scanMode,'squared');const first=ctx.state.candidateId,original=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
-  ctx.state.presentedAt=Date.now()-1000; // a person reads the task before answering
+  await new Promise(resolve=>setTimeout(resolve,320)); // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});assert.notEqual(ctx.state.candidateId,first);
   const after=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
   for(let i=0;i<3;i++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
@@ -38977,6 +39041,8 @@ test('Help answers how the steady scanner, backup list, Debug log link and rank 
   [/How long can the dot trail get\?<\/dt>/,/stays on one row[^<]*a count such as \+3 earlier/],
   [/How long can the dot trail get\?<\/dt>/,/up to two of the newest dots, only as many as fit with their titles readable/],
   [/Can I run WOOP on an overdue task\?<\/dt>/,/Run WOOP appears above the scanner choices/],
+  [/Why didn’t my second tap count\?<\/dt>/,/ignored for a moment after a new task appears/],
+  [/Why does the page move after I answer\?<\/dt>/,/scrolls just enough to show the next task/],
   [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
   [/Does Settings load every backup\?<\/dt>/,/read only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
   [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],
@@ -38988,7 +39054,7 @@ test('RISK debug log link #2309: the report gains backup and Undo counts and siz
  // The ordinary opening holds every backup anyway, so it can note their size
  // for a later opening that must not read them.
  const normal=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage});t.after(()=>normal.dispose());
- for(let i=0;i<200&&vm.runInContext('deviceBackupMeasuringOwed',normal.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10)); // backups are measured just after the board opens
+ for(let i=0;i<1500&&vm.runInContext('deviceBackupMeasuringOwed',normal.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10)); // backups are measured just after the board opens
  for(const title of ['PRIVATE undo one 2309','PRIVATE undo two 2309','PRIVATE undo three 2309']){normal.shim.document.getElementById('addInput').value=title;normal.ctx.onAction('add',{});}
  const rebuilt=vm.runInContext('(()=>{const seen={count:0},original=UndoBoardCopy.prototype.toString;UndoBoardCopy.prototype.toString=function(){seen.count++;return original.call(this);};return seen;})()',normal.ctx);
  const boardChars=JSON.stringify(normal.ctx.state).length,running=normal.ctx.buildSupportDiagnosticsReport().savedData;
