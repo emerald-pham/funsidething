@@ -939,6 +939,7 @@ its RISK test; the map follows.
 - RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds
 - RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance
 - RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work
+- RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new task are dropped and just after it are accepted
 - RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision
 - RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work
 - RISK context editor visibility: real contexts govern requirements and filters without mutating assignments
@@ -1550,6 +1551,7 @@ its RISK test; the map follows.
 - RISK sync dealt candidate: a same-revision copy differing in anything else still publishes this board
 - RISK sync dealt candidate: a same-revision copy with a different candidate of its own still publishes this board
 - RISK sync dealt candidate: a board with unsaved changes still publishes when only the candidate differs
+- RISK sync dealt candidate: a candidate adopted from a device 3, 45 or 90 seconds ahead can be answered by keyboard and by click
 - RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered
 - RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board
 - RISK CLOUD LATENCY: ordinary edits retain the two-second debounce and stay dirty until server acknowledgement

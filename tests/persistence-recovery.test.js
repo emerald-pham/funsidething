@@ -5374,9 +5374,9 @@ test('RISK sync dealt candidate: a board with unsaved changes still publishes wh
 // #2308 re-review: presentedAt travels in the cloud payload, so a device with a
 // faster clock dealt a time that is still in this device's future. The window
 // that stops a double tap is timed here, from when this device showed the task.
-for(const skewMs of [3000,45000,90000])for(const [input,answer] of [['keyboard press',(shim)=>shim.document.dispatchEvent({type:'keydown',key:'n',repeat:false})],
+test('RISK sync dealt candidate: a candidate adopted from a device 3, 45 or 90 seconds ahead can be answered by keyboard and by click',async t=>{
+ for(const skewMs of [3000,45000,90000])for(const [input,answer] of [['keyboard press',(shim)=>shim.document.dispatchEvent({type:'keydown',key:'n',repeat:false})],
  ['delegated click',(shim,candidate)=>{const button={dataset:{act:'no',candidate,benchmark:'bench'}};button.closest=()=>button;shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>button}});}]]){
- test(`RISK sync dealt candidate: a candidate adopted from a device ${skewMs/1000} s ahead can be answered by ${input}`,async t=>{
   const ahead=Date.now()+skewMs;
   const app=await cleanDealtBoard2308(t,doc=>{const other=JSON.parse(doc.payload);other.candidateId='later';other.presentedAt=ahead;return {...doc,rev:doc.rev+1,payload:JSON.stringify(other)};}),{ctx,shim}=app;
   await ctx.cloudPull();
@@ -5384,9 +5384,9 @@ for(const skewMs of [3000,45000,90000])for(const [input,answer] of [['keyboard p
   assert.equal(ctx.state.presentedAt,ahead,'positive control: its presentation time is in this device’s future');
   await new Promise(resolve=>setTimeout(resolve,240));
   answer(shim,'later');
-  assert.equal(ctx.state.considered.later,'no','the answer counts');
- });
-}
+  assert.equal(ctx.state.considered.later,'no',`${skewMs/1000} s ahead by ${input}: the answer counts`);
+ }
+});
 test('RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered',async t=>{
  const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
  await ctx.cloudPull();
