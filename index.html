@@ -3080,20 +3080,21 @@ const DEVICE_BACKUP_TEXT_KINDS=["decision-recovery-choice"];
 // and losing it means the measures are taken again from the exact snapshots.
 // Keeping it out of device storage leaves those raw stores exactly as recovery
 // checks and read-only comparisons expect them.
-const DEVICE_BACKUP_FACTS_KEY="fvp:chain-scanner:backup-facts";
+const DEVICE_BACKUP_FACTS_KEY="fvp:chain-scanner:backup-facts",DEVICE_BACKUP_FACTS_VERSION=2;   // bump when deviceBackupDisplayFacts changes
 let deviceBackupFactsMemory=null;
 function knownDeviceBackupFacts(){
   if(deviceBackupFactsMemory)return deviceBackupFactsMemory;
   const known=new Map();
   try{
     const saved=JSON.parse(localStorage.getItem(DEVICE_BACKUP_FACTS_KEY)||"null");
-    if(saved?.version===1&&Array.isArray(saved.rows))for(const [hash,fact] of saved.rows)
-      if(typeof hash==="string"&&Number.isSafeInteger(fact?.chars)&&fact.facts&&typeof fact.facts==="object")known.set(hash,fact);
+    if(saved?.version===DEVICE_BACKUP_FACTS_VERSION&&Array.isArray(saved.rows))for(const [hash,fact] of saved.rows)
+      // A saved "unreadable" is taken again: a later build may read those bytes.
+      if(typeof hash==="string"&&Number.isSafeInteger(fact?.chars)&&fact.facts&&typeof fact.facts==="object"&&fact.facts.readable!==false)known.set(hash,fact);
   }catch(e){}
   return deviceBackupFactsMemory=known;
 }
 function saveDeviceBackupFacts(){
-  try{localStorage.setItem(DEVICE_BACKUP_FACTS_KEY,JSON.stringify({version:1,rows:[...knownDeviceBackupFacts()]}));}catch(e){}
+  try{localStorage.setItem(DEVICE_BACKUP_FACTS_KEY,JSON.stringify({version:DEVICE_BACKUP_FACTS_VERSION,rows:[...knownDeviceBackupFacts()]}));}catch(e){}
 }
 // A save knows what it just wrote, so the automatic latest copy that came with
 // it is listed from that, without reading the new board back on every answer.
@@ -3107,7 +3108,7 @@ function rememberSavedBoardFacts(hash,payload){
 function deviceBackupDisplayFacts(payload,row){
   if(row?.kind==="latest")return {readable:true,incomplete:true};
   const facts={readable:validSavedPayload(payload)};
-  try{facts.boardAccount=backupBoardAccount(JSON.parse(payload));}catch(e){}
+  try{const board=JSON.parse(payload);facts.emptyCloud=board?.emptyCloud===true;facts.boardAccount=backupBoardAccount(board);}catch(e){}
   return facts;
 }
 // The exact saved text of these backups, read only when an action needs it.
@@ -12551,7 +12552,9 @@ async function completeDecisionRecoveryHolds(confirmed,superseded){
 }
 function decisionRecoveryEvidenceOnly(row){
   if(["decision-recovery-pending","decision-recovery-choice","decision-recovery-confirmed","decision-recovery-superseded"].includes(row?.kind))return true;
-  try{return row?.kind==="decision-recovery-cloud"&&JSON.parse(row.payload).emptyCloud===true;}catch(error){return false;}
+  if(row?.kind!=="decision-recovery-cloud")return false;
+  if(typeof row.payload!=="string")return row.payloadFacts?.emptyCloud===true;
+  try{return JSON.parse(row.payload).emptyCloud===true;}catch(error){return false;}
 }
 function decisionRecoveryProblem(message){return Object.assign(Error(message),{decisionRecoveryMessage:message});}
 function decisionRecoveryAvailable(){
@@ -16292,7 +16295,7 @@ function openHelp(){
     + '<dt>What is Halving weighting?</dt><dd>Halving weighting is the default for new clients. It orders remaining eligible tasks by estimated likelihood and gives the highest 50%, then 25%, then 12.5%, with the last receiving the remainder. One task gets 100%; two get 50% each; three get 50%, 25%, 25%. Each draw removes that task and reassigns the remaining shares. Likelihood (%) shows underlying Chance-mode likelihood, not Halving weighting selection odds. Ratings update as you compare; a fresh pass refreshes the ordering. The oldest eligible first dot stays the same unless you enable Skip automatically dotting the oldest task. Choose a mode in Settings.</dd>'
     + '<dt>What is Squared Weighting?</dt><dd>Squared Weighting favors higher-Chance tasks earlier: twice the Chance share gives four times the draw weight. For example, 60% and 40% become about 69.23% and 30.77%. Its displayed percentages show the squared shares. The ordering stays fixed during a pass and through reload; a fresh pass refreshes it. The same eligibility rules and oldest eligible first dot apply unless you enable Skip automatically dotting the oldest task. Choose another mode in Settings.</dd>'
     + '<dt>What is chance mode?</dt><dd>Chance mode uses a weighted random order. Overall percentages describe the full eligible pool using current ratings, including scanned and chained tasks, not the next candidate. Available shares total 100% within rounding; fallback-only pools have no percentage. Ratings and eligibility change shares; scanning past a task does not. All Tasks can order shares highest first, with stable ties, fallback rows next, and ineligible tasks last. List filters do not recalculate shares. Ineligible tasks show 0%; small shares show &lt;0.01%. Scanned after marks fallback ordering after weighted candidates. Descending offers highest estimated likelihood first. By default, every mode chooses the first dot by age: the oldest eligible task never marked Done, or the oldest eligible task if all have been done before.</dd>'
-    + '<dt>Can I run WOOP on an overdue task?</dt><dd>Run WOOP appears beside the scanner choices when the offered task’s due date is before today. It explicitly dots that task, pauses scanning, and opens WOOP, even with Last task WOOP off. Describe the outcome, obstacle and if/then action, then save. Cancel discards unfinished answers but keeps the dot; Undo can reverse that choice. An existing plan is shown instead of overwritten. Delete WOOP plan explicitly removes it and opens a fresh walkthrough. Unrecognized or conflicting saved plans remain preserved and read-only. Completed or blocked tasks are not offered. Scanner titles, date badges and controls wrap in narrow or enlarged views.</dd>'
+    + '<dt>Can I run WOOP on an overdue task?</dt><dd>Run WOOP appears above the scanner choices when the offered task’s due date is before today. It explicitly dots that task, pauses scanning, and opens WOOP, even with Last task WOOP off. Describe the outcome, obstacle and if/then action, then save. Cancel discards unfinished answers but keeps the dot; Undo can reverse that choice. An existing plan is shown instead of overwritten. Delete WOOP plan explicitly removes it and opens a fresh walkthrough. Unrecognized or conflicting saved plans remain preserved and read-only. Completed or blocked tasks are not offered. Scanner titles, date badges and controls wrap in narrow or enlarged views.</dd>'
     + '<dt>What is Last task WOOP?</dt><dd>Last task WOOP is off by default in Settings → Scanning and recurrence. After two recorded Dislodge actions, the sole remaining dot offers WOOP when scanning is paused or reaches End of the list. An active scan with eligible candidates or a chain with several dots does not offer it. The task offers Walk Thru WOOP for Final Task: describe the best outcome, an obstacle, and an if/then plan. Next advances each step; Save WOOP plan saves the answers. Cancel discards unfinished answers. Saved answers return with that final task; Delete WOOP plan removes them. Turning it off hides the feature without deleting plans. Dislodgements before recording began are unavailable.</dd>'
     + '<dt>Why do Yes, No and Can\u2019t stay at the bottom of the screen?</dt><dd>While a candidate is showing, Yes, No and Can\u2019t stay in one place at the bottom of the screen, clear of the iPhone home bar, however long the chain or the task title gets. Run WOOP and the finish buttons sit above them, so they never move the choices. Titles still appear in full above the row.</dd>'
     + '<dt>How long can the dot trail get?</dt><dd>The dot trail stays on one row. It shows up to two of the newest dots, only as many as fit with their titles readable, and a count such as +3 earlier for the ones before them. Earlier dots are still on your chain.</dd>'
@@ -16346,7 +16349,7 @@ function openHelp(){
     + '<dt>What does Reset everything do?</dt><dd>Reset everything asks for a second confirmation and first saves an exact restorable copy locally. If the backup cannot save, or the board or account changes while it saves, reset stops and keeps newer work open. The recovery copy remains in Settings backups. Reset selects Squared Weighting, the existing reset default.</dd>'
     + '<dt>Can I restore raw backup files?</dt><dd>Raw backup arrays let you select a supported board; no entry is selected automatically. Damaged, unknown and pending entries stay evidence in the complete original file copy. Current-board exports and complete archives use their current board. Exact file bytes and the current board are protected before the preview. Unsupported or damaged parts remain recoverable; they cannot replace healthy tasks.</dd>'
     + '<dt>Does Settings load every backup?</dt><dd>No. Settings lists each backup from what it learned when the backup was first saved: its date, kind and size, and whether it could be read. Opening the app and Settings cost about the same however many backups this device holds, and every backup stays listed and saved exactly. A backup\u2019s text is read only when you download, restore or delete it, and it is checked against its saved fingerprint first. One that could not be read is listed as Unreadable backup and cannot be restored. If a backup\u2019s text was damaged after it was saved, Restore refuses it and your current board stays as it is.</dd>'
-    + '<dt>Why does Settings remind me about manual backups?</dt><dd>Manual backups stay on this device until you delete them; they are never removed automatically. Each one is a full copy of your board, so keeping more than two slows the app down. When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup. Delete older ones you don’t need with Delete in the backup list. Make manual backup still works, with no limit and no extra step. Only manual backups of the account you are using count.</dd>'
+    + '<dt>Why does Settings remind me about manual backups?</dt><dd>Manual backups stay on this device until you delete them; they are never removed automatically. Each one is a full copy of your board, so keeping more than two takes up space on this device. When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup. Delete older ones you don’t need with Delete in the backup list. Make manual backup still works, with no limit and no extra step. Only manual backups of the account you are using count.</dd>'
     + '<dt>What if saved ratings disagree with recorded comparisons?</dt><dd>File or paste Restore replaces the selected snapshot; choose its saved numbers or ratings calculated from its recorded comparisons. Review saved decisions instead combines compatible device and cloud decisions. Its saved-rating choice replaces numbers only for listed disagreements, including comparison effects there; other tasks keep combined ratings. Nothing is selected automatically. Earlier decisions and History remain in the board or witnessed history; exact originals and pending evidence stay in Settings backups. No comparison is invented. Preview and Cancel leave the board unchanged; cancelling a paste retains its text. Account-bound recovery requires the signed-in account and exact cloud confirmation. Unsupported authority, changed sources, unavailable storage or uncertain confirmation stay held. Retry alone never publishes a prepared choice.</dd>'
     + '<dt>What can I do when saved appearances disagree?</dt><dd>Choose Review saved decisions from the cloud error or Settings → Data and backups. The review shows this device and cloud, their revisions, available times and actual appearance values. Expand What stays with either appearance for changed field paths, source values and which displaced values remain in backups. Missing times are unavailable; device clocks do not order cloud saves. No choice is selected by default. The disabled “Save choice and sync” button appears subdued until you select a value. Choosing an offered System, Light or Dark value makes a fresh appearance decision while keeping earlier decisions, compatible task edits, comparisons, ratings and History.</dd>'
     + '<dt>How are recovery sources and pending choices protected?</dt><dd>Before publishing, exact copies of both sources and pending upload evidence must save and read back on this device. The prepared choice stays in a protected backup. The active board stays unchanged until its exact cloud save is confirmed and local application succeeds. A new review lists earlier prepared values and IDs. Confirming its new choice abandons their publication, retaining exact superseded archives. A changed source or account requires another review. A pending choice stays protected through close, reload and reconnect; its backup cannot be deleted while pending. If cloud confirms but local application fails, the message distinguishes them and keeps recovery copies. Evidence-only archives cannot restore empty boards. Failed saves remain retryable without clearing storage or reinstalling.</dd>'
@@ -16550,7 +16553,7 @@ function groupedChangelogHtml(...sources){
 // reminds people to delete older ones; Make manual backup keeps working with
 // no confirmation.
 const MANUAL_BACKUP_REMINDER_AT=2;
-const MANUAL_BACKUP_REMINDER_TEXT="Keeping more than two manual backups slows the app down. Delete older ones you don\u2019t need.";
+const MANUAL_BACKUP_REMINDER_TEXT="Keeping more than two manual backups takes up space on this device. Delete older ones you don\u2019t need.";
 // The account a backup's board belongs to, and the one the open board belongs
 // to, as Restore names them before it warns about a cross-account restore.
 function backupBoardAccount(board){return typeof board?.syncAccount==="string"?board.syncAccount:null;}

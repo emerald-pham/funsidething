@@ -21984,5 +21984,28 @@
       "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK long scan memory browser' tests/persistence-recovery.test.js, three runs before the change",
       "failure": "All three runs failed on the old total-growth check. First run: 'chromium: 60 answers grew web process memory by 168 MiB, above the 117 MiB allowance' and 'webkit: 60 answers grew web process memory by 394 MiB, above the 117 MiB allowance'. Second run: 161 and 385 MiB. Third run: 166 and 379 MiB. No other assertion failed."
     }
+  },
+  {
+    "baseCommit": "140f9aa06282ac51511c25122a5660e8fabfd046",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups slows the app down. Delete older ones you don’t need.';",
+      "tests/persistence-recovery.test.js:-test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works',async t=>{",
+      "tests/persistence-recovery.test.js:-assert.match(answer,/keeping more than two slows the app down/);"
+    ],
+    "reason": "#2308 independent review N2: the manual backup reminder and its FAQ said more than two backups slow the app down, which #2310 made untrue because backups no longer load into memory for the list. Each backup is still a full copy stored on the device, so the wording now says it takes up space. The reminder, its trigger and Delete guidance are unchanged. The test name is reworded so it does not claim the old copy.",
+    "previousBehavior": "The reminder and FAQ answer said keeping more than two manual backups slows the app down.",
+    "intendedBehavior": "The reminder and FAQ answer say keeping more than two manual backups takes up space on this device.",
+    "preservedCoverage": [
+      "Every assertion about when the reminder shows, which account it counts, its status role and its placement keeps its existing expectation against the new text.",
+      "The FAQ answer keeps its checks that Make manual backup still works, with no limit and no extra step, and that only this account counts.",
+      "The November 6 changelog entry is history and keeps its original wording and its assertion."
+    ],
+    "replacementTests": [
+      "RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works"
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/index.html LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK manual backup reminder' tests/persistence-recovery.test.js",
+      "failure": "Before the wording changed: 'RISK manual backup reminder guidance' failed with: The input did not match the regular expression /keeping more than two takes up space on this device/, and the reminder tests failed with the reminder text still reading: Keeping more than two manual backups slows the app down."
+    }
   }
 ]

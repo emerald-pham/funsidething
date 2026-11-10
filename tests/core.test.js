@@ -3340,6 +3340,25 @@ test('RISK cloud source recovery #2281: while another saved copy cannot be read,
  assert.deepEqual(await store.readHead(),head);assert.equal(JSON.stringify(ctx.state),before);
 });
 
+// #2310 review: damage found only by Apply's own read. The facts are learned
+// first, so listing still succeeds and only reading the text can catch it.
+test('RISK cloud source recovery #2281: a saved copy damaged after its facts were learned still stops Apply before any cloud write',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+ assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:{id:'unrelated-2310',day:'2026-11-01',at:1,kind:'manual',payload:JSON.stringify({tasks:[],unrelated:1})}})).ok,true);
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ let payloadHash;await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{const request=tx.objectStore('backups').get('unrelated-2310');
+  request.onsuccess=()=>{payloadHash=request.result.payloadHash;tx.objectStore('snapshots').put({hash:payloadHash,payload:JSON.stringify({tasks:[],unrelated:2})},payloadHash);};});
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ assert.equal(vm.runInContext('deviceBackupCacheReadable',ctx),true,'positive control: the list still reads from learned facts, so only Apply can notice');
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+ const writes=backend.writes.length,before=JSON.stringify(ctx.state);
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/saved copies could not all be read back, so nothing was applied/);
+ assert.equal(backend.writes.length,writes,'no cloud write');assert.equal(JSON.stringify(ctx.state),before);
+});
+
 // #2281 CI: a summary saved by a startup timer landed at an arbitrary moment,
 // in the middle of whatever the app was doing then (a recovery save counted
 // the archive rows it had just written). Archives the previous release saved
@@ -21873,9 +21892,9 @@ test('RISK steady scanner browser: Tab never stops on a control hidden behind th
  for(const [engineName,engine] of await steadyScannerEngines()){
   const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
   try{
-   for(const viewport of [{width:390,height:844},{width:320,height:568},{width:844,height:390},{width:1280,height:800}]){
+   for(const viewport of [{width:390,height:844},{width:320,height:568},{width:844,height:390},{width:1280,height:800},{width:1000,height:700},{width:768,height:1024}]){
     const label=`${engineName} ${viewport.width}x${viewport.height}`;
-    const board=steadyScannerBoard({tasks:24,over:{chain:['steady-0','steady-1'],candidateId:'steady-2',listOpen:true}});
+    const board=steadyScannerBoard({tasks:40,over:{chain:['steady-0','steady-1'],candidateId:'steady-2',listOpen:true}});
     const {page,context,errors}=await steadyScannerPage(browser,board,{...viewport,touch:false});
     try{
      await page.waitForSelector('[data-act="yes"]',{timeout:15000});
@@ -38846,6 +38865,7 @@ test('Help answers how the steady scanner, backup list, Debug log link and rank 
   [/stay at the bottom of the screen\?<\/dt>/,/Yes, No and Can’t stay in one place at the bottom of the screen/],
   [/How long can the dot trail get\?<\/dt>/,/stays on one row[^<]*a count such as \+3 earlier/],
   [/How long can the dot trail get\?<\/dt>/,/up to two of the newest dots, only as many as fit with their titles readable/],
+  [/Can I run WOOP on an overdue task\?<\/dt>/,/Run WOOP appears above the scanner choices/],
   [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
   [/Does Settings load every backup\?<\/dt>/,/read only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
   [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],

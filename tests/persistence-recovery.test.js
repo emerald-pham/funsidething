@@ -5095,6 +5095,46 @@ test('RISK backup list memory: a first opening does not measure backups before t
  assert.equal(JSON.parse(storage.getItem('fvp:chain-scanner:backup-facts')).rows.filter(([hash])=>hashes.has(hash)).length,4,'what was measured is saved for later openings');
 });
 
+// #2310 review: Restore on an empty-cloud evidence copy has to look as refused as
+// it is, even though the list holds no text for the row to be read from.
+const backupRestoreMarkup=(app,id)=>{app.ctx.openSettings();const markup=app.shim.document.getElementById('modalRoot').innerHTML;return markup.match(new RegExp('<button[^>]*data-act="restore-local-backup"[^>]*'+id+'[^>]*>|<button[^>]*'+id+'[^>]*data-act="restore-local-backup"[^>]*>'))?.[0]||'';};
+const backupFactsRow=async(indexedDB,dbName,storage,payload,id,kind)=>{
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Board for the copy');assert.equal(await first.ctx.persist(),true);
+ const store=first.shim.window.ScannerDeviceStore,head=await store.readHead();
+ assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id,kind,day:'2026-10-02',at:Date.parse('2026-10-02T12:00:00Z'),payload}})).ok);
+ await vm.runInContext('refreshDeviceBackupCache()',first.ctx);
+ const row=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',first.ctx)).find(entry=>entry.id===id);
+ return {first,row,saved:()=>JSON.parse(storage.getItem('fvp:chain-scanner:backup-facts'))};
+};
+test('RISK backup list memory: Restore stays disabled on an empty-cloud evidence copy listed without its text, including from facts learned by an earlier build',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-evidence-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const {first,row,saved}=await backupFactsRow(indexedDB,dbName,storage,JSON.stringify({tasks:[],emptyCloud:true,revision:7}),'evidence-empty','decision-recovery-cloud');
+ assert.equal(row.payload,undefined,'the row holds no text');
+ assert.equal(row.payloadFacts.readable,true,'positive control: only being evidence stops this copy from restoring');
+ assert.match(backupRestoreMarkup(first,'evidence-empty'),/\sdisabled/,'Restore renders disabled');
+ await first.dispose?.();
+ // An earlier build's cache knows the row is readable, and nothing else about it.
+ const old=saved();old.version=1;for(const entry of old.rows)if(entry[0]===row.payloadHash)delete entry[1].facts.emptyCloud;
+ storage.setItem('fvp:chain-scanner:backup-facts',JSON.stringify(old));
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ await vm.runInContext('refreshDeviceBackupCache()',reopened.ctx);
+ assert.match(backupRestoreMarkup(reopened,'evidence-empty'),/\sdisabled/,'measured again, Restore renders disabled');
+});
+test('RISK backup list memory: a saved verdict of unreadable is measured again, so a later build that can read the copy lists it as readable',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-verdict-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const board=syncState({tasks:[syncTask('kept','Readable copy')]});
+ const {first,row,saved}=await backupFactsRow(indexedDB,dbName,storage,JSON.stringify(board),'verdict-copy','manual');
+ assert.equal(row.payloadFacts.readable,true,'positive control: the copy is readable');
+ await first.dispose?.();
+ const old=saved();for(const entry of old.rows)if(entry[0]===row.payloadHash)entry[1].facts.readable=false;
+ storage.setItem('fvp:chain-scanner:backup-facts',JSON.stringify(old));
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ await vm.runInContext('refreshDeviceBackupCache()',reopened.ctx);
+ const listed=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx)).find(entry=>entry.id==='verdict-copy');
+ assert.equal(listed.payloadFacts.readable,true,'the stale verdict did not stick');
+});
+
 test('RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back',async t=>{
  const {indexedDB,IDBObjectStore}=await import('fake-indexeddb'),dbName='chain-scanner-save-read-'+Date.now()+'-'+Math.random();
  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;t.after(()=>app.dispose?.());
@@ -5255,6 +5295,18 @@ test('RISK sync dealt candidate: a same-revision copy differing in anything else
  await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
  assert.ok(sync.calls.includes('push'),'a real difference still reaches the cloud');
  assert.equal(sync.remoteState().tasks[1].title,'Next task');
+});
+test('RISK sync dealt candidate: a same-revision copy with a different candidate of its own still publishes this board',async t=>{
+ const app=await cleanDealtBoard2308(t,doc=>{const other=JSON.parse(doc.payload);other.candidateId='later';other.presentedAt=1790000000000;return {...doc,payload:JSON.stringify(other)};}),{ctx,sync}=app;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'the cloud copy held another candidate, so this is not only a redraw');
+ assert.equal(sync.remoteState().candidateId,'next');
+});
+test('RISK sync dealt candidate: a board with unsaved changes still publishes when only the candidate differs',async t=>{
+ const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
+ ctx.state.syncDirty=true;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'a dirty board is not the clean redraw this skip is for');
 });
 test('RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered',async t=>{
  const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
@@ -9215,7 +9267,7 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
 // down. The button keeps working with no confirmation. The reminder is a
 // polite status only on the render where it first appears, so re-rendering
 // Settings does not announce it again.
-const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups slows the app down. Delete older ones you don’t need.';
+const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups takes up space on this device. Delete older ones you don’t need.';
 const manualBackupReminderIn=markup=>{
  const match=markup.match(/<p id="manualBackupReminder"([^>]*)>([\s\S]*?)<\/p>/);
  return match?{text:match[2],status:/\brole="status"/.test(match[1]),beside:markup.includes('data-act="make-manual-backup">Make manual backup</button></div><p id="manualBackupReminder"')}:null;
@@ -9536,7 +9588,7 @@ test('RISK manual backup reminder visual browser: the reminder beside Make manua
 // #2254 (owner decision of 2026-11-06): Help explains the manual backup
 // reminder within the 130-word answer limit, and the changelog announces it.
 // Neither sends anyone to another device: people have only their phone.
-test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works',async t=>{
+test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
@@ -9545,7 +9597,7 @@ test('RISK manual backup reminder guidance: mounted FAQ and changelog say that f
  assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
  const answer=answerTo('Why does Settings remind me about manual backups?');
  assert.match(answer,/Manual backups stay on this device until you delete them; they are never removed automatically\./);
- assert.match(answer,/keeping more than two slows the app down/);
+ assert.match(answer,/keeping more than two takes up space on this device/);
  // #2254 release review: the reminder renders below Make manual backup.
  assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup\./);
  assert.match(answer,/Delete older ones you don’t need/);
