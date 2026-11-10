@@ -5913,6 +5913,28 @@ test('RISK Settings hierarchy: moved Changelog leaves no Save settings button an
  const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reloaded.ctx.state.settings.workedHours,17);assert.equal(reloaded.ctx.state.settings.scanMode,'both');assert.equal(reloaded.ctx.state.settings.listMetric,'chance');assert.equal(reloaded.ctx.state.settings.dateFormat,'ymd');
 });
 
+// #2303: Settings help is at most one short line, and only where a control
+// cannot be understood without it. The repeated phrases are gone everywhere.
+test('RISK Settings help: every control has at most one short line of help and no repeated save or sync phrases',async()=>{
+ for(const scanMode of ['halving','squared']){
+  const {ctx,shim}=await loadApp();ctx.setScanPreference(scanMode);ctx.openSettings();
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  const sections=markup.split('<details class="settings-section"').slice(1).map(part=>part.split('</details>')[0]);
+  const names=sections.map(part=>part.match(/<summary>(.*?)<\/summary>/)?.[1]);
+  assert.deepEqual(names.slice(0,2),['Scene and appearance','Scanning and recurrence'],'positive control: the control sections are read');
+  for(const [index,part] of sections.slice(0,2).entries()){
+   const help=[...part.matchAll(/<(p|span)\b[^>]*class="kv[^"]*"[^>]*>([\s\S]*?)<\/\1>/g)].map(match=>match[2].replace(/<[^>]+>/g,'').trim()).filter(Boolean);
+   for(const line of help){
+    assert.ok(line.length<=70,`${scanMode}/${names[index]}: help is one short line: "${line}" (${line.length} characters)`);
+    assert.ok((line.match(/[.!?](\s|$)/g)||[]).length<=1,`${scanMode}/${names[index]}: help is a single sentence: "${line}"`);
+   }
+  }
+  for(const phrase of [/Off by default/i,/Saves? immediately/i,/Synced with your board/i,/syncs with your board/i,/Save settings/i])
+   assert.doesNotMatch(markup,phrase,scanMode+': Settings no longer repeats '+phrase);
+ }
+ assert.doesNotMatch(appSrc,/Synced with your board when signed in/,'the location status update does not add it back');
+});
+
 test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and saving as you change',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Every setting saves as soon as you change it/i])assert.match(help,pattern);
