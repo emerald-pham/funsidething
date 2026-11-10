@@ -1327,6 +1327,8 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
   // own. It's never reassigned though, so a one-time copy is fine here.
   vm.runInContext("this.esc = esc;", sandbox);
   await flush(); // let the boot IIFE's `await loadState()` resolve before returning
+  // #2309: a Debug log link holds the opening, so state stays null by design.
+  if(arguments[0]?.awaitStartup===false)return { ctx: sandbox, shim, dispose:fixture.dispose };
   if(indexedDBProvider){
     // Hashing and IndexedDB completion are not bounded by an event-loop count.
     // Await readiness with an explicit deadline so slowness cannot masquerade
@@ -3047,6 +3049,14 @@ function webProcessMemorySampler(tag,intervalMs=40){
   return {peakBytes:Math.max(0,...peaks.values()),processes:peaks.size,samples};}};
 }
 
+// #2310: a device backup's text is no longer held by the app's list, so a check
+// of its exact bytes reads them from device storage, as a recovery action does.
+async function backupRowsWithText(ctx){
+ const listed=Array.from(ctx.readLocalBackups()),missing=listed.filter(row=>typeof row.payload!=='string').map(row=>row.id);
+ const exact=missing.length?Array.from(await ctx.deviceBackupsWithText(missing)):[];
+ return [...listed.filter(row=>typeof row.payload==='string'),...exact];
+}
+
 // #2195: the shape a real diagnostics export captured (spec #2194), rebuilt from
 // isolated synthetic data only. Recovery (#2198) and read-cost (#2201) tickets
 // reuse capturedUnreadableGenerationFixture() instead of inventing a failure.
@@ -3959,7 +3969,7 @@ export {
   recoveringCloudStatusHarness, recentDeletionAt, deletionEvidence, repeatedDeletionBoard,
   loadStorageV2, loadCloudV2, cloudV2Payload, cloudV2Adapter, CAPTURED_UNREADABLE_GENERATION,
   syntheticBoardOfBytes, capturedUnreadableGenerationFixture, CAPTURED_RECOVERY_BUDGET_MS,
-  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
+  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler, backupRowsWithText,
   largeSignedInBoardFixture,
   CAPTURED_RESULT_BUDGET_MS, largeSerializedBytes2198, CAPTURED_PHONE_SERIALIZATION_BYTES,
   exactPaddedBoard, capturedGenerationAcceptedApp2198, RECORDED_HEALTHY_STATUS_8CD524A,

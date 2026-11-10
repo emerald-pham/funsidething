@@ -13,10 +13,18 @@ set -uo pipefail
 payload=$(cat)
 file=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // ""')
 
+# Agent worktrees live at .claude/worktrees/<name>/, so the .claude exemption
+# below used to switch this guard off for every implementer subagent (#2321).
+# Judge a file there by its path inside that checkout.
+judged=$file
+case "$file" in
+  */.claude/worktrees/*/*) judged=${file##*/.claude/worktrees/}; judged=/${judged#*/} ;;
+esac
+
 case "$file" in
   */scripts/test-first-gate.mjs|*/scripts/release-evidence.mjs|*/scripts/install-release-hook.mjs|*/.claude/hooks/test-first-guard.sh|*/.github/workflows/*.yml|*/.github/workflows/*.yaml) ;;
   *)
-    case "$file" in
+    case "$judged" in
       */.git/*|*/.github/*|*/.claude/*|*/audits/*|*/node_modules/*|*/scripts/*) exit 0 ;;
     esac
     case "$file" in

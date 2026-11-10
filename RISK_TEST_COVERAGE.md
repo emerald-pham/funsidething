@@ -145,6 +145,7 @@ its RISK test; the map follows.
 - RISK cloud source recovery #2281: after failed attempts saved by the previous release on the large phone board, Apply and a later save read about the same device storage at once however many there were
 - RISK cloud source recovery #2281: a confirmed choice also completes the earlier attempts’ archives of the same cloud evidence, so later saves do not re-check them
 - RISK cloud source recovery #2281: while another saved copy cannot be read, Apply stops before any cloud write and changes no board
+- RISK cloud source recovery #2281: a saved copy damaged after its facts were learned still stops Apply before any cloud write
 - RISK cloud source recovery #2281: opening the app writes no archive summary by itself; only a review of cloud recovery sources does
 - RISK cloud source recovery #2281: a confirmed choice that names its archive still counts its originals as recovered once an older device collected them, and healthy edits save
 - RISK cloud source review #2272 limit: a generation whose readability flips between the review and Apply still stops Apply without a cloud write
@@ -594,6 +595,22 @@ its RISK test; the map follows.
 - RISK landscape metropolis: city silhouettes occlude selected-party spotlights
 - RISK landscape metropolis: gardens and patios both skip towers with lightning rods
 - RISK landscape city and aircraft: current changelog names the skyline and plane details
+- RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit
+- RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit
+- RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit
+- RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit
+- RISK steady scanner browser: Yes No and Cant answer a saved candidate whose presentation time is 45 seconds ahead of this device in Chromium and WebKit
+- RISK steady scanner browser: a double tap on Postpone or Done acts once and leaves the next task alone in Chromium and WebKit
+- RISK steady scanner browser: a mouse press on a control partly under the pinned row still clicks it in Chromium and WebKit
+- RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit
+- RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit
+- RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit
+- RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit
+- RISK steady scanner browser: the trail fits again when web fonts finish loading in Chromium and WebKit
+- RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit
+- RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit
+- RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit
+- RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
 - RISK landscape shadows: grounded objects share the dominant celestial light
 - RISK landscape vehicles: lower train shadows lie along its rail under changing light
@@ -692,6 +709,7 @@ its RISK test; the map follows.
 - RISK RESET SAFETY: the confirmed reset keeps an exact durable pre-reset copy that survives reload and restores
 - RISK RESET SAFETY: backup failure aborts reset before state or primary storage changes
 - RISK RESET SAFETY: quota compaction makes room for the mandatory copy without deleting retained rows
+- RISK long scan Undo: every answer is kept exactly once through reload, each of 30 Undo steps reverses its own action, and frame text stays byte-exact
 - RISK RESET SAFETY: failed primary reset preserves Undo and never restores an old account after switching
 - RISK CLOUD PAYLOAD: hydration removes only exact duplicate deletion facts and preserves conflicting same-ID evidence
 - RISK CLOUD PAYLOAD: Undo and Restore replacement unions stay idempotent while recording new causal deletion facts
@@ -922,6 +940,7 @@ its RISK test; the map follows.
 - RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds
 - RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance
 - RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work
+- RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new task are dropped and just after it are accepted
 - RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision
 - RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work
 - RISK context editor visibility: real contexts govern requirements and filters without mutating assignments
@@ -1363,6 +1382,13 @@ its RISK test; the map follows.
 - RISK debug log: document and event limits expire without retaining injected private fields
 - RISK debug log: app reload reasons and lifecycle observations survive without private error text
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
+- RISK debug log link #2309: the link opens the read-only log at opening without Settings or reading any backup text
+- RISK debug log link #2309: counting backups loads no backup rows, so a cold opening stays clear of retained file bytes
+- RISK debug log link #2309: the report gains backup and Undo counts and sizes, and never their contents
+- RISK debug log link #2309: leaving the log returns to the ordinary board, and selecting the log still works
+- RISK debug log link #2309: an ordinary opening, or another fragment, loads the board and shows no log
+- RISK debug log link #2309: the link is safe with no prior state and when device storage cannot open
+- RISK debug log link #2309: inside a running app the Help link opens the log without Settings, and can be used again
 - RISK support diagnostics: real device retries count attempts while unexplained churn remains refused
 - RISK support diagnostics: native debounce reports scheduled, saving, and drained work accurately
 - RISK support diagnostics: accepted acknowledgements expire with their account and backend context
@@ -1384,6 +1410,9 @@ its RISK test; the map follows.
 - RISK support diagnostics: executing document and observed worker/cache identities remain distinct and bounded
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
 - RISK numeric responsiveness: optimized sampling and cold display preserve released distributions and random streams
+- RISK numeric responsiveness: a rank refresh reusing the previous refresh arrays returns exactly what new arrays would
+- RISK numeric responsiveness: an answer whose next candidates plainly clear the threshold skips the full better-task integration, and one that may not still runs it
+- RISK forecast caller preservation: the better-task check decides every board and threshold exactly as the full integration does
 - RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements
 - RISK forecast caller preservation: current Math receivers preserve exact released shared-draw integration
 - RISK saved chance shape preservation: opponent key order enumerability and unknown fields keep the same support boundary
@@ -1475,14 +1504,18 @@ its RISK test; the map follows.
 - RISK device save settle: the Debug log keeps the stage, code and attempts of a failed save through the next change until a save is verified
 - RISK device save settle: a message cleared by a verified save while the tab was hidden does not appear when it is shown again
 - RISK device save settle: when both copies changed the same task, the board keeps one version and a backup keeps the version from this tab
+- RISK rapid action durability: answers repaired over another saved copy mid-sync still offer the next candidate with no extra tap
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
 - RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads
 - RISK lossless cloud recovery: an exact current board repairs missing chunks without a historical ACK
 - RISK resilient sync recovery: unsupported unverifiable and foreign sources never authorize a replacement
 - RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return
 - RISK cloud generation recovery browser: a real click on Use my board from before recovery in open Settings passes the busy check in Chromium and WebKit
+- RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit
+- RISK backup memory browser: the first opening with no learned facts stays close to an ordinary opening while every backup is measured, in Chromium and WebKit
 - RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit
 - RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit
+- RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit
 - RISK cloud generation recovery browser: the board renders and a trusted key reaches Add before any automatic recovery source read starts, and Settings, the debug log, Review cloud recovery and Restore stay reachable while it runs in Chromium and WebKit
 - RISK large board recovery browser: a deliberate run of the automatic recovery default from Retry sync reconciles a large board onto an intact earlier generation within a memory margin of opening it locally, keeping every decision, draft and newer edit, in Chromium and WebKit
 - RISK BACKUP FILE RESTORE: a signed-in large board file asks a board with no account to sign in first instead of failing, and changes nothing
@@ -1521,6 +1554,23 @@ its RISK test; the map follows.
 - RISK SCALABLE RECOVERY: cloud replacement awaits an IndexedDB safety copy and old-tab bytes reconcile without becoming blind authority
 - RISK SCALABLE RECOVERY: clean cloud adoption releases its IndexedDB proof only after shared legacy conflicts become durable
 - RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority never revives or uploads its stale legacy shell
+- RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes
+- RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once
+- RISK backup list memory: a first opening does not measure backups before the board is open, lists them all, and learns their measures afterwards
+- RISK backup list memory: Restore stays disabled on an empty-cloud evidence copy listed without its text, including from facts learned by an earlier build
+- RISK backup list memory: a saved verdict of unreadable is measured again, so a later build that can read the copy lists it as readable
+- RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back
+- RISK backup list memory: the older browser backup list is compared by hash without keeping its text, so a mirrored row merges and a different one stays listed
+- RISK backup read back: a brief device read failure during an account switch is retried, keeps its diagnostics and still adopts the new board
+- RISK backup read back: a device read that keeps failing holds the switch honestly within its budget and leaves the board alone
+- RISK backup read back: a sign-out during the retry budget stops reading
+- RISK backup read back: an edit made while the safety copy is being read back holds the account switch instead of being lost
+- RISK sync dealt candidate: a candidate dealt by a redraw on a clean board does not queue a cloud write
+- RISK sync dealt candidate: a same-revision copy differing in anything else still publishes this board
+- RISK sync dealt candidate: a same-revision copy with a different candidate of its own still publishes this board
+- RISK sync dealt candidate: a board with unsaved changes still publishes when only the candidate differs
+- RISK sync dealt candidate: a candidate adopted from a device 3, 45 or 90 seconds ahead can be answered by keyboard and by click
+- RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered
 - RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board
 - RISK CLOUD LATENCY: ordinary edits retain the two-second debounce and stay dirty until server acknowledgement
 - RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership
@@ -1634,7 +1684,7 @@ its RISK test; the map follows.
 - RISK manual backup reminder: manual backups saved before they named an account are read at most once across Settings renders and still count only for their own account
 - RISK manual backup reminder: Make manual backup stays enabled past two and saves a third with no confirmation or extra step
 - RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit
-- RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works
+- RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works
 - RISK acknowledged recovery trim: nothing is trimmed while a later recovery waits on an unreadable copy, holds an older copy or saves without cloud confirmation, and the first acknowledged save after the cloud confirms trims
 - RISK acknowledged recovery trim: after an adoption the cloud confirms, the device clears the recovery archives and the migrated older backup list and keeps the board, the acknowledged copy, every backup, the older browser pair, headers-only records and a note naming what the earlier-source check still reports
 - RISK acknowledged recovery trim: the trim deletes by key in bounded batches without reading the whole store or a large archive, and a page closed mid-trim finishes on the next opening without the cloud
@@ -1645,6 +1695,9 @@ its RISK test; the map follows.
 - RISK acknowledged recovery trim: a note the trim kept still lets the check of earlier sources reconcile that generation once it can be read, and the trim after its acknowledgement clears the note
 - RISK acknowledged recovery trim: an adoption the cloud acknowledges while the app opens is trimmed without a further save, once the check of earlier sources has run or when a phone over its work budget leaves that check for a deliberate run
 - RISK acknowledged recovery trim guidance: Settings, mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays
+- RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice
+- RISK debug log link #2309: Download debug log delivers the file while the link holds the opening
+- RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read
 
 ## tests/repository-process.test.js
 
@@ -1663,6 +1716,7 @@ its RISK test; the map follows.
 - RISK test-first gate: an app change paired with an edit to any split test file is accepted
 - RISK test-first gate: a root tests.js is no longer a test file and adding or editing one is rejected
 - RISK test-first gate: the edit hook treats the test directory as the test surface
+- RISK test-first gate: the edit hook guards app edits inside an agent worktree
 - RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test
 - RISK test-first gate: future runtime modules are detected without a filename allowlist
 - RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case
