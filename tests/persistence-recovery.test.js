@@ -21,10 +21,11 @@ import {
   deletionEvidence, loadStorageV2, exerciseCompletionEditorBoundaries, liveScanSyncClients,
   liveDoneDeliverySnapshot, ordinaryEditDebounceControl, settleRecovery188,
   settleRecoveryOperations188, divergentCloudSourceApp187, replaceIndependentServerPayload263,
-  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,
+  LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler, backupRowsWithText,
   largeSignedInBoardFixture,
 } from "./shared.js";
 import { rewriteGenerationFixture } from "./shared.js";
+import { createDeviceBudgetClock, expireDeviceBudget } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
 import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDGET_MS, coldRelaunch2198, refuseNextRecoveryTransaction255,
   exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
@@ -338,10 +339,14 @@ test('RISK offline startup budget: stalled open and raw reads expose unsaved wor
   const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-startup-budget-'+fault+'-'+Math.random(),control={stallRawRead:fault==='stalled-raw-read'},inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
   const original=JSON.stringify(syncState({v:2,tasks:[syncTask('late-original','Late original task')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'late-backup',kind:'manual',at:1,day:'2026-10-24',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
   const indexedDBProvider=fault==='stalled-open'?{open(){return {};}}:deviceFaultProvider187(factory,control);let app;
-  const loading=loadApp({indexedDBProvider,deviceDbName,deviceOpenTimeoutMs:35,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
-  t.after(async()=>{control.releaseRawRead?.();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));
+  const clock=createDeviceBudgetClock(35),stalls=()=>(control.rawReadReleases||[]).length;
+  const loading=loadApp({indexedDBProvider,deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
+  t.after(async()=>{await clock.advance(350);control.releaseRawRead?.();await loading;await app?.dispose();});
+  await expireDeviceBudget(clock,()=>fault==='stalled-open'?clock.armed>0:!!control.releaseRawRead,'startup reaches the stalled storage step');await fixtureDeadline(loading,'one startup budget releases the stalled startup');
   assert.ok(app,'one original startup budget must release a permanently stalled storage read into a useful workspace');
-  assert.equal(app.ctx.deviceStorageActive(),false);app.shim.document.getElementById('addInput').value='Accepted while storage read stalled';await fixtureDeadline(app.ctx.onAction('add',{}),'stalled storage Add returns honestly',400);assert.equal(await fixtureDeadline(app.ctx.persist(),'stalled storage save returns honestly',400),false);
+  assert.equal(app.ctx.deviceStorageActive(),false);app.shim.document.getElementById('addInput').value='Accepted while storage read stalled';
+  {const before=stalls(),adding=app.ctx.onAction('add',{});await expireDeviceBudget(clock,()=>fault==='stalled-open'?clock.armed>0:stalls()>before,'the Add reaches the stalled storage step');await fixtureDeadline(adding,'stalled storage Add returns honestly');}
+  {const before=stalls(),saving=app.ctx.persist();await expireDeviceBudget(clock,()=>fault==='stalled-open'?clock.armed>0:stalls()>before,'the save reaches the stalled storage step');assert.equal(await fixtureDeadline(saving,'stalled storage save returns honestly'),false);}
   const id=app.ctx.state.tasks.find(row=>row.title==='Accepted while storage read stalled').id;assert.ok(app.ctx.deviceSaveIssue());
   if(fault==='stalled-raw-read'){
    control.releaseRawRead();await flush();await flush();assert.ok(app.ctx.state.tasks.some(row=>row.id===id),'a late original read cannot replace accepted in-memory work');assert.equal(app.ctx.deviceStorageActive(),false,'timed-out startup cannot activate later');
@@ -355,13 +360,15 @@ test('RISK offline startup resume: fresh storage saves accepted memory work whil
  const inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
  const original=JSON.stringify(syncState({v:2,tasks:[syncTask('withheld-original','Protected original before withheld callback')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'withheld-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>{tx.objectStore('meta').delete('head');tx.objectStore('meta').put({unknown:[31]},'pending:withheld');});
  const before=await inspector.readRawExportSnapshot(),storage=sharedScannerStorage({[DEVICE_AUTHORITY_KEY]:'1'});let app;
- const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);
- t.after(async()=>{for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);const releaseOld=control.releaseRawRead;assert.equal(typeof releaseOld,'function');
- app.shim.document.getElementById('addInput').value='Accepted while old readonly delivery stays withheld';await fixtureDeadline(app.ctx.onAction('add',{}),'withheld readonly Add returns',400);assert.equal(await fixtureDeadline(app.ctx.persist(),'withheld readonly save returns',400),false);const accepted=JSON.stringify(app.ctx.state),id=app.ctx.state.tasks.find(row=>row.title==='Accepted while old readonly delivery stays withheld').id;
+ const clock=createDeviceBudgetClock(35),stalls=()=>(control.rawReadReleases||[]).length;
+ const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);
+ t.after(async()=>{await clock.advance(350);for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});
+ await expireDeviceBudget(clock,()=>!!control.releaseRawRead,'startup reaches the withheld readonly delivery');await fixtureDeadline(loading,'one startup budget releases the withheld delivery');assert.ok(app);const releaseOld=control.releaseRawRead;assert.equal(typeof releaseOld,'function');
+ app.shim.document.getElementById('addInput').value='Accepted while old readonly delivery stays withheld';{const stalled=stalls(),adding=app.ctx.onAction('add',{});await expireDeviceBudget(clock,()=>stalls()>stalled,'the Add reaches the withheld readonly delivery');await fixtureDeadline(adding,'withheld readonly Add returns');}{const stalled=stalls(),saving=app.ctx.persist();await expireDeviceBudget(clock,()=>stalls()>stalled,'the save reaches the withheld readonly delivery');assert.equal(await fixtureDeadline(saving,'withheld readonly save returns'),false);}const accepted=JSON.stringify(app.ctx.state),id=app.ctx.state.tasks.find(row=>row.title==='Accepted while old readonly delivery stays withheld').id;
  assert.equal(vm.runInContext('localDeviceStartupAttempt.expired&&localDeviceStartupAttempt.pending',app.ctx),true);
  control.stallRawRead=false;
- const fresh=await fixtureDeadline(app.ctx.window.ScannerDeviceStore.readRawExportSnapshot(),'fresh raw request completes before old callback',400);assert.equal(JSON.stringify(fresh),JSON.stringify(before));
- assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh save after readonly storage returns',400),true,'an expired readonly callback cannot permanently block a fresh guarded save');
+ const fresh=await fixtureDeadline(app.ctx.window.ScannerDeviceStore.readRawExportSnapshot(),'fresh raw request completes before old callback');assert.equal(JSON.stringify(fresh),JSON.stringify(before));
+ assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh save after readonly storage returns'),true,'an expired readonly callback cannot permanently block a fresh guarded save');
  const saved=await inspector.readHead(),hold=await inspector.getRecoveryCloudHold(),archive=(await inspector.listOpaqueArchives()).find(row=>row.key===hold.originalKey);assert.ok(JSON.parse(saved.payload).tasks.some(row=>row.id===id));assert.ok(archive);
  assert.equal(JSON.stringify(JSON.parse(archive.raw).indexedDB),JSON.stringify(app.ctx.encodeManualArchiveSnapshot(before).stores));
  releaseOld();await flush();await flush();assert.equal((await inspector.readHead()).payload,saved.payload,'obsolete readonly delivery cannot overwrite the verified current head');assert.equal(JSON.stringify(app.ctx.state),saved.payload,'obsolete delivery cannot adopt the old original over current work');assert.notEqual(saved.payload,original);assert.ok(JSON.parse(accepted).tasks.some(row=>row.id===id));
@@ -373,16 +380,21 @@ test('RISK offline startup resume budget: fresh stalled captures stop and uncert
   const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-resume-bound-'+fault+'-'+Math.random(),control={stallRawRead:fault==='fresh-read-stalls',stallRawWrite:fault==='startup-write-withheld'};
   const inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
   const original=JSON.stringify(syncState({v:2,tasks:[syncTask('budget-original','Protected source before delayed storage')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'budget-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
-  let app;const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,seedStorage:{[DEVICE_AUTHORITY_KEY]:'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
-  t.after(async()=>{for(const release of control.rawReadReleases||[])release();control.releaseRawWrite?.();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);
-  app.shim.document.getElementById('addInput').value='Accepted work during delayed '+fault;await fixtureDeadline(app.ctx.onAction('add',{}),'delayed storage Add returns',400);const accepted=JSON.stringify(app.ctx.state);
+  let app;const clock=createDeviceBudgetClock(35),stalls=()=>(control.rawReadReleases||[]).length;
+  const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,seedStorage:{[DEVICE_AUTHORITY_KEY]:'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
+  t.after(async()=>{await clock.advance(350);for(const release of control.rawReadReleases||[])release();control.releaseRawWrite?.();await loading;await app?.dispose();});
+  await expireDeviceBudget(clock,()=>fault==='fresh-read-stalls'?!!control.releaseRawRead:!!control.releaseRawWrite,'startup reaches the delayed storage step');await fixtureDeadline(loading,'one startup budget releases the delayed storage');assert.ok(app);
+  app.shim.document.getElementById('addInput').value='Accepted work during delayed '+fault;
+  if(fault==='fresh-read-stalls'){const stalled=stalls(),adding=app.ctx.onAction('add',{});await expireDeviceBudget(clock,()=>stalls()>stalled,'the Add reaches the delayed storage read');await fixtureDeadline(adding,'delayed storage Add returns');}
+  else await fixtureDeadline(app.ctx.onAction('add',{}),'delayed storage Add returns');
+  const accepted=JSON.stringify(app.ctx.state);
   if(fault==='fresh-read-stalls'){
    control.releaseRawRead();await flush();await flush();control.stallRawRead=true;
-   assert.equal(await fixtureDeadline(app.ctx.persist(),'fresh recovery capture has one bounded budget',400),false);
+   {const stalled=stalls(),saving=app.ctx.persist();await expireDeviceBudget(clock,()=>stalls()>stalled,'the fresh capture reaches the stalled read');assert.equal(await fixtureDeadline(saving,'fresh recovery capture has one bounded budget'),false);}
    assert.equal(app.ctx.deviceStorageActive(),false);assert.equal(JSON.stringify(app.ctx.state),accepted);control.releaseRawRead();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted);assert.equal(app.ctx.deviceStorageActive(),false,'late fresh read cannot activate after its own timeout');assert.equal(await inspector.readHead(),null);
   }else{
    assert.equal(typeof control.releaseRawWrite,'function','the original recovery write started before its completion delivery was withheld');const before=await inspector.readRawExportSnapshot();
-   assert.equal(await fixtureDeadline(app.ctx.persist(),'uncertain started mutation remains protected',400),false);assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(before),'a pending started mutation cannot be replayed as a fresh recovery write');
+   assert.equal(await fixtureDeadline(app.ctx.persist(),'uncertain started mutation remains protected'),false);assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(before),'a pending started mutation cannot be replayed as a fresh recovery write');
    control.releaseRawWrite();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted);assert.equal(app.ctx.deviceStorageActive(),false,'late original write completion cannot adopt over accepted memory work');
   }
  });
@@ -390,14 +402,14 @@ test('RISK offline startup resume budget: fresh stalled captures stop and uncert
 
 test('RISK offline recovery activation: a verified committed workspace activates before optional cache reads can strand later edits',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),control={quotaOpaque:true},deviceDbName='offline-final-activation-'+Math.random(),original='{unreadable activation original',storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:original,[SYNC_STORE_KEY]:'{other unreadable activation original'});
- const app=await loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(async()=>{for(const release of control.rawReadReleases||[])release();await app.dispose();});
+ const clock=createDeviceBudgetClock(60),app=await loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,budgetClock:clock,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(async()=>{await clock.advance(600);for(const release of control.rawReadReleases||[])release();await app.dispose();});
  app.shim.document.getElementById('addInput').value='Accepted before verified recovery activates';await app.ctx.onAction('add',{});assert.equal(await app.ctx.persist(),false);const first=app.ctx.state.tasks.find(row=>row.title==='Accepted before verified recovery activates').id;
  control.quotaOpaque=false;let armed=true;const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{set(key,value);if(armed&&key===DEVICE_AUTHORITY_KEY){armed=false;control.stallRawRead=true;}};
- assert.equal(await fixtureDeadline(app.ctx.persist(),'verified fresh recovery activation completes',400),true,'the fully read-back committed head and process flags must activate as one transition');assert.equal(armed,false);
+ assert.equal(await fixtureDeadline(app.ctx.persist(),'verified fresh recovery activation completes'),true,'the fully read-back committed head and process flags must activate as one transition');assert.equal(armed,false);
  assert.equal(app.ctx.deviceStorageActive(),true);assert.equal(vm.runInContext('memoryRecoveryWorkspace',app.ctx),false);assert.equal(app.ctx.deviceSaveIssue(),null);
  const hold=await app.ctx.window.ScannerDeviceStore.getRecoveryCloudHold(),saved=await app.ctx.window.ScannerDeviceStore.readHead();assert.equal(saved.payload,JSON.stringify(app.ctx.state));assert.ok(JSON.parse(saved.payload).tasks.some(row=>row.id===first));
  control.stallRawRead=false;
- app.shim.document.getElementById('addInput').value='Later accepted work after verified activation';await fixtureDeadline(app.ctx.onAction('add',{}),'later activation Add returns',400);const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after verified activation').id;
+ app.shim.document.getElementById('addInput').value='Later accepted work after verified activation';await fixtureDeadline(app.ctx.onAction('add',{}),'later activation Add returns');const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after verified activation').id;
  app.ctx.doneTask(later);assert.equal(await app.ctx.persist(),true);await app.ctx.onAction('undo',{});assert.equal(await app.ctx.persist(),true);assert.equal(!!app.ctx.state.tasks.find(row=>row.id===later).done,false);
  app.shim.document.getElementById('addInput').value='Unfinished activation draft';const accepted=JSON.stringify(app.ctx.state);for(const release of control.rawReadReleases||[])release();await flush();await flush();assert.equal(JSON.stringify(app.ctx.state),accepted,'late optional cache delivery cannot replace current accepted edits');assert.equal(app.shim.document.getElementById('addInput').value,'Unfinished activation draft');
  assert.equal(await app.ctx.persist(),true);const final=await app.ctx.window.ScannerDeviceStore.readHead(),archive=(await app.ctx.window.ScannerDeviceStore.listOpaqueArchives()).find(row=>row.key===hold.originalKey);assert.equal(final.payload,JSON.stringify(app.ctx.state));assert.ok(JSON.parse(archive.raw).localStorage.some(row=>row.key===LOCAL_HEAD_KEY&&row.raw===original));
@@ -408,15 +420,22 @@ test('RISK offline recovery reentry: settled own recovery writes permit fresh cu
  for(const mode of ['settled-own-intent','settled-own-intent-read-retry','settled-own-intent-write-retry','changed-hold'])await t.test(mode,async t=>{
   const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),control={stallRawWrite:true},deviceDbName='offline-settled-reentry-'+mode+'-'+Math.random(),storage=sharedScannerStorage({[DEVICE_AUTHORITY_KEY]:'1'}),inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
   const original=JSON.stringify(syncState({v:2,tasks:[syncTask('settled-original','Original before uncertain recovery completion')]}));await inspector.commitHead({expectedHash:null,payload:original});const head=await inspector.readHead();await inspector.putBackup({expectedHash:head.hash,backup:{id:'settled-backup',kind:'manual',at:1,day:'2026-10-25',payload:original}});await editRawDevice187(factory,deviceDbName,tx=>{tx.objectStore('meta').delete('head');tx.objectStore('meta').put({unknown:[41]},'pending:settled');});
-  let app;const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);t.after(async()=>{control.releaseRawWrite?.();for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});await new Promise(resolve=>setTimeout(resolve,150));assert.ok(app);
-  app.shim.document.getElementById('addInput').value='Accepted while recovery completion is uncertain';await fixtureDeadline(app.ctx.onAction('add',{}),'uncertain completion Add returns',400);const first=app.ctx.state.tasks.find(row=>row.title==='Accepted while recovery completion is uncertain').id,prior=await inspector.readRawExportSnapshot(),priorHold=await inspector.getRecoveryCloudHold(),priorArchive=(await inspector.listOpaqueArchives()).find(row=>row.key===priorHold.originalKey);
+  let app;const clock=createDeviceBudgetClock(60);
+  const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:60,budgetClock:clock,sharedStorage:storage,navigatorProvider:{onLine:false}}).then(value=>app=value);t.after(async()=>{await clock.advance(600);control.releaseRawWrite?.();for(const release of control.rawReadReleases||[])release();await loading;await app?.dispose();});
+  await expireDeviceBudget(clock,()=>!!control.releaseRawWrite,'startup reaches the uncertain recovery write');await fixtureDeadline(loading,'one startup budget releases the uncertain recovery write');assert.ok(app);
+  app.shim.document.getElementById('addInput').value='Accepted while recovery completion is uncertain';await fixtureDeadline(app.ctx.onAction('add',{}),'uncertain completion Add returns');const first=app.ctx.state.tasks.find(row=>row.title==='Accepted while recovery completion is uncertain').id,prior=await inspector.readRawExportSnapshot(),priorHold=await inspector.getRecoveryCloudHold(),priorArchive=(await inspector.listOpaqueArchives()).find(row=>row.key===priorHold.originalKey);
   assert.equal(await app.ctx.persist(),false,'an uncertain started write cannot replay before completion settles');assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(prior));
   control.releaseRawWrite();await flush();await flush();assert.equal(app.ctx.deviceStorageActive(),false,'late completion alone cannot adopt over accepted memory work');assert.ok(app.ctx.state.tasks.some(row=>row.id===first));
   if(mode==='changed-hold')await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').put({...priorHold,unknownPeer:{keep:[43]}},'recoveryCloudHold'));
   if(mode==='settled-own-intent-read-retry')control.stallRawRead=true;if(mode==='settled-own-intent-write-retry')control.quotaOpaque=true;
-  app.shim.document.getElementById('addInput').value='Later accepted work after recovery settles';await fixtureDeadline(app.ctx.onAction('add',{}),'settled completion Add returns',400);const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after recovery settles').id;app.shim.document.getElementById('addInput').value='Unfinished settled recovery draft';
+  app.shim.document.getElementById('addInput').value='Later accepted work after recovery settles';
+  {const stalled=(control.rawReadReleases||[]).length;let addReturned=false;const adding=Promise.resolve(app.ctx.onAction('add',{})).finally(()=>{addReturned=true;});
+   // A read stalled by this Add needs its own budget to pass; Add may also return without reaching storage.
+   if(mode==='settled-own-intent-read-retry'){await fixtureDeadline(async wait=>{while(!addReturned&&(control.rawReadReleases||[]).length<=stalled)await wait();},'the settled Add reaches the stalled read or returns');if(!addReturned)await clock.advance();}
+   await fixtureDeadline(adding,'settled completion Add returns');}
+  const later=app.ctx.state.tasks.find(row=>row.title==='Later accepted work after recovery settles').id;app.shim.document.getElementById('addInput').value='Unfinished settled recovery draft';
   if(mode==='settled-own-intent-read-retry')control.stallRawRead=false;if(mode==='settled-own-intent-write-retry')control.quotaOpaque=false;const beforeSave=await inspector.readRawExportSnapshot();
-  assert.equal(await fixtureDeadline(app.ctx.persist(),'settled recovery permits one fresh current save',400),mode!=='changed-hold','only exact own settled recovery intent can resume durable progress');assert.equal(app.shim.document.getElementById('addInput').value,'Unfinished settled recovery draft');
+  assert.equal(await fixtureDeadline(app.ctx.persist(),'settled recovery permits one fresh current save'),mode!=='changed-hold','only exact own settled recovery intent can resume durable progress');assert.equal(app.shim.document.getElementById('addInput').value,'Unfinished settled recovery draft');
   if(mode==='changed-hold'){assert.equal(JSON.stringify(await inspector.readRawExportSnapshot()),JSON.stringify(beforeSave));assert.equal(app.ctx.deviceStorageActive(),false);return;}
   app.ctx.doneTask(later);assert.equal(await app.ctx.persist(),true);await app.ctx.onAction('undo',{});assert.equal(await app.ctx.persist(),true);
   const saved=await inspector.readHead(),hold=await inspector.getRecoveryCloudHold();assert.equal(saved.payload,JSON.stringify(app.ctx.state));for(const id of [first,later])assert.ok(JSON.parse(saved.payload).tasks.some(row=>row.id===id));assert.equal((await inspector.listOpaqueArchives()).find(row=>row.key===priorHold.originalKey).raw,priorArchive.raw);assert.ok(hold.originalKey);
@@ -427,6 +446,29 @@ test('RISK offline recovery reentry: settled own recovery writes permit fresh cu
   }
   await app.dispose();const cold=await loadApp({indexedDBProvider:factory,deviceDbName,sharedStorage:storage,navigatorProvider:{onLine:false}});t.after(()=>cold.dispose());for(const id of [first,later])assert.ok(cold.ctx.state.tasks.some(row=>row.id===id));assert.equal(!!cold.ctx.state.tasks.find(row=>row.id===later).done,false);assert.equal((await inspector.getRecoveryCloudHold()).originalKey,hold.originalKey);
  });
+});
+
+// A budget timer the clock did not capture runs on a real timer, so a test could
+// pass with a budget that no longer matches the configured delay.
+test('RISK offline startup budget: spending a budget no timer armed fails the test',async()=>{
+ const unarmed=createDeviceBudgetClock(35);
+ await assert.rejects(expireDeviceBudget(unarmed,()=>true,'the stall was reached'),/no device budget timer was armed/i);
+ const armed=createDeviceBudgetClock(35);let expired=false;armed.setTimeout(()=>{expired=true;},35);
+ await expireDeviceBudget(armed,()=>true,'the stall was reached');
+ assert.equal(expired,true,'an armed budget is spent exactly as before');
+});
+
+test('RISK offline startup budget: a stalled start stays pending until its one controlled budget expires',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),factory=new IDBFactory(),deviceDbName='offline-budget-clock-'+Math.random(),control={stallRawRead:true},inspector=loadStorageV2({indexedDB:factory}).createDeviceStore({indexedDB:factory,crypto:webcrypto,dbName:deviceDbName});await inspector.open();t.after(()=>inspector.close());
+ const original=JSON.stringify(syncState({v:2,tasks:[syncTask('clock-original','Original before stalled start')]}));await inspector.commitHead({expectedHash:null,payload:original});await editRawDevice187(factory,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
+ let app;const clock=createDeviceBudgetClock(35);
+ const loading=loadApp({indexedDBProvider:deviceFaultProvider187(factory,control),deviceDbName,deviceOpenTimeoutMs:35,budgetClock:clock,seedStorage:{'fvp:chain-scanner:device-store-v2':'1'},navigatorProvider:{onLine:false}}).then(value=>app=value);
+ t.after(async()=>{await clock.advance(350);control.releaseRawRead?.();await loading;await app?.dispose();});
+ await fixtureDeadline(async wait=>{while(!control.releaseRawRead)await wait();},'startup reaches the stalled read');
+ await new Promise(resolve=>setTimeout(resolve,100));
+ assert.equal(app,undefined,'real time alone cannot spend the controlled startup budget');
+ await clock.advance();await fixtureDeadline(loading,'one startup budget releases the stalled startup');
+ assert.ok(app,'one controlled budget must release the stalled startup into a useful workspace');assert.equal(app.ctx.deviceStorageActive(),false);
 });
 
 test('RISK offline memory restore: a deliberate Paste after storage returns protects accepted unsaved work',async t=>{
@@ -706,6 +748,47 @@ test('RISK rapid action durability: ten distinct actions remain pending through 
  const head=await store.readHead();await app.dispose();const reopened=await loadAppAtTime(at,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off',async pull(){return{error:true};},async push(){return{error:true};}})});apps.push(reopened);assertFacts(reopened.ctx.state);assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload);
 });
 
+// #2306: a save that had to be repaired over a head moved by another page merges
+// both pages' choices, and projecting the merged Start cleared the candidate. The
+// repaired board was drawn without dealing, leaving a chain with nothing to decide.
+test('RISK rapid action durability: answers repaired over another saved copy mid-sync still offer the next candidate with no extra tap',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='rapid-repair-'+Math.random(),at=Date.parse('2026-10-20T15:00:00Z');
+ const board=syncState({tasks:Array.from({length:24},(_,i)=>Object.assign(syncTask('repair-'+i,'Task '+i),{mu:50-i,sigma:5})),chain:[],candidateId:null,mode:'scan',scanMode:'descending',passId:'repair-pass',passStartedAt:0,snooze:100,syncAccount:'e@example.com',syncRev:4,syncDirty:false,updatedAt:at-HOUR,settings:{horizonMin:60,thresholdPct:0,samples:50,cantMin:30,workedHours:8,theme:'system'}}),raw=JSON.stringify(board),h=makeSyncHarness({remote:board,rev:4,delayMs:2});
+ const open=options=>loadAppAtTime(at,{indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:h.factory,...options});
+ const first=await open({seed:2306,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx,shim}=first,apps=[first];
+ t.after(async()=>{for(const item of apps){item.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',item.ctx);await item.dispose();}});
+ const until=async(predicate,label)=>{const end=performance.now()+10000;do{if(await predicate())return;await syncSettle(15);}while(performance.now()<end);assert.fail(label);};
+ const control=app=>({dataset:{candidate:app.ctx.state.candidateId,benchmark:app.ctx.state.chain.at(-1)}});
+ await ctx.cloudPull();ctx.onAction('start-scan',{dataset:{}});assert.equal(ctx.state.chain.length,1,'a real Start seeds this pass');ctx.cloudPushNow();await settleSavedViewPublication(first,h,'Start reaches the cloud');
+ const second=await open({seed:2307,sharedStorage:shim.localStorage});apps.push(second);await second.ctx.cloudPull();await settleSavedViewPublication(second,h,'second page matches the cloud');
+ const otherAnswer=control(second);second.ctx.onAction('no',otherAnswer);assert.equal(await second.ctx.persist(),true,'the other page moves the saved head');second.ctx.suspendCloudSync();
+ const events=()=>ctx.state.decisionEvents.filter(row=>row.kind!=='current-choice'),noControl=control(first);
+ ctx.onAction('no',noControl);const yesControl=control(first);assert.notEqual(yesControl.dataset.candidate,noControl.dataset.candidate,'the first answer deals the next candidate');
+ ctx.onAction('yes',yesControl);const mine=events().map(row=>row.id);assert.equal(mine.length,2,'both answers are accepted before the repair');
+ await until(()=>{const head=vm.runInContext('!cloudPushInFlight&&!pulling',ctx);return head&&events().length===3&&h.doc.payload===ctx.cloudPayload();},'the repaired board reaches the cloud');
+ const scan=shim.document.getElementById('scan').innerHTML,offered=ctx.state.candidateId;
+ assert.ok(offered,'tasks remain, so a candidate is dealt without any further action');
+ assert.ok(ctx.pool().some(row=>row.id===offered),'the dealt candidate is one the pass can still offer');
+ assert.match(scan,new RegExp('data-act="yes" data-candidate="'+offered+'"'),'its Yes control is on screen');
+ assert.match(scan,new RegExp('data-act="no" data-candidate="'+offered+'"'),'its No control is on screen');
+ assert.deepEqual(events().map(row=>row.id).filter(id=>mine.includes(id)).sort(),[...mine].sort(),'each accepted answer is kept exactly once');
+ assert.equal(new Set(ctx.state.decisionEvents.map(row=>row.id)).size,ctx.state.decisionEvents.length,'no answer is duplicated by the repair');
+ assert.equal(ctx.state.considered[otherAnswer.dataset.candidate],'no','the other page\'s answer survives the repair');
+ assert.equal(ctx.state.chain.includes(yesControl.dataset.candidate),true,'the Yes remains on the chain');
+ const dealt=JSON.stringify(ctx.state);ctx.onAction('no',noControl);assert.equal(JSON.stringify(ctx.state),dealt,'an answer aimed at an already-replaced candidate does nothing');
+ const pushes=h.calls.filter(call=>call==='push').length;ctx.render();await syncSettle(60);
+ assert.equal(JSON.stringify(ctx.state),dealt,'redrawing a dealt candidate changes nothing');assert.equal(h.calls.filter(call=>call==='push').length,pushes,'dealing is not a cloud write of its own');
+ await until(async()=>(await ctx.window.ScannerDeviceStore.readHead())?.payload===JSON.stringify(ctx.state)||await ctx.persist()&&(await ctx.window.ScannerDeviceStore.readHead())?.payload===JSON.stringify(ctx.state),'the repaired board is durable');
+ const reopened=await open({sharedStorage:shim.localStorage});apps.push(reopened);
+ assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.decisionEvents)).map(row=>row.id).sort(),JSON.parse(JSON.stringify(ctx.state.decisionEvents)).map(row=>row.id).sort(),'reload keeps every accepted answer once');
+ assert.match(reopened.shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'reload still offers a candidate');
+ await ctx.onAction('undo',{});
+ assert.equal(ctx.state.chain.includes(yesControl.dataset.candidate),false,'Undo reverses only the latest answer');
+ assert.equal(ctx.state.considered[noControl.dataset.candidate],'no','Undo keeps the earlier answer');
+ assert.equal(ctx.state.considered[otherAnswer.dataset.candidate],'no','Undo keeps the other page\'s answer');
+ assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'Undo still leaves a candidate to decide');
+});
+
 test('RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations',{timeout:20000+9*5000},async t=>{
  // Finite envelope: startup/auth, two native saves and two ACKs, initial
  // recovery, Retry and healthy-revision observation retain their 5s bounds.
@@ -823,7 +906,7 @@ test('RISK resilient sync recovery: unsupported unverifiable and foreign sources
   }else assert.ok(JSON.stringify(originalNamespace)===original,'unproved recovery performs no mutation in the original account');
   if(control==='foreign identity'){
    assert.equal(ctx.state.tasks.length,0,'an empty different authenticated identity never inherits the old board; '+JSON.stringify({identity:backend.CS.recoveryIdentity(),localIdentity:ctx.state.syncIdentity,localRevision:ctx.state.syncRev,otherPaths:[...backend.docs.keys()].filter(key=>!key.startsWith('users/owner'))}));
-   assert.ok(ctx.readLocalBackups().some(row=>row.payload===local),'the displaced account source remains exact and recoverable');
+   assert.ok((await backupRowsWithText(ctx)).some(row=>row.payload===local),'the displaced account source remains exact and recoverable');
    const foreign=await backend.CS.pull();
    if(foreign.payload)assert.equal(JSON.parse(foreign.payload).tasks.length,0,'an explicit ordinary sync under the new identity cannot publish old-account tasks');
   }else if(!supportedFallback)assert.ok(JSON.stringify(ctx.state)===local,'unproved source never replaces the accepted board');
@@ -1106,11 +1189,247 @@ async function largeBoardOpeningWithinMargin(t,motion){
  }
  assert.deepEqual(failures,[],JSON.stringify(observed));
 }
+// #2310 (spec #2308 slice 2): memory is compared on one board with and without
+// extra saved backups, never against an absolute byte count, so the same page
+// work cancels out. On the release before #2310, this test measured 30 extra
+// backups adding 104 to 124 MiB at opening and 168 to 412 MiB at Settings; the
+// 64 MiB margin only absorbs engine noise.
+const BACKUP_MEMORY_EXTRA=30,BACKUP_MEMORY_MARGIN=64*1024*1024;
+async function backupMemoryStaysFlat(t){
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),observed=[],failures=[],mib=bytes=>Math.round(bytes/1048576);
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const measure=async extra=>{
+   const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2310-'+engineName+'-'+extra+'-'));
+   const launch=async tag=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+     env:webProcessMemoryEnv(tag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({payload})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',payload);},{payload:fixture.payload});
+    return context;
+   };
+   const ready=page=>page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state!=='undefined'&&state,null,{timeout:90000});
+   try{
+    const tag=`chain-2310-${engineName}-${extra}-${process.pid}-${Date.now()}`;
+    let context=await launch(tag+'-seed');
+    let saved;
+    try{
+     const page=context.pages()[0]||await context.newPage();
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(1500);
+     // Each extra backup is a distinct board copy saved through the app's own path.
+     saved=await page.evaluate(async count=>{let ok=0;for(let i=0;i<count;i++){state.updatedAt=Date.now()+i;if((await saveDurableBackup('manual',JSON.stringify(state),{account:null}))?.id)ok++;}return ok;},extra);
+     await page.waitForTimeout(800);
+    }finally{await context.close();}
+    assert.equal(saved,extra,`${engineName}: every extra backup was saved`);
+    context=await launch(tag);
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     const opening=webProcessMemorySampler(tag);let open;
+     try{await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(4000);}
+     finally{open=await opening.stop();}
+     const settingsSampler=webProcessMemorySampler(tag);let settings,listed;
+     try{await page.locator('[data-act="settings"]').first().click();await page.locator('.backup-row').first().waitFor({state:'attached',timeout:60000});await page.waitForTimeout(2500);listed=await page.locator('.backup-row').count();}
+     finally{settings=await settingsSampler.stop();}
+     return {open,settings,listed,errors};
+    }finally{await context.close();}
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const few=await measure(0),many=await measure(BACKUP_MEMORY_EXTRA);
+  const summary={engine:engineName,openFewMiB:mib(few.open.peakBytes),openManyMiB:mib(many.open.peakBytes),settingsFewMiB:mib(few.settings.peakBytes),settingsManyMiB:mib(many.settings.peakBytes),listed:[few.listed,many.listed]};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  assert.ok(few.open.processes>0&&many.open.processes>0&&few.settings.samples>5&&many.settings.samples>5,`${engineName}: web-process memory was sampled ${JSON.stringify(summary)}`);
+  assert.equal(many.listed-few.listed,BACKUP_MEMORY_EXTRA,`${engineName}: every extra backup is still listed in Settings`);
+  assert.deepEqual([few.errors,many.errors],[[],[]],`${engineName}: no page errors`);
+  if(many.open.peakBytes-few.open.peakBytes>BACKUP_MEMORY_MARGIN)failures.push(`${engineName}: ${BACKUP_MEMORY_EXTRA} extra backups added ${mib(many.open.peakBytes-few.open.peakBytes)} MiB at opening`);
+  if(many.settings.peakBytes-few.settings.peakBytes>BACKUP_MEMORY_MARGIN)failures.push(`${engineName}: ${BACKUP_MEMORY_EXTRA} extra backups added ${mib(many.settings.peakBytes-few.settings.peakBytes)} MiB at Settings`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+}
+test('RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>backupMemoryStaysFlat(t));
+// #2310 re-review: every updating device passes through one opening with no
+// learned facts. Measuring must not stack on the opening's own memory, even if
+// the person saves in the first seconds. A device with learned facts is the
+// reference; the margin allows the measuring itself and sampler noise.
+const FIRST_OPENING_MEASURE_MARGIN_MIB=130;
+test('RISK backup memory browser: the first opening with no learned facts stays close to an ordinary opening while every backup is measured, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),failures=[],mib=bytes=>Math.round(bytes/1048576);
+ const FACTS='fvp:chain-scanner:backup-facts';
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'chain-2310-first-'+engineName+'-')),tag=`chain-2310-first-${engineName}-${process.pid}-${Date.now()}`;
+  const launch=async(runTag,forget)=>{
+   const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},serviceWorkers:'block',reducedMotion:'reduce',
+    env:webProcessMemoryEnv(runTag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await context.addInitScript(({payload,forget,FACTS})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    if(forget)localStorage.removeItem(FACTS);
+    if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',payload);},{payload:fixture.payload,forget,FACTS});
+   return context;
+  };
+  const ready=page=>page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&typeof state!=='undefined'&&state,null,{timeout:90000});
+  const measuredAll=page=>page.waitForFunction(({FACTS,count})=>(JSON.parse(localStorage.getItem(FACTS)||'{"rows":[]}').rows||[]).filter(([,fact])=>fact.facts?.incomplete!==true).length>=count,{FACTS,count:BACKUP_MEMORY_EXTRA},{timeout:90000});
+  try{
+   let context=await launch(tag+'-seed',false);
+   try{
+    const page=context.pages()[0]||await context.newPage();
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(1500);
+    const saved=await page.evaluate(async count=>{let ok=0;for(let i=0;i<count;i++){state.updatedAt=Date.now()+i;if((await saveDurableBackup('manual',JSON.stringify(state),{account:null}))?.id)ok++;}return ok;},BACKUP_MEMORY_EXTRA);
+    assert.equal(saved,BACKUP_MEMORY_EXTRA,`${engineName}: every extra backup was saved`);
+    await page.waitForTimeout(800);
+   }finally{await context.close();}
+   // An ordinary opening of the same data, once its facts are learned.
+   context=await launch(tag+'-learn',false);
+   try{const page=context.pages()[0]||await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await measuredAll(page);await page.waitForTimeout(500);}
+   finally{await context.close();}
+   context=await launch(tag+'-ordinary',false);let ordinary;
+   try{const page=context.pages()[0]||await context.newPage(),sampler=webProcessMemorySampler(tag+'-ordinary');
+    try{await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);await page.waitForTimeout(4000);}finally{ordinary=await sampler.stop();}
+   }finally{await context.close();}
+   context=await launch(tag+'-first',true);let first,errors=[];
+   try{const page=context.pages()[0]||await context.newPage(),sampler=webProcessMemorySampler(tag+'-first');page.on('pageerror',error=>errors.push(error.message));
+    try{
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await ready(page);
+     await page.waitForTimeout(1500);
+     assert.equal(await page.evaluate(async()=>{state.updatedAt=Date.now();return await persist(true);}),true,`${engineName}: the early save succeeds`);
+     await measuredAll(page);await page.waitForTimeout(1000);
+    }finally{first=await sampler.stop();}
+   }finally{await context.close();}
+   t.diagnostic(JSON.stringify({engine:engineName,ordinaryMiB:mib(ordinary.peakBytes),firstMiB:mib(first.peakBytes)}));
+   assert.ok(first.samples>5&&ordinary.samples>5,`${engineName}: web-process memory was sampled`);
+   assert.ok(mib(first.peakBytes)<=mib(ordinary.peakBytes)+FIRST_OPENING_MEASURE_MARGIN_MIB,`${engineName}: the first opening peaked at ${mib(first.peakBytes)} MiB, the ordinary opening at ${mib(ordinary.peakBytes)} MiB`);
+   assert.deepEqual(errors,[],`${engineName}: no page errors`);
+  }catch(error){failures.push(error.message.split('\n')[0]);}finally{fs.rmSync(profile,{recursive:true,force:true});}
+ }
+ assert.deepEqual(failures,[]);
+});
 test('RISK large board opening browser: a large saved board opens from device storage within a fixed memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'reduced'));
 // #2228 review (story 19): the same opening guarantee with normal motion,
 // where the scenery animates. Both scenarios share the motion choice, so the
 // margin over the empty board stays the same.
 test('RISK large board opening browser: with normal motion, a large saved board opens from device storage within the same memory margin of an empty board, with every task present and editable, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},t=>largeBoardOpeningWithinMargin(t,'normal'));
+
+// #2311 (spec #2308): a long scan used to retain two whole serialized boards
+// per Undo frame, so 30 frames held about 62 board copies of JS memory. The
+// answers are trusted taps on the real scanner buttons, paced like a quick
+// person. Rendering and saving also raise peak web-process memory during a
+// scan, independent of Undo and of the board, so each engine repeats the same
+// scan with Undo capture turned off and the bound applies to what Undo adds on
+// top of that same control: a fixed margin for sampler noise plus a small
+// multiple of the board size. Growth compares each run against its own settled
+// scanning board, so a machine's absolute baseline does not matter.
+const LONG_SCAN_ANSWERS=60,LONG_SCAN_PACE_MS=150,LONG_SCAN_FIXED_MARGIN=80*1024*1024,LONG_SCAN_BYTES_FACTOR=16;
+const LONG_SCAN_ROWS_PER_ANSWER=4,LONG_SCAN_RANK_BUFFERS_PER_ANSWER=8;
+// #2308 (owner-approved): the whole-scan ceiling only guards against getting
+// worse. The original target was 117 MiB, the same allowance Undo still has, but
+// the same scan with Undo off already grows more than that in both engines here
+// (WebKit 316-365 MiB, Chromium 138-156 MiB), so no Undo fix can reach it. Each
+// ceiling is about 15% above the highest of three runs per engine on desktop
+// (Chromium 168 MiB, WebKit 394 MiB). Passing here does not show a phone is
+// safe: the installed iPhone run is the real acceptance.
+const LONG_SCAN_GROWTH_GUARD_MIB={chromium:193,webkit:453};
+test('RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const fixture=await largeBoardFixture(),{stats}=fixture,allowance=LONG_SCAN_FIXED_MARGIN+LONG_SCAN_BYTES_FACTOR*stats.serializedBytes;
+ assert.equal(stats.tasks,LARGE_BOARD_SHAPE.tasks);assert.ok(stats.serializedBytes>=LARGE_BOARD_SHAPE.serializedBytes);
+ const mib=bytes=>Math.round(bytes/1048576),observed=[],failures=[];
+ for(const [engineName,engine] of [['chromium',chromium],['webkit',webkit]]){
+  let longScanWork=null,longScanStarted=0,longScanSeconds=0;
+  const scan=async undoCaptured=>{
+   const label=undoCaptured?'undo':'control',profile=fs.mkdtempSync(path.join(os.tmpdir(),`chain-2311-${engineName}-${label}-`)),tag=`chain-2311-${engineName}-${label}-${process.pid}-${Date.now()}`;
+   const launch=async(runTag,seed)=>{
+    const context=await engine.launchPersistentContext(profile,{headless:true,viewport:{width:390,height:844},deviceScaleFactor:3,serviceWorkers:'block',reducedMotion:'reduce',
+     env:webProcessMemoryEnv(runTag),...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    await context.addInitScript(({seed})=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+     localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+     if(seed!==null&&localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',seed);},{seed});
+    return context;
+   };
+   const opened=page=>page.waitForFunction(count=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]')&&document.querySelectorAll('#listBody [data-row]').length===count,LARGE_BOARD_SHAPE.tasks,{timeout:90000});
+   try{
+    let context=await launch(tag+'-seed',fixture.payload);
+    try{
+     const page=context.pages()[0]||await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await opened(page);
+     await page.waitForFunction(()=>new Promise(resolve=>{const request=indexedDB.open('chain-scanner-v2');request.onerror=()=>resolve(false);
+      request.onsuccess=()=>{const names=[...request.result.objectStoreNames];request.result.close();resolve(names.length>0);};}),null,{timeout:30000});
+     await page.waitForTimeout(1000);
+    }finally{await context.close();}
+    context=await launch(tag,null);
+    try{
+     const page=context.pages()[0]||await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+     await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});await opened(page);
+     if(!undoCaptured)await page.evaluate(()=>{window.pushUndo=function(){};window.sealUndoFrame=function(){};});
+     if(!await page.evaluate(()=>state.candidateId))await page.locator('[data-act="start-scan"]').first().click();
+     await page.waitForFunction(()=>!!state.candidateId,null,{timeout:30000});
+     await page.waitForTimeout(3000);
+     const settledSampler=webProcessMemorySampler(tag);await page.waitForTimeout(3000);const settled=await settledSampler.stop();
+     // #2313: counted at the platform boundary, so the assertion is about work
+     // the page does rather than how the app arranges it. A row element counts
+     // once, the first time it joins the list; a row that only moves is not new.
+     if(undoCaptured)await page.evaluate(()=>{
+      const work=window.__longScanWork={rows:0,placed:0,floatArrays:0},seen=new WeakSet(document.querySelectorAll('#listBody [data-row]'));
+      new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1&&node.matches('[data-row]')){work.placed++;if(!seen.has(node)){seen.add(node);work.rows++;}}}).observe(document.getElementById('listBody'),{childList:true});
+      window.Float32Array=new Proxy(window.Float32Array,{construct(target,args,newTarget){work.floatArrays++;return Reflect.construct(target,args,newTarget);}});
+     });
+     if(undoCaptured)longScanStarted=Date.now();
+     const sampler=webProcessMemorySampler(tag);let memory,answered=0,last=null;
+     try{
+      for(let guard=0;answered<LONG_SCAN_ANSWERS&&guard<LONG_SCAN_ANSWERS*3;guard++){
+       const before=await page.evaluate(()=>({candidate:state.candidateId,intervention:!!state.interventionActive,length:state.chain.length}));
+       if(before.intervention){await page.locator('[data-act="continue-scan"]').click();await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
+       assert.ok(before.candidate,`${engineName} ${label}: the scan offers a candidate at answer ${answered}`);
+       const act=before.length%5?'no':'yes';
+       last={act,candidate:before.candidate};
+       await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+       await page.locator(`[data-act="${act}"]`).click();
+       await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
+       answered++;
+       await page.waitForTimeout(LONG_SCAN_PACE_MS);
+      }
+      await page.waitForTimeout(1500);
+     }finally{memory=await sampler.stop();}
+     assert.equal(answered,LONG_SCAN_ANSWERS,`${engineName} ${label}: every answer was accepted`);
+     if(undoCaptured){
+      longScanSeconds=(Date.now()-longScanStarted)/1000;
+      longScanWork=await page.evaluate(()=>new Promise(resolve=>setTimeout(()=>resolve({...window.__longScanWork}),0)));
+      // What the kept rows now show is exactly what a fresh list would draw.
+      const list=()=>page.evaluate(()=>document.getElementById('listBody').innerHTML);
+      const kept=await list();
+      await page.evaluate(()=>{onAction('toggle-list',{dataset:{}});onAction('toggle-list',{dataset:{}});});
+      assert.equal(await list(),kept,`${engineName}: the list kept through 60 answers matches a freshly drawn list`);
+      // Undo still reaches its limit and reverses only the newest answer.
+      assert.equal(await page.evaluate(()=>undoStack.length),30,`${engineName}: 60 answers keep the 30-step Undo limit`);
+      await page.evaluate(()=>undo());
+      await page.waitForFunction(({act,candidate})=>state.candidateId===candidate||(act==='no'&&!Object.hasOwn(state.considered,candidate)),last,{timeout:10000});
+      assert.equal(await page.evaluate(()=>undoStack.length),29,`${engineName}: Undo consumed one step`);
+     }
+     assert.deepEqual(errors,[],`${engineName} ${label}: no page errors`);
+     assert.ok(settled.processes>0&&memory.processes>0&&settled.samples>10&&memory.samples>10,`${engineName} ${label}: web-process memory was sampled`);
+     return {growth:memory.peakBytes-settled.peakBytes,settled:settled.peakBytes,peak:memory.peakBytes};
+    }finally{await context.close();}
+   }finally{fs.rmSync(profile,{recursive:true,force:true});}
+  };
+  const control=await scan(false),undo=await scan(true),added=undo.growth-control.growth;
+  const summary={engine:engineName,controlGrowthMiB:mib(control.growth),undoGrowthMiB:mib(undo.growth),addedByUndoMiB:mib(added),allowanceMiB:mib(allowance),settledPeakMiB:mib(undo.settled),answersPeakMiB:mib(undo.peak)};
+  observed.push(summary);t.diagnostic(JSON.stringify(summary));
+  if(added>allowance)failures.push(`${engineName}: Undo added ${mib(added)} MiB to 60 answers, above the ${mib(allowance)} MiB allowance`);
+  // #2313 (seam agreed in #2308): the whole scan, not only Undo's part of it.
+  if(undo.growth>LONG_SCAN_GROWTH_GUARD_MIB[engineName]*1048576)failures.push(`${engineName}: 60 answers grew web process memory by ${mib(undo.growth)} MiB, above the ${LONG_SCAN_GROWTH_GUARD_MIB[engineName]} MiB guard`);
+  // Each answer changes a few tasks: only those rows may be drawn from scratch,
+  // and a rank refresh reuses its per-task buffers instead of allocating more.
+  t.diagnostic(JSON.stringify({engine:engineName,work:longScanWork}));
+  if(longScanWork.rows>LONG_SCAN_ANSWERS*LONG_SCAN_ROWS_PER_ANSWER)failures.push(`${engineName}: 60 answers drew ${longScanWork.rows} list rows from scratch, above ${LONG_SCAN_ANSWERS*LONG_SCAN_ROWS_PER_ANSWER}`);
+  // Rows reshuffled by a rank refresh: at most about one whole-list pass per
+  // second of scanning, however fast the answers come. A rate of work, not a speed.
+  const placedAllowed=Math.ceil(LARGE_BOARD_SHAPE.tasks*(longScanSeconds+2));
+  if(longScanWork.placed>placedAllowed)failures.push(`${engineName}: 60 answers placed ${longScanWork.placed} list rows, above ${placedAllowed} for a ${Math.round(longScanSeconds)} second scan`);
+  if(longScanWork.floatArrays>LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER)failures.push(`${engineName}: 60 answers allocated ${longScanWork.floatArrays} rank buffers, above ${LONG_SCAN_ANSWERS*LONG_SCAN_RANK_BUFFERS_PER_ANSWER}`);
+ }
+ assert.deepEqual(failures,[],JSON.stringify(observed));
+});
 
 // #2226 (spec #2224): the accepted device board appears and takes input before
 // any automatic recovery default work starts, extending #2194's board before
@@ -4739,6 +5058,343 @@ test('RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority ne
  reopened.ctx.cloudPushNow();await syncSettle(PAST_DEBOUNCE+40);
  assert.equal(pushes.length,0,'an unavailable durable authority cannot upload a default or stale board');
  assert.equal(storage.getItem(SYNC_STORE_KEY),legacyRaw,'the last legacy recovery bytes stay untouched');
+});
+
+test('RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-'+Date.now()+'-'+Math.random();
+ const loaded=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=loaded,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Saved in the manual copy');assert.equal(await ctx.persist(),true);
+ const manualBoard=JSON.stringify(ctx.state),manual=await ctx.saveDurableBackup('manual',manualBoard);assert.ok(manual?.id);
+ // A copy of bytes the app cannot read back as a board, written straight to device storage.
+ const head=await store.readHead(),unreadable='{"tasks":';
+ assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id:'device-unreadable',kind:'other-browser-copy',day:'2026-10-01',at:Date.parse('2026-10-01T12:00:00Z'),payload:unreadable}})).ok);
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ const cached=()=>JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx));
+ const rows=cached();assert.ok(rows.length>=3,'the fixture holds several device copies');
+ assert.deepEqual(rows.filter(row=>'payload' in row).map(row=>row.kind),[],'the in-memory backup list holds no backup text');
+ assert.deepEqual(rows.filter(row=>JSON.stringify(row).includes('Saved in the manual copy')).map(row=>row.id),[],'no row carries board contents');
+ assert.ok(rows.every(row=>typeof row.id==='string'&&typeof row.kind==='string'&&typeof row.day==='string'&&Number.isFinite(row.at)&&/^[0-9a-f]{64}$/.test(row.payloadHash)&&Number.isSafeInteger(row.payloadChars)),'identity and display facts are kept');
+ assert.equal(rows.find(row=>row.id===manual.id).payloadChars,manualBoard.length,'its size is the exact saved length');
+ assert.equal(rows.find(row=>row.id==='device-unreadable').payloadFacts.readable,false,'an unreadable copy is known as one');
+ // Settings lists both device copies; the unreadable one stays visible and cannot be restored.
+ ctx.openSettings();
+ let view=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(view,/Unreadable backup · device-unreadable/);
+ assert.match(view,/data-act="restore-local-backup" data-id="device-unreadable"[^>]*disabled/);
+ assert.match(view,new RegExp('data-act="restore-local-backup" data-id="'+manual.id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'"(?![^>]*disabled)'));
+ assert.equal(Array.from(vm.runInContext('backupRowsShown',ctx)).some(row=>row.payload!==undefined),false,'the shown list holds no text either');
+ // Restore rewrites the board from the exact stored copy, read for this action.
+ ctx.addTask('Added after the manual copy');assert.equal(await ctx.persist(),true);
+ const reads=[],readBackups=store.readBackups;store.readBackups=function(ids){reads.push(ids);return readBackups.call(this,ids);};
+ assert.equal(await ctx.restoreDurableBackupById('device-unreadable'),false,'the unreadable copy is refused');
+ ctx.openSettings();
+ assert.equal(await ctx.restoreDurableBackupById(manual.id),true,'Restore reads the exact device copy');
+ assert.deepEqual(reads.map(ids=>Array.from(ids)),[['device-unreadable'],[manual.id]],'each backup text is read only by the action that needs it');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Saved in the manual copy'));
+ assert.equal((await store.listBackups()).find(row=>row.id===manual.id).payload,manualBoard,'the copy keeps its exact bytes');
+ assert.equal((await store.listBackups()).find(row=>row.id==='device-unreadable').payload,unreadable,'the unreadable copy keeps its exact bytes');
+ // Delete checks the exact stored row and removes only it.
+ const others=(await store.listBackups()).filter(row=>row.id!==manual.id).map(row=>row.id);
+ ctx.openSettings();
+ const removed=await ctx.onAction('delete-local-backup',{dataset:{id:manual.id}});
+ assert.equal(removed,true,'the listed copy is deleted after its exact bytes are checked');
+ assert.deepEqual(Array.from(await store.listBackups(),row=>row.id).sort(),[...others].sort(),'every other copy stays');
+ await loaded.dispose?.();
+});
+
+test('RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-reopen-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Saved on this device');assert.equal(await first.ctx.persist(),true);
+ const manual=await first.ctx.saveDurableBackup('manual',JSON.stringify(first.ctx.state));assert.ok(manual?.id);
+ const store=first.shim.window.ScannerDeviceStore,exact=(await store.readBackups([manual.id]))[0];
+ assert.equal(exact.payload,JSON.stringify(first.ctx.state),'the exact read returns the stored text');
+ // Damage the stored bytes under their hash, leaving the row and its learned facts alone.
+ await new Promise((resolve,reject)=>{const open=indexedDB.open(dbName);open.onerror=()=>reject(open.error);open.onsuccess=()=>{const db=open.result,tx=db.transaction(['backups','snapshots'],'readwrite'),request=tx.objectStore('backups').get(manual.id);
+  request.onsuccess=()=>tx.objectStore('snapshots').put({hash:request.result.payloadHash,payload:'{"damaged":true}'},request.result.payloadHash);tx.oncomplete=()=>{db.close();resolve();};tx.onerror=()=>reject(tx.error);};});
+ await assert.rejects(store.readBackups([manual.id]),/corrupt/,'damaged bytes cannot be returned as the backup');
+ await first.dispose?.();
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ const shown=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx));
+ assert.ok(shown.some(row=>row.id===manual.id),'the listing comes from what was already learned, without reading the text');
+ assert.equal(await reopened.ctx.restoreDurableBackupById(manual.id),false,'Restore still refuses the damaged copy');
+ await reopened.dispose?.();
+});
+
+// #2310 review: measuring every backup used to run inside the five-second
+// device opening budget, and on the first opening after the update a slow phone
+// could spend it all there and end up read-only. Nothing the opening needs comes
+// from a measure, so the measuring waits until the board is open.
+test('RISK backup list memory: a first opening does not measure backups before the board is open, lists them all, and learns their measures afterwards',async t=>{
+ const {indexedDB,IDBObjectStore}=await import('fake-indexeddb'),dbName='chain-scanner-facts-first-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Saved before the update');assert.equal(await first.ctx.persist(),true);
+ const store=first.shim.window.ScannerDeviceStore,head=await store.readHead();
+ for(let i=0;i<4;i++)assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id:'first-open-'+i,kind:'manual',day:'2026-11-0'+(i+1),at:i+1,payload:head.payload+' '.repeat(i+1)}})).ok);
+ await vm.runInContext('refreshDeviceBackupCache()',first.ctx);
+ const rows=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',first.ctx)),hashes=new Set(rows.filter(row=>row.id.startsWith('first-open-')).map(row=>row.payloadHash));
+ assert.equal(hashes.size,4,'four distinct saved boards');
+ await first.dispose?.();
+ storage.removeItem('fvp:chain-scanner:backup-facts');
+ let boardOpen=()=>false,saveDone=false;const measuringStarted=()=>saveDone,early=[],saveReads=[],original=IDBObjectStore.prototype.get;
+ IDBObjectStore.prototype.get=function(key){if(this.name==='snapshots'&&hashes.has(key)&&!measuringStarted())(boardOpen()?saveReads:early).push(key);return original.call(this,key);};
+ t.after(()=>{IDBObjectStore.prototype.get=original;});
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage,awaitStartup:false});
+ t.after(()=>reopened.dispose?.());
+ boardOpen=()=>vm.runInContext('!!state',reopened.ctx);
+ const until=async(check,what)=>{for(let i=0;i<1800;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail(what);};
+ await until(boardOpen,'the board opens');
+ assert.deepEqual(early,[],'no backup was measured before the board opened');
+ // A save soon after opening lists its backups again, and must not measure them all at once either.
+ reopened.ctx.addTask('Answered in the first seconds');assert.equal(await reopened.ctx.persist(),true);
+ assert.deepEqual(saveReads,[],'an early save measures no backup');
+ saveDone=true;
+ assert.equal(vm.runInContext('deviceStorageAuthority',reopened.ctx),true,'device storage opened with authority');
+ const listed=()=>JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx));
+ assert.deepEqual(listed().filter(row=>row.id.startsWith('first-open-')).map(row=>row.id).sort(),['first-open-0','first-open-1','first-open-2','first-open-3'],'every backup is listed as soon as the board opens');
+ await until(()=>listed().filter(row=>row.id.startsWith('first-open-')).every(row=>Number.isSafeInteger(row.payloadChars)&&row.payloadFacts?.readable===true),'the measures are learned after the board opens');
+ assert.equal(JSON.parse(storage.getItem('fvp:chain-scanner:backup-facts')).rows.filter(([hash])=>hashes.has(hash)).length,4,'what was measured is saved for later openings');
+});
+
+// #2310 review: Restore on an empty-cloud evidence copy has to look as refused as
+// it is, even though the list holds no text for the row to be read from.
+const backupRestoreMarkup=(app,id)=>{app.ctx.openSettings();const markup=app.shim.document.getElementById('modalRoot').innerHTML;return markup.match(new RegExp('<button[^>]*data-act="restore-local-backup"[^>]*'+id+'[^>]*>|<button[^>]*'+id+'[^>]*data-act="restore-local-backup"[^>]*>'))?.[0]||'';};
+const backupFactsRow=async(indexedDB,dbName,storage,payload,id,kind)=>{
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Board for the copy');assert.equal(await first.ctx.persist(),true);
+ const store=first.shim.window.ScannerDeviceStore,head=await store.readHead();
+ assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id,kind,day:'2026-10-02',at:Date.parse('2026-10-02T12:00:00Z'),payload}})).ok);
+ await vm.runInContext('refreshDeviceBackupCache()',first.ctx);
+ const row=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',first.ctx)).find(entry=>entry.id===id);
+ return {first,row,saved:()=>JSON.parse(storage.getItem('fvp:chain-scanner:backup-facts'))};
+};
+test('RISK backup list memory: Restore stays disabled on an empty-cloud evidence copy listed without its text, including from facts learned by an earlier build',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-evidence-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const {first,row,saved}=await backupFactsRow(indexedDB,dbName,storage,JSON.stringify({tasks:[],emptyCloud:true,revision:7}),'evidence-empty','decision-recovery-cloud');
+ assert.equal(row.payload,undefined,'the row holds no text');
+ assert.equal(row.payloadFacts.readable,true,'positive control: only being evidence stops this copy from restoring');
+ assert.match(backupRestoreMarkup(first,'evidence-empty'),/\sdisabled/,'Restore renders disabled');
+ await first.dispose?.();
+ // An earlier build's cache knows the row is readable, and nothing else about it.
+ const old=saved();old.version=1;for(const entry of old.rows)if(entry[0]===row.payloadHash)delete entry[1].facts.emptyCloud;
+ storage.setItem('fvp:chain-scanner:backup-facts',JSON.stringify(old));
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ assert.match(backupRestoreMarkup(reopened,'evidence-empty'),/\sdisabled/,'before it is measured, Restore renders disabled');
+ for(let i=0;i<1500&&vm.runInContext('deviceBackupMeasuringOwed',reopened.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(vm.runInContext('deviceBackupMeasuringOwed',reopened.ctx),false,'positive control: the copy was measured');
+ assert.match(backupRestoreMarkup(reopened,'evidence-empty'),/\sdisabled/,'measured again, Restore renders disabled');
+});
+test('RISK backup list memory: a saved verdict of unreadable is measured again, so a later build that can read the copy lists it as readable',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-facts-verdict-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const board=syncState({tasks:[syncTask('kept','Readable copy')]});
+ const {first,row,saved}=await backupFactsRow(indexedDB,dbName,storage,JSON.stringify(board),'verdict-copy','manual');
+ assert.equal(row.payloadFacts.readable,true,'positive control: the copy is readable');
+ await first.dispose?.();
+ const old=saved();for(const entry of old.rows)if(entry[0]===row.payloadHash)entry[1].facts.readable=false;
+ storage.setItem('fvp:chain-scanner:backup-facts',JSON.stringify(old));
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ for(let i=0;i<1500&&vm.runInContext('deviceBackupMeasuringOwed',reopened.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10));
+ const listed=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',reopened.ctx)).find(entry=>entry.id==='verdict-copy');
+ assert.equal(listed.payloadFacts.readable,true,'the stale verdict did not stick');
+});
+
+test('RISK backup list memory: an ordinary save lists its own automatic copy from what it just wrote, without reading a saved board back',async t=>{
+ const {indexedDB,IDBObjectStore}=await import('fake-indexeddb'),dbName='chain-scanner-save-read-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;t.after(()=>app.dispose?.());
+ // The day's first save also writes its daily copy, which is measured once for that day.
+ for(const title of ['Saved first','Saved again']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ assert.ok(JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx)).some(row=>row.kind==='daily'),'the daily copy already exists');
+ const reads=[],original=IDBObjectStore.prototype.get;
+ // The listing's read pairs backups with snapshots in a read-only transaction; the save's commit does its own.
+ IDBObjectStore.prototype.get=function(...args){if(this.name==='snapshots'&&this.transaction.mode==='readonly'&&this.transaction.objectStoreNames.contains('backups'))reads.push(args[0]);return original.apply(this,args);};
+ t.after(()=>{IDBObjectStore.prototype.get=original;});
+ for(const title of ['Saved second','Saved third']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ assert.deepEqual(reads,[],'two saves read no saved board back');
+ const rows=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx)),board=JSON.stringify(ctx.state);
+ const latest=rows.filter(row=>row.kind==='latest');
+ assert.equal(latest.length,1,'the list still shows the automatic latest copy');
+ assert.equal(latest[0].payloadChars,board.length,'its size is the exact length of the board just saved');
+ assert.ok(!('payload' in latest[0]),'and it holds no text');
+ IDBObjectStore.prototype.get=original;
+ const stored=(await shim.window.ScannerDeviceStore.listBackups()).find(row=>row.id===latest[0].id);
+ assert.equal(stored.payload,board,'the copy on the device keeps the exact bytes');
+ // A manual copy of that same board is another row of the same bytes: it still gets a full description.
+ const manual=await ctx.saveDurableBackup('manual',board);assert.ok(manual?.id);
+ const manualRow=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache)',ctx)).find(row=>row.id===manual.id);
+ assert.equal(manualRow.payloadFacts.readable,true);assert.notEqual(manualRow.payloadFacts.incomplete,true,'the skipped description is filled in when another row needs it');
+});
+
+test('RISK backup list memory: the older browser backup list is compared by hash without keeping its text, so a mirrored row merges and a different one stays listed',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-legacy-hashes-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage}),{ctx,shim}=app;t.after(()=>app.dispose?.());
+ ctx.addTask('Board in the mirrored backup');assert.equal(await ctx.persist(),true);
+ const board=JSON.stringify(ctx.state),manual=await ctx.saveDurableBackup('manual',board);assert.ok(manual?.id);
+ const conflict=await ctx.saveDurableBackup('manual',board+' ');assert.ok(conflict?.id);
+ const identity=row=>({id:row.id,day:row.day,at:row.at,kind:row.kind});
+ const differentText=JSON.stringify({...JSON.parse(board),updatedAt:7});
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{...identity(manual),payload:board},{...identity(conflict),payload:differentText}]));
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ const held=vm.runInContext(`(()=>{const out=[],walk=value=>{if(typeof value==="string")out.push(value);else if(value instanceof Map)for(const [k,v]of value){walk(k);walk(v);}else if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==="object")Object.values(value).forEach(walk);};walk(legacyBackupHashes);return out;})()`,ctx);
+ assert.ok(held.length>0,'the comparison holds what it needs');
+ assert.deepEqual(Array.from(held).filter(text=>text.length>128).map(text=>text.length),[],'no raw index or backup text is kept');
+ ctx.openSettings();
+ const shown=Array.from(vm.runInContext('backupRowsShown',ctx));
+ assert.equal(shown.filter(row=>row.id===manual.id).length,1,'the exact mirror of a device backup is listed once');
+ assert.equal(shown.filter(row=>row.id===conflict.id).length,2,'a browser row with different bytes under the same ID stays listed beside the device row');
+ assert.equal(shim.document.getElementById('modalRoot').innerHTML.match(/Duplicate backup ID/g)?.length,2,'and both of those are shown as a duplicate');
+});
+
+// #2308 review: before an account switch replaces the board, cloudPull finds the
+// previous board's safety copy by hash and reads its exact bytes back. These
+// drive that real pull with a real device store; only the read is interfered with.
+async function accountSwitchDeviceApp2308(t){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-switch-'+Date.now()+'-'+Math.random();
+ const local=syncState({tasks:[syncTask('board-a','Board of the previous account')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});t.after(()=>app.dispose?.());
+ const remote=syncState({tasks:[syncTask('board-b','Board of the new account')],syncAccount:'other@example.com'});
+ const sync=makeSyncHarness({remote,rev:7}),backend=sync.factory();backend.user='other@example.com';
+ app.shim.window.CloudSync=backend;
+ // Only the device copy can prove this board: no older browser list holds it.
+ storage.removeItem(LOCAL_BACKUPS_KEY);
+ const store=app.shim.window.ScannerDeviceStore,readBackups=store.readBackups;
+ // The safety copy's read: earlier reads have other jobs and are left alone.
+ const faults={reads:0,fail:0,during:null};
+ store.readBackups=async function(ids){
+  if(!Array.from(ids).some(id=>String(id).startsWith('before-account-switch')))return readBackups.call(this,ids);
+  faults.reads++;
+  if(faults.fail>0){faults.fail--;throw Object.assign(Error('fixture read aborted'),{name:'AbortError'});}
+  const rows=await readBackups.call(this,ids);
+  faults.during?.();
+  return rows;
+ };
+ const titles=()=>Array.from(app.ctx.state.tasks,row=>row.title),toastText=()=>app.shim.document.getElementById('toast').textContent;
+ // The app's own timers are unreferenced; this keeps the process up through a retry wait.
+ const keepAlive=setInterval(()=>{},10);t.after(()=>clearInterval(keepAlive));
+ return {...app,store,sync,faults,titles,toastText};
+}
+const deviceReadFailures2308=ctx=>ctx.buildSupportDiagnosticsReport().events.filter(row=>row.stage==='device-store'&&row.status==='failed');
+
+test('RISK backup read back: a brief device read failure during an account switch is retried, keeps its diagnostics and still adopts the new board',async t=>{
+ const app=await accountSwitchDeviceApp2308(t);
+ app.faults.fail=1;
+ await app.ctx.cloudPull();
+ assert.deepEqual(app.titles(),['Board of the new account'],'the retried read proves the safety copy, so the switch completes: '+app.toastText());
+ assert.equal(app.faults.reads,2,'one failed read and one retry');
+ assert.doesNotMatch(app.toastText(),/held/i,'a recovered read needs no notice');
+ assert.equal(deviceReadFailures2308(app.ctx).length,1,'the failed attempt is kept in the Debug log');
+ assert.ok((await app.store.listBackups()).some(row=>row.kind==='before-account-switch'&&row.payload.includes('Board of the previous account')),'the previous board stays exactly recoverable');
+});
+
+test('RISK backup read back: a device read that keeps failing holds the switch honestly within its budget and leaves the board alone',async t=>{
+ const app=await accountSwitchDeviceApp2308(t),before=JSON.stringify(app.ctx.state);
+ app.faults.fail=99;
+ await app.ctx.cloudPull();
+ assert.equal(JSON.stringify(app.ctx.state),before,'the board is not replaced');
+ assert.deepEqual(app.titles(),['Board of the previous account']);
+ assert.ok(app.faults.reads>=2&&app.faults.reads<=4,'retries stop at a small budget: '+app.faults.reads);
+ assert.equal(deviceReadFailures2308(app.ctx).length,app.faults.reads,'every attempt is kept in the Debug log');
+ assert.equal(vm.runInContext('cloudAdoptionHeld',app.ctx),true,'the cloud copy stays held, so no write can follow');
+ assert.doesNotMatch(app.toastText(),/no restorable local copy/,'a failed read is not reported as a missing copy');
+ assert.match(app.toastText(),/could not (?:be )?read/i,'the notice names what actually happened: '+app.toastText());
+ assert.ok(vm.runInContext('syncErrorLog',app.ctx).some(row=>row.code==='recovery-unavailable'),'the failure stays visible in the sync log');
+ assert.equal(app.sync.calls.includes('push'),false,'nothing is written to the new account');
+});
+
+test('RISK backup read back: a sign-out during the retry budget stops reading',async t=>{
+ const app=await accountSwitchDeviceApp2308(t);
+ app.faults.fail=99;
+ const realFail=app.faults;
+ app.ctx.window.CloudSync.user='other@example.com';
+ const pull=app.ctx.cloudPull();
+ for(let i=0;i<500&&!app.faults.reads;i++)await flush();
+ assert.equal(app.faults.reads,1,'the first attempt has run');
+ app.ctx.window.CloudSync.user=null;
+ await pull;await syncSettle(400);
+ assert.equal(realFail.reads,1,'no attempt starts once the sign-in it served is gone');
+ assert.deepEqual(app.titles(),['Board of the previous account'],'nothing is adopted');
+ assert.doesNotMatch(app.toastText(),/held/i,'a pull nobody is waiting for says nothing');
+ assert.equal(vm.runInContext('syncErrorLog',app.ctx).some(row=>row.code==='recovery-unavailable'),false,'and reports no failure');
+});
+
+test('RISK backup read back: an edit made while the safety copy is being read back holds the account switch instead of being lost',async t=>{
+ const app=await accountSwitchDeviceApp2308(t);
+ app.faults.during=()=>{app.faults.during=null;app.ctx.addTask('Edit made during the read');};
+ await app.ctx.cloudPull();
+ assert.ok(app.titles().includes('Edit made during the read'),'the edit stays on the board: '+JSON.stringify(app.titles()));
+ assert.ok(app.titles().includes('Board of the previous account'),'the previous board was not replaced');
+ assert.equal(app.ctx.state.syncAccount,'e@example.com','the edited board stays with its own account');
+ assert.equal(app.ctx.state.syncRev,3,'and keeps its own revision base');
+ assert.equal(vm.runInContext('undoStack.length',app.ctx),1,'and its Undo step');
+ assert.equal(vm.runInContext('cloudAdoptionHeld',app.ctx),true);
+ assert.equal(vm.runInContext('deferredCloudPull',app.ctx),true,'a later pull reconciles the edit with its own safety copy');
+});
+
+// #2308 review: the scanner deals a missing candidate while drawing, and the
+// candidate is in the cloud payload, so a clean board could differ from its own
+// acknowledged copy only because of a redraw.
+async function cleanDealtBoard2308(t,deliver=remote=>remote){
+ const board=syncState({tasks:[{...syncTask('bench','Benchmark task'),mu:35},syncTask('next','Next task'),syncTask('later','Later task')],chain:['bench'],candidateId:null,presentedAt:0,mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'deal-pass',settings:{...syncState().settings,thresholdPct:0},syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.stringify(board),sync=makeSyncHarness({remote:board,rev:4,delayMs:1}),storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw});
+ const app=await loadApp({sharedStorage:storage,cloudSyncFactory:()=>sync.factory()});t.after(()=>app.dispose?.());
+ const {ctx}=app;
+ assert.equal(ctx.state.candidateId,'next','drawing dealt the missing candidate');
+ assert.notEqual(ctx.state.presentedAt,0);
+ // The cloud copy is exactly this board as acknowledged, before the deal.
+ const acknowledged=JSON.parse(ctx.cloudPayload());acknowledged.candidateId=null;acknowledged.presentedAt=0;
+ sync.doc=deliver({...sync.doc,payload:JSON.stringify(acknowledged)})??sync.doc;
+ return {...app,sync,acknowledged};
+}
+test('RISK sync dealt candidate: a candidate dealt by a redraw on a clean board does not queue a cloud write',async t=>{
+ const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.deepEqual(sync.calls.filter(call=>call==='push'),[],'nothing changed but the redraw, so nothing is sent');
+ assert.equal(ctx.state.syncDirty,false,'the board stays clean');
+ assert.equal(ctx.state.candidateId,'next','the dealt candidate stays on screen');
+ assert.equal(sync.doc.rev,4);
+});
+test('RISK sync dealt candidate: a same-revision copy differing in anything else still publishes this board',async t=>{
+ const app=await cleanDealtBoard2308(t,doc=>{const other=JSON.parse(doc.payload);other.tasks[1].title='Older cloud title';return {...doc,payload:JSON.stringify(other)};}),{ctx,sync}=app;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'a real difference still reaches the cloud');
+ assert.equal(sync.remoteState().tasks[1].title,'Next task');
+});
+test('RISK sync dealt candidate: a same-revision copy with a different candidate of its own still publishes this board',async t=>{
+ const app=await cleanDealtBoard2308(t,doc=>{const other=JSON.parse(doc.payload);other.candidateId='later';other.presentedAt=1790000000000;return {...doc,payload:JSON.stringify(other)};}),{ctx,sync}=app;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'the cloud copy held another candidate, so this is not only a redraw');
+ assert.equal(sync.remoteState().candidateId,'next');
+});
+test('RISK sync dealt candidate: a board with unsaved changes still publishes when only the candidate differs',async t=>{
+ const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
+ ctx.state.syncDirty=true;
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'a dirty board is not the clean redraw this skip is for');
+});
+// #2308 re-review: presentedAt travels in the cloud payload, so a device with a
+// faster clock dealt a time that is still in this device's future. The window
+// that stops a double tap is timed here, from when this device showed the task.
+test('RISK sync dealt candidate: a candidate adopted from a device 3, 45 or 90 seconds ahead can be answered by keyboard and by click',async t=>{
+ for(const skewMs of [3000,45000,90000])for(const [input,answer] of [['keyboard press',(shim)=>shim.document.dispatchEvent({type:'keydown',key:'n',repeat:false})],
+ ['delegated click',(shim,candidate)=>{const button={dataset:{act:'no',candidate,benchmark:'bench'}};button.closest=()=>button;shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>button}});}]]){
+  const ahead=Date.now()+skewMs;
+  const app=await cleanDealtBoard2308(t,doc=>{const other=JSON.parse(doc.payload);other.candidateId='later';other.presentedAt=ahead;return {...doc,rev:doc.rev+1,payload:JSON.stringify(other)};}),{ctx,shim}=app;
+  await ctx.cloudPull();
+  assert.equal(ctx.state.candidateId,'later','positive control: the other device’s candidate was adopted');
+  assert.equal(ctx.state.presentedAt,ahead,'positive control: its presentation time is in this device’s future');
+  await new Promise(resolve=>setTimeout(resolve,240));
+  answer(shim,'later');
+  assert.equal(ctx.state.considered.later,'no',`${skewMs/1000} s ahead by ${input}: the answer counts`);
+ }
+});
+test('RISK sync dealt candidate: a later real edit publishes as usual, and the dealt candidate can be answered',async t=>{
+ const app=await cleanDealtBoard2308(t),{ctx,sync}=app;
+ await ctx.cloudPull();
+ ctx.onAction('no',{dataset:{candidate:'next',benchmark:'bench'}});
+ await syncSettle(PAST_DEBOUNCE+40);
+ assert.ok(sync.calls.includes('push'),'an answer is an edit and reaches the cloud');
+ assert.equal(sync.remoteState().considered.next,'no');
+ assert.equal(ctx.state.syncDirty,false);
 });
 
 test('RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board',async()=>{
@@ -8690,7 +9346,7 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
 // down. The button keeps working with no confirmation. The reminder is a
 // polite status only on the render where it first appears, so re-rendering
 // Settings does not announce it again.
-const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups slows the app down. Delete older ones you don’t need.';
+const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups takes up space on this device. Delete older ones you don’t need.';
 const manualBackupReminderIn=markup=>{
  const match=markup.match(/<p id="manualBackupReminder"([^>]*)>([\s\S]*?)<\/p>/);
  return match?{text:match[2],status:/\brole="status"/.test(match[1]),beside:markup.includes('data-act="make-manual-backup">Make manual backup</button></div><p id="manualBackupReminder"')}:null;
@@ -8794,7 +9450,7 @@ test('RISK manual backup reminder: the reminder counts this account’s manual b
  assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'one backup of this account does not bring the reminder');
  await makeManualBackup2254(app);await makeManualBackup2254(app);
  assert.equal(manualRows(ctx).length,4,'positive control: four manual backups are on this device');
- const parses=countBackupParses2254(t,ctx,new Set(manualRows(ctx).map(row=>row.payload)));
+ const parses=countBackupParses2254(t,ctx,new Set((await backupRowsWithText(ctx)).filter(row=>row.kind==='manual').map(row=>row.payload)));
  for(let render=0;render<3;render++){
   const rendered=reminderRender2254(ctx,parses);
   assert.equal(rendered.reminder?.text,MANUAL_BACKUP_REMINDER,'this account’s backups bring the reminder on render '+render);
@@ -8826,10 +9482,11 @@ test('RISK manual backup reminder: manual backups saved before they named an acc
  const rows=manualRows(ctx).filter(row=>row.id.startsWith('older-'));
  assert.equal(rows.length,4,'fixture: four older manual backups are listed');
  assert.ok(rows.every(row=>!Object.hasOwn(row,'account')),'fixture: the older backups name no account');
- const parses=countBackupParses2254(t,ctx,new Set(rows.map(row=>row.payload)));
+ assert.deepEqual(Array.from(rows,row=>row.payloadFacts.boardAccount).sort(),['me@example.test','me@example.test','other@example.test','other@example.test'],'each older backup names its account from one read when it was first listed');
+ const parses=countBackupParses2254(t,ctx,new Set((await backupRowsWithText(ctx)).filter(row=>row.id.startsWith('older-')).map(row=>row.payload)));
  const first=reminderRender2254(ctx,parses);
  assert.equal(first.reminder?.text,MANUAL_BACKUP_REMINDER,'two older backups of this account bring the reminder');
- assert.ok(first.parsed>=1&&first.parsed<=rows.length,'each older backup is read at most once on the first render ('+first.parsed+')');
+ assert.equal(first.parsed,0,'the first render reads no older backup: its account was read once when it was first listed');
  ctx.openSettings();
  assert.equal(manualBackupReminderIn(settingsMarkup(app))?.text,MANUAL_BACKUP_REMINDER,'Settings shows the reminder');
  for(let render=0;render<3;render++){
@@ -8854,7 +9511,7 @@ test('RISK manual backup reminder: Make manual backup stays enabled past two and
  await makeManualBackup2254(app);
  assert.equal(confirms,0,'no confirmation is asked');
  assert.equal(manualRows(ctx).length,3,'one press saves a third manual backup');
- assert.ok(manualRows(ctx).some(row=>row.payload.includes('Only in the third backup')),'the third backup holds the current board');
+ assert.ok((await backupRowsWithText(ctx)).some(row=>row.kind==='manual'&&row.payload.includes('Only in the third backup')),'the third backup holds the current board');
  assert.match(app.shim.document.getElementById('toast').textContent,/Manual backup saved on this device\./);
  assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button is still enabled after the third');
  assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder is still shown after the third');
@@ -9010,7 +9667,7 @@ test('RISK manual backup reminder visual browser: the reminder beside Make manua
 // #2254 (owner decision of 2026-11-06): Help explains the manual backup
 // reminder within the 130-word answer limit, and the changelog announces it.
 // Neither sends anyone to another device: people have only their phone.
-test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works',async t=>{
+test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
@@ -9019,7 +9676,7 @@ test('RISK manual backup reminder guidance: mounted FAQ and changelog say that f
  assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
  const answer=answerTo('Why does Settings remind me about manual backups?');
  assert.match(answer,/Manual backups stay on this device until you delete them; they are never removed automatically\./);
- assert.match(answer,/keeping more than two slows the app down/);
+ assert.match(answer,/keeping more than two takes up space on this device/);
  // #2254 release review: the reminder renders below Make manual backup.
  assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup\./);
  assert.match(answer,/Delete older ones you don’t need/);
@@ -9540,4 +10197,120 @@ test('RISK acknowledged recovery trim guidance: Settings, mounted FAQ and change
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
   assert.doesNotMatch(text,/recovers on its own|rebuilds on its own|on its own, once/,question+': no wording the guidance tests retired');
  }
+});
+
+// #2309 review: the opening is held behind the log with no end of its own, so
+// anything else that opens during the hold must not trap the person there.
+async function debugLogLinkHeldPage2309(engine,engineName,seed){
+ const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL});
+ const url=process.env.LANDSCAPE_BROWSER_URL,origin=new URL(url).origin;
+ const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3,hasTouch:true,serviceWorkers:'block',acceptDownloads:true});
+ await context.addInitScript(()=>Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false}));
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(url);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+ await page.evaluate(async seed=>{
+  closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;addTask('Held link task');await persist();
+  if(seed.motionAgeDays===null)localStorage.removeItem('fvp:chain-scanner:landscape-motion');
+  else localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()-seed.motionAgeDays*24*3600000}));
+ },seed);
+ await page.goto('about:blank');await page.goto(origin+'/#debug-log');
+ await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+ await page.waitForTimeout(900);
+ return {browser,page,errors};
+}
+const debugLogLinkEngines2309=async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ return [['chromium',chromium],...(process.env.CI==='true'?[]:[['webkit',webkit]])];
+};
+test('RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice',async t=>{
+ await openingBoardFixture(t);
+ const failures=[];
+ for(const [engineName,engine] of await debugLogLinkEngines2309())for(const [label,motionAgeDays] of [['first visit',null],['eight-day-old choice',8]]){
+  const name=`${engineName} ${label}`;
+  const {browser,page,errors}=await debugLogLinkHeldPage2309(engine,engineName,{motionAgeDays});
+  try{
+   const top=await page.evaluate(()=>{const b=document.querySelector('#modalRoot [data-act="close-modal"]').getBoundingClientRect(),hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return {onTheLog:!!hit?.closest?.('#modalRoot'),hit:hit?.tagName+'#'+(hit?.id||'')};});
+   assert.ok(top.onTheLog,`${name}: nothing covers the log's Close button: ${top.hit}`);
+   await page.locator('#modalRoot [data-act="close-modal"]').click({timeout:3000});
+   await page.waitForFunction(()=>state?.tasks?.some(task=>task.title==='Held link task'),null,{timeout:15000});
+   assert.equal(await page.evaluate(()=>location.hash),'',`${name}: a reload now opens the ordinary board`);
+   // The check is still owed, and now it answers.
+   await page.waitForFunction(()=>document.getElementById('motionDialog')?.open===true,null,{timeout:5000}).catch(()=>{throw new Error(`${name}: the motion check still comes up after the log closes`);});
+   await page.locator('#motionDialog [data-landscape-motion="reduced"]').click({timeout:3000});
+   await page.waitForFunction(()=>document.getElementById('motionDialog')?.open===false,null,{timeout:5000});
+   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('fvp:chain-scanner:landscape-motion')||'{}').choice),'reduced',`${name}: the answer is saved`);
+   assert.deepEqual(errors,[],`${name}: no page errors`);
+  }catch(error){failures.push(`${name}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK debug log link #2309: Download debug log delivers the file while the link holds the opening',async t=>{
+ await openingBoardFixture(t);
+ const failures=[];
+ for(const [engineName,engine] of await debugLogLinkEngines2309()){
+  const {browser,page,errors}=await debugLogLinkHeldPage2309(engine,engineName,{motionAgeDays:0});
+  try{
+   const downloaded=page.waitForEvent('download',{timeout:4000}).then(file=>file.suggestedFilename()).catch(()=>'no download');
+   await page.locator('#modalRoot [data-act="download-support-diagnostics"]').click({timeout:3000});
+   assert.equal(await downloaded,'chain-scanner-debug-log.json',`${engineName}: the file arrives`);
+   assert.equal(await page.evaluate(()=>document.querySelector('#modalRoot h2')?.textContent),'Debug log',`${engineName}: the log stays open`);
+   assert.deepEqual(errors,[],`${engineName}: no page errors`);
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read',async t=>{
+ await openingBoardFixture(t);
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const url=process.env.LANDSCAPE_BROWSER_URL,origin=new URL(url).origin,failures=[];
+ // CI installs only Chromium; the local run covers WebKit, the iPhone engine.
+ for(const [engineName,engine] of [['chromium',chromium],...(process.env.CI==='true'?[]:[['webkit',webkit]])]){
+  const browser=await engine.launch(engineName==='webkit'?{headless:true}:{headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL});
+  try{
+   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:3});
+   await context.addInitScript(()=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    if(location.protocol==='about:')return;
+    localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+    window.__snapshotReads=[];
+    for(const method of ['get','getAll','openCursor']){const original=IDBObjectStore.prototype[method];IDBObjectStore.prototype[method]=function(...args){if(this.name==='snapshots')window.__snapshotReads.push(method);return original.apply(this,args);};}
+   });
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage();page.on('pageerror',error=>failures.push(engineName+': '+error.message));
+   await page.goto(url);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   const expected=await page.evaluate(async()=>{
+    closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;addTask('PRIVATE offline link task');await persist();
+    const store=window.ScannerDeviceStore,head=await store.readHead();
+    for(let i=0;i<4;i++)await store.putBackup({expectedHash:head.hash,backup:{id:'native-link-'+i,kind:'manual',at:i+1,day:'2026-11-0'+(i+1),payload:head.payload+' '.repeat(i)}});
+    return (await store.listBackups()).length;
+   });
+   await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+   await page.goto('about:blank');
+   if(engineName==='webkit'){
+    // Playwright WebKit cannot navigate offline at all (internal error), so its
+    // run proves the held opening online; Chromium proves the offline shell.
+    await page.goto(origin+'/#debug-log');
+   }else{await context.setOffline(true);await page.goto(origin+'/#debug-log');}
+   await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+   await page.waitForFunction(()=>JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData?.backups?.count?.status==='observed');
+   const linked=await page.evaluate(()=>({board:state,hash:location.hash,reads:window.__snapshotReads,settings:!!document.querySelector('#modalRoot [data-act="save-settings"]'),count:JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData.backups.count.value,text:document.getElementById('supportDiagnosticsData').value}));
+   assert.equal(linked.board,null,engineName+': the board has not opened behind the log');
+   assert.deepEqual(linked.reads,[],engineName+': no saved board or backup text was read');
+   assert.equal(linked.settings,false,engineName+': Settings did not open');
+   assert.equal(linked.count,expected,engineName+': live backup count');
+   assert.doesNotMatch(linked.text,/PRIVATE|native-link-/,engineName+': metadata only');
+   assert.equal(await page.locator('#supportDiagnosticsData').isVisible(),true,engineName+': the log is visible during opening');
+   await page.locator('#modalRoot [data-act="close-modal"]').click();
+   await page.waitForFunction(()=>state?.tasks?.some(task=>task.title==='PRIVATE offline link task'));
+   assert.equal(await page.evaluate(()=>location.hash),'',engineName+': a reload now opens the ordinary board');
+   await page.locator('[data-act="help"]').first().click();await page.locator('#modalRoot a[href="#debug-log"]').click();
+   await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
+   assert.equal(await page.evaluate(()=>location.hash),'',engineName+': the in-window link can be followed again');
+   await context.setOffline(false);
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[],'the held opening raises no page errors');
 });

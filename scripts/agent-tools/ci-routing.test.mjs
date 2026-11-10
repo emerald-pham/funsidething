@@ -1,3 +1,4 @@
+import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -867,7 +868,10 @@ test('workflow runs the weekly velocity report nightly with only the permissions
   const report = /node scripts\/agent-tools\/ci-monitor\.mjs velocity-report\b/;
   const scheduled = workflowJobsRunning(workflowContext('schedule', 'refs/heads/main'), report);
   assert.equal(scheduled.length, 1, 'a scheduled run on main must produce the velocity report exactly once');
-  assert.equal(workflowJobsRunning(workflowContext('workflow_dispatch', 'refs/heads/main'), report).length, 1, 'the maintainer can run the report on demand');
+  // #2293: a repository-wide count says nothing about a dispatched candidate, so
+  // the report stays a scheduled alarm and a dispatch cannot fail on it or comment on its issue.
+  for (const ref of ['refs/heads/main', 'refs/heads/release-candidate'])
+    assert.deepEqual(workflowJobsRunning(workflowContext('workflow_dispatch', ref), report), [], `a dispatched run on ${ref} must skip the velocity report`);
   for (const context of [workflowContext('push', 'refs/heads/main'), workflowContext('pull_request', 'refs/pull/17/merge', { event: { action: 'synchronize' } })])
     assert.deepEqual(workflowJobsRunning(context, report), [], `${context.github.event_name} runs must not file velocity alerts`);
   const { text } = scheduled[0];
@@ -880,4 +884,21 @@ test('workflow runs the weekly velocity report nightly with only the permissions
   assert.ok(permissions && !permissions.inline, 'the job must declare its own permissions');
   const granted = Object.fromEntries(permissions.body.split('\n').filter(line => line.trim()).map(line => line.trim().split(/:\s*/)));
   assert.deepEqual(granted, { contents: 'read', actions: 'read', 'pull-requests': 'read', issues: 'write' }, 'issues: write is the only write the report needs');
+});
+
+test('RISK test inventory: workflow input reuse refuses a loaded run as an original pass', t => {
+  const f=fixture(t),plan=invoke(f,{event:'pull_request',ref:'refs/pull/17/merge',checkout:f.merge,planOnly:true});
+  f.largeNativeEvidence=Buffer.from('{"status":"passed"}\n');
+  const github=publishedInputPass(f,plan.record,['native-process']);
+  const artifact=github.artifacts.find(a=>a.name.endsWith('-native-process')),directory=artifact.fixturePath.slice(0,-4);
+  const reportPath=path.join(directory,'result.json'),report=JSON.parse(readFileSync(reportPath));
+  report.status='passed-under-load';report.cpuLoad={workers:1};
+  const bytes=JSON.stringify(report);writeFileSync(reportPath,bytes);
+  const marker=github.jobs.find(j=>j.name==='regression-native-process').steps.find(s=>s.name.startsWith('Completed CI gate '));
+  marker.name=marker.name.replace(/result [a-f0-9]{64}$/,'result '+createHash('sha256').update(bytes).digest('hex'));
+  const zip=spawnSync('zip',['-qr',artifact.fixturePath,'.'],{cwd:directory,encoding:'utf8'});assert.equal(zip.status,0,zip.stderr);
+  artifact.digest='sha256:'+createHash('sha256').update(readFileSync(artifact.fixturePath)).digest('hex');
+  writeFileSync(f.external,JSON.stringify(github));
+  const main=invoke(f,{ref:'refs/heads/main',checkout:f.merge,source:f.merge});assert.equal(main.status,0,main.stderr);
+  assert.equal(main.record.inputPasses['native-process'],undefined,'a loaded original must require current execution');
 });

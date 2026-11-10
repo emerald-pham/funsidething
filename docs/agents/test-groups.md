@@ -129,6 +129,35 @@ This command supplements `npm test`; it does not change the full-suite
 boundary. Run the affected focused process tests during development, and use the
 repository's required full suite and CI gates for final qualification.
 
+## Loaded runs
+
+Add `--cpu-load <busy-processes>` (1 to 64) to a group run to reproduce a slow
+machine locally. It is for timer, debounce and race work: a change that orders
+asynchronous steps, or a failure that appears only on slower hosts. Skip it
+elsewhere. Nothing requires it and CI never sets it.
+
+Check `status` in the [host coordination](host-coordination.md) ledger first and
+do not starve another owner's active work. The busy processes run only while the
+group's test process runs, and they end with the run on pass, failure, interrupt
+or the runner's death. A count near the host's core count (or above it) is the
+useful range.
+
+A loaded result records `cpuLoad.workers` and passes as `passed-under-load`, so
+the aggregate, the CI consumer and input-pass reuse all refuse it. It is never
+release or canonical evidence.
+
+## Which groups a diff needs
+
+CI runs every group on any diff, because it keys each group on the complete
+checkout tree. No changed file narrows the list, and a documentation-only diff
+needs the same groups as a scenery change.
+
+## Reading a failed group
+
+A failed group's log gives each failed test's first assertion line, capped at 200
+characters. Compared values on later assertion lines stay in the `test.tap`
+artifact, because job logs are public.
+
 ## Nightly cross-engine cohort
 
 `scripts/test-group-assignments.json` lists cross-engine native roots under
@@ -150,10 +179,28 @@ npm run test:group -- --group nightly-cross-engine --output-dir <new-empty-dir> 
   --source-sha <sha> --comparison-base <sha>
 ```
 
-The run fails when no nightly root is declared, when a declared root is not
-registered exactly once in its file (resolves to zero tests), or when any
-nightly case fails, is skipped or is missing. `--describe` does not check
-nightly roots, so required CI stays green while only the nightly run is red. It writes `result.json` and TAP like a group run, but it is not
+A row whose test has not landed declares its owning PR as `pendingOn: "#<number>"`
+and is pending; every other row is active. The run executes the active roots.
+With none it succeeds without starting a test process, records status
+`no_active_roots`, and annotates that 0 cross-engine cases ran, naming the
+pending roots. A nightly run that passes preflight records `crossEngine` in
+`result.json`, with the case count and the active and pending roots. A preflight
+failure records none.
+
+The run fails when no nightly root is declared at all, when an active root is
+not registered exactly once in its file (resolves to zero tests), when a pending
+root's test is registered (remove its `pendingOn` to move it to active), or when
+any nightly case fails, is skipped or is missing. Active and pending rows read a
+title the same way: a direct `test(...)` title written plainly, with escapes or
+as a template with no substitutions, or else any string in the file's code that
+spells the title, such as a constant or a table it registers from. A title built
+at run time by concatenation or substitution cannot be read statically, so a
+pending root with such a title stays pending after its test lands; write each
+nightly root's title as one whole literal.
+
+Neither `--describe` nor the `core` group checks whether nightly roots are
+registered; `core` only pins that the list is valid. Required CI therefore stays
+green when a pending root lands and only the nightly run is red. The nightly run writes `result.json` and TAP like a group run, but it is not
 a required group and cannot be described, covered or aggregated. When and how
 releases depend on it is in
 [release and review](release-and-review.md#nightly-cross-engine-native-checks).

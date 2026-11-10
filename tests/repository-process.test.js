@@ -302,6 +302,34 @@ test('RISK test-first gate: the edit hook treats the test directory as the test 
  assert.equal(hook('index.html'),false,'a staged split test change also counts');
 });
 
+test('RISK test-first gate: the edit hook guards app edits inside an agent worktree',async t=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-worktree-hook-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(cwd,...args)=>{const r=spawnSync('git',args,{cwd,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+ fs.mkdirSync(path.join(root,'tests'));fs.mkdirSync(path.join(root,'scripts'));fs.writeFileSync(path.join(root,'index.html'),'<p>old</p>\n');
+ fs.writeFileSync(path.join(root,'tests/core.test.js'),"test('core: one',()=>{});\n");fs.writeFileSync(path.join(root,'scripts/tool.mjs'),'export const one=1;\n');
+ fs.mkdirSync(path.join(root,'.claude/hooks'),{recursive:true});fs.writeFileSync(path.join(root,'.claude/hooks/test-first-guard.sh'),'exit 0\n');
+ git(root,'init','-q');git(root,'config','user.email','hook@example.invalid');git(root,'config','user.name','Hook fixture');git(root,'add','.');git(root,'commit','-qm','base');
+ // The Agent tool creates implementer worktrees under .claude/worktrees/, which
+ // is where implement-spec subagents edit the app (#2321).
+ const worktree=path.join(root,'.claude/worktrees/agent-fixture');
+ git(root,'worktree','add','-q','-b','agent-fixture',worktree);
+ const hook=file=>{
+  const r=spawnSync('bash',[path.join(__dirname,'.claude/hooks/test-first-guard.sh')],{input:JSON.stringify({tool_input:{file_path:file}}),encoding:'utf8'});
+  assert.equal(r.status,0,r.stderr);return /"permissionDecision": "deny"/.test(r.stdout);
+ };
+ assert.equal(hook(path.join(worktree,'index.html')),true,'an app edit in an agent worktree with no test written is refused');
+ assert.equal(hook(path.join(worktree,'.claude/hooks/test-first-guard.sh')),true,'the hook itself stays guarded in a worktree');
+ assert.equal(hook(path.join(worktree,'tests/core.test.js')),false,'writing a test in a worktree is never refused');
+ assert.equal(hook(path.join(worktree,'scripts/tool.mjs')),false,'tooling stays exempt in a worktree as in the primary checkout');
+ assert.equal(hook(path.join(worktree,'.claude/hooks/helper.mjs')),false,"the worktree's own .claude files stay exempt");
+ assert.equal(hook(path.join(root,'.claude/hooks/helper.mjs')),false,"the primary checkout's .claude files stay exempt");
+ fs.appendFileSync(path.join(root,'tests/core.test.js'),"test('core: two',()=>{});\n");
+ assert.equal(hook(path.join(worktree,'index.html')),true,"a test written in the primary checkout does not unlock a worktree's app edit");
+ fs.appendFileSync(path.join(worktree,'tests/core.test.js'),"test('core: three',()=>{});\n");
+ assert.equal(hook(path.join(worktree,'index.html')),false,"an uncommitted test change in the worktree lets its app edit through");
+});
+
 test('RISK test-first gate: the edit hook refuses a root tests.js and never counts it as a written test',async t=>{
  const os=await import('node:os'),root=fs.mkdtempSync(path.join(os.tmpdir(),'chain-root-tests-hook-'));
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
@@ -520,6 +548,292 @@ test('RISK repository process: CSS comment removal cannot join selector tokens u
   assert.equal(deriveReleaseReviewPlan(cssTokenJoin.repo,cssTokenJoin.candidateSha,cssTokenJoin.baseSha).mode,'independent-review',
    'removing a CSS comment that joins selector tokens is executable behavior');
  }finally{cleanupReleaseGateFixture(cssTokenJoin);}
+});
+
+// Release preparation (#2296) runs the real command with its working directory
+// in a fixture repository and git's repository-locating variables removed, so
+// neither the commands nor the fixture can reach this checkout.
+function releaseCommand(fixture,...args){
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const name of Object.keys(env))if(name.startsWith('GIT_'))delete env[name];
+ return spawnSync(process.execPath,[path.join(__dirname,'scripts/release-evidence.mjs'),...args],{cwd:fixture.repo,encoding:'utf8',timeout:30000,env});
+}
+
+test('RISK repository process: release plan prints the review plan the validator derives for a commit',async()=>{
+ const {deriveReleaseReviewPlan}=await import('../scripts/release-evidence.mjs');
+ const fixture=makeScaledReviewFixture({candidate:{'src/cloud-sync.mjs':'export const value = 2;\n'}});
+ try{
+  const printed=releaseCommand(fixture,'plan',fixture.candidateSha,fixture.baseSha);
+  assert.equal(printed.status,0,printed.stdout+printed.stderr);
+  const plan=JSON.parse(printed.stdout);
+  assert.deepEqual(plan,{schemaVersion:2,changedFiles:['src/cloud-sync.mjs'],mode:'dual-review',
+   requiresCodeReview:true,requiresFaqReview:false,requiresOwnerFaqCoverage:true,requiresSpecialistReview:true,
+   requiresTypographyReview:false,specialistDomains:['memory-cloud-sync']});
+  assert.deepEqual(plan,deriveReleaseReviewPlan(fixture.repo,fixture.candidateSha,fixture.baseSha));
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+const releaseReportHeader=(commit,verdict,completed)=>`Commit: ${commit}\nVerdict: ${verdict}\nCompleted: ${completed}\n\n`;
+function writeReleaseReports(fixture,reports){
+ const directory=path.join(fixture.root,'reports');
+ fs.mkdirSync(directory,{recursive:true});
+ for(const [name,text] of Object.entries(reports))fs.writeFileSync(path.join(directory,name),text);
+ return directory;
+}
+const sha256Of=text=>createHash('sha256').update(text).digest('hex');
+// Reports below are dated, and prepare refuses a report older than its commit,
+// so these candidates are committed at a fixed earlier moment.
+function atReleaseCommitDate(work){
+ const previous=process.env.GIT_COMMITTER_DATE;process.env.GIT_COMMITTER_DATE='2026-11-01T11:00:00Z';
+ try{return work();}
+ finally{if(previous===undefined)delete process.env.GIT_COMMITTER_DATE;else process.env.GIT_COMMITTER_DATE=previous;}
+}
+const datedReleaseFixture=options=>atReleaseCommitDate(()=>makeScaledReviewFixture(options));
+
+test('RISK repository process: release prepare writes receipt input that record accepts once a person adds the summaries',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const independent=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independent});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input,{
+   schemaVersion:2,
+   candidate:{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha},
+   ownerReview:{task:'owner:2296',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:'2026-11-01T12:00:33.000Z',
+    summary:'',scope:{fullDiff:true,rationale:''},
+    evidencePath:path.join(reports,'owner-review.md'),evidenceSha256:sha256Of(owner)},
+   independentReview:{task:'independent-review:2296',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:'2026-11-01T11:53:58.000Z',
+    summary:'',scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+    evidencePath:path.join(reports,'independent-review.md'),evidenceSha256:sha256Of(independent)},
+  });
+  const unauthored=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unauthored.status,0,'an input nobody has summarized must not become a receipt');
+  assert.match(unauthored.stderr,/summary/i);
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='An ordinary tooling change fits the derived independent review.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+  const verified=releaseCommand(fixture,'verify',fixture.candidateSha);
+  assert.equal(verified.status,0,verified.stdout+verified.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+// Prepares an ordinary tooling candidate whose owner report is fine and whose
+// independent report is the one under test.
+function prepareWithIndependentReport(independentReport,issue='2296'){
+ const fixture=datedReleaseFixture({candidate:{'scripts/tool.mjs':'export const value = 2;\n'}});
+ const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+ const reports=writeReleaseReports(fixture,{'owner-review.md':owner,'independent-review.md':independentReport(fixture)});
+ const result=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,issue);
+ const inputWritten=fs.existsSync(path.join(reports,'receipt-input.json'));
+ cleanupReleaseGateFixture(fixture);
+ return {result,inputWritten};
+}
+
+test('RISK repository process: release prepare refuses a report naming another commit',()=>{
+ const {result,inputWritten}=prepareWithIndependentReport(fixture=>
+  releaseReportHeader(fixture.baseSha,'approved','2026-11-01T11:53:58.000Z')+'A review of the previous commit.\n');
+ assert.notEqual(result.status,0,'a review of another commit cannot approve this candidate');
+ assert.match(result.stderr,/independent-review\.md.*names commit/i);
+ assert.equal(inputWritten,false);
+});
+
+test('RISK repository process: release prepare refuses a report with no approved verdict',()=>{
+ const missing=prepareWithIndependentReport(fixture=>`Commit: ${fixture.candidateSha}\nCompleted: 2026-11-01T11:53:58.000Z\n\nNo verdict line.\n`);
+ assert.notEqual(missing.result.status,0,'a report without a verdict cannot approve this candidate');
+ assert.match(missing.result.stderr,/independent-review\.md.*Verdict/);
+ assert.equal(missing.inputWritten,false);
+ const blocked=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'changes-requested','2026-11-01T11:53:58.000Z'));
+ assert.notEqual(blocked.result.status,0,'a report that asks for changes cannot approve this candidate');
+ assert.match(blocked.result.stderr,/independent-review\.md.*changes-requested/);
+ assert.equal(blocked.inputWritten,false);
+});
+
+test('RISK repository process: release prepare refuses a report with a missing or future completion time',()=>{
+ const missing=prepareWithIndependentReport(fixture=>`Commit: ${fixture.candidateSha}\nVerdict: approved\n\nNo completion time.\n`);
+ assert.notEqual(missing.result.status,0,'a report without a completion time cannot supply the receipt time');
+ assert.match(missing.result.stderr,/independent-review\.md.*Completed/);
+ assert.equal(missing.inputWritten,false);
+ const future=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved',new Date(Date.now()+3600000).toISOString()));
+ assert.notEqual(future.result.status,0,'a future completion time cannot enter an immutable receipt');
+ assert.match(future.result.stderr,/independent-review\.md.*future/);
+ assert.equal(future.inputWritten,false);
+});
+
+test('RISK repository process: release prepare refuses an issue that is not a positive whole number',()=>{
+ for(const issue of ['not-a-number','#2296','0','12a']){
+  const {result,inputWritten}=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The reviewer read the exact diff.\n',issue);
+  assert.notEqual(result.status,0,issue+' cannot name a release task');
+  assert.match(result.stderr,/issue/i);
+  assert.equal(inputWritten,false);
+ }
+});
+
+test('RISK repository process: release prepare refuses a completion time before the candidate commit',()=>{
+ const early=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T10:59:59.000Z')+'A review dated before the commit existed.\n');
+ assert.notEqual(early.result.status,0,'a review cannot finish before the commit it reviews existed');
+ assert.match(early.result.stderr,/independent-review\.md.*before the candidate/i);
+ assert.equal(early.inputWritten,false);
+ const sameSecond=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:00:00.000Z')+'A review finished in the second of the commit.\n');
+ assert.equal(sameSecond.result.status,0,'the commit time itself is not earlier: '+sameSecond.result.stderr);
+});
+
+test('RISK repository process: release prepare refuses one report body used for both the owner and independent review',()=>{
+ // Only the owner report's own time differs, so a changed header cannot make one review look like two.
+ const {result,inputWritten}=prepareWithIndependentReport(fixture=>releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T11:53:58.000Z')+'The owner read the exact diff.\n');
+ assert.notEqual(result.status,0,'the owner and the independent reviewer must each write their own report');
+ assert.match(result.stderr,/owner-review\.md.*independent-review\.md/);
+ assert.equal(inputWritten,false);
+});
+
+test('RISK repository process: release prepare needs only the reports the derived plan requires',()=>{
+ const fixture=datedReleaseFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(Object.keys(input),['schemaVersion','candidate','ownerReview']);
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A documentation-only diff needs only the owner review.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare takes specialist domains from the plan and source digests from the exact commit',()=>{
+ const candidateText='export const cloudValue = 2;\n';
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':candidateText}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const specialist=header('2026-11-01T12:05:26.000Z');
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  const inputPath=path.join(reports,'receipt-input.json');
+  const absent=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(absent.status,0,'the plan requires a specialist, so its report cannot be absent');
+  assert.match(absent.stderr,/specialist-review\.md/);
+  assert.equal(fs.existsSync(inputPath),false);
+
+  writeReleaseReports(fixture,{'specialist-review.md':specialist});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  const unassessed={affected:null,rationale:'',tests:[]};
+  assert.deepEqual(input.specialistReview,{task:'specialist-review:2296',outcome:'approved',reviewedSha:fixture.candidateSha,
+   completedAt:'2026-11-01T12:05:26.000Z',summary:'',domains:['memory-cloud-sync'],
+   scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+   memoryScope:{memory:unassessed,cloud:unassessed,sync:unassessed},
+   sources:[{path:path.join(fs.realpathSync(fixture.repo),'scripts/cloud-sync.mjs'),sha256:sha256Of(candidateText)}],
+   evidencePath:path.join(reports,'specialist-review.md'),evidenceSha256:sha256Of(specialist)});
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='A cloud tooling change fits the derived code and specialist reviews.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  input.specialistReview.summary='The specialist read the full diff and found no cloud or sync defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const unjudged=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unjudged.status,0,'memory, cloud and sync impact stay a judgement made by a person');
+  assert.match(unjudged.stderr,/memoryScope/);
+  const assessed=area=>({affected:false,rationale:`This candidate does not change ${area} behaviour.`,tests:['RISK focused preservation test']});
+  input.specialistReview.memoryScope={memory:assessed('memory'),cloud:assessed('cloud'),sync:assessed('sync')};
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare refuses a source file that differs from the exact commit',()=>{
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  fs.writeFileSync(path.join(fixture.repo,'scripts/cloud-sync.mjs'),'export const cloudValue = 3;\n');
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(prepared.status,0,'a digest of the commit cannot be paired with different bytes on disk');
+  assert.match(prepared.stderr,/scripts\/cloud-sync\.mjs/);
+  assert.equal(fs.existsSync(path.join(reports,'receipt-input.json')),false);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare refuses a changed file it cannot read from the exact commit',()=>{
+ // A read that fails looks like a deleted file unless the two are told apart. A
+ // gitlink is in the commit but has no blob, so reading it fails.
+ const fixture=datedReleaseFixture({candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n'}});
+ try{
+  fixture.candidateSha=atReleaseCommitDate(()=>{
+   releaseGateGit(fixture.repo,['update-index','--add','--cacheinfo','160000,'+fixture.baseSha+',scripts/cloud-module']);
+   releaseGateGit(fixture.repo,['commit','-q','-m','Add a gitlink']);
+   return releaseGateGit(fixture.repo,['rev-parse','HEAD']);
+  });
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(prepared.status,0,'a source the digest list silently omits is not fingerprinted');
+  assert.match(prepared.stderr,/scripts\/cloud-module/);
+  assert.equal(fs.existsSync(path.join(reports,'receipt-input.json')),false);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare leaves a file the candidate deleted out of the source digests',()=>{
+ const fixture=datedReleaseFixture({base:{'scripts/cloud-retired.mjs':'export const retired = 1;\n'},candidate:{'scripts/cloud-sync.mjs':'export const cloudValue = 2;\n','scripts/cloud-retired.mjs':null}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),
+   'independent-review.md':header('2026-11-01T11:53:58.000Z'),'specialist-review.md':header('2026-11-01T12:05:26.000Z')});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const {sources}=JSON.parse(fs.readFileSync(path.join(reports,'receipt-input.json'),'utf8')).specialistReview;
+  assert.deepEqual(sources.map(source=>path.basename(source.path)),['cloud-sync.mjs']);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare leaves FAQ coverage for a person to author on a product change',()=>{
+ const fixture=datedReleaseFixture({candidate:{'src/feature.mjs':'export const value = 2;\n'}});
+ try{
+  const header=(completed,body='The review of the exact diff.\n')=>releaseReportHeader(fixture.candidateSha,'approved',completed)+body;
+  const reports=writeReleaseReports(fixture,{'owner-review.md':header('2026-11-01T12:00:33.000Z','The owner read the exact diff.\n'),'independent-review.md':header('2026-11-01T11:53:58.000Z')});
+  const prepared=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.equal(prepared.status,0,prepared.stdout+prepared.stderr);
+  const inputPath=path.join(reports,'receipt-input.json');
+  const input=JSON.parse(fs.readFileSync(inputPath,'utf8'));
+  assert.deepEqual(input.ownerReview.faqCoverage,{result:'',summary:''});
+  input.ownerReview.summary='The owner read every line of the exact candidate diff.';
+  input.ownerReview.scope.rationale='An ordinary product change fits the derived independent review.';
+  input.independentReview.summary='The reviewer read the full diff and its tests and found no defect.';
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const unauthored=releaseCommand(fixture,'record',inputPath);
+  assert.notEqual(unauthored.status,0,'FAQ coverage stays a result a person records');
+  assert.match(unauthored.stderr,/FAQ coverage/);
+  input.ownerReview.faqCoverage=SCALED_FAQ_COVERAGE;
+  fs.writeFileSync(inputPath,JSON.stringify(input,null,2)+'\n');
+  const recorded=releaseCommand(fixture,'record',inputPath);
+  assert.equal(recorded.status,0,recorded.stdout+recorded.stderr);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release prepare keeps summaries a person already wrote',()=>{
+ const fixture=datedReleaseFixture({candidate:{'docs/notes.md':'Updated notes.\n'}});
+ try{
+  const owner=releaseReportHeader(fixture.candidateSha,'approved','2026-11-01T12:00:33.000Z')+'The owner read the exact diff.\n';
+  const reports=writeReleaseReports(fixture,{'owner-review.md':owner});
+  const inputPath=path.join(reports,'receipt-input.json');
+  const authored='{"note":"summaries a person already wrote"}\n';
+  fs.writeFileSync(inputPath,authored);
+  const again=releaseCommand(fixture,'prepare',fixture.candidateSha,fixture.baseSha,reports,'2296');
+  assert.notEqual(again.status,0,'preparing again must not silently discard authored text');
+  assert.match(again.stderr,/receipt-input\.json/);
+  assert.equal(fs.readFileSync(inputPath,'utf8'),authored);
+ }finally{cleanupReleaseGateFixture(fixture);}
 });
 
 test('RISK repository process: release recording classifies the tail of a complete large diff',async t=>{
@@ -1884,11 +2198,18 @@ test('RISK repository process: deployment fetches deleted squash PR head and rej
 });
 
 test('RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states',()=>{
- for(const name of ['CLAUDE.md','RELEASE_GATES.md']){
+ for(const name of ['RELEASE_GATES.md']){
   const guide=fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' ');assert.match(guide,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
   assert.match(guide,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(guide,/theme labels alone.*not.*coverage/i);
   assert.match(guide,/changed control.*established neighboring control/i);assert.match(guide,/top, middle and end.*scroll/i);assert.match(guide,/day and night.*enlarged/i);assert.match(guide,/screenshots in isolation.*not.*pass/i);
  }
+});
+test('RISK repository process boundary: visual test requirements live in the rendered-evidence guide behind one always-loaded pointer for changed controls or layout',()=>{
+ const read=name=>fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' '),requirements=read('docs/agents/rendered-evidence.md'),policy=read('CLAUDE.md');
+ assert.match(requirements,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
+ assert.match(requirements,/changed control.*established neighboring control/i);assert.match(requirements,/top, middle and end.*scroll/i);assert.match(requirements,/day and night.*enlarged/i);assert.match(requirements,/screenshots in isolation.*not.*pass/i);
+ assert.match(policy,/changed controls or layout.*rendered-evidence\.md/i,'the always-loaded instructions must still route changed controls or layout to the requirements');
+ assert.match(policy,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(policy,/theme labels alone.*not.*coverage/i);
 });
 test('RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes',async t=>{
  const os=await import('node:os'),fixture=fs.mkdtempSync(path.join(os.tmpdir(),'chain-preflight-outgoing-'));
@@ -1990,6 +2311,16 @@ test('RISK repository process: grouped runner stays covered at the default npm t
  assert.match(result.stdout||'',/^# skipped 0$/m,'The runner contract cannot pass through a skip');
 });
 
+test('RISK repository process: failed groups state a capped reason in the job log',t=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^test group (runner names why a test failed in the job log|runner keeps a failed test reason to one capped line of the first assertion|nightly job log names why a cross-engine case failed)$','scripts/agent-tools/test-groups.test.mjs'],{cwd:__dirname,env,encoding:'utf8',timeout:120000,maxBuffer:8*1024*1024});
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');t.diagnostic(output);
+ assert.equal(result.error,undefined,'The failure-line contracts must start: '+(result.error?.message||output));
+ assert.equal(result.status,0,'A failed group must state its reason within the cap: '+output);
+ assert.match(result.stdout||'',/^# tests 3$/m,'Every failure-line contract must run');
+ assert.match(result.stdout||'',/^# skipped 0$/m,'These contracts cannot pass through a skip');
+});
+
 test('RISK repository process: required parallel scanner aggregation rejects absent group evidence',()=>{
  const env={...process.env};delete env.NODE_TEST_CONTEXT;
  const result=spawnSync(process.execPath,['--test','--test-name-pattern=^test group workflow scanner command rejects missing parallel group evidence$',path.join(__dirname,'scripts/agent-tools/test-groups.test.mjs')],{cwd:__dirname,env,encoding:'utf8',timeout:30000,maxBuffer:8*1024*1024});
@@ -2017,4 +2348,112 @@ test('RISK repository process: nested native fixture output stays isolated at th
  assert.match(result.stdout||'',/^# skipped 0$/m,'The command-boundary contract cannot pass through a skip');
  assert.match(result.stdout||'',/^# Nested output negative control:.*ENOENT: no such file or directory, open .*candidate-identity\.json/m,
   'The unisolated inherited-output child must actually fail before the isolated child proves success');
+});
+
+// A reviewer ran these tests with GIT_DIR set, and the fixtures' own git
+// commands moved the real branch and HEAD (#2292). These cases start real test
+// processes aimed at a throwaway repository and inspect it afterwards, so the
+// repository running the suite is never the one at risk.
+const environmentWithoutGitLocation=()=>{
+ const env={...process.env};delete env.NODE_TEST_CONTEXT;
+ for(const name of ['GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE'])delete env[name];
+ return env;
+};
+function sacrificialGitRepository(t){
+ const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'chain-sacrificial-git-'));
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ const git=(...args)=>{const r=spawnSync('git',args,{cwd:root,encoding:'utf8',env:environmentWithoutGitLocation()});assert.equal(r.status,0,r.stderr);return r.stdout;};
+ fs.writeFileSync(path.join(root,'tracked.txt'),'original\n');
+ git('init','-q','-b','main');git('config','user.email','sacrificial@example.invalid');git('config','user.name','Sacrificial fixture');git('add','.');git('commit','-qm','base');
+ const snapshot=()=>({
+  head:fs.readFileSync(path.join(root,'.git/HEAD'),'utf8'),
+  refs:git('for-each-ref','--format=%(refname) %(objectname)'),
+  index:createHash('sha256').update(fs.readFileSync(path.join(root,'.git/index'))).digest('hex'),
+  workTree:fs.readdirSync(root).filter(entry=>entry!=='.git').sort().join(','),
+ });
+ return {root,gitDir:path.join(root,'.git'),indexFile:path.join(root,'.git/index'),snapshot};
+}
+const changedSnapshotFields=(before,after)=>Object.keys(before).filter(field=>before[field]!==after[field]);
+
+test('RISK repository process: a real git-fixture test cannot change the repository an inherited git variable names',t=>{
+ const fixtureRoot='RISK test-first gate: an app change paired with an edit to any split test file is accepted';
+ const outcomes={},expected={};
+ for(const variable of ['GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE']){
+  const sacrificial=sacrificialGitRepository(t);
+  const value={GIT_DIR:sacrificial.gitDir,GIT_WORK_TREE:sacrificial.root,GIT_INDEX_FILE:sacrificial.indexFile}[variable];
+  const before=sacrificial.snapshot();
+  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--test-name-pattern=^'+fixtureRoot+'$','tests/repository-process.test.js'],
+   {cwd:__dirname,encoding:'utf8',env:{...environmentWithoutGitLocation(),[variable]:value},maxBuffer:16*1024*1024,timeout:120000});
+  outcomes[variable]={changed:changedSnapshotFields(before,sacrificial.snapshot()),exitStatus:child.status,passed:/^# pass (\d+)$/m.exec(child.stdout||'')?.[1]};
+  expected[variable]={changed:[],exitStatus:0,passed:'1'};
+ }
+ assert.deepEqual(outcomes,expected,'The fixture must work only on its own repository and still pass');
+});
+
+test('RISK repository process: every test file keeps inherited git variables away from the fixtures it spawns',t=>{
+ // The directories are listed rather than named so a new test file is covered
+ // the moment it exists. Selecting no test keeps each process to its load; the
+ // preload then acts as that file's git fixture, in the file's own process.
+ const testFiles=[
+  ...fs.readdirSync(path.join(__dirname,'tests')).filter(file=>file.endsWith('.test.js')).map(file=>'tests/'+file),
+  ...fs.readdirSync(path.join(__dirname,'scripts/agent-tools')).filter(file=>file.endsWith('.test.mjs')).map(file=>'scripts/agent-tools/'+file),
+ ];
+ assert.ok(testFiles.includes('tests/core.test.js')&&testFiles.includes('scripts/agent-tools/checkpoint.test.mjs'),'both test directories were listed');
+ const workspace=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'chain-git-preload-'));
+ t.after(()=>fs.rmSync(workspace,{recursive:true,force:true}));
+ const preload=path.join(workspace,'fixture-preload.mjs');
+ fs.writeFileSync(preload,`import {spawnSync} from 'node:child_process';
+import fs from 'node:fs';
+// node --test passes --import to each file's process and also runs it itself;
+// only the file's process is the one under test.
+if(process.env.NODE_TEST_CONTEXT)process.on('exit',()=>{
+ const cwd=process.env.FIXTURE_PRELOAD_REPOSITORY;fs.mkdirSync(cwd,{recursive:true});
+ for(const args of [['init','-q'],['-c','user.email=fixture@example.invalid','-c','user.name=Fixture','commit','--allow-empty','-qm','fixture'],['checkout','-q','-b','preload-fixture']])
+  spawnSync('git',args,{cwd,stdio:'ignore'});
+});
+`);
+ const unprotected={};
+ for(const file of testFiles){
+  const sacrificial=sacrificialGitRepository(t);
+  const fixtureRepository=path.join(workspace,file.replace(/\W/g,'-'));
+  const before=sacrificial.snapshot();
+  const child=spawnSync(process.execPath,['--test','--test-reporter=tap','--import='+preload,'--test-name-pattern=^no test has this name$',file],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024,timeout:120000,
+   env:{...environmentWithoutGitLocation(),GIT_DIR:sacrificial.gitDir,GIT_WORK_TREE:sacrificial.root,GIT_INDEX_FILE:sacrificial.indexFile,FIXTURE_PRELOAD_REPOSITORY:fixtureRepository}});
+  const changed=changedSnapshotFields(before,sacrificial.snapshot());
+  const ownFixtureWritten=fs.existsSync(path.join(fixtureRepository,'.git/refs/heads/preload-fixture'));
+  if(changed.length||child.status!==0||!ownFixtureWritten)unprotected[file]={changed,exitStatus:child.status,ownFixtureWritten};
+ }
+ assert.deepEqual(unprotected,{},'Each file named here must load tests/isolate-git-env.js before its tests run (tests/shared.js already does)');
+});
+
+// #2293: both Nightly cross-engine roots name tests that exist only on the #285
+// work. This runs in the required core group, so it pins the list itself and not
+// the state of those tests: a landed pending root fails Nightly preflight, never
+// required CI. The fixture cases in test-groups.test.mjs pin the zero-case run.
+test('RISK repository process: the Nightly root list stays valid whether or not its pending roots have landed',()=>{
+ const webkitRoots=['RISK repository process: native button gate detects errors raised by a real click','RISK repository process: required native button actions execute in Chromium and WebKit'];
+ const parent=fs.mkdtempSync(path.join(os.tmpdir(),'chain-nightly-list-')),output=path.join(parent,'run');
+ try{
+  const head=spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim();
+  const described=spawnSync(process.execPath,['scripts/test-groups.mjs','--describe','--group','core','--output-dir',output,'--repository','local/nightly','--event-policy','local','--run-id','1','--run-attempt','1','--source-sha',head,'--comparison-base',head],{cwd:__dirname,encoding:'utf8',timeout:60000});
+  assert.equal(described.status,0,'the required cohort must accept the declared Nightly roots: '+described.stdout+described.stderr);
+  const {nightlyRoots}=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/test-group-assignments.json'),'utf8'));
+  assert.ok(nightlyRoots.length>0,'an empty list would fail every Nightly');
+  for(const root of webkitRoots)assert.ok(nightlyRoots.some(entry=>entry.root===root),'the WebKit root stays declared: '+root);
+  for(const entry of nightlyRoots){
+   assert.ok(fs.existsSync(path.join(__dirname,entry.file)),'each root names a file that exists: '+entry.root);
+   if(Object.hasOwn(entry,'pendingOn'))assert.match(entry.pendingOn,/^#[1-9]\d*$/,'a pending root names its owning PR: '+entry.root);
+  }
+ }finally{fs.rmSync(parent,{recursive:true,force:true});}
+});
+
+test('RISK test inventory: the group CPU-load option stays local, guided and off in every required entry point',()=>{
+ const workflows=path.join(__dirname,'.github/workflows');
+ for(const file of fs.readdirSync(workflows))assert.doesNotMatch(fs.readFileSync(path.join(workflows,file),'utf8'),/cpu-load/,file+' must not set the CPU-load option');
+ for(const [name,command] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8')).scripts))assert.doesNotMatch(command,/cpu-load/,'npm script '+name+' must not require it');
+ const guide=fs.readFileSync(path.join(__dirname,'docs/agents/test-groups.md'),'utf8');
+ assert.match(guide,/## Loaded runs/,'the guide has one Loaded runs section');
+ assert.match(guide,/--cpu-load/,'it names the option');
+ assert.match(guide,/timer, debounce and race/,'it says when to reach for a loaded run');
+ assert.match(guide,/host coordination/i,'it says to respect the host coordination ledger');
 });

@@ -75,7 +75,10 @@ jobs:
   # (merged PRs, CI duration, issues opened, open PR ages) in the step summary.
   # No merge to main while PRs are open, or more than 100 new issues, fails the
   # job with an annotation and files (or comments on) one needs-triage issue.
+  # Schedule only (#2293): the count is repository-wide, so a run dispatched on a
+  # candidate must neither fail on it nor comment on the alert issue.
   velocity-report:
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

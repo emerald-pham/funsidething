@@ -57,6 +57,7 @@ import {
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
+import { backupRowsWithText } from "./shared.js";
 
 // #2281 CI: node:test keeps every finished test with its subtests and hooks,
 // so a hook or subtest that closed over an app kept that app's realm until the
@@ -3339,6 +3340,25 @@ test('RISK cloud source recovery #2281: while another saved copy cannot be read,
  assert.deepEqual(await store.readHead(),head);assert.equal(JSON.stringify(ctx.state),before);
 });
 
+// #2310 review: damage found only by Apply's own read. The facts are learned
+// first, so listing still succeeds and only reading the text can catch it.
+test('RISK cloud source recovery #2281: a saved copy damaged after its facts were learned still stops Apply before any cloud write',async t=>{
+ const app=await freshSourceCheckFixture187(t),{ctx,shim,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ for(const key of [...backend.docs.keys()])if(key.startsWith('users/owner/generations/'+originalRoot.activeGeneration+'/chunks/'))backend.docs.delete(key);
+ assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:{id:'unrelated-2310',day:'2026-11-01',at:1,kind:'manual',payload:JSON.stringify({tasks:[],unrelated:1})}})).ok,true);
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ let payloadHash;await editRawDevice187(app.indexedDB,app.deviceDbName,tx=>{const request=tx.objectStore('backups').get('unrelated-2310');
+  request.onsuccess=()=>{payloadHash=request.result.payloadHash;tx.objectStore('snapshots').put({hash:payloadHash,payload:JSON.stringify({tasks:[],unrelated:2})},payloadHash);};});
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ assert.equal(vm.runInContext('deviceBackupCacheReadable',ctx),true,'positive control: the list still reads from learned facts, so only Apply can notice');
+ assert.equal(await ctx.onAction('review-cloud-source-recovery',{}),true);
+ assert.equal(await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'generation:'+originalRoot.previousGeneration}}),true);
+ const writes=backend.writes.length,before=JSON.stringify(ctx.state);
+ assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),false);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/saved copies could not all be read back, so nothing was applied/);
+ assert.equal(backend.writes.length,writes,'no cloud write');assert.equal(JSON.stringify(ctx.state),before);
+});
+
 // #2281 CI: a summary saved by a startup timer landed at an arbitrary moment,
 // in the middle of whatever the app was doing then (a recovery save counted
 // the archive rows it had just written). Archives the previous release saved
@@ -4473,7 +4493,7 @@ test('RISK legacy completion recovery: immutable released Done stays offchain th
   assert.deepEqual(Array.from(ctx.state.chain),[f.ids[1]],'expired eventless completion defeats the released earlier Dot before scanner cleanup');
   assert.ok(paints.length>0);assert.ok(paints.every(chain=>!chain.includes(f.ids[0])),'no recovery DOM replacement exposes completed membership');
   assert.ok(writes.every(chain=>!chain.includes(f.ids[0])),'no successful durable write stores revived membership');
-  const durable=JSON.parse(store?(await store.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY));assert.deepEqual(durable.chain,[f.ids[1]]);for(const source of [f.completed,f.stale])assert.ok(ctx.readLocalBackups().some(row=>row.payload===source),'the exact completed and later legacy sources remain recoverable');
+  const durable=JSON.parse(store?(await store.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY));assert.deepEqual(durable.chain,[f.ids[1]]);for(const source of [f.completed,f.stale])assert.ok((await backupRowsWithText(ctx)).some(row=>row.payload===source),'the exact completed and later legacy sources remain recoverable');
   assert.equal(ctx.state.tasks.find(row=>row.id===f.ids[1]).title,'Retained legacy title');assert.equal(JSON.stringify(ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratings);
   assert.equal(ctx.state.tasks.find(row=>row.id===f.ids[0]).lastDoneAt,f.at+100);assert.equal(ctx.isEligible(ctx.state.tasks.find(row=>row.id===f.ids[0])),true,'expired rest restores eligibility separately');
   const events=JSON.stringify(ctx.state.decisionEvents);await closeLegacyApp173(app);const cold=await loadAppAtTime(f.at+2*3600000+1,{sharedStorage:shim.localStorage,...opts});t.after(()=>closeLegacyApp173(cold));assert.deepEqual(Array.from(cold.ctx.state.chain),[f.ids[1]],backend+' cold reopen keeps the actual saved completion boundary');assert.equal(JSON.stringify(cold.ctx.state.decisionEvents),events);
@@ -4490,9 +4510,9 @@ test('RISK legacy completion startup acknowledgement: pending IndexedDB upgrade 
  await entered;const pendingHead=await store.readHead(),facts=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]));assert.ok(startupSave);assert.notEqual(vm.runInContext('deviceHeadHash',app.ctx),pendingHead.hash,'the real committed startup head has not yet been acknowledged by the app');assert.notEqual(vm.runInContext('lastPersistedRaw',app.ctx),pendingHead.payload);
  app.shim.localStorage.setItem(SYNC_STORE_KEY,f.stale);app.shim.localStorage.setItem(LOCAL_HEAD_KEY,f.stale);assert.equal(await app.ctx.persist(),false,'pending startup acknowledgement holds the first recovery save');assert.equal(await app.ctx.persist(),false,'pending startup acknowledgement also holds a second immediate save');assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),f.stale);assert.equal(app.shim.localStorage.getItem(LOCAL_HEAD_KEY),f.stale);assert.deepEqual(JSON.parse((await store.readHead()).payload).chain,[f.ids[1]]);
  release();assert.equal(await startupSave,true,'the actual startup persist returns success after its acknowledgement is delivered');const acknowledged=await store.readHead();assert.equal(vm.runInContext('deviceHeadHash',app.ctx),acknowledged.hash);assert.equal(vm.runInContext('lastPersistedRaw',app.ctx),acknowledged.payload);assert.equal(JSON.stringify(app.ctx.state),acknowledged.payload);
- if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true,'fallback obsolete save retries through the real save boundary');assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]]);assert.equal(app.ctx.state.tasks.find(row=>row.id===f.ids[1]).title,'Retained legacy title');const expectedFacts=new Map([...JSON.parse(facts),...(JSON.parse(f.stale).decisionEvents||[])].map(row=>[row.id,row]));assert.equal(app.ctx.state.decisionEvents.length,expectedFacts.size);for(const row of expectedFacts.values())assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(event=>event.id===row.id)),JSON.stringify(row));assert.equal(JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratings);for(const source of [f.completed,f.stale])assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===source));assert.ok(paints.length>0);assert.ok(writes.length>0);assert.ok(paints.every(chain=>!chain.includes(f.ids[0])));assert.ok(writes.every(chain=>!chain.includes(f.ids[0])));
+ if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true,'fallback obsolete save retries through the real save boundary');assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]]);assert.equal(app.ctx.state.tasks.find(row=>row.id===f.ids[1]).title,'Retained legacy title');const expectedFacts=new Map([...JSON.parse(facts),...(JSON.parse(f.stale).decisionEvents||[])].map(row=>[row.id,row]));assert.equal(app.ctx.state.decisionEvents.length,expectedFacts.size);for(const row of expectedFacts.values())assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(event=>event.id===row.id)),JSON.stringify(row));assert.equal(JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratings);for(const source of [f.completed,f.stale])assert.ok((await backupRowsWithText(app.ctx)).some(row=>row.payload===source));assert.ok(paints.length>0);assert.ok(writes.length>0);assert.ok(paints.every(chain=>!chain.includes(f.ids[0])));assert.ok(writes.every(chain=>!chain.includes(f.ids[0])));
  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'pending-startup recovery exact publication');assert.deepEqual(h.remoteState().chain,[f.ids[1]]);assert.equal(JSON.stringify(h.remoteState().decisionEvents),JSON.stringify(app.ctx.state.decisionEvents));const saved=await store.readHead();assert.equal(saved.payload,JSON.stringify(app.ctx.state));const journal=JSON.stringify(app.ctx.state.decisionEvents);await closeLegacyApp173(app);
- const cold=await loadAppAtTime(f.at+2*3600000+1,{indexedDBProvider,deviceDbName,sharedStorage:app.shim.localStorage});t.after(()=>closeLegacyApp173(cold));assert.deepEqual(Array.from(cold.ctx.state.chain),[f.ids[1]]);assert.equal(JSON.stringify(cold.ctx.state.decisionEvents),journal);for(const source of [f.completed,f.stale])assert.ok(cold.ctx.readLocalBackups().some(row=>row.payload===source));
+ const cold=await loadAppAtTime(f.at+2*3600000+1,{indexedDBProvider,deviceDbName,sharedStorage:app.shim.localStorage});t.after(()=>closeLegacyApp173(cold));assert.deepEqual(Array.from(cold.ctx.state.chain),[f.ids[1]]);assert.equal(JSON.stringify(cold.ctx.state.decisionEvents),journal);for(const source of [f.completed,f.stale])assert.ok((await backupRowsWithText(cold.ctx)).some(row=>row.payload===source));
 });
 
 test('RISK legacy completion startup copies: both literal divergent sources precede every upgrade write',async t=>{
@@ -4692,7 +4712,7 @@ test('RISK legacy completion released Start: normally acknowledged expired retur
   const local=await loadAppAtTime(at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:exactOldDevice,[LOCAL_HEAD_KEY]:exactOldDevice},...opts});t.after(()=>closeLegacyApp173(local));
   assert.deepEqual(Array.from(local.ctx.state.chain),['expiry-recurring'],'startup retains the real released return instead of minting contradictory authority');
   assert.equal(local.ctx.state.decisionEvents.some(row=>row.kind==='completion-boundary'),false);const oldFacts=JSON.stringify(local.ctx.state.decisionEvents),oldRatings=JSON.stringify(local.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]));
-  const added=local.ctx.addTask('Newer draft while chronology is held');assert.equal(await local.ctx.persist(),false);assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);assert.equal(local.shim.localStorage.getItem(LOCAL_HEAD_KEY),exactOldDevice);if(local.ctx.window.ScannerDeviceStore)assert.equal((await local.ctx.window.ScannerDeviceStore.readHead()).payload,exactOldDevice);assert.ok(local.ctx.readLocalBackups().some(row=>row.payload===exactOldDevice));assert.equal(JSON.stringify(local.ctx.state.decisionEvents),oldFacts);assert.equal(JSON.stringify(local.ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma])),oldRatings);
+  const added=local.ctx.addTask('Newer draft while chronology is held');assert.equal(await local.ctx.persist(),false);assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);assert.equal(local.shim.localStorage.getItem(LOCAL_HEAD_KEY),exactOldDevice);if(local.ctx.window.ScannerDeviceStore)assert.equal((await local.ctx.window.ScannerDeviceStore.readHead()).payload,exactOldDevice);assert.ok((await backupRowsWithText(local.ctx)).some(row=>row.payload===exactOldDevice));assert.equal(JSON.stringify(local.ctx.state.decisionEvents),oldFacts);assert.equal(JSON.stringify(local.ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma])),oldRatings);
   await closeLegacyApp173(local);const cold=await loadAppAtTime(at+3*3600000,{sharedStorage:local.shim.localStorage,...opts});t.after(()=>closeLegacyApp173(cold));assert.deepEqual(Array.from(cold.ctx.state.chain),['expiry-recurring']);assert.equal(JSON.stringify(cold.ctx.state.decisionEvents),oldFacts);assert.equal(await cold.ctx.persist(),false,'cold reopen retains the unresolved source rather than learning a guessed checkpoint');assert.equal(cold.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);
   const recovery=await loadAppAtTime(at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:beforeDoneRaw,[LOCAL_HEAD_KEY]:beforeDoneRaw},...opts, ...(backend==='indexedDB'?{deviceDbName:'held-incoming-start-'+Math.random()}: {})});t.after(()=>closeLegacyApp173(recovery));
   const draft=recovery.ctx.addTask('Retained current draft beside incoming old Start'),prior=JSON.stringify(recovery.ctx.state);recovery.shim.localStorage.setItem(SYNC_STORE_KEY,exactOldDevice);recovery.shim.localStorage.setItem(LOCAL_HEAD_KEY,exactOldDevice);assert.equal(await recovery.ctx.persist(),false);assert.equal(JSON.stringify(recovery.ctx.state),prior);assert.ok(recovery.ctx.state.tasks.some(row=>row.id===draft.id));assert.equal(recovery.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);assert.equal(recovery.shim.localStorage.getItem(LOCAL_HEAD_KEY),exactOldDevice);
@@ -21570,6 +21590,643 @@ test('Scanner browser: secondary actions dim during scanning and brighten for fo
  }finally{await browser.close();}
 });
 
+// #2312 (spec #2308 slice 4): Yes, No and Can't stay under the thumb. This journey
+// runs at phone size in Chromium and WebKit with real touch taps. Every answer
+// after the first taps the spot Yes, No and Can't first appeared at, across
+// titles from a few words to a full paragraph and a chain that keeps growing.
+const STEADY_SCANNER_FILLER='ask for the quote again and compare the two replies before deciding what to keep ';
+const steadyScannerBoard=({tasks=60,showPostpone=false,over={},taskOver=()=>({})}={})=>JSON.stringify(syncState({
+ tasks:Array.from({length:tasks},(_,i)=>({...syncTask('steady-'+i,'Steady task '+i+' '+STEADY_SCANNER_FILLER.repeat([0,0,1,3,0,6,1][i%7])),createdAt:1790000000000+i,...taskOver(i)})),
+ listOpen:false,seenQuickStart:true,...over,settings:{...syncState().settings,showPostpone,...(over.settings||{})}}));
+async function steadyScannerEngines(){
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT||process.env.PLAYWRIGHT_MODULE||'playwright');
+ return [['chromium',chromium],['webkit',webkit]];
+}
+async function steadyScannerPage(browser,board,{width=390,height=844,touch=true}={}){
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:3,hasTouch:touch,isMobile:touch,serviceWorkers:'block',reducedMotion:'reduce'});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await context.addInitScript(board=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+ },board);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true'&&!document.querySelector('dialog[open]'),null,{timeout:60000});
+ return {context,page,errors};
+}
+const steadyScannerCenter=box=>({x:box.left+box.width/2,y:box.top+box.height/2});
+const steadyScannerControls=page=>page.evaluate(()=>{
+ const box=act=>{const el=document.querySelector(`[data-act="${act}"]`);if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+ return {yes:box('yes'),no:box('no'),cant:box('cant'),continue:box('continue-scan'),candidate:state.candidateId,intervention:!!state.interventionActive,chain:state.chain.length,viewportHeight:innerHeight,viewportWidth:innerWidth};
+});
+async function steadyScannerStart(page){
+ const start=page.locator('[data-act="start-scan"]').first();
+ const box=await start.boundingBox();assert.ok(box,'the opening view offers Start scanning');
+ await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);
+ await page.waitForFunction(()=>!!state.candidateId&&!!document.querySelector('[data-act="yes"]'),null,{timeout:15000});
+ await page.waitForTimeout(250);
+}
+// The answer that was tapped has to be the one that took effect, so the page
+// is asked for a new candidate (or the honest paused notice) each time.
+async function steadyScannerAnswer(page,point,prior){
+ await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+ await page.touchscreen.tap(point.x,point.y);
+ await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,prior,{timeout:10000});
+}
+test('RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const ANSWERS=36,failures=[];
+ for(const [baseEngineName,engine] of await steadyScannerEngines())for(const viewport of [{width:390,height:844},{width:768,height:1024}]){
+  const engineName=`${baseEngineName} ${viewport.width}px`;
+  const browser=await engine.launch({headless:true,...(baseEngineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}),viewport);
+   await steadyScannerStart(page);
+   let home=null,answered=0;
+   for(let guard=0;answered<ANSWERS&&guard<ANSWERS*3;guard++){
+    const now=await steadyScannerControls(page);
+    if(now.intervention){const c=steadyScannerCenter(now.continue);await page.touchscreen.tap(c.x,c.y);await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
+    assert.ok(now.yes&&now.no&&now.cant,`${engineName} answer ${answered}: Yes, No and Can't are showing`);
+    home??=now;
+    for(const act of ['yes','no','cant']){
+     assert.ok(Math.abs(now[act].top-home[act].top)<=1&&Math.abs(now[act].left-home[act].left)<=1,`${engineName} answer ${answered}: ${act} stayed where it first appeared (chain ${now.chain}): started at ${Math.round(home[act].left)},${Math.round(home[act].top)} and is now at ${Math.round(now[act].left)},${Math.round(now[act].top)}`);
+     assert.ok(now[act].top>=0&&now[act].bottom<=now.viewportHeight&&now[act].left>=0&&now[act].right<=now.viewportWidth,`${engineName} answer ${answered}: ${act} is fully on screen: bottom ${Math.round(now[act].bottom)} of ${now.viewportHeight}`);
+    }
+    const act=answered%3===1?'yes':answered%7===5?'cant':'no';
+    await steadyScannerAnswer(page,steadyScannerCenter(home[act]),now.candidate);
+    answered++;
+   }
+   assert.equal(answered,ANSWERS,`${engineName}: every answer was accepted`);
+   assert.deepEqual(errors,[],`${engineName}: no page errors`);
+  }catch(error){failures.push(error.message);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const YES_ANSWERS=14,failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines())for(const width of [320,390,768]){
+  const label=`${engineName} ${width}px`;
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard(),{width,height:width>=768?1024:844});
+   await steadyScannerStart(page);
+   let hiddenSeen=0;
+   for(let guard=0,answered=0;answered<YES_ANSWERS&&guard<YES_ANSWERS*3;guard++){
+    const now=await steadyScannerControls(page);
+    if(now.intervention){const c=steadyScannerCenter(now.continue);await page.touchscreen.tap(c.x,c.y);await page.waitForFunction(()=>!state.interventionActive,null,{timeout:10000});continue;}
+    await steadyScannerAnswer(page,steadyScannerCenter(now.yes),now.candidate);answered++;
+    await page.waitForTimeout(40);
+    const trail=await page.evaluate(()=>{
+     const row=document.querySelector('.crumbs');if(!row)return null;
+     const crumbs=[...row.querySelectorAll('[data-act="reveal"]:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
+     return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),narrowest:Math.min(...crumbs.map(c=>c.getBoundingClientRect().width)),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
+    });
+    if(!trail)continue;
+    assert.ok(trail.height<=trail.tallest+2&&trail.spread<=8,`${label}: ${trail.chain.length} dots stay on one row: the trail is ${Math.round(trail.height)} px tall`);
+    assert.ok(trail.overflow<=1&&trail.right<=trail.innerWidth,`${label}: the trail stays inside the screen`);
+    assert.ok(trail.narrowest>=40,`${label}: every shown dot stays wide enough to read: the narrowest is ${Math.round(trail.narrowest)} px`);
+    const behindBenchmark=trail.chain.slice(0,-1),hidden=behindBenchmark.length-trail.shown.length;
+    assert.deepEqual(trail.shown,behindBenchmark.slice(hidden),`${label}: the trail shows the newest dots`);
+    if(hidden>0){hiddenSeen=hidden;assert.match(trail.text,new RegExp(`\\+${hidden} earlier`),`${label}: the trail counts the ${hidden} earlier dots: ${trail.text}`);}
+    else assert.doesNotMatch(trail.text,/earlier/,`${label}: no count is shown when nothing is hidden`);
+   }
+   assert.ok(hiddenSeen>0,`${label}: a 14-dot chain has earlier dots to count`);
+   assert.deepEqual(errors,[],`${label}: no page errors`);
+  }catch(error){failures.push(error.message);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+const STEADY_ENLARGED_TEXT='.btn{font-size:21px!important}.crumbs{font-size:19px!important}.card .title{font-size:23px!important}.qline{font-size:28px!important}';
+const steadySeededBoard=({floatingHeader=false,showPostpone=false,tasks=8}={})=>steadyScannerBoard({tasks,showPostpone,
+ taskOver:i=>i===2?{due:'2026-01-02'}:{},
+ over:{chain:['steady-0','steady-1'],candidateId:'steady-2',settings:{floatingHeader}}});
+test('RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const measure=page=>page.evaluate(()=>{
+  const box=el=>{if(!el)return null;const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+  const controls=['yes','no','cant','postpone','run-woop'].map(act=>[act,document.querySelector(`[data-act="${act}"]`)]).filter(([,el])=>el);
+  const scroller=document.scrollingElement;scroller.scrollTo(0,scroller.scrollHeight);
+  const foot=box(document.querySelector('.foot')),title=document.querySelector('.card.cand .title');
+  const atEnd={foot,scrollY:scrollY};scroller.scrollTo(0,0);
+  return {controls:Object.fromEntries(controls.map(([act,el])=>[act,{...box(el),clipped:el.scrollWidth>el.clientWidth+1||el.scrollHeight>el.clientHeight+1}])),
+   titleText:title.textContent.trim(),titleClipped:title.scrollWidth>title.clientWidth+1||title.scrollHeight>title.clientHeight+1,atEnd,header:box(document.getElementById('appHeader')),headerFloating:document.getElementById('appHeader').classList.contains('floating'),
+   finishTop:box(document.querySelector('.decide-finish')).top,overflow:document.documentElement.scrollWidth-innerWidth,viewportHeight:innerHeight,viewportWidth:innerWidth};
+ });
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const spec of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone with enlarged text',width:320,height:568,enlarged:true},
+    {name:'iPhone portrait with Postpone',width:390,height:844,showPostpone:true},
+    {name:'iPhone portrait with enlarged text and Postpone',width:390,height:844,enlarged:true,showPostpone:true},
+    {name:'iPhone portrait with floating header',width:390,height:844,floatingHeader:true},
+    {name:'tablet portrait',width:768,height:1024},
+    {name:'tablet portrait with enlarged text and Postpone',width:768,height:1024,enlarged:true,showPostpone:true},
+    {name:'short landscape',width:844,height:390},
+    {name:'short landscape with enlarged text',width:844,height:390,enlarged:true},
+    {name:'short landscape with floating header',width:844,height:390,floatingHeader:true},
+    {name:'desktop',width:1000,height:900,touch:false},
+   ]){
+    const label=`${engineName} ${spec.name}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard(spec),spec);
+    try{
+     if(spec.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     await page.waitForFunction(()=>!!document.querySelector('[data-act="run-woop"]'),null,{timeout:15000}).catch(()=>{throw new Error(`${label}: the overdue candidate offers Run WOOP`);});
+     await page.waitForTimeout(80);
+     const shot=await measure(page);
+     const pinnedTop=Math.min(shot.finishTop,...Object.values(shot.controls).map(c=>c.top));
+     for(const [act,c] of Object.entries(shot.controls)){
+      assert.ok(c.top>=0&&c.bottom<=shot.viewportHeight&&c.left>=0&&c.right<=shot.viewportWidth,`${label}: ${act} is on screen: ${JSON.stringify(c)}`);
+      assert.equal(c.clipped,false,`${label}: ${act} shows its whole label`);
+      assert.ok(c.height>=44,`${label}: ${act} is ${Math.round(c.height)} px tall, too small to tap`);
+     }
+     assert.ok(shot.overflow<=0,`${label}: no sideways page overflow: ${shot.overflow}`);
+     assert.ok(shot.atEnd.foot.bottom<=pinnedTop+1,`${label}: scrolled to the end, the footer clears the pinned row: footer ends ${Math.round(shot.atEnd.foot.bottom)}, the row starts ${Math.round(pinnedTop)}`);
+     assert.equal(shot.titleText,('Steady task 2 '+STEADY_SCANNER_FILLER).trim(),`${label}: the candidate title is shown in full`);
+     assert.equal(shot.titleClipped,false,`${label}: the candidate title is not cut off`);
+     if(spec.floatingHeader){assert.equal(shot.headerFloating,true,`${label}: the header floats`);assert.ok(shot.header.bottom<=pinnedTop,`${label}: the floating header and pinned row do not overlap`);}
+     // Run WOOP belongs to one candidate, so it must not move the choices when it goes.
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     const withWoop=await steadyScannerControls(page);
+     await page.evaluate(()=>document.scrollingElement.scrollTo(0,0));
+     const answerAt=steadyScannerCenter(withWoop.no);
+     if(spec.touch===false)await page.mouse.click(answerAt.x,answerAt.y);else await page.touchscreen.tap(answerAt.x,answerAt.y);
+     await page.waitForFunction(prior=>state.candidateId!==prior,withWoop.candidate,{timeout:10000});
+     const after=await steadyScannerControls(page);
+     assert.equal(await page.locator('[data-act="run-woop"]').count(),0,`${label}: the next candidate is not overdue`);
+     for(const act of ['yes','no','cant'])assert.ok(Math.abs(after[act].top-withWoop[act].top)<=1&&Math.abs(after[act].left-withWoop[act].left)<=1,`${label}: ${act} stays put when Run WOOP goes: ${Math.round(withWoop[act].top)} to ${Math.round(after[act].top)}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// With the row pinned, a second tap lands on the button of the next candidate
+// before anyone could have read it, so a physical press inside 200 ms of the new
+// task appearing is dropped.
+test('RISK steady scanner browser: a double tap or a repeated key answers only the shown task and the next answer after the window is accepted in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const input of ['two touch taps 60 ms apart','two touch taps 120 ms apart','mouse double click','two key presses']){
+    const label=`${engineName} ${input}`,touch=input.includes('touch');
+    const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:390,height:844,touch});
+    try{
+     await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(400);
+     const first=await steadyScannerControls(page),at=steadyScannerCenter(first.no);
+     if(input==='mouse double click')await page.mouse.click(at.x,at.y,{clickCount:2,delay:15});
+     else if(input==='two key presses'){await page.keyboard.press('n');await page.waitForTimeout(40);await page.keyboard.press('n');}
+     else{await page.touchscreen.tap(at.x,at.y);await page.waitForTimeout(input.includes('120')?120:60);await page.touchscreen.tap(at.x,at.y);}
+     await page.waitForFunction(prior=>state.candidateId!==prior,first.candidate,{timeout:5000});
+     await page.waitForTimeout(40);
+     const seen=await page.evaluate(()=>({answered:Object.keys(state.considered),candidate:state.candidateId}));
+     assert.deepEqual(seen.answered,[first.candidate],`${label}: only the task on screen was answered: ${seen.answered}`);
+     await page.waitForTimeout(400);
+     if(touch)await page.touchscreen.tap(at.x,at.y);else if(input==='two key presses')await page.keyboard.press('n');else await page.mouse.click(at.x,at.y);
+     await page.waitForFunction(prior=>state.candidateId!==prior,seen.candidate,{timeout:5000}).catch(()=>{throw new Error(`${label}: an answer after the window was not accepted`);});
+     assert.equal(await page.evaluate(id=>state.considered[id],seen.candidate),'no',`${label}: the later answer counted`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// presentedAt syncs, so it can be ahead of this device's clock.
+test('RISK steady scanner browser: Yes No and Cant answer a saved candidate whose presentation time is 45 seconds ahead of this device in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const board=steadyScannerBoard({tasks:12,over:{chain:['steady-0','steady-1'],candidateId:'steady-2',presentedAt:Date.now()+45000}});
+  const {page,context}=await steadyScannerPage(browser,board,{width:390,height:844,touch:true});
+  try{
+   await page.waitForSelector('[data-act="no"]',{timeout:15000});await page.waitForTimeout(500);
+   const now=await steadyScannerControls(page),at=steadyScannerCenter(now.no);
+   await page.touchscreen.tap(at.x,at.y);
+   await page.waitForFunction(prior=>state.candidateId!==prior,now.candidate,{timeout:3000}).catch(()=>{throw new Error('a real tap did nothing');});
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK steady scanner browser: a double tap on Postpone or Done acts once and leaves the next task alone in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const act of ['postpone','cand-done','bench-done']){
+    const label=`${engineName} ${act}`;
+    const board=steadyScannerBoard({tasks:12,showPostpone:true,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{width:390,height:844,touch:true});
+    try{
+     const selector=act==='postpone'?'.decide [data-act="postpone"]':`[data-act="${act}"]`;
+     await page.waitForSelector(selector,{timeout:15000});await page.waitForTimeout(500);
+     const before=await page.evaluate(()=>undoStack.length),box=await page.locator(selector).first().boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+     await page.touchscreen.tap(x,y);await page.waitForTimeout(60);await page.touchscreen.tap(x,y);
+     await page.waitForTimeout(450);
+     assert.equal(await page.evaluate(()=>undoStack.length),before+1,`${label}: the double tap took one action`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// Focus lands on mousedown, so a correction that scrolls then would move the
+// control away before mouseup and lose the click.
+test('RISK steady scanner browser: a mouse press on a control partly under the pinned row still clicks it in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const {page,context}=await steadyScannerPage(browser,steadySeededBoard({tasks:12}),{width:1000,height:700,touch:false});
+  try{
+   await page.waitForSelector('.siderail [data-act="edit"]',{timeout:15000});await page.waitForTimeout(200);
+   const rects=()=>page.evaluate(()=>{const e=document.querySelector('.siderail [data-act="edit"]').getBoundingClientRect();return {left:e.left,width:e.width,top:e.top,bottom:e.bottom,rowTop:document.querySelector('.decide').getBoundingClientRect().top,y:scrollY};});
+   const start=await rects();
+   await page.evaluate(by=>scrollBy(0,by),start.top-(start.rowTop-13));await page.waitForTimeout(60);
+   const placed=await rects();
+   assert.ok(placed.top<placed.rowTop&&placed.bottom>placed.rowTop,`${engineName}: positive control: the control straddles the row: ${Math.round(placed.top)}-${Math.round(placed.bottom)}, row ${Math.round(placed.rowTop)}`);
+   await page.mouse.move(placed.left+placed.width/2,placed.top+6);await page.mouse.down();await page.waitForTimeout(90);await page.mouse.up();
+   await page.waitForFunction(()=>!!document.querySelector('#modalRoot [data-act="save-edit"],#modalRoot .frow'),null,{timeout:2000}).catch(()=>{throw new Error('Edit did not open');});
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// A short page can leave the task being decided on entirely under the pinned row.
+test('RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:1280,height:720},{width:1000,height:700},{width:375,height:667},{width:390,height:844}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{...viewport,touch:false});
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});await page.waitForTimeout(200);
+     const read=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect(),yes=document.querySelector('[data-act="yes"]').getBoundingClientRect();return {titleTop:t.top,titleBottom:t.bottom,rowTop:row.top,y:scrollY,yesTop:yes.top,candidate:state.candidateId};});
+     const opened=await read();
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     await page.keyboard.press('n');
+     await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await page.waitForTimeout(60);
+     const shown=await read();
+     assert.ok(shown.titleBottom<=shown.rowTop&&shown.titleTop>=0,`${label}: the next title is clear of the pinned row: ${Math.round(shown.titleTop)}-${Math.round(shown.titleBottom)}, the row starts ${Math.round(shown.rowTop)}, scrolled ${Math.round(shown.y)}`);
+     let previous=shown;
+     for(let answer=0;answer<3;answer++){
+      await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+      await page.keyboard.press('n');
+      await page.waitForFunction(prior=>state.candidateId!==prior,previous.candidate,{timeout:5000});await page.waitForTimeout(60);
+      const now=await read();
+      assert.equal(now.y,previous.y,`${label}: answer ${answer} does not move a stable layout`);
+      assert.equal(now.yesTop,shown.yesTop,`${label}: Yes stays where it was`);
+      assert.ok(now.titleBottom<=now.rowTop,`${label}: answer ${answer}: the next title is clear of the row`);
+      previous=now;
+     }
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// Past the phone widths the row stops reaching the screen edges, so it has to
+// line up with the panels above it. A row wider than them stuck out with square ends.
+test('RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,context}=await steadyScannerPage(browser,steadySeededBoard(),{width:744,height:1133,touch:false});
+   await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+   for(const width of [733,744,750,760,761,1000]){
+    await page.setViewportSize({width,height:1133});await page.waitForTimeout(60);
+    const seen=await page.evaluate(()=>{const row=document.querySelector('.decide'),a=row.getBoundingClientRect(),b=document.getElementById('listWrap').getBoundingClientRect();return {rowLeft:a.left,rowRight:a.right,panelLeft:b.left,panelRight:b.right,radius:parseFloat(getComputedStyle(row).borderTopLeftRadius)};});
+    if(Math.abs(seen.rowLeft-seen.panelLeft)>1||Math.abs(seen.rowRight-seen.panelRight)>1)failures.push(`${engineName} ${width}px: the row spans ${seen.rowLeft}-${seen.rowRight}, the panels ${seen.panelLeft}-${seen.panelRight}`);
+    if(!(seen.radius>0))failures.push(`${engineName} ${width}px: the row has square ends`);
+   }
+   await context.close();
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// One row has no second line to fall back on, so a pill must never shrink below
+// a readable title. These views are the ones where pills emptied to a clipped
+// letter and the row ran off the panel: enlarged text, and page zoom, which
+// appears to the page as a smaller screen. Five em is about eight characters.
+const STEADY_LONG_TITLE='Renew the passport before the trip gets any closer to the deadline';
+const steadyTrailBoard=({dots,title=()=>STEADY_LONG_TITLE})=>steadyScannerBoard({tasks:dots+4,taskOver:i=>({title:title(i)}),over:{chain:Array.from({length:dots},(_,i)=>'steady-'+i),candidateId:'steady-'+dots}});
+const steadyReadTrail=page=>page.evaluate(()=>{
+ const row=document.querySelector('.crumbs'),box=row.getBoundingClientRect(),font=parseFloat(getComputedStyle(row).fontSize);
+ const visible=[...row.children].filter(c=>!c.hidden),pen=document.createElement('canvas').getContext('2d');
+ const dots=visible.filter(c=>c.matches('[data-act="reveal"]')).map(dot=>{const style=getComputedStyle(dot);pen.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;return {id:dot.dataset.id,room:dot.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),natural:pen.measureText(dot.textContent).width};});
+ const tops=visible.map(c=>{const r=c.getBoundingClientRect();return r.top+r.height/2;});
+ return {chain:[...state.chain],everyDot:[...row.querySelectorAll('[data-act="reveal"]')].map(d=>d.dataset.id),dots,font,text:row.innerText,
+  spread:Math.max(...tops)-Math.min(...tops),height:box.height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),
+  overflow:row.scrollWidth-row.clientWidth,furthest:Math.max(...visible.map(c=>c.getBoundingClientRect().right))-box.right,past:box.right-document.querySelector('.card.bench').getBoundingClientRect().right,
+  page:document.documentElement.scrollWidth-innerWidth};
+});
+function steadyAssertTrail(t,label){
+ const behind=t.chain.slice(0,-1),hidden=behind.length-t.dots.length;
+ assert.deepEqual(t.everyDot,behind,`${label}: every dot stays named in the trail`);
+ assert.deepEqual(t.dots.map(d=>d.id),behind.slice(hidden),`${label}: the dots shown are the newest ones`);
+ assert.ok(t.spread<=8&&t.height<=t.tallest+2,`${label}: one row: spread ${Math.round(t.spread)}, ${Math.round(t.height)} px tall`);
+ assert.ok(t.overflow<=1&&t.furthest<=1,`${label}: nothing runs past the trail's box: overflow ${t.overflow}, furthest ${t.furthest.toFixed(1)}`);
+ assert.ok(t.past<=1,`${label}: the trail stays inside the panel: ${t.past.toFixed(1)} past it`);
+ assert.ok(t.page<=0,`${label}: no sideways page scroll: ${t.page}`);
+ for(const dot of t.dots){const need=Math.min(dot.natural,t.font*5);assert.ok(dot.room+1>=need,`${label}: a shown dot has room for its title: ${dot.room.toFixed(1)} px, needs ${need.toFixed(1)}`);}
+ if(hidden>0)assert.match(t.text,new RegExp(`\\+${hidden} earlier`),`${label}: counts the ${hidden} earlier dots: ${t.text}`);
+ else{assert.doesNotMatch(t.text,/earlier/,`${label}: no count when nothing is hidden: ${t.text}`);assert.match(t.text,new RegExp(`${t.chain.length} dots`),`${label}: names the chain length: ${t.text}`);}
+}
+test('RISK steady scanner browser: the dot trail shows only the dots that fit with readable titles and never overflows when text is enlarged or the screen is narrow in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const view of [
+    {name:'small phone',width:320,height:568},
+    {name:'small phone enlarged',width:320,height:568,enlarged:true},
+    {name:'phone at 150%',width:260,height:563},
+    {name:'small phone at 150%',width:213,height:379},
+    {name:'phone at 200%',width:195,height:422},
+    {name:'short landscape enlarged',width:844,height:390,enlarged:true},
+    {name:'desktop',width:1280,height:800},
+   ])for(const trail of [
+    {name:'two dots',dots:2},
+    {name:'three dots',dots:3},
+    {name:'nine dots',dots:9},
+    {name:'short titles',dots:3,title:i=>['Do','Go'][i%2]},
+   ]){
+    const label=`${engineName} ${view.name} ${trail.name}`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard(trail),{...view,touch:false});
+    try{
+     await page.waitForSelector('.crumbs',{timeout:15000});
+     if(view.enlarged)await page.addStyleTag({content:STEADY_ENLARGED_TEXT});
+     await page.waitForTimeout(80);
+     steadyAssertTrail(await steadyReadTrail(page),label);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.split('\n').slice(0,8).join(' '));}finally{await context.close();}
+   }
+   // A rotated phone or a zoom change resizes the live trail without a new answer.
+   const label=`${engineName} resized`;
+   const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard({dots:3}),{width:1280,height:800,touch:false});
+   try{
+    await page.waitForSelector('.crumbs',{timeout:15000});await page.waitForTimeout(80);
+    assert.equal((await steadyReadTrail(page)).dots.length,2,`${label}: desktop has room for both dots`);
+    await page.setViewportSize({width:195,height:422});await page.waitForTimeout(120);
+    const narrow=await steadyReadTrail(page);steadyAssertTrail(narrow,`${label} to narrow`);
+    assert.ok(narrow.dots.length<2,`${label}: the narrow trail drops a dot rather than crushing both`);
+    await page.setViewportSize({width:1280,height:800});await page.waitForTimeout(120);
+    const wide=await steadyReadTrail(page);steadyAssertTrail(wide,`${label} back to wide`);
+    assert.equal(wide.dots.length,2,`${label}: the dots come back with the room`);
+    assert.deepEqual(errors,[],`${label}: no page errors`);
+   }catch(error){failures.push(error.message.split('\n')[0]);}finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// The count and "this ↓" are the trail's fixed words. Pills give up width for
+// them, so a label must not lose so much as a letter while a pill is showing.
+// A clone with no flex constraint is the label's real width, in the same engine.
+test('RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const width of [320,375,390,393,402,414,430,480])for(const dots of [3,9]){
+    const label=`${engineName} ${width}px ${dots} dots`;
+    const {page,context,errors}=await steadyScannerPage(browser,steadyTrailBoard({dots}),{width,height:844,touch:false});
+    try{
+     await page.waitForSelector('.crumbs',{timeout:15000});await page.evaluate(()=>document.fonts?.ready);await page.waitForTimeout(120);
+     const seen=await page.evaluate(()=>{
+      const row=document.querySelector('.crumbs'),labels=[...row.querySelectorAll('.lbl,.arrow')].filter(el=>!el.hidden);
+      return {pills:row.querySelectorAll('.crumb:not([hidden])').length,overflow:row.scrollWidth-row.clientWidth,clipped:labels.flatMap(el=>{
+       const copy=el.cloneNode(true);copy.style.cssText+=';position:absolute;visibility:hidden;flex:none;overflow:visible;max-width:none';row.append(copy);
+       const whole=copy.getBoundingClientRect().width,has=el.getBoundingClientRect().width;copy.remove();
+       return has+.01<whole?[`${el.textContent}: ${has.toFixed(3)} of ${whole.toFixed(3)}`]:[];
+      })};
+     });
+     if(seen.pills)assert.deepEqual(seen.clipped,[],`${label}: no label is cut beside ${seen.pills} dot(s)`);
+     assert.ok(seen.overflow<=1,`${label}: the row still fits: ${seen.overflow}`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n').slice(0,6).join(' ')}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// A web font arriving late changes the labels without changing the row's size,
+// so nothing else tells the trail to fit again. The wider label stands in for
+// the swapped font, and the browser's own event is what the trail listens to.
+test('RISK steady scanner browser: the trail fits again when web fonts finish loading in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  const {page,context}=await steadyScannerPage(browser,steadyTrailBoard({dots:3}),{width:768,height:1024,touch:false});
+  try{
+   await page.waitForSelector('.crumbs',{timeout:15000});await page.waitForTimeout(120);
+   const pills=()=>page.evaluate(()=>document.querySelectorAll('.crumbs .crumb:not([hidden])').length);
+   assert.equal(await pills(),2,`${engineName}: both dots fit before the font arrives`);
+   await page.addStyleTag({content:'.crumbs .lbl{letter-spacing:32px}'});await page.waitForTimeout(80);
+   await page.evaluate(()=>document.fonts.dispatchEvent(new Event('loadingdone')));await page.waitForTimeout(80);
+   assert.ok(await pills()<2,`${engineName}: the trail refits for the new label width`);
+  }catch(error){failures.push(`${engineName}: ${error.message.split('\n')[0]}`);}finally{await context.close();await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// The first candidate after opening, Start or Resume has to be readable too, but
+// a person's own place on the page, such as a restored saved view, comes first.
+test('RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ const clear=page=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title')?.getBoundingClientRect(),row=document.querySelector('.decide')?.getBoundingClientRect();return t&&row?{bottom:t.bottom,top:t.top,rowTop:row.top,clear:t.bottom<=row.top&&t.top>=0}:null;});
+ const titles=i=>({title:'Same length title number '+String(i).padStart(2,'0')});
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:1280,height:720},{width:1000,height:700},{width:375,height:667}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const seeded=steadyScannerBoard({tasks:12,taskOver:titles,over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const opened=await steadyScannerPage(browser,seeded,{...viewport,touch:false});
+    try{
+     await opened.page.waitForSelector('[data-act="yes"]',{timeout:15000});await opened.page.waitForTimeout(150);
+     const shown=await clear(opened.page);
+     assert.ok(shown?.clear,`${label}: opening reveals the first candidate: ${JSON.stringify(shown)}`);
+     // Resume from work mode, starting at the top of the page.
+     await opened.page.locator('[data-act="start-working"]').first().click();
+     await opened.page.waitForSelector('[data-act="resume-scan"]',{timeout:5000});
+     await opened.page.evaluate(()=>scrollTo(0,0));
+     await opened.page.locator('[data-act="resume-scan"]').first().click();
+     await opened.page.waitForSelector('[data-act="yes"]',{timeout:5000});await opened.page.waitForTimeout(100);
+     const resumed=await clear(opened.page);
+     assert.ok(resumed?.clear,`${label}: Resume reveals the candidate: ${JSON.stringify(resumed)}`);
+     // A restored place on the page is the person's, even with the title covered.
+     const covered=await opened.page.evaluate(()=>{scrollTo(0,0);const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return t.bottom>row.top+24;});
+     if(covered){
+      await opened.page.evaluate(()=>scrollTo(0,12));await opened.page.waitForTimeout(100);
+      const place=await opened.page.evaluate(()=>scrollY);
+      assert.ok(place>0,`${label}: positive control: the page is scrolled`);
+      await opened.page.reload({waitUntil:'domcontentloaded'});
+      await opened.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:30000});await opened.page.waitForTimeout(200);
+      const after=await opened.page.evaluate(()=>scrollY);
+      assert.ok(Math.abs(after-place)<=3,`${label}: a restored position stays: ${place} became ${after}`);
+     }
+     assert.deepEqual(opened.errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await opened.context.close();}
+    const fresh=await steadyScannerPage(browser,steadyScannerBoard({tasks:12,taskOver:titles}),{...viewport,touch:false});
+    try{
+     await fresh.page.locator('[data-act="start-scan"]').first().click();
+     await fresh.page.waitForFunction(()=>!!state.candidateId&&!!document.querySelector('[data-act="yes"]'),null,{timeout:15000});await fresh.page.waitForTimeout(100);
+     const started=await clear(fresh.page);
+     assert.ok(started?.clear,`${label}: Start reveals the first candidate: ${JSON.stringify(started)}`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await fresh.context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// The reveal belongs to answering. Undo and context changes are pressed from
+// above the scanner, and moving the page would carry that control off-screen.
+test('RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[];
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:320,height:568},{width:844,height:390},{width:390,height:664}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const board=steadyScannerBoard({tasks:12,taskOver:i=>({title:'Same length title number '+String(i).padStart(2,'0')}),over:{chain:['steady-0','steady-1'],candidateId:'steady-2'}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{...viewport,touch:false});
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});await page.waitForTimeout(200);
+     const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+     const title=()=>page.evaluate(()=>{const t=document.querySelector('.card.cand .title').getBoundingClientRect(),row=document.querySelector('.decide').getBoundingClientRect();return {bottom:t.bottom,rowTop:row.top,y:scrollY,candidate:state.candidateId};});
+     const clickOn=async selector=>{const box=await page.locator(selector).first().boundingBox();await page.mouse.click(box.x+box.width/2,box.y+box.height/2);};
+     // Answering from the top of the page reveals the next title.
+     await page.evaluate(()=>scrollTo(0,0));await settle();
+     const opened=await title();
+     assert.ok(opened.bottom>opened.rowTop,`${label}: positive control: the title starts covered: ends ${Math.round(opened.bottom)}, row ${Math.round(opened.rowTop)}`);
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     await page.keyboard.press('n');
+     await page.waitForFunction(prior=>state.candidateId!==prior,opened.candidate,{timeout:5000});await settle();
+     const answered=await title();
+     assert.ok(answered.bottom<=answered.rowTop,`${label}: the answer reveals the next title: ends ${Math.round(answered.bottom)}, row ${Math.round(answered.rowTop)}`);
+     // Undo, pressed from the header at the top of the page, stays under the finger.
+     await page.evaluate(()=>scrollTo(0,0));await settle();
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     const beforeUndo=await title();
+     await clickOn('[data-act="undo"]');
+     await page.waitForFunction(prior=>state.candidateId!==prior,beforeUndo.candidate,{timeout:5000});await settle();await page.waitForTimeout(60);
+     const undone=await page.evaluate(()=>({y:scrollY,undoTop:document.querySelector('[data-act="undo"]').getBoundingClientRect().top}));
+     assert.equal(undone.y,beforeUndo.y,`${label}: Undo does not move the page`);
+     assert.ok(undone.undoTop>=0,`${label}: Undo stays on screen: top ${Math.round(undone.undoTop)}`);
+     // A context change replaces the candidate from the panel above the scanner.
+     await page.evaluate(()=>{state.contexts=[{id:'c1',name:'Home',active:true},{id:'c2',name:'Errands',active:true}];for(const task of state.tasks)if(task.id===state.candidateId)task.ctx=['c1'];state.ctxOpen=true;render();});await settle();
+     const item='[data-act="cycle-context"][data-ctx="c1"]';
+     await page.locator(item).first().scrollIntoViewIfNeeded();await settle();
+     const beforeContext=await title(),itemBefore=await page.locator(item).first().boundingBox();
+     await clickOn(item);
+     await page.waitForFunction(prior=>state.candidateId!==prior,beforeContext.candidate,{timeout:5000});await settle();await page.waitForTimeout(60);
+     assert.equal(await page.evaluate(()=>scrollY),beforeContext.y,`${label}: a context change does not move the page`);
+     assert.equal(Math.round((await page.locator(item).first().boundingBox()).y),Math.round(itemBefore.y),`${label}: the context control stays under the finger`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(`${label}: ${error.message.split('\n')[0]}`);}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+// A fixed row sits over the page without the browser knowing, so a control under
+// it counted as already on screen: Tab stopped there and the focus ring was
+// invisible. Real key presses are the only way to observe the browser's choice.
+// macOS WebKit needs Option for Tab to stop on buttons.
+test('RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[],STOPS=70;
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   for(const viewport of [{width:390,height:844},{width:320,height:568},{width:844,height:390},{width:1280,height:800},{width:1000,height:700},{width:768,height:1024}]){
+    const label=`${engineName} ${viewport.width}x${viewport.height}`;
+    const board=steadyScannerBoard({tasks:40,over:{chain:['steady-0','steady-1'],candidateId:'steady-2',listOpen:true}});
+    const {page,context,errors}=await steadyScannerPage(browser,board,{...viewport,touch:false});
+    try{
+     await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+     await page.waitForTimeout(80);
+     const hidden=[];let onThePage=0;
+     for(let i=0;i<STOPS;i++){
+      await page.keyboard.press(engineName==='webkit'?'Alt+Tab':'Tab');
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const stop=await page.evaluate(()=>{
+       const el=document.activeElement,row=document.querySelector('.decide');
+       if(!el||el===document.body||el.closest('.decide'))return null;
+       const r=el.getBoundingClientRect();
+       return {name:el.dataset.act||el.id||el.tagName,top:r.top,bottom:r.bottom,rowTop:row.getBoundingClientRect().top};
+      });
+      if(!stop)continue;
+      onThePage++;
+      if(stop.bottom>stop.rowTop)hidden.push(`${stop.name} ends ${Math.round(stop.bottom)}, the row starts ${Math.round(stop.rowTop)}`);
+     }
+     assert.ok(onThePage>=30,`${label}: the walk reached the page's controls: ${onThePage} stops`);
+     assert.deepEqual(hidden,[],`${label}: ${hidden.length} of ${onThePage} focus stops are behind the pinned row`);
+     assert.deepEqual(errors,[],`${label}: no page errors`);
+    }catch(error){failures.push(error.message.slice(0,900));}finally{await context.close();}
+   }
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const failures=[],safeBottom=34;
+ for(const [engineName,engine] of await steadyScannerEngines()){
+  const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});
+  try{
+   const {page,context,errors}=await steadyScannerPage(browser,steadySeededBoard({tasks:4}));
+   try{
+    await page.waitForSelector('[data-act="yes"]',{timeout:15000});
+    await page.evaluate(()=>toast('Saved'));await page.waitForTimeout(60);
+    const shown=await page.evaluate(()=>{const t=document.querySelector('.toast.show').getBoundingClientRect(),row=document.querySelector('.decide-finish').getBoundingClientRect();return {toastBottom:t.bottom,rowTop:row.top};});
+    assert.ok(shown.toastBottom<=shown.rowTop,`${engineName}: a toast sits above the pinned row: ends ${Math.round(shown.toastBottom)}, row starts ${Math.round(shown.rowTop)}`);
+    if(engineName==='chromium'){
+     const cdp=await context.newCDPSession(page);
+     await cdp.send('Emulation.setSafeAreaInsetsOverride',{insets:{top:47,topMax:47,left:0,leftMax:0,bottom:safeBottom,bottomMax:safeBottom,right:0,rightMax:0}});
+     await page.waitForTimeout(80);
+     const clear=await page.evaluate(()=>({bottom:document.querySelector('[data-act="yes"]').getBoundingClientRect().bottom,height:innerHeight}));
+     assert.ok(clear.bottom<=clear.height-safeBottom,`${engineName}: Yes clears a ${safeBottom}px home indicator: ends ${Math.round(clear.bottom)} of ${clear.height}`);
+     await cdp.send('Emulation.clearSafeAreaInsetsOverride').catch(()=>{});
+    }
+    for(let guard=0;guard<12&&await page.locator('[data-act="no"]').count();guard++){
+     const before=await steadyScannerControls(page);if(before.intervention)break;
+     await page.waitForFunction(()=>!answerBeforeCandidateCouldBeRead(),null,{timeout:5000});
+     await page.touchscreen.tap(steadyScannerCenter(before.no).x,steadyScannerCenter(before.no).y);
+     await page.waitForFunction(prior=>state.candidateId!==prior||state.interventionActive,before.candidate,{timeout:10000});
+    }
+    await page.waitForTimeout(80);
+    const ended=await page.evaluate(()=>({text:document.getElementById('scan').textContent,fixedDescendants:[...document.querySelectorAll('#scan *')].filter(e=>getComputedStyle(e).position==='fixed').length,padding:parseFloat(getComputedStyle(document.querySelector('.wrap')).paddingBottom)}));
+    assert.match(ended.text,/End of the list/,`${engineName}: the scan ended honestly: ${ended.text.slice(0,80)}`);
+    assert.equal(ended.fixedDescendants,0,`${engineName}: nothing stays pinned without a candidate`);
+    assert.ok(ended.padding<=62+(engineName==='chromium'?safeBottom:0),`${engineName}: the page gives back the room it reserved: ${ended.padding}`);
+    assert.deepEqual(errors,[],`${engineName}: no page errors`);
+   }catch(error){failures.push(error.message);}finally{await context.close();}
+  }finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('Scanner emphasis clears when the candidate pool is exhausted without changing scan mode',async()=>{
  const {ctx,shim}=await loadApp({seed:2821});
  ctx.addTask('Dotted task',true);ctx.addTask('Next task',false);ctx.render();
@@ -24559,6 +25216,7 @@ test('RISK PWA updates: a scanner gesture commits durably without an automatic s
  shim.document.dispatchEvent({type:'pointerdown'});await handlers.controllerchange();
  assert.equal(reloads.length,0,'a ready worker cannot replace the page between pointerdown and the scanner click');
  const noButton={dataset:{act:'no'},disabled:false};
+ await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'finishing a response does not end the active session');
@@ -24587,6 +25245,7 @@ test('RISK PWA updates: a gesture beginning during an update save preserves the 
  assert.equal(reloads.length,0,'a gesture that begins before save resolution still blocks page replacement');
  const noButton={dataset:{act:'no'},disabled:false};
  shim.document.dispatchEvent({type:'pointerup'});
+ await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
  await new Promise(resolve=>setTimeout(resolve,450));
  assert.equal(reloads.length,0,'the downloaded update keeps the used document open after the real scanner click');
@@ -26251,6 +26910,64 @@ test('RISK RESET SAFETY: quota compaction makes room for the mandatory copy with
  const rows=ctx.readLocalBackups();
  assert.ok(rows.some(row=>row.kind==='before-reset'&&row.payload===prior));
  for(const row of retained)assert.equal(rows.find(saved=>saved.id===row.id)?.payload,row.payload,'retained recovery stays exact: '+row.id);
+});
+
+// #2311: Undo frames no longer hold whole serialized boards, so this drives a
+// long scan through the real actions and checks each answer stays exactly once,
+// each of the 30 Undo steps reverses its own action, and the frame text still
+// reads back byte-for-byte for recovery. Expected values are recorded from the
+// board before each action, independent of how a frame stores it.
+test('RISK long scan Undo: every answer is kept exactly once through reload, each of 30 Undo steps reverses its own action, and frame text stays byte-exact',async()=>{
+ const start=Date.parse('2026-06-01T12:00:00Z');let now=start;
+ const seeded=syncState({contexts:[{id:'home',name:'Home',active:true}],listOpen:true,seenQuickStart:true,
+  tasks:Array.from({length:80},(_,i)=>({...syncTask('long-scan-'+i,'Zoë ✓ 𝒳 task '+i),ctx:['home'],createdAt:start-(80-i)*3600000}))});
+ const app=await loadApp({seed:2311,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(seeded)}}),{ctx}=app;
+ await ctx.__dataReady;
+ const at=()=>{now+=60000;setFakeTime(ctx,now);};at();
+ const facts=()=>JSON.stringify({chain:ctx.state.chain,considered:ctx.state.considered,ratings:ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])});
+ ctx.onAction('start-scan',{});
+ const history=[];let answers=0;
+ for(let guard=0;answers<40&&guard<120;guard++){
+  at();
+  const benchmark=ctx.state.chain.at(-1);
+  const before=facts(),depth=vm.runInContext('undoStack.length',ctx);
+  if(ctx.state.interventionActive){ctx.onAction('continue-scan',{dataset:{benchmark}});}
+  else{
+   assert.ok(ctx.state.candidateId,'the scan offers a candidate at answer '+answers);
+   ctx.onAction(ctx.state.chain.length%5?'no':'yes',{dataset:{candidate:ctx.state.candidateId,benchmark}});
+   answers++;
+  }
+  if(vm.runInContext('undoStack.length',ctx)!==depth||depth===30)history.push(before);
+ }
+ assert.equal(answers,40,'the scan takes 40 answers');
+ assert.equal(vm.runInContext('undoStack.length',ctx),30,'Undo keeps its 30-step limit');
+ assert.equal(await ctx.persist(),true);
+ const answersOnBoard=ctx.state.decisionEvents.filter(event=>event.kind==='no'||event.kind==='comparison');
+ const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
+ await reload.ctx.__dataReady;
+ const reloadedIds=reload.ctx.state.decisionEvents.map(event=>event.id);
+ assert.equal(new Set(reloadedIds).size,reloadedIds.length,'no decision is duplicated through reload');
+ for(const event of answersOnBoard)assert.equal(reload.ctx.state.decisionEvents.filter(row=>row.id===event.id).length,1,'each answer is kept exactly once through reload');
+ await reload.dispose();
+ for(let step=1;step<=30;step++){
+  at();
+  assert.ok(await ctx.onAction('undo',{}),'Undo step '+step+' is available');
+  assert.equal(facts(),history[history.length-step],'Undo step '+step+' restores the board before its own action');
+ }
+ assert.equal(vm.runInContext('undoStack.length',ctx),0,'30 steps used the whole stack');
+ assert.equal(await ctx.onAction('undo',{}),false,'a 31st Undo step is unavailable');
+ // A frame reads back exactly as JSON.stringify would write the board, for
+ // every value JSON treats specially, because recovery saves that text.
+ ctx.state.undoOddValues={absent:undefined,nan:NaN,text:'line\n"quote" ✓ 𝒳'};
+ ctx.state.undoOddRows=[1,undefined,()=>0,NaN,,'✓'];
+ ctx.state.undoOmitted=undefined;
+ vm.runInContext('pushUndo()',ctx);
+ assert.equal(String(vm.runInContext('undoStack.at(-1).snapshot',ctx)),JSON.stringify(ctx.state),'a frame reads back byte-for-byte');
+ ctx.state.tasks[0].title='Changed after the frame';
+ vm.runInContext('sealUndoFrame()',ctx);
+ assert.equal(String(vm.runInContext('undoStack.at(-1).after',ctx)),JSON.stringify(ctx.state),'the sealed side of a frame reads back byte-for-byte');
+ assert.notEqual(String(vm.runInContext('undoStack.at(-1).snapshot',ctx)),String(vm.runInContext('undoStack.at(-1).after',ctx)),'a frame keeps both sides apart');
+ await app.dispose();
 });
 
 test('RISK RESET SAFETY: failed primary reset preserves Undo and never restores an old account after switching',async()=>{
@@ -31441,6 +32158,7 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   const {ctx,shim}=await loadApp({seed:618});const bench=ctx.addTask('Synthetic benchmark'),candidate=ctx.addTask('Synthetic candidate'),next=ctx.addTask('Synthetic next');
   Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',scanMode,snooze:100});ctx.render();
   const initial=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
   assert.equal(ctx.state.candidateId,next.id,'the ordinary first press advances to the next candidate');
   if(key==='y')assert.ok(candidate.mu>25&&bench.mu<25,'Yes retains candidate-over-benchmark orientation');
@@ -31450,11 +32168,42 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   for(let repeat=0;repeat<3;repeat++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
   assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a held key cannot act on the replacement or record another observation');
   assert.equal(vm.runInContext('undoStack.length',ctx),undoDepth,'ignored repeats add no Undo frame');
+  await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
+  shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
+  assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a repeat after the read window still cannot act');
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});
   assert.notEqual(JSON.stringify(ctx.state),after,'a fresh keypress can judge the replacement');
   ctx.undo();assert.equal(ctx.state.candidateId,next.id,'one Undo reverses the second fresh decision');
   ctx.undo();assert.equal(ctx.state.candidateId,candidate.id,'a second Undo reverses the first decision');
   assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),initial,'Undo restores exact original ratings');
+ }
+});
+
+// The owner set the window at 200 ms. The clock is the page's own, held still so
+// the boundary is exact; a real timer could not land on either side reliably.
+test('RISK press guard: Yes No Cant Postpone and Done inside 200 ms of a new task are dropped and just after it are accepted',async t=>{
+ for(const [name,press] of [
+ ['the Yes key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'y',repeat:false})],
+ ['the No key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'n',repeat:false})],
+ ["the Can't key",({shim})=>shim.document.dispatchEvent({type:'keydown',key:'c',repeat:false})],
+ ['the Done key',({shim})=>shim.document.dispatchEvent({type:'keydown',key:'d',repeat:false})],
+ ...['yes','no','cant','postpone','cand-done','bench-done'].map(act=>[`a click on ${act}`,({shim})=>{
+  const tag=shim.elements.get('scan').innerHTML.match(new RegExp('<button[^>]*data-act="'+act+'"[^>]*>'))?.[0];assert.ok(tag,act+' is on the scanner');
+  const dataset=Object.fromEntries([...tag.matchAll(/data-([a-z-]+)="([^"]*)"/g)].map(([,key,value])=>[key.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()),value]));
+  const button={dataset};button.closest=()=>button;shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>button}});
+ }])]){
+  const app=await loadApp({seed:2841}),{ctx}=app;t.after(()=>app.dispose?.());
+  ctx.state.settings.showPostpone=true;
+  ctx.addTask('Dotted task',true);for(const title of ['Second','Third','Fourth','Fifth','Sixth'])ctx.addTask(title,false);ctx.render();
+  let clock=50000;ctx.performance={now:()=>clock};
+  const undo=()=>vm.runInContext('undoStack.length',ctx);
+  // An answer draws a new task at this clock.
+  ctx.onAction('no',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});
+  const drawn=ctx.state.candidateId,before=undo();assert.ok(drawn,'a new task is showing');
+  clock+=199;press(app);
+  assert.equal(undo(),before,`${name} at 199 ms is dropped`);assert.equal(ctx.state.candidateId,drawn);
+  clock+=2;press(app);
+  assert.equal(undo(),before+1,`${name} at 201 ms is accepted`);
  }
 });
 
@@ -31472,6 +32221,7 @@ test('RISK Squared Weighting held keys: real keyboard repeats preserve the newly
   const {ctx,shim}=await loadApp({seed:959});ctx.addTask('Oldest synthetic task');ctx.addTask('Synthetic one');ctx.addTask('Synthetic two');ctx.addTask('Synthetic three');
   const el=makeFakeElement();el.dataset={act:'start-scan',mode:'squared'};el.closest=()=>el;shim.document.dispatchEvent({type:'click',detail:1,target:el});ctx.state.snooze=100;
   assert.equal(ctx.state.scanMode,'squared');const first=ctx.state.candidateId,original=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  await new Promise(resolve=>setTimeout(resolve,240)); // a person reads the task before answering
   shim.document.dispatchEvent({type:'keydown',key,repeat:false});assert.notEqual(ctx.state.candidateId,first);
   const after=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
   for(let i=0;i<3;i++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
@@ -38427,6 +39177,179 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/supportDiagnosticsData/,'the report is viewable and selectable even when clipboard access is unavailable');
 });
 
+const sharedDebugLogStorage2309=()=>{const values=new Map();return {getItem:key=>values.has(key)?values.get(key):null,setItem(key,value){values.set(key,String(value));},removeItem(key){values.delete(key);},key:i=>[...values.keys()][i]??null,get length(){return values.size;}};};
+// #2309: a real device store holding saved backups, for opening through the
+// Debug log link. The counts come from the store's own listing, not the report.
+async function debugLogLinkDevice2309(){
+ const {IDBFactory}=await import('fake-indexeddb');
+ const indexedDBProvider=new IDBFactory(),deviceDbName='debug-log-link-'+Math.random();
+ const storage=sharedDebugLogStorage2309();
+ const seed=await loadApp({indexedDBProvider,deviceDbName,sharedStorage:storage});
+ seed.shim.document.getElementById('addInput').value='PRIVATE debug log link task 2309';
+ seed.ctx.onAction('add',{});assert.equal(await seed.ctx.persist(),true,'the seeded board is durable');
+ const store=seed.ctx.window.ScannerDeviceStore,head=await store.readHead();
+ for(let i=0;i<5;i++)assert.equal((await store.putBackup({expectedHash:head.hash,
+  backup:{id:'link-backup-'+i,kind:'manual',at:i+1,day:'2026-11-0'+(i+1),payload:JSON.stringify({...JSON.parse(head.payload),padding:'PRIVATE backup text '+'x'.repeat(4096+i)})}})).ok,true);
+ const rows=await store.listBackups();
+ await seed.dispose();
+ return {indexedDBProvider,deviceDbName,storage,expectedBackups:rows.length,expectedCharacters:rows.reduce((sum,row)=>sum+row.payload.length,0)};
+}
+const debugLogLinkSnapshotReads2309=async t=>{
+ const {IDBObjectStore}=await import('fake-indexeddb'),reads=[];
+ for(const method of ['get','getAll','openCursor']){
+  const original=IDBObjectStore.prototype[method];
+  IDBObjectStore.prototype[method]=function(...args){if(this.name==='snapshots')reads.push(method);return original.apply(this,args);};
+  t.after(()=>{IDBObjectStore.prototype[method]=original;});
+ }
+ return reads;
+};
+const debugLogLinkReport2309=async app=>{
+ let report=app.ctx.buildSupportDiagnosticsReport();
+ for(let i=0;i<500&&report.savedData?.backups?.count?.status!=='observed';i++){await flush();report=app.ctx.buildSupportDiagnosticsReport();}
+ return report;
+};
+
+test('RISK debug log link #2309: the link opens the read-only log at opening without Settings or reading any backup text',async t=>{
+ const device=await debugLogLinkDevice2309(),reads=await debugLogLinkSnapshotReads2309(t);
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+ const report=await debugLogLinkReport2309(app),modal=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Debug log<\/h2>/,'the link shows the Debug log');
+ assert.match(modal,/readonly aria-label="Debug log"/,'the log stays selectable and read-only');
+ assert.doesNotMatch(modal,/<h2>Settings<\/h2>/,'the link does not go through Settings');
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups,'the live backup count comes from the rows');
+ assert.deepEqual(reads,[],'no saved board or backup text is read to open the log');
+});
+
+// A backup row can carry a retained file's bytes, so the rows are full backup
+// text too: counting them must not load them (#2308 review).
+test('RISK debug log link #2309: counting backups loads no backup rows, so a cold opening stays clear of retained file bytes',async t=>{
+ const device=await debugLogLinkDevice2309(),{IDBObjectStore}=await import('fake-indexeddb'),reads=[];
+ for(const method of ['get','getAll','openCursor']){
+  const original=IDBObjectStore.prototype[method];
+  IDBObjectStore.prototype[method]=function(...args){if(this.name==='backups')reads.push(method);return original.apply(this,args);};
+  t.after(()=>{IDBObjectStore.prototype[method]=original;});
+ }
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+ const report=await debugLogLinkReport2309(app);
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups,'the count is the real number of stored backups');
+ assert.deepEqual(reads,[],'no backup row is loaded to count them');
+});
+
+test('Help answers how the steady scanner, backup list, Debug log link and rank column now behave',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
+ const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ for(const [topic,answer] of [
+  [/stay at the bottom of the screen\?<\/dt>/,/Yes, No and Can’t stay in one place at the bottom of the screen/],
+  [/How long can the dot trail get\?<\/dt>/,/stays on one row[^<]*a count such as \+3 earlier/],
+  [/How long can the dot trail get\?<\/dt>/,/up to two of the newest dots, only as many as fit with their titles readable/],
+  [/Can I run WOOP on an overdue task\?<\/dt>/,/Run WOOP appears above the scanner choices/],
+  [/Why didn’t my second tap count\?<\/dt>/,/ignored for a moment after a new task appears/],
+  [/Why does the page move after I answer\?<\/dt>/,/scrolls just enough to show the next task/],
+  [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
+  [/Does Settings load every backup\?<\/dt>/,/read only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
+  [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],
+ ]){assert.match(help,topic);assert.match(help,answer);}
+});
+
+test('RISK debug log link #2309: the report gains backup and Undo counts and sizes, and never their contents',async t=>{
+ const device=await debugLogLinkDevice2309();
+ // The ordinary opening holds every backup anyway, so it can note their size
+ // for a later opening that must not read them.
+ const normal=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage});t.after(()=>normal.dispose());
+ for(let i=0;i<1500&&vm.runInContext('deviceBackupMeasuringOwed',normal.ctx);i++)await new Promise(resolve=>setTimeout(resolve,10)); // backups are measured just after the board opens
+ for(const title of ['PRIVATE undo one 2309','PRIVATE undo two 2309','PRIVATE undo three 2309']){normal.shim.document.getElementById('addInput').value=title;normal.ctx.onAction('add',{});}
+ const rebuilt=vm.runInContext('(()=>{const seen={count:0},original=UndoBoardCopy.prototype.toString;UndoBoardCopy.prototype.toString=function(){seen.count++;return original.call(this);};return seen;})()',normal.ctx);
+ const boardChars=JSON.stringify(normal.ctx.state).length,running=normal.ctx.buildSupportDiagnosticsReport().savedData;
+ assert.equal(rebuilt.count,0,'measuring Undo never rebuilds a whole board');
+ assert.equal(running.backups.count.value,device.expectedBackups,'a running app reports its held backup rows');
+ assert.equal(running.backups.totalCharacters.value,device.expectedCharacters,'a running app reports their held text size');
+ assert.equal(running.undo.frames.value,3,'three additions hold three Undo frames');
+ assert.ok(running.undo.characters.value>boardChars/2,'Undo size counts what the frames hold');
+ assert.ok(running.undo.characters.value<3*boardChars,'text shared between frames is counted once');
+ assert.doesNotMatch(normal.ctx.supportDiagnosticsText(),/PRIVATE/,'no task text in the running report');
+ await normal.dispose();
+ const linked=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>linked.dispose());
+ const report=await debugLogLinkReport2309(linked);
+ assert.equal(report.savedData.backups.count.value,device.expectedBackups);
+ assert.equal(report.savedData.backups.totalCharacters.status,'observed');
+ assert.equal(report.savedData.backups.totalCharacters.value,device.expectedCharacters,'the size noted by the ordinary opening is reported without reading the text');
+ assert.equal(report.savedData.undo.frames.value,0,'an opening behind the link holds no Undo frames');
+ assert.equal(report.savedData.undo.characters.value,0);
+ const text=linked.ctx.supportDiagnosticsText();
+ assert.doesNotMatch(text,/PRIVATE|link-backup-/,'no task text, backup text or recovery-source identifiers in the report');
+ assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the report stays within its budget');
+ assert.match(linked.shim.document.getElementById('supportDiagnosticsData').value,/"totalCharacters"/,'the visible log carries the counts once they arrive');
+});
+
+test('RISK debug log link #2309: leaving the log returns to the ordinary board, and selecting the log still works',async t=>{
+ const device=await debugLogLinkDevice2309();
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/#debug-log',awaitStartup:false,navigatorProvider:{clipboard:{async writeText(){}}}});t.after(()=>app.dispose());
+ await debugLogLinkReport2309(app);
+ assert.equal(app.ctx.state,null,'the board stays unloaded while the log is open');
+ assert.equal(await app.ctx.onAction('copy-support-diagnostics',{}),true,'the log can be copied from this view');
+ assert.equal(await app.ctx.onAction('select-support-diagnostics',{}),true,'the log can be selected from this view');
+ assert.equal(app.ctx.state,null,'copying does not start the board');
+ let replacedUrl=null;app.shim.window.history={replaceState(_state,_title,url){replacedUrl=url;app.shim.window.location=new URL(url,app.shim.window.location.href);}};
+ await app.ctx.onAction('close-modal',{});
+ const deadline=Date.now()+5000;while(app.ctx.state===null&&Date.now()<deadline)await flush();
+ assert.notEqual(app.ctx.state,null,'leaving the log continues the ordinary opening');
+ assert.ok(app.ctx.state.tasks.some(task=>task.title==='PRIVATE debug log link task 2309'),'the ordinary saved board opens');
+ assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'the log closes');
+ assert.equal(replacedUrl,'/','the link is removed so a reload opens normally');
+ assert.equal(app.shim.window.location.hash,'');
+});
+
+test('RISK debug log link #2309: an ordinary opening, or another fragment, loads the board and shows no log',async t=>{
+ for(const locationHref of [undefined,'https://scanner.example/#other']){
+  const device=await debugLogLinkDevice2309();
+  const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref});t.after(()=>app.dispose());
+  assert.ok(app.ctx.state.tasks.some(task=>task.title==='PRIVATE debug log link task 2309'));
+  assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,'an ordinary opening is unchanged');
+ }
+});
+
+test('RISK debug log link #2309: the link is safe with no prior state and when device storage cannot open',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const brokenIDB={open(){throw Object.assign(Error('PRIVATE broken device store'),{name:'UnknownError'});}};
+ for(const [label,options,count] of [['empty device',{indexedDBProvider:new IDBFactory(),deviceDbName:'debug-log-link-empty-'+Math.random()},{value:0,status:'observed'}],
+  ['no IndexedDB',{},{value:null,status:'unobserved'}],
+  ['broken IndexedDB',{indexedDBProvider:brokenIDB,deviceDbName:'debug-log-link-broken'},{value:null,status:'unavailable'}]]){
+  const app=await loadApp({...options,locationHref:'https://scanner.example/#debug-log',awaitStartup:false});t.after(()=>app.dispose());
+  for(let i=0;i<500&&app.ctx.buildSupportDiagnosticsReport().savedData.backups.count.status==='unobserved'&&count.status!=='unobserved';i++)await flush();
+  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/,label+': the log opens');
+  const {count:reported,totalCharacters}=app.ctx.buildSupportDiagnosticsReport().savedData.backups;
+  assert.equal(reported.value,count.value,label+': backup count');assert.equal(reported.status,count.status,label+': backup count status');
+  assert.equal(totalCharacters.status,'unobserved',label+': no invented size');
+  assert.doesNotMatch(app.ctx.supportDiagnosticsText(),/PRIVATE/,label+': failure text stays out');
+  await app.ctx.onAction('close-modal',{});
+  const deadline=Date.now()+5000;while(app.ctx.state===null&&Date.now()<deadline)await flush();
+  assert.notEqual(app.ctx.state,null,label+': the ordinary opening continues');
+ }
+});
+
+test('RISK debug log link #2309: inside a running app the Help link opens the log without Settings, and can be used again',async t=>{
+ const device=await debugLogLinkDevice2309();
+ const app=await loadApp({indexedDBProvider:device.indexedDBProvider,deviceDbName:device.deviceDbName,sharedStorage:device.storage,locationHref:'https://scanner.example/'});t.after(()=>app.dispose());
+ const {ctx,shim}=app,before=JSON.stringify(ctx.state);
+ ctx.onAction('help',{});
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<a href="#debug-log">/,'Help offers the link inside the installed window');
+ // #2308: the owner asked for the link at the bottom of Help, so only the OK button may follow it.
+ const help=shim.document.getElementById('modalRoot').innerHTML,linkLine='<p class="kv">If Settings will not open, <a href="#debug-log">open the Debug log</a> here instead.</p>';
+ assert.equal(help.split(linkLine).length,2,'Help shows the link once, with its wording');
+ assert.ok(help.indexOf(linkLine)>help.lastIndexOf('</details>'),'the link comes after every Help chapter, Changelog included');
+ assert.match(help.slice(help.indexOf(linkLine)+linkLine.length),/^<div class="mbtns"><button class="btn done" data-act="ok-quickstart">OK<\/button><\/div>/,'nothing but the OK button follows the link');
+ assert.match(help,/How do I open the debug log if Settings will not open\?<\/dt><dd>Help has a link at the bottom that opens the Debug log directly/,'the FAQ says where the link is');
+ let replacedUrl=null;shim.window.history={replaceState(_state,_title,url){replacedUrl=url;shim.window.location=new URL(url,shim.window.location.href);}};
+ shim.window.location=new URL('https://scanner.example/#debug-log');shim.window.dispatchEvent({type:'hashchange'});
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(modal,/<h2>Debug log<\/h2>/,'following the link shows the log');
+ assert.doesNotMatch(modal,/<h2>Settings<\/h2>/,'without Settings');
+ assert.equal(replacedUrl,'/','the fragment clears so the same link can open it again');
+ await ctx.onAction('close-modal',{});
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<h2>Debug log<\/h2>/);
+ assert.equal(JSON.stringify(ctx.state),before,'opening and leaving the log changes no board data');
+});
+
 test('RISK support diagnostics: real device retries count attempts while unexplained churn remains refused',async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'diagnostics-retry-'+Math.random()}),{ctx}=app,store=ctx.window.ScannerDeviceStore;
@@ -38981,6 +39904,67 @@ test('RISK numeric responsiveness: optimized sampling and cold display preserve 
  const cases=[[],[{id:'sole',mu:NaN,sigma:0}],[{id:'a',mu:-1e5,sigma:-1},{id:'b',mu:1e5,sigma:1e5},{id:'c',mu:25,sigma:8}],[{id:'same',mu:1,sigma:3},{id:'same',mu:2,sigma:4},{id:'other',mu:3,sigma:5}]];
  for(const tasks of cases){vm.runInContext('chanceDisplayWeightCache=null',ctx);const actual=ctx.chanceDisplayWeights(tasks),expected=new Map(tasks.map(task=>[task.id,ctx.chanceWeight(task,tasks)]));for(const [id,weight] of expected)assert.equal(actual.get(id),weight,'cold normalized weights preserve ID exclusion, bounds and tails exactly');}
  const tasks=[{id:'a',mu:25,sigma:8},{id:'b',mu:26,sigma:7}];ctx.chanceWeight=task=>task.id==='a'?.25:.75;assert.deepEqual([...ctx.chanceDisplayWeights(tasks)].map(([id,weight])=>[id,weight]),[['a',.25],['b',.75]],'a replacement calculator retains its existing fallback');
+});
+
+// #2313: a rank refresh overwrites the previous refresh's arrays. Whatever those
+// arrays held, the result is the one a refresh with new arrays would return, and
+// a refresh of a different size cannot reuse them.
+test('RISK numeric responsiveness: a rank refresh reusing the previous refresh arrays returns exactly what new arrays would',async t=>{
+ const app=await loadApp({seed:2313});t.after(()=>app.dispose());const {ctx}=app;
+ const draw=(items,reuse)=>{
+  vm.runInContext('globalThis.refreshDraws=0;globalThis.refreshSequence=[.125,.625,.25,.875,.375,.75];Math.random=function(){return refreshSequence[refreshDraws++%refreshSequence.length];};_spare=null',ctx);
+  return ctx.rankStats(items,7,reuse);
+ };
+ const view=stats=>[...stats].map(([id,row])=>({id,hist:[...row.hist],cdf:[...row.cdf],topK:row.topK,n:row.n}));
+ const items=Array.from({length:5},(_,i)=>({id:'refresh-'+i,mu:25+i*2,sigma:3+i}));
+ const earlier=draw(items.map((item,i)=>({...item,mu:40-i*7,sigma:1+i})));
+ assert.notDeepEqual(view(earlier),view(draw(items)),'the earlier refresh left different values in its arrays');
+ assert.deepEqual(view(draw(items,earlier)),view(draw(items)),'reused arrays hold exactly the new refresh');
+ const fewer=items.slice(0,4);
+ assert.deepEqual(view(draw(fewer,draw(items))),view(draw(fewer)),'a different task count gets arrays of its own size');
+});
+
+// #2308 review: an answer whose next candidates already clear the threshold has
+// no use for the exact chance: only whether it is below the threshold matters.
+const betterSoonBoard2308=(mu,thresholdPct)=>syncState({tasks:[{...syncTask('bench','Benchmark'),mu:30,sigma:3},...Array.from({length:12},(_,i)=>({...syncTask('c'+i,'Candidate '+i),mu,sigma:3}))],chain:['bench'],candidateId:'c0',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'better-pass',settings:{...syncState().settings,thresholdPct}});
+const betterSoonApp2308=board=>{const raw=JSON.stringify(board);return loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw})});};
+const countBetterSoon2308=ctx=>vm.runInContext('(()=>{const seen={count:0},original=chanceBetterSoon;chanceBetterSoon=function(...args){seen.count++;return original.apply(this,args);};return seen;})()',ctx);
+test('RISK numeric responsiveness: an answer whose next candidates plainly clear the threshold skips the full better-task integration, and one that may not still runs it',async t=>{
+ const clear=await betterSoonApp2308(betterSoonBoard2308(30,25));t.after(()=>clear.dispose());
+ const counted=countBetterSoon2308(clear.ctx);
+ clear.ctx.onAction('no',{dataset:{candidate:'c0',benchmark:'bench'}});
+ assert.equal(counted.count,0,'one equal candidate alone clears 25%, so no integration is needed');
+ assert.equal(clear.ctx.state.interventionActive,false);assert.ok(clear.ctx.state.candidateId,'the next candidate is dealt');
+ const unsure=await betterSoonApp2308(betterSoonBoard2308(22,40));t.after(()=>unsure.dispose());
+ const countedUnsure=countBetterSoon2308(unsure.ctx);
+ unsure.ctx.onAction('no',{dataset:{candidate:'c0',benchmark:'bench'}});
+ assert.equal(countedUnsure.count,1,'no single candidate clears the threshold, so the shared-draw integration still decides');
+});
+test('RISK forecast caller preservation: the better-task check decides every board and threshold exactly as the full integration does',async t=>{
+ const app=await betterSoonApp2308(betterSoonBoard2308(30,25));t.after(()=>app.dispose());const {ctx}=app,state=ctx.state;
+ let seed=2308;const next=()=>(seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296;
+ let skippedChecks=0,intervened=0,kept=0;
+ for(let round=0;round<120;round++){
+  const spread=[1,4,12][round%3];
+  state.tasks.forEach((row,i)=>{row.mu=25+(next()-.5)*spread*(i?2:1)+(i?(round%5)-2:0);row.sigma=.8+next()*(round%4===0?8:3);});
+  state.decisionsMs=round%7===0?[]:Array.from({length:5},()=>2000+next()*28000);
+  const order=ctx.candidateOrder(ctx.pool()),bench=ctx.benchmark(),perMin=ctx.decisionsPerMinute();
+  const exact=ctx.chanceBetterSoon(bench,order,perMin);
+  const single=Math.max(...order.slice(0,Math.max(1,Math.round(perMin))).map(row=>ctx.pBeats(row,bench)));
+  // Thresholds on and around both exact values are where a shortcut could disagree.
+  for(const threshold of [exact,exact-1e-9,exact+1e-9,single,single-1e-9,single+1e-9,single+1e-4,single+1e-3,.05,.25,.5,.9]){
+   if(!(threshold>0&&threshold<=1))continue;
+   state.settings.thresholdPct=threshold*100;state.interventionActive=false;state.interventionP=null;state.candidateId='c0';state.snooze=0;
+   ctx.maybeIntervene();
+   const expected=exact<state.settings.thresholdPct/100;
+   assert.equal(state.interventionActive,expected,`round ${round} threshold ${threshold}: exact chance ${exact}`);
+   assert.equal(state.interventionP,expected?exact:null,'the shown chance is the exact one whenever the notice appears');
+   assert.equal(state.candidateId,expected?null:'c0');
+   if(expected)intervened++;else kept++;
+   if(threshold===.05&&single>=.051)skippedChecks++;
+  }
+ }
+ assert.ok(intervened>40&&kept>40&&skippedChecks>40,`the run covers both outcomes and the shortcut: ${intervened} / ${kept} / ${skippedChecks}`);
 });
 
 test('RISK numeric caller preservation: stable CDFs and long history fingerprints survive current Math replacements',async t=>{

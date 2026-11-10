@@ -1,8 +1,15 @@
 # Development workflow
 
-Locate the installed `mattpocock-skills` v1.3.1 plugin to invoke skills. Discover its path
-at session start; older sessions may need explicit file reads. The current host
-installation is `/Users/emeraldpham/.codex/plugins/cache/mattpocock/mattpocock-skills/1.3.1/skills`.
+Invoke `mattpocock-skills` skills by name where the host offers that: in Claude
+Code, the Skill tool with `mattpocock-skills:<name>`. It loads only that
+skill's `SKILL.md` and prints its base directory; read the companion files the
+table names from there. Where a skill cannot be invoked by name (GPT routes, or
+the user-invoked `implement`, `implement-spec` and `to-spec` from a subagent),
+read its files under the installed plugin's `skills/` directory, in whichever
+version is installed:
+`~/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/<version>/skills`
+for Claude Code and
+`~/.codex/plugins/cache/mattpocock/mattpocock-skills/<version>/skills` for Codex.
 If unavailable, report that limitation and follow the repository gates; never
 claim a skill was read when it was not. Load only the skill relevant to the task.
 
@@ -27,6 +34,14 @@ external services or activate accounts does not grant authorization for it.
 Use the current task brief as the spec when it supplies the agreed requirements;
 carry genuinely missing product decisions back to the parent/user.
 
+When the maintainer is obviously asleep, such as overnight Eastern time with a
+question already unanswered, and the work is waiting on them, take the
+recommended decision and continue. Record each decision and its reason in the
+issue or PR so they can reverse it on waking. This never changes which
+authorization, holds, test-first, review or release requirements apply: task
+holds, every approval or confirmation AGENTS.md or release and review reserves
+for the maintainer, and permission prompts still wait for them.
+
 ## Subagent lifecycle
 
 For each distinct repository-improvement task, start a fresh subagent unless
@@ -36,6 +51,11 @@ current task through supported close operations. Preserve active user-owned
 workers and transcripts. If closing is unsupported, report the limitation.
 Retain the model restrictions in [AGENTS.md](../../AGENTS.md) and existing
 ownership and shared-resource coordination.
+
+Every brief that asks a subagent for a functional change names the `tdd` skill
+and the agreed seams. That includes review fixes, follow-up rounds and
+integration repairs, whose briefs left it out before #2321. The subagent loads
+`tdd` and reads its `tests.md` and `mocking.md` before its first test.
 
 ## Strict TDD at agreed seams
 
