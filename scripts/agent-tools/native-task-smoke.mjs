@@ -250,6 +250,8 @@ async function runNativeSmoke(options) {
     for (let index = 0; index < 20; index++) {
       const action = index < 10 ? 'yes' : 'bench-done';
       const before = await page.evaluate(() => ({ candidate: state.candidateId, benchmark: benchmark()?.id, clicks: window.__releaseClicks.length }));
+      // The app ignores a press in the first moment after a new task is drawn.
+      await page.waitForFunction(() => typeof answerBeforeCandidateCouldBeRead !== 'function' || !answerBeforeCandidateCouldBeRead(), null, { timeout: 2_000 });
       const control = page.locator('[data-act="' + action + '"]').first();
       // Completing the benchmark can remove one wrapped crumbs row. Its new
       // button still overlaps the old button near the top, while the old center

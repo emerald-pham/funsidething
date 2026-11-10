@@ -21900,5 +21900,161 @@
       "command": "With one pending root registered in tests/native-process.test.js: node --test --test-name-pattern='Nightly on this head' tests/repository-process.test.js, before the pin changed",
       "failure": "The pin failed with 'a dispatched candidate with only pending roots must succeed' (exit 1, 1 fail) while the same head's Nightly correctly stopped at preflight_failed; the replacement pin passes on that landing and fails on an empty list, a malformed owner, a missing file and a dropped root."
     }
+  },
+  {
+    "baseCommit": "3d787463d53f041e577ea37766417340cad6f2ad",
+    "weakenedTestLines": [
+      "tests/core.test.js:-const added=local.ctx.addTask('Newer draft while chronology is held');assert.equal(await local.ctx.persist(),false);assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);assert.equal(local.shim.localStorage.getItem(LOCAL_HEAD_KEY),exactOldDevice);if(local.ctx.window.ScannerDeviceStore)assert.equal((await local.ctx.window.ScannerDeviceStore.readHead()).payload,exactOldDevice);assert.ok(local.ctx.readLocalBackups().some(row=>row.payload===exactOldDevice));assert.equal(JSON.stringify(local.ctx.state.decisionEvents),oldFacts);assert.equal(JSON.stringify(local.ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma])),oldRatings);",
+      "tests/core.test.js:-const cold=await loadAppAtTime(f.at+2*3600000+1,{indexedDBProvider,deviceDbName,sharedStorage:app.shim.localStorage});t.after(()=>closeLegacyApp173(cold));assert.deepEqual(Array.from(cold.ctx.state.chain),[f.ids[1]]);assert.equal(JSON.stringify(cold.ctx.state.decisionEvents),journal);for(const source of [f.completed,f.stale])assert.ok(cold.ctx.readLocalBackups().some(row=>row.payload===source));",
+      "tests/core.test.js:-const durable=JSON.parse(store?(await store.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY));assert.deepEqual(durable.chain,[f.ids[1]]);for(const source of [f.completed,f.stale])assert.ok(ctx.readLocalBackups().some(row=>row.payload===source),'the exact completed and later legacy sources remain recoverable');",
+      "tests/core.test.js:-if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true,'fallback obsolete save retries through the real save boundary');assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]]);assert.equal(app.ctx.state.tasks.find(row=>row.id===f.ids[1]).title,'Retained legacy title');const expectedFacts=new Map([...JSON.parse(facts),...(JSON.parse(f.stale).decisionEvents||[])].map(row=>[row.id,row]));assert.equal(app.ctx.state.decisionEvents.length,expectedFacts.size);for(const row of expectedFacts.values())assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(event=>event.id===row.id)),JSON.stringify(row));assert.equal(JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratings);for(const source of [f.completed,f.stale])assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===source));assert.ok(paints.length>0);assert.ok(writes.length>0);assert.ok(paints.every(chain=>!chain.includes(f.ids[0])));assert.ok(writes.every(chain=>!chain.includes(f.ids[0])));",
+      "tests/persistence-recovery.test.js:-LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,",
+      "tests/persistence-recovery.test.js:-assert.ok(ctx.readLocalBackups().some(row=>row.payload===local),'the displaced account source remains exact and recoverable');",
+      "tests/persistence-recovery.test.js:-assert.ok(first.parsed>=1&&first.parsed<=rows.length,'each older backup is read at most once on the first render ('+first.parsed+')');",
+      "tests/persistence-recovery.test.js:-assert.ok(manualRows(ctx).some(row=>row.payload.includes('Only in the third backup')),'the third backup holds the current board');",
+      "tests/persistence-recovery.test.js:-const parses=countBackupParses2254(t,ctx,new Set(manualRows(ctx).map(row=>row.payload)));",
+      "tests/persistence-recovery.test.js:-const parses=countBackupParses2254(t,ctx,new Set(rows.map(row=>row.payload)));",
+      "tests/shared.js:-LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,"
+    ],
+    "reason": "#2310 (spec #2308 slice 2, agreed by the owner): the app's in-memory backup list no longer holds backup text, so a synchronous read of a device backup's payload through readLocalBackups cannot return it. These checks now read the same exact bytes from device storage, and the older-manual-backup reminder test records that the board's account is read once when the backup is first listed, not on the first Settings render.",
+    "previousBehavior": "Every saved device backup's full text stayed in the in-memory backup list, so tests read row.payload synchronously from readLocalBackups, and the reminder parsed an older manual backup's board on its first Settings render.",
+    "intendedBehavior": "The in-memory list holds identity and display facts only. Exact text is read from device storage by the action that needs it, and each older manual backup's account is learned once when that board is first measured, so no Settings render parses a board.",
+    "preservedCoverage": [
+      "Each changed check still asserts the exact bytes of the same source, now read and hash-verified from device storage (backupRowsWithText), including across a cold reopen.",
+      "The reminder tests still prove that Settings renders parse no manual backup, that later renders read nothing, and that each account's own backups are counted.",
+      "The parse counter still watches the exact backup texts, so it cannot pass vacuously."
+    ],
+    "replacementTests": [
+      "RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit",
+      "RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes",
+      "RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once"
+    ],
+    "redEvidence": {
+      "command": "A local helper script outside this repository, not retained, which served the worktree on an OS-assigned port, set LANDSCAPE_BROWSER_URL and LANDSCAPE_PLAYWRIGHT, and ran the test named RISK backup memory browser on the unchanged app at 3d78746. To repeat it, serve a checkout at a local URL, set those two variables and run node --test --test-name-pattern='RISK backup memory browser' tests/persistence-recovery.test.js.",
+      "failure": "chromium: 30 extra backups added 124 MiB at opening and 168 MiB at Settings; webkit: 30 extra backups added 104 MiB at opening and 412 MiB at Settings, against a 64 MiB margin."
+    }
+  },
+  {
+    "baseCommit": "2a3772468a73308f03834a4363cacf7a92be11e1",
+    "weakenedTestLines": [
+      "tests/core.test.js:-const browser=await engine.launch({headless:true,...(engineName==='chromium'&&process.env.LANDSCAPE_BROWSER_CHANNEL?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL}:{})});",
+      "tests/core.test.js:-const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard(),{width});",
+      "tests/core.test.js:-const {page,errors}=await steadyScannerPage(browser,steadyScannerBoard({taskOver:i=>i%11===3?{due:'2026-01-02'}:{}}));",
+      "tests/core.test.js:-for(const [engineName,engine] of await steadyScannerEngines())for(const width of [320,390]){",
+      "tests/core.test.js:-for(const [engineName,engine] of await steadyScannerEngines()){",
+      "tests/core.test.js:-test('RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone widths in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{",
+      "tests/persistence-recovery.test.js:-test('RISK long scan memory browser: Undo adds no more than a small multiple of the board size to 60 answers on a large saved board, keeps 30 steps, and still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{"
+    ],
+    "reason": "#2308 code review: docs/agents/tdd-and-regression.md requires phone, tablet and short-landscape viewports for a layout change, and the steady-scanner specs had no tablet. Two of those test lines change to add 768x1024 runs, and the dot-trail test and the long-scan memory test are renamed so each title says what it checks. These tests exist only on this branch, so main sees them as new; the entry records the change for review.",
+    "previousBehavior": "The steady-scanner specs ran the pinned row and dot trail at phone sizes, short landscape and desktop only, the dot-trail title said phone widths, and the long-scan memory title named only Undo although the test also bounds whole-scan growth, rows drawn and rank buffers.",
+    "intendedBehavior": "The same specs also run at tablet size in Chromium and WebKit, with every existing viewport and assertion kept. The dot-trail title says phone and tablet widths, and the long-scan title names everything the test checks.",
+    "preservedCoverage": [
+      "Every existing phone, short-landscape, floating-header, enlarged-text and desktop case still runs with its original assertions.",
+      "The long-scan memory test keeps its Undo and work-count assertions; its total-growth check is the per-engine guard described in intendedBehavior."
+    ],
+    "replacementTests": [
+      "RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit",
+      "RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit",
+      "RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit",
+      "RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit"
+    ],
+    "redEvidence": {
+      "command": "None for these changes: adding a viewport and renaming titles fix test coverage and names, not app behavior. Run as LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK steady scanner browser' tests/core.test.js",
+      "failure": "No failure was observed: the tablet cases passed on their first run in Chromium and WebKit, 4 tests passing, so they record existing behavior at that size rather than a repaired fault."
+    }
+  },
+  {
+    "baseCommit": "5cc1edc856b3078ffb701c031b31b7453758daa4",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-if(undo.growth>allowance)failures.push(`${engineName}: 60 answers grew web process memory by ${mib(undo.growth)} MiB, above the ${mib(allowance)} MiB allowance`);",
+      "tests/persistence-recovery.test.js:-test('RISK long scan memory browser: 60 answers on a large saved board grow memory by no more than a small multiple of the board size, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{"
+    ],
+    "reason": "#2308: the owner approved replacing the 117 MiB total-growth allowance in the long-scan memory test, which the scan cannot reach, with a per-engine guard just above current numbers. The same scan with Undo turned off already grew 138-156 MiB in Chromium and 316-365 MiB in WebKit, so the old limit could not pass whatever Undo did. The title is reworded so it no longer claims a bound the test stopped enforcing. These tests exist only on this branch, so main sees them as new; the entry records the loosening for review.",
+    "previousBehavior": "The whole-scan check failed the test when 60 answers grew web-process memory by more than the 117 MiB allowance (80 MiB fixed margin plus 16 times the board size), in both engines, and the title said growth stayed within a small multiple of the board size.",
+    "intendedBehavior": "The whole-scan check fails the test when 60 answers grow web-process memory above 193 MiB in Chromium or 453 MiB in WebKit, about 15% above the highest of three runs per engine. It only catches memory getting worse; the original target stays recorded in the why-comment and the installed iPhone run remains the real acceptance.",
+    "preservedCoverage": [
+      "The Undo-delta bound is unchanged: what Undo adds over the same scan with Undo off must stay within the same 117 MiB allowance.",
+      "The work-count assertions are unchanged: list rows drawn from scratch, rows placed per second of scanning, and rank buffers allocated.",
+      "The 30-step Undo limit, Undo reversing only the newest answer, the kept list matching a freshly drawn list, every answer being accepted and no page errors all keep their assertions."
+    ],
+    "replacementTests": [
+      "RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit"
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK long scan memory browser' tests/persistence-recovery.test.js, three runs before the change",
+      "failure": "All three runs failed on the old total-growth check. First run: 'chromium: 60 answers grew web process memory by 168 MiB, above the 117 MiB allowance' and 'webkit: 60 answers grew web process memory by 394 MiB, above the 117 MiB allowance'. Second run: 161 and 385 MiB. Third run: 166 and 379 MiB. No other assertion failed."
+    }
+  },
+  {
+    "baseCommit": "140f9aa06282ac51511c25122a5660e8fabfd046",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups slows the app down. Delete older ones you don’t need.';",
+      "tests/persistence-recovery.test.js:-test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works',async t=>{",
+      "tests/persistence-recovery.test.js:-assert.match(answer,/keeping more than two slows the app down/);"
+    ],
+    "reason": "#2308 independent review N2: the manual backup reminder and its FAQ said more than two backups slow the app down, which #2310 made untrue because backups no longer load into memory for the list. Each backup is still a full copy stored on the device, so the wording now says it takes up space. The reminder, its trigger and Delete guidance are unchanged. The test name is reworded so it does not claim the old copy.",
+    "previousBehavior": "The reminder and FAQ answer said keeping more than two manual backups slows the app down.",
+    "intendedBehavior": "The reminder and FAQ answer say keeping more than two manual backups takes up space on this device.",
+    "preservedCoverage": [
+      "Every assertion about when the reminder shows, which account it counts, its status role and its placement keeps its existing expectation against the new text.",
+      "The FAQ answer keeps its checks that Make manual backup still works, with no limit and no extra step, and that only this account counts.",
+      "The November 6 changelog entry is history and keeps its original wording and its assertion."
+    ],
+    "replacementTests": [
+      "RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works"
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/index.html LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK manual backup reminder' tests/persistence-recovery.test.js",
+      "failure": "Before the wording changed: 'RISK manual backup reminder guidance' failed with: The input did not match the regular expression /keeping more than two takes up space on this device/, and the reminder tests failed with the reminder text still reading: Keeping more than two manual backups slows the app down."
+    }
+  },
+  {
+    "baseCommit": "821bb52904b52686c1f43cca8607f4799c4b81e0",
+    "weakenedTestLines": [
+      "tests/core.test.js:-const added=local.ctx.addTask('Newer draft while chronology is held');assert.equal(await local.ctx.persist(),false);assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);assert.equal(local.shim.localStorage.getItem(LOCAL_HEAD_KEY),exactOldDevice);if(local.ctx.window.ScannerDeviceStore)assert.equal((await local.ctx.window.ScannerDeviceStore.readHead()).payload,exactOldDevice);assert.ok(local.ctx.readLocalBackups().some(row=>row.payload===exactOldDevice));assert.equal(JSON.stringify(local.ctx.state.decisionEvents),oldFacts);assert.equal(JSON.stringify(local.ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma])),oldRatings);",
+      "tests/core.test.js:-const cold=await loadAppAtTime(f.at+2*3600000+1,{indexedDBProvider,deviceDbName,sharedStorage:app.shim.localStorage});t.after(()=>closeLegacyApp173(cold));assert.deepEqual(Array.from(cold.ctx.state.chain),[f.ids[1]]);assert.equal(JSON.stringify(cold.ctx.state.decisionEvents),journal);for(const source of [f.completed,f.stale])assert.ok(cold.ctx.readLocalBackups().some(row=>row.payload===source));",
+      "tests/core.test.js:-const durable=JSON.parse(store?(await store.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY));assert.deepEqual(durable.chain,[f.ids[1]]);for(const source of [f.completed,f.stale])assert.ok(ctx.readLocalBackups().some(row=>row.payload===source),'the exact completed and later legacy sources remain recoverable');",
+      "tests/core.test.js:-if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true,'fallback obsolete save retries through the real save boundary');assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]]);assert.equal(app.ctx.state.tasks.find(row=>row.id===f.ids[1]).title,'Retained legacy title');const expectedFacts=new Map([...JSON.parse(facts),...(JSON.parse(f.stale).decisionEvents||[])].map(row=>[row.id,row]));assert.equal(app.ctx.state.decisionEvents.length,expectedFacts.size);for(const row of expectedFacts.values())assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(event=>event.id===row.id)),JSON.stringify(row));assert.equal(JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratings);for(const source of [f.completed,f.stale])assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===source));assert.ok(paints.length>0);assert.ok(writes.length>0);assert.ok(paints.every(chain=>!chain.includes(f.ids[0])));assert.ok(writes.every(chain=>!chain.includes(f.ids[0])));",
+      "tests/persistence-recovery.test.js:-LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,",
+      "tests/persistence-recovery.test.js:-assert.match(answer,/keeping more than two slows the app down/);",
+      "tests/persistence-recovery.test.js:-assert.ok(ctx.readLocalBackups().some(row=>row.payload===local),'the displaced account source remains exact and recoverable');",
+      "tests/persistence-recovery.test.js:-assert.ok(first.parsed>=1&&first.parsed<=rows.length,'each older backup is read at most once on the first render ('+first.parsed+')');",
+      "tests/persistence-recovery.test.js:-assert.ok(manualRows(ctx).some(row=>row.payload.includes('Only in the third backup')),'the third backup holds the current board');",
+      "tests/persistence-recovery.test.js:-const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups slows the app down. Delete older ones you don’t need.';",
+      "tests/persistence-recovery.test.js:-const parses=countBackupParses2254(t,ctx,new Set(manualRows(ctx).map(row=>row.payload)));",
+      "tests/persistence-recovery.test.js:-const parses=countBackupParses2254(t,ctx,new Set(rows.map(row=>row.payload)));",
+      "tests/persistence-recovery.test.js:-test('RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two slows the app down, and that Make manual backup still works',async t=>{",
+      "tests/shared.js:-LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler,"
+    ],
+    "reason": "#2308 consolidated record: the test-first gate needs one entry covering every line the diff weakens, and this release weakens lines across four changes that each have their own entry: backup text leaving memory (#2310), the steady-scanner tablet viewport and test renames (#2308 code review), the owner-approved per-engine memory growth guard (#2313), and the manual backup reminder copy (#2308 independent review).",
+    "previousBehavior": "Every saved device backup's full text stayed in the in-memory backup list, so tests read row.payload synchronously from readLocalBackups, and the reminder parsed an older manual backup's board on its first Settings render. The steady-scanner specs ran the pinned row and dot trail at phone sizes, short landscape and desktop only, the dot-trail title said phone widths, and the long-scan memory title named only Undo although the test also bounds whole-scan growth, rows drawn and rank buffers. The whole-scan check failed the test when 60 answers grew web-process memory by more than the 117 MiB allowance (80 MiB fixed margin plus 16 times the board size), in both engines, and the title said growth stayed within a small multiple of the board size. The reminder and FAQ answer said keeping more than two manual backups slows the app down.",
+    "intendedBehavior": "The in-memory list holds identity and display facts only. Exact text is read from device storage by the action that needs it, and each older manual backup's account is learned once when that board is first measured, so no Settings render parses a board. The same specs also run at tablet size in Chromium and WebKit, with every existing viewport and assertion kept. The dot-trail title says phone and tablet widths, and the long-scan title names everything the test checks. The whole-scan check fails the test when 60 answers grow web-process memory above 193 MiB in Chromium or 453 MiB in WebKit, about 15% above the highest of three runs per engine. It only catches memory getting worse; the original target stays recorded in the why-comment and the installed iPhone run remains the real acceptance. The reminder and FAQ answer say keeping more than two manual backups takes up space on this device.",
+    "preservedCoverage": [
+      "Each changed check still asserts the exact bytes of the same source, now read and hash-verified from device storage (backupRowsWithText), including across a cold reopen.",
+      "The reminder tests still prove that Settings renders parse no manual backup, that later renders read nothing, and that each account's own backups are counted.",
+      "The parse counter still watches the exact backup texts, so it cannot pass vacuously.",
+      "Every existing phone, short-landscape, floating-header, enlarged-text and desktop case still runs with its original assertions.",
+      "The long-scan memory test keeps its Undo and work-count assertions; its total-growth check is the per-engine guard described in intendedBehavior.",
+      "The Undo-delta bound is unchanged: what Undo adds over the same scan with Undo off must stay within the same 117 MiB allowance.",
+      "The work-count assertions are unchanged: list rows drawn from scratch, rows placed per second of scanning, and rank buffers allocated.",
+      "The 30-step Undo limit, Undo reversing only the newest answer, the kept list matching a freshly drawn list, every answer being accepted and no page errors all keep their assertions.",
+      "Every assertion about when the reminder shows, which account it counts, its status role and its placement keeps its existing expectation against the new text.",
+      "The FAQ answer keeps its checks that Make manual backup still works, with no limit and no extra step, and that only this account counts.",
+      "The November 6 changelog entry is history and keeps its original wording and its assertion."
+    ],
+    "replacementTests": [
+      "RISK backup memory browser: saved backups add no more than a small fixed margin at opening and at Settings, and every one stays listed, in Chromium and WebKit",
+      "RISK backup list memory: backups stay out of memory while Settings lists every copy, including an unreadable one, and Restore and Delete act on exact device bytes",
+      "RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once",
+      "RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit",
+      "RISK steady scanner browser: a long chain keeps the dot trail to one row of its newest dots with a count of the earlier ones at phone and tablet widths in Chromium and WebKit",
+      "RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit",
+      "RISK long scan memory browser: 60 answers on a large saved board stay under a per-engine memory growth guard, Undo adds little and keeps 30 steps, each answer redraws only the rows it changed, and Undo still reverses the newest answer, in Chromium and WebKit",
+      "RISK manual backup reminder guidance: mounted FAQ and changelog say that from two manual backups Settings reminds you that keeping more than two takes up space, and that Make manual backup still works"
+    ],
+    "redEvidence": {
+      "command": "A local helper script outside this repository, not retained, which served the worktree on an OS-assigned port, set LANDSCAPE_BROWSER_URL and LANDSCAPE_PLAYWRIGHT, and ran the test named RISK backup memory browser on the unchanged app at 3d78746. To repeat it, serve a checkout at a local URL, set those two variables and run node --test --test-name-pattern='RISK backup memory browser' tests/persistence-recovery.test.js. | None for these changes: adding a viewport and renaming titles fix test coverage and names, not app behavior. Run as LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK steady scanner browser' tests/core.test.js | LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/ LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK long scan memory browser' tests/persistence-recovery.test.js, three runs before the change | LANDSCAPE_BROWSER_URL=http://127.0.0.1:<port>/index.html LANDSCAPE_PLAYWRIGHT=<playwright> node --test --test-name-pattern='RISK manual backup reminder' tests/persistence-recovery.test.js",
+      "failure": "chromium: 30 extra backups added 124 MiB at opening and 168 MiB at Settings; webkit: 30 extra backups added 104 MiB at opening and 412 MiB at Settings, against a 64 MiB margin. | No failure was observed: the tablet cases passed on their first run in Chromium and WebKit, 4 tests passing, so they record existing behavior at that size rather than a repaired fault. | All three runs failed on the old total-growth check. First run: 'chromium: 60 answers grew web process memory by 168 MiB, above the 117 MiB allowance' and 'webkit: 60 answers grew web process memory by 394 MiB, above the 117 MiB allowance'. Second run: 161 and 385 MiB. Third run: 166 and 379 MiB. No other assertion failed. | Before the wording changed: 'RISK manual backup reminder guidance' failed with: The input did not match the regular expression /keeping more than two takes up space on this device/, and the reminder tests failed with the reminder text still reading: Keeping more than two manual backups slows the app down."
+    }
   }
 ]
