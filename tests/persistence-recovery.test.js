@@ -3398,6 +3398,29 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
  assert.deepEqual([...enlargedCoverage].sort(),['cards','contexts','filters','history','rows'],'actual enlarged coverage includes the complete board surfaces');
 });
 
+test('RISK saved view opening: an empty chain shows Start, not a candidate an older client stored for the retired skip checkbox',async t=>{
+ await openingBoardFixture(t);
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:false,scannerState:'stored-unpaired',syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
+ try{
+  await view.waitForFirebaseImports();
+  const opening=await view.page.evaluate(()=>{
+   const root=[...document.querySelectorAll('.wrap')].find(e=>getComputedStyle(e).visibility==='visible'&&e.getBoundingClientRect().width>0);
+   return {ready:document.documentElement.dataset.appReady==='true',visible:!!root,scan:root?.querySelector('[data-preview-id="scan"]')?.textContent||'',cards:[...(root?.querySelectorAll('.card .title')||[])].map(e=>e.textContent)};
+  });
+  assert.equal(opening.ready,false,'the saved board is still the read-only opening view');
+  assert.equal(opening.visible,true);
+  assert.equal(opening.cards.includes('Saved appearance task 02'),false,'the stored candidate is not shown on an empty chain: '+JSON.stringify(opening.cards));
+  assert.match(opening.scan,/Nothing dotted yet/,'the opening view offers Start, as the live scanner does');
+  view.releaseHeldFirebaseImports();await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:15000});
+  const live=await view.page.evaluate(()=>({scan:document.getElementById('scan').innerHTML,stored:state.candidateId,chain:state.chain.length}));
+  assert.match(live.scan,/data-act="start-scan"/,'the live scanner offers Start');
+  assert.doesNotMatch(live.scan,/data-act="yes"/,'and no unpaired choice');
+  assert.equal(live.chain,0);
+  assert.equal(typeof live.stored,'string','the older client\'s stored candidate is kept for it rather than rewritten');
+  assert.deepEqual(view.errors,[]);
+ }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
+});
+
 test('RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts',async t=>{
  await openingBoardFixture(t);
  for(const savedFilter of ['ineligible','context','status','combined','missing-context','long-query','hint-refresh'])await t.test(savedFilter,async()=>{

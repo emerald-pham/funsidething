@@ -748,7 +748,9 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
     if(board.ctxOpen){const grid=make('div','ctxgrid');for(const c of [...board.contexts,...(board.contexts.length?[null]:[])]){const on=c?c.active&&!c.excluded:!board.settings.excludeNoContext,mode=on?'included':'excluded',name=c?c.name:'No context';appendMarkup(grid,presentation.context(c,{mode,label:name+': '+mode+'. Next: '+(on?'excluded':'included')+'.',mark:'<span class="ctxmark" aria-hidden="true">'+(on?'✓':'✕')+'</span>'}));}grid.append(make('button','ctxadd','+ context'));contexts.append(grid);}
     const chrome=presentation.chrome(board);pane('themeBtn').textContent=chrome.theme;pane('passLabel').textContent=chrome.passLabel;pane('passFill').style.width=chrome.passWidth;
     const scan=pane('scan');scan.replaceChildren();
-    const byId=new Map(board.tasks.map(task=>[task.id,task])),chain=board.chain.map(id=>byId.get(id)),benchmark=chain.at(-1),candidate=byId.get(board.candidateId),preference=board.settings.dateFormat||'system';
+    // An empty chain waits for Start, as offeredCandidateId() rules for the live
+    // scanner: a candidate stored there belongs to an older client (#2332).
+    const byId=new Map(board.tasks.map(task=>[task.id,task])),chain=board.chain.map(id=>byId.get(id)),benchmark=chain.at(-1),candidate=chain.length?byId.get(board.candidateId):undefined,preference=board.settings.dateFormat||'system';
     appendMarkup(scan,presentation.chain(chain));
     const candShowing=presentation.candidateShowing(board,hasPool,benchmark,candidate);
     if(benchmark)appendMarkup(scan,presentation.card('bench',presentation.title(benchmark),presentation.chips(benchmark,preference)));
@@ -8501,6 +8503,10 @@ function recomputeRanks(){
   sparkCache.clear();
 }
 function chainStart(){ return state.chain.length === 0; }
+// An empty chain waits for Start (#2300). A candidate stored there belongs to an
+// older client that still reads the retired skip flag (#2332): kept for it, but
+// never shown to or answered by this one.
+function offeredCandidateId(){ return chainStart() ? null : state.candidateId; }
 function oldestFirst(p){ // chain start: age among tasks never marked Done
   if(!p.length) return null;
   // Reopening clears completion dates, but restoredAt preserves evidence that
@@ -8830,7 +8836,15 @@ function ensureCandidate(){
   if((state.passStartedAt && now >= passResetCutoff(state.passStartedAt)) || (state.chance && now >= passResetCutoff(state.chance.at))) newPass(false, true);
   if(state.mode !== "scan" || state.interventionActive) return;
   // A chain waits for Start to seed a benchmark.
-  if(chainStart()){ state.candidateId = null; return; }
+  if(chainStart()){
+    // #2332: Stable still deals an unpaired candidate here when the retired
+    // skipOldestFirstDot is saved on mid-pass. Clearing it was a scan repair
+    // this client published on every read, and Stable re-dealt it on its next
+    // one, so the two pushed revisions at each other. Leave that stored id as
+    // Stable keeps it; offeredCandidateId() keeps it out of view and reach.
+    if(state.settings.skipOldestFirstDot !== true || !state.passStartedAt) state.candidateId = null;
+    return;
+  }
   const p = pool();
   const cur = state.candidateId ? taskById(state.candidateId) : null;
   const valid = cur && p.some(t=>t.id===cur.id);
@@ -9030,7 +9044,7 @@ const taskActionOwnerBundle=(()=>{
       // Reject unknown historical/UI tokens before they can clear a candidate
       // or create a fresh pass with no decision attached.
       if(kind!=="yes"&&kind!=="no"&&kind!=="cant"&&kind!=="cand-done")return false;
-      const candidate=taskById(state.candidateId);if(!candidate)return false;
+      const candidate=taskById(offeredCandidateId());if(!candidate)return false;
       const b=benchmark();
       if(!b&&(kind==="yes"||kind==="no"))return false;
       const observation=captureRatingObservation(kind,[candidate.id,...(b&&(kind==="yes"||kind==="no")?[b.id]:[])]);
@@ -9101,7 +9115,7 @@ const taskActionOwnerBundle=(()=>{
     }
     if(command.type==="candidate-worked"){
       const id=command.taskId;
-      if(state.mode!=="scan"||state.interventionActive||state.candidateId!==id||!pool().some(t=>t.id===id))return false;
+      if(state.mode!=="scan"||state.interventionActive||offeredCandidateId()!==id||!pool().some(t=>t.id===id))return false;
       return executeTaskAction("worked",id);
     }
     if(command.type==="task")return executeTaskAction(command.action,command.taskId,null,null,command.gesture||null);
@@ -11895,7 +11909,7 @@ function woopHTML(task){
 // Offered controls cannot authorize a later board, account or replacement task.
 let overdueWoopBinding=null,overdueWoopSession=null;
 function overdueWoopCandidate(task){
-  return !!task && state.mode==="scan" && !state.interventionActive && state.candidateId===task.id && !!benchmark() && normalizedISODate(task.due) && dueInfo(task.due)?.cls==="due-overdue" && pool().some(t=>t===task) && canDotTask(task);
+  return !!task && state.mode==="scan" && !state.interventionActive && offeredCandidateId()===task.id && !!benchmark() && normalizedISODate(task.due) && dueInfo(task.due)?.cls==="due-overdue" && pool().some(t=>t===task) && canDotTask(task);
 }
 function overdueWoopControl(task){
   if(!overdueWoopCandidate(task))return "";
@@ -11978,7 +11992,7 @@ function renderScan(){
   let html = "";
   const b = benchmark();
   const p = pool();
-  const cand = taskById(state.candidateId);
+  const cand = taskById(offeredCandidateId());
   const benchBinding=b ? ' data-benchmark="'+esc(b.id)+'"' : '';
   const choiceBinding=' data-candidate="'+esc(cand?.id || '')+'"'+benchBinding;
   // mirrors hotkeyDone/hotkeyDelete's candidate-first precedence, so only the
@@ -12105,7 +12119,7 @@ function keepPresentedTitleClear(){
   firstDrawOfOpening=false;
   if(!revealNextTitle&&!opening)return;
   revealNextTitle=false;
-  const id=state.candidateId;
+  const id=offeredCandidateId();
   if(!id)return;
   requestAnimationFrame(()=>{
     const title=document.querySelector(".card.cand .title"),row=document.querySelector(".decide");
@@ -17917,7 +17931,7 @@ function onAction(act, el){
   if(automaticRecoveryDeclineBusy)return false;
   if(RESTART_DIAGNOSTICS_ACTIONS.has(act))restartDiagnosticsRecord("action",act);
   // A detached/stale control stays bound to what the user saw, never to its replacement.
-  if(el?.dataset?.candidate!==undefined && el.dataset.candidate!==(state.candidateId || '')) return;
+  if(el?.dataset?.candidate!==undefined && el.dataset.candidate!==(offeredCandidateId() || '')) return;
   if(el?.dataset?.benchmark!==undefined && el.dataset.benchmark!==(benchmark()?.id || '')) return;
   switch(act){
     case "qctx": {
@@ -17934,7 +17948,7 @@ function onAction(act, el){
       break;
     case "bench-done": TaskActionOwner.perform({type:"benchmark",action:"done"}); break;
     case "bench-cant": TaskActionOwner.perform({type:"benchmark",action:"cant"}); break;
-    case "postpone": if(state.mode==="scan" && !state.interventionActive && pool().some(t=>t.id===state.candidateId))postponeTask(state.candidateId);break;
+    case "postpone": if(state.mode==="scan" && !state.interventionActive && pool().some(t=>t.id===offeredCandidateId()))postponeTask(offeredCandidateId());break;
     case "bench-postpone": if(benchmark())postponeTask(benchmark().id);break;
     case "dislodge": TaskActionOwner.perform({type:"benchmark",action:"dislodge"}); break;
     case "run-woop": runOverdueWoop(el.dataset); break;
@@ -18468,9 +18482,9 @@ document.addEventListener("keydown", e=>{
   const plainEditUndo=!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t?.isContentEditable;
   // One held decision key must not answer for the next card dealt by commit().
   if(["y","n","c","d"].includes(k)&&answerBeforeCandidateCouldBeRead()) return;
-  if(k==="y"&&!e.repeat&&!state.interventionActive&&state.candidateId) TaskActionOwner.perform({type:"decision",decision:"yes"});   // dot it
-  else if(k==="n"&&!e.repeat&&!state.interventionActive&&state.candidateId) TaskActionOwner.perform({type:"decision",decision:"no"});
-  else if(k==="c"&&!e.repeat&&!state.interventionActive&&state.candidateId) TaskActionOwner.perform({type:"decision",decision:"cant"});
+  if(k==="y"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"yes"});   // dot it
+  else if(k==="n"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"no"});
+  else if(k==="c"&&!e.repeat&&!state.interventionActive&&offeredCandidateId()) TaskActionOwner.perform({type:"decision",decision:"cant"});
   else if(k==="d"&&!e.repeat) hotkeyDone();                                                   // one held key is one completion
   else if(k==="w") TaskActionOwner.perform({type:"benchmark",action:"worked"});           // worked on it — cross off, back to the bottom
   else if(e.key==="Delete"||e.key==="Backspace"){ e.preventDefault(); hotkeyDelete(); }       // remove it entirely
@@ -18489,11 +18503,11 @@ function scannerEditTask(){
 /* "Done" and "Delete" act on the candidate you're deciding on, if one's showing;
    otherwise they fall back to the benchmark at the head of the chain. */
 function hotkeyDone(){
-  if(!state.interventionActive && state.mode==="scan" && state.candidateId){ TaskActionOwner.perform({type:"decision",decision:"cand-done"}); return; }
+  if(!state.interventionActive && state.mode==="scan" && offeredCandidateId()){ TaskActionOwner.perform({type:"decision",decision:"cand-done"}); return; }
   TaskActionOwner.perform({type:"benchmark",action:"done"});
 }
 function hotkeyDelete(){
-  if(!state.interventionActive && state.mode==="scan" && state.candidateId){ deleteTask(state.candidateId); return; }
+  if(!state.interventionActive && state.mode==="scan" && offeredCandidateId()){ deleteTask(offeredCandidateId()); return; }
   const b = benchmark();
   if(b) deleteTask(b.id);
 }

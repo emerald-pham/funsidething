@@ -4553,6 +4553,53 @@ test('RISK BACKWARD COMPATIBILITY: the released client with the same board open 
  assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'the chain is unchanged');
 });
 
+// #2332: Stable still deals an unpaired candidate on an empty chain when a
+// board carries the retired skipOldestFirstDot and a pass has started. A client
+// that cleared it on every read published a scan repair that Stable re-dealt on
+// its next read, so the two pushed revisions at each other with nobody acting.
+const SKIP_FLAG_STABLE='5548cd7cf69493712f63a36ac02fdd4dc6ae2b48';
+async function skipFlagStableRounds(t,{skip,trigger}){
+ const released=spawnSync('git',['show',SKIP_FLAG_STABLE+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
+ const at=Date.parse('2026-11-10T15:00:00Z');
+ const initial=syncState({tasks:[{...syncTask('flag-oldest','Flag oldest'),createdAt:1},{...syncTask('flag-likely','Flag likely'),createdAt:2,mu:30}],
+  settings:{scanMode:'descending',showPostpone:true,skipOldestFirstDot:skip},chain:[],mode:'scan',passStartedAt:at-60000,passId:'flag-pass',
+  syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const stable=await loadAppAtTime(at,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+ t.after(()=>closeLegacyApp173(stable));await stable.ctx.cloudPull();await syncSettle(40);
+ const seen=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+ const app=await loadAppAtTime(at+1000,{seedStorage:{[SYNC_STORE_KEY]:seen,[LOCAL_HEAD_KEY]:seen},cloudSyncFactory:h.factory});
+ t.after(()=>closeLegacyApp173(app));await app.ctx.cloudPull();await syncSettle(60);
+ // One ordinary write, then nobody touches either client.
+ const writer=trigger==='stable'?stable:app,offered=stable.ctx.state.candidateId;
+ if(trigger==='stable'&&offered)stable.ctx.onAction('no',{dataset:{candidate:offered,benchmark:''}});
+ else{hydrateUnchangedEditorDraft(writer,'flag-likely');writer.shim.document.getElementById('etTitle').value='Edited on '+trigger;writer.ctx.onAction('save-edit',{dataset:{id:'flag-likely'}});}
+ assert.equal(await writer.ctx.persist(),true);await writer.ctx.cloudPull();await writer.ctx.cloudPushNow();await syncSettle(60);
+ const revs=[h.doc.rev];
+ for(let round=0;round<4;round++){
+  await app.ctx.cloudPull();await syncSettle(60);revs.push(h.doc.rev);
+  await stable.ctx.cloudPull();await syncSettle(60);revs.push(h.doc.rev);
+ }
+ t.diagnostic(JSON.stringify({skip,trigger,offered,revs,cloudCandidate:h.remoteState().candidateId}));
+ // At most one follow-up write: Stable deals its own candidate once when the
+ // board it reads has none (its ordinary first deal). After that the board is quiet.
+ assert.ok(revs.at(-1)-revs[0]<=1,'skip '+skip+', '+trigger+' writes: the revision settles instead of climbing ('+revs.join(' → ')+')');
+ assert.equal(revs.at(-1),revs[2],'skip '+skip+', '+trigger+' writes: no client pushes again once both have read the board ('+revs.join(' → ')+')');
+ assert.equal(app.ctx.window.CloudSync.status==='error',false,'the candidate stays in sync');
+ assert.equal(stable.ctx.window.CloudSync.status==='error',false,'Stable stays in sync');
+ // #2300 still holds on this client while Stable keeps its candidate stored.
+ app.ctx.render();const scan=app.shim.document.getElementById('scan').innerHTML;
+ assert.match(scan,/data-act="start-scan"/,'the candidate offers Start on the empty chain');
+ assert.doesNotMatch(scan,/data-act="yes"/,'the candidate offers no unpaired choice');
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['flag-oldest'],'Start dots the oldest eligible task');
+}
+test('RISK BACKWARD COMPATIBILITY: with the retired skip checkbox saved on and an empty started chain, Stable and the candidate stop writing after an ordinary edit',async t=>{
+ for(const trigger of ['stable','candidate'])await t.test('flag on, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:true,trigger});});
+ // Control: without the flag both clients already agree that an empty chain has no candidate.
+ for(const trigger of ['stable','candidate'])await t.test('flag off, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:false,trigger});});
+});
+
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
  const at=Date.parse('2026-10-18T03:00:00Z'),ids=['quiet-first','quiet-second'];
  const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Quiet task '+(i+1)),createdAt:i+1})),mode:'work',scanMode:'descending',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}});
