@@ -8775,7 +8775,9 @@ function commitEvergreenDefault(){
   const text=String(field.value??"").trim(),number=text===""?NaN:Number(text),hours=number*(unit?.value==="days"?24:1);
   const [low,high]=SETTINGS_RANGE.evergreenHours;
   if(!Number.isFinite(hours)||hours<low||hours>high){
-    const parts=evergreenIntervalParts(state.settings.evergreenHours);field.value=String(parts.value);if(unit)unit.value=parts.unit;return false;
+    // Typing already suggested the reset checkbox, so it returns with the interval.
+    const parts=evergreenIntervalParts(state.settings.evergreenHours),reset=document.getElementById("stEverReset");
+    field.value=String(parts.value);if(unit)unit.value=parts.unit;if(reset)reset.checked=state.settings.evergreenResetAtDay!==false;return false;
   }
   // The reset suggestion that typing makes is part of the same committed default.
   suggestEvergreenReset(field);

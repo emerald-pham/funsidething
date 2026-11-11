@@ -10637,6 +10637,23 @@ test("committed settings: an out-of-range cantMin returns to its last valid valu
   assert.equal(ctx.state.settings.cantMin, 12, "above 480 keeps the last valid value, not a clamp to 480");
 });
 
+// #2332 (review N2): typing in Default evergreen interval suggests the reset
+// checkbox as you go, so an interval that is then refused must put it back too.
+test("committed settings: an invalid Default evergreen interval returns the reset checkbox with the hours and unit", async () => {
+  const { ctx, shim } = await loadApp({ seed: 53 });
+  ctx.openSettings();
+  assert.equal(ctx.state.settings.evergreenHours, 18);assert.equal(ctx.state.settings.evergreenResetAtDay, true);
+  const reset = shim.document.getElementById("stEverReset"); Object.assign(reset, { id: "stEverReset", checked: true, matches: () => false });
+  const unit = shim.document.getElementById("stEverUnit"); Object.assign(unit, { id: "stEverUnit", value: "hours" });
+  const field = shim.document.getElementById("stEverHours"); Object.assign(field, { id: "stEverHours", value: "100000", matches: () => false });
+  shim.document.dispatchEvent({ type: "input", target: field });
+  assert.equal(reset.checked, false, "typing a long interval suggests turning the reset off");
+  shim.document.dispatchEvent({ type: "change", target: field });
+  assert.equal(field.value, "18", "the refused interval returns to the saved hours");
+  assert.equal(reset.checked, true, "and the reset checkbox returns to the saved value");
+  assert.equal(ctx.state.settings.evergreenResetAtDay, true, "nothing was saved");
+});
+
 test("committed settings: a blank or non-numeric cantMin returns to its last valid value", async () => {
   const { ctx } = await loadApp({ seed: 52 });
   commitSetting(ctx, "stCantMin", 45);
