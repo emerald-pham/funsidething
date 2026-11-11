@@ -18094,10 +18094,12 @@ function onAction(act, el){
       pasteDraftBuffer=null;openPasteDialog(raw,settingsDraft);break;
     }
     case "restore-backup": {
-      // #2303: one Restore button; a file or pasted board is chosen inside the
-      // same protected flow, which then shows the same preview as before.
+      // #2303: one Restore button reveals Choose a file and Paste board data
+      // beside it; either one then opens the same protected preview as before.
+      // It is a disclosure, so a second press closes the choices (#2332).
       const choices=document.getElementById("restoreChoices");
       if(!choices)return onAction("choose-backup-file",el);
+      if(!choices.hidden){choices.hidden=true;el?.setAttribute?.("aria-expanded","false");break;}
       choices.hidden=false;el?.setAttribute?.("aria-expanded","true");
       try{choices.querySelector?.('[data-act="choose-backup-file"]')?.focus?.();}catch{}
       break;

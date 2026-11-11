@@ -10325,6 +10325,22 @@ test("RISK backup and Restore consolidation: Settings keeps one Download backup 
   assert.doesNotMatch(html, /Current board recovery/);
 });
 
+// #2332 (review N6/F3): Restore is a disclosure for its two choices, so a
+// second press closes them and its aria-expanded says so.
+test("RISK backup and Restore consolidation: a second Restore press closes its choices and reports them collapsed", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openSettings();
+  const choices = shim.document.getElementById("restoreChoices"); choices.hidden = true;
+  const restore = makeFakeElement(); const attributes = { "aria-expanded": "false" };
+  Object.assign(restore, { dataset: { act: "restore-backup" }, setAttribute: (name, value) => { attributes[name] = String(value); }, getAttribute: name => attributes[name] ?? null });
+  ctx.onAction("restore-backup", restore);
+  assert.equal(choices.hidden, false, "the first press shows Choose a file and Paste board data");
+  assert.equal(attributes["aria-expanded"], "true", "and reports them expanded");
+  ctx.onAction("restore-backup", restore);
+  assert.equal(choices.hidden, true, "the second press closes them");
+  assert.equal(attributes["aria-expanded"], "false", "and reports them collapsed");
+});
+
 test('RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),original='{unreadable original backup source';
  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'raw-format-safety-'+Math.random(),seedStorage:{[SYNC_STORE_KEY]:original,[LOCAL_HEAD_KEY]:'different protected original'}}),{ctx,shim}=app;
