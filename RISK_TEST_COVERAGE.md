@@ -882,6 +882,30 @@ its RISK test; the map follows.
 - RISK Chance labels: an empty-chain preview excludes positive tails that overflow for every possible saved hash
 - RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels
 - RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes
+- RISK delete red backups: one confirmed press deletes only the backups strictly older than seven days and leaves the board alone
+- RISK delete red backups: unreadable, pending-choice, duplicate and missing-ID red rows are never counted or deleted in bulk
+- RISK delete red backups: device-store backups and their older-list mirrors are deleted together while recent ones and the saved board stay
+- RISK delete red backups: cancelling the one confirmation leaves every backup byte and the board unchanged
+- RISK delete red backups: when storage refuses a write part-way the remaining backups stay intact and the message reports what was kept
+- RISK delete red backups: a backup list another tab changed after Settings drew it is not deleted from; the person is asked nothing and told to check again
+- RISK delete red backups: a device-store backup rewritten elsewhere since Settings drew it is kept, even after the backups before it are deleted
+- RISK delete red backups: the press is acknowledged at once and a second press while it runs asks and deletes nothing more
+- RISK delete red backups: a compressed backup list from an earlier version loses only its red backups and stays compressed
+- RISK delete red backups: the Delete of a single row pressed while a bulk deletion runs still asks its own question and is honoured
+- RISK delete red backups: a red copy a recovery has pinned is not counted or deleted in bulk, in the older backup list or the device store
+- RISK delete red backups: no button is offered while the older backup list cannot be read, because no row could be deleted
+- RISK delete red backups: a recovery that begins during the run stops it; the backups not yet deleted stay and the message says why
+- RISK delete red backups: a copy a recovery pins after Settings drew it makes the press refuse before asking, like any other change to the list
+- RISK delete red backups: when the device store cannot be listed part-way the run stops, no backup is half-deleted, and the message counts only what was removed
+- RISK delete red backups: the button sits with the backup list, after Restore, in the #2303 Data and backups order
+- RISK delete red backups: a device-store backup rewritten elsewhere while the run is under way is kept
+- RISK delete red backups: Settings redrawing during the run does not replace what the person confirmed; a backup rewritten since the press is kept
+- RISK delete red backups: a copy a recovery pins while the run is under way is kept
+- RISK delete red backups: a backup something else removes during the run is not reported as kept
+- RISK delete red backups: while the device store cannot be listed no button is offered, so a mirrored backup never loses only its older-list copy
+- RISK delete red backups: when the device store stays unreadable after a deletion the message does not claim the rest are still listed
+- RISK delete red backups: the records and originals a recovery keeps are not counted or deleted in bulk, however old
+- RISK delete red backups: while a recovery is unsettled the button is unavailable with its reason, a forced press deletes nothing, and each row keeps its own Delete
 - RISK fireworks occurrence: standalone sampled starts are exactly four times the original interval while duration odds budgets and festival timing stay intact
 - RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade
 - RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls

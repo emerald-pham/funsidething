@@ -31212,6 +31212,608 @@ test('RISK backup age styling: Delete turns destructive strictly after seven ela
  }
 });
 
+// #2327: manual and other keep-until-deleted copies never retire by
+// themselves, so the red rows piled up and each needed its own Delete and
+// confirmation. One button now deletes exactly the red rows whose own Delete
+// works, after one confirmation.
+// The press waits a timer tick between backups. The harness's app timers do
+// not keep Node alive by themselves, so a test holds the loop open meanwhile.
+const whileAlive=async promise=>{const alive=setInterval(()=>{},5);try{return await promise;}finally{clearInterval(alive);}};
+const redBackupsButton=markup=>markup.match(/<button class="([^"]+)" data-act="delete-old-backups"([^>]*)>([^<]*)<\/button>/);
+test('RISK delete red backups: one confirmed press deletes only the backups strictly older than seven days and leaves the board alone',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),week=7*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state);
+ const rows=[['younger',week-1],['boundary',week],['older',week+1],['oldest',30*24*HOUR],['future',-HOUR],['unknown',null]]
+  .map(([id,age])=>({id,kind:'manual',day:'2026-10-01',at:age===null?null:now-age,payload}));
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ const asked=[];ctx.confirm=message=>{asked.push(message);return true;};
+ ctx.openSettings();
+ const button=redBackupsButton(shim.document.getElementById('modalRoot').innerHTML);
+ assert.ok(button,'Settings offers one button for the red backups');
+ assert.equal(button[3],'Delete 2 backups older than seven days','the button names how many backups it deletes');
+ assert.ok(button[1].split(/\s+/).includes('danger'),'it uses the destructive style of the red row Delete');
+ assert.doesNotMatch(button[2],/disabled/);
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(asked.length,1,'one confirmation covers the whole deletion');
+ assert.match(asked[0],/2 backups/);assert.match(asked[0],/cannot be undone/i);assert.match(asked[0],/current board will stay/i);
+ assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),rows.filter(row=>row.id!=='older'&&row.id!=='oldest'),'only rows over seven elapsed days are removed; the rest keep their exact content and order');
+ assert.equal(JSON.stringify(ctx.state),payload,'the current board is unchanged');
+ assert.match(shim.document.getElementById('toast').textContent,/^Deleted 2 backups older than seven days/);
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML),null,'the refreshed list has nothing red left, so the button is gone');
+});
+
+test('RISK delete red backups: unreadable, pending-choice, duplicate and missing-ID red rows are never counted or deleted in bulk',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),other=JSON.stringify({...ctx.state,updatedAt:123});
+ const row=(id,kind,extra={})=>({id,kind,day:'2026-09-06',at:old,payload,...extra});
+ const {id:dropped,...missingId}=row('none','manual');
+ // 'shared' is one restore point listed twice with the same board: Settings marks it "Shared restore point; deletion unavailable".
+ const kept=[row('bad','daily',{payload:'unreadable'}),row('choice','decision-recovery-choice'),row('dup','manual'),row('dup','manual',{payload:other}),row('shared','manual'),row('shared','manual'),missingId];
+ const asked=[];ctx.confirm=message=>{asked.push(message);return true;};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(kept));
+ ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML),null,'no button while no red row has a working Delete of its own');
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(asked.length,0,'nothing to delete, so nothing is asked');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),JSON.stringify(kept));
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Shared restore point; deletion unavailable/,'fixture: the shared restore point is recognised');
+ const rows=[kept[0],row('stale-tab','stale-tab-draft'),kept[1],kept[2],row('mine','manual'),kept[3],row('other-browser','other-browser-copy'),kept[4],kept[5],row('reset','before-reset'),kept[6]];
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 4 backups older than seven days','only readable red rows with a working Delete are counted, whatever their kind');
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(asked.length,1);assert.match(asked[0],/^Delete 4 backups older than seven days/);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),JSON.stringify(kept),'every protected, unreadable and ambiguous row keeps its exact bytes and order');
+ assert.match(shim.document.getElementById('toast').textContent,/^Deleted 4 backups older than seven days/);
+});
+
+// A device whose backups live in the device store, with one red and one
+// recent backup still mirrored in the older backup list from the storage
+// upgrade, plus one red and one recent backup held only by the device store.
+async function redBackupsDeviceFixture2327(t){
+ const {indexedDB}=await import('fake-indexeddb'),deviceDbName='chain-scanner-red-backups-'+Date.now()+'-'+Math.random();
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,recent=now-HOUR;
+ const raw=JSON.stringify(syncState({tasks:[syncTask('red-backups-board','Current board')]}));
+ const row=(id,at)=>({id,day:at===old?'2026-09-06':'2026-10-06',at,kind:'manual',payload:raw});
+ const mirrorOld=row('mirror-old',old),mirrorNew=row('mirror-new',recent),deviceOld=row('device-old',old),deviceNew=row('device-new',recent);
+ // Exactly seven days, a future time: neither is red, so every device-store test also checks they stay.
+ const deviceWeek=row('device-week',now-7*24*HOUR),deviceFuture=row('device-future',now+HOUR);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw,[LOCAL_BACKUPS_KEY]:JSON.stringify([mirrorOld,mirrorNew])});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(loaded));
+ setFakeTime(loaded.ctx,now);
+ const store=loaded.shim.window.ScannerDeviceStore;
+ for(const backup of [deviceOld,deviceNew,deviceWeek,deviceFuture])assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup})).ok,true);
+ await loaded.ctx.refreshDeviceBackupCache();
+ const ids=async()=>Array.from(await store.listBackups(),item=>item.id).filter(id=>/^(mirror|device)-/.test(id)).sort();
+ assert.deepEqual(await ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old'],'fixture: the device store holds all six backups');
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),mine=item=>/^(mirror|device)-/.test(item.id);
+ assert.deepEqual(listed().filter(mine),[mirrorOld,mirrorNew],'fixture: two are still mirrored in the older backup list');
+ const asked=[];loaded.ctx.confirm=message=>{asked.push(message);return true;};
+ const press=async()=>{const result=await whileAlive(loaded.ctx.onAction('delete-old-backups',{}));for(let i=0;i<10;i++)await flush();return result;};
+ return {...loaded,indexedDB,deviceDbName,now,storage,store,ids,listed,mine,others:listed().filter(item=>!mine(item)),asked,press,mirrorNew,head:await store.readHead(),board:JSON.stringify(loaded.ctx.state)};
+}
+test('RISK delete red backups: device-store backups and their older-list mirrors are deleted together while recent ones and the saved board stay',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,storage,store}=fixture;
+ ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days','a mirrored backup is one row and counts once');
+ await fixture.press();
+ assert.equal(fixture.asked.length,1,'one confirmation covers both stores');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new'],'the device store keeps only the recent backups');
+ assert.deepEqual(fixture.listed().filter(fixture.mine),[fixture.mirrorNew],'the mirror of the deleted backup is gone and the recent mirror is unchanged');
+ assert.deepEqual(fixture.listed().filter(item=>!fixture.mine(item)),fixture.others,'the app\'s own copies in the older backup list are untouched');
+ assert.equal((await store.readHead()).payload,fixture.head.payload,'deleting backups never writes the saved board');
+ assert.equal(JSON.stringify(ctx.state),fixture.board,'the open board is unchanged');
+ assert.match(shim.document.getElementById('toast').textContent,/^Deleted 2 backups older than seven days/);
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML),null);
+});
+
+test('RISK delete red backups: cancelling the one confirmation leaves every backup byte and the board unchanged',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),raw='[ '+['one','two'].map(id=>JSON.stringify({id,kind:'manual',day:'2026-09-06',at:old,payload})).join(' , ')+' ]';
+ storage.setItem(LOCAL_BACKUPS_KEY,raw);
+ const asked=[];ctx.confirm=message=>{asked.push(message);return false;};
+ ctx.openSettings();
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);
+ assert.equal(asked.length,1,'the person was asked once and said no');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),raw,'the backup list keeps its exact bytes, spacing included');
+ assert.equal(JSON.stringify(ctx.state),payload);
+ assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Deleted/);
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days','the button is still offered');
+});
+
+test('RISK delete red backups: when storage refuses a write part-way the remaining backups stay intact and the message reports what was kept',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),rows=['one','two','three'].map((id,i)=>({id,kind:'manual',day:'2026-09-06',at:old-i*HOUR,payload}));
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ ctx.confirm=()=>true;ctx.openSettings();
+ const write=storage.setItem;let writes=0;
+ storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY&&++writes>1)throw new Error('storage refused the write');return write(key,value);};
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ const left=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.equal(left.length,2,'only the write storage accepted removed a backup');
+ for(const row of left)assert.deepEqual(row,rows.find(item=>item.id===row.id),'a kept backup is unchanged');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 2 backups were kept and are still listed. They changed or could not be removed.','a partial result is never reported as a full one, and says why');
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days','the refreshed list still offers the kept backups');
+ const before=storage.getItem(LOCAL_BACKUPS_KEY);
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),before);
+ assert.equal(shim.document.getElementById('toast').textContent,'No backups were deleted. 2 backups were kept and are still listed. They changed or could not be removed.');
+});
+
+test('RISK delete red backups: a backup list another tab changed after Settings drew it is not deleted from; the person is asked nothing and told to check again',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),rows=['one','two'].map((id,i)=>({id,kind:'manual',day:'2026-09-06',at:old-i*HOUR,payload}));
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ const asked=[];ctx.confirm=message=>{asked.push(message);return true;};
+ ctx.openSettings();
+ const changed=JSON.stringify([rows[0],{...rows[1],payload:JSON.stringify({...ctx.state,updatedAt:123})}]);
+ storage.setItem(LOCAL_BACKUPS_KEY,changed);
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);
+ assert.equal(asked.length,0,'the count the person would confirm is stale, so nothing is asked');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),changed,'neither the rewritten backup nor its unchanged neighbour is deleted');
+ assert.match(shim.document.getElementById('toast').textContent,/^Backup list changed\. Check it again before deleting\./);
+});
+
+test('RISK delete red backups: a device-store backup rewritten elsewhere since Settings drew it is kept, even after the backups before it are deleted',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ // Older than the others, so it is tried last, after earlier deletions have redrawn the list.
+ const older={id:'device-older',day:'2026-09-05',at:fixture.now-31*24*HOUR,kind:'manual',payload:fixture.head.payload};
+ assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:older})).ok,true);await ctx.refreshDeviceBackupCache();
+ ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 3 backups older than seven days');
+ const db=await new Promise((resolve,reject)=>{const request=fixture.indexedDB.open(fixture.deviceDbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ try{await new Promise((resolve,reject)=>{
+  const tx=db.transaction('backups','readwrite'),backups=tx.objectStore('backups'),request=backups.get(older.id);
+  request.onsuccess=()=>backups.put({...request.result,at:request.result.at-1,note:'rewritten in another tab'},older.id);
+  tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(tx.error||Error('rewrite aborted'));
+ });}finally{db.close();}
+ await fixture.press();
+ assert.equal(fixture.asked.length,1);
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-older','device-week','mirror-new'],'the backup the person never saw in this form is kept');
+ assert.equal(Array.from(await store.listBackups()).find(row=>row.id===older.id).note,'rewritten in another tab','and keeps the other tab\'s content');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days. 1 backup was kept and is still listed. It changed or could not be removed.');
+});
+
+test('RISK delete red backups: the press is acknowledged at once and a second press while it runs asks and deletes nothing more',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim}=fixture;
+ ctx.openSettings();
+ const said=[],toast=ctx.toast;ctx.toast=(message,duration)=>{said.push(message);return toast(message,duration);};
+ const running=ctx.onAction('delete-old-backups',{});
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleting 2 backups older than seven days…','the press shows it is working before the device store answers');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old'],'fixture: the first press is still running');
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false,'a second press during the run is ignored');
+ assert.equal(fixture.asked.length,1,'and asks nothing');
+ assert.equal(await whileAlive(running),true);for(let i=0;i<10;i++)await flush();
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new']);
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days from this device.');
+ assert.deepEqual(said,['Deleting 2 backups older than seven days…','Deleted 2 backups older than seven days from this device.'],'one progress message and one result: no message per backup');
+});
+
+// Old saved data: a backup list an earlier version stored compressed. Passed
+// on its first run, because each row goes through the per-row Delete, which
+// already rewrites a compressed list; kept as the old-data regression.
+test('RISK delete red backups: a compressed backup list from an earlier version loses only its red backups and stays compressed',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),row=(id,at,extra={})=>({id,kind:'manual',day:'2026-09-06',at,payload,...extra});
+ const rows=[row('old-one',old,{futureData:{z:1,a:[2]}}),row('recent',now-HOUR,{futureData:{keep:'exact'}}),row('old-two',old-HOUR)];
+ storage.setItem(LOCAL_BACKUPS_KEY,ctx.packBackupIndex(JSON.stringify(rows)));
+ assert.notEqual(storage.getItem(LOCAL_BACKUPS_KEY),JSON.stringify(rows),'fixture: the stored list is compressed');
+ ctx.confirm=()=>true;ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days');
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ const stored=storage.getItem(LOCAL_BACKUPS_KEY);
+ assert.notEqual(stored[0],'[','the list is still stored compressed, not as plain JSON');
+ assert.deepEqual(JSON.parse(ctx.unpackBackupIndex(stored)),[rows[1]],'read back through the app\'s list reader, only the recent backup is left, with every field, unknown ones included');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days from this device.');
+});
+
+// Settings redraws after a backup action, and a redraw draws Data and backups
+// closed. After deleting many backups the person wants to see what is left.
+// Coverage limit: keyboard focus and scroll after the redraw are checked in a
+// real browser, not here.
+test('Delete red backups: the redrawn Settings keeps Data and backups open on the result, for a full, partial or refused deletion',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),rows=['one','two','three'].map((id,i)=>({id,kind:'manual',day:'2026-09-06',at:old-i*HOUR,payload}));
+ const backupsOpen=()=>/<details class="settings-section" data-settings-section="data" open><summary>Data and backups<\/summary>/.test(shim.document.getElementById('modalRoot').innerHTML);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ ctx.confirm=()=>true;ctx.openSettings();
+ assert.equal(backupsOpen(),false,'fixture: opening Settings draws the section closed');
+ const write=storage.setItem;let writes=0;
+ storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY&&++writes>1)throw new Error('storage refused the write');return write(key,value);};
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(backupsOpen(),true,'partial result: the kept backups are in view');
+ storage.setItem=write;ctx.openSettings();
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).reverse()));
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(backupsOpen(),true,'changed list: the list to check again is in view');
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).length,0);
+ assert.equal(backupsOpen(),true,'full result: the emptied list is in view');
+});
+
+// Review finding: the bulk press skips each row's own question. That must hold
+// only for the rows the bulk press itself is deleting, never for a Delete the
+// person presses on another row while the bulk deletion is still running.
+test('RISK delete red backups: the Delete of a single row pressed while a bulk deletion runs still asks its own question and is honoured',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx}=fixture;
+ const asked=[];ctx.confirm=message=>{asked.push(message);return !/^Delete this local backup\?/.test(message);};
+ ctx.openSettings();
+ const running=ctx.onAction('delete-old-backups',{});
+ await ctx.onAction('delete-local-backup',{dataset:{id:'device-new'}});
+ await whileAlive(running);for(let i=0;i<10;i++)await flush();
+ assert.deepEqual(asked.filter(message=>/^Delete this local backup\?/.test(message)).length,1,'the recent backup\'s own Delete asked its own question');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new'],'and, answered no, kept that backup while the bulk deletion finished');
+});
+
+// Independent review findings 4 and 6: every deleted row redrew Settings. On
+// the older backup list that all ran in one task, so the page froze and the
+// progress message never painted; and each redraw replaced whatever dialog
+// the person had opened meanwhile.
+test('Delete red backups: Settings is redrawn once, at the end and on the backup list, however many backups are deleted, in either store',async t=>{
+ const count=(ctx,shim)=>{const draws=[],renderSettings=ctx.renderSettings;ctx.renderSettings=options=>{const result=renderSettings(options);draws.push(/<details class="settings-section" data-settings-section="data" open><summary>Data and backups<\/summary>/.test(shim.document.getElementById('modalRoot').innerHTML));return result;};return draws;};
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const legacy=await loadApp({sharedStorage:storage});setFakeTime(legacy.ctx,now);
+ const payload=JSON.stringify(legacy.ctx.state);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(['one','two','three','four'].map((id,i)=>({id,kind:'manual',day:'2026-09-06',at:old-i*HOUR,payload}))));
+ legacy.ctx.confirm=()=>true;legacy.ctx.openSettings();
+ const legacyDraws=count(legacy.ctx,legacy.shim);
+ await whileAlive(legacy.ctx.onAction('delete-old-backups',{}));
+ assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[],'fixture: all four older-list backups were deleted');
+ assert.deepEqual(legacyDraws,[true],'older list: one redraw, with Data and backups open');
+ const fixture=await redBackupsDeviceFixture2327(t);
+ fixture.ctx.openSettings();
+ const deviceDraws=count(fixture.ctx,fixture.shim);
+ await fixture.press();
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new'],'fixture: both device-store backups were deleted');
+ assert.deepEqual(deviceDraws,[true],'device store: one redraw, with Data and backups open');
+});
+
+test('Delete red backups: an older-list deletion yields between backups, so the progress message can paint and other work can run',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(['one','two','three','four'].map((id,i)=>({id,kind:'manual',day:'2026-09-06',at:old-i*HOUR,payload}))));
+ ctx.confirm=()=>true;ctx.openSettings();
+ const seen=[];
+ // Queued before the press: a deletion that never yields runs to the end first.
+ setTimeout(()=>seen.push(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).length),0);
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).length,0);
+ assert.equal(seen.length,1,'the queued work ran during the deletion');
+ assert.ok(seen[0]>0,'and saw backups still waiting to be deleted, not an already finished run (saw '+seen[0]+' left)');
+});
+
+test('Delete red backups: a dialog the person opens, or Settings being closed, during a bulk deletion is left as it is when the deletion finishes',async t=>{
+ for(const during of ['raw backup data','closed']){
+  const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim}=fixture;
+  ctx.openSettings();
+  const running=ctx.onAction('delete-old-backups',{});
+  if(during==='closed')ctx.closeModal();else ctx.onAction('view-raw-backups',{});
+  const meanwhile=shim.document.getElementById('modalRoot').innerHTML;
+  assert.equal(/data-settings-section=/.test(meanwhile),false,during+': fixture: Settings is no longer the open dialog');
+  await whileAlive(running);for(let i=0;i<10;i++)await flush();
+  assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new'],during+': the deletion still finished');
+  assert.equal(/data-settings-section=/.test(shim.document.getElementById('modalRoot').innerHTML),false,during+': Settings did not reopen over it');
+  if(during==='raw backup data')assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="rawBackupData"/,'the raw backup data dialog is still open');
+  assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days from this device.',during+': the result is still reported');
+ }
+});
+
+// Independent review finding 1: a copy a recovery has pinned (the board's
+// protectedBackupIds) stays pinned past seven days, and neither store's delete
+// checks the pin. Fixture: the pin is set on the open board directly.
+test('RISK delete red backups: a red copy a recovery has pinned is not counted or deleted in bulk, in the older backup list or the device store',async t=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const legacy=await loadApp({sharedStorage:storage});setFakeTime(legacy.ctx,now);
+ const payload=JSON.stringify(legacy.ctx.state),rows=[{id:'pinned',kind:'before-cloud-adoption',day:'2026-09-06',at:old,payload},{id:'mine',kind:'manual',day:'2026-09-06',at:old-HOUR,payload}];
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ legacy.ctx.state.protectedBackupIds=['pinned'];legacy.ctx.confirm=()=>true;legacy.ctx.openSettings();
+ assert.equal(redBackupsButton(legacy.shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 1 backup older than seven days','older list: the pinned copy is not counted');
+ await whileAlive(legacy.ctx.onAction('delete-old-backups',{}));
+ assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[rows[0]],'older list: the pinned copy keeps its exact content');
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ const pinned={id:'device-pinned',day:'2026-09-06',at:fixture.now-30*24*HOUR,kind:'before-cloud-adoption',payload:fixture.head.payload};
+ assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:pinned})).ok,true);await ctx.refreshDeviceBackupCache();
+ ctx.state.protectedBackupIds=[pinned.id];ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days','device store: the pinned copy is not counted');
+ await fixture.press();
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-pinned','device-week','mirror-new'],'device store: the pinned copy is kept');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days from this device.','nothing the person was offered was kept');
+});
+
+// Independent review finding 5: with an unreadable older backup list every
+// row's own Delete refuses, so the person confirmed a permanent deletion that
+// could not happen.
+test('RISK delete red backups: no button is offered while the older backup list cannot be read, because no row could be deleted',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,storage}=fixture;
+ const malformed='[{"id":"partial"';storage.setItem(LOCAL_BACKUPS_KEY,malformed);
+ ctx.openSettings();
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/Backup list cannot be read/,'fixture: Settings reports the unreadable list');
+ assert.match(markup,/data-act="delete-local-backup" data-id="device-old"/,'fixture: the red device-store backup is still listed');
+ assert.equal(redBackupsButton(markup),null);
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);for(let i=0;i<10;i++)await flush();
+ assert.equal(fixture.asked.length,0,'nothing is asked');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old']);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),malformed);
+});
+
+// Independent review finding 3: the recovery wait was checked only at the
+// press, so a recovery that began during the run did not stop it.
+test('RISK delete red backups: a recovery that begins during the run stops it; the backups not yet deleted stay and the message says why',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ ctx.openSettings();
+ const deleteBackup=store.deleteBackup;let first=true;
+ store.deleteBackup=async(...args)=>{const result=await deleteBackup.apply(store,args);if(first){first=false;vm.runInContext('deviceRecoveryCloudHold={workspace:"working-board",reason:"cloud-source-recovery"}',ctx);}return result;};
+ await fixture.press();
+ const left=await fixture.ids();
+ assert.equal(left.filter(id=>/-old$/.test(id)).length,1,'one red backup was deleted before the recovery began and the other was kept: '+left);
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 1 backup was kept and is still listed. A recovery started, so deleting stopped.');
+ const button=redBackupsButton(shim.document.getElementById('modalRoot').innerHTML);
+ assert.match(button[2],/ disabled/,'the redrawn button now waits for the recovery');
+});
+
+test('RISK delete red backups: a copy a recovery pins after Settings drew it makes the press refuse before asking, like any other change to the list',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),raw=JSON.stringify(['one','two'].map((id,i)=>({id,kind:'before-cloud-adoption',day:'2026-09-06',at:old-i*HOUR,payload})));
+ storage.setItem(LOCAL_BACKUPS_KEY,raw);
+ const asked=[];ctx.confirm=message=>{asked.push(message);return true;};
+ ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days');
+ ctx.state.protectedBackupIds=['two'];
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);
+ assert.equal(asked.length,0,'the count the person would confirm no longer holds');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),raw);
+ assert.match(shim.document.getElementById('toast').textContent,/^Backup list changed\. Check it again before deleting\./);
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 1 backup older than seven days','the redrawn button offers only the unpinned backup');
+});
+
+// Independent review finding 2: after one failed device-store listing the
+// redrawn list was empty, so the message counted backups as deleted that were
+// still stored, and a mirrored backup could lose only its older-list copy.
+test('RISK delete red backups: when the device store cannot be listed part-way the run stops, no backup is half-deleted, and the message counts only what was removed',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ ctx.openSettings();
+ const list=store.listBackupFacts,deleteBackup=store.deleteBackup;let failNext=false,failures=0;
+ store.deleteBackup=async(...args)=>{const result=await deleteBackup.apply(store,args);failNext=true;return result;};
+ store.listBackupFacts=async(...args)=>{if(failNext){failNext=false;failures++;throw new Error('transient listing failure');}return list.apply(store,args);};
+ await fixture.press();
+ assert.equal(failures,1,'fixture: the listing after the first deletion failed once');
+ const left=await fixture.ids(),mirrored=fixture.listed().filter(fixture.mine).map(item=>item.id);
+ assert.equal(left.filter(id=>/-old$/.test(id)).length,1,'exactly one red backup was deleted: '+left);
+ assert.equal(mirrored.includes('mirror-old'),left.includes('mirror-old'),'the mirrored backup is in both stores or in neither');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 1 backup was kept and is still listed. The backup list could not be read, so deleting stopped.');
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 1 backup older than seven days','once the list reads again, the kept backup is listed and offered');
+});
+
+// Independent review, wording: Help, Settings and the changelog said the
+// button deletes "every" old backup and that "protected copies stay", which
+// described neither what it leaves nor the kept-until-deleted copies it removes.
+test('Delete red backups: Help, Settings and the changelog say what the button deletes, what it leaves and when it waits',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.onAction('help',{});const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>Can I delete all my old backups at once\?<\/dt><dd>(.*?)<\/dd>/)?.[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+ assert.ok(answer,'Help has the question');
+ assert.ok(answer.split(' ').length<=130,'the answer stays within the 130-word limit');
+ assert.match(answer,/Delete N backups older than seven days appears just above your backups/,'it names the button as drawn, with its count, where #2303 puts it');
+ assert.match(answer,/When at least one of them can be deleted this way/,'it does not promise the button for red backups it would leave');
+ assert.match(answer,/asks once/);assert.match(answer,/how many were deleted and how many were kept, and why/);
+ assert.match(answer,/leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned/);
+ assert.match(answer,/kept until you delete it is deleted like any other/,'it says the keep-until-deleted copies are included');
+ assert.match(answer,/waits while a recovery is unsettled and stops if one begins/);
+ assert.match(answer,/cannot be brought back/);assert.match(answer,/current board is not changed/);
+ assert.doesNotMatch(answer,/every red backup|protected copies/,'the two inaccurate phrases are gone');
+ const changelog=help.match(/<h3>November 10, 2026<\/h3><ul>(.*?)<\/ul>/)?.[1]||'';
+ assert.match(changelog,/delete backups older than seven days with one button/);
+ assert.match(changelog,/leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned/);
+ assert.doesNotMatch(changelog,/delete every backup|protected copies/);
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ // #2303: help under a Settings control is at most one short line, so the
+ // explanation Settings used to carry is the Help answer checked above.
+ assert.doesNotMatch(settings,/one button here deletes them after a single confirmation/,'Settings does not repeat the Help answer');
+ assert.match(changelog,/The button that deletes backups older than seven days now sits just above your backups\./,'the changelog says where the button moved');
+});
+
+// #2327 merged under #2303: Settings lists Data and backups in an agreed order,
+// so the button that deletes the red rows sits with the backup list it acts on.
+test('RISK delete red backups: the button sits with the backup list, after Restore, in the #2303 Data and backups order',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{id:'old-one',kind:'manual',day:'2026-09-06',at:old,payload}]));
+ ctx.openSettings();
+ const data=shim.document.getElementById('modalRoot').innerHTML.split('<summary>Data and backups</summary>')[1]||'';
+ const list=data.split('<div id="settingsBackupList">')[1]?.split('<details class="settings-troubleshooting">')[0]||'';
+ assert.ok(redBackupsButton(list),'the button is inside the backup list');
+ const order=[/data-act="make-manual-backup">Make backup</,/data-act="restore-backup"[^>]*>Restore</,/data-act="delete-old-backups"/,/class="mgr backup-row"/,/<details class="settings-troubleshooting">/,/data-act="wipe">Reset everything</].map(pattern=>data.search(pattern));
+ assert.ok(order.every(index=>index>=0),'every item is drawn: '+JSON.stringify(order));
+ assert.deepEqual(order.slice().sort((a,b)=>a-b),order,'Make backup, Restore, the button, the backups, Troubleshooting, Reset everything: '+JSON.stringify(order));
+ assert.equal((data.match(/data-act="delete-old-backups"/g)||[]).length,1,'one button');
+});
+
+// Passed on its first run: the per-row Delete reads the stored backup again
+// before deleting and compares it with what Settings listed. Kept because the
+// bulk press no longer redraws between backups and depends on that check.
+test('RISK delete red backups: a device-store backup rewritten elsewhere while the run is under way is kept',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ const older={id:'device-older',day:'2026-09-05',at:fixture.now-31*24*HOUR,kind:'manual',payload:fixture.head.payload};
+ assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:older})).ok,true);await ctx.refreshDeviceBackupCache();
+ ctx.openSettings();
+ const rewrite=async()=>{
+  const db=await new Promise((resolve,reject)=>{const request=fixture.indexedDB.open(fixture.deviceDbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+  try{await new Promise((resolve,reject)=>{
+   const tx=db.transaction('backups','readwrite'),backups=tx.objectStore('backups'),request=backups.get(older.id);
+   request.onsuccess=()=>backups.put({...request.result,at:request.result.at-1,note:'rewritten in another tab'},older.id);
+   tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(tx.error||Error('rewrite aborted'));
+  });}finally{db.close();}
+ };
+ const deleteBackup=store.deleteBackup;let first=true;
+ store.deleteBackup=async(...args)=>{const result=await deleteBackup.apply(store,args);if(first){first=false;await rewrite();}return result;};
+ await fixture.press();
+ assert.equal(first,false,'fixture: the rewrite happened after the first deletion');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-older','device-week','mirror-new']);
+ assert.equal(Array.from(await store.listBackups()).find(row=>row.id===older.id).note,'rewritten in another tab');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days. 1 backup was kept and is still listed. It changed or could not be removed.');
+});
+
+// Second independent review. The run compared each stored backup with what
+// Settings had last drawn, so anything that redrew Settings during the run
+// (the person's own Delete on another row, reopening Settings) replaced what
+// the person had confirmed with whatever storage held by then.
+const rewriteDeviceBackup2327=async(fixture,id,change)=>{
+ const db=await new Promise((resolve,reject)=>{const request=fixture.indexedDB.open(fixture.deviceDbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ try{await new Promise((resolve,reject)=>{
+  const tx=db.transaction('backups','readwrite'),backups=tx.objectStore('backups'),request=backups.get(id);
+  request.onsuccess=()=>{const next=change(request.result);if(next===null)backups.delete(id);else backups.put(next,id);};
+  tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>reject(tx.error||Error('rewrite aborted'));
+ });}finally{db.close();}
+};
+const addOlderDeviceBackup2327=async fixture=>{
+ const older={id:'device-older',day:'2026-09-05',at:fixture.now-31*24*HOUR,kind:'manual',payload:fixture.head.payload};
+ assert.equal((await fixture.store.putBackup({expectedHash:(await fixture.store.readHead()).hash,backup:older})).ok,true);await fixture.ctx.refreshDeviceBackupCache();
+ return older;
+};
+// Runs `during` once, right after the run's first device-store deletion.
+const afterFirstDeletion2327=(fixture,during)=>{
+ const deleteBackup=fixture.store.deleteBackup;let first=true;
+ fixture.store.deleteBackup=async(...args)=>{const result=await deleteBackup.apply(fixture.store,args);if(first){first=false;await during();}return result;};
+ return ()=>first===false;
+};
+test('RISK delete red backups: Settings redrawing during the run does not replace what the person confirmed; a backup rewritten since the press is kept',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ await addOlderDeviceBackup2327(fixture);ctx.openSettings();
+ const happened=afterFirstDeletion2327(fixture,async()=>{
+  await rewriteDeviceBackup2327(fixture,'device-older',row=>({...row,at:fixture.now-HOUR,day:'2026-10-06',note:'rewritten in another tab'}));
+  await ctx.refreshDeviceBackupCache();ctx.openSettings();
+ });
+ await fixture.press();
+ assert.equal(happened(),true,'fixture: Settings was redrawn from current storage after the first deletion');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-older','device-week','mirror-new'],'the rewritten backup, now recent, is kept');
+ assert.equal(Array.from(await store.listBackups()).find(row=>row.id==='device-older').note,'rewritten in another tab');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days. 1 backup was kept and is still listed. It changed or could not be removed.');
+});
+
+test('RISK delete red backups: a copy a recovery pins while the run is under way is kept',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim}=fixture;
+ ctx.openSettings();let pinned=null;
+ afterFirstDeletion2327(fixture,async()=>{pinned=(await fixture.ids()).find(id=>/-old$/.test(id));ctx.state.protectedBackupIds=[pinned];});
+ await fixture.press();
+ assert.ok(pinned,'fixture: one red backup was still stored when the pin arrived');
+ assert.ok((await fixture.ids()).includes(pinned),'the newly pinned copy is kept in the device store');
+ assert.equal(fixture.listed().some(item=>item.id==='mirror-old'),pinned==='mirror-old','and its older-list mirror, if it has one, is kept with it');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 1 backup was kept and is still listed. It changed or could not be removed.');
+});
+
+test('RISK delete red backups: a backup something else removes during the run is not reported as kept',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim}=fixture;
+ await addOlderDeviceBackup2327(fixture);ctx.openSettings();
+ afterFirstDeletion2327(fixture,()=>rewriteDeviceBackup2327(fixture,'device-older',()=>null));
+ await fixture.press();
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new'],'fixture: the other tab removed the third red backup');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days from this device. 1 backup was already removed.');
+});
+
+test('RISK delete red backups: while the device store cannot be listed no button is offered, so a mirrored backup never loses only its older-list copy',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ const list=store.listBackupFacts;store.listBackupFacts=async()=>{throw new Error('device store cannot be listed');};
+ await ctx.refreshDeviceBackupCache();ctx.openSettings();
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/data-act="delete-local-backup" data-id="mirror-old"/,'fixture: the mirrored red backup is still listed, from the older backup list');
+ assert.equal(redBackupsButton(markup),null);
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);for(let i=0;i<10;i++)await flush();
+ assert.equal(fixture.asked.length,0);
+ store.listBackupFacts=list;
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old']);
+ assert.deepEqual(fixture.listed().filter(fixture.mine).map(item=>item.id),['mirror-old','mirror-new'],'the older backup list still holds both mirrors');
+ // Third review, wording: the device store stops listing after Settings drew the button.
+ await ctx.refreshDeviceBackupCache();ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 2 backups older than seven days','fixture: the list reads again and the button is back');
+ store.listBackupFacts=async()=>{throw new Error('device store cannot be listed');};await ctx.refreshDeviceBackupCache();
+ assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false);for(let i=0;i<10;i++)await flush();
+ store.listBackupFacts=list;
+ assert.equal(fixture.asked.length,0,'the press refuses before asking');
+ assert.equal(shim.document.getElementById('toast').textContent,'Backup list cannot be read right now. No backup was deleted; try again later.','and says the list could not be read, not that it changed');
+ assert.deepEqual(await fixture.ids(),['device-future','device-new','device-old','device-week','mirror-new','mirror-old']);
+});
+
+test('RISK delete red backups: when the device store stays unreadable after a deletion the message does not claim the rest are still listed',async t=>{
+ const fixture=await redBackupsDeviceFixture2327(t),{ctx,shim,store}=fixture;
+ ctx.openSettings();
+ const list=store.listBackupFacts;
+ afterFirstDeletion2327(fixture,async()=>{store.listBackupFacts=async()=>{throw new Error('device store cannot be listed');};});
+ await fixture.press();
+ store.listBackupFacts=list;
+ assert.equal((await fixture.ids()).filter(id=>/-old$/.test(id)).length,1,'exactly one red backup was deleted');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days. 1 backup was not deleted. The backup list could not be read, so deleting stopped.');
+});
+
+// Specialist review, blocking: a finished cloud recovery keeps a
+// decision-recovery-confirmed copy as its record. Later cloud saves read that
+// record to know the incident is over; with it deleted, every save re-read the
+// whole recovery archive. The copies a recovery keeps are its records and
+// originals, so none of them is deleted in bulk.
+test('RISK delete red backups: the records and originals a recovery keeps are not counted or deleted in bulk, however old',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state),row=(id,kind,i)=>({id,kind,day:'2026-09-06',at:old-i*HOUR,payload});
+ const kept=['decision-recovery-confirmed','decision-recovery-superseded','decision-recovery-pending','decision-recovery-cloud','decision-recovery-device'].map((kind,i)=>row(kind,kind,i));
+ const asked=[];ctx.confirm=message=>{asked.push(message);return true;};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(kept));ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML),null,'recovery records alone offer no button');
+ const rows=[kept[0],kept[1],row('mine','manual',9),kept[2],kept[3],kept[4]];
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));ctx.openSettings();
+ assert.equal(redBackupsButton(shim.document.getElementById('modalRoot').innerHTML)?.[3],'Delete 1 backup older than seven days');
+ await whileAlive(ctx.onAction('delete-old-backups',{}));
+ assert.equal(asked.length,1);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),JSON.stringify(kept),'every recovery record and original keeps its exact bytes and order');
+ assert.equal(shim.document.getElementById('toast').textContent,'Deleted 1 backup older than seven days from this device.');
+});
+
+// Coverage limit: each recovery state is set on the loaded app directly, not
+// reached through a failing cloud or device read. Settings' own notice for the
+// state is asserted so the fixture is the state Settings recognises.
+test('RISK delete red backups: while a recovery is unsettled the button is unavailable with its reason, a forced press deletes nothing, and each row keeps its own Delete',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR;
+ const states=[
+  ['saved source needs recovery','liveBoardAccepted=false','liveBoardAccepted=true',/Saved device source needs recovery/],
+  ['cloud recovery pending','deviceRecoveryCloudHold={workspace:"working-board",reason:"cloud-source-recovery"}','deviceRecoveryCloudHold=null',/Cloud recovery is pending/],
+  ['cloud recovery waiting','window.CloudSync={configured:true,ready:true,user:"e@example.com",status:"synced"};automaticRecoveryWaiting={backend:window.CloudSync,account:"e@example.com",identity:cloudAccountIdentity()}','automaticRecoveryWaiting=null',/Cloud recovery is waiting/],
+ ];
+ for(const [name,enter,leave,notice] of states){
+  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+  const payload=JSON.stringify(ctx.state),rows=['one','two'].map(id=>({id,kind:'manual',day:'2026-09-06',at:old,payload})),raw=JSON.stringify(rows);
+  storage.setItem(LOCAL_BACKUPS_KEY,raw);
+  const asked=[];ctx.confirm=message=>{asked.push(message);return true;};
+  vm.runInContext(enter,ctx);ctx.openSettings();
+  let markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,notice,name+': fixture shows Settings\' own recovery notice');
+  const waiting=redBackupsButton(markup);
+  assert.ok(waiting,name+': the button stays visible so the reason has something to explain');
+  assert.match(waiting[2],/ disabled/,name+': the button is unavailable');
+  assert.deepEqual(waiting[1].split(/\s+/),['btn','subtle'],name+': it takes the one button style that has a disabled look, not the red one that looks pressable');
+  const reason=markup.match(/<p id="oldBackupsWait"[^>]*>([^<]*)<\/p>/);
+  assert.ok(reason&&waiting[2].includes('aria-describedby="oldBackupsWait"'),name+': the reason is tied to the button');
+  assert.match(reason[1],/waits until recovery settles/i);assert.match(reason[1],/each backup can still be deleted by itself/i);
+  for(const id of ['one','two'])assert.doesNotMatch(markup.match(new RegExp('<button class="[^"]+" data-act="delete-local-backup" data-id="'+id+'"([^>]*)>'))[1],/disabled/,name+': the row keeps its own Delete');
+  assert.equal(await whileAlive(ctx.onAction('delete-old-backups',{})),false,name+': a forced or stale press is refused');
+  assert.equal(asked.length,0,name+': nothing is asked');
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),raw,name+': every backup keeps its exact bytes');
+  vm.runInContext(leave,ctx);ctx.openSettings();
+  markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(redBackupsButton(markup)[2],/disabled/,name+': the button returns once recovery has settled');
+  assert.ok(redBackupsButton(markup)[1].split(/\s+/).includes('danger'),name+': and is red again');
+  assert.doesNotMatch(markup,/id="oldBackupsWait"/);
+ }
+});
+
 test('RISK fireworks occurrence: standalone sampled starts are exactly four times the original interval while duration odds budgets and festival timing stay intact',()=>{
  const load=(released=false)=>{const context=vm.createContext({Date,Math,console});for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js']){let source=fs.readFileSync(path.join(__dirname,file),'utf8');if(released){const r=spawnSync('git',['show','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b:'+file],{cwd:__dirname,encoding:'utf8'});assert.equal(r.status,0);source=r.stdout;}vm.runInContext(source,context);}return context;};
  for(const rate of [0,1,2,10]){
