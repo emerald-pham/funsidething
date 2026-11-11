@@ -12781,6 +12781,14 @@ test("UI: benchmark's action row is greyed out (lowered opacity) during scanning
   assert.match(row, /class="actionrow[^"]*disabled/, `action row should carry the disabled class during scan, got: ${row}`);
 });
 
+// #2332 (typography review F4): the status line names the signed-in account, and
+// a long address overflowed Settings by 6px at 320px.
+test("CSS: the Data and backups status line wraps a long account address", () => {
+  const rule = styleSrc.match(/\.settings-data-status\{([^}]*)\}/);
+  assert.ok(rule, "there should be a .settings-data-status rule");
+  assert.match(rule[1], /overflow-wrap:\s*anywhere/);
+});
+
 test("CSS: .actionrow.disabled lowers opacity to show it's a different mode, but keeps it clickable", () => {
   const rule = styleSrc.match(/\.actionrow\.disabled\{([^}]*)\}/);
   assert.ok(rule, "there should be a .actionrow.disabled rule");
