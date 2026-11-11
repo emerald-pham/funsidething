@@ -4541,9 +4541,10 @@ test('RISK works like normal: after both chain start options, committed Settings
  await worksLikeNormalJourney2304(t);
 });
 
-// #2304: Stable, the released client (main at cb48e3c when this run was written),
-// stays open on the same cloud board while the run above uses every new feature.
-const WORKS_LIKE_NORMAL_RELEASED='cb48e3cee0cebfa2d8f126f5a0b75d124d555c15';
+// #2304: Stable, the released client, stays open on the same cloud board while
+// the run above uses every new feature. Written against cb48e3c; #2332 moved it
+// to 5548cd7, the Stable build deployed when this release was reviewed.
+const WORKS_LIKE_NORMAL_RELEASED='5548cd7cf69493712f63a36ac02fdd4dc6ae2b48';
 test('RISK BACKWARD COMPATIBILITY: the released client with the same board open keeps syncing through the works-like-normal run, with no recovery prompt and no lost setting',async t=>{
  const released=spawnSync('git',['show',WORKS_LIKE_NORMAL_RELEASED+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
  let stable;
