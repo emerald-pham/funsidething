@@ -1415,6 +1415,17 @@ function setInput(ctx, id, value) {
   ctx.document.getElementById(id).value = String(value);
 }
 
+// #2303: every Settings field saves when it is committed. A committed field is
+// a change event on the real control, the way a browser reports leaving an
+// edited number box or picking an option; there is no Save settings button.
+function commitSetting(shim, id, value) {
+  const field = shim.document.getElementById(id);
+  Object.assign(field, { id, matches: () => false });
+  if (typeof value === "boolean") field.checked = value; else field.value = String(value);
+  shim.document.dispatchEvent({ type: "change", target: field });
+  return field;
+}
+
 /* =====================================================================
    "WORKED ON IT" IS BULLETPROOF FOR A CONFIGURABLE WINDOW
    Forster rule 7 crosses a task off and sends it to the bottom of the list.
@@ -1899,6 +1910,8 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   if(!oneTask)addTask('Unmatched control task');if(availabilityFixture)state.tasks.at(-1).startsAt='2026-10-29';save();await persist();render();},{longTitle:startupOptions.longTitle===true,oneTask:startupOptions.oneTask===true,availabilityFixture:startupOptions.availabilityFixture===true});
  if(activeScanner)await page.locator('[data-act="start-scan"]').first().click();
  if(startupOptions.scannerState)await page.evaluate(async mode=>{state.chain=state.tasks.slice(0,2).map(t=>t.id);state.candidateId=state.tasks[2].id;state.mode=mode==='paused'?'work':'scan';state.interventionActive=mode==='intervention';state.interventionP=.23;save();await persist();render();},startupOptions.scannerState);
+ // #2332: then a started pass with an empty chain where an older client that reads the retired skip flag has stored its candidate.
+ if(startupOptions.scannerState==='stored-unpaired')await page.evaluate(async()=>{state.chain=[];state.mode='scan';state.passStartedAt=Date.now();state.passId=state.passId||'stored-unpaired-pass';state.settings.skipOldestFirstDot=true;state.candidateId=state.tasks[2].id;state.presentedAt=Date.now();save();await persist();render();});
  if(keepHeader){await page.locator('[data-act="settings"]').first().click();await page.getByText('Scanning and recurrence',{exact:true}).click();await page.locator('#stFloatingHeader').check();await page.locator('#modalRoot [data-act="close-modal"]').click();}
  if(await page.locator('#listBody').isHidden())await page.locator('[data-act="toggle-list"]').first().click();
  await page.locator('#listSearch').fill('Saved appearance');
@@ -4024,7 +4037,7 @@ export {
   manifestHrefFromHtml, serviceWorkerSource, appShellContract, serviceWorkerHarness, slice, engineSrc,
   mulberry32, SEED_SNIPPET, loadEngine, readConst, extractAppScript, appSrc, makeFakeElement,
   makeDomShim, flush, loadApp, setFakeTime, realNow, publishedBetaContinuation, SAVE_DEBOUNCE_MS,
-  settle, persisted, makeFakeCloudSyncFactory, setInput, WH_STORE_KEY, preChangeState, localAt,
+  settle, persisted, makeFakeCloudSyncFactory, setInput, commitSetting, WH_STORE_KEY, preChangeState, localAt,
   addTaskAged, titleOf, scanHtmlOf, benchAction, fillEditPane, STORE_KEY, THEME_HINT_KEY, themeBootSrc,
   runThemeBoot, themeBtnText, styleSrc, COLOR_RE, WHITE_RE, INVARIANT_PROPS, ALLOWED_DECLS,
   declarations, lightDarkArgs, offendingDeclarations, ALLOWED_NON_ASCII, decodeEscapes, themeTokens,

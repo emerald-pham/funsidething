@@ -21,8 +21,8 @@ For behavior-changing controls, begin with the prior state and exercise the
 transition through the actual consumer: the change/click handler, command, or
 import path. A helper test or fixture already set to the final value cannot
 prove that the control reaches the rule. Check equivalent entry points where
-they should share that rule (for example, Add and Edit Hours → Days, or a scan
-preference change and Save settings). Cover only the relevant transitions and
+they should share that rule (for example, Add and Edit Hours → Days, or Restore
+from a chosen file and from pasted board data). Cover only the relevant transitions and
 saved-data consequences for the change; do not expand this into a blanket
 matrix or introduce another test framework. For Add and Edit Hours → Days,
 assert the displayed draft before saving and the persisted result afterward;
