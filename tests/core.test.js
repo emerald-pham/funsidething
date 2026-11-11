@@ -4353,6 +4353,15 @@ test('RISK chain start: synced Undo reverses the option and the Start it enabled
  assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-older',25],['undo-likely',30]],'every reversal stays neutral');
 });
 
+// #2332 (review N8): the Debug log's restart actions name only actions the app
+// still handles; Save settings went away with #2303.
+test('committed settings: the Debug log restart actions list only actions the app still handles',async()=>{
+ const {ctx}=await loadApp();
+ const listed=[...vm.runInContext('RESTART_DIAGNOSTICS_ACTIONS',ctx)];
+ const stale=listed.filter(act=>!html.includes('case "'+act+'"')&&!html.includes("case '"+act+"'"));
+ assert.deepEqual(stale,[],'every listed action is a case the action handler still has');
+});
+
 test('RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button',async()=>{
  const app=await loadApp({seed:2324}),{ctx,shim}=app;
  Object.assign(ctx.addTask('Save older',false),{id:'save-older',createdAt:1});Object.assign(ctx.addTask('Save likely',false),{id:'save-likely',createdAt:2,mu:32});
@@ -4386,6 +4395,26 @@ test('RISK chain start: the FAQ and current Changelog explain both options, the 
  for(const question of ['What is Halving weighting?','What is Squared Weighting?','What is chance mode?'])assert.match(answer(question),/Chain starts with/,'mode FAQ points at the setting: '+question);
  const current=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
  assert.match(current,/Chain starts with/);assert.match(current,/Most likely/);assert.match(current,/Oldest eligible/);
+});
+
+// #2332 release reviews: the FAQ and Changelog copy matches what this release does.
+test('RISK chain start: the FAQ and current Changelog describe this release accurately after review',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{const found=view.match(new RegExp('<dt>'+question.replace(/[?]/g,'\\?')+'</dt><dd>(.*?)</dd>'));assert.ok(found,'the mounted FAQ includes '+question);return found[1];};
+ const start=answer('What does Chain starts with do?');
+ assert.match(start,/affects only the next start: existing dots stay\./,'no capital after the colon');
+ assert.doesNotMatch(start,/Older versions keep starting with the oldest task/,'not true for a board that had the old checkbox on');
+ assert.match(start,/Older versions[^.]*old checkbox on[^.]*first dot/i,'older versions on a board with the old checkbox on still offer an unpaired first choice');
+ assert.match(answer('How do Settings save?'),/whole-number box[^.]*fraction|fraction[^.]*whole-number box/i,'a fraction in a whole-number box returns too');
+ assert.match(answer('What does Download board only contain?'),/appears beside Download backup when a backup comes out partial[^.]*fails or has not finished/i,'it also appears when a backup fails or stalls');
+ assert.match(answer('Does Settings close when I make or delete a backup?'),/Troubleshooting/,'Troubleshooting stays open too');
+ assert.match(answer('Does Settings close when I make or delete a backup?'),/short screen[^.]*Make backup/i,'on a short screen the focused Make backup stays in view');
+ const current=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const today=current.match(/<h3>November 10, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)[1];
+ assert.doesNotMatch(today,/Make manual backup/,'the button is Make backup now');
+ assert.doesNotMatch(today,/inside the same protected preview/,'the file and paste choices appear beside Restore, before the preview');
+ assert.match(today,/Choose a file and Paste board data beside it/);
+ assert.match(today,/partial, fails or has not finished[^.]*Download board only appears beside it/i);
 });
 
 // #2304 (spec #2298, story 58): one run tries every new feature on a synthetic
@@ -18773,6 +18802,37 @@ test('RISK storage-failure messages: a failed device save names Download backup,
   ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/available in Download board only below/);
   heal();
   assert.equal(await ctx.onAction('download-current-board',{}),true);assert.match(await downloadedText(files.at(-1)),/Another unsaved edit/,'the board-only file holds the edit that could not save');
+});
+
+// #2332 (review N1): before #2303 Download board was always there and read no
+// device storage. Download backup reads the device database, which has no time
+// limit and can stop answering, and its build can fail outright. Either way the
+// open board must still have a way out of the tab.
+test('RISK storage-failure messages: Download board only appears when Download backup fails or does not finish',async()=>{
+  const boardOnly=shim=>/data-act="download-current-board">Download board only</.test(shim.document.getElementById('settingsDownloads').innerHTML);
+  for(const failure of ['stalls','fails']){
+    const app=await loadApp(),{ctx,shim}=app;
+    ctx.addTask('Board that must leave the tab',false);assert.equal(await ctx.persist(),true);
+    ctx.openSettings();assert.equal(boardOnly(shim),false,failure+': fixture: not offered before a backup is tried');
+    const timers=[];
+    if(failure==='stalls'){
+      // The device database stops answering partway through the backup.
+      vm.runInContext('deviceStore={readRawExportRows:()=>new Promise(()=>{})}',ctx);
+      ctx.setTimeout=(fn,ms)=>{timers.push({fn,ms});return timers.length;};ctx.clearTimeout=()=>{};
+      const pending=ctx.onAction('download-recovery-file',{});pending.catch?.(()=>{});
+      for(let i=0;i<20;i++)await flush();
+      for(const timer of timers.splice(0))if(timer.ms<=20000)timer.fn();
+    }else{
+      // The browser cannot compute the backup's change digests.
+      ctx.crypto={subtle:{digest:()=>Promise.reject(Error('digest unavailable'))}};
+      await ctx.onAction('download-recovery-file',{})?.catch?.(()=>{});
+      for(let i=0;i<20;i++)await flush();
+    }
+    assert.equal(boardOnly(shim),true,failure+': Download board only is offered beside Download backup');
+    ctx.openSettings();assert.equal(boardOnly(shim),true,failure+': and stays offered when Settings reopens');
+    const files=captureDownloads(app);assert.equal(await ctx.onAction('download-current-board',{}),true);
+    assert.match(await downloadedText(files.at(-1)),/Board that must leave the tab/,failure+': it saves the open board');
+  }
 });
 
 test('RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage',async()=>{
