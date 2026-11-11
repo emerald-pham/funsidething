@@ -4560,9 +4560,12 @@ test('RISK BACKWARD COMPATIBILITY: the released client with the same board open 
 const SKIP_FLAG_STABLE='5548cd7cf69493712f63a36ac02fdd4dc6ae2b48';
 async function skipFlagStableRounds(t,{skip,trigger}){
  const released=spawnSync('git',['show',SKIP_FLAG_STABLE+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
- const at=Date.parse('2026-11-10T15:00:00Z');
+ const at=Date.parse('2026-11-10T15:00:00Z'),fromStableUi=trigger==='stable-start';
+ // stable-start reaches the same state through Stable's own Settings and Start
+ // instead of a board saved mid-pass.
  const initial=syncState({tasks:[{...syncTask('flag-oldest','Flag oldest'),createdAt:1},{...syncTask('flag-likely','Flag likely'),createdAt:2,mu:30}],
-  settings:{scanMode:'descending',showPostpone:true,skipOldestFirstDot:skip},chain:[],mode:'scan',passStartedAt:at-60000,passId:'flag-pass',
+  settings:{scanMode:'descending',showPostpone:true,...(fromStableUi?{}:{skipOldestFirstDot:skip})},
+  ...(fromStableUi?{}:{chain:[],mode:'scan',passStartedAt:at-60000,passId:'flag-pass'}),
   syncAccount:'e@example.com',syncRev:4,syncDirty:false});
  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
  const stable=await loadAppAtTime(at,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
@@ -4571,16 +4574,25 @@ async function skipFlagStableRounds(t,{skip,trigger}){
  const app=await loadAppAtTime(at+1000,{seedStorage:{[SYNC_STORE_KEY]:seen,[LOCAL_HEAD_KEY]:seen},cloudSyncFactory:h.factory});
  t.after(()=>closeLegacyApp173(app));await app.ctx.cloudPull();await syncSettle(60);
  // One ordinary write, then nobody touches either client.
- const writer=trigger==='stable'?stable:app,offered=stable.ctx.state.candidateId;
- if(trigger==='stable'&&offered)stable.ctx.onAction('no',{dataset:{candidate:offered,benchmark:''}});
+ const writer=trigger==='candidate'?app:stable,offered=stable.ctx.state.candidateId;
+ if(fromStableUi){
+  stable.ctx.openSettings();const box=stable.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:skip,matches:()=>false});
+  stable.shim.document.dispatchEvent({type:'change',target:box});stable.ctx.closeModal();
+  stable.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.equal(stable.ctx.state.chain.length,skip?0:1,'Stable starts unseeded only with its old checkbox on');
+ }else if(trigger==='stable'&&offered)stable.ctx.onAction('no',{dataset:{candidate:offered,benchmark:''}});
  else{hydrateUnchangedEditorDraft(writer,'flag-likely');writer.shim.document.getElementById('etTitle').value='Edited on '+trigger;writer.ctx.onAction('save-edit',{dataset:{id:'flag-likely'}});}
  assert.equal(await writer.ctx.persist(),true);await writer.ctx.cloudPull();await writer.ctx.cloudPushNow();await syncSettle(60);
- const revs=[h.doc.rev];
+ const revs=[h.doc.rev],adoptionCopies=client=>client.ctx.readLocalBackups().filter(row=>row.kind==='before-cloud-adoption').length,copies=[];
  for(let round=0;round<4;round++){
   await app.ctx.cloudPull();await syncSettle(60);revs.push(h.doc.rev);
   await stable.ctx.cloudPull();await syncSettle(60);revs.push(h.doc.rev);
+  copies.push([adoptionCopies(stable),adoptionCopies(app)]);
  }
- t.diagnostic(JSON.stringify({skip,trigger,offered,revs,cloudCandidate:h.remoteState().candidateId}));
+ t.diagnostic(JSON.stringify({skip,trigger,offered,revs,copies,cloudCandidate:h.remoteState().candidateId}));
+ // Each adopted revision saves a whole-board copy on the reading device; once both
+ // have read the one allowed follow-up write, no more copies may appear.
+ assert.deepEqual(copies.at(-1),copies[1],'skip '+skip+', '+trigger+' writes: reading a settled board saves no more adoption backups ('+JSON.stringify(copies)+')');
  // At most one follow-up write: Stable deals its own candidate once when the
  // board it reads has none (its ordinary first deal). After that the board is quiet.
  assert.ok(revs.at(-1)-revs[0]<=1,'skip '+skip+', '+trigger+' writes: the revision settles instead of climbing ('+revs.join(' → ')+')');
@@ -4588,6 +4600,7 @@ async function skipFlagStableRounds(t,{skip,trigger}){
  assert.equal(app.ctx.window.CloudSync.status==='error',false,'the candidate stays in sync');
  assert.equal(stable.ctx.window.CloudSync.status==='error',false,'Stable stays in sync');
  // #2300 still holds on this client while Stable keeps its candidate stored.
+ if(fromStableUi&&!skip)return;
  app.ctx.render();const scan=app.shim.document.getElementById('scan').innerHTML;
  assert.match(scan,/data-act="start-scan"/,'the candidate offers Start on the empty chain');
  assert.doesNotMatch(scan,/data-act="yes"/,'the candidate offers no unpaired choice');
@@ -4595,9 +4608,9 @@ async function skipFlagStableRounds(t,{skip,trigger}){
  assert.deepEqual(Array.from(app.ctx.state.chain),['flag-oldest'],'Start dots the oldest eligible task');
 }
 test('RISK BACKWARD COMPATIBILITY: with the retired skip checkbox saved on and an empty started chain, Stable and the candidate stop writing after an ordinary edit',async t=>{
- for(const trigger of ['stable','candidate'])await t.test('flag on, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:true,trigger});});
+ for(const trigger of ['stable','candidate','stable-start'])await t.test('flag on, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:true,trigger});});
  // Control: without the flag both clients already agree that an empty chain has no candidate.
- for(const trigger of ['stable','candidate'])await t.test('flag off, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:false,trigger});});
+ for(const trigger of ['stable','candidate','stable-start'])await t.test('flag off, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:false,trigger});});
 });
 
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
