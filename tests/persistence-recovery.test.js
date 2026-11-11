@@ -2203,7 +2203,7 @@ async function signedInLargeBoardFile2247(){
  }finally{await source.dispose();}
 }
 async function pasteIntoRestore2247(app,text){
- app.ctx.openSettings();app.shim.document.getElementById('backupRestoreSource').value='paste';await app.ctx.onAction('restore-backup',{});
+ app.ctx.openSettings();await app.ctx.onAction('restore-backup',{});await app.ctx.onAction('open-paste-recovery',{});
  const box=app.shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;app.shim.document.dispatchEvent({type:'input',target:box});
  return app.ctx.onAction('preview-pasted-recovery',{});
 }
@@ -2776,6 +2776,9 @@ async function openSettingsSectionFor(page,act){
  await page.locator('#appHeader [data-act="settings"]').click();
  const section=page.locator('#modalRoot details.settings-section:has([data-act="'+act+'"])');
  if(await section.count()&&!await section.first().evaluate(el=>el.open))await section.first().locator(':scope > summary').click();
+ // #2303: the Debug log and Review saved decisions sit in the closed Troubleshooting section.
+ const nested=page.locator('#modalRoot details.settings-troubleshooting:has([data-act="'+act+'"])');
+ if(await nested.count()&&!await nested.first().evaluate(el=>el.open))await nested.first().locator(':scope > summary').click();
 }
 // Measures one export: an idle window with the starting dialog open, then the
 // click and whatever finishes it (finish returns true once it is saved).
@@ -2920,19 +2923,22 @@ test('RISK large board recovery file browser: while cloud recovery waits, Downlo
  start:page=>page.locator('#modalRoot [data-act="download-recovery-file"]').click({timeout:120000}),
  finish:async()=>false})));
 
-// #2246: an actual visual test for the controls #2246 adds, each measured
-// beside its established neighbour in the same pane:
-// - Download board and Download recovery file beside Restore in Data and
-//   backups, with an accepted board;
-// - Download recovery file alone beside Restore when the device has no
-//   accepted board (an unreadable original opens an empty new-work board);
+// #2246, #2303: an actual visual test for the Data and backups controls, each
+// measured beside its established neighbour in the same pane:
+// - Download backup beside Restore, with an accepted board and a complete backup;
+// - Download backup with Download board only beside it once a backup comes out
+//   partial;
+// - Download backup alone beside Restore when the device has no accepted board
+//   (an unreadable original opens an empty new-work board);
+// - Restore's Choose a file and Paste board data, and Troubleshooting's View
+//   debug log and Review saved decisions;
 // - the Debug log dialog's Copy debug log and Download debug log beside its
 //   Select all and Refresh log.
 // Day and night themes (attribute, computed color scheme and the modal's own
 // paint, which must differ between them and be opaque), phone, the enlarged
 // 260 px phone and desktop, ordinary and 150% text, native keyboard focus,
 // Chromium and WebKit. Screenshots go to DOWNLOADS_VISUAL_DIR when it is set.
-test('RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK downloads visual browser: Download backup, Download board only beside a partial backup, the Restore choices and Troubleshooting render like their neighbours, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
  const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
@@ -2946,10 +2952,20 @@ test('RISK downloads visual browser: Download board and Download recovery file r
   try{boards.set(theme,JSON.stringify(app.ctx.state));}finally{await app.dispose();}
  }
  const scenarios=[
-  {name:'downloads',controls:[['download-current-board','Download board'],['download-recovery-file','Download recovery file']],neighbours:[['restore-backup','Restore']],absent:[],
+  {name:'downloads',controls:[['download-recovery-file','Download backup']],neighbours:[['restore-backup','Restore']],absent:['download-current-board'],
    open:page=>openSettingsSectionFor(page,'download-recovery-file')},
-  {name:'no-board',unreadable:true,controls:[['download-recovery-file','Download recovery file']],neighbours:[['restore-backup','Restore']],absent:['download-current-board'],
+  // #2303: a backup that comes out partial puts Download board only beside it.
+  {name:'partial',controls:[['download-recovery-file','Download backup'],['download-current-board','Download board only']],neighbours:[['restore-backup','Restore']],absent:[],
+   open:async page=>{await openSettingsSectionFor(page,'download-recovery-file');
+    await page.evaluate(()=>{const get=Storage.prototype.getItem;window.__restoreGetItem=()=>{Storage.prototype.getItem=get;};Storage.prototype.getItem=function(key){if(key==='fvp:chain-scanner:daily-backups:v1')throw Error('fixture unreadable source');return get.call(this,key);};});
+    await page.locator('#modalRoot [data-act="download-recovery-file"]').click();
+    await page.waitForSelector('#modalRoot [data-act="download-current-board"]',{timeout:20000});await page.evaluate(()=>window.__restoreGetItem());}},
+  {name:'no-board',unreadable:true,controls:[['download-recovery-file','Download backup']],neighbours:[['restore-backup','Restore']],absent:['download-current-board'],
    open:page=>openSettingsSectionFor(page,'download-recovery-file')},
+  {name:'restore-choices',controls:[['choose-backup-file','Choose a file'],['open-paste-recovery','Paste board data']],neighbours:[['restore-backup','Restore']],absent:[],
+   open:async page=>{await openSettingsSectionFor(page,'restore-backup');await page.locator('#modalRoot [data-act="restore-backup"]').click();}},
+  {name:'troubleshooting',controls:[['view-support-diagnostics','View debug log'],['review-decision-recovery','Review saved decisions']],neighbours:[['make-manual-backup','Make backup']],absent:[],
+   open:page=>openSettingsSectionFor(page,'view-support-diagnostics')},
   {name:'debug-log',controls:[['copy-support-diagnostics','Copy debug log'],['download-support-diagnostics','Download debug log']],neighbours:[['select-support-diagnostics','Select all'],['refresh-support-diagnostics','Refresh log']],absent:[],
    open:async page=>{await openSettingsSectionFor(page,'view-support-diagnostics');await page.locator('#modalRoot [data-act="view-support-diagnostics"]').click();
     await page.waitForFunction(()=>!!document.getElementById('supportDiagnosticsData')?.value,null,{timeout:10000});}},
@@ -3050,7 +3066,7 @@ test('RISK downloads visual browser: Download board and Download recovery file r
  for(const [key,byView] of Object.entries(paints))for(const [viewName] of viewports)
   if(byView['light/'+viewName]===byView['dark/'+viewName])failures.push(`${key}/${viewName}: the modal paints the same in day and night (${byView['light/'+viewName]})`);
  t.diagnostic(JSON.stringify({paints,focus:observed.map(({where,focus})=>({where,focus}))}));
- assert.equal(observed.length,36,'every engine, view, theme and viewport was measured');
+ assert.equal(observed.length,2*scenarios.length*2*viewports.length,'every engine, view, theme and viewport was measured');assert.equal(scenarios.length,6,'#2303: downloads, partial, no board, Restore choices, Troubleshooting and the Debug log');
  assert.deepEqual(failures,[],JSON.stringify(observed.slice(0,2)));
 });
 
@@ -3710,7 +3726,7 @@ test('RISK saved view opening source preservation: invalid optional appearance k
    const settings=view.page.locator('[data-saved-preview] [data-act="settings"]');await settings.focus();await view.page.keyboard.press('Shift+Tab');assert.equal(await view.page.evaluate(()=>document.activeElement.id),'syncBtn','native keyboard navigation reaches the real recovery status');
    if(process.env.SAVED_VIEW_ARTIFACT_DIR){const name='terminal-hold-'+(config.theme||'light')+'-'+(config.viewport?.width||390)+(config.sourceFault?'-signed-in':'');await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,name+'.png')});fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,name+'.json'),JSON.stringify({held,frames:await view.page.evaluate(()=>window.__firstAppearanceFrames)},null,2)+'\n');}
    await view.page.locator('[data-saved-preview] [data-act="settings"]').click();assert.match(await view.page.locator('#modalRoot').innerText(),/read.only|needs recovery/i);assert.equal(await view.page.locator('#stDateFormat').isDisabled(),true,'held Settings cannot edit a hidden workspace');
-   await view.page.getByText('Data and backups',{exact:true}).click();await view.page.locator('#backupRestoreSource').selectOption('paste');await view.page.locator('#modalRoot [data-act="restore-backup"]').click();assert.equal(await view.page.locator('#jsonBox').isEditable(),true,'the existing deliberate Paste Restore remains reachable');await view.page.getByRole('button',{name:'Close',exact:true}).last().click();
+   await view.page.getByText('Data and backups',{exact:true}).click();await view.page.locator('#modalRoot [data-act="restore-backup"]').click();await view.page.locator('#modalRoot [data-act="open-paste-recovery"]').click();assert.equal(await view.page.locator('#jsonBox').isEditable(),true,'the existing deliberate Paste Restore remains reachable');await view.page.getByRole('button',{name:'Close',exact:true}).last().click();
    if(process.env.SAVED_VIEW_ARTIFACT_DIR)await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'terminal-settings-'+(config.theme||'light')+'-'+(config.viewport?.width||390)+(config.sourceFault?'-signed-in':'')+'.png')});
    await view.page.evaluate(()=>{onAction('add',{});TaskActionOwner.perform({type:'benchmark',action:'done'});});assert.equal(await view.page.evaluate(()=>state.tasks.length),0);
    if(config.mask){
@@ -3826,6 +3842,94 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
   }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
  }
  assert.deepEqual([...enlargedCoverage].sort(),['cards','contexts','filters','history','rows'],'actual enlarged coverage includes the complete board surfaces');
+});
+
+// #2332 (typography review F1): after the bulk delete, keyboard focus returns to
+// Make backup. On a short screen that button sat above the backup list it
+// scrolled to, so the focus ring was off-screen and a second Enter silently
+// made a backup. 640x400 is a 1280x800 window at 200% zoom; 320x568 is an
+// iPhone SE class screen.
+async function bulkDeleteFocusInBrowser(t,{width,height,mobile,troubleshootingOpen=false}){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,DAY=86400000,now=Date.now();
+ const board=JSON.stringify(syncState({seenQuickStart:true,tasks:[syncTask('focus-backup-task','Focus backup task')]}));
+ const browser=await chromium.launch({headless:true,...(openingBoardSelfHosted||!process.env.LANDSCAPE_BROWSER_CHANNEL?{}:{channel:process.env.LANDSCAPE_BROWSER_CHANNEL})});
+ t.after(()=>browser.close());
+ const context=await browser.newContext({viewport:{width,height},isMobile:mobile,hasTouch:mobile,serviceWorkers:'block',reducedMotion:'reduce'});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await context.addInitScript(board=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+ },board);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ // Backups made ten days ago are the red rows the bulk delete removes.
+ await page.clock.install({time:now-10*DAY});
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:60000});
+ const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
+ const openData=async()=>{
+  await page.evaluate(()=>{for(let i=0;i<4&&document.querySelector('.mback');i++)closeModal();});
+  await page.locator('#appHeader [data-act="settings"]').click();
+  await page.evaluate(()=>{const section=document.querySelector('#modalRoot details[data-settings-section="data"]');if(section)section.open=true;});
+ };
+ for(let i=0;i<3;i++){
+  await openData();const rows=await page.locator('#modalRoot .backup-row').count();
+  await page.locator('#modalRoot [data-act="make-manual-backup"]').click();
+  await page.waitForFunction(rows=>document.querySelectorAll('#modalRoot .backup-row').length>rows,rows,{timeout:15000});
+ }
+ await page.clock.setSystemTime(now);
+ await openData();
+ await page.waitForSelector('#modalRoot [data-act="delete-old-backups"]',{timeout:15000});
+ if(troubleshootingOpen)await page.locator('#modalRoot details.settings-troubleshooting > summary').click();
+ page.once('dialog',dialog=>dialog.accept());
+ await page.evaluate(()=>{const button=document.querySelector('#modalRoot [data-act="delete-old-backups"]');button.scrollIntoView({block:'center'});button.focus();});
+ await page.keyboard.press('Enter');
+ await page.waitForFunction(()=>!document.querySelector('#modalRoot [data-act="delete-old-backups"]')&&document.activeElement?.dataset?.act==='make-manual-backup',null,{timeout:20000});
+ await page.evaluate(()=>new Promise(requestAnimationFrame));
+ const seen=await page.evaluate(()=>{
+  const focus=document.activeElement.getBoundingClientRect(),modal=document.querySelector('#modalRoot .modal').getBoundingClientRect();
+  return {focus:[Math.round(focus.top),Math.round(focus.bottom)],modal:[Math.round(modal.top),Math.round(modal.bottom)],
+   visible:focus.top>=modal.top-0.5&&focus.bottom<=modal.bottom+0.5&&focus.top>=-0.5&&focus.bottom<=innerHeight+0.5,
+   // The ring is a 2px outline 2px outside the button; the modal clips it.
+   ring:focus.top-4>=modal.top-0.5&&focus.bottom+4<=modal.bottom+0.5};
+ });
+ assert.equal(seen.ring,true,width+'x'+height+': the focus ring around Make backup is not clipped by the dialog edge '+JSON.stringify(seen));
+ t.diagnostic(JSON.stringify({width,height,...seen}));
+ if(process.env.BACKUP_FOCUS_VISUAL_DIR){fs.mkdirSync(process.env.BACKUP_FOCUS_VISUAL_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.BACKUP_FOCUS_VISUAL_DIR,`backup-delete-focus-${width}x${height}.png`)});}
+ assert.equal(seen.visible,true,width+'x'+height+': Make backup, which has keyboard focus, is in view after the bulk delete '+JSON.stringify(seen));
+ // #2332 (typography review F2): the FAQ promises open sections stay open through a backup action.
+ if(troubleshootingOpen)assert.equal(await page.evaluate(()=>document.querySelector('#modalRoot details.settings-troubleshooting')?.open),true,'Troubleshooting stays open after the bulk delete');
+ assert.deepEqual(errors,[]);
+}
+test('RISK backup delete focus: after deleting old backups by keyboard on a short screen, the focused Make backup is in view',async t=>{
+ await openingBoardFixture(t);
+ for(const [width,height,mobile] of [[640,400,false],[320,568,true]])await t.test(width+'x'+height,async sub=>{await bulkDeleteFocusInBrowser(sub,{width,height,mobile});});
+ await t.test('390x844 with Troubleshooting open',async sub=>{await bulkDeleteFocusInBrowser(sub,{width:390,height:844,mobile:true,troubleshootingOpen:true});});
+});
+
+test('RISK saved view opening: an empty chain shows Start, not a candidate an older client stored for the retired skip checkbox',async t=>{
+ await openingBoardFixture(t);
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:false,scannerState:'stored-unpaired',syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
+ try{
+  await view.waitForFirebaseImports();
+  const opening=await view.page.evaluate(()=>{
+   const root=[...document.querySelectorAll('.wrap')].find(e=>getComputedStyle(e).visibility==='visible'&&e.getBoundingClientRect().width>0);
+   return {ready:document.documentElement.dataset.appReady==='true',visible:!!root,scan:root?.querySelector('[data-preview-id="scan"]')?.textContent||'',cards:[...(root?.querySelectorAll('.card .title')||[])].map(e=>e.textContent)};
+  });
+  assert.equal(opening.ready,false,'the saved board is still the read-only opening view');
+  assert.equal(opening.visible,true);
+  assert.equal(opening.cards.includes('Saved appearance task 02'),false,'the stored candidate is not shown on an empty chain: '+JSON.stringify(opening.cards));
+  assert.match(opening.scan,/Nothing dotted yet/,'the opening view offers Start, as the live scanner does');
+  view.releaseHeldFirebaseImports();await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:15000});
+  const live=await view.page.evaluate(()=>({scan:document.getElementById('scan').innerHTML,stored:state.candidateId,chain:state.chain.length}));
+  assert.match(live.scan,/data-act="start-scan"/,'the live scanner offers Start');
+  assert.doesNotMatch(live.scan,/data-act="yes"/,'and no unpaired choice');
+  assert.equal(live.chain,0);
+  assert.equal(typeof live.stored,'string','the older client\'s stored candidate is kept for it rather than rewritten');
+  assert.deepEqual(view.errors,[]);
+ }finally{view.releaseHeldFirebaseImports();await view.browser.close();}
 });
 
 test('RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts',async t=>{
@@ -4386,8 +4490,8 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   const restoreAction=settings.match(/<button\b[^>]*data-act="([^"]*restore-backup[^"]*)"[^>]*>\s*Restore\s*<\/button>/);
   assert.ok(restoreAction,'Settings exposes the single guarded Restore action');
   assert.equal((settings.match(/data-act="restore-backup"/g)||[]).length,1,'the board-data area has exactly one Restore action');
-  assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the Restore action routes either a native file or paste source');
-  assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'the board-data area has no competing file or paste action');
+  assert.match(settings,/data-act="restore-backup"[^>]*>Restore<\/button><\/div><div id="restoreChoices"[^>]*hidden[^>]*>[\s\S]*?data-act="choose-backup-file"[\s\S]*?data-act="open-paste-recovery"/,'#2303: the Restore action routes either a native file or paste source, chosen inside Restore');
+  assert.doesNotMatch(settings,/id="backupRestoreSource"/,'the board-data area has no source selector beside Restore');
   assert.match(settings,/<input\b(?=[^>]*type="file")(?=[^>]*id="restoreBackupFile")[^>]*>/,'the action uses a native JSON file input');
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;
   let pickerOpened=0;input.click=()=>{pickerOpened++;};
@@ -4408,7 +4512,9 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
     return shim.document.getElementById('modalRoot').innerHTML;
   }
   await ctx.onAction(restoreAction[1],{});
-  assert.equal(pickerOpened,1,'the Settings action opens the native file picker');
+  assert.equal(pickerOpened,0,'Restore first offers the file or paste choice');
+  await ctx.onAction('choose-backup-file',{});
+  assert.equal(pickerOpened,1,'choosing a file inside Restore opens the native file picker');
   const preview=await selectFile(file);
   const confirm=preview.match(/<button\b[^>]*data-act="confirm-file-restore"[^>]*>/)?.[0];
   assert.ok(confirm,'the supported file reaches a preview with an explicit restore confirmation; '+shim.document.getElementById('toast').textContent);
@@ -4432,7 +4538,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   assert.equal(JSON.stringify(ctx.state),currentBoardRaw,'Cancel leaves the current board unchanged');
   assert.deepEqual(primaryWrites,[],'Cancel does not replace the durable board');
   assert.deepEqual(cloudPushCalls,[],'selecting, previewing and cancelling do not upload');
-  await ctx.onAction(restoreAction[1],{});assert.equal(pickerOpened,2);
+  await ctx.onAction(restoreAction[1],{});await ctx.onAction('choose-backup-file',{});assert.equal(pickerOpened,2);
   const confirmedPreview=await selectFile(file);
   assert.match(confirmedPreview,/data-act="confirm-file-restore"/);
 
@@ -4483,7 +4589,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
     appSources:{localStorage:[],indexedDB:{database:'chain-scanner-v2',stores:{meta:[],snapshots:[],
       backups:[{key:{type:'string',value:'pending-upload'},value:{type:'object',value:{task:{id:'pending-queue-task',title:'Pending queue task'}}}}],opaque:[]}}}};
   const archiveBytes=new TextEncoder().encode(JSON.stringify(archive,null,2)),archiveFile=new File([archiveBytes],'recovery <archive>.json',{type:'application/json'});
-  await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,1);
+  await reopened.ctx.onAction(reopenedAction[1],{});await reopened.ctx.onAction('choose-backup-file',{});assert.equal(archivePickerOpens,1);
   let archivePreview;
   await t.test('file selection stays pending until its real exact-byte read completes',async()=>{
     const read=archiveFile.arrayBuffer.bind(archiveFile);
@@ -4519,7 +4625,7 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
 
   const heldHead=await reopenedStore.readHead(),incomplete={...archive,manifest:{...archive.manifest,status:'partial',failures:[{source:'indexedDB.backups',status:'error'}]}};
   const incompleteFile=new File([JSON.stringify(incomplete)],'incomplete.json',{type:'application/json'});
-  const pickerBefore=archivePickerOpens;await reopened.ctx.onAction(reopenedAction[1],{});assert.equal(archivePickerOpens,pickerBefore+1);
+  const pickerBefore=archivePickerOpens;await reopened.ctx.onAction(reopenedAction[1],{});await reopened.ctx.onAction('choose-backup-file',{});assert.equal(archivePickerOpens,pickerBefore+1);
   const priorToast=reopened.shim.document.getElementById('toast').textContent;reopened.shim.document.getElementById('toast').textContent='';
   await selectReopenedFile(incompleteFile,{accepted:false});
   for(let attempt=0;attempt<100&&!reopened.shim.document.getElementById('toast').textContent.includes('incomplete');attempt++)await flush();
@@ -5546,6 +5652,49 @@ test('RISK backup list memory: backups stay out of memory while Settings lists e
  assert.equal(removed,true,'the listed copy is deleted after its exact bytes are checked');
  assert.deepEqual(Array.from(await store.listBackups(),row=>row.id).sort(),[...others].sort(),'every other copy stays');
  await loaded.dispose?.();
+});
+
+// #2303: deleting a backup rebuilt Settings from scratch, which closed Data and
+// backups and lost the place in the list. Whether the delete succeeds or is
+// refused, Settings now stays open with Data and backups open and the list in view.
+test('RISK backup delete keeps its place: deleting a backup leaves Settings open with Data and backups open and the list in view, whether the delete succeeds or is refused',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-delete-place-'+Date.now()+'-'+Math.random();
+ const loaded=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=loaded,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('First copy task');assert.equal(await ctx.persist(),true);
+ const first=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(first?.id);
+ ctx.addTask('Second copy task');assert.equal(await ctx.persist(),true);
+ const second=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(second?.id);
+ await vm.runInContext('refreshDeviceBackupCache()',ctx);
+ const list=shim.document.getElementById('settingsBackupList');let broughtIntoView=0;list.scrollIntoView=()=>{broughtIntoView++;};
+ const place=()=>{const markup=shim.document.getElementById('modalRoot').innerHTML;
+  return {settings:/<h2>Settings<\/h2>/.test(markup),dataOpen:/<details class="settings-section"[^>]*\sopen\b[^>]*><summary>Data and backups<\/summary>/.test(markup),listed:markup.includes('id="settingsBackupList"')};};
+ ctx.openSettings();assert.deepEqual(place(),{settings:true,dataOpen:false,listed:true},'positive control: Data and backups starts closed when Settings opens');
+ assert.equal(await ctx.onAction('delete-local-backup',{dataset:{id:first.id}}),true,'the delete succeeds');
+ assert.deepEqual(place(),{settings:true,dataOpen:true,listed:true},'after a delete Settings stays open with Data and backups open');
+ assert.ok(broughtIntoView>=1,'the backup list is brought into view');
+ assert.equal((await store.listBackups()).some(row=>row.id===first.id),false,'positive control: the copy was deleted');
+ ctx.closeModal();ctx.openSettings();broughtIntoView=0;
+ const deleteBackup=store.deleteBackup;store.deleteBackup=async()=>false;
+ try{assert.equal(await ctx.onAction('delete-local-backup',{dataset:{id:second.id}}),false,'the delete is refused');}
+ finally{store.deleteBackup=deleteBackup;}
+ assert.match(shim.document.getElementById('toast').textContent,/Backup list changed/,'positive control: the refusal is reported');
+ assert.deepEqual(place(),{settings:true,dataOpen:true,listed:true},'after a refused delete Settings stays open with Data and backups open');
+ assert.ok(broughtIntoView>=1,'the backup list is brought into view after a refusal too');
+ assert.ok((await store.listBackups()).some(row=>row.id===second.id),'the refused copy stays');
+ await loaded.dispose?.();
+});
+
+test('RISK backup delete keeps its place guidance: the mounted FAQ says making or deleting a backup keeps Settings open at the backup list',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
+ const answer=answerTo('Does Settings close when I make or delete a backup?');
+ assert.match(answer,/^No\./);
+ assert.match(answer,/Make backup and deleting a backup keep Settings open/);
+ assert.match(answer,/Data and backups open and the backup list in view/);
+ assert.match(answer,/even when the backup cannot be deleted/);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
 });
 
 test('RISK backup list memory: a copy whose stored bytes were damaged is refused by the exact read, and a reopened app lists every copy from facts it learned once',async()=>{
@@ -9795,7 +9944,7 @@ test('RISK contained board adoption browser: on a heavy device store, adopting t
 const MANUAL_BACKUP_REMINDER='Keeping more than two manual backups takes up space on this device. Delete older ones you don’t need.';
 const manualBackupReminderIn=markup=>{
  const match=markup.match(/<p id="manualBackupReminder"([^>]*)>([\s\S]*?)<\/p>/);
- return match?{text:match[2],status:/\brole="status"/.test(match[1]),beside:markup.includes('data-act="make-manual-backup">Make manual backup</button></div><p id="manualBackupReminder"')}:null;
+ return match?{text:match[2],status:/\brole="status"/.test(match[1]),beside:markup.includes('data-act="make-manual-backup">Make backup</button></div><p id="manualBackupReminder"')}:null;
 };
 const settingsMarkup=app=>app.shim.document.getElementById('modalRoot').innerHTML;
 const manualRows=ctx=>ctx.readLocalBackups().filter(row=>row.kind==='manual');
@@ -9810,7 +9959,7 @@ test('RISK manual backup reminder: Settings shows no reminder below two manual b
  const app=await loadApp();t.after(()=>app.dispose());const {ctx}=app;
  ctx.addTask('Reminder threshold task');await ctx.persist();
  ctx.openSettings();
- assert.match(settingsMarkup(app),/data-act="make-manual-backup">Make manual backup<\/button>/,'positive control: Settings lists the backup area');
+ assert.match(settingsMarkup(app),/data-act="make-manual-backup">Make backup<\/button>/,'positive control: Settings lists the backup area');
  assert.equal(manualBackupReminderIn(settingsMarkup(app)),null,'no reminder with no manual backup');
  // Other kinds are listed beside manual copies but are not manual backups.
  assert.equal(ctx.saveLocalBackup('before-restore',JSON.stringify(ctx.state)),true);
@@ -9952,14 +10101,14 @@ test('RISK manual backup reminder: Make manual backup stays enabled past two and
  await makeManualBackup2254(app);await makeManualBackup2254(app);
  let confirms=0;ctx.confirm=()=>{confirms++;return false;};
  assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder shows at two manual backups');
- assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button stays enabled beside the reminder');
+ assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make backup<\/button>/,'the button stays enabled beside the reminder');
  ctx.addTask('Only in the third backup');
  await makeManualBackup2254(app);
  assert.equal(confirms,0,'no confirmation is asked');
  assert.equal(manualRows(ctx).length,3,'one press saves a third manual backup');
  assert.ok((await backupRowsWithText(ctx)).some(row=>row.kind==='manual'&&row.payload.includes('Only in the third backup')),'the third backup holds the current board');
  assert.match(app.shim.document.getElementById('toast').textContent,/Manual backup saved on this device\./);
- assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make manual backup<\/button>/,'the button is still enabled after the third');
+ assert.match(settingsMarkup(app),/<button class="btn subtle" data-act="make-manual-backup">Make backup<\/button>/,'the button is still enabled after the third');
  assert.ok(manualBackupReminderIn(settingsMarkup(app)),'the reminder is still shown after the third');
 });
 
@@ -10124,9 +10273,9 @@ test('RISK manual backup reminder guidance: mounted FAQ and changelog say that f
  assert.match(answer,/Manual backups stay on this device until you delete them; they are never removed automatically\./);
  assert.match(answer,/keeping more than two takes up space on this device/);
  // #2254 release review: the reminder renders below Make manual backup.
- assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder below Make manual backup\./);
+ assert.match(answer,/When this account has two or more, Settings → Data and backups shows a reminder below Make backup\./);
  assert.match(answer,/Delete older ones you don’t need/);
- assert.match(answer,/Make manual backup still works, with no limit and no extra step\./);
+ assert.match(answer,/Make backup still works, with no limit and no extra step\./);
  assert.match(answer,/Only manual backups of the account you are using count\./);
  assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
@@ -10616,16 +10765,16 @@ test('RISK acknowledged recovery trim: an adoption the cloud acknowledges while 
 // of the older backup list (an opaque "<n>:fvp:chain-scanner:daily-backups:v1"
 // row), as the owner authorized for "migrated legacy copies" on #2254
 // (2026-11-07). Settings, Help and the changelog say so in plain words.
-test('RISK acknowledged recovery trim guidance: Settings, mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays',async t=>{
+test('RISK acknowledged recovery trim guidance: the mounted FAQ and changelog say that once the cloud confirms the board the app clears old recovery copies and the storage upgrade’s copy of the older backup list by itself, what it keeps, and that until then every recovery copy stays',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
- app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- const section=settings.split('<h3>Daily local backups</h3>')[1]?.split('</p>')[0]||'';
- assert.ok(section,'positive control: Settings has the Daily local backups notes');
- assert.match(section,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
- assert.doesNotMatch(section,/Separate recovery archives kept by a storage upgrade remain intact/,'Settings no longer says that copy stays');
+ app.ctx.openSettings();assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/Daily local backups/,'#2303: Settings leaves the cleanup notes to the FAQ');
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const section=answerTo('When are old backups cleaned up?');
+ assert.ok(section,'positive control: the Data and backups FAQ has the cleanup notes');
+ assert.match(section,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
+ assert.doesNotMatch(section,/Separate recovery archives kept by a storage upgrade remain intact/,'the FAQ does not say that copy stays');
  const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  assert.ok(answerTo('Does the app fix an unreadable cloud copy by itself?'),'positive control: the mounted Help has the adoption answer');
  const answer=answerTo('What happens to old recovery copies on this device?');
@@ -10742,7 +10891,7 @@ test('RISK debug log link #2309: an installed offline shell opens the log from t
    }else{await context.setOffline(true);await page.goto(origin+'/#debug-log');}
    await page.waitForFunction(()=>document.querySelector('#modalRoot h2')?.textContent==='Debug log');
    await page.waitForFunction(()=>JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData?.backups?.count?.status==='observed');
-   const linked=await page.evaluate(()=>({board:state,hash:location.hash,reads:window.__snapshotReads,settings:!!document.querySelector('#modalRoot [data-act="save-settings"]'),count:JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData.backups.count.value,text:document.getElementById('supportDiagnosticsData').value}));
+   const linked=await page.evaluate(()=>({board:state,hash:location.hash,reads:window.__snapshotReads,settings:!!document.querySelector('#modalRoot #stHorizon'),count:JSON.parse(document.getElementById('supportDiagnosticsData').value).savedData.backups.count.value,text:document.getElementById('supportDiagnosticsData').value}));
    assert.equal(linked.board,null,engineName+': the board has not opened behind the log');
    assert.deepEqual(linked.reads,[],engineName+': no saved board or backup text was read');
    assert.equal(linked.settings,false,engineName+': Settings did not open');

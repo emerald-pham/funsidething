@@ -21,7 +21,7 @@ import {
   landscapeLuminance, manifestHrefFromHtml, serviceWorkerSource, appShellContract,
   serviceWorkerHarness, slice, loadEngine, readConst, extractAppScript, appSrc, makeFakeElement,
   makeDomShim, flush, loadApp, setFakeTime, realNow, publishedBetaContinuation, settle, persisted,
-  makeFakeCloudSyncFactory, setInput, WH_STORE_KEY, preChangeState, localAt, addTaskAged, titleOf,
+  makeFakeCloudSyncFactory, setInput, commitSetting, WH_STORE_KEY, preChangeState, localAt, addTaskAged, titleOf,
   scanHtmlOf, benchAction, fillEditPane, STORE_KEY, THEME_HINT_KEY, runThemeBoot, themeBtnText,
   styleSrc, offendingDeclarations, ALLOWED_NON_ASCII, decodeEscapes, themeTokens, channel, luminance,
   contrast, CONTRAST_PAIRS, openList, listHTML, listCount, selectedListIds, tagRowHTML, litTags,
@@ -535,7 +535,7 @@ test('RISK offline repair guidance: help distinguishes a working workspace cloud
  assert.match(help,/original sources remain protected/i,'a new workspace is not described as a recovered empty board');
  assert.match(help,/repair a damaged cloud board from complete retained cloud copies/i);
  assert.match(help,/does not confirm edits still waiting on this device/i,'server repair and local edit acknowledgement remain separate');
- assert.match(help,/one Restore action: choose a JSON file or Paste JSON/i,'automatic repair retains the established deliberate Restore route');
+ assert.match(help,/one Restore action: choose a file or paste board data/i,'automatic repair retains the established deliberate Restore route');
 });
 
 test('RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving',async t=>{
@@ -632,8 +632,8 @@ test('RISK unreadable device recovery: the recovery file excludes the placeholde
  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class{constructor(parts){this.text=parts.join('');}};
  ctx.URL={createObjectURL(value){blob=value;return 'blob:source-only';},revokeObjectURL(){}};
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download recovery file\s*<\/button>/);
- assert.ok(download,'the unavailable-board view exposes the single Download recovery file action');
+ const download=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+ assert.ok(download,'the unavailable-board view exposes the single Download backup action');
  assert.doesNotMatch(settings,/data-act="download-current-board"/,'without an accepted board no board export is offered');
  assert.match(settings,/no accepted board, so the file has none/,'Settings says the recovery file has no board');
  await ctx.onAction('download-current-board',{});assert.equal(downloads.length,0,'the shell cannot be exported as an accepted board');
@@ -760,7 +760,7 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
- assert.match(answer,/one Restore action.*choose a JSON file or Paste JSON/i);assert.match(answer,/Download recovery file saves the readable sources as evidence, never a restorable board/i);
+ assert.match(answer,/one Restore action.*choose a file or paste board data/i);assert.match(answer,/Download backup saves the readable sources as evidence, never a restorable board/i);
  assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
  assert.match(answer,/When cloud sync is configured, the header shows disabled syncing while the board is still opening; this does not confirm cloud saving\./);
  assert.match(answer,/After the board opens, genuine recovery warnings and cloud errors remain visible\./);
@@ -1797,8 +1797,8 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
 test('RISK automatic recovery comparisons: compatible independent observations replay once instead of becoming rating defaults',async t=>{
  const app=await divergentCloudSourceApp187(t,{phase:'automatic-inputs',holdCloudPush:true}),{ctx,backend,originalRoot}=app;
  const nativeSaves=observeQueuedNativeSaves(ctx,t);
- ctx.window.CloudSync.ready=false;ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});ctx.decide('yes');assert.equal(await ctx.persist(),true);
+ ctx.window.CloudSync.ready=false;
+ ctx.state.mode='scan';ctx.state.scanMode='descending';ctx.dotTask(ctx.candidateOrder(ctx.pool())[0].id);assert.equal(await ctx.persist(),true);
  assert.ok((await nativeSaves.settle('shared comparison setup')).results.every(result=>result===true));
  const shared=JSON.stringify(ctx.state),peer=await loadAppAtTime(1792323000000,{seedStorage:{[SYNC_STORE_KEY]:shared,[LOCAL_HEAD_KEY]:shared}});t.after(()=>closeLegacyApp173(peer));const peerSaves=observeQueuedNativeSaves(peer.ctx,t);
  assert.equal(peer.ctx.state.candidateId,ctx.state.candidateId);assert.ok(ctx.state.candidateId);
@@ -4010,283 +4010,637 @@ test('RISK resilient sync recovery: a failed rebuild protects every source and r
  for(const row of preserved)assert.ok(retained.some(copy=>copy.key===row.key&&copy.raw===row.raw),'a later attempt never replaces the earlier exact evidence');
 });
 
-test('RISK optional oldest start: enabled Start offers a candidate without dotting or learning',async()=>{
- const {ctx,shim}=await loadApp({seed:182});
- Object.assign(ctx.addTask('Oldest optional-start task',false),{id:'optional-oldest',createdAt:1});
- Object.assign(ctx.addTask('Higher-ranked optional-start task',false),{id:'optional-higher',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;
- const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory]));
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.deepEqual(Array.from(ctx.state.chain),[],'the enabled preference must not automatically place the oldest task');
- assert.equal(ctx.state.candidateId,'optional-higher','an eligible candidate is offered using the selected mode');
- assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory])),ratings,'starting without a benchmark creates no learning');
- assert.match(shim.document.getElementById('scan').innerHTML,/Higher-ranked optional-start task/,'the first candidate is visible');
- assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'an existing affirmative action can choose the first dot');
+// #2300: Settings is the consumer. A helper or a fixture already set to the final value would not prove the control reaches the rule.
+function chooseChainStart(app,value){
+ app.ctx.openSettings();const select=app.shim.document.getElementById('stChainStartsWith');Object.assign(select,{id:'stChainStartsWith',value,matches:()=>false});
+ app.shim.document.dispatchEvent({type:'change',target:select});app.ctx.closeModal();
+}
+test('RISK chain start: Settings offers Oldest eligible and Most likely, defaulting to Oldest eligible, without the old checkbox',async()=>{
+ const {ctx,shim}=await loadApp({seed:2300});ctx.openSettings();const view=shim.document.getElementById('modalRoot').innerHTML;
+ const control=view.match(/<select id="stChainStartsWith"[^>]*>(.*?)<\/select>/);
+ assert.ok(control,'Settings has a Chain starts with dropdown');
+ assert.deepEqual([...control[1].matchAll(/<option value="([^"]+)"([^>]*)>([^<]+)<\/option>/g)].map(m=>[m[3],/selected/.test(m[2])]),[['Oldest eligible',true],['Most likely',false]]);
+ assert.match(view,/<label for="stChainStartsWith">Chain starts with<\/label>/);
+ assert.doesNotMatch(view,/stSkipOldestFirstDot|Skip automatically dotting the oldest task/);
 });
 
-test('RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally',async()=>{
- const {ctx}=await loadApp({seed:183});
- Object.assign(ctx.addTask('Older first-choice task',false),{id:'first-older',createdAt:1});
- Object.assign(ctx.addTask('First deliberate choice',false),{id:'first-chosen',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
- ctx.onAction('yes',{dataset:{candidate:'first-chosen',benchmark:''}});
- assert.deepEqual(Array.from(ctx.state.chain),['first-chosen'],'Yes explicitly establishes the first dot without a benchmark');
- assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'the unpaired choice leaves means and uncertainty unchanged');
- assert.equal(ctx.state.candidateId,'first-older');
- ctx.onAction('yes',{dataset:{candidate:'first-older',benchmark:'first-chosen'}});
- assert.deepEqual(Array.from(ctx.state.chain),['first-chosen','first-older']);
- assert.ok(ctx.state.tasks.find(t=>t.id==='first-older').mu>25,'a later real comparison still trains the chosen candidate');
- assert.ok(ctx.state.tasks.find(t=>t.id==='first-chosen').mu<30,'the first explicitly chosen task participates in later learning');
+test('RISK chain start: Most likely starts the chain with the highest displayed overall chance in every scan mode',async()=>{
+ for(const mode of ['descending','chance','squared','halving']){
+  const app=await loadApp({seed:2301}),{ctx}=app;
+  Object.assign(ctx.addTask('Oldest low chance',false),{id:'likely-oldest',createdAt:1,mu:20});
+  Object.assign(ctx.addTask('Highest chance',false),{id:'likely-high',createdAt:3,mu:32});
+  Object.assign(ctx.addTask('Middle chance',false),{id:'likely-middle',createdAt:2,mu:26});
+  chooseChainStart(app,'mostLikely');assert.equal(ctx.state.settings.chainStartsWith,'mostLikely',mode);
+  ctx.state.settings.scanMode=mode;ctx.onAction('start-scan',{dataset:{mode}});
+  assert.deepEqual(Array.from(ctx.state.chain),['likely-high'],mode+' starts with the most likely task, not the oldest');
+ }
 });
 
-test('RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it',async()=>{
- const {ctx}=await loadApp({seed:184});
- Object.assign(ctx.addTask('Later first choice',false),{id:'skip-next',createdAt:1});
- Object.assign(ctx.addTask('Skip this first choice',false),{id:'skip-first',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;
+test('RISK chain start: Most likely ties go to the older task then the task id, with no randomness',async()=>{
+ const started=async(seed,tasks)=>{
+  const app=await loadApp({seed});chooseChainStart(app,'mostLikely');
+  for(const [id,extra] of tasks)Object.assign(app.ctx.addTask(id,false),{id,...extra});
+  app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});return Array.from(app.ctx.state.chain);
+ };
+ assert.deepEqual(await started(2302,[['tie-newer',{createdAt:9}],['tie-older',{createdAt:1}]]),['tie-older'],'equal chances go to the older task');
+ assert.deepEqual(await started(2303,[['tie-b',{createdAt:5}],['tie-a',{createdAt:5}]]),['tie-a'],'equal chance and age go to the task id');
+ assert.deepEqual(await started(2304,[['near-newer',{createdAt:9,mu:25.0000001}],['near-older',{createdAt:1,mu:25}]]),['near-older'],'rows showing the same percentage are tied even if their unrounded chances differ');
+ for(const seed of [2305,2306,2307])assert.deepEqual(await started(seed,[['same-newer',{createdAt:9,mu:28}],['same-older',{createdAt:1,mu:24}]]),['same-newer'],'the seed never changes the choice');
+});
+
+test('RISK chain start: Most likely draws only from the eligible pool, including a task done before',async()=>{
+ const at=Date.parse('2026-10-18T12:00:00Z'),{ctx,shim}=await loadAppAtTime(at,{seed:2308});const app={ctx,shim};
+ ctx.state.contexts=[{id:'allowed-context',name:'Allowed',active:true},{id:'excluded-context',name:'Excluded',active:true,excluded:true}];
+ const add=(id,extra={})=>Object.assign(ctx.addTask(id,false),{id,createdAt:1,mu:60,...extra});
+ add('completed-ineligible',{done:true});add('future-ineligible',{startsAt:'2099-01-01'});add('context-ineligible',{ctx:['excluded-context']});
+ add('resting-ineligible',{evergreen:true,evergreenHours:24,evergreenResetAtDay:false,lastDoneAt:at});
+ add('dependency-ineligible',{prerequisiteId:'done-before',prerequisiteIds:['done-before']});
+ add('done-before',{createdAt:9,mu:40,lastDoneAt:at-3*86400000});add('never-done',{createdAt:2,mu:20});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(ctx.state.chain),['done-before'],'unlike Oldest eligible, the highest chance does not prefer never-done tasks; ineligible tasks stay out');
+});
+
+test('RISK chain start: the row preview, empty-chain notice and percentage explanation follow the selected option',async()=>{
+ const app=await loadApp({seed:2309}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Oldest preview task',false),{id:'preview-oldest',createdAt:1,mu:20});
+ Object.assign(ctx.addTask('Likely preview task',false),{id:'preview-likely',createdAt:2,mu:32});
+ ctx.state.settings.listMetric='chance';ctx.state.settings.scanMode='chance';ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.render();
+ const marker=title=>new RegExp('chainind"[^>]*>\\u2192 </span>[^\\n]{0,120}'+title);
+ const list=()=>shim.document.getElementById('listBody').innerHTML,scan=()=>shim.document.getElementById('scan').innerHTML;
+ assert.match(list(),marker('Oldest preview task'),'Oldest eligible previews the oldest task');
+ assert.doesNotMatch(list(),marker('Likely preview task'));
+ assert.match(scan(),/Chance mode starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before\./);
+ assert.match(list(),/The first dot is chosen by age/);
+ chooseChainStart(app,'mostLikely');ctx.render();
+ assert.match(list(),marker('Likely preview task'),'Most likely previews the same task Start will dot');
+ assert.doesNotMatch(list(),marker('Oldest preview task'));
+ assert.match(scan(),/Nothing dotted yet \u2014 Chance mode starts on the eligible task with the highest overall chance/);
+ assert.doesNotMatch(scan(),/oldest eligible/);
+ assert.match(list(),/The first dot goes to the highest overall chance/);
+ assert.doesNotMatch(list(),/chosen by age/);
+ ctx.onAction('start-scan',{dataset:{mode:'chance'}});assert.deepEqual(Array.from(ctx.state.chain),['preview-likely'],'Start keeps the promise the preview made');
+});
+
+const savedSkipBoard=(extra={})=>{
+ const board=syncState({tasks:[{...syncTask('skip-saved-oldest','Saved oldest'),createdAt:1},{...syncTask('skip-saved-likely','Saved likely'),createdAt:2,mu:32}],...extra});
+ board.settings={...board.settings,skipOldestFirstDot:true,...extra.settings};return JSON.stringify(board);
+};
+// Most likely compares displayed percentages, so these weights are chosen to
+// round differently under each scan mode's display. The weights are the seam:
+// the real ones come from ratings and cannot be pinned to a rounding edge.
+async function mostLikelyBoard(seed,{settingsMode,passMode,weights,considered={}}){
+ const tasks=Object.keys(weights).map((id,i)=>({...syncTask(id,'Task '+id),createdAt:i+1}));
+ const raw=JSON.stringify(syncState({tasks,scanMode:passMode,considered,listOpen:true,settings:{...syncState().settings,scanMode:settingsMode,squaredDefaultVersion:1,listMetric:'chance',chainStartsWith:'mostLikely'}}));
+ const app=await loadApp({seed,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ app.ctx.chanceWeight=task=>weights[task.id];app.ctx.render();
+ const marked=()=>[...app.shim.document.getElementById('listBody').innerHTML.matchAll(/chainind"[^>]*>→ <\/span>[^\n]{0,120}?Task (\w+)/g)].map(m=>m[1]);
+ const explained=()=>app.ctx.state.tasks.filter(task=>!(task.id in considered)).filter(task=>/first dot goes to the highest overall chance; ties/.test(app.ctx.taskSelectionSummary(task,app.ctx.chanceDisplayStats()).title)).map(task=>task.id);
+ const label=id=>app.ctx.taskSelectionSummary(app.ctx.state.tasks.find(task=>task.id===id),app.ctx.chanceDisplayStats(),'chance').label;
+ const start=()=>{app.ctx.onAction('start-scan',{});return Array.from(app.ctx.state.chain);};
+ return {...app,marked,explained,label,start,notice:()=>app.shim.document.getElementById('scan').innerHTML};
+}
+
+test('RISK chain start: the preview, the percentage explanation, the notice and Start agree on the scan mode Most likely reads',async()=>{
+ // Under Chance these show 50.00% and 50.00% (a tie, so the older A); squared they show 49.99% and 50.01%.
+ const board=await mostLikelyBoard(2330,{settingsMode:'squared',passMode:'chance',weights:{A:.99984,B:1}});
+ assert.equal(board.ctx.state.scanMode,'chance','the saved pass still carries the last pass mode');
+ assert.match(board.notice(),/Squared Weighting starts on the eligible task with the highest overall chance/,'the notice names the scan preference Start applies');
+ const preview={marked:board.marked(),explained:board.explained()};
+ assert.deepEqual(board.start(),['B'],'Start applies the Squared Weighting preference and dots its most likely task');
+ assert.deepEqual(preview,{marked:['B'],explained:['B']},'the row marker and the percentage explanation promised the task Start dots');
+});
+
+test('RISK chain start: Most likely ties compare the percentages people see, so <0.01% beats 0% in Halving',async()=>{
+ // C has been scanned this pass, so only A and B can start the chain. A's share underflows to exactly 0.
+ const weights={A:1e-300,B:1e-15,C:1e308};
+ const halving=await mostLikelyBoard(2331,{settingsMode:'halving',passMode:'halving',weights,considered:{C:'no'}});
+ assert.deepEqual([halving.label('A'),halving.label('B')],['0% likelihood','<0.01% likelihood'],'Halving shows these two differently');
+ assert.deepEqual(halving.marked(),['B'],'the higher shown percentage is previewed');
+ assert.deepEqual(halving.start(),['B'],'the higher shown percentage starts the chain');
+ const chance=await mostLikelyBoard(2332,{settingsMode:'chance',passMode:'chance',weights,considered:{C:'no'}});
+ assert.deepEqual([chance.label('A'),chance.label('B')],['<0.01% overall','<0.01% overall'],'Chance mode shows them the same');
+ assert.deepEqual(chance.start(),['A'],'the same shown percentage is a tie, which goes to the older task');
+});
+
+test('RISK chain start: the saved preview marks the same first dot on a detached board with no scan mode',async()=>{
+ const {ctx}=await loadApp({seed:2325});
+ Object.assign(ctx.addTask('Detached oldest',false),{id:'detached-oldest',createdAt:1,mu:20});Object.assign(ctx.addTask('Detached likely',false),{id:'detached-likely',createdAt:2,mu:32});
+ const board=JSON.parse(JSON.stringify(ctx.state));board.settings.chainStartsWith='mostLikely';delete board.scanMode;
+ assert.equal(vm.runInContext('boardPresentation.rowContext',ctx)(board).nextDotted.id,'detached-likely','the preview reads the detached board, not live state');
+ assert.match(vm.runInContext('boardPresentation.startNotice',ctx)(board),/highest overall chance/);
+ delete board.settings.chainStartsWith;assert.equal(vm.runInContext('boardPresentation.rowContext',ctx)(board).nextDotted.id,'detached-oldest');
+});
+
+test('RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag',async()=>{
+ const raw=savedSkipBoard(),{ctx,shim}=await loadApp({seed:2310,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.match(shim.document.getElementById('scan').innerHTML,/starts on the oldest eligible task/,'the notice promises the oldest task, not an unpaired choice');
+ assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/choose the first dot/);
  ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory]));
- ctx.onAction('no',{dataset:{candidate:'skip-first',benchmark:''}});
- assert.equal(ctx.state.considered['skip-first'],'no','an unpaired No skips the candidate for this pass');
- assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,'skip-next');
- assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma,t.ratingHistory])),ratings,'an unpaired skip creates no comparison observation or rating change');
+ assert.deepEqual(Array.from(ctx.state.chain),['skip-saved-oldest'],'Start dots the oldest eligible task');
+ assert.equal(ctx.state.settings.skipOldestFirstDot,true,'an older client still reads this flag, so the saved value stays');
+});
+
+test('RISK chain start: a board saved mid-pass with an empty chain and the old checkbox on starts with Oldest eligible',async()=>{
+ for(const mode of ['scan','work']){
+  const raw=savedSkipBoard({mode,scanMode:'descending',passId:'saved-empty-pass',passStartedAt:Date.now()-60000,candidateId:'skip-saved-likely',considered:{'skip-saved-gone':'no'}}),{ctx,shim}=await loadApp({seed:2311,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="yes"/,mode+': no unpaired candidate is offered');
+  assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/,mode+': the visible action is Start, not Resume');
+  ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.deepEqual(Array.from(ctx.state.chain),['skip-saved-oldest'],mode+': the empty mid-pass chain starts with the oldest eligible task');
+ }
+});
+
+test('RISK chain start: the old checkbox saved on mid-pass deals no hidden candidate for d, c or Delete to act on',async()=>{
+ for(const key of ['d','c','Delete']){
+  const raw=savedSkipBoard({mode:'scan',scanMode:'descending',passId:'saved-hidden-pass',passStartedAt:Date.now()-60000,considered:{}}),{ctx,shim}=await loadApp({seed:2311,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  // Long after the board was drawn, so the press guard cannot be what stops the key.
+  let now=0;ctx.performance={now:()=>now};ctx.render();now+=60000;
+  assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/,key+': Start is the visible action');
+  const dealt=ctx.state.candidateId,before=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.done,t.lastDoneAt??null,t.mu,t.sigma]));
+  shim.document.dispatchEvent({type:'keydown',key,repeat:false,preventDefault(){}});
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.done,t.lastDoneAt??null,t.mu,t.sigma])),before,key+': the key cannot mark Done, answer or delete a task nobody can see');
+  assert.equal(dealt,null,key+': no candidate is dealt behind the Start notice');
+  assert.equal(ctx.state.settings.skipOldestFirstDot,true,key+': an older client still reads the saved flag');
+ }
+});
+
+test('RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting',async()=>{
+ const app=await loadApp({seed:2312}),{ctx}=app;
+ Object.assign(ctx.addTask('Existing oldest dot',false),{id:'keep-oldest',createdAt:1,mu:20});
+ Object.assign(ctx.addTask('Existing candidate',false),{id:'keep-candidate',createdAt:2,mu:32});
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});const chain=Array.from(ctx.state.chain),candidate=ctx.state.candidateId,ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+ chooseChainStart(app,'mostLikely');
+ assert.equal(ctx.state.settings.chainStartsWith,'mostLikely');assert.deepEqual(Array.from(ctx.state.chain),chain,'the dot already on the chain stays');
+ assert.equal(ctx.state.candidateId,candidate,'the current candidate stays');assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'ratings stay');
+ ctx.onAction('undo',{});assert.equal(ctx.state.settings.chainStartsWith,undefined,'Undo restores the default option');assert.deepEqual(Array.from(ctx.state.chain),chain,'Undo leaves the chain');
+});
+
+test('RISK chain start: replacing the head of a started chain is the same under either option',async()=>{
+ const heads={};
+ for(const choice of ['oldest','mostLikely']){
+  const app=await loadApp({seed:2313}),{ctx}=app;
+  for(const [id,createdAt,mu] of [['head-first',1,28],['head-low',2,20],['head-middle',3,24]])Object.assign(ctx.addTask(id,false),{id,createdAt,mu});
+  chooseChainStart(app,choice);ctx.dotTask('head-first');ctx.postponeTask('head-first');heads[choice]=Array.from(ctx.state.chain);
+ }
+ assert.deepEqual(heads,{oldest:['head-middle'],mostLikely:['head-middle']},'the option only decides a new chain, never its replacement head');
+});
+
+// #2300: an older client still open during a rollout cannot be changed, so a board carrying the new setting has to look ordinary to it.
+const CHAIN_START_OLDER_RELEASES=['3d787463d53f041e577ea37766417340cad6f2ad','7b9c92a41999a44a12f92b7d6d1c8d02758c635e'];
+test('RISK BACKWARD COMPATIBILITY: a board carrying Chain starts with and a recorded settings decision syncs through an older released client',async t=>{
+ for(const release of CHAIN_START_OLDER_RELEASES)await t.test(release.slice(0,7),async sub=>{
+  const released=spawnSync('git',['show',release+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
+  const at=Date.parse('2026-11-09T12:00:00Z'),initial=syncState({tasks:[{...syncTask('compat-older','Older compat task'),createdAt:1},{...syncTask('compat-likely','Likely compat task'),createdAt:2,mu:32}],settings:{scanMode:'descending',showPostpone:true},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),opts={seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory};
+  const current=await loadAppAtTime(at,opts);sub.after(()=>closeLegacyApp173(current));await current.ctx.cloudPull();
+  // Both decisions go through Settings so the board holds what a real save records.
+  chooseChainStart(current,'mostLikely');
+  current.ctx.openSettings();const postpone=current.shim.document.getElementById('stShowPostpone');Object.assign(postpone,{id:'stShowPostpone',checked:false,matches:()=>false});current.shim.document.dispatchEvent({type:'change',target:postpone});current.ctx.closeModal();
+  assert.equal(await current.ctx.persist(),true);await current.ctx.cloudPull();await current.ctx.cloudPushNow();await settleSavedViewPublication(current,h,'candidate publishes the setting and a recorded decision');
+  const published=JSON.parse(h.doc.payload);assert.equal(published.settings.chainStartsWith,'mostLikely','the cloud board carries the new setting');
+  assert.ok(published.decisionEvents.some(event=>event.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='showPostpone'),'the board carries a recorded settings decision');
+  const seen=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+  const older=await loadAppAtTime(at+1000,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:seen,[LOCAL_HEAD_KEY]:seen},cloudSyncFactory:h.factory});sub.after(()=>typeof older.ctx.suspendCloudSync==='function'?closeLegacyApp173(older):undefined);
+  await older.ctx.cloudPull();
+  assert.equal(older.ctx.window.CloudSync.status==='error',false,'older client: no hold on the published board ('+older.ctx.window.CloudSync.errorCode+')');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',older.ctx),false,'older client: adoption is not held');
+  assert.equal(older.ctx.state.settings.chainStartsWith,'mostLikely','older client: the field is retained');
+  assert.doesNotMatch(older.shim.document.getElementById('syncBtn').textContent,/error|hold/i,'older client: no recovery prompt on the sync control');
+  assert.deepEqual(Array.from(older.ctx.state.protectedBackupIds||[]),[],'older client: no recovery copy was kept for this routine read');
+  hydrateUnchangedEditorDraft(older,'compat-older');older.shim.document.getElementById('etTitle').value='Edited by the older client';older.ctx.onAction('save-edit',{dataset:{id:'compat-older'}});
+  assert.equal(await older.ctx.persist(),true);await older.ctx.cloudPull();await older.ctx.cloudPushNow();
+  for(let n=0;n<160&&JSON.parse(h.doc.payload).tasks.find(row=>row.id==='compat-older').title!=='Edited by the older client';n++)await syncSettle(5);
+  assert.equal(older.ctx.window.CloudSync.status==='error',false,'older client: no hold after its own write ('+older.ctx.window.CloudSync.errorCode+')');
+  assert.equal(JSON.parse(h.doc.payload).settings.chainStartsWith,'mostLikely','the older write retains the field');
+  assert.equal(JSON.parse(h.doc.payload).tasks.find(row=>row.id==='compat-older').title,'Edited by the older client');
+  await current.ctx.cloudPull();await syncSettle(30);
+  assert.equal(current.ctx.window.CloudSync.status==='error',false,'candidate: no hold after reading the older write ('+current.ctx.window.CloudSync.errorCode+')');
+  assert.equal(current.ctx.state.settings.chainStartsWith,'mostLikely');assert.equal(current.ctx.state.settings.showPostpone,false);
+  current.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(current.ctx.state.chain),['compat-likely'],'the candidate still honors the retained choice');
+ });
+});
+
+test('RISK chain start: a chain started with Most likely compares and learns like any other chain',async()=>{
+ const app=await loadApp({seed:2314}),{ctx}=app;
+ Object.assign(ctx.addTask('Learning head',false),{id:'learn-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Learning candidate',false),{id:'learn-candidate',createdAt:1,mu:25});
+ Object.assign(ctx.addTask('Learning third',false),{id:'learn-third',createdAt:3,mu:24});
+ chooseChainStart(app,'mostLikely');const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(ctx.state.chain),['learn-head']);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'Start stays ranking-neutral');
+ assert.equal(ctx.state.candidateId,'learn-candidate');ctx.onAction('yes',{dataset:{candidate:'learn-candidate',benchmark:'learn-head'}});
+ assert.deepEqual(Array.from(ctx.state.chain),['learn-head','learn-candidate'],'Yes against the automatic head adds the candidate as usual');
+ assert.equal(ctx.state.candidateId,'learn-third');ctx.onAction('yes',{dataset:{candidate:'learn-third',benchmark:'learn-candidate'}});
+ assert.ok(ctx.state.tasks.find(t=>t.id==='learn-third').mu>24,'a real comparison trains the candidate');
+ assert.ok(ctx.state.tasks.find(t=>t.id==='learn-candidate').mu<25,'and the explicitly chosen benchmark');
+});
+
+test('RISK chain start: a No after a Most likely start skips for this pass and Undo restores it',async()=>{
+ const app=await loadApp({seed:2315}),{ctx}=app;
+ Object.assign(ctx.addTask('Skip head',false),{id:'skip-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Skip candidate',false),{id:'skip-candidate',createdAt:1,mu:25});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ ctx.onAction('no',{dataset:{candidate:'skip-candidate',benchmark:'skip-head'}});
+ assert.equal(ctx.state.considered['skip-candidate'],'no','No skips the candidate for this pass');assert.deepEqual(Array.from(ctx.state.chain),['skip-head']);
  ctx.onAction('undo',{});
- assert.equal(ctx.state.considered['skip-first'],undefined);assert.equal(ctx.state.candidateId,'skip-first');
- ctx.onAction('no',{dataset:{candidate:'skip-first',benchmark:''}});
- ctx.onAction('new-pass',{});
- assert.equal(ctx.state.considered['skip-first'],undefined,'a fresh pass clears the unpaired No');
- assert.equal(ctx.state.candidateId,'skip-first');assert.deepEqual(Array.from(ctx.state.chain),[]);
+ assert.equal(ctx.state.considered['skip-candidate'],undefined);assert.equal(ctx.state.candidateId,'skip-candidate');assert.deepEqual(Array.from(ctx.state.chain),['skip-head']);
 });
 
-test('RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data',async()=>{
- const app=await loadApp({seed:185}),{ctx,shim}=app;
- Object.assign(ctx.addTask('Settings oldest fixture',false),{id:'settings-oldest',createdAt:1,privateFutureTask:'retained'});
- Object.assign(ctx.addTask('Settings next fixture',false),{id:'settings-next',createdAt:2});
- ctx.state.settings.privateFutureSetting={retained:7};ctx.openSettings();
- const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});
- shim.document.dispatchEvent({type:'change',target:box});
- shim.document.getElementById('stScanMode').value='descending';ctx.onAction('save-settings',{});
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.deepEqual(Array.from(ctx.state.chain),[],'the real Settings save must enable an unseeded Start');
- assert.equal(ctx.state.settings.skipOldestFirstDot,true);ctx.openSettings();
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
- ctx.closeModal();assert.equal(await ctx.persist(),true);
- const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(raw);
+test('RISK chain start: Settings change and reopen retain Most likely and unrelated data',async()=>{
+ const app=await loadApp({seed:2316}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Reopen older',false),{id:'reopen-older',createdAt:1,privateFutureTask:'retained'});
+ Object.assign(ctx.addTask('Reopen likely',false),{id:'reopen-likely',createdAt:2,mu:32});
+ ctx.state.settings.privateFutureSetting={retained:7};chooseChainStart(app,'mostLikely');
+ for(let n=0;n<40&&JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)||'{}').settings?.chainStartsWith!=='mostLikely';n++)await syncSettle(5);
+ const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(raw);assert.equal(JSON.parse(raw).settings.chainStartsWith,'mostLikely','the change event alone saves the choice with the board');
  const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
- reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
- reopened.ctx.closeModal();reopened.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.deepEqual(Array.from(reopened.ctx.state.chain),[]);
- assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='settings-oldest').privateFutureTask,'retained');
+ reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/<option value="mostLikely" selected>Most likely<\/option>/);
+ reopened.ctx.closeModal();reopened.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(reopened.ctx.state.chain),['reopen-likely']);
+ assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='reopen-older').privateFutureTask,'retained');
  assert.equal(JSON.stringify(reopened.ctx.state.settings.privateFutureSetting),'{"retained":7}');
 });
 
-test('RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow',async()=>{
- const {ctx,shim}=await loadApp({seed:186});
- Object.assign(ctx.addTask('Marker oldest task',false),{id:'marker-oldest',createdAt:1});
- Object.assign(ctx.addTask('Marker next task',false),{id:'marker-next',createdAt:2});
- ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.listMetric='chance';ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.render();
- assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Will be added to the chain when you start scanning/,'the list must not promise a suppressed automatic first dot');
- assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/The first dot is chosen by age/);
- ctx.state.listOpen=false;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.match(shim.document.getElementById('scan').innerHTML,/Choose this task as the first dot/);
- for(let i=0;i<2;i++){const id=ctx.state.candidateId;assert.ok(id);ctx.onAction('no',{dataset:{candidate:id,benchmark:''}});}
- assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,null);
- assert.match(shim.document.getElementById('scan').innerHTML,/All eligible candidates have been scanned/);
- assert.match(shim.document.getElementById('scan').innerHTML,/data-act="rescan"/,'explicit rescan remains available with no first dot');
- ctx.onAction('rescan',{});assert.ok(ctx.state.candidateId);assert.deepEqual(Array.from(ctx.state.chain),[]);
+test('RISK chain start: a pass started with Most likely keeps its scan skips through a cold reopen',async()=>{
+ const app=await loadApp({seed:2317}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Cold head',false),{id:'cold-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Cold skipped',false),{id:'cold-skipped',createdAt:1,mu:25});
+ Object.assign(ctx.addTask('Cold next',false),{id:'cold-next',createdAt:3,mu:24});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});ctx.onAction('no',{dataset:{candidate:'cold-skipped',benchmark:'cold-head'}});
+ assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.equal(reopened.ctx.state.considered['cold-skipped'],'no');assert.deepEqual(Array.from(reopened.ctx.state.chain),['cold-head']);assert.equal(reopened.ctx.state.candidateId,'cold-next');
 });
 
-test('RISK optional oldest start: skips before the first choice survive that choice and cold reopen',async()=>{
- const app=await loadApp({seed:187}),{ctx,shim}=app;
- Object.assign(ctx.addTask('Keep for later',false),{id:'flow-later',createdAt:1});
- Object.assign(ctx.addTask('Skip before choosing',false),{id:'flow-skipped',createdAt:2,mu:30});
- Object.assign(ctx.addTask('Choose this first',false),{id:'flow-chosen',createdAt:3,mu:28});
- ctx.state.settings.skipOldestFirstDot=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- ctx.onAction('no',{dataset:{candidate:'flow-skipped',benchmark:''}});
- assert.equal(ctx.state.candidateId,'flow-chosen');ctx.onAction('yes',{dataset:{candidate:'flow-chosen',benchmark:''}});
- assert.equal(ctx.state.considered['flow-skipped'],'no','choosing the first dot must not begin a different pass and revive a skipped candidate');
- assert.equal(ctx.state.candidateId,'flow-later');assert.deepEqual(Array.from(ctx.state.chain),['flow-chosen']);
- assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY);
- const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
- assert.equal(reopened.ctx.state.considered['flow-skipped'],'no');assert.deepEqual(Array.from(reopened.ctx.state.chain),['flow-chosen']);
- assert.equal(reopened.ctx.state.candidateId,'flow-later');
-});
-
-test('RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary',async()=>{
- const at=+new Date(2026,9,18,1),{ctx}=await loadAppAtTime(at,{seed:188});
- Object.assign(ctx.addTask('Day boundary lower task',false),{id:'day-lower',createdAt:1});
- Object.assign(ctx.addTask('Day boundary first task',false),{id:'day-first',createdAt:2,mu:30});
- ctx.state.settings.skipOldestFirstDot=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- ctx.onAction('no',{dataset:{candidate:'day-first',benchmark:''}});assert.equal(ctx.state.candidateId,'day-lower');
- ctx.onAction('start-working',{});setFakeTime(ctx,at+2*60*60*1000);
+test('RISK chain start: scan marks still clear at the ordinary day boundary under Most likely',async()=>{
+ const at=+new Date(2026,9,18,1),{ctx,shim}=await loadAppAtTime(at,{seed:2318});const app={ctx,shim};
+ Object.assign(ctx.addTask('Day head',false),{id:'day-head',createdAt:2,mu:30});
+ Object.assign(ctx.addTask('Day skipped',false),{id:'day-skipped',createdAt:1,mu:25});
+ chooseChainStart(app,'mostLikely');ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ ctx.onAction('no',{dataset:{candidate:'day-skipped',benchmark:'day-head'}});ctx.onAction('start-working',{});setFakeTime(ctx,at+2*60*60*1000);
  ctx.onAction('resume-scan',{dataset:{mode:'descending'}});
- assert.equal(ctx.state.considered['day-first'],undefined,'empty-chain passes still expire at the local day marker');
- assert.equal(ctx.state.candidateId,'day-first');assert.deepEqual(Array.from(ctx.state.chain),[]);
+ assert.equal(ctx.state.considered['day-skipped'],undefined,'the pass still expires at the local day marker');assert.deepEqual(Array.from(ctx.state.chain),['day-head']);
 });
 
-test('RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate',async()=>{
- const {ctx,shim}=await loadApp({seed:189});ctx.addTask('Wait for Start',false);ctx.openSettings();
- const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});
- shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
- assert.equal(ctx.state.candidateId,null,'changing a future-start preference must leave the initial scanner behind Start');
- assert.deepEqual(Array.from(ctx.state.chain),[]);assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/);
- assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/starts on the oldest/);
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.ok(ctx.state.candidateId);assert.deepEqual(Array.from(ctx.state.chain),[]);
+test('RISK chain start: changing the option waits for explicit Start before dotting',async()=>{
+ const app=await loadApp({seed:2319}),{ctx,shim}=app;ctx.addTask('Wait for Start',false);chooseChainStart(app,'mostLikely');
+ assert.equal(ctx.state.candidateId,null,'changing a future-start preference must leave the scanner behind Start');assert.deepEqual(Array.from(ctx.state.chain),[]);
+ assert.match(shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/);
 });
 
-test('RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes',async()=>{
- for(const value of [undefined,false,true,null,0,1,'true','false',{},[]])for(const mode of ['descending','chance','squared','halving','both']){
-  const initial=syncState({tasks:[{...syncTask('default-oldest','Oldest default task'),createdAt:1},{...syncTask('default-next','Newer default task'),createdAt:2}],settings:{scanMode:mode}});
-  if(value!==undefined)initial.settings.skipOldestFirstDot=value;
-  const raw=JSON.stringify(initial),{ctx}=await loadApp({seed:190,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
-  assert.equal(ctx.state.settings.skipOldestFirstDot,value===true,'only a saved boolean true enables the option');
-  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
-  ctx.onAction('start-scan',{dataset:{mode:mode==='both'?'descending':mode}});
-  if(value===true){assert.deepEqual(Array.from(ctx.state.chain),[]);assert.ok(['default-oldest','default-next'].includes(ctx.state.candidateId));}
-  else assert.deepEqual(Array.from(ctx.state.chain),['default-oldest'],'older and invalid preferences preserve the oldest automatic first dot');
-  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'automatic or unseeded Start remains neutral');
+test('RISK chain start: missing invalid and legacy values start with Oldest eligible across all supported scan modes',async()=>{
+ for(const value of [undefined,'oldest','mostLikely',null,0,1,'true','mostlikely',{},[]])for(const mode of ['descending','chance','squared','halving','both']){
+  const initial=syncState({tasks:[{...syncTask('value-oldest','Oldest value task'),createdAt:1},{...syncTask('value-likely','Likely value task'),createdAt:2,mu:32}],settings:{scanMode:mode}});
+  if(value!==undefined)initial.settings.chainStartsWith=value;
+  const raw=JSON.stringify(initial),{ctx}=await loadApp({seed:2320,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  assert.equal(ctx.state.settings.chainStartsWith,value==='mostLikely'?'mostLikely':undefined,'only the saved string mostLikely selects Most likely; anything else reads as the default');
+  if(value===undefined)assert.equal(JSON.stringify(ctx.state.settings).includes('chainStartsWith'),false,'a default board gains no new key, so an update never changes its saved payload');
+  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));ctx.onAction('start-scan',{dataset:{mode:mode==='both'?'descending':mode}});
+  assert.deepEqual(Array.from(ctx.state.chain),[value==='mostLikely'?'value-likely':'value-oldest'],String(value)+'/'+mode);
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'Start remains neutral');
  }
 });
 
-test('RISK optional oldest start: zero and one eligible tasks remain usable with either preference',async()=>{
- for(const enabled of [false,true]){
-  const {ctx,shim}=await loadApp({seed:191});ctx.state.settings.skipOldestFirstDot=enabled;
+test('RISK chain start: zero and one eligible tasks remain usable with either option',async()=>{
+ for(const option of ['oldest','mostLikely']){
+  const app=await loadApp({seed:2321}),{ctx,shim}=app;chooseChainStart(app,option);
   ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,null);
   assert.match(shim.document.getElementById('scan').innerHTML,/Nothing eligible to scan|Nothing on the list yet/);
-  const task=ctx.addTask('Sole eligible task',false),ratings=JSON.stringify([task.mu,task.sigma]);ctx.onAction('start-scan',{dataset:{mode:'descending'}});
-  if(enabled){
-   assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.candidateId,task.id);
-   ctx.onAction('no',{dataset:{candidate:task.id,benchmark:''}});assert.equal(ctx.state.candidateId,null);assert.deepEqual(Array.from(ctx.state.chain),[]);
-   ctx.onAction('new-pass',{});assert.equal(ctx.state.candidateId,task.id);ctx.onAction('yes',{dataset:{candidate:task.id,benchmark:''}});
-  }
-  assert.deepEqual(Array.from(ctx.state.chain),[task.id]);assert.equal(JSON.stringify([ctx.state.tasks[0].mu,ctx.state.tasks[0].sigma]),ratings);
+  const task=ctx.addTask('Sole eligible task',false),ratings=JSON.stringify([task.mu,task.sigma]);
+  ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[task.id],option);
+  assert.equal(JSON.stringify([ctx.state.tasks[0].mu,ctx.state.tasks[0].sigma]),ratings);
  }
 });
 
-test('RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries',async()=>{
- const at=Date.parse('2026-10-18T12:00:00Z'),{ctx}=await loadAppAtTime(at,{seed:192});
- ctx.state.contexts=[{id:'allowed-context',name:'Allowed',active:true},{id:'excluded-context',name:'Excluded',active:true,excluded:true}];
- const add=(id,extra={})=>Object.assign(ctx.addTask(id,false),{id,createdAt:1,...extra});
- add('completed-ineligible',{done:true});add('future-ineligible',{startsAt:'2099-01-01'});add('context-ineligible',{ctx:['excluded-context']});
- add('resting-ineligible',{evergreen:true,evergreenHours:24,evergreenResetAtDay:false,lastDoneAt:at});
- add('dependency-ineligible',{prerequisiteId:'eligible-only',prerequisiteIds:['eligible-only']});add('eligible-only',{createdAt:9});add('postpone-first',{createdAt:10,mu:40});
- ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.showPostpone=true;ctx.onAction('start-scan',{dataset:{mode:'descending'}});
- assert.equal(ctx.state.candidateId,'postpone-first');ctx.onAction('postpone',{dataset:{candidate:'postpone-first',benchmark:''}});
- assert.deepEqual(Array.from(ctx.state.chain),[],'postponing an unpaired candidate must not automatically dot its replacement');
- assert.equal(ctx.state.candidateId,'eligible-only','all existing ineligible tasks stay outside the empty-chain candidate pool');
- assert.deepEqual(Array.from(ctx.state.chain),[]);ctx.onAction('no',{dataset:{candidate:'eligible-only',benchmark:''}});assert.equal(ctx.state.candidateId,null);
- ctx.onAction('new-pass',{});assert.equal(ctx.state.candidateId,'eligible-only','a fresh pass clears No without ending an active postponement or rest');
-});
-
-test('RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged',async()=>{
- const {ctx,shim}=await loadApp({seed:193});const a=ctx.addTask('Existing automatic dot',false),b=ctx.addTask('Existing candidate',false);
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});const chain=Array.from(ctx.state.chain),ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
- ctx.openSettings();const box=shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});shim.document.dispatchEvent({type:'change',target:box});ctx.closeModal();
- assert.deepEqual(Array.from(ctx.state.chain),chain);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
- ctx.onAction('undo',{});assert.equal(ctx.state.settings.skipOldestFirstDot,false);assert.deepEqual(Array.from(ctx.state.chain),chain);
- ctx.onAction('yes',{dataset:{candidate:b.id,benchmark:a.id}});assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'toggling does not retroactively make an automatic seed participate in learning');
- for(const enabled of [false,true]){
-  const app=await loadApp({seed:194}),task=app.ctx.addTask('Explicit manual first dot',false);app.ctx.state.settings.skipOldestFirstDot=enabled;
-  const before=JSON.stringify([task.mu,task.sigma]);app.ctx.dotTask(task.id);assert.deepEqual(Array.from(app.ctx.state.chain),[task.id]);assert.equal(JSON.stringify([task.mu,task.sigma]),before);
- }
-});
-
-test('RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit',async t=>{
+test('RISK chain start: the choice follows the board to another device beside an independent peer edit',async t=>{
  const at=Date.parse('2026-10-18T12:00:00Z');
- const initial=syncState({tasks:[{...syncTask('cloud-later','Cloud later task'),createdAt:1},{...syncTask('cloud-skipped','Cloud skipped task'),createdAt:2,mu:30},{...syncTask('cloud-chosen','Cloud chosen task'),createdAt:3,mu:28}],settings:{scanMode:'descending',skipOldestFirstDot:false},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const initial=syncState({tasks:[{...syncTask('cloud-older','Cloud older task'),createdAt:1},{...syncTask('cloud-likely','Cloud likely task'),createdAt:2,mu:30}],settings:{scanMode:'descending'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),opts={seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory};
  const a=await loadAppAtTime(at,opts),b=await loadAppAtTime(at,opts);t.after(()=>closeLegacyApp173(a));t.after(()=>closeLegacyApp173(b));await a.ctx.cloudPull();await b.ctx.cloudPull();a.ctx.window.CloudSync.ready=false;b.ctx.window.CloudSync.ready=false;
- setFakeTime(b.ctx,at+50);hydrateUnchangedEditorDraft(b,'cloud-later');b.shim.document.getElementById('etTitle').value='Independent peer title';b.ctx.onAction('save-edit',{dataset:{id:'cloud-later'}});assert.equal(await b.ctx.persist(),true);
- setFakeTime(a.ctx,at+100);a.ctx.openSettings();const box=a.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});a.shim.document.dispatchEvent({type:'change',target:box});a.ctx.closeModal();
- a.ctx.onAction('start-scan',{dataset:{mode:'descending'}});a.ctx.onAction('no',{dataset:{candidate:'cloud-skipped',benchmark:''}});a.ctx.onAction('yes',{dataset:{candidate:'cloud-chosen',benchmark:''}});assert.equal(await a.ctx.persist(),true);
- a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'unseeded first choices publication');
- b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await settleSavedViewPublication(b,h,'independent peer edit and unseeded choices');
- await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'unseeded peer acknowledgement');
+ setFakeTime(b.ctx,at+50);hydrateUnchangedEditorDraft(b,'cloud-older');b.shim.document.getElementById('etTitle').value='Independent peer title';b.ctx.onAction('save-edit',{dataset:{id:'cloud-older'}});assert.equal(await b.ctx.persist(),true);
+ setFakeTime(a.ctx,at+100);chooseChainStart(a,'mostLikely');assert.equal(await a.ctx.persist(),true);
+ a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'option publication');
+ b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await settleSavedViewPublication(b,h,'independent peer edit and option');
+ await a.ctx.cloudPull();await a.ctx.cloudPushNow();await settleSavedViewPublication(a,h,'peer acknowledgement');
  for(const app of [a,b]){
-  assert.equal(app.ctx.state.settings.skipOldestFirstDot,true);assert.deepEqual(Array.from(app.ctx.state.chain),['cloud-chosen']);
-  assert.equal(app.ctx.state.considered['cloud-skipped'],'no','sync keeps a first skip without a fabricated comparison');
-  assert.equal(app.ctx.state.tasks.find(row=>row.id==='cloud-later').title,'Independent peer title');
-  assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.tasks.map(row=>[row.id,row.mu]).sort())),[['cloud-chosen',28],['cloud-later',25],['cloud-skipped',30]],'independent first choices do not train any pair');
+  assert.equal(app.ctx.state.settings.chainStartsWith,'mostLikely','the choice follows the board');
+  assert.equal(app.ctx.state.tasks.find(row=>row.id==='cloud-older').title,'Independent peer title');
+  app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(app.ctx.state.chain),['cloud-likely'],'both devices start chains the same way');
  }
 });
 
-test('RISK optional oldest start: an empty started pass publishes and resumes with its saved draw',async t=>{
+test('RISK chain start: a started Most likely pass publishes reloads and resumes with its saved draw',async t=>{
  for(const mode of ['descending','chance','squared','halving']){
-  const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('resume-a','Resume older'),createdAt:1},{...syncTask('resume-b','Resume higher'),createdAt:2,mu:30}],settings:{scanMode:mode,skipOldestFirstDot:true},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
-  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seed:195,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
+  const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('resume-a','Resume older'),createdAt:1},{...syncTask('resume-b','Resume higher'),createdAt:2,mu:30}],settings:{scanMode:mode,chainStartsWith:'mostLikely'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seed:2322,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));
   await app.ctx.cloudPull();app.ctx.window.CloudSync.ready=false;app.ctx.onAction('start-scan',{dataset:{mode}});
-  const candidate=app.ctx.state.candidateId,draw=JSON.stringify(app.ctx.state.chance);assert.ok(candidate);assert.deepEqual(Array.from(app.ctx.state.chain),[]);
+  assert.deepEqual(Array.from(app.ctx.state.chain),['resume-b'],mode);const draw=JSON.stringify(app.ctx.state.chance);
   app.ctx.onAction('start-working',{});assert.equal(await app.ctx.persist(),true);
-  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();
-  assert.notEqual(app.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','a started empty pass must be publishable before any explicit choice');
-  await settleSavedViewPublication(app,h,'empty started '+mode+' pass');
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'started '+mode+' pass');
   const saved=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
-  const reopened=await loadAppAtTime(at+1000,{seed:196,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(reopened));
+  const reopened=await loadAppAtTime(at+1000,{seed:2323,seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(reopened));
   await reopened.ctx.cloudPull();reopened.ctx.onAction('resume-scan',{dataset:{mode}});
-  assert.equal(reopened.ctx.state.candidateId,candidate);assert.equal(JSON.stringify(reopened.ctx.state.chance),draw,'pause reload and resume keep the saved draw');assert.deepEqual(Array.from(reopened.ctx.state.chain),[]);
+  assert.equal(JSON.stringify(reopened.ctx.state.chance),draw,'pause reload and resume keep the saved draw');assert.deepEqual(Array.from(reopened.ctx.state.chain),['resume-b']);
  }
 });
 
-test('RISK optional oldest start: synced Undo reverses first choices Start and preference without learning',async t=>{
- const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('undo-first','Skip first'),createdAt:1,mu:30},{...syncTask('undo-second','Choose second'),createdAt:2,mu:28}],settings:{skipOldestFirstDot:false},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+test('RISK chain start: synced Undo reverses the option and the Start it enabled without learning',async t=>{
+ const at=Date.parse('2026-10-18T12:00:00Z'),initial=syncState({tasks:[{...syncTask('undo-older','Undo older'),createdAt:1,mu:25},{...syncTask('undo-likely','Undo likely'),createdAt:2,mu:30}],settings:{scanMode:'descending'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(app));await app.ctx.cloudPull();
  const publish=async label=>{assert.equal(await app.ctx.persist(),true);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,label);};
- app.ctx.openSettings();const box=app.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:true,matches:()=>false});app.shim.document.dispatchEvent({type:'change',target:box});app.ctx.closeModal();
- app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});app.ctx.onAction('no',{dataset:{candidate:'undo-first',benchmark:''}});await publish('first unpaired skip');
- assert.equal(h.remoteState().considered['undo-first'],'no');app.ctx.onAction('yes',{dataset:{candidate:'undo-second',benchmark:''}});await publish('first explicit dot');
- app.ctx.onAction('undo',{});await publish('Undo first explicit dot');assert.deepEqual(h.remoteState().chain,[]);assert.equal(h.remoteState().considered['undo-first'],'no');
- app.ctx.onAction('undo',{});await publish('Undo first skip');assert.equal(h.remoteState().considered['undo-first'],undefined);assert.equal(app.ctx.state.candidateId,'undo-first');
- app.ctx.onAction('undo',{});await publish('Undo empty Start');assert.equal(app.ctx.state.candidateId,null);assert.deepEqual(h.remoteState().chain,[]);
- app.ctx.onAction('undo',{});await publish('Undo optional-start preference');assert.equal(h.remoteState().settings.skipOldestFirstDot,false);
- assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-first',30],['undo-second',28]],'all synced reversals remain unpaired and neutral');
+ chooseChainStart(app,'mostLikely');await publish('option');assert.equal(h.remoteState().settings.chainStartsWith,'mostLikely');
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await publish('Most likely Start');assert.deepEqual(h.remoteState().chain,['undo-likely']);
+ app.ctx.onAction('undo',{});await publish('Undo Start');assert.deepEqual(h.remoteState().chain,[]);assert.equal(h.remoteState().settings.chainStartsWith,'mostLikely','Undo reversed only the Start');
+ app.ctx.onAction('undo',{});await publish('Undo option');assert.equal(h.remoteState().settings.chainStartsWith,undefined,'Undo restores the default option on the cloud board');
+ assert.deepEqual(h.remoteState().tasks.map(row=>[row.id,row.mu]),[['undo-older',25],['undo-likely',30]],'every reversal stays neutral');
 });
 
-test('RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots',async()=>{
- const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
- const answer=question=>{const found=view.match(new RegExp('<dt>'+question.replace(/[?]/g,'\\?')+'</dt><dd>(.*?)</dd>'));assert.ok(found,'the mounted FAQ includes '+question);return found[1];};
- const choice=answer('Can I choose the first dot myself?');
- assert.match(choice,/Skip automatically dotting the oldest task/);assert.match(choice,/off by default/i);assert.match(choice,/saves immediately/i);assert.match(choice,/Yes.*first dot/);assert.match(choice,/No.*pass/);assert.match(choice,/rating|learning/);assert.match(choice,/existing dots/i);
- for(const question of ['What is Halving weighting?','What is Squared Weighting?','What is chance mode?','What happens to dots saved before this update?'])assert.match(answer(question),/unless.*skip|option.*off|by default/i,'automatic-first guidance accounts for the opt out: '+question);
- const current=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
- assert.match(current,/Settings.*choose the first dot yourself/);assert.match(current,/off by default/i);
+// #2332 (review N8): the Debug log's restart actions name only actions the app
+// still handles; Save settings went away with #2303.
+test('committed settings: the Debug log restart actions list only actions the app still handles',async()=>{
+ const {ctx}=await loadApp();
+ const listed=[...vm.runInContext('RESTART_DIAGNOSTICS_ACTIONS',ctx)];
+ const stale=listed.filter(act=>!html.includes('case "'+act+'"')&&!html.includes("case '"+act+"'"));
+ assert.deepEqual(stale,[],'every listed action is a case the action handler still has');
 });
 
-test('RISK optional oldest start: Save settings alone persists the checkbox transition',async()=>{
- const {ctx,shim}=await loadApp({seed:197});ctx.addTask('Save-only eligible task',false);ctx.openSettings();
- assert.equal(ctx.state.settings.skipOldestFirstDot,false);
- shim.document.getElementById('stSkipOldestFirstDot').checked=true;
- ctx.onAction('save-settings',{});
- assert.equal(ctx.state.settings.skipOldestFirstDot,true,'Save must read the checked draft even without an immediate change event');
- ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[]);assert.ok(ctx.state.candidateId);
+test('RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button',async()=>{
+ const app=await loadApp({seed:2324}),{ctx,shim}=app;
+ Object.assign(ctx.addTask('Save older',false),{id:'save-older',createdAt:1});Object.assign(ctx.addTask('Save likely',false),{id:'save-likely',createdAt:2,mu:32});
+ ctx.openSettings();assert.equal(ctx.state.settings.chainStartsWith,undefined);
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="save-settings"/,'#2303: there is no Save settings button to remember');
+ commitSetting(shim,'stChainStartsWith','mostLikely');
+ assert.equal(ctx.state.settings.chainStartsWith,'mostLikely','the committed choice saves by itself');
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),['save-likely']);
  assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
- reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
+ reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/<option value="mostLikely" selected>Most likely<\/option>/);
 });
 
-test('RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw',async()=>{
- for(const mode of ['descending','chance','squared','halving']){
-  const {ctx,shim}=await loadApp({seed:198});
-  for(let n=0;n<4;n++)Object.assign(ctx.addTask('Paused candidate '+n,false),{id:'pause-'+n,createdAt:n+1,mu:25+n});
-  ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.scanMode=mode;ctx.onAction('start-scan',{dataset:{mode}});
-  const skipped=ctx.state.candidateId;ctx.onAction('no',{dataset:{candidate:skipped,benchmark:''}});
-  const chosen=ctx.state.candidateId;ctx.onAction('yes',{dataset:{candidate:chosen,benchmark:''}});ctx.onAction('start-working',{});ctx.onAction('worked',{dataset:{benchmark:chosen}});
-  assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.mode,'work');
-  const before={passId:ctx.state.passId,draw:JSON.stringify(ctx.state.chance)},view=shim.document.getElementById('scan').innerHTML,action=view.match(/data-act="(start-scan|resume-scan)"/)?.[1];
-  assert.equal(action,'resume-scan','an already-started empty paused chain must offer Resume through its actual visible action');
-  ctx.onAction(action,{dataset:{mode}});assert.equal(ctx.state.passId,before.passId);assert.equal(JSON.stringify(ctx.state.chance),before.draw);assert.equal(ctx.state.considered[skipped],'no');assert.ok(ctx.state.candidateId);
- }
-});
-
-test('RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts',async()=>{
+test('RISK chain start: Quick start and the immediate-save FAQ describe the dropdown',async()=>{
  const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
  const quick=view.match(/<summary>Quick start<\/summary>([\s\S]*?)<\/details>/)[1];
- assert.match(quick,/With no dot, Yes chooses.*No skips.*this pass/,'Quick start must explain the initial unpaired choice');
+ assert.doesNotMatch(quick,/With no dot, Yes chooses/,'there is no unpaired first choice any more');
+ assert.match(quick,/Start scanning adds the first dot.*Chain starts with/,'Quick start explains the first dot comes from the setting');
  assert.match(quick,/Once a dot exists, compare each candidate/,'benchmark comparisons start only after a dot exists');
- const countdown=view.match(/<dt>What do the countdown tags mean\?<\/dt><dd>(.*?)<\/dd>/)[1];
- assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'timer cleanup does not promise automatic placement');
  const immediate=view.match(/<dt>Which settings save immediately\?<\/dt><dd>(.*?)<\/dd>/)[1];
- assert.match(immediate,/Skip automatically dotting the oldest task/,'the complete immediate-save inventory includes the new checkbox');
+ assert.match(immediate,/Chain starts with/,'the complete immediate-save inventory includes the dropdown');
+ assert.doesNotMatch(immediate,/Skip automatically dotting the oldest task/);
+});
+
+test('RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{const found=view.match(new RegExp('<dt>'+question.replace(/[?]/g,'\\?')+'</dt><dd>(.*?)</dd>'));assert.ok(found,'the mounted FAQ includes '+question);return found[1];};
+ const start=answer('What does Chain starts with do?');
+ for(const text of [/Oldest eligible.*default/i,/Most likely/,/highest overall chance/i,/older task.*task id|oldest task.*task id/i,/no randomness|never random/i,/Existing dots stay/i,/Undo/,/follows? your board/i,/Older versions/i])assert.match(start,text);
+ assert.match(start,/checkbox/i,'the FAQ says what happened to the old checkbox');assert.match(start,/starts? with Oldest eligible/i);
+ assert.doesNotMatch(view,/Can I choose the first dot myself|Skip automatically dotting the oldest task/,'nothing still describes the removed checkbox');
+ for(const question of ['What is Halving weighting?','What is Squared Weighting?','What is chance mode?'])assert.match(answer(question),/Chain starts with/,'mode FAQ points at the setting: '+question);
+ const current=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.match(current,/Chain starts with/);assert.match(current,/Most likely/);assert.match(current,/Oldest eligible/);
+});
+
+// #2332 release reviews: the FAQ and Changelog copy matches what this release does.
+test('RISK chain start: the FAQ and current Changelog describe this release accurately after review',async()=>{
+ const {ctx,shim}=await loadApp();ctx.onAction('help',{});const view=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=question=>{const found=view.match(new RegExp('<dt>'+question.replace(/[?]/g,'\\?')+'</dt><dd>(.*?)</dd>'));assert.ok(found,'the mounted FAQ includes '+question);return found[1];};
+ const start=answer('What does Chain starts with do?');
+ assert.match(start,/affects only the next start: existing dots stay\./,'no capital after the colon');
+ assert.doesNotMatch(start,/Older versions keep starting with the oldest task/,'not true for a board that had the old checkbox on');
+ assert.match(start,/Older versions[^.]*old checkbox on[^.]*first dot/i,'older versions on a board with the old checkbox on still offer an unpaired first choice');
+ assert.match(answer('How do Settings save?'),/whole-number box[^.]*fraction|fraction[^.]*whole-number box/i,'a fraction in a whole-number box returns too');
+ assert.match(answer('What does Download board only contain?'),/appears beside Download backup when a backup comes out partial[^.]*fails or has not finished/i,'it also appears when a backup fails or stalls');
+ assert.match(answer('Does Settings close when I make or delete a backup?'),/Troubleshooting/,'Troubleshooting stays open too');
+ assert.match(answer('Does Settings close when I make or delete a backup?'),/short screen[^.]*Make backup/i,'on a short screen the focused Make backup stays in view');
+ const current=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8').match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ const today=current.match(/<h3>November 10, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)[1];
+ assert.doesNotMatch(today,/Make manual backup/,'the button is Make backup now');
+ assert.doesNotMatch(today,/inside the same protected preview/,'the file and paste choices appear beside Restore, before the preview');
+ assert.match(today,/Choose a file and Paste board data beside it/);
+ assert.match(today,/partial, fails or has not finished[^.]*Download board only appears beside it/i);
+});
+
+// #2304 (spec #2298, story 58): one run tries every new feature on a synthetic
+// board, then does ordinary work on that same board. The expected board at the
+// end is written out by hand below, not read back from the app.
+const WORKS_LIKE_NORMAL_AT=Date.parse('2026-11-10T15:00:00Z');
+const WORKS_LIKE_NORMAL_SETTINGS={showPostpone:true,cantMin:12,horizonMin:90,dateFormat:'ymd'};
+function worksLikeNormalBoard2304(){
+ return syncState({tasks:[{...syncTask('normal-oldest','Oldest errand'),createdAt:1,mu:20},{...syncTask('normal-likely','Likely errand'),createdAt:2,mu:32},
+  {...syncTask('normal-middle','Middle errand'),createdAt:3,mu:26},{...syncTask('normal-newest','Newest errand'),createdAt:4,mu:22}],
+  settings:{scanMode:'descending',horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:8,theme:'system'},syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+}
+const worksLikeNormalHistory2304=app=>{
+ if(app.ctx.state.histOpen)app.ctx.render();else app.ctx.onAction('toggle-hist',{});
+ return [...app.shim.document.getElementById('histPanel').innerHTML.matchAll(/<span class="dt[^"]*">([^<]+)/g)].map(match=>match[1].trim());
+};
+const worksLikeNormalTasks2304=board=>board.tasks.map(task=>[task.title,task.done===true]);
+async function worksLikeNormalJourney2304(t,{beforeJourney,afterPublish}={}){
+ const {IDBFactory}=await import('fake-indexeddb');
+ const initial=worksLikeNormalBoard2304(),raw=JSON.stringify(initial),h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}),factory=new IDBFactory(),deviceDbName='works-like-normal-'+Date.now()+'-'+Math.random();
+ // The real cloud backend reports the signed-in identity a file restore checks; this harness stands in for it.
+ const cloudSyncFactory=()=>{const CS=h.factory();CS.recoveryIdentity=()=>'works-like-normal:e@example.com';CS.recoveryEvidence=async()=>({identity:CS.recoveryIdentity(),epoch:1,pending:false});return CS;};
+ let clock=WORKS_LIKE_NORMAL_AT;
+ const open=async()=>{clock+=60000;const opened=await loadAppAtTime(clock,{seed:2304,sharedStorage:storage,indexedDBProvider:factory,deviceDbName,cloudSyncFactory});t.after(()=>closeLegacyApp173(opened));return opened;};
+ const reload=async current=>{await closeLegacyApp173(current);return open();};
+ const publish=async(current,stage)=>{assert.equal(await current.ctx.persist(),true,stage);await current.ctx.cloudPull();await current.ctx.cloudPushNow();await settleSavedViewPublication(current,h,stage);if(afterPublish)await afterPublish({h,stage});};
+ const noRecoveryPrompt=async(current,stage)=>{
+  assert.equal(current.ctx.window.CloudSync.status==='error',false,stage+': no sync hold ('+current.ctx.window.CloudSync.errorCode+')');
+  assert.equal(vm.runInContext('cloudAdoptionHeld||openingRecoveryHeld',current.ctx),false,stage+': nothing is held for recovery');
+  assert.doesNotMatch(current.shim.document.getElementById('syncBtn').textContent,/error|hold/i,stage+': the sync control shows no recovery prompt');
+  current.ctx.closeModal();await syncSettle(5);
+  assert.equal(current.shim.document.getElementById('modalRoot').innerHTML,'',stage+': no recovery dialog opens');
+ };
+ let app=await open();await app.ctx.cloudPull();
+ if(beforeJourney)await beforeJourney({h,raw});
+
+ // Both Chain starts with options, then back to the default.
+ chooseChainStart(app,'mostLikely');app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-likely'],'Most likely starts with the highest chance');
+ await publish(app,'Most likely start');
+ app.ctx.onAction('undo',{});assert.deepEqual(Array.from(app.ctx.state.chain),[],'Undo takes the Most likely Start back');
+ chooseChainStart(app,'oldest');assert.equal(app.ctx.state.settings.chainStartsWith,undefined,'switching back restores the default option');
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'Oldest eligible starts with the oldest task again');
+ app.ctx.onAction('undo',{});assert.deepEqual(Array.from(app.ctx.state.chain),[],'Undo takes the Oldest eligible Start back');
+ await publish(app,'both chain start options');
+
+ // Settings save as they are committed and survive a reload; the ? menu opens closed.
+ app.ctx.openSettings();for(const [id,value] of [['stShowPostpone',true],['stCantMin',12],['stHorizon',90],['stDateFormat','ymd']])commitSetting(app.shim,id,value);app.ctx.closeModal();
+ await publish(app,'committed settings');
+ // The reloaded board is checked before the cloud is read, so the cloud copy cannot mask a lost setting.
+ app=await reload(app);
+ const pick=settings=>Object.fromEntries(Object.keys(WORKS_LIKE_NORMAL_SETTINGS).map(key=>[key,settings[key]]));
+ assert.deepEqual(pick(app.ctx.state.settings),WORKS_LIKE_NORMAL_SETTINGS,'every committed setting survives the reload');
+ assert.equal('chainStartsWith' in app.ctx.state.settings,false,'the default option leaves no saved key');
+ await app.ctx.cloudPull();await noRecoveryPrompt(app,'settings reload');
+ app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<option value="oldest" selected>Oldest eligible<\/option>/,'Settings shows Oldest eligible after the reload');app.ctx.closeModal();
+ assert.deepEqual(helpMenuSections2302(app),['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups'].map(title=>({title,open:false})),'the ? menu opens with Changelog first and every section closed');
+ app.ctx.closeModal();
+
+ // Ordinary work: scan, dot, Done, Undo, Done again, resume.
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'Start dots the oldest task');
+ assert.equal(app.ctx.state.candidateId,'normal-likely','the highest-chance task is offered first');assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="yes"/,'the scanner offers Yes');
+ app.ctx.onAction('yes',{dataset:{candidate:'normal-likely',benchmark:'normal-oldest'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest','normal-likely'],'Yes dots the candidate');
+ app.ctx.onAction('start-working',{});assert.equal(app.ctx.state.mode,'work','Pause starts working on the last dot');
+ app.ctx.onAction('bench-done',{});
+ assert.equal(app.ctx.state.tasks.find(task=>task.id==='normal-likely').done,true,'Done marks the task being worked on');
+ assert.deepEqual(worksLikeNormalHistory2304(app),['Likely errand'],'History lists the task marked Done');
+ app.ctx.onAction('undo',{});
+ assert.equal(app.ctx.state.tasks.find(task=>task.id==='normal-likely').done,false,'Undo reverses Done');
+ assert.deepEqual(worksLikeNormalHistory2304(app),[],'Undo takes it out of History');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest','normal-likely'],'Undo puts the dot back');
+ app.ctx.onAction('bench-done',{});assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'Done again leaves the earlier dot');
+ app.ctx.onAction('resume-scan',{dataset:{mode:'descending'}});assert.equal(app.ctx.state.mode,'scan','resume returns to scanning');
+ assert.equal(app.ctx.state.candidateId,'normal-middle','resuming offers the next task');
+ await publish(app,'ordinary work');
+
+ // A backup before going offline; its restore preview comes after reconnecting.
+ await app.ctx.onAction('make-manual-backup',{});for(let n=0;n<100&&!/class="mgr backup-row"/.test(app.shim.document.getElementById('modalRoot').innerHTML);n++)await flush();
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/class="mgr backup-row"/,'Make backup lists the new backup');app.ctx.closeModal();
+ const files=captureDownloads(app);await app.ctx.onAction('download-recovery-file',{});for(let n=0;n<100&&!files.length;n++)await flush();
+ assert.equal(files.length,1,'Download backup saves one file');const backupText=await downloadedText(files[0]),backup=JSON.parse(backupText);
+ assert.equal(backup.manifest.status,'complete','the backup is complete');
+ assert.deepEqual(worksLikeNormalTasks2304(backup.currentBoard),[['Oldest errand',false],['Likely errand',true],['Middle errand',false],['Newest errand',false]],'the backup holds the board');
+
+ // Offline: a No, then a reload with the cloud unreachable, then reconnect.
+ h.failPull=true;app.ctx.window.CloudSync.ready=false;
+ app.ctx.onAction('no',{dataset:{candidate:'normal-middle',benchmark:'normal-oldest'}});assert.equal(app.ctx.state.considered['normal-middle'],'no');
+ app=await reload(app);
+ assert.equal(app.ctx.state.considered['normal-middle'],'no','the offline No survives the offline reload');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'the chain survives the offline reload');
+ assert.deepEqual(pick(app.ctx.state.settings),WORKS_LIKE_NORMAL_SETTINGS,'settings survive the offline reload');
+ assert.notEqual(h.remoteState().considered['normal-middle'],'no','the cloud has not seen the No while offline');
+ h.failPull=false;await publish(app,'reconnect');await noRecoveryPrompt(app,'reconnect');
+ assert.equal(h.remoteState().considered['normal-middle'],'no','reconnecting publishes the offline No');
+
+ // A restore preview of the earlier backup, cancelled, leaves the newer board as it was.
+ const before=JSON.stringify({tasks:app.ctx.state.tasks,chain:app.ctx.state.chain,considered:app.ctx.state.considered,settings:app.ctx.state.settings});
+ app.ctx.openSettings();await app.ctx.onAction('restore-backup',{});await app.ctx.onAction('open-paste-recovery',{});
+ const box=app.shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=backupText;app.shim.document.dispatchEvent({type:'input',target:box});
+ assert.equal(await app.ctx.onAction('preview-pasted-recovery',{}),true,'Restore previews the backup ('+app.shim.document.getElementById('toast').textContent+')');
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/<h2>Preview backup file<\/h2>/,'the protected preview opens');
+ await app.ctx.onAction('cancel-file-restore',{});app.ctx.closeModal();
+ assert.equal(JSON.stringify({tasks:app.ctx.state.tasks,chain:app.ctx.state.chain,considered:app.ctx.state.considered,settings:app.ctx.state.settings}),before,'a cancelled preview changes nothing');
+ await publish(app,'after restore preview');
+
+ // The board, on this device and in the cloud, is the expected one.
+ const expectedTasks=[['Oldest errand',false],['Likely errand',true],['Middle errand',false],['Newest errand',false]];
+ for(const [label,board] of [['device',app.ctx.state],['cloud',h.remoteState()]]){
+  assert.deepEqual(worksLikeNormalTasks2304(board),expectedTasks,label+': tasks');
+  assert.deepEqual(Array.from(board.chain),['normal-oldest'],label+': chain');
+  assert.deepEqual(pick(board.settings),WORKS_LIKE_NORMAL_SETTINGS,label+': settings');
+  assert.equal('chainStartsWith' in board.settings,false,label+': default chain start');
+  assert.equal(board.considered['normal-middle'],'no',label+': the offline No');
+ }
+ assert.deepEqual(worksLikeNormalHistory2304(app),['Likely errand'],'History');
+ await noRecoveryPrompt(app,'final board');
+ return {app,h};
+}
+
+test('RISK works like normal: after both chain start options, committed Settings with a reload and the ? menu, ordinary scanning, Done, Undo, resume, offline reload, reconnect, backup and restore preview leave the expected board',async t=>{
+ await worksLikeNormalJourney2304(t);
+});
+
+// #2304: Stable, the released client, stays open on the same cloud board while
+// the run above uses every new feature. Written against cb48e3c; #2332 moved it
+// to 5548cd7, the Stable build deployed when this release was reviewed.
+const WORKS_LIKE_NORMAL_RELEASED='5548cd7cf69493712f63a36ac02fdd4dc6ae2b48';
+test('RISK BACKWARD COMPATIBILITY: the released client with the same board open keeps syncing through the works-like-normal run, with no recovery prompt and no lost setting',async t=>{
+ const released=spawnSync('git',['show',WORKS_LIKE_NORMAL_RELEASED+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
+ let stable;
+ const stableClear=stage=>{
+  assert.equal(stable.ctx.window.CloudSync.status==='error',false,stage+': no hold on Stable ('+stable.ctx.window.CloudSync.errorCode+')');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',stable.ctx),false,stage+': Stable does not hold the board');
+  assert.doesNotMatch(stable.shim.document.getElementById('syncBtn').textContent,/error|hold/i,stage+': no recovery prompt on the Stable sync control');
+  assert.equal(stable.shim.document.getElementById('modalRoot').innerHTML,'',stage+': no recovery dialog opens on Stable');
+ };
+ const {app,h}=await worksLikeNormalJourney2304(t,{async beforeJourney({h,raw}){
+  stable=await loadAppAtTime(WORKS_LIKE_NORMAL_AT,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+  t.after(()=>closeLegacyApp173(stable));await stable.ctx.cloudPull();
+ },async afterPublish({h,stage}){
+  // Stable pulls each time the run publishes, and keeps every setting the board carries.
+  await stable.ctx.cloudPull();await syncSettle(20);stableClear('Stable after '+stage);
+  for(const [key,value] of Object.entries(h.remoteState().settings))assert.equal(JSON.stringify(stable.ctx.state.settings[key]),JSON.stringify(value),'Stable after '+stage+': setting '+key+' is kept');
+  assert.deepEqual(Array.from(stable.ctx.state.chain),h.remoteState().chain,'Stable after '+stage+': same chain');
+ }});
+ const settings=JSON.parse(JSON.stringify(app.ctx.state.settings));
+ const sameSettings=(board,stage)=>{for(const [key,value] of Object.entries(settings))assert.equal(JSON.stringify(board.settings[key]),JSON.stringify(value),stage+': setting '+key+' is kept');};
+ await stable.ctx.cloudPull();await syncSettle(30);stableClear('Stable reads the board');
+ assert.deepEqual(worksLikeNormalTasks2304(stable.ctx.state),[['Oldest errand',false],['Likely errand',true],['Middle errand',false],['Newest errand',false]],'Stable shows the same tasks');
+ assert.deepEqual(Array.from(stable.ctx.state.chain),['normal-oldest'],'Stable shows the same chain');
+ sameSettings(stable.ctx.state,'Stable reads the board');
+ hydrateUnchangedEditorDraft(stable,'normal-newest');stable.shim.document.getElementById('etTitle').value='Newest errand, edited on Stable';stable.ctx.onAction('save-edit',{dataset:{id:'normal-newest'}});
+ assert.equal(await stable.ctx.persist(),true);await stable.ctx.cloudPull();await stable.ctx.cloudPushNow();
+ for(let n=0;n<160&&h.remoteState().tasks.find(row=>row.id==='normal-newest').title!=='Newest errand, edited on Stable';n++)await syncSettle(5);
+ stableClear('Stable writes the board');
+ assert.equal(h.remoteState().tasks.find(row=>row.id==='normal-newest').title,'Newest errand, edited on Stable','Stable keeps syncing');
+ sameSettings(h.remoteState(),'Stable writes the board');
+ await app.ctx.cloudPull();await syncSettle(30);
+ assert.equal(app.ctx.window.CloudSync.status==='error',false,'the candidate reads the Stable write without a hold ('+app.ctx.window.CloudSync.errorCode+')');
+ assert.equal(vm.runInContext('cloudAdoptionHeld||openingRecoveryHeld',app.ctx),false,'the candidate holds nothing for recovery');
+ assert.equal(app.ctx.state.tasks.find(row=>row.id==='normal-newest').title,'Newest errand, edited on Stable','the candidate receives the Stable edit');
+ sameSettings(app.ctx.state,'the candidate after the Stable write');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['normal-oldest'],'the chain is unchanged');
+});
+
+// #2332: Stable still deals an unpaired candidate on an empty chain when a
+// board carries the retired skipOldestFirstDot and a pass has started. A client
+// that cleared it on every read published a scan repair that Stable re-dealt on
+// its next read, so the two pushed revisions at each other with nobody acting.
+const SKIP_FLAG_STABLE='5548cd7cf69493712f63a36ac02fdd4dc6ae2b48';
+async function skipFlagStableRounds(t,{skip,trigger}){
+ const released=spawnSync('git',['show',SKIP_FLAG_STABLE+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(released.status,0,released.stderr);
+ const at=Date.parse('2026-11-10T15:00:00Z'),fromStableUi=trigger==='stable-start';
+ // stable-start reaches the same state through Stable's own Settings and Start
+ // instead of a board saved mid-pass.
+ const initial=syncState({tasks:[{...syncTask('flag-oldest','Flag oldest'),createdAt:1},{...syncTask('flag-likely','Flag likely'),createdAt:2,mu:30}],
+  settings:{scanMode:'descending',showPostpone:true,...(fromStableUi?{}:{skipOldestFirstDot:skip})},
+  ...(fromStableUi?{}:{chain:[],mode:'scan',passStartedAt:at-60000,passId:'flag-pass'}),
+  syncAccount:'e@example.com',syncRev:4,syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const stable=await loadAppAtTime(at,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+ t.after(()=>closeLegacyApp173(stable));await stable.ctx.cloudPull();await syncSettle(40);
+ const seen=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+ const app=await loadAppAtTime(at+1000,{seedStorage:{[SYNC_STORE_KEY]:seen,[LOCAL_HEAD_KEY]:seen},cloudSyncFactory:h.factory});
+ t.after(()=>closeLegacyApp173(app));await app.ctx.cloudPull();await syncSettle(60);
+ // One ordinary write, then nobody touches either client.
+ const writer=trigger==='candidate'?app:stable,offered=stable.ctx.state.candidateId;
+ if(fromStableUi){
+  stable.ctx.openSettings();const box=stable.shim.document.getElementById('stSkipOldestFirstDot');Object.assign(box,{id:'stSkipOldestFirstDot',checked:skip,matches:()=>false});
+  stable.shim.document.dispatchEvent({type:'change',target:box});stable.ctx.closeModal();
+  stable.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.equal(stable.ctx.state.chain.length,skip?0:1,'Stable starts unseeded only with its old checkbox on');
+ }else if(trigger==='stable'&&offered)stable.ctx.onAction('no',{dataset:{candidate:offered,benchmark:''}});
+ else{hydrateUnchangedEditorDraft(writer,'flag-likely');writer.shim.document.getElementById('etTitle').value='Edited on '+trigger;writer.ctx.onAction('save-edit',{dataset:{id:'flag-likely'}});}
+ assert.equal(await writer.ctx.persist(),true);await writer.ctx.cloudPull();await writer.ctx.cloudPushNow();await syncSettle(60);
+ const revs=[h.doc.rev],adoptionCopies=client=>client.ctx.readLocalBackups().filter(row=>row.kind==='before-cloud-adoption').length,copies=[];
+ for(let round=0;round<4;round++){
+  await app.ctx.cloudPull();await syncSettle(60);revs.push(h.doc.rev);
+  await stable.ctx.cloudPull();await syncSettle(60);revs.push(h.doc.rev);
+  copies.push([adoptionCopies(stable),adoptionCopies(app)]);
+ }
+ t.diagnostic(JSON.stringify({skip,trigger,offered,revs,copies,cloudCandidate:h.remoteState().candidateId}));
+ // Each adopted revision saves a whole-board copy on the reading device; once both
+ // have read the one allowed follow-up write, no more copies may appear.
+ assert.deepEqual(copies.at(-1),copies[1],'skip '+skip+', '+trigger+' writes: reading a settled board saves no more adoption backups ('+JSON.stringify(copies)+')');
+ // At most one follow-up write: Stable deals its own candidate once when the
+ // board it reads has none (its ordinary first deal). After that the board is quiet.
+ assert.ok(revs.at(-1)-revs[0]<=1,'skip '+skip+', '+trigger+' writes: the revision settles instead of climbing ('+revs.join(' → ')+')');
+ assert.equal(revs.at(-1),revs[2],'skip '+skip+', '+trigger+' writes: no client pushes again once both have read the board ('+revs.join(' → ')+')');
+ assert.equal(app.ctx.window.CloudSync.status==='error',false,'the candidate stays in sync');
+ assert.equal(stable.ctx.window.CloudSync.status==='error',false,'Stable stays in sync');
+ // #2300 still holds on this client while Stable keeps its candidate stored.
+ if(fromStableUi&&!skip)return;
+ app.ctx.render();const scan=app.shim.document.getElementById('scan').innerHTML;
+ assert.match(scan,/data-act="start-scan"/,'the candidate offers Start on the empty chain');
+ assert.doesNotMatch(scan,/data-act="yes"/,'the candidate offers no unpaired choice');
+ app.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.deepEqual(Array.from(app.ctx.state.chain),['flag-oldest'],'Start dots the oldest eligible task');
+}
+test('RISK BACKWARD COMPATIBILITY: with the retired skip checkbox saved on and an empty started chain, Stable and the candidate stop writing after an ordinary edit',async t=>{
+ for(const trigger of ['stable','candidate','stable-start'])await t.test('flag on, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:true,trigger});});
+ // Control: without the flag both clients already agree that an empty chain has no candidate.
+ for(const trigger of ['stable','candidate','stable-start'])await t.test('flag off, '+trigger+' writes',async sub=>{await skipFlagStableRounds(sub,{skip:false,trigger});});
 });
 
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
@@ -5852,21 +6206,45 @@ test('RISK changelog dates: direct FAQ notes combine repeated dates in descendin
  ctx.openHelp();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Where can I see what changed\?/,'chronological notes no longer repeat the removed navigation question');
 });
 
-test('RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation',async()=>{
+test('RISK Settings hierarchy: moved Changelog leaves no Save settings button and committed fields keep their validation',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
  assert.doesNotMatch(markup,/<summary>Changelog<\/summary>/,'release notes have moved to FAQs / Changelog');
- const save=markup.indexOf('data-act="save-settings"');assert.ok(save>markup.lastIndexOf('</details>'),'Save settings is after every disclosure, including backups');assert.equal((markup.match(/data-act="save-settings"/g)||[]).length,1);
+ assert.doesNotMatch(markup,/data-act="save-settings"|>Save settings</,'#2303: every field saves when committed, so there is no Save settings button');
  for(const entry of html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1].matchAll(/<li>([\s\S]*?)<\/li>/g)){ctx.openHelp();assert.ok(shim.document.getElementById('modalRoot').innerHTML.includes(entry[0]),'all historical entries remain in help');}ctx.openSettings();
- for(const [id,value] of Object.entries({stHorizon:'999',stCantMin:'',stWorkedHrs:'17',stThresh:'0',stSamples:'50',stEverHours:'21',stEverUnit:'hours',stScanMode:'both',stListMetric:'chance',stDateFormat:'ymd'}))shim.document.getElementById(id).value=value;
- ctx.onAction('save-settings',{});await ctx.persist();assert.equal(ctx.state.settings.horizonMin,480);assert.equal(ctx.state.settings.cantMin,30);assert.equal(ctx.state.settings.workedHours,17);assert.equal(ctx.state.settings.thresholdPct,25);assert.equal(ctx.state.settings.evergreenHours,21);
+ for(const [id,value] of Object.entries({stHorizon:'999',stCantMin:'',stWorkedHrs:'17',stThresh:'0',stSamples:'50',stEverHours:'21',stEverUnit:'hours',stScanMode:'both',stListMetric:'chance',stDateFormat:'ymd'}))commitSetting(shim,id,value);
+ await ctx.persist();assert.equal(ctx.state.settings.horizonMin,60,'an out-of-range Horizon returns to its last valid value; it is not clamped');assert.equal(shim.document.getElementById('stHorizon').value,'60','the field shows that value again');
+ assert.equal(ctx.state.settings.cantMin,30);assert.equal(shim.document.getElementById('stCantMin').value,'30','an emptied field returns to its last valid value');assert.equal(ctx.state.settings.workedHours,17);assert.equal(ctx.state.settings.thresholdPct,25);assert.equal(shim.document.getElementById('stThresh').value,'25');assert.equal(ctx.state.settings.samples,50);assert.equal(ctx.state.settings.evergreenHours,21);
  const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reloaded.ctx.state.settings.workedHours,17);assert.equal(reloaded.ctx.state.settings.scanMode,'both');assert.equal(reloaded.ctx.state.settings.listMetric,'chance');assert.equal(reloaded.ctx.state.settings.dateFormat,'ymd');
 });
 
-test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
+// #2303: Settings help is at most one short line, and only where a control
+// cannot be understood without it. The repeated phrases are gone everywhere.
+test('RISK Settings help: every control has at most one short line of help and no repeated save or sync phrases',async()=>{
+ for(const scanMode of ['halving','squared']){
+  const {ctx,shim}=await loadApp();ctx.setScanPreference(scanMode);ctx.openSettings();
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  const sections=markup.split('<details class="settings-section"').slice(1).map(part=>part.split('</details>')[0]);
+  const names=sections.map(part=>part.match(/<summary>(.*?)<\/summary>/)?.[1]);
+  assert.deepEqual(names.slice(0,2),['Scene and appearance','Scanning and recurrence'],'positive control: the control sections are read');
+  for(const [index,part] of sections.slice(0,2).entries()){
+   const help=[...part.matchAll(/<(p|span)\b[^>]*class="kv[^"]*"[^>]*>([\s\S]*?)<\/\1>/g)].map(match=>match[2].replace(/<[^>]+>/g,'').trim()).filter(Boolean);
+   for(const line of help){
+    assert.ok(line.length<=70,`${scanMode}/${names[index]}: help is one short line: "${line}" (${line.length} characters)`);
+    assert.ok((line.match(/[.!?](\s|$)/g)||[]).length<=1,`${scanMode}/${names[index]}: help is a single sentence: "${line}"`);
+   }
+  }
+  for(const phrase of [/Off by default/i,/Saves? immediately/i,/Synced with your board/i,/syncs with your board/i,/Save settings/i])
+   assert.doesNotMatch(markup,phrase,scanMode+': Settings no longer repeats '+phrase);
+ }
+ assert.doesNotMatch(appSrc,/Synced with your board when signed in/,'the location status update does not add it back');
+});
+
+test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and saving as you change',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Every setting saves as soon as you change it/i])assert.match(help,pattern);
+ assert.doesNotMatch(help,/Save settings is at the bottom/,'#2303: there is no Save settings button to describe');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 
@@ -5891,12 +6269,13 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included','restore green before testing Settings green-to-red transition');
     await page.locator('[data-act="help"]').click();let modal=page.locator('#modalRoot .modal');const log=modal.locator('[data-help-changelog]');
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
-    const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.help-faq')],first=section.at(-1),next=section[1],save=e.querySelector('[data-act="ok-quickstart"]');return {font:getComputedStyle(first.querySelector('summary')).fontSize,otherFont:getComputedStyle(next.querySelector('summary')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
+    const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.help-faq')],first=e.querySelector('[data-help-changelog]'),next=section[1],save=e.querySelector('[data-act="ok-quickstart"]');return {font:getComputedStyle(first.querySelector('summary')).fontSize,otherFont:getComputedStyle(next.querySelector('summary')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
     assert.equal(styles.font,styles.otherFont);assert.equal(styles.surface,styles.otherSurface);assert.equal(styles.summary,styles.otherSummary);assert.equal(styles.last,true);assert.equal(styles.overflow,true);
     await modal.locator('[data-act="close-modal"]').click();await page.locator('[data-act="settings"]').click();modal=page.locator('#modalRoot .modal');await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
     await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
-    const save=modal.locator('[data-act="save-settings"]');await save.scrollIntoViewIfNeeded();if(width<1000)await save.tap();else await save.click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
-    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
+    assert.equal(await page.locator('#stHorizon').inputValue(),'60','#2303: leaving an out-of-range Horizon returns it to its last valid value');
+    assert.equal(await modal.locator('[data-act="save-settings"]').count(),0,'#2303: there is no Save settings button');await modal.locator('[data-act="close-modal"]').click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
+    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),60);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
     await page.evaluate(()=>openSettings());await page.locator('#modalRoot [data-act="close-modal"]').click();assert.equal(await page.evaluate(()=>state.settings.workedHours),19,'closing Settings retains the saved value');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     if(process.env.CONTEXT_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.CONTEXT_EVIDENCE_DIR,`${name}-${width}x${height}-contexts.png`)});
@@ -7840,8 +8219,8 @@ test('RISK AUTH HYDRATION: real Auth and native resume wait for the durable boar
   const release=new Promise(resolve=>{releaseOpen=resolve;}),entered=new Promise(resolve=>{openEntered=resolve;});
   try{
    warm=await loadAppAtTime(at,{sharedStorage:storage,indexedDBProvider:factory,deviceDbName:dbName});
-   warm.ctx.setSkipOldestFirstDotPreference(!skipFirstDot);
-   warm.ctx.setSkipOldestFirstDotPreference(skipFirstDot);
+   warm.ctx.setShowPostponePreference(false);
+   warm.ctx.setShowPostponePreference(true);
    assert.equal(await warm.ctx.persist(true),true,'the saved board and its pending local choices have an authoritative device head');
    const durable=warm.shim.window.ScannerDeviceStore,initialHead=await durable.readHead();
    const expectedState=JSON.parse(initialHead.payload),expectedEventIds=expectedState.decisionEvents.map(event=>event.id);
@@ -9919,23 +10298,77 @@ test("RISK rating bounds: hydration and frozen chance opponents normalize extrem
   assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
 });
 
-test("RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore", async () => {
+// #2303 (owner spec #2298 and decisions of 2026-11-09): the Data section is, in
+// order, one status line, Make backup, Download backup, Restore, the backup
+// list, a closed Troubleshooting section and Reset everything. Housekeeping is
+// gone; Clear history stays in the History panel.
+test("RISK Data and backups layout: one status line, Make backup, Download backup, Restore, the backup list, closed Troubleshooting and Reset everything, with Clear history only in History", async () => {
+  const { ctx, shim } = await loadApp();
+  const done = ctx.addTask("Finished layout task", false); ctx.addTask("Open layout task", false);
+  ctx.state.chain = [done.id]; ctx.pushUndo(); ctx.completeTask(done); await ctx.persist();
+  ctx.onAction("make-manual-backup", {}); for (let i = 0; i < 50 && !ctx.readLocalBackups().some(row => row.kind === "manual"); i++) await flush();
+  ctx.openSettings();
+  const markup = shim.document.getElementById("modalRoot").innerHTML;
+  const data = markup.split("<summary>Data and backups</summary>")[1] || "";
+  assert.ok(data, "positive control: Settings has Data and backups");
+  assert.equal((data.match(/class="statusdot"/g) || []).length, 1, "one status line");
+  const order = [/class="statusdot"/, /data-act="make-manual-backup">Make backup</, /data-act="download-recovery-file">Download backup</,
+    /data-act="restore-backup"[^>]*>Restore</, /class="mgr backup-row"/, /<details class="settings-troubleshooting"><summary>Troubleshooting<\/summary>/,
+    /data-act="wipe">Reset everything</];
+  const at = order.map(pattern => data.search(pattern));
+  assert.ok(at.every(index => index >= 0), "every item is in the Data section: " + JSON.stringify(at));
+  assert.deepEqual(at.slice().sort((a, b) => a - b), at, "the items appear in the approved order: " + JSON.stringify(at));
+  const troubleshooting = data.split('<details class="settings-troubleshooting">')[1]?.split("</details>")[0] || "";
+  assert.match(troubleshooting, /data-act="view-support-diagnostics">View debug log</, "Troubleshooting holds the Debug log");
+  assert.match(troubleshooting, /data-act="review-decision-recovery">Review saved decisions</, "Troubleshooting holds Review saved decisions");
+  assert.doesNotMatch(markup, /<details class="settings-troubleshooting" open/, "Troubleshooting is closed when Settings opens");
+  assert.doesNotMatch(markup, /Housekeeping|data-act="clear-done"|History panel/, "Settings no longer repeats Clear history");
+  ctx.closeModal(); ctx.state.histOpen = true; ctx.render();
+  assert.match(shim.document.getElementById("histPanel").innerHTML, /data-act="clear-done">Clear history</, "Clear history stays in the History panel");
+});
+
+// #2303: the install action moves out of Scanning and recurrence.
+test("RISK Settings install: Install this app on your phone sits outside Scanning and recurrence", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openSettings();
+  const markup = shim.document.getElementById("modalRoot").innerHTML;
+  const scanning = markup.split("<summary>Scanning and recurrence</summary>")[1]?.split("</details>")[0] || "";
+  assert.ok(scanning.includes('id="stChainStartsWith"'), "positive control: the Scanning section is read");
+  assert.doesNotMatch(scanning, /data-act="install-app"/, "the install action is not a scanning setting");
+  assert.equal((markup.match(/data-act="install-app">Install this app on your phone</g) || []).length, 1, "Settings still offers it once");
+  ctx.onAction("install-app", {});
+  assert.match(shim.document.getElementById("modalRoot").innerHTML, /iPhone|Android|Install/, "it still opens the install help");
+});
+
+test("RISK backup and Restore consolidation: Settings keeps one Download backup and one guarded Restore", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openSettings();
   const panel = shim.document.getElementById("modalRoot").innerHTML;
-  assert.match(panel, /<h3>Download<\/h3>/);
-  assert.match(panel, /<h3>Debug log<\/h3>/);
-  assert.equal((panel.match(/data-act="download-current-board"/g) || []).length, 1, "the board-data area has one Download board action");
-  assert.equal((panel.match(/data-act="download-recovery-file"/g) || []).length, 1, "the board-data area has one Download recovery file action");
+  assert.equal((panel.match(/data-act="download-current-board"/g) || []).length, 0, "#2303: with a complete backup there is no separate board download");
+  assert.equal((panel.match(/data-act="download-recovery-file">Download backup</g) || []).length, 1, "the board-data area has one Download backup action");
   assert.equal((panel.match(/data-act="restore-backup"/g) || []).length, 1, "the board-data area has one guarded Restore action");
   assert.doesNotMatch(panel, /id="backupDownloadFormat"|data-act="download-backup"|data-act="view-current-board"|data-act="view-database-repair"/);
-  assert.match(panel, /id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/);
+  assert.doesNotMatch(panel, /id="backupRestoreSource"/, "#2303: file or paste is chosen inside Restore, not beside it");
+  assert.match(panel, /data-act="restore-backup"[^>]*>Restore<\/button><\/div><div id="restoreChoices"[^>]*hidden[^>]*>[\s\S]*?data-act="choose-backup-file"[\s\S]*?data-act="open-paste-recovery"/, "Restore holds the file and paste choices");
   assert.doesNotMatch(panel, /data-act="download-recovery-archive"/);
-  assert.doesNotMatch(panel, /data-act="choose-backup-file"|data-act="open-paste-recovery"/);
   assert.doesNotMatch(panel, /Current board recovery/i);
-  assert.match(html, /use Download board in Settings before closing it/);
-  assert.match(html, /use Download board in Settings before choosing whether to delete an older backup/);
   assert.doesNotMatch(html, /Current board recovery/);
+});
+
+// #2332 (review N6/F3): Restore is a disclosure for its two choices, so a
+// second press closes them and its aria-expanded says so.
+test("RISK backup and Restore consolidation: a second Restore press closes its choices and reports them collapsed", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openSettings();
+  const choices = shim.document.getElementById("restoreChoices"); choices.hidden = true;
+  const restore = makeFakeElement(); const attributes = { "aria-expanded": "false" };
+  Object.assign(restore, { dataset: { act: "restore-backup" }, setAttribute: (name, value) => { attributes[name] = String(value); }, getAttribute: name => attributes[name] ?? null });
+  ctx.onAction("restore-backup", restore);
+  assert.equal(choices.hidden, false, "the first press shows Choose a file and Paste board data");
+  assert.equal(attributes["aria-expanded"], "true", "and reports them expanded");
+  ctx.onAction("restore-backup", restore);
+  assert.equal(choices.hidden, true, "the second press closes them");
+  assert.equal(attributes["aria-expanded"], "false", "and reports them collapsed");
 });
 
 test('RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board',async t=>{
@@ -9949,7 +10382,7 @@ test('RISK backup format safety: without an accepted board the recovery download
  assert.deepEqual(await ctx.window.ScannerDeviceStore.readRawExportSnapshot(),before);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),original);
 });
 
-test('RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK backup format browser: enlarged unreadable Settings keeps the Restore choices and the backup safety text readable',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),{resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,browser=await chromium.launch({headless:true});
  const evidence=process.env.BACKUP_CONTROL_EVIDENCE_DIR;if(evidence)fs.mkdirSync(evidence,{recursive:true});
@@ -9966,19 +10399,22 @@ test('RISK backup format browser: enlarged unreadable Settings keeps the Restore
    // precondition). Either way this device has no accepted board to export.
    const noBoard=()=>page.evaluate(()=>({accepted:liveBoardAccepted,emptyNewWork:emptyNewWorkWorkspace()}));
    const opened=await noBoard();assert.ok(!opened.accepted||opened.emptyNewWork,'no accepted board to export '+JSON.stringify(opened));
-   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details').filter({has:page.locator('#backupRestoreSource')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
+   await page.locator('[data-act="settings"]').first().click();const section=page.locator('#modalRoot details.settings-section').filter({has:page.locator('[data-act="restore-backup"]')});if(!await section.evaluate(e=>e.open))await section.locator(':scope > summary').click();
    const before=await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot());
-   await page.addStyleTag({content:'#backupRestoreSource,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
-   await page.evaluate(()=>document.fonts.ready);await page.locator('#backupRestoreSource').scrollIntoViewIfNeeded();
-   // #2246: no format selector; without an accepted board only Download recovery file is offered.
-   assert.equal(await page.locator('#backupDownloadFormat').count(),0);
+   await page.addStyleTag({content:'#modalRoot .modal .btn,#stDateFormat{font-size:22.5px!important} #modalRoot .modal .kv{font-size:20.25px!important}'});
+   await page.evaluate(()=>document.fonts.ready);
+   // #2246: no format selector; without an accepted board only Download backup is offered.
+   assert.equal(await page.locator('#backupDownloadFormat').count(),0);assert.equal(await page.locator('#backupRestoreSource').count(),0,'#2303: no source selector beside Restore');
    assert.deepEqual(await page.locator('#modalRoot [data-act^="download-"]').evaluateAll(es=>es.map(e=>e.dataset.act).filter(act=>act!=='download-raw-backups')),['download-recovery-file']);
-   const geometry=await page.locator('#backupRestoreSource').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect(),s=getComputedStyle(e),probe=document.createElement('select'),option=document.createElement('option');option.textContent=e.selectedOptions[0].textContent;probe.appendChild(option);probe.style.cssText='position:fixed;visibility:hidden;width:max-content;max-width:none;min-width:0;';probe.style.font=s.font;probe.style.padding=s.padding;probe.style.border=s.border;probe.style.appearance=s.appearance;document.body.appendChild(probe);const nativeIntrinsicWidth=probe.getBoundingClientRect().width;probe.remove();return{id:e.id,left:r.left,right:r.right,width:r.width,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,text:e.selectedOptions[0].textContent,nativeIntrinsicWidth,appearance:s.appearance};}));
+   const restore=page.locator('#modalRoot [data-act="restore-backup"]');await restore.scrollIntoViewIfNeeded();await restore.click();assert.equal(await page.locator('#restoreChoices').isVisible(),true,'Restore opens its file and paste choices');
+   await page.locator('#restoreChoices').scrollIntoViewIfNeeded();
+   const geometry=await page.locator('#restoreChoices [data-act]').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect(),p=e.closest('.modal').getBoundingClientRect(),s=getComputedStyle(e);return{act:e.dataset.act,left:r.left,right:r.right,parentLeft:p.left,parentRight:p.right,fontSize:s.fontSize,scrollWidth:e.scrollWidth,clientWidth:e.clientWidth,text:e.textContent};}));
    if(evidence)await page.screenshot({path:path.join(evidence,theme+'-raw-format.png')});t.diagnostic(JSON.stringify({theme,geometry}));
-   for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.id+' must remain inside its real Settings row');assert.ok(r.nativeIntrinsicWidth<=r.width+1,r.id+' leaves room for its complete label and native arrow compared with an unconstrained native reference');assert.notEqual(r.appearance,'none');}
+   assert.deepEqual(geometry.map(r=>r.act),['choose-backup-file','open-paste-recovery']);
+   for(const r of geometry){assert.equal(r.fontSize,'22.5px');assert.ok(r.left>=r.parentLeft-1&&r.right<=r.parentRight+1,r.act+' must remain inside the Settings pane');assert.ok(r.scrollWidth<=r.clientWidth+1,r.act+' shows its complete label '+r.text);}
    const help=page.locator('#modalRoot p.kv').filter({hasText:'the file has none: it is marked partial and cannot be restored as a board.'});assert.equal(await help.isVisible(),true);
    assert.equal(await help.evaluate(e=>e.scrollWidth<=e.clientWidth+1),true);
-   await page.locator('#backupRestoreSource').selectOption('paste');assert.equal(await page.locator('#backupRestoreSource').inputValue(),'paste');assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.deepEqual(await noBoard(),opened,'the device still has no accepted board to export');
+   assert.deepEqual(await page.evaluate(()=>ScannerDeviceStore.readRawExportSnapshot()),before);assert.deepEqual(await noBoard(),opened,'the device still has no accepted board to export');
   }finally{await context.close();}
  });}finally{await browser.close();}
 });
@@ -10183,50 +10619,89 @@ test("UI: the list badge shows remaining cooldown minutes for an active can't ma
   assert.match(listHtml, /class="skipped">can.t \u00b7 50m<\/span>/, `expected a "can't · 50m" badge in: ${listHtml}`);
 });
 
-test("save-settings: cantMin is read, clamped [5,480], and persisted independently of horizonMin", async () => {
+// #2303: with no Save settings button, every remaining Settings field saves
+// when it is committed, survives a reload and reaches the rule it controls.
+test("RISK committed settings: every remaining Settings field saves when committed, survives a reload and takes effect", async () => {
+  const app = await loadApp({ seed: 2303 }), { ctx, shim } = app;
+  ctx.openSettings();
+  const committed = { stHorizon: 90, stCantMin: 12, stWorkedHrs: 20, stThresh: 30, stSamples: 400, stPostponeHours: 2.5,
+    stEverHours: 3, stEverUnit: "days", stEverReset: false, stShowPostpone: true, stLastTaskWoop: true, stFloatingHeader: true,
+    stPatternedIndicators: true, stDateFormat: "ymd", stListMetric: "chance", stScanMode: "chance", stChainStartsWith: "mostLikely" };
+  for (const [id, value] of Object.entries(committed)) commitSetting(shim, id, value);
+  const expected = { horizonMin: 90, cantMin: 12, workedHours: 20, thresholdPct: 30, samples: 400, postponeHours: 2.5, evergreenHours: 72,
+    evergreenResetAtDay: false, showPostpone: true, lastTaskWoop: true, floatingHeader: true, patternedIndicators: true,
+    dateFormat: "ymd", listMetric: "chance", scanMode: "chance", chainStartsWith: "mostLikely" };
+  const pick = settings => Object.fromEntries(Object.keys(expected).map(key => [key, settings[key]]));
+  assert.deepEqual(pick(ctx.state.settings), expected, "each committed field saved without a Save settings button");
+  ctx.closeModal();
+  assert.equal(await ctx.persist(), true);
+  const reloaded = await loadApp({ seed: 2304, seedStorage: { [SYNC_STORE_KEY]: shim.localStorage.getItem(SYNC_STORE_KEY) } });
+  assert.deepEqual(pick(reloaded.ctx.state.settings), expected, "every committed setting survives a reload");
+  // A committed number reaches its rule: Can't now holds for 12 minutes.
+  const r = reloaded.ctx;
+  r.addTask("Task A", false); r.addTask("Said can't", false);
+  r.startScan("descending");
+  const t0 = realNow(r); setFakeTime(r, t0); r.decide("cant");
+  setFakeTime(r, t0 + 2 * 60000); r.state.listOpen = true; r.render();
+  assert.match(r.document.getElementById("listBody").innerHTML, /class="skipped">can.t \u00b7 10m<\/span>/, "the committed Can't sticks for value is the one in effect");
+});
+
+test("committed settings: cantMin saves on its own and leaves horizonMin alone", async () => {
   const { ctx } = await loadApp({ seed: 50 });
-  setInput(ctx, "stHorizon", 90);
-  setInput(ctx, "stCantMin", 12);
-  setInput(ctx, "stThresh", 20);
-  setInput(ctx, "stSamples", 300);
-  ctx.onAction("save-settings", {});
+  commitSetting(ctx, "stHorizon", 90);
+  commitSetting(ctx, "stCantMin", 12);
   assert.equal(ctx.state.settings.horizonMin, 90);
   assert.equal(ctx.state.settings.cantMin, 12);
+  assert.equal(await ctx.persist(), true);
+  const reloaded = await loadApp({ seedStorage: { [SYNC_STORE_KEY]: ctx.localStorage.getItem(SYNC_STORE_KEY) } });
+  assert.equal(reloaded.ctx.state.settings.cantMin, 12, "the committed value survives a reload");
 });
 
-test("save-settings: cantMin below 5 clamps up to 5, above 480 clamps down to 480", async () => {
+test("committed settings: an out-of-range cantMin returns to its last valid value instead of clamping", async () => {
   const { ctx } = await loadApp({ seed: 51 });
-  setInput(ctx, "stHorizon", 60);
-  setInput(ctx, "stCantMin", 2); // non-zero (0 is falsy and hits the ||default fallback instead, same as horizonMin)
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 5);
-
-  setInput(ctx, "stCantMin", 9999);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 480);
+  commitSetting(ctx, "stCantMin", 12);
+  const low = commitSetting(ctx, "stCantMin", 2);
+  assert.equal(ctx.state.settings.cantMin, 12, "below 5 keeps the last valid value, not a clamp to 5");
+  assert.equal(low.value, "12", "the field shows the last valid value again");
+  commitSetting(ctx, "stCantMin", 9999);
+  assert.equal(ctx.state.settings.cantMin, 12, "above 480 keeps the last valid value, not a clamp to 480");
 });
 
-test("save-settings: a blank/non-numeric cantMin falls back to 30, not to horizonMin's default", async () => {
+// #2332 (review N2): typing in Default evergreen interval suggests the reset
+// checkbox as you go, so an interval that is then refused must put it back too.
+test("committed settings: an invalid Default evergreen interval returns the reset checkbox with the hours and unit", async () => {
+  const { ctx, shim } = await loadApp({ seed: 53 });
+  ctx.openSettings();
+  assert.equal(ctx.state.settings.evergreenHours, 18);assert.equal(ctx.state.settings.evergreenResetAtDay, true);
+  const reset = shim.document.getElementById("stEverReset"); Object.assign(reset, { id: "stEverReset", checked: true, matches: () => false });
+  const unit = shim.document.getElementById("stEverUnit"); Object.assign(unit, { id: "stEverUnit", value: "hours" });
+  const field = shim.document.getElementById("stEverHours"); Object.assign(field, { id: "stEverHours", value: "100000", matches: () => false });
+  shim.document.dispatchEvent({ type: "input", target: field });
+  assert.equal(reset.checked, false, "typing a long interval suggests turning the reset off");
+  shim.document.dispatchEvent({ type: "change", target: field });
+  assert.equal(field.value, "18", "the refused interval returns to the saved hours");
+  assert.equal(reset.checked, true, "and the reset checkbox returns to the saved value");
+  assert.equal(ctx.state.settings.evergreenResetAtDay, true, "nothing was saved");
+});
+
+test("committed settings: a blank or non-numeric cantMin returns to its last valid value", async () => {
   const { ctx } = await loadApp({ seed: 52 });
-  setInput(ctx, "stHorizon", 60);
-  setInput(ctx, "stCantMin", "");
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 30);
+  commitSetting(ctx, "stCantMin", 45);
+  const blank = commitSetting(ctx, "stCantMin", "");
+  assert.equal(ctx.state.settings.cantMin, 45);
+  assert.equal(blank.value, "45");
+  commitSetting(ctx, "stCantMin", "abc");
+  assert.equal(ctx.state.settings.cantMin, 45);
 });
 
-test("save-settings: a literal 0 is falsy and falls back to the default rather than clamping to the minimum (shared quirk with horizonMin/thresholdPct)", async () => {
+test("committed settings: 0 for horizonMin or cantMin returns to the last valid value", async () => {
   const { ctx } = await loadApp({ seed: 53 });
-  setInput(ctx, "stHorizon", 0);
-  setInput(ctx, "stCantMin", 0);
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.horizonMin, 60, "0 hits the existing ||60 fallback, not Math.max(5,...)");
-  assert.equal(ctx.state.settings.cantMin, 30, "0 hits the ||30 fallback the same way, for consistency");
+  commitSetting(ctx, "stHorizon", 90);
+  commitSetting(ctx, "stCantMin", 40);
+  commitSetting(ctx, "stHorizon", 0);
+  commitSetting(ctx, "stCantMin", 0);
+  assert.equal(ctx.state.settings.horizonMin, 90, "0 is out of range, so the last valid value stays");
+  assert.equal(ctx.state.settings.cantMin, 40);
 });
 
 /* ---------- quick-add context picker ---------- */
@@ -10708,57 +11183,41 @@ test("data from before this change: a stored 'worked' task with no timestamp is 
   assert.equal(ctx.state.considered.w, undefined);
 });
 
-/* ---- save-settings validation (mirrors the cantMin tests) ---- */
+/* ---- committed settings validation (mirrors the cantMin tests) ---- */
 
-test("save-settings: workedHours is read, clamped [1,720], and persisted independently of the other fields", async () => {
+test("committed settings: workedHours saves on its own and leaves the other fields alone", async () => {
   const { ctx } = await loadApp({ seed: 404 });
-  setInput(ctx, "stHorizon", 90);
-  setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  setInput(ctx, "stWorkedHrs", 12);
-  ctx.onAction("save-settings", {});
+  commitSetting(ctx, "stCantMin", 30);
+  commitSetting(ctx, "stWorkedHrs", 12);
   assert.equal(ctx.state.settings.workedHours, 12);
   assert.equal(ctx.state.settings.cantMin, 30, "an unrelated field must be untouched");
 });
 
-test("save-settings: workedHours below 1 clamps up to 1, above 720 clamps down to 720", async () => {
+test("committed settings: an out-of-range workedHours returns to its last valid value instead of clamping", async () => {
   const { ctx } = await loadApp({ seed: 405 });
-  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
-
-  setInput(ctx, "stWorkedHrs", -3);                       // non-zero, so it clamps rather than hitting the fallback
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, 1);
-
-  setInput(ctx, "stWorkedHrs", 9999);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, 720);
+  commitSetting(ctx, "stWorkedHrs", 12);
+  const field = commitSetting(ctx, "stWorkedHrs", -3);
+  assert.equal(ctx.state.settings.workedHours, 12, "below 1 keeps the last valid value, not a clamp to 1");
+  assert.equal(field.value, "12");
+  commitSetting(ctx, "stWorkedHrs", 9999);
+  assert.equal(ctx.state.settings.workedHours, 12, "above 720 keeps the last valid value, not a clamp to 720");
 });
 
-/* These two used to assert a literal 8, which was right when 8 was the
-   default and went stale the moment it moved to 16 — leaving them pinning the
-   one save-settings fallback that no longer matched DEFAULT_SETTINGS, i.e.
-   the exact drift AUDIT H6 is about. The behaviour under test is unchanged:
-   an empty or falsy field takes the default. It just reads the default now
-   instead of restating a number that can move again. */
-test("save-settings: a blank or non-numeric workedHours falls back to the default", async () => {
+/* These two once pinned the Save settings fallback to the default (AUDIT H6).
+   #2303 removed Save settings: an empty, non-numeric or out-of-range field now
+   returns to its last valid value, so no fallback number can drift. */
+test("committed settings: a blank or non-numeric workedHours returns to its last valid value", async () => {
   const { ctx } = await loadApp({ seed: 406 });
-  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
-  setInput(ctx, "stWorkedHrs", "");
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, readConst(ctx, "DEFAULT_SETTINGS").workedHours);
+  commitSetting(ctx, "stWorkedHrs", 20);
+  commitSetting(ctx, "stWorkedHrs", "");
+  assert.equal(ctx.state.settings.workedHours, 20);
 });
 
-test("save-settings: a literal 0 workedHours is falsy and takes the default, not a clamp to 1", async () => {
+test("committed settings: 0 workedHours returns to the last valid value", async () => {
   const { ctx } = await loadApp({ seed: 407 });
-  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
-  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
-  setInput(ctx, "stWorkedHrs", 0);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, readConst(ctx, "DEFAULT_SETTINGS").workedHours,
-    "0 is falsy, so it takes the default — the same way horizonMin and cantMin take theirs");
+  commitSetting(ctx, "stWorkedHrs", 20);
+  commitSetting(ctx, "stWorkedHrs", 0);
+  assert.equal(ctx.state.settings.workedHours, 20, "0 is out of range, so the last valid value stays");
 });
 
 /* ---- settings UI ---- */
@@ -12087,7 +12546,7 @@ test("UI: Quick start displays four essential steps in order", async () => {
   assert.deepEqual(steps, [
   "Add tasks. Optionally assign contexts, then enable the contexts needed for those tasks.",
   "Choose Start scanning.",
-  "With no dot, Yes chooses the first task and No skips it for this pass. Once a dot exists, compare each candidate with the newest dot: Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
+  "Start scanning adds the first dot, chosen by Chain starts with in Settings: by default the oldest eligible task. Once a dot exists, compare each candidate with the newest dot: Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
   "Choose done scanning when ready. Work the chain from the newest dot upward, using Done for finished tasks, Worked on it for progress, or Dislodge to set a task aside."
 ]);
 });
@@ -12097,7 +12556,7 @@ test("UI: Quick start keeps task-state explanations in a collapsed scanning chap
   ctx.openHelp();
   const markup = shim.elements.get("modalRoot").innerHTML;
   const quickStartEnd = markup.indexOf("</ol>");
-  const faqStart = markup.indexOf('<details class="help-faq">');
+  const faqStart = markup.indexOf('<details class="help-faq"><summary><h3>');
   assert.ok(quickStartEnd > 0 && faqStart > quickStartEnd, "Detailed chapters follow essential quick-start steps");
   const faq = markup.match(/<details class="help-faq"><summary><h3>Scanning and recurrence<\/h3><\/summary>([\s\S]*?)<\/details>/)?.[1];
   assert.ok(faq, "Scanning is a separate native disclosure, closed by default");
@@ -12321,6 +12780,14 @@ test("UI: benchmark's action row is greyed out (lowered opacity) during scanning
   const row = shim.elements.get("scan").innerHTML.match(/<div class="actionrow[^"]*">([\s\S]*?)<\/div>/)[0];
 
   assert.match(row, /class="actionrow[^"]*disabled/, `action row should carry the disabled class during scan, got: ${row}`);
+});
+
+// #2332 (typography review F4): the status line names the signed-in account, and
+// a long address overflowed Settings by 6px at 320px.
+test("CSS: the Data and backups status line wraps a long account address", () => {
+  const rule = styleSrc.match(/\.settings-data-status\{([^}]*)\}/);
+  assert.ok(rule, "there should be a .settings-data-status rule");
+  assert.match(rule[1], /overflow-wrap:\s*anywhere/);
 });
 
 test("CSS: .actionrow.disabled lowers opacity to show it's a different mode, but keeps it clickable", () => {
@@ -13881,15 +14348,16 @@ test("clearCompleted: still runs (and clears the log) when there are no done tas
   assert.deepEqual([...ctx.state.workLog], [], "should have cleared even with zero done tasks");
 });
 
-test("openSettings: shows the housekeeping copy and Clear history button when only work-log entries exist", async () => {
+test("History: offers Clear history when only work-log entries exist, and Settings does not repeat it", async () => {
   const { ctx, shim } = await loadApp({ seed: 367 });
   const t = ctx.addTask("Task A", false);
   ctx.workedOnTask(t.id);
 
   ctx.openSettings();
   const html = shim.elements.get("modalRoot").innerHTML;
-  assert.match(html, /data-act="clear-done"/, "Clear history should be offered");
-  assert.ok(!/No completed tasks stored right now/.test(html));
+  assert.doesNotMatch(html, /data-act="clear-done"|Housekeeping/, "#2303: Settings no longer repeats Clear history");
+  ctx.closeModal(); ctx.state.histOpen = true; ctx.render();
+  assert.match(shim.elements.get("histPanel").innerHTML, /data-act="clear-done">Clear history</, "Clear history should be offered in History");
 });
 
 test("theme: a fresh state defaults the preference to 'system'", async () => {
@@ -16486,8 +16954,10 @@ test('LOCAL BACKUPS: seven local calendar days, latest save today, and pre-resto
     ['2026-09-06','2026-09-07','2026-09-08']);
   const day3 = entries.find(entry => entry.day === '2026-09-03' && entry.kind === 'latest');
   ctx.openSettings();
-  assert.match(shim.document.getElementById('modalRoot').innerHTML, /Daily local backups/);
-  assert.match(shim.document.getElementById('modalRoot').innerHTML, /seven calendar days/);
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML, /Daily local backups|seven calendar days/, '#2303: retention details moved out of Settings');
+  ctx.openHelp();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML.split('<summary><h3>Data and backups</h3></summary>')[1], /seven calendar days/, 'the Data and backups FAQ keeps the retention details');
+  ctx.openSettings();
   ctx.onAction('restore-local-backup', { dataset: { id: day3.id } });
   entries = ctx.readLocalBackups();
   assert.ok(entries.some(entry => entry.kind === 'before-restore' && entry.payload.includes('Day 8')),
@@ -16511,7 +16981,7 @@ test('LOCAL BACKUPS: a manual backup remains restorable after the seven-day wind
   ctx.addTask('Current board'); await ctx.persist();
   assert.ok(ctx.readLocalBackups().some(entry=>entry.id===saved.id));
   ctx.openSettings();
-  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Make manual backup/);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="make-manual-backup">Make backup</);
   ctx.onAction('restore-local-backup',{dataset:{id:saved.id}});
   assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Keep indefinitely','Current board']);
   assert.ok(ctx.readLocalBackups().some(entry=>entry.kind==='before-restore' && entry.payload.includes('Current board')));
@@ -16599,9 +17069,11 @@ test('RISK LOCAL BACKUPS: the non-actionable backup-full warning is absent from 
   'a genuinely failed primary save still reports unsaved work');
 });
 
-test('RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies',async()=>{
+test('RISK LOCAL BACKUPS: the Data and backups FAQ explains automatic early retirement while preserving chosen copies',async()=>{
  const {ctx,shim}=await loadApp();ctx.openSettings();
- const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/older automatic copies may retire sooner/,'#2303: Settings leaves retention details to the FAQ');
+ ctx.openHelp();
+ const markup=shim.document.getElementById('modalRoot').innerHTML.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(markup,/older automatic copies may retire sooner/);
  assert.match(markup,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
 });
@@ -17461,7 +17933,7 @@ test('RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device 
  assert.equal(JSON.stringify(ctx.deviceSaveIssue()),JSON.stringify({stage:'primary-write',code:'quota-exhausted'}));
  assert.match(shim.document.getElementById('toast').textContent,/device-save:primary-write\/quota-exhausted/);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/primary-write\/quota-exhausted/);
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/available in Download board below/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/available in Download backup below/);
  blockOriginal=false;assert.equal(await ctx.persist(),true);assert.equal(ctx.deviceSaveIssue(),null,'a successful retry clears the stale diagnosis');
 
  const missing=await loadApp();
@@ -17833,19 +18305,25 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(html,/title="Settings, contexts, and backups"/);
 });
 
-test('RISK JSON COPY PASTE: Download board saves the exact board JSON without saving, and pasting it restores through the guarded preview',async t=>{
+test('RISK JSON COPY PASTE: a partial Download backup offers Download board only, which saves the exact board JSON without saving, and pasting it restores through the guarded preview',async t=>{
   const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
   t.after(()=>app.dispose());
   const task=ctx.addTask('Copy <board> & keep 🌿');await ctx.persist();
   task.futureCopyField={keep:'unknown value'};ctx.state.futureCopyBoardField={retain:true};
   const before=JSON.stringify(ctx.state),saved=storage.getItem(SYNC_STORE_KEY),writes=[];
   const set=storage.setItem.bind(storage);storage.setItem=(key,value)=>{writes.push(key);return set(key,value);};
-  // #2246: Download board is the one board export; the person copies the file's text.
+  // #2303 (owner decision of 2026-11-10): Download backup is the one download.
+  // With no device database here it comes out partial, which Restore refuses,
+  // so Download board only appears beside it; the person copies that file's text.
   const files=captureDownloads(app);ctx.openSettings();
-  const download=shim.document.getElementById('modalRoot').innerHTML.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download board<\/button>/);
-  assert.ok(download,'Settings offers Download board');
-  assert.equal(await ctx.onAction(download[1],{}),true);assert.equal(files.length,1);assert.equal(files[0].name,'chain-scanner-current-board.json');
-  const copied=await downloadedText(files[0]);
+  const download=shim.document.getElementById('modalRoot').innerHTML.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download backup<\/button>/);
+  assert.ok(download,'Settings offers Download backup');
+  assert.equal(await ctx.onAction(download[1],{}),true);for(let i=0;i<100&&!files.length;i++)await flush();assert.equal(files.length,1);assert.equal(files[0].name,'chain-scanner-recovery-file.json');
+  assert.equal(JSON.parse(await downloadedText(files[0])).manifest.status,'partial','fixture: this backup comes out partial');
+  const boardOnly=shim.document.getElementById('settingsDownloads').innerHTML.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download board only<\/button>/);
+  assert.ok(boardOnly,'Download board only appears beside the partial backup');
+  assert.equal(await ctx.onAction(boardOnly[1],{}),true);assert.equal(files.length,2);assert.equal(files[1].name,'chain-scanner-current-board.json');
+  const copied=await downloadedText(files[1]);
   const board=JSON.parse(copied);
   assert.equal(board.tasks.find(row=>row.id===task.id).futureCopyField.keep,'unknown value');
   assert.equal(board.futureCopyBoardField.retain,true);
@@ -17858,8 +18336,8 @@ test('RISK JSON COPY PASTE: Download board saves the exact board JSON without sa
   const target=destination.ctx,dom=destination.shim;
   target.addTask('Board before pasted restore',false);await prepareBackupFileFixtureSource(destination);
   const original=JSON.stringify(target.state),originalHead=await target.window.ScannerDeviceStore.readHead();
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';
-  await target.onAction('restore-backup',{});
+  target.openSettings();await target.onAction('restore-backup',{});
+  await target.onAction('open-paste-recovery',{});
   const pasted=dom.document.getElementById('jsonBox');pasted.id='jsonBox';pasted.value=copied;
   dom.document.dispatchEvent({type:'input',target:pasted});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
@@ -17877,15 +18355,15 @@ test('RISK JSON COPY PASTE: Download board saves the exact board JSON without sa
   assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.payload===original),'the displaced board remains protected');
 });
 
-test('RISK JSON COPY PASTE: Quick start explains Download board, copying the file and guarded paste',async t=>{
+test('RISK JSON COPY PASTE: Quick start explains Download backup, copying the file and guarded paste',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
   const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const answer=help.match(/<dt>How do I copy and paste JSON\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(answer,'Quick start includes the JSON copy and paste workflow');
-  assert.match(answer,/Download board saves.*JSON file/);
-  assert.match(answer,/does not include local backups or recovery sources.*Download recovery file does/i);
+  assert.match(answer,/Download backup saves.*JSON file/);
+  assert.match(answer,/every readable saved source.*Restore applies only its current board/i);
   assert.match(answer,/open the file and copy its text/i);
-  assert.match(answer,/Restore.*Paste JSON.*preview.*confirm/i);
+  assert.match(answer,/Restore.*Paste board data.*preview.*confirm/i);
   assert.match(answer,/accepted.*unsaved|may not have saved/i);
   assert.match(answer,/not.*Debug log/i);
 });
@@ -17900,7 +18378,7 @@ test('RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact sav
   const head=await store.readHead();await store.putBackup({expectedHash:head.hash,backup:{id:'repair-manual-original',kind:'manual',day:'2026-10-25',at:1,payload:'{"unknownOriginal":"keep exact"}'}});
   const before=JSON.stringify(await store.readRawExportSnapshot()),boardBefore=JSON.stringify(ctx.state);
   const files=captureDownloads(app);ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const view=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download recovery file<\/button>/);
+  const view=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>Download backup<\/button>/);
   assert.ok(view,'Settings exposes one combined database and repair export');
   assert.equal(await ctx.onAction(view[1],{}),true);assert.equal(files.length,1);assert.equal(files[0].name,'chain-scanner-recovery-file.json');
   const copied=await downloadedText(files[0]);
@@ -17914,7 +18392,7 @@ test('RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact sav
   assert.equal(JSON.stringify(await store.readRawExportSnapshot()),before);assert.equal(JSON.stringify(ctx.state),boardBefore,'repair export is read-only');
   const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-copy-restore-'+Date.now()});
   t.after(()=>destination.dispose());target.addTask('Before repair-file restore',false);await prepareBackupFileFixtureSource(target);
-  const original=JSON.stringify(target.state);target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  const original=JSON.stringify(target.state);target.openSettings();await target.onAction('restore-backup',{});await target.onAction('open-paste-recovery',{});
   const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;dom.document.dispatchEvent({type:'input',target:box});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);assert.equal(JSON.stringify(target.state),original);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);assert.equal(target.state.tasks[0].futureRepairField.keep,'unknown 🌿');
@@ -17922,11 +18400,11 @@ test('RISK DATABASE REPAIR EXPORT: the Settings recovery file includes exact sav
   assert.ok((await target.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='restore-file-source'&&Buffer.from(row.restoreFile?.bytesBase64||'','base64').toString('utf8')===copied),'the exact package remains protected for repair');
 });
 
-// #2246 (owner, 2026-11-06): one export and one recovery option. Settings →
-// Data and backups offers exactly two downloads, Download board (ordinary
-// board JSON) and Download recovery file (the board, every readable saved
-// source, build details and the Debug log), with no format choice and no
-// view/copy dialogs, and both files round-trip through the single Restore.
+// #2246 (owner, 2026-11-06): one export and one recovery option, with no format
+// choice and no view/copy dialogs. #2303 (owner, 2026-11-10): Settings shows one
+// Download backup (the board, every readable saved source, build details and the
+// Debug log); Download board only (ordinary board JSON) appears beside it only when
+// the backup comes out partial. Both files round-trip through the single Restore.
 function captureDownloads(app){
  const files=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>files.push({href:link.href,name:link.download});
  const createElement=app.shim.document.createElement;app.shim.document.createElement=tag=>tag==='a'?link:createElement.call(app.shim.document,tag);
@@ -17937,13 +18415,13 @@ async function restorePasted(text,label){
  const {IDBFactory}=await import('fake-indexeddb');
  const target=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'restore-'+label+'-'+Date.now()+'-'+Math.random()});
  target.ctx.addTask('Before restoring '+label,false);await prepareBackupFileFixtureSource(target);
- target.ctx.openSettings();target.shim.document.getElementById('backupRestoreSource').value='paste';await target.ctx.onAction('restore-backup',{});
+ target.ctx.openSettings();await target.ctx.onAction('restore-backup',{});await target.ctx.onAction('open-paste-recovery',{});
  const box=target.shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;target.shim.document.dispatchEvent({type:'input',target:box});
  const previewed=await target.ctx.onAction('preview-pasted-recovery',{}),toastText=target.shim.document.getElementById('toast').textContent;
  const confirmed=previewed?await target.ctx.onAction('confirm-file-restore',{}):false;
  return {target,previewed,confirmed,toast:toastText};
 }
-test('RISK DOWNLOADS: Settings offers exactly one board export and one recovery export, and both files round-trip through Restore',async t=>{
+test('RISK DOWNLOADS: Settings offers one Download backup, and the backup and the board-only file both round-trip through Restore',async t=>{
   const {IDBFactory}=await import('fake-indexeddb');
   const app=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'two-downloads-'+Date.now()}),{ctx,shim}=app;
   t.after(()=>app.dispose());ctx.addTask('Exported task',false);await prepareBackupFileFixtureSource(app);
@@ -17954,9 +18432,10 @@ test('RISK DOWNLOADS: Settings offers exactly one board export and one recovery 
   // Every export or download control, apart from the Debug log's own report.
   const exports=[...data.matchAll(/<button\b[^>]*data-act="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map(([,act,label])=>({act,label}))
    .filter(({act,label})=>/download|export|view \/ copy|copy/i.test(label)&&act!=='view-support-diagnostics');
-  assert.deepEqual(exports.map(({label})=>label),['Download board','Download recovery file'],'exactly one board export and one recovery export');
+  assert.deepEqual(exports.map(({label})=>label),['Download backup'],'#2303: one download while the backup comes out complete');
   assert.doesNotMatch(data,/id="backupDownloadFormat"|Full recovery archive|data-act="view-current-board"|data-act="view-database-repair"/,'no format choice and no view/copy export dialogs');
-  await ctx.onAction(exports[0].act,{});await ctx.onAction(exports[1].act,{});for(let i=0;i<100&&files.length<2;i++)await flush();
+  // The board-only file stays available for a partial backup; its action still saves the board.
+  await ctx.onAction('download-current-board',{});await ctx.onAction(exports[0].act,{});for(let i=0;i<100&&files.length<2;i++)await flush();
   assert.equal(files.length,2,'both controls save a file');
   const boardText=await downloadedText(files[0]),recoveryText=await downloadedText(files[1]);
   const board=JSON.parse(boardText),recovery=JSON.parse(recoveryText);
@@ -18102,7 +18581,7 @@ test('RISK DATABASE REPAIR EXPORT: a large recovery file downloads losslessly wi
   // The downloaded file restores through the existing Restore preview.
   const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'repair-large-restore-'+Date.now()});
   t.after(()=>destination.dispose());target.addTask('Before large repair-file restore',false);await prepareBackupFileFixtureSource(target);
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  target.openSettings();await target.onAction('restore-backup',{});await target.onAction('open-paste-recovery',{});
   const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;dom.document.dispatchEvent({type:'input',target:box});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);
@@ -18140,7 +18619,7 @@ test('RISK MANUAL JSON EXPORT: a large recovery file with several saved copies d
   assert.equal(JSON.stringify(ctx.state),boardBefore,'the archive download is read-only');
   const {ctx:target,shim:dom,...destination}=await loadBackupFileFixtureApp({indexedDBProvider:new IDBFactory(),deviceDbName:'full-archive-large-restore-'+Date.now()});
   t.after(()=>destination.dispose());target.addTask('Before large archive restore',false);await prepareBackupFileFixtureSource(target);
-  target.openSettings();dom.document.getElementById('backupRestoreSource').value='paste';await target.onAction('restore-backup',{});
+  target.openSettings();await target.onAction('restore-backup',{});await target.onAction('open-paste-recovery',{});
   const box=dom.document.getElementById('jsonBox');box.id='jsonBox';box.value=text;dom.document.dispatchEvent({type:'input',target:box});
   assert.equal(await target.onAction('preview-pasted-recovery',{}),true,dom.document.getElementById('toast').textContent);
   assert.equal(await target.onAction('confirm-file-restore',{}),true);
@@ -18169,7 +18648,7 @@ test('RISK DATABASE REPAIR EXPORT: unreadable storage produces a labeled partial
       assert.equal(JSON.stringify(ctx.state),before,'an incomplete export cannot replace accepted work');
       IDBDatabase.prototype.transaction=transaction;storage.getItem=get;
       const copied=raw;
-      ctx.openSettings();shim.document.getElementById('backupRestoreSource').value='paste';await ctx.onAction('restore-backup',{});
+      ctx.openSettings();await ctx.onAction('restore-backup',{});await ctx.onAction('open-paste-recovery',{});
       const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=copied;shim.document.dispatchEvent({type:'input',target:box});
       assert.equal(await ctx.onAction('preview-pasted-recovery',{}),false,'a partial diagnostic package cannot be restored as a complete backup');
       assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-file-restore"/);assert.equal(JSON.stringify(ctx.state),before);
@@ -18289,20 +18768,80 @@ test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without in
 
 test('RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diagnostics and partial-report limits',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
-  const answer=help.match(/<dt>What does Download recovery file contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
+  const answer=help.match(/<dt>What does Download backup contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
   assert.match(answer,/current board.*saved.*sources.*Debug log/i);assert.match(answer,/build.*storage|storage.*build/i);
   assert.match(answer,/partial.*cannot.*restore/i);assert.match(answer,/only.*current board.*pending.*never replayed/i);
   assert.match(answer,/read.only|never saves or syncs/i);assert.match(answer,/one source at a time/);
   const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.doesNotMatch(log,/copy, or download the report/,'the FAQ no longer advertises removed standalone exporters');
-  assert.match(log,/Download recovery file/);
+  assert.match(log,/Download backup/);
 });
 
 test('RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the recovery file for repairs',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const reload=help.match(/<dt>Why did the app reload\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(reload);
   assert.match(reload,/View debug log, then Copy debug log or Download debug log/);assert.match(reload,/metadata only/);
-  assert.match(reload,/Download recovery file/);assert.match(reload,/partial|unreadable/i);
+  assert.match(reload,/Troubleshooting → View debug log, then Copy debug log or Download debug log/,'#2303: the log is under Troubleshooting');
+  assert.match(reload,/Download backup/);assert.match(reload,/partial|unreadable/i);
+});
+
+// #2303 (owner decision of 2026-11-10): Download backup saves the recovery file.
+// Restore refuses a partial one, so once a backup comes out partial Download
+// board only appears beside it, and the storage-failure messages point to
+// whichever button applies.
+test('RISK storage-failure messages: a failed device save names Download backup, or Download board only once a backup has come out partial',async()=>{
+  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage}),{ctx,shim}=app;
+  ctx.addTask('Board to protect',false);assert.equal(await ctx.persist(),true);
+  const set=storage.setItem;
+  const fail=()=>{storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)throw Error('denied');return set.call(storage,key,value);};};
+  const heal=()=>{storage.setItem=set;};
+  const toastText=()=>shim.document.getElementById('toast').textContent;
+  fail();ctx.addTask('Unsaved edit',false);assert.equal(await ctx.persist(),false);
+  assert.match(toastText(),/use Download backup in Settings before closing it/,'before any partial backup the message names Download backup');
+  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(settings,/available in Download backup below/);assert.doesNotMatch(settings,/data-act="download-current-board"/);
+  heal();
+  const files=captureDownloads(app);assert.equal(await ctx.onAction('download-recovery-file',{}),true);for(let i=0;i<100&&!files.length;i++)await flush();
+  assert.equal(JSON.parse(await downloadedText(files[0])).manifest.status,'partial','fixture: with no device database the backup comes out partial');
+  assert.match(shim.document.getElementById('settingsDownloads').innerHTML,/data-act="download-recovery-file">Download backup<\/button><button[^>]*data-act="download-current-board">Download board only<\/button>/,'the open Settings shows Download board only beside Download backup at once');
+  ctx.openSettings();settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(settings,/id="settingsDownloads"><button[^>]*data-act="download-recovery-file">Download backup<\/button><button[^>]*data-act="download-current-board">Download board only<\/button><\/div>/,'reopened Settings keeps it beside Download backup');
+  fail();ctx.addTask('Another unsaved edit',false);assert.equal(await ctx.persist(),false);
+  assert.match(toastText(),/use Download board only in Settings before closing it/,'after a partial backup the message names Download board only');
+  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/available in Download board only below/);
+  heal();
+  assert.equal(await ctx.onAction('download-current-board',{}),true);assert.match(await downloadedText(files.at(-1)),/Another unsaved edit/,'the board-only file holds the edit that could not save');
+});
+
+// #2332 (review N1): before #2303 Download board was always there and read no
+// device storage. Download backup reads the device database, which has no time
+// limit and can stop answering, and its build can fail outright. Either way the
+// open board must still have a way out of the tab.
+test('RISK storage-failure messages: Download board only appears when Download backup fails or does not finish',async()=>{
+  const boardOnly=shim=>/data-act="download-current-board">Download board only</.test(shim.document.getElementById('settingsDownloads').innerHTML);
+  for(const failure of ['stalls','fails']){
+    const app=await loadApp(),{ctx,shim}=app;
+    ctx.addTask('Board that must leave the tab',false);assert.equal(await ctx.persist(),true);
+    ctx.openSettings();assert.equal(boardOnly(shim),false,failure+': fixture: not offered before a backup is tried');
+    const timers=[];
+    if(failure==='stalls'){
+      // The device database stops answering partway through the backup.
+      vm.runInContext('deviceStore={readRawExportRows:()=>new Promise(()=>{})}',ctx);
+      ctx.setTimeout=(fn,ms)=>{timers.push({fn,ms});return timers.length;};ctx.clearTimeout=()=>{};
+      const pending=ctx.onAction('download-recovery-file',{});pending.catch?.(()=>{});
+      for(let i=0;i<20;i++)await flush();
+      for(const timer of timers.splice(0))if(timer.ms<=20000)timer.fn();
+    }else{
+      // The browser cannot compute the backup's change digests.
+      ctx.crypto={subtle:{digest:()=>Promise.reject(Error('digest unavailable'))}};
+      await ctx.onAction('download-recovery-file',{})?.catch?.(()=>{});
+      for(let i=0;i<20;i++)await flush();
+    }
+    assert.equal(boardOnly(shim),true,failure+': Download board only is offered beside Download backup');
+    ctx.openSettings();assert.equal(boardOnly(shim),true,failure+': and stays offered when Settings reopens');
+    const files=captureDownloads(app);assert.equal(await ctx.onAction('download-current-board',{}),true);
+    assert.match(await downloadedText(files.at(-1)),/Board that must leave the tab/,failure+': it saves the open board');
+  }
 });
 
 test('RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage',async()=>{
@@ -18315,18 +18854,18 @@ test('RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable with
   ctx.state.protectedBackupIds=['device-only-recovery-id'];
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  assert.match(settings,/data-act="download-current-board"/);
-  assert.match(settings,/data-act="download-recovery-file"/);
+  assert.match(settings,/data-act="download-recovery-file">Download backup</,'#2303: Download backup saves the board open in this tab');
   assert.doesNotMatch(settings,/data-act="import-json"|id="jsonBox"/,'bulk import stays out of Settings');
-  let download=null;
-  const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={...download,href:link.href,name:link.download};};
-  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
-  ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
-  ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board';},revokeObjectURL(){}};
+  const files=captureDownloads({ctx,shim});
   ctx.onAction('settings',{});
+  assert.equal(await ctx.onAction('download-recovery-file',{}),true);for(let i=0;i<100&&!files.length;i++)await flush();
+  assert.equal(files[0].name,'chain-scanner-recovery-file.json');
+  const board=JSON.stringify(JSON.parse(await downloadedText(files[0])).currentBoard);
+  assert.match(board,/Only in this open tab/);assert.doesNotMatch(board,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of the backup board');
+  // The board-only file, offered when a backup comes out partial, keeps the same contract.
   ctx.onAction('download-current-board',{});
-  assert.equal(download.name,'chain-scanner-current-board.json');assert.equal(download.href,'blob:current-board');
-  assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of exports');
+  assert.equal(files[1].name,'chain-scanner-current-board.json');const text=await downloadedText(files[1]);
+  assert.match(text,/Only in this open tab/);assert.doesNotMatch(text,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of exports');
 });
 
 test('RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file',async t=>{
@@ -18379,13 +18918,13 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download the board an
 
   ctx.openSettings();
   const settings=shim.document.getElementById('modalRoot').innerHTML;
-  const boardControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download board\s*<\/button>/);
-  const recoveryControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download recovery file\s*<\/button>/);
-  assert.ok(boardControl&&recoveryControl,'Settings exposes Download board and Download recovery file');
-  assert.equal((settings.match(/data-act="download-current-board"/g)||[]).length,1,'Settings has exactly one board download action');
-  assert.equal((settings.match(/data-act="download-recovery-file"/g)||[]).length,1,'Settings has exactly one recovery download action');
+  const recoveryControl=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Download backup\s*<\/button>/);
+  assert.ok(recoveryControl,'Settings exposes Download backup');
+  // #2303: the board-only action is offered beside a backup that comes out partial; it is exercised directly here.
+  const boardControl=[null,'download-current-board'];
+  assert.equal((settings.match(/data-act="download-current-board"/g)||[]).length,0,'no separate board download while the backup is complete');
+  assert.equal((settings.match(/data-act="download-recovery-file"/g)||[]).length,1,'Settings has exactly one backup download action');
   assert.doesNotMatch(settings,/id="backupDownloadFormat"|data-act="download-backup"|data-act="download-recovery-archive"/,'no format choice remains');
-  assert.match(settings,/Download recovery file saves that board together with every readable saved source/i,'Settings explains the recovery file contents');
 
   await ctx.onAction(boardControl[1],{});
   for(let attempt=0;attempt<100&&downloads.length<1;attempt++)await flush();
@@ -18459,13 +18998,13 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download the board an
   assert.equal(JSON.stringify(roundTrip.ctx.state),roundTripBefore,'the versioned archive is rejected by the ordinary board importer without changing the board');
 
   ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
-  const exportFaq=help.match(/<dt>What does Download board contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  const exportFaq=help.match(/<dt>What does Download board only contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(exportFaq,'the extended FAQ explains the two downloads');
   assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
-  assert.match(exportFaq,/Download board saves ordinary board JSON.*accepted edits that may not have saved/i);
-  assert.match(exportFaq,/one board export; Download recovery file is the one recovery export/i);
-  assert.match(exportFaq,/recovery file restores only its current board, and pending work is never replayed/i);
-  assert.match(exportFaq,/Without an accepted board, only Download recovery file is offered and its file has no board/i);
+  assert.match(exportFaq,/It saves ordinary board JSON.*accepted edits that may not have saved/i);
+  assert.match(exportFaq,/appears beside Download backup when a backup comes out partial/i);
+  assert.match(exportFaq,/a backup restores only its current board, and pending work is never replayed/i);
+  assert.match(exportFaq,/Without an accepted board, Download backup.s file has no board and Download board only does not appear/i);
   assert.match(exportFaq,/Restore accepts either file, older recovery archives and repair exports, and raw backup lists/i);
 
   assert.equal(JSON.stringify(ctx.state),memoryBefore,'export leaves the accepted in-memory board untouched');
@@ -18531,8 +19070,9 @@ test('RISK BACKUP FILE RESTORE: current decisions survive file selection and cro
   app.shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
   app.ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
   app.ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board-fixture';},revokeObjectURL(){}};
-  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-current-board"/);
-  app.ctx.onAction('download-current-board',{});assert.ok(download?.blob,'the actual Settings download produced a board file');
+  // #2303: the board-only file is offered beside a backup that comes out partial; Settings always has Download backup.
+  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="download-recovery-file">Download backup</);
+  app.ctx.onAction('download-current-board',{});assert.ok(download?.blob,'the board-only download produced a board file');
   assert.equal(download.name,'chain-scanner-current-board.json');
   return new File([download.blob.text],name,{type:'application/json'});
  }
@@ -18543,7 +19083,7 @@ test('RISK BACKUP FILE RESTORE: current decisions survive file selection and cro
   const input=makeFakeElement();input.id='restoreBackupFile';input.files=[];input.matches=()=>false;input.click=()=>{};
   const originalGet=app.shim.document.getElementById.bind(app.shim.document);
   app.shim.document.getElementById=id=>id==='restoreBackupFile'?input:originalGet(id);
-  await app.ctx.onAction(action[1],{});input.files=[file];app.shim.document.dispatchEvent({type:'change',target:input});
+  await app.ctx.onAction(action[1],{});await app.ctx.onAction('choose-backup-file',{});input.files=[file];app.shim.document.dispatchEvent({type:'change',target:input});
   for(let attempt=0;attempt<160;attempt++){
    await flush();const markup=app.shim.document.getElementById('modalRoot').innerHTML;
    if(markup.includes('data-act="confirm-file-restore"')||app.shim.document.getElementById('toast').textContent.includes('could not be prepared safely')
@@ -20952,17 +21492,13 @@ test("AUDIT H5: with nothing dotted, only the task Start scanning will dot carri
    the migration will not run again to correct it. */
 test("AUDIT H6: a cleared 'worked on it' field falls back to the current default, not the retired 8", async () => {
   const { ctx } = await loadApp({ seed: 8006 });
-  const d = ctx.document;
-  d.getElementById("stHorizon").value = "60";
-  d.getElementById("stCantMin").value = "30";
-  d.getElementById("stWorkedHrs").value = "";        // cleared the box, hit Save
-  d.getElementById("stThresh").value = "25";
-  d.getElementById("stSamples").value = "250";
-  ctx.onAction("save-settings", {});
+  // #2303: cleared the box and left it; there is no Save settings button.
+  const field = commitSetting(ctx, "stWorkedHrs", "");
 
   const DEFAULTS = readConst(ctx, "DEFAULT_SETTINGS");
   assert.equal(ctx.state.settings.workedHours, DEFAULTS.workedHours,
-    "every save-settings fallback must come from DEFAULT_SETTINGS, workedHours included");
+    "a cleared field keeps the current value, which on a fresh board is DEFAULT_SETTINGS, not the retired 8");
+  assert.equal(field.value, String(DEFAULTS.workedHours), "and the box shows that value again");
 });
 
 /* ---- H7: a dot pointing at nothing strands the scan ----
@@ -25235,11 +25771,11 @@ test('RISK PWA updates: the extended FAQ and changelog explain uninterrupted use
 test('Scan preference: saving always chance changes the current scan, without changing ratings or marks',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan();ctx.state.snooze=100;ctx.decide('no');
  const marks=JSON.stringify(ctx.state.considered), ratings=ctx.state.tasks.map(t=>t.mu);
- ctx.openSettings();shim.document.getElementById('stScanMode').value='chance';ctx.onAction('save-settings',{});
+ ctx.openSettings();commitSetting(shim,'stScanMode','chance');
  assert.equal(ctx.state.scanMode,'chance');assert.ok(ctx.state.chance);
  assert.equal(JSON.stringify(ctx.state.considered),marks);assert.deepEqual(ctx.state.tasks.map(t=>t.mu),ratings);
  const seed=ctx.state.chance.seed;ctx.onAction('start-working',{});ctx.onAction('resume-scan',{});assert.equal(ctx.state.chance.seed,seed);
- shim.document.getElementById('stScanMode').value='descending';ctx.onAction('save-settings',{});assert.equal(ctx.state.scanMode,'descending');
+ commitSetting(shim,'stScanMode','descending');assert.equal(ctx.state.scanMode,'descending');
 });
 test('Scan preference: both mode buttons are available when resuming a chain',async()=>{
  const {ctx,shim}=await loadApp();ctx.addTask('a');ctx.addTask('b');ctx.startScan();ctx.state.settings.scanMode='both';ctx.onAction('start-working',{});
@@ -26183,8 +26719,8 @@ test('RISK evergreen hours or days: stored hours survive conversion, UI save, an
  shim.document.getElementById('etEverHours').value='2';shim.document.getElementById('etEverUnit').value='days';
  ctx.onAction('save-edit',{dataset:{id:weekly.id}});assert.equal(weekly.evergreenHours,48);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stEverUnit"/);
- shim.document.getElementById('stEverHours').value='3';shim.document.getElementById('stEverUnit').value='days';
- ctx.onAction('save-settings',{});assert.equal(ctx.state.settings.evergreenHours,72);
+ commitSetting(shim,'stEverHours','3');assert.equal(ctx.state.settings.evergreenHours,3,'#2303: the number saves when committed, in the unit shown');
+ commitSetting(shim,'stEverUnit','days');assert.equal(ctx.state.settings.evergreenHours,72,'changing the unit saves the same number in days');
  const fresh=ctx.addTask('New default');assert.equal(fresh.evergreenHours,72);
 });
 
@@ -26480,15 +27016,16 @@ test('RISK synced scene: Settings reflects board scene choices when device mirro
  const panel=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-unset/);
  assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-set/);
- assert.match(panel,/A scene time is selected\. Synced with your board when signed in/);
- assert.match(panel,/Sky location set\. Synced with your board when signed in/);
+ assert.match(panel,/id="settingsSceneTimeStatus" class="kv">A scene time is selected\.</);
+ assert.match(panel,/id="settingsLocationStatus" class="kv">Sky location set\.</);
+ assert.doesNotMatch(panel,/Synced with your board/,'#2303: Settings no longer repeats that choices sync');
 });
 
 test('RISK synced scene: Settings discloses coordinate sync and offline device copies',()=>{
  assert.match(html,/id="locationDescription"[^>]*>[^<]*coordinates[^<]*signed-in board/i);
  assert.doesNotMatch(html,/It stays on this device and is never sent to a location service/);
- assert.match(appSrc,/Scene time[^\n]*Synced with your board when signed in/);
- assert.match(appSrc,/Location[^\n]*Synced with your board when signed in/);
+ // #2303: the location dialog keeps the disclosure; Settings rows no longer repeat it.
+ assert.doesNotMatch(appSrc,/Synced with your board when signed in/);
 });
 
 test('Landscape polish: small autumn leaves, seeded group sizes, stronger vertical drift, and daytime skyline',()=>{
@@ -28818,6 +29355,15 @@ test('RISK fireworks realism: uneven blooms leave ballistic trails and fading em
 });
 
 
+// #2303: recent sync errors are shown inside the Debug log, which Settings
+// opens from its closed Troubleshooting section.
+function openRecentSyncErrors(ctx){
+ ctx.openSettings();
+ const settings=ctx.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(settings,/Recent sync errors/,'Settings itself no longer lists sync errors');
+ assert.match(settings,/<details class="settings-troubleshooting"><summary>Troubleshooting<\/summary>[\s\S]*?data-act="view-support-diagnostics"/,'the Debug log is under the closed Troubleshooting section');
+ ctx.onAction('view-support-diagnostics',{});
+}
 test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload',async()=>{
  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});
  const failures={push:Object.assign(Error('private task and token detail'),{code:'unavailable'})};
@@ -28827,11 +29373,9 @@ test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics af
  delete failures.push;
  assert.equal((await backend.CS.push('{}',1,0)).ok,true);
  assert.equal(backend.CS.status,'ok');assert.equal(backend.CS.errorCode,null);
- app.ctx.openSettings();
+ openRecentSyncErrors(app.ctx);
  const rendered=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(rendered,/Recent sync errors/);
- assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Current-board view and copy'));
- assert.ok(rendered.indexOf('Recent sync errors')<rendered.indexOf('Daily local backups'));
+ assert.match(rendered,/<h2>Debug log<\/h2>[\s\S]*Recent sync errors/,'#2303: recent sync errors are inside the Debug log');
  assert.match(rendered,/push.*unavailable/);
  assert.match(rendered,/<time datetime="[^"]+"/);
  assert.doesNotMatch(rendered,/private task and token detail/);
@@ -28840,23 +29384,23 @@ test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics af
  const raw=storage.getItem('fvp:chain-scanner:sync-error-log:v1');
  assert.ok(raw,'the diagnosis survives the recovered error fields');
  assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(),['at','code','stage']);
- const reloaded=await loadApp({sharedStorage:storage});reloaded.ctx.openSettings();
+ const reloaded=await loadApp({sharedStorage:storage});openRecentSyncErrors(reloaded.ctx);
  assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/push.*unavailable/);
 });
 
 test('RISK SYNC ERROR LOG: history rejects unsafe or malformed diagnostic fields',async()=>{
  const storage=sharedScannerStorage({'fvp:chain-scanner:sync-error-log:v1':'{broken'}),{ctx,shim}=await loadApp({sharedStorage:storage});
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/No sync errors recorded/);
+ openRecentSyncErrors(ctx);assert.match(shim.document.getElementById('modalRoot').innerHTML,/No sync errors recorded/);
  for(let i=0;i<35;i++)ctx.recordSyncError('pull','failure-'+i);
  ctx.recordSyncError('<img src=x>','private@example.test / task contents');
  const entries=JSON.parse(storage.getItem('fvp:chain-scanner:sync-error-log:v1'));
  assert.equal(entries.length,36);assert.deepEqual(entries[0],{at:entries[0].at,stage:'sync',code:'unknown'});
  assert.equal(entries[1].code,'failure-34');assert.equal(entries.at(-1).code,'failure-0');
  assert.ok(entries.every(entry=>Number.isFinite(entry.at)&&entry.at>0));
- ctx.openSettings();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<img src=x>|private@example/);
+ openRecentSyncErrors(ctx);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<img src=x>|private@example/);
  storage.setItem('fvp:chain-scanner:sync-error-log:v1',JSON.stringify([{at:1e99,stage:'push',code:'invalid'},
   {at:Date.now(),stage:'pull',code:'unavailable',payload:'private payload',account:'private@example.test'}]));
- const restored=await loadApp({sharedStorage:storage});restored.ctx.openSettings();
+ const restored=await loadApp({sharedStorage:storage});openRecentSyncErrors(restored.ctx);
  assert.match(restored.shim.document.getElementById('modalRoot').innerHTML,/unavailable/);
  assert.doesNotMatch(restored.shim.document.getElementById('modalRoot').innerHTML,/private payload|private@example|Invalid Date/);
 });
@@ -28866,7 +29410,7 @@ test('RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder can
  const original=storage.setItem;
  storage.setItem=(key,value)=>{if(key==='fvp:chain-scanner:sync-error-log:v1')throw Error('quota');return original(key,value);};
  assert.doesNotThrow(()=>ctx.recordSyncError('reconcile','revision-conflict'));
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/revision-conflict/);
+ openRecentSyncErrors(ctx);assert.match(shim.document.getElementById('modalRoot').innerHTML,/revision-conflict/);
  ctx.state.tasks.push(syncTask('saved','Still saved'));assert.equal(await ctx.persist(),true);
  assert.equal(ctx.deviceSaveIssue(),null);
  const backend=await loadCloudBackendV2({failures:{pull:Object.assign(Error('offline'),{code:'unavailable'})},recordSyncError:()=>{throw Error('recorder failed');}});
@@ -28876,7 +29420,7 @@ test('RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder can
 test('RISK SYNC ERROR LOG: reconciliation errors record once and update an open Settings log without replacing drafts',async()=>{
  const {ctx,shim}=await loadApp();
  shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok'};
- ctx.openSettings();
+ openRecentSyncErrors(ctx);
  const root=shim.document.getElementById('modalRoot'),before=root.innerHTML;
  const log=shim.document.getElementById('syncErrorLog');
  ctx.reportCloudReconcileError('invalid-payload');
@@ -28898,7 +29442,7 @@ test('RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expir
  setFakeTime(ctx,start+10*minute);ctx.recordSyncError('push','unavailable');
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'the code can record again at the ten-minute boundary');
  setFakeTime(ctx,start+59*minute);ctx.recordSyncError('pull','deadline-exceeded');
- ctx.openSettings();
+ openRecentSyncErrors(ctx);
  assert.equal(JSON.parse(storage.getItem(key)).length,3);
  assert.equal(timers.size,1,'one expiry timer tracks the oldest retained entry');
  assert.equal([...timers.values()][0].delay,minute);
@@ -28910,7 +29454,7 @@ test('RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expir
  assert.match(shim.document.getElementById('syncErrorLog').innerHTML,/No sync errors recorded/);
  assert.equal(timers.size,0);
  storage.setItem(key,JSON.stringify([{at:Date.now()-61*minute,stage:'pull',code:'expired-code'}]));
- const reloaded=await loadApp({sharedStorage:storage});reloaded.ctx.openSettings();
+ const reloaded=await loadApp({sharedStorage:storage});openRecentSyncErrors(reloaded.ctx);
  assert.doesNotMatch(reloaded.shim.document.getElementById('modalRoot').innerHTML,/expired-code/);
  assert.equal(storage.getItem(key),null,'cold startup removes expired persisted rows too');
 });
@@ -28923,7 +29467,7 @@ test('RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'a stale tab must retain errors recorded since it loaded');
  setFakeTime(b.ctx,start+2000);b.ctx.recordSyncError('push','unavailable');
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'another tab must respect the existing code interval');
- setFakeTime(a.ctx,start+3000);a.ctx.openSettings();
+ setFakeTime(a.ctx,start+3000);openRecentSyncErrors(a.ctx);
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/deadline-exceeded/);
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'opening older Settings cannot erase another tab error');
 });
@@ -29035,7 +29579,7 @@ test('RISK SYNC ERROR ICON: the small thundercloud appears only beside a current
  assert.match(rule,/font-size:\s*12px/);
  CS.status='syncing';ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
  CS.status='ok';await ctx.cloudPull();ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/pull: unavailable/,'the retained error remains available after the icon clears');
+ openRecentSyncErrors(ctx);assert.match(shim.document.getElementById('modalRoot').innerHTML,/pull: unavailable/,'the retained error remains available after the icon clears');
 });
 
 
@@ -30604,10 +31148,11 @@ test('RISK live scan sync: the second physical click of one double-click cannot 
  assert.equal(next.lastDoneAt,null,'a physical double click remains one completion even when the DOM has replaced the control');
 });
 
-test('RISK live scan sync: Settings describes live revision refresh while retaining draft protection',async()=>{
- const {a}=await liveScanSyncClients();a.ctx.openSettings();
- assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
- assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts and pressed controls wait until you finish/,'the draft and pressed-control boundary remains visible to the user');
+test('RISK live scan sync: the Data and backups FAQ describes live revision refresh while retaining draft protection',async()=>{
+ const {a}=await liveScanSyncClients();a.ctx.openHelp();
+ const answer=a.shim.document.getElementById('modalRoot').innerHTML.split('<dt>When does cloud sync check for changes?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/when another device saves/,'#2303: the FAQ must describe the open-device refresh that Settings used to');
+ assert.match(answer,/Drafts and pressed controls wait until you finish/,'the draft and pressed-control boundary remains visible to the user');
 });
 
 /* Dependencies are saved by task ID; fixtures never use an account or a real board. */
@@ -31038,7 +31583,7 @@ test('Delete red backups: the redrawn Settings keeps Data and backups open on th
  const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
  const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
  const payload=JSON.stringify(ctx.state),rows=['one','two','three'].map((id,i)=>({id,kind:'manual',day:'2026-09-06',at:old-i*HOUR,payload}));
- const backupsOpen=()=>/<details class="settings-section" open><summary>Data and backups<\/summary>/.test(shim.document.getElementById('modalRoot').innerHTML);
+ const backupsOpen=()=>/<details class="settings-section" data-settings-section="data" open><summary>Data and backups<\/summary>/.test(shim.document.getElementById('modalRoot').innerHTML);
  storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
  ctx.confirm=()=>true;ctx.openSettings();
  assert.equal(backupsOpen(),false,'fixture: opening Settings draws the section closed');
@@ -31074,7 +31619,7 @@ test('RISK delete red backups: the Delete of a single row pressed while a bulk d
 // progress message never painted; and each redraw replaced whatever dialog
 // the person had opened meanwhile.
 test('Delete red backups: Settings is redrawn once, at the end and on the backup list, however many backups are deleted, in either store',async t=>{
- const count=(ctx,shim)=>{const draws=[],openSettings=ctx.openSettings;ctx.openSettings=()=>{const result=openSettings();draws.push(/<details class="settings-section" open><summary>Data and backups<\/summary>/.test(shim.document.getElementById('modalRoot').innerHTML));return result;};return draws;};
+ const count=(ctx,shim)=>{const draws=[],renderSettings=ctx.renderSettings;ctx.renderSettings=options=>{const result=renderSettings(options);draws.push(/<details class="settings-section" data-settings-section="data" open><summary>Data and backups<\/summary>/.test(shim.document.getElementById('modalRoot').innerHTML));return result;};return draws;};
  const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
  const legacy=await loadApp({sharedStorage:storage});setFakeTime(legacy.ctx,now);
  const payload=JSON.stringify(legacy.ctx.state);
@@ -31114,10 +31659,10 @@ test('Delete red backups: a dialog the person opens, or Settings being closed, d
   const running=ctx.onAction('delete-old-backups',{});
   if(during==='closed')ctx.closeModal();else ctx.onAction('view-raw-backups',{});
   const meanwhile=shim.document.getElementById('modalRoot').innerHTML;
-  assert.equal(/data-act="save-settings"/.test(meanwhile),false,during+': fixture: Settings is no longer the open dialog');
+  assert.equal(/data-settings-section=/.test(meanwhile),false,during+': fixture: Settings is no longer the open dialog');
   await whileAlive(running);for(let i=0;i<10;i++)await flush();
   assert.deepEqual(await fixture.ids(),['device-future','device-new','device-week','mirror-new'],during+': the deletion still finished');
-  assert.equal(/data-act="save-settings"/.test(shim.document.getElementById('modalRoot').innerHTML),false,during+': Settings did not reopen over it');
+  assert.equal(/data-settings-section=/.test(shim.document.getElementById('modalRoot').innerHTML),false,during+': Settings did not reopen over it');
   if(during==='raw backup data')assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="rawBackupData"/,'the raw backup data dialog is still open');
   assert.equal(shim.document.getElementById('toast').textContent,'Deleted 2 backups older than seven days from this device.',during+': the result is still reported');
  }
@@ -31220,7 +31765,7 @@ test('Delete red backups: Help, Settings and the changelog say what the button d
  const answer=help.match(/<dt>Can I delete all my old backups at once\?<\/dt><dd>(.*?)<\/dd>/)?.[1].replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
  assert.ok(answer,'Help has the question');
  assert.ok(answer.split(' ').length<=130,'the answer stays within the 130-word limit');
- assert.match(answer,/Delete N backups older than seven days appears beside Make manual backup/,'it names the button as drawn, with its count');
+ assert.match(answer,/Delete N backups older than seven days appears just above your backups/,'it names the button as drawn, with its count, where #2303 puts it');
  assert.match(answer,/When at least one of them can be deleted this way/,'it does not promise the button for red backups it would leave');
  assert.match(answer,/asks once/);assert.match(answer,/how many were deleted and how many were kept, and why/);
  assert.match(answer,/leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned/);
@@ -31233,7 +31778,27 @@ test('Delete red backups: Help, Settings and the changelog say what the button d
  assert.match(changelog,/leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned/);
  assert.doesNotMatch(changelog,/delete every backup|protected copies/);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/When readable backups are older than seven days, one button here deletes them after a single confirmation\. It leaves unreadable backups, recovery records, pending choices and copies a recovery has pinned\./);
+ // #2303: help under a Settings control is at most one short line, so the
+ // explanation Settings used to carry is the Help answer checked above.
+ assert.doesNotMatch(settings,/one button here deletes them after a single confirmation/,'Settings does not repeat the Help answer');
+ assert.match(changelog,/The button that deletes backups older than seven days now sits just above your backups\./,'the changelog says where the button moved');
+});
+
+// #2327 merged under #2303: Settings lists Data and backups in an agreed order,
+// so the button that deletes the red rows sits with the backup list it acts on.
+test('RISK delete red backups: the button sits with the backup list, after Restore, in the #2303 Data and backups order',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),old=now-30*24*HOUR,storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});setFakeTime(ctx,now);
+ const payload=JSON.stringify(ctx.state);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{id:'old-one',kind:'manual',day:'2026-09-06',at:old,payload}]));
+ ctx.openSettings();
+ const data=shim.document.getElementById('modalRoot').innerHTML.split('<summary>Data and backups</summary>')[1]||'';
+ const list=data.split('<div id="settingsBackupList">')[1]?.split('<details class="settings-troubleshooting">')[0]||'';
+ assert.ok(redBackupsButton(list),'the button is inside the backup list');
+ const order=[/data-act="make-manual-backup">Make backup</,/data-act="restore-backup"[^>]*>Restore</,/data-act="delete-old-backups"/,/class="mgr backup-row"/,/<details class="settings-troubleshooting">/,/data-act="wipe">Reset everything</].map(pattern=>data.search(pattern));
+ assert.ok(order.every(index=>index>=0),'every item is drawn: '+JSON.stringify(order));
+ assert.deepEqual(order.slice().sort((a,b)=>a-b),order,'Make backup, Restore, the button, the backups, Troubleshooting, Reset everything: '+JSON.stringify(order));
+ assert.equal((data.match(/data-act="delete-old-backups"/g)||[]).length,1,'one button');
 });
 
 // Passed on its first run: the per-row Delete reads the stored backup again
@@ -32114,7 +32679,7 @@ test('RISK backup help: expiry, protected-copy deletion, the two downloads and a
  const countdown=answer('What do the countdown tags mean?');
  const taskHelp=answer('Can I undo, restore, or remove a task?');
  const backups=answer('How do backups and Restore work?');
- const exports=answer('What does Download board contain?');
+ const exports=answer('What does Download board only contain?');
  const worked=answer('What does Worked on it mean?');
  assert.match(countdown,/Start clears expired.*before building.*eligible pool/,'expired holds clear before the next eligible pool is built');
  assert.match(taskHelp,/Backup deletion asks for confirmation and keeps the current board/);
@@ -32127,11 +32692,11 @@ test('RISK backup help: expiry, protected-copy deletion, the two downloads and a
  assert.match(backups,/Manual and protected recovery copies remain/);
  assert.match(backups,/Matching duplicate backups appear once/);
  assert.match(backups,/Long before-and-after values wrap inside the preview\./);
- assert.match(exports,/It is the one board export; Download recovery file is the one recovery export/);
- assert.match(exports,/Download board saves ordinary board JSON/);
+ assert.match(exports,/appears beside Download backup when a backup comes out partial/);
+ assert.match(exports,/It saves ordinary board JSON/);
  assert.match(exports,/adding every readable saved source, build details and the Debug log/i);
- assert.match(exports,/only Download recovery file is offered and its file has no board/i);
- assert.match(exports,/a recovery file restores only its current board/);
+ assert.match(exports,/Download backup.s file has no board and Download board only does not appear/i);
+ assert.match(exports,/a backup restores only its current board/);
  assert.match(exports,/pending work is never replayed/);
  assert.match(exports,/File restore keeps supported recorded choices and protects displaced decisions\./);
  assert.match(worked,/It leaves the dotted chain and stays off it through saving and syncing\./);
@@ -32283,7 +32848,8 @@ test('RISK legacy automatic expiry FAQ: save rotation permanently removes expire
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Automatic backups cover today and the previous six local dates/);assert.match(help,/older automatic entries.*successful save/);assert.match(help,/Manual and protected recovery copies remain/i);assert.match(help,/opening Settings does not delete it/i);assert.match(help,/more than seven days old/);
  assert.match(help,/removed after a successful save, without Undo/);assert.match(help,/protected recovery copies remain until you delete/);
- ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);
+ // #2303: the cleanup notes moved from Settings to the Data and backups FAQ.
+ const settings=help.split('<dt>When are old backups cleaned up?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(settings,/removed permanently from the active backup list.*successful save/);
  // #2254 release review (B3): the acknowledged trim (owner authorization on
  // #2254, 2026-11-07, "migrated legacy copies") clears the storage upgrade's
  // copy of the older backup list once the cloud confirms the board, so
@@ -32510,11 +33076,36 @@ test('RISK daily backup retention adoption copy: a manual backup of the same boa
 
 // #2254 (owner rule): Settings, Help and the November 6 changelog say what
 // the rule keeps. Every Help answer keeps the 130-word limit.
-test('RISK daily backup retention guidance: Settings, Help and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
+// #2303: what left Settings is in the Data and backups FAQ, and the current
+// changelog describes the simpler Settings.
+test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved sync, retention and error explanations within 130 words, and the current changelog describes the simpler Settings',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const data=markup.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('</details>')[0]||'';
+ const answer=question=>data.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer('When does cloud sync check for changes?'),/Cloud sync refreshes on load, when you return, and when another device saves\. Independent decisions combine; conflicting current choices use when each choice was made\. Drafts and pressed controls wait until you finish\./);
+ assert.match(answer('How long do backups stay on this device?'),/Daily copies stay on this device for today and the two calendar days before it/);
+ assert.match(answer('When are old backups cleaned up?'),/Cleanup waits if the board or backup list changes or storage refuses the write\./);
+ assert.match(answer('How do Settings save?'),/Every setting saves as soon as you change it[\s\S]*returns to the last valid value/);
+ assert.match(answer('What can I do if a save or sync fails?'),/Recent sync errors, in the Debug log under Troubleshooting,/);
+ const words=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].filter(m=>m[2].replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length>130).map(m=>m[1]);
+ assert.deepEqual(words,[],'every Help answer stays within the 130-word limit');
+ assert.doesNotMatch(data,/Download recovery file|Save settings is at the bottom|Paste JSON/,'the FAQ names the controls Settings now shows');
+ assert.doesNotMatch(markup.split('data-changelog-notes>')[0]+(markup.split('data-changelog-notes>')[1]||'').split('</details>').slice(1).join('</details>'),/Save settings applies|in Settings and Save settings/,'no FAQ answer sends anyone to the removed Save settings button');
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('</ul>')[0]||'';
+ assert.match(current,/<li>Settings is much shorter\./,'the newest changelog entry describes the simpler Settings');
+ assert.match(current,/Every setting now saves as soon as you change it, and a number out of range returns to the last valid one\./);
+ assert.match(current,/Download backup/);assert.match(current,/Download board only/);assert.match(current,/Troubleshooting/);
+});
+
+test('RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- const section=settings.split('<h3>Daily local backups</h3>')[1]?.split('</p>')[0]||'';
+ assert.doesNotMatch(settings,/Daily local backups|Daily copies stay on this device/,'#2303: Settings leaves retention details to the FAQ');
+ await app.ctx.onAction('help',{});
+ const section=app.shim.document.getElementById('modalRoot').innerHTML.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(section,/Daily copies stay on this device for today and the two calendar days before it, so at most three; other automatic copies stay for up to seven calendar days/);
  assert.match(section,/While cloud recovery waits or holds your board, before the cloud confirms it, daily copies keep the seven days\./);
  assert.match(section,/Daily copies saved before this update, or holding another account’s board, also keep seven days\./);
@@ -32640,8 +33231,8 @@ test('RISK Squared Weighting joins: newly eligible tasks share one frozen scale 
  assert.deepEqual(other.slice().reverse(),scores,'a new weight cannot change the scale midway through one ordering');
 });
 
-test('RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks',async()=>{
- for(const entry of ['change','save-settings']){
+test('RISK Squared Weighting consumer transitions: actual Settings changes switch modes without changing ratings or pass marks',async()=>{
+ for(const entry of ['change']){
   const {ctx,shim}=await loadApp({seed:952});const root=ctx.addTask('Oldest'),next=ctx.addTask('Next'),blocked=ctx.addTask('Blocked');ctx.setTaskPrerequisites(blocked.id,[next.id]);
   const click=(act,mode)=>{const control=makeFakeElement();control.dataset={act,...(mode?{mode}:{})};control.closest=()=>control;shim.document.dispatchEvent({type:'click',detail:1,target:control});};
   ctx.openSettings();const select=shim.document.getElementById('stScanMode');select.id='stScanMode';select.matches=()=>true;select.value='descending';shim.document.dispatchEvent({type:'change',target:select});
@@ -32650,7 +33241,8 @@ test('RISK Squared Weighting consumer transitions: actual Settings change and Sa
   for(const mode of ['squared','chance','descending','squared']){
    ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('<option value="'+mode+'"'));
    select.value=mode;
-   if(entry==='change')shim.document.dispatchEvent({type:'change',target:select});else click('save-settings');
+   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="save-settings"/,'#2303: the change itself is the only way a mode is saved');
+   shim.document.dispatchEvent({type:'change',target:select});
    assert.equal(ctx.state.settings.scanMode,mode,entry+' reaches the shared preference rule');assert.equal(ctx.state.scanMode,mode);
    assert.equal(JSON.stringify(ctx.state.tasks),tasks,'presentation transitions invent no rating decisions');assert.equal(JSON.stringify(ctx.state.considered),marks);
    assert.equal(ctx.state.settings.squaredDefaultVersion,1);
@@ -34218,7 +34810,7 @@ test('RISK dependency form presentation: Hard heading follows active rows across
 
 test('RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\bopen\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
+ const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups']);for(const c of chapters)assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
 });
 
 test('RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins',()=>{
@@ -34384,7 +34976,8 @@ test('RISK Postpone: mounted scanner action defers without rating or task edits 
 });
 test('RISK Postpone: Settings validates custom hours preserves old values and final task resumes coherently',async()=>{
  const {ctx,shim}=await loadApp({seed:982});assert.equal(ctx.state.settings.postponeHours,1);for(const v of [null,'',Infinity,NaN,-1,0])assert.equal(ctx.normalizeSettings({postponeHours:v,cantMin:47}).postponeHours,1);assert.equal(ctx.normalizeSettings({cantMin:47,workedHours:19}).workedHours,19);
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label for="stPostponeHours">/);shim.document.getElementById('stPostponeHours').value='2.5';ctx.onAction('save-settings',{dataset:{}});assert.equal(ctx.state.settings.postponeHours,2.5);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label for="stPostponeHours">/);commitSetting(shim,'stPostponeHours','2.5');assert.equal(ctx.state.settings.postponeHours,2.5);
+ for(const invalid of ['-1','0','','abc','100000']){const field=commitSetting(shim,'stPostponeHours',invalid);assert.equal(ctx.state.settings.postponeHours,2.5,invalid+' returns to the last valid value');assert.equal(field.value,'2.5');}
  setFakeTime(ctx,Date.parse('2026-10-10T12:00:00Z'));const a=ctx.addTask('Sole');ctx.state.chain=[a.id];ctx.state.mode='work';const at=realNow(ctx);ctx.onAction('bench-postpone',{dataset:{benchmark:a.id}});assert.equal(ctx.taskPostponeUntil(a),at+9000000);assert.equal(ctx.state.chain.length,0);assert.equal(ctx.state.candidateId,null);assert.equal(ctx.state.mode,'scan');
  await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});setFakeTime(reload.ctx,Date.parse('2026-10-10T12:00:00Z'));assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===a.id)),false);assert.equal(reload.ctx.state.settings.postponeHours,2.5);
  ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===a.id)),0);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
@@ -34715,11 +35308,86 @@ test('RISK FAQs menu label: help navigation and named dialog use FAQs while reta
  assert.match(html,/<button class="ghost" data-act="help" title="FAQs \/ Changelog" aria-label="FAQs \/ Changelog">\?<\/button>/);
  const {ctx,shim}=await loadApp();const before=JSON.stringify(ctx.state);ctx.onAction('help',{});
  const markup=shim.elements.get('modalRoot').innerHTML;assert.match(markup,/<h2 id="faqsTitle">FAQs \/ Changelog<\/h2>/);
- assert.match(markup,/<details class="help-faq" open><summary>Quick start<\/summary>/);
+ assert.match(markup,/<details class="help-faq"><summary>Quick start<\/summary>/);
  assert.equal(JSON.stringify(ctx.state),before,'opening FAQs preserves board state');
  assert.match(html,/querySelector\('#modalRoot \.modal'\)\?\.setAttribute\('aria-labelledby','faqsTitle'\)/);
  assert.match(ctx.taskRatingHistoryHTML({ratingHistory:[]}),/Help: FAQs \/ Changelog → Task history/);
  assert.match(ctx.dependencyFieldsHTML('edit',[]),/See dependency FAQ in FAQs \/ Changelog\./);
+});
+
+// #2302: reads the sections a person sees in the ? menu, with the real release
+// notes loaded so a Changelog section at the top is tested with its true content.
+function helpMenuSections2302(app){
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ app.ctx.onAction('help',{});
+ return [...app.shim.document.getElementById('modalRoot').innerHTML.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)].map(([,attributes,title])=>({title:title.replace(/<[^>]+>/g,''),open:/\bopen\b/.test(attributes)}));
+}
+
+test('RISK FAQs menu order: the ? menu lists Changelog first and keeps the other sections in their usual order',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ assert.deepEqual(helpMenuSections2302(app).map(section=>section.title),['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups']);
+});
+
+test('RISK FAQs menu closed: every section starts closed when a person opens the ? menu and when a new person is shown it automatically',async t=>{
+ const closedSections=['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups'].map(title=>({title,open:false}));
+ const newcomer=await loadApp({seed:5});t.after(()=>newcomer.dispose());
+ assert.equal(newcomer.ctx.state.seenQuickStart,undefined,'a new person has not seen the menu yet');
+ const shown=newcomer.shim.document.getElementById('modalRoot').innerHTML;
+ assert.deepEqual([...shown.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)].map(([,attributes,title])=>({title:title.replace(/<[^>]+>/g,''),open:/\bopen\b/.test(attributes)})),closedSections,'the menu shown automatically on first boot');
+ const returning=await loadApp({seed:6});t.after(()=>returning.dispose());
+ returning.ctx.state.seenQuickStart=true;returning.ctx.closeModal();
+ assert.deepEqual(helpMenuSections2302(returning),closedSections,'the menu opened from the ? button');
+});
+
+test('RISK FAQs menu guidance: the extended FAQ and the November 9 release note explain Changelog first and closed sections',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());helpMenuSections2302(app);
+ const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=markup.match(/<dt>How is this menu arranged\?<\/dt><dd>(.*?)<\/dd>/)?.[1]||'';
+ assert.match(answer,/Changelog comes first/);
+ assert.match(answer,/Every section, including Quick start, starts closed each time this menu opens/);
+ assert.match(answer,/never changes your board/);
+ const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 9, 2026</h3>')[1]?.split('<h3>')[0]||'';
+ assert.match(release,/The \? menu now opens with Changelog first and every section closed, including Quick start\./);
+});
+
+test('RISK FAQs menu browser: Chromium and WebKit show every section closed on each open and each section still opens and closes by pointer and keyboard',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const titles=['Changelog','Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups'],allClosed=titles.map(title=>({title,open:false}));
+ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true});
+  try{for(const [width,height] of [[390,844],[1280,800]]){
+   const label=name+' '+width+'px: ',context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
+   try{
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+    const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.help-faq');
+    const shown=()=>sections.evaluateAll(list=>list.map(section=>({title:section.querySelector(':scope > summary').textContent,open:section.open})));
+    const openMenu=async()=>{await page.getByRole('button',{name:'FAQs / Changelog'}).click();await modal.waitFor();};
+    await modal.waitFor();await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.deepEqual(await shown(),allClosed,label+'a new person is shown the menu with every section closed');
+    // The shared browser fixtures use this to recognize the first-run menu; it must not depend on which section is first.
+    const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+    assert.equal(await resolveExpectedFirstRunHelp(page),true,label+'the shared fixture still recognizes and closes the first-run menu');await modal.waitFor({state:'detached'});
+    await openMenu();assert.deepEqual(await shown(),allClosed,label+'the ? button opens the menu with every section closed');
+    await modal.locator('[data-act="close-modal"]').focus();await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Changelog',label+'Tab reaches Changelog first');
+    for(const [index,title] of titles.entries()){
+     const section=sections.nth(index),summary=section.locator(':scope > summary'),isOpen=()=>section.evaluate(element=>element.open);
+     await summary.click();assert.equal(await isOpen(),true,label+title+' opens by pointer');
+     await summary.click();assert.equal(await isOpen(),false,label+title+' closes by pointer');
+     await summary.focus();await page.keyboard.press('Enter');assert.equal(await isOpen(),true,label+title+' opens by Enter');
+     await page.keyboard.press('Space');assert.equal(await isOpen(),false,label+title+' closes by Space');
+    }
+    for(const closeControl of ['close-modal','ok-quickstart']){
+     for(const index of [0,5])await sections.nth(index).locator(':scope > summary').click();
+     assert.deepEqual((await shown()).filter(section=>section.open).map(section=>section.title),['Changelog','Contexts'],label+'the opened sections are open before leaving');
+     await modal.locator('[data-act="'+closeControl+'"]').click();await modal.waitFor({state:'detached'});
+     await openMenu();assert.deepEqual(await shown(),allClosed,label+'sections opened earlier are closed after leaving with '+closeControl);
+    }
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
 });
 
 test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers',async()=>{
@@ -35955,7 +36623,7 @@ test('RISK Show Postpone preference: actual Settings checkbox hides both scanner
  shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.showPostpone,false);
  assert.doesNotMatch(scanner(),/data-act="(?:bench-)?postpone"/);assert.equal(JSON.stringify(ctx.state.tasks),tasks);assert.equal(JSON.stringify(ctx.state.chain),chain);assert.equal(ctx.state.candidateId,b.id);
  ctx.closeModal();ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stShowPostpone" type="checkbox"\//);
- ctx.onAction('save-settings',{dataset:{}});assert.equal(ctx.state.settings.showPostpone,false);
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="save-settings"/,'#2303: the checkbox change is the saved choice; there is no Save settings button to repeat it');assert.equal(ctx.state.settings.showPostpone,false);
  await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.state.settings.showPostpone,false);assert.equal(reload.ctx.taskPostponeUntil(reload.ctx.state.tasks.find(t=>t.id===held.id)),until);
  field.checked=true;shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.showPostpone,true);assert.match(scanner(),/data-act="postpone"/);
  ctx.state.mode='work';ctx.state.candidateId=null;ctx.render();assert.match(scanner(),/data-act="bench-postpone"/);
@@ -36476,7 +37144,7 @@ test('RISK cloud current choices: explicit Start scanning mode records its new a
  assert.ok(ctx.supportedCurrentChoiceEvent(rootEvent),'the strict projector recognizes only the bounded fresh-pass root choice');
 });
 
-test('RISK cloud current choices: Save settings retains changed shared preferences as one action',async()=>{
+test('RISK cloud current choices: each committed shared preference is retained as its own action',async()=>{
  const at=Date.parse('2026-10-16T17:05:00.000Z');
  const initial=syncState({tasks:[syncTask('settings-choice','Settings task')],chain:[],candidateId:null,
   passStartedAt:at-60000,passId:'shared-pass-settings',scanMode:'descending',syncRev:4,
@@ -36489,14 +37157,14 @@ test('RISK cloud current choices: Save settings retains changed shared preferenc
  const h=makeSyncHarness({remote,rev:4,delayMs:1});
  const {ctx,shim}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
  await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+1234);ctx.openSettings();
- shim.document.getElementById('stHorizon').value='90';
- shim.document.getElementById('stSamples').value='500';
- shim.document.getElementById('stScanMode').value='descending';
- ctx.onAction('save-settings',{});
+ commitSetting(shim,'stHorizon','90');
+ setFakeTime(ctx,at+1300);commitSetting(shim,'stSamples','500');
+ commitSetting(shim,'stScanMode','descending');
  const events=ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target.type==='setting')||[];
- assert.equal(events.length,2,'Save records both changed shared preferences instead of replacing settings wholesale');
- assert.equal(new Set(events.map(event=>event.actionId)).size,1,'one Save settings gesture has one Undo grouping identity');
- assert.ok(events.every(event=>event.at===at+1234),'all settings retain the original Save action time');
+ assert.equal(events.length,2,'#2303: each committed field records its changed shared preference; an unchanged one records nothing');
+ assert.equal(new Set(events.map(event=>event.actionId)).size,2,'each committed field is its own action with its own Undo grouping identity');
+ assert.equal(events.find(event=>event.target.property==='horizonMin').at,at+1234,'each setting retains the time it was committed');
+ assert.equal(events.find(event=>event.target.property==='samples').at,at+1300);
  assert.deepEqual(JSON.parse(JSON.stringify(events.map(event=>event.target).sort((a,b)=>a.property<b.property?-1:a.property>b.property?1:0))),[
   {type:'setting',id:'board',property:'horizonMin'},{type:'setting',id:'board',property:'samples'}]);
  assert.deepEqual(JSON.parse(JSON.stringify(events.find(event=>event.target.property==='horizonMin').before)),{present:true,value:60});
@@ -37722,7 +38390,7 @@ test('RISK cloud current choices: projected Can’t and Return preserve the orig
  assert.ok(returned.observedActionIds.includes(cant.id),'Return retains its causal link to the exact hold');
 });
 
-test('RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence',async()=>{
+test('RISK independent decision guidance: the rendered FAQ distinguishes retained decisions targeted Undo and held evidence',async()=>{
  const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML;
  const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
@@ -37740,8 +38408,8 @@ test('RISK independent decision guidance: rendered FAQ and Settings distinguish 
  assert.match(answer('Can I undo, restore, or remove a task?'),/keeping unrelated decisions/i);
  assert.match(answer('How does Undo work after Bulk Edit?'),/One Undo reverses the batch.*keeping unrelated progress/i);
  assert.doesNotMatch(answer('How does Undo work after Bulk Edit?'),/restore an earlier board|older peer fields|leave batch values in place/i);
- shim.window.CloudSync={configured:true,ready:true,user:'guidance-fixture@example.invalid'};ctx.closeModal();ctx.openSettings();
- const settings=shim.document.getElementById('modalRoot').innerHTML;
+ // #2303: the sync explanation Settings showed is now in the Data and backups FAQ.
+ const settings=answer('When does cloud sync check for changes?');
  assert.match(settings,/Independent decisions combine/);
  assert.match(settings,/conflicting current choices use when each choice was made/);
  assert.doesNotMatch(settings,/newest revision wins/);
@@ -37834,10 +38502,10 @@ test('RISK device save warning browser: actual held Add keeps every text line on
    await page.locator('[data-act="settings"]').click();
    await poll(page,()=>!document.querySelector('#toast.show'),null,'natural warning expiry');
    const data=page.locator('#modalRoot details').filter({has:page.locator('[data-act="make-manual-backup"]')});for(const panel of await data.all())if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
-   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Download recovery file/);
+   assert.equal(await page.locator('[data-act="make-manual-backup"]').isVisible(),true);assert.match(await page.locator('#modalRoot').innerText(),/Download backup/);
    const issue=page.locator('#modalRoot .kv').filter({hasText:'Last device save issue:'});await issue.scrollIntoViewIfNeeded();assert.equal(await issue.isVisible(),true);assert.match(await issue.innerText(),/Last device save issue:.*device-save:completion-upgrade\/ambiguous-legacy-completion/s);
    row.details=await issue.evaluate(el=>{const b=el.getBoundingClientRect(),code=el.querySelector('code'),r=code.getBoundingClientRect();return {text:el.textContent,rect:{x:b.x,y:b.y,w:b.width,h:b.height},code:{x:r.x,y:r.y,w:r.width,h:r.height},scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});assert.ok(row.details.scrollWidth<=row.details.clientWidth+1);assert.ok(row.details.code.x>=row.details.rect.x&&row.details.code.x+row.details.code.w<=row.details.rect.x+row.details.rect.w+1);
-   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['download-current-board','download-recovery-file'])fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
+   await page.evaluate(()=>document.fonts.ready);fonts.details=await platformFonts('#modalRoot p.kv:has(code)');for(const act of ['download-current-board','download-recovery-file'])if(await page.locator('#modalRoot [data-act="'+act+'"]').count())fonts[act]=await platformFonts('#modalRoot [data-act="'+act+'"]');await session.detach();
    if(evidence){fs.writeFileSync(path.join(evidence,theme+'-'+scale+'.json'),JSON.stringify(row,null,2));await page.screenshot({path:path.join(evidence,theme+'-'+scale+'-details.png')});
     if(process.env.TOAST_REVIEW_PAUSE==='1'){const ack=path.join(evidence,theme+'-'+scale+'-details-inspected');const end=Date.now()+180000;while(!fs.existsSync(ack)&&Date.now()<end)await new Promise(r=>setTimeout(r,100));assert.ok(fs.existsSync(ack),'owner inspected actual native details before closing its context');}}
    assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:v1')),exactOldDevice);assert.equal(await page.evaluate(()=>localStorage.getItem('fvp:chain-scanner:protected:v1')),exactOldDevice);
@@ -38479,8 +39147,8 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
  const settings=root.innerHTML;assert.match(settings,/<h2>Settings<\/h2>/,'the visible header Settings action opens Settings');
  const restoreButton=settings.match(/<button\b(?=[^>]*data-act="restore-backup")[^>]*>\s*Restore\s*<\/button>/);
  assert.ok(restoreButton,'Settings exposes one guarded Restore action');
- assert.match(settings,/id="backupRestoreSource"[\s\S]*?value="file"[\s\S]*?value="paste"/,'the same Restore action offers native file and paste sources');
- assert.doesNotMatch(settings,/data-act="choose-backup-file"|data-act="open-paste-recovery"/,'file and paste are choices, not competing Settings actions');
+ assert.match(settings,/data-act="restore-backup"[^>]*>Restore<\/button><\/div><div id="restoreChoices"[^>]*hidden[^>]*>[\s\S]*?data-act="choose-backup-file"[\s\S]*?data-act="open-paste-recovery"/,'#2303: the same Restore action offers native file and paste sources inside it, hidden until Restore is chosen');
+ assert.doesNotMatch(settings,/id="backupRestoreSource"/,'file and paste are not chosen beside Restore');
  assert.doesNotMatch(settings,/id="jsonBox"/,'the editable paste area stays in its own dialog');
  const numericDraft=shim.document.getElementById('stHorizon');numericDraft.value='77';
  root.querySelectorAll=selector=>selector==='input,select,textarea'?[numericDraft]:[];
@@ -38494,7 +39162,9 @@ test('RISK pasted recovery UI: Settings opens an editable protected preview and 
   assert.equal((markup.match(/class="modal" role="dialog"/g)||[]).length,1,message+' keeps one dialog');
   return markup;
  };
- click('restore-backup');
+ const choices=shim.document.getElementById('restoreChoices');choices.hidden=true;
+ click('restore-backup');assert.equal(choices.hidden,false,'Restore reveals its file and paste choices');
+ click('open-paste-recovery');
  assert.match(oneDialog('Opening paste recovery'),/id="jsonBox"/,'the visible Settings route opens an editable text area');
  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
  const waitForPreview=async()=>{
@@ -38634,7 +39304,7 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
   const dispatch=action=>{const target=makeFakeElement();target.dataset={act:action};target.closest=selector=>selector==='[data-act]'?target:null;shim.document.dispatchEvent({type:'click',target,detail:1});};
   dispatch('settings');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'pasting starts from the visible Settings control');
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="restore-backup"/);
-  dispatch('restore-backup');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
+  dispatch('restore-backup');dispatch('open-paste-recovery');const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=raw;shim.document.dispatchEvent({type:'input',target:box});
   assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="preview-pasted-recovery"/);
   dispatch('preview-pasted-recovery');
   const expectedChoice=format==='raw'?'fileRestoreBackupChoice':'fileRestoreLearningChoice';
@@ -38660,7 +39330,7 @@ test('RISK pasted recovery UI: archive and raw backup text use the visible Setti
  const help=source.shim.document.getElementById('modalRoot').innerHTML,faq=help.match(/<dt>How do I paste a saved board\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended Data and backups FAQ explains pasted recovery');
  assert.ok(faq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the pasted-recovery FAQ keeps its word limit');
- assert.match(faq,/Settings → Data and backups → Restore.*choose Paste JSON.*select Restore/,'the FAQ names the consolidated Settings route');
+ assert.match(faq,/Settings → Data and backups → Restore, then choose Paste board data/,'#2303: the FAQ names the consolidated Settings route, with paste chosen inside Restore');
  assert.match(faq,/separate from Review saved decisions.*combines device and cloud choices/,'the FAQ distinguishes snapshot restore from held-cloud choice merging');
 });
 
@@ -39270,21 +39940,72 @@ test('RISK cloud source recovery metadata: native preview distinguishes server s
  assert.match(preview,/Upload creation time \(device clock\):/);assert.match(preview,/Decision time for missing or unrecorded changes: unavailable/);assert.match(preview,/does not establish which board is newer/);
 });
 
-test('RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery',async t=>{
+// A browser builds new Settings controls from the markup on every render, while
+// the Node shim keeps one object per id. Mount fresh ones the way a page would,
+// so a repaint after the render is what the person would actually see.
+function mountSettingsControls(shim){
+ const root=shim.document.getElementById('modalRoot');let html=String(root.innerHTML??''),generation=0,mounted=null;
+ Object.defineProperty(root,'innerHTML',{get:()=>html,set:value=>{html=String(value);generation++;},configurable:true});
+ const attr=(text,name)=>(text.match(new RegExp('\\b'+name+'="([^"]*)"'))||[])[1];
+ const build=()=>{
+  const controls=[];
+  for(const [,id,rest] of html.matchAll(/<input id="(st[A-Za-z]+)"([^>]*)>/g))controls.push(Object.assign(makeFakeElement(),{id,type:attr(rest,'type')||'text',value:attr(rest,'value')??'',checked:/\bchecked\b/.test(rest)}));
+  for(const [,id,body] of html.matchAll(/<select id="(st[A-Za-z]+)"[^>]*>(.*?)<\/select>/g)){
+   const options=[...body.matchAll(/<option value="([^"]*)"([^>]*)>/g)],selected=Math.max(0,options.findIndex(option=>/\bselected\b/.test(option[2])));
+   controls.push(Object.assign(makeFakeElement(),{id,value:options[selected]?.[1]??'',selectedIndex:selected}));
+  }
+  return controls;
+ };
+ root.querySelectorAll=selector=>{
+  if(!html.includes('<h2>Settings</h2>')||!/input|select|textarea/.test(String(selector)))return [];
+  if(mounted?.generation!==generation)mounted={generation,controls:build()};
+  return mounted.controls;
+ };
+ return id=>root.querySelectorAll('input,select,textarea').find(control=>control.id===id);
+}
+
+test('RISK Settings after Restore: a confirmed restore, a cancelled preview and a closed paste all show the saved values',async t=>{
+ for(const outcome of ['confirm','cancel','close paste'])await t.test(outcome,async sub=>{
+  const {IDBFactory}=await import('fake-indexeddb');
+  const app=await loadApp({indexedDBProvider:new IDBFactory(),deviceDbName:'settings-after-restore-'+Math.random()}),{ctx,shim}=app;sub.after(()=>closeLegacyApp173(app));
+  ctx.addTask('Current task');assert.equal(await ctx.persist(),true);
+  const source=JSON.parse(JSON.stringify(ctx.state));source.tasks=[{id:'restored',title:'Restored task',ctx:[],mu:25,sigma:8.333333333333334,createdAt:1}];
+  source.settings={...source.settings,horizonMin:200,dateFormat:'ymd',chainStartsWith:'mostLikely',evergreenResetAtDay:false};
+  const shown=mountSettingsControls(shim);ctx.openSettings();
+  // Shown but never saved: with no Save button, Settings must not bring this back.
+  shown('stWorkedHrs').value='37';
+  await ctx.onAction('restore-backup',{});await ctx.onAction('open-paste-recovery',{});
+  const box=shim.document.getElementById('jsonBox');box.id='jsonBox';box.value=JSON.stringify(source);shim.document.dispatchEvent({type:'input',target:box});
+  if(outcome==='close paste')ctx.onAction('close-paste-recovery',{});
+  else{
+   assert.equal(await ctx.onAction('preview-pasted-recovery',{}),true);
+   if(outcome==='confirm'){assert.equal(await ctx.onAction('confirm-file-restore',{}),true);for(let n=0;n<50;n++)await flush();}
+   else{ctx.onAction('cancel-file-restore',{});ctx.onAction('close-paste-recovery',{});}
+  }
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<h2>Settings<\/h2>/,'the person returns to Settings');
+  const saved=ctx.state.settings;
+  assert.equal(saved.horizonMin,outcome==='confirm'?200:60);
+  assert.deepEqual({horizon:shown('stHorizon').value,dateFormat:shown('stDateFormat').value,chainStartsWith:shown('stChainStartsWith').value,reset:shown('stEverReset').checked,worked:shown('stWorkedHrs').value},
+   {horizon:String(saved.horizonMin),dateFormat:saved.dateFormat,chainStartsWith:saved.chainStartsWith||'oldest',reset:saved.evergreenResetAtDay,worked:String(saved.workedHours)},outcome+': Settings shows the saved values');
+ });
+});
+
+test('RISK cloud source recovery drafts: Settings shows the saved values after native review cancel delayed reads and confirmed recovery',async t=>{
  for(const outcome of ['cancel','cancel during read','confirm'])await t.test(outcome,async sub=>{
   const app=await divergentCloudSourceApp187(sub),{ctx,shim}=app;
-  ctx.onAction('settings',{});const root=shim.document.getElementById('modalRoot'),control=shim.document.getElementById('stWorkedHrs');control.id='stWorkedHrs';control.type='number';control.value='37';
-  root.querySelectorAll=()=>root.innerHTML.includes('<h2>Settings</h2>')?[control]:[];
+  const shown=mountSettingsControls(shim);ctx.onAction('settings',{});const root=shim.document.getElementById('modalRoot');
+  // Shown but never saved: with no Save button (#2303), Settings must not bring this back.
+  shown('stWorkedHrs').value='37';
   let release;if(outcome==='cancel during read'){const gate=new Promise(resolve=>release=resolve);sub.after(()=>release());app.faults.serverRead=async()=>gate;}
   const reviewing=ctx.onAction('review-cloud-source-recovery',{});
   if(outcome==='cancel during read'){
-   for(let n=0;n<100&&!root.innerHTML.includes('Reading the separate');n++)await flush();control.value='16';ctx.onAction('close-modal',{});delete app.faults.serverRead;release();assert.equal(await reviewing,false);
+   for(let n=0;n<100&&!root.innerHTML.includes('Reading the separate');n++)await flush();ctx.onAction('close-modal',{});delete app.faults.serverRead;release();assert.equal(await reviewing,false);
   }else{
-   assert.equal(await reviewing,true);control.value='16';
+   assert.equal(await reviewing,true);
    if(outcome==='confirm'){await ctx.onAction('choose-cloud-recovery-source',{dataset:{value:'device'}});assert.equal(await ctx.onAction('apply-cloud-source-recovery',{}),true);}else ctx.onAction('close-modal',{});
   }
   assert.match(root.innerHTML,/<h2>Settings<\/h2>/,'review returns to the originating Settings pane');
-  assert.equal(control.value,'37','the actual unsaved Settings value is restored instead of being silently discarded');assert.equal(ctx.state.settings.workedHours,16,'restoring the draft never saves it implicitly');
+  assert.equal(shown('stWorkedHrs').value,'16','Settings shows the saved value, not one that was never saved');assert.equal(ctx.state.settings.workedHours,16,'the unsaved value is not saved implicitly');
  });
 });
 
@@ -39388,13 +40109,13 @@ test('RISK recovery identity consumers: verified cloud adoption rebases independ
 });
 
 
-test('RISK support diagnostics: Settings names the board and recovery downloads for their contents',async t=>{
+test('RISK support diagnostics: Settings names Download backup and the FAQ names what each download holds',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openSettings();
  const settings=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/Download board saves the board open in this tab as ordinary board JSON/i,'the board download is distinct from the recovery file');
- assert.match(settings,/data-act="download-current-board"/,'the one board download action remains available');
- assert.match(settings,/data-act="download-recovery-file"/,'the one recovery download action remains available');
+ assert.match(settings,/data-act="download-recovery-file">Download backup</,'#2303: the one backup download action remains available');
+ assert.doesNotMatch(settings,/data-act="download-current-board"/,'the board-only download appears only beside a partial backup');
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help.match(/<dt>What does Download board only contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1]||'',/It saves ordinary board JSON for the board open in this tab/i,'the board-only download is distinct from the backup');
  const faq=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');
  assert.match(faq,/local metadata report/i);assert.match(faq,/never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text/i);
@@ -39561,8 +40282,8 @@ test('RISK debug log: an interrupted actual cloud review retains its stage in a 
 test('RISK debug log: the replacement screen copies a unified log without a download',async t=>{
  let copied=null;const app=await loadApp({navigatorProvider:{clipboard:{async writeText(text){copied=text;}}}}),{ctx,shim}=app;t.after(()=>app.dispose());
  ctx.openSettings();let modal=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(modal,/<h3>Debug log<\/h3>/,'Settings replaces the old debugger with the unified log');
- assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/Download recovery file/);
+ assert.match(modal,/<summary>Troubleshooting<\/summary>[\s\S]*?>View debug log</,'#2303: Settings replaces the old debugger with the unified log, under Troubleshooting');
+ assert.doesNotMatch(modal,/<h3>Support diagnostics<\/h3>/);assert.match(modal,/Download backup/);
  assert.equal(await ctx.onAction('view-support-diagnostics',{}),true);modal=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(modal,/<h2>Debug log<\/h2>/);assert.match(modal,/readonly aria-label="Debug log"/,'manual copy remains available without a clipboard API');
  assert.equal(await ctx.onAction('copy-support-diagnostics',{}),true);assert.ok(JSON.parse(copied).restartDiagnostics);
@@ -39634,8 +40355,8 @@ test('RISK support diagnostics: local report stays redacted, bounded, and separa
  app.ctx.openSettings();const settings=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(settings,/Debug log/i,'Settings offers a separate support report');
  assert.match(settings,/data-act="view-support-diagnostics"/);assert.match(settings,/data-act="download-recovery-file"/);assert.doesNotMatch(settings,/data-act="copy-support-diagnostics"/);assert.doesNotMatch(settings,/data-act="download-support-diagnostics"/);
- assert.match(settings,/metadata report.*not a board backup/i,'the local report cannot be mistaken for restorable board data');
  app.ctx.onAction('view-support-diagnostics',{});
+ assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/debug log[\s\S]*not a board backup/i,'#2303: the log itself says it cannot be mistaken for restorable board data');
  let report=app.ctx.buildSupportDiagnosticsReport();
  for(let i=0;i<100&&report.app.executingScriptSha256.status==='pending';i++){await flush();report=app.ctx.buildSupportDiagnosticsReport();}
  const text=app.ctx.supportDiagnosticsText();
