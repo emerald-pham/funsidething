@@ -1909,9 +1909,9 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
   for(let i=0;i<(oneTask?1:65);i++)addTask('Saved appearance task '+String(i).padStart(2,'0')+(i===0&&longTitle?' '+('Saved long task text '.repeat(100)):''));
   if(!oneTask)addTask('Unmatched control task');if(availabilityFixture)state.tasks.at(-1).startsAt='2026-10-29';save();await persist();render();},{longTitle:startupOptions.longTitle===true,oneTask:startupOptions.oneTask===true,availabilityFixture:startupOptions.availabilityFixture===true});
  if(activeScanner)await page.locator('[data-act="start-scan"]').first().click();
- // #2332: a started pass with an empty chain where an older client that reads the retired skip flag has stored its candidate.
+ if(startupOptions.scannerState)await page.evaluate(async mode=>{state.chain=state.tasks.slice(0,2).map(t=>t.id);state.candidateId=state.tasks[2].id;state.mode=mode==='paused'?'work':'scan';state.interventionActive=mode==='intervention';state.interventionP=.23;save();await persist();render();},startupOptions.scannerState);
+ // #2332: then a started pass with an empty chain where an older client that reads the retired skip flag has stored its candidate.
  if(startupOptions.scannerState==='stored-unpaired')await page.evaluate(async()=>{state.chain=[];state.mode='scan';state.passStartedAt=Date.now();state.passId=state.passId||'stored-unpaired-pass';state.settings.skipOldestFirstDot=true;state.candidateId=state.tasks[2].id;state.presentedAt=Date.now();save();await persist();render();});
- else if(startupOptions.scannerState)await page.evaluate(async mode=>{state.chain=state.tasks.slice(0,2).map(t=>t.id);state.candidateId=state.tasks[2].id;state.mode=mode==='paused'?'work':'scan';state.interventionActive=mode==='intervention';state.interventionP=.23;save();await persist();render();},startupOptions.scannerState);
  if(keepHeader){await page.locator('[data-act="settings"]').first().click();await page.getByText('Scanning and recurrence',{exact:true}).click();await page.locator('#stFloatingHeader').check();await page.locator('#modalRoot [data-act="close-modal"]').click();}
  if(await page.locator('#listBody').isHidden())await page.locator('[data-act="toggle-list"]').first().click();
  await page.locator('#listSearch').fill('Saved appearance');
