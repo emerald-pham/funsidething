@@ -12780,28 +12780,27 @@ test("UI #221: in work mode, returning an older dot keeps work mode on the same 
   assert.equal(ctx.state.mode, "work");
 });
 
-test("UI #221: returning the only dot leaves the existing empty-chain state with no replacement dot, with the oldest-first setting on or off", async t => {
-  for (const skipOldestFirstDot of [false, true]) await t.test(`skipOldestFirstDot ${skipOldestFirstDot}`, async () => {
-    const { ctx, shim } = await loadApp({ seed: 2219 });
-    ctx.state.settings.skipOldestFirstDot = skipOldestFirstDot;
+// #2300 (merged from main) retired the skip-the-first-dot checkbox for Chain
+// starts with; both options dot one task at Start, so both return to Start.
+test("UI #221: returning the only dot leaves the existing empty-chain state with no replacement dot, whichever way the chain starts", async t => {
+  for (const chainStartsWith of ["oldest", "mostLikely"]) await t.test(`chainStartsWith ${chainStartsWith}`, async () => {
+    const app = await loadApp({ seed: 2219 }), { ctx, shim } = app;
+    chooseChainStart(app, chainStartsWith);
     addTaskAged(ctx, "Oldest pool task", 900000);
     addTaskAged(ctx, "Newer pool task", 1000);
     ctx.onAction("start-scan", { dataset: { mode: "descending" } });
-    if (skipOldestFirstDot) answerShownCandidate(ctx, "yes");
     const only = renderedBoard(shim.elements.get("scan").innerHTML).benchmark;
     assert.ok(only, "precondition: one dot");
+    assert.equal(ctx.state.chain.length, 1, "precondition: Start dotted exactly one task");
 
     returnBenchmarkFromEdit(ctx, shim);
 
     const scan = shim.elements.get("scan").innerHTML, board = renderedBoard(scan);
     assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: [], benchmark: null }, "no dot is chosen in its place");
     assert.deepEqual(Array.from(ctx.state.chain), []);
-    if (skipOldestFirstDot) assert.ok(board.candidate, "with the setting on, the scan offers a first candidate as it does with no dot");
-    else {
-      assert.equal(board.candidate, null);
-      assert.match(scan, /Nothing dotted yet/, "with the setting off, the board waits for Start");
-      assert.match(scan, /data-act="start-scan"/);
-    }
+    assert.equal(board.candidate, null);
+    assert.match(scan, /Nothing dotted yet/, "the board waits for Start");
+    assert.match(scan, /data-act="start-scan"/);
   });
 });
 
