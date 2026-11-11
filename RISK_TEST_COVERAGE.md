@@ -207,8 +207,10 @@ its RISK test; the map follows.
 - RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button
 - RISK chain start: Quick start and the immediate-save FAQ describe the dropdown
 - RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox
+- RISK chain start: the FAQ and current Changelog describe this release accurately after review
 - RISK works like normal: after both chain start options, committed Settings with a reload and the ? menu, ordinary scanning, Done, Undo, resume, offline reload, reconnect, backup and restore preview leave the expected board
 - RISK BACKWARD COMPATIBILITY: the released client with the same board open keeps syncing through the works-like-normal run, with no recovery prompt and no lost setting
+- RISK BACKWARD COMPATIBILITY: with the retired skip checkbox saved on and an empty started chain, Stable and the candidate stop writing after an ordinary edit
 - RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption
 - RISK quiet reconciliation feedback: a displaced local title keeps its recovery notice and exact backup
 - RISK quiet reconciliation feedback: independent comparison learning beside Dislodge stays quiet
@@ -408,6 +410,7 @@ its RISK test; the map follows.
 - RISK Data and backups layout: one status line, Make backup, Download backup, Restore, the backup list, closed Troubleshooting and Reset everything, with Clear history only in History
 - RISK Settings install: Install this app on your phone sits outside Scanning and recurrence
 - RISK backup and Restore consolidation: Settings keeps one Download backup and one guarded Restore
+- RISK backup and Restore consolidation: a second Restore press closes its choices and reports them collapsed
 - RISK backup format safety: without an accepted board the recovery download says in readable text that its file has no board
 - RISK backup format browser: enlarged unreadable Settings keeps the Restore choices and the backup safety text readable
 - RISK committed settings: every remaining Settings field saves when committed, survives a reload and takes effect
@@ -545,6 +548,7 @@ its RISK test; the map follows.
 - RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diagnostics and partial-report limits
 - RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the recovery file for repairs
 - RISK storage-failure messages: a failed device save names Download backup, or Download board only once a backup has come out partial
+- RISK storage-failure messages: Download board only appears when Download backup fails or does not finish
 - RISK RECOVERY EXPORT: an unsaved in-memory board remains downloadable without device storage
 - RISK MANUAL JSON EXPORT: the actual Settings actions download the board and the recovery file
 - RISK MANUAL JSON EXPORT: unreadable, unsupported, changing and hydration-placeholder sources make a recovery file marked partial, never a complete one
@@ -1565,6 +1569,8 @@ its RISK test; the map follows.
 - RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens
 - RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening
 - RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits
+- RISK backup delete focus: after deleting old backups by keyboard on a short screen, the focused Make backup is in view
+- RISK saved view opening: an empty chain shows Start, not a candidate an older client stored for the retired skip checkbox
 - RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts
 - RISK saved view full-board safety: supported copies and identity masks never grant authority
 - RISK saved view broken-board startup: configured Firebase leaves the prior warning neutral until its first event
