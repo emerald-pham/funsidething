@@ -2059,10 +2059,19 @@ let backupBatch = null;
 // A redraw after deleting many backups returns to the list it changed. Since
 // #2303 that is the redraw every backup action uses (reopenSettingsAtBackups:
 // open sections kept, the backup list in view); keyboard focus goes back to
-// Make backup, as it did before, without scrolling away from the list.
+// Make backup, as it did before. Make backup sits above the list, so on a short
+// screen (200% zoom, a small phone) the list in view left the focused button
+// off-screen, where a second Enter made a backup nobody saw (#2332). The
+// focused button wins: "nearest" scrolls only when it is out of view, and the
+// margin keeps its focus ring (2px outside the button) clear of the dialog edge.
 function openSettingsOnBackups(){
   reopenSettingsAtBackups();
-  try{document.querySelector('#modalRoot [data-act="make-manual-backup"]')?.focus?.({preventScroll:true});}catch(e){}
+  try{
+    const button=document.querySelector('#modalRoot [data-act="make-manual-backup"]');
+    button?.focus?.({preventScroll:true});
+    if(button?.style)button.style.scrollMarginBlock="8px";
+    button?.scrollIntoView?.({block:"nearest"});
+  }catch(e){}
 }
 function backupCountText(count){return count+(count===1?' backup':' backups');}
 // While a recovery is unsettled an old copy can be the only recovery source,

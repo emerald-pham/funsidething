@@ -3398,6 +3398,67 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
  assert.deepEqual([...enlargedCoverage].sort(),['cards','contexts','filters','history','rows'],'actual enlarged coverage includes the complete board surfaces');
 });
 
+// #2332 (typography review F1): after the bulk delete, keyboard focus returns to
+// Make backup. On a short screen that button sat above the backup list it
+// scrolled to, so the focus ring was off-screen and a second Enter silently
+// made a backup. 640x400 is a 1280x800 window at 200% zoom; 320x568 is an
+// iPhone SE class screen.
+async function bulkDeleteFocusInBrowser(t,{width,height,mobile}){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,DAY=86400000,now=Date.now();
+ const board=JSON.stringify(syncState({seenQuickStart:true,tasks:[syncTask('focus-backup-task','Focus backup task')]}));
+ const browser=await chromium.launch({headless:true,...(openingBoardSelfHosted||!process.env.LANDSCAPE_BROWSER_CHANNEL?{}:{channel:process.env.LANDSCAPE_BROWSER_CHANNEL})});
+ t.after(()=>browser.close());
+ const context=await browser.newContext({viewport:{width,height},isMobile:mobile,hasTouch:mobile,serviceWorkers:'block',reducedMotion:'reduce'});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await context.addInitScript(board=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+ },board);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ // Backups made ten days ago are the red rows the bulk delete removes.
+ await page.clock.install({time:now-10*DAY});
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:60000});
+ const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
+ const openData=async()=>{
+  await page.evaluate(()=>{for(let i=0;i<4&&document.querySelector('.mback');i++)closeModal();});
+  await page.locator('#appHeader [data-act="settings"]').click();
+  await page.evaluate(()=>{const section=document.querySelector('#modalRoot details[data-settings-section="data"]');if(section)section.open=true;});
+ };
+ for(let i=0;i<3;i++){
+  await openData();const rows=await page.locator('#modalRoot .backup-row').count();
+  await page.locator('#modalRoot [data-act="make-manual-backup"]').click();
+  await page.waitForFunction(rows=>document.querySelectorAll('#modalRoot .backup-row').length>rows,rows,{timeout:15000});
+ }
+ await page.clock.setSystemTime(now);
+ await openData();
+ await page.waitForSelector('#modalRoot [data-act="delete-old-backups"]',{timeout:15000});
+ page.once('dialog',dialog=>dialog.accept());
+ await page.evaluate(()=>{const button=document.querySelector('#modalRoot [data-act="delete-old-backups"]');button.scrollIntoView({block:'center'});button.focus();});
+ await page.keyboard.press('Enter');
+ await page.waitForFunction(()=>!document.querySelector('#modalRoot [data-act="delete-old-backups"]')&&document.activeElement?.dataset?.act==='make-manual-backup',null,{timeout:20000});
+ await page.evaluate(()=>new Promise(requestAnimationFrame));
+ const seen=await page.evaluate(()=>{
+  const focus=document.activeElement.getBoundingClientRect(),modal=document.querySelector('#modalRoot .modal').getBoundingClientRect();
+  return {focus:[Math.round(focus.top),Math.round(focus.bottom)],modal:[Math.round(modal.top),Math.round(modal.bottom)],
+   visible:focus.top>=modal.top-0.5&&focus.bottom<=modal.bottom+0.5&&focus.top>=-0.5&&focus.bottom<=innerHeight+0.5,
+   // The ring is a 2px outline 2px outside the button; the modal clips it.
+   ring:focus.top-4>=modal.top-0.5&&focus.bottom+4<=modal.bottom+0.5};
+ });
+ assert.equal(seen.ring,true,width+'x'+height+': the focus ring around Make backup is not clipped by the dialog edge '+JSON.stringify(seen));
+ t.diagnostic(JSON.stringify({width,height,...seen}));
+ if(process.env.BACKUP_FOCUS_VISUAL_DIR){fs.mkdirSync(process.env.BACKUP_FOCUS_VISUAL_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.BACKUP_FOCUS_VISUAL_DIR,`backup-delete-focus-${width}x${height}.png`)});}
+ assert.equal(seen.visible,true,width+'x'+height+': Make backup, which has keyboard focus, is in view after the bulk delete '+JSON.stringify(seen));
+ assert.deepEqual(errors,[]);
+}
+test('RISK backup delete focus: after deleting old backups by keyboard on a short screen, the focused Make backup is in view',async t=>{
+ await openingBoardFixture(t);
+ for(const [width,height,mobile] of [[640,400,false],[320,568,true]])await t.test(width+'x'+height,async sub=>{await bulkDeleteFocusInBrowser(sub,{width,height,mobile});});
+});
+
 test('RISK saved view opening: an empty chain shows Start, not a candidate an older client stored for the retired skip checkbox',async t=>{
  await openingBoardFixture(t);
  const view=await invisibleSavedViewBrowser('light',false,false,{width:390,height:844},false,{brokenDeviceBoard:true,retainAppearance:false,scannerState:'stored-unpaired',syntheticCloud:true,holdConfiguredFirebaseImports:true,openingDelayMs:4000,topOfPage:true});
