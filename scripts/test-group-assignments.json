@@ -450,6 +450,11 @@
   ],
   "environmentSkips": [
     {
+      "root": "RISK FAQs menu browser: Chromium and WebKit show every section closed on each open and each section still opens and closes by pointer and keyboard",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
       "root": "RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
@@ -635,7 +640,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK downloads visual browser: Download board and Download recovery file render like Restore beside them, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
+      "root": "RISK downloads visual browser: Download backup, Download board only beside a partial backup, the Restore choices and Troubleshooting render like their neighbours, with and without an accepted board, and the Debug log Copy and Download render like Select all and Refresh, in day and night, ordinary and enlarged text, phone and desktop, with keyboard focus, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -727,7 +732,7 @@
     },
     {
       "baselineRoot": "RISK backup and Restore consolidation: Settings keeps one guarded action with all formats",
-      "currentRoot": "RISK backup and Restore consolidation: Settings keeps one board download, one recovery download and one guarded Restore",
+      "currentRoot": "RISK backup and Restore consolidation: Settings keeps one Download backup and one guarded Restore",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
@@ -735,7 +740,7 @@
     },
     {
       "baselineRoot": "RISK backup format browser: enlarged unreadable Settings keeps native selectors and safety text readable",
-      "currentRoot": "RISK backup format browser: enlarged unreadable Settings keeps the Restore selector and the recovery file safety text readable",
+      "currentRoot": "RISK backup format browser: enlarged unreadable Settings keeps the Restore choices and the backup safety text readable",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
@@ -783,7 +788,7 @@
     },
     {
       "baselineRoot": "RISK support diagnostics: Settings names the existing board export for its contents",
-      "currentRoot": "RISK support diagnostics: Settings names the board and recovery downloads for their contents",
+      "currentRoot": "RISK support diagnostics: Settings names Download backup and the FAQ names what each download holds",
       "baselineGroup": "core",
       "group": "core",
       "file": "tests/core.test.js",
@@ -804,6 +809,294 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2272 (spec acceptance criteria: a committedAt-only head refresh must not stop the review or use up the single fresh recheck) renamed this root: the review now completes in the first pair instead of spending its one fresh recheck on head metadata; the renamed test keeps the cancellable progress, preservation and no-write contracts, as recorded in the #2272 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: enabled Start offers a candidate without dotting or learning",
+      "currentRoot": "RISK chain start: a board with the old checkbox saved on starts with Oldest eligible and keeps the saved flag",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally",
+      "currentRoot": "RISK chain start: a chain started with Most likely compares and learns like any other chain",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it",
+      "currentRoot": "RISK chain start: a No after a Most likely start skips for this pass and Undo restores it",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: Settings change save and reopen retain the preference and unrelated data",
+      "currentRoot": "RISK chain start: Settings change and reopen retain Most likely and unrelated data",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: markers first-choice wording and exhausted-state controls match the enabled flow",
+      "currentRoot": "RISK chain start: the row preview, empty-chain notice and percentage explanation follow the selected option",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: skips before the first choice survive that choice and cold reopen",
+      "currentRoot": "RISK chain start: a pass started with Most likely keeps its scan skips through a cold reopen",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: an unseeded descending pass clears first skips at the ordinary day boundary",
+      "currentRoot": "RISK chain start: scan marks still clear at the ordinary day boundary under Most likely",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: enabling the setting waits for explicit Start before offering the first candidate",
+      "currentRoot": "RISK chain start: changing the option waits for explicit Start before dotting",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: missing invalid and off values preserve defaults across all supported scan modes",
+      "currentRoot": "RISK chain start: missing invalid and legacy values start with Oldest eligible across all supported scan modes",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: Quick start countdown and immediate-save inventory describe unpaired starts",
+      "currentRoot": "RISK chain start: Quick start and the immediate-save FAQ describe the dropdown",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: Save settings alone persists the checkbox transition",
+      "currentRoot": "RISK chain start: committing Chain starts with alone persists the transition, with no Save settings button",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry. #2303 removes Save settings, so the root now commits the dropdown itself."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: toggling preserves an existing neutral chain and manual first Dot remains unchanged",
+      "currentRoot": "RISK chain start: changing the option leaves existing dots alone and Undo reverses only the setting",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: zero and one eligible tasks remain usable with either preference",
+      "currentRoot": "RISK chain start: zero and one eligible tasks remain usable with either option",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: the unseeded candidate pool preserves completion date context dependency rest and postponement boundaries",
+      "currentRoot": "RISK chain start: Most likely draws only from the eligible pool, including a task done before",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: synced preference first skip and explicit dot retain an independent peer edit",
+      "currentRoot": "RISK chain start: the choice follows the board to another device beside an independent peer edit",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: an empty started pass publishes and resumes with its saved draw",
+      "currentRoot": "RISK chain start: a started Most likely pass publishes reloads and resumes with its saved draw",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: synced Undo reverses first choices Start and preference without learning",
+      "currentRoot": "RISK chain start: synced Undo reverses the option and the Start it enabled without learning",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: FAQ and current Changelog explain opt out defaults first choices and retained dots",
+      "currentRoot": "RISK chain start: the FAQ and current Changelog explain both options, the default and the retired checkbox",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw",
+      "currentRoot": "RISK chain start: a board saved mid-pass with an empty chain and the old checkbox on starts with Oldest eligible",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2300 (chain start, parent #2298 decisions of 2026-11-09) removes the Skip automatically dotting the oldest task checkbox and its unpaired first-choice flow; this root's coverage now follows Chain starts with, as recorded in the #2300 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation",
+      "currentRoot": "RISK Settings hierarchy: moved Changelog leaves no Save settings button and committed fields keep their validation",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save",
+      "currentRoot": "RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and saving as you change",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: cantMin is read, clamped [5,480], and persisted independently of horizonMin",
+      "currentRoot": "committed settings: cantMin saves on its own and leaves horizonMin alone",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: cantMin below 5 clamps up to 5, above 480 clamps down to 480",
+      "currentRoot": "committed settings: an out-of-range cantMin returns to its last valid value instead of clamping",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a blank/non-numeric cantMin falls back to 30, not to horizonMin's default",
+      "currentRoot": "committed settings: a blank or non-numeric cantMin returns to its last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a literal 0 is falsy and falls back to the default rather than clamping to the minimum (shared quirk with horizonMin/thresholdPct)",
+      "currentRoot": "committed settings: 0 for horizonMin or cantMin returns to the last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: workedHours is read, clamped [1,720], and persisted independently of the other fields",
+      "currentRoot": "committed settings: workedHours saves on its own and leaves the other fields alone",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: workedHours below 1 clamps up to 1, above 720 clamps down to 720",
+      "currentRoot": "committed settings: an out-of-range workedHours returns to its last valid value instead of clamping",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a blank or non-numeric workedHours falls back to the default",
+      "currentRoot": "committed settings: a blank or non-numeric workedHours returns to its last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "save-settings: a literal 0 workedHours is falsy and takes the default, not a clamp to 1",
+      "currentRoot": "committed settings: 0 workedHours returns to the last valid value",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks",
+      "currentRoot": "RISK Squared Weighting consumer transitions: actual Settings changes switch modes without changing ratings or pass marks",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK cloud current choices: Save settings retains changed shared preferences as one action",
+      "currentRoot": "RISK cloud current choices: each committed shared preference is retained as its own action",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "openSettings: shows the housekeeping copy and Clear history button when only work-log entries exist",
+      "currentRoot": "History: offers Clear history when only work-log entries exist, and Settings does not repeat it",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies",
+      "currentRoot": "RISK LOCAL BACKUPS: the Data and backups FAQ explains automatic early retirement while preserving chosen copies",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK live scan sync: Settings describes live revision refresh while retaining draft protection",
+      "currentRoot": "RISK live scan sync: the Data and backups FAQ describes live revision refresh while retaining draft protection",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence",
+      "currentRoot": "RISK independent decision guidance: the rendered FAQ distinguishes retained decisions targeted Undo and held evidence",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 (simpler Settings, parent #2298 decisions of 2026-11-09 and 2026-11-10) removes Save settings, merges the downloads into Download backup with Download board only beside a partial backup, puts the Restore source inside Restore and moves retention and sync details to the FAQ; this root's coverage follows the new controls, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK cloud source recovery drafts: Settings drafts survive native review cancel delayed reads and confirmed recovery",
+      "currentRoot": "RISK cloud source recovery drafts: Settings shows the saved values after native review cancel delayed reads and confirmed recovery",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2303 review round (parent #2298): with no Save settings button every field saves when committed, so returning to Settings from a recovery review shows the saved values rather than a repainted draft; the same three outcomes run, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
     }
   ]
 }
