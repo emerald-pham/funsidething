@@ -3403,7 +3403,7 @@ test('RISK saved view broken-board visibility: the complete saved board is reada
 // scrolled to, so the focus ring was off-screen and a second Enter silently
 // made a backup. 640x400 is a 1280x800 window at 200% zoom; 320x568 is an
 // iPhone SE class screen.
-async function bulkDeleteFocusInBrowser(t,{width,height,mobile}){
+async function bulkDeleteFocusInBrowser(t,{width,height,mobile,troubleshootingOpen=false}){
  const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
  const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin,DAY=86400000,now=Date.now();
@@ -3436,6 +3436,7 @@ async function bulkDeleteFocusInBrowser(t,{width,height,mobile}){
  await page.clock.setSystemTime(now);
  await openData();
  await page.waitForSelector('#modalRoot [data-act="delete-old-backups"]',{timeout:15000});
+ if(troubleshootingOpen)await page.locator('#modalRoot details.settings-troubleshooting > summary').click();
  page.once('dialog',dialog=>dialog.accept());
  await page.evaluate(()=>{const button=document.querySelector('#modalRoot [data-act="delete-old-backups"]');button.scrollIntoView({block:'center'});button.focus();});
  await page.keyboard.press('Enter');
@@ -3452,11 +3453,14 @@ async function bulkDeleteFocusInBrowser(t,{width,height,mobile}){
  t.diagnostic(JSON.stringify({width,height,...seen}));
  if(process.env.BACKUP_FOCUS_VISUAL_DIR){fs.mkdirSync(process.env.BACKUP_FOCUS_VISUAL_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.BACKUP_FOCUS_VISUAL_DIR,`backup-delete-focus-${width}x${height}.png`)});}
  assert.equal(seen.visible,true,width+'x'+height+': Make backup, which has keyboard focus, is in view after the bulk delete '+JSON.stringify(seen));
+ // #2332 (typography review F2): the FAQ promises open sections stay open through a backup action.
+ if(troubleshootingOpen)assert.equal(await page.evaluate(()=>document.querySelector('#modalRoot details.settings-troubleshooting')?.open),true,'Troubleshooting stays open after the bulk delete');
  assert.deepEqual(errors,[]);
 }
 test('RISK backup delete focus: after deleting old backups by keyboard on a short screen, the focused Make backup is in view',async t=>{
  await openingBoardFixture(t);
  for(const [width,height,mobile] of [[640,400,false],[320,568,true]])await t.test(width+'x'+height,async sub=>{await bulkDeleteFocusInBrowser(sub,{width,height,mobile});});
+ await t.test('390x844 with Troubleshooting open',async sub=>{await bulkDeleteFocusInBrowser(sub,{width:390,height:844,mobile:true,troubleshootingOpen:true});});
 });
 
 test('RISK saved view opening: an empty chain shows Start, not a candidate an older client stored for the retired skip checkbox',async t=>{

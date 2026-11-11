@@ -16817,7 +16817,11 @@ function reopenSettingsAtBackups(){
   let open=[];
   try{open=Array.from(root?.querySelectorAll?.("details.settings-section[open][data-settings-section]")||[],section=>section.dataset.settingsSection);}catch{}
   const top=root?.querySelector?.(".modal")?.scrollTop;
+  // Troubleshooting nests inside Data and backups; the FAQ promises it stays open too.
+  let troubleshootingOpen=false;
+  try{troubleshootingOpen=!!root?.querySelector?.("details.settings-troubleshooting")?.open;}catch{}
   renderSettings({openSections:new Set([...open,"data"])});
+  if(troubleshootingOpen){try{const nested=root?.querySelector?.("details.settings-troubleshooting");if(nested)nested.open=true;}catch{}}
   const modal=root?.querySelector?.(".modal");if(modal&&Number.isFinite(top))modal.scrollTop=top;
   try{document.getElementById("settingsBackupList")?.scrollIntoView?.({block:"nearest"});}catch{}
 }
