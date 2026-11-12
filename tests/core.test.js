@@ -33093,7 +33093,8 @@ test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved s
  assert.deepEqual(words,[],'every Help answer stays within the 130-word limit');
  assert.doesNotMatch(data,/Download recovery file|Save settings is at the bottom|Paste JSON/,'the FAQ names the controls Settings now shows');
  assert.doesNotMatch(markup.split('data-changelog-notes>')[0]+(markup.split('data-changelog-notes>')[1]||'').split('</details>').slice(1).join('</details>'),/Save settings applies|in Settings and Save settings/,'no FAQ answer sends anyone to the removed Save settings button');
- const current=(markup.split('data-changelog-notes>')[1]||'').split('</ul>')[0]||'';
+ // #2334: a later dated entry now sits above it, so read the November 10 entry by its date.
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 10, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(current,/<li>Settings is much shorter\./,'the newest changelog entry describes the simpler Settings');
  assert.match(current,/Every setting now saves as soon as you change it, and a number out of range returns to the last valid one\./);
  assert.match(current,/Download backup/);assert.match(current,/Download board only/);assert.match(current,/Troubleshooting/);
