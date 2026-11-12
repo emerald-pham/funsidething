@@ -11571,6 +11571,13 @@ test('RISK redundant backups guidance: the mounted FAQ and changelog say repeate
  assert.match(answer,/Manual, restore, reset, import and recovery copies, pinned copies and unreadable backups are never removed this way/);
  assert.match(answer,/an edit that lost to another tab’s newer change/,'a draft keeping a losing edit is named as staying');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ // #2333 review: the answer on how long backups stay must not still promise that
+ // drafts and other-browser copies stay until deleted, now that a save clears them.
+ const retention=answerTo('How long do backups stay on this device?');
+ const promises=retention.split(/(?<=\.)\s+/).filter(sentence=>/stale.tab drafts?|other-browser cop/i.test(sentence)&&/until you delete/i.test(sentence));
+ assert.ok(promises.length>0,'positive control: the retention answer still says how long drafts and other-browser copies stay');
+ assert.deepEqual(promises.filter(sentence=>!/unless a save clears/i.test(sentence)),[],'no sentence promises a draft or other-browser copy stays until deleted without the clean-up');
+ assert.ok(retention.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the retention answer stays within the 130-word limit');
  const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 10, 2026</h3>')[0];
  assert.match(notes,/Data and backups no longer fills up with copies that add nothing\./);
 });

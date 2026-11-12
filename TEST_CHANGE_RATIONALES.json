@@ -22896,7 +22896,7 @@
       "The Data and backups FAQ assertions, the 130-word Help limit and the removed Save settings checks in the same test are untouched."
     ],
     "replacementTests": [
-      "RISK missing-task save loop: a repeated same-day worked-on History row the board tidies away is not kept back as a missing task by every save"
+      "RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays"
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern=\"RISK simpler Settings guidance: the Data and backups FAQ\" tests/core.test.js (2026-11-12 about 00:55 UTC, after adding the November 11, 2026 changelog entry and before editing the test)",
@@ -22915,11 +22915,11 @@
     ],
     "reason": "#2335 (approved scope) makes every successful save clear automatic backups that repeat another kept copy byte for byte, and stale-tab drafts the saved board already holds. Two retention tests built every backup row from the very same board bytes, and the acknowledged-recovery-trim test seeded its kept stale-tab draft as an exact copy of the board, as fixture shortcuts, so the new clean-up correctly removed rows they expect to survive for other reasons. The changelog line is listed again because this diff also carries the #2334 change against the same comparison base.",
     "previousBehavior": "RISK LOCAL BACKUPS (aged stale-tab and other-browser recovery) seeded a stale-tab draft and an other-browser copy that were exact copies of the current board; RISK daily backup retention scope seeded four daily backups with identical bytes on different days and accounts. RISK acknowledged recovery trim (after an adoption the cloud confirms) seeded its kept stale-tab draft as JSON.stringify(ctx.state). All asserted that those rows survive a save.",
-    "intendedBehavior": "Each seeded row now holds its own board (a task the board lacks, or distinct board facts), so no row is a redundant repeat, and both tests assert exactly what they asserted before: aged stale-tab and other-browser copies never expire, and only this account's daily backups are trimmed to three calendar days while other-account and unnamed ones keep seven.",
+    "intendedBehavior": "Each seeded row now holds its own board (a task the board lacks, or distinct board facts), so no row is a redundant repeat, and all three tests assert exactly what they asserted before: aged stale-tab and other-browser copies never expire, only this account's daily backups are trimmed to three calendar days while other-account and unnamed ones keep seven, and the acknowledged trim keeps the kept draft and every backup while it clears the recovery archives.",
     "preservedCoverage": [
-      "Every assertion in both tests is unchanged: stale-tab-draft and other-browser-copy rows are not routine expiring history, and the account-scoped three-day daily trim with seven days for other-account and unnamed dailies, on the device and in the older backup list.",
+      "Every assertion in all three tests is unchanged. The two retention tests still check that stale-tab-draft and other-browser-copy rows are not routine expiring history, and the account-scoped three-day daily trim with seven days for other-account and unnamed dailies, on the device and in the older backup list.",
       "The positive control that the seven-day rule still retires the expired copy, and the current-board check, are untouched.",
-        "RISK acknowledged recovery trim still asserts that the kept draft, manual backups, other-browser copy and every backup stay while recovery archives are cleared; its draft now holds a task the board lacks."
+      "RISK acknowledged recovery trim still asserts that the kept draft, manual backups, other-browser copy and every backup stay while recovery archives are cleared; its draft now holds a task the board lacks."
     ],
     "replacementTests": [
       "RISK redundant backups: exact-duplicate automatic copies already on the device are reduced to one by the next save, and every distinct board stays listed and restorable",
@@ -22928,6 +22928,33 @@
     "redEvidence": {
       "command": "CHAIN_NATIVE_PORT=47736 node --test --test-name-pattern=\"RISK LOCAL BACKUPS: aged stale-tab|RISK daily backup retention scope: a save trims\" tests/core.test.js (2026-11-12 about 03:29 UTC, after the #2335 clean-up and before editing the fixtures; first seen in the core group run 2335-core-a2)",
       "failure": "AssertionError: stale-tab-draft is not routine expiring history; AssertionError: this device: private-own-kept stays; and in persistence-recovery group run 2335-persistence-recovery-b1 (03:5x UTC): AssertionError: the kept backup stale-tab-draft:1792323000000:t4e5e783e-... stays"
+    }
+  },
+  {
+    "baseCommit": "0529577e367910647f524ef2c919277daa2f259d",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.match(markup,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);",
+      "tests/core.test.js:-assert.match(section,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);",
+      "tests/core.test.js:-const current=(markup.split('data-changelog-notes>')[1]||'').split('</ul>')[0]||'';",
+      "tests/core.test.js:-const f=await privateLegacyExpiryFixture({makeRows:row=>[",
+      "tests/core.test.js:-const rows=['stale-tab-draft','other-browser-copy'].map((kind,i)=>({id:'protected-'+i,day,at,kind,payload}));",
+      "tests/core.test.js:-row('private-other-account','daily','2026-10-04',{account:'another-account@example.test'}),row('private-unnamed','daily','2026-10-04'),",
+      "tests/core.test.js:-row('private-own-trimmed','daily','2026-10-04',{account:null}),row('private-own-kept','daily','2026-10-05',{account:null}),",
+      "tests/persistence-recovery.test.js:-const draft=await ctx.saveDurableBackup('stale-tab-draft',JSON.stringify(ctx.state));assert.ok(draft?.id,'fixture: a kept draft copy');"
+    ],
+    "reason": "#2333 review finding 3: the Help answer How long do backups stay on this device? still promised that stale-tab drafts and other-browser copies stay until you delete them, which #2335's clean-up made untrue and which contradicted the answer Does the app clear backups that repeat each other?. Two core guidance tests pinned that exact sentence. The other six lines are the #2334 changelog read and the #2335 fixture changes recorded in the two entries above; they are listed again because one entry must cover every weakened line of this diff against main after main was merged in.",
+    "previousBehavior": "RISK LOCAL BACKUPS (the FAQ explains automatic early retirement) and RISK daily backup retention guidance asserted the sentence: Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them.",
+    "intendedBehavior": "Both tests assert that manual copies, displaced local edits and unsynced account-switch copies stay until you delete them, and that stale tab drafts and other-browser copies stay until you delete them too, unless a save clears a repeat of another copy or a draft the saved board holds.",
+    "preservedCoverage": [
+      "RISK LOCAL BACKUPS still asserts that Settings leaves retention details to the FAQ and that older automatic copies may retire sooner; manual, displaced local edits and unsynced account-switch copies are still promised to stay until deleted.",
+      "RISK daily backup retention guidance keeps every other assertion: three calendar days of daily copies, seven for other automatic copies, the recovery hold, the older daily copies, the 130-word limit and the November 6 changelog lines."
+    ],
+    "replacementTests": [
+      "RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK daily backup retention guidance|RISK redundant backups guidance\" tests/core.test.js tests/persistence-recovery.test.js (2026-11-12T05:13:04Z) and node --test --test-name-pattern=\"RISK LOCAL BACKUPS: the Data and backups FAQ explains\" tests/core.test.js (05:13:32Z), each after editing the assertions and with the FAQ answer still unchanged",
+      "failure": "AssertionError: The input did not match the regular expression /Manual, displaced local edits and unsynced account-switch copies stay until you delete them/ (both core tests); the extended guidance test failed 'no sentence promises a draft or other-browser copy stays until deleted without the clean-up' with the old sentence as the only promise. Chronology: the FAQ was first edited at 05:12, the core tests were then seen failing on the old wording; the FAQ edit was set aside, the assertions changed, these red runs observed, and the edit re-applied."
     }
   }
 ]

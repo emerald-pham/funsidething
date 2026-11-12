@@ -17075,7 +17075,9 @@ test('RISK LOCAL BACKUPS: the Data and backups FAQ explains automatic early reti
  ctx.openHelp();
  const markup=shim.document.getElementById('modalRoot').innerHTML.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(markup,/older automatic copies may retire sooner/);
- assert.match(markup,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
+ assert.match(markup,/Manual, displaced local edits and unsynced account-switch copies stay until you delete them/);
+ // #2333 review (#2335): drafts and other-browser copies stay too, except the repeats and contained drafts a save clears.
+ assert.match(markup,/Stale tab drafts and other-browser copies stay until you delete them too, unless a save clears a repeat of another copy or a draft the saved board holds\./);
 });
 
 test('RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched',async()=>{
@@ -33113,7 +33115,9 @@ test('RISK daily backup retention guidance: the Data and backups FAQ and the Nov
  assert.match(section,/Daily copies stay on this device for today and the two calendar days before it, so at most three; other automatic copies stay for up to seven calendar days/);
  assert.match(section,/While cloud recovery waits or holds your board, before the cloud confirms it, daily copies keep the seven days\./);
  assert.match(section,/Daily copies saved before this update, or holding another account’s board, also keep seven days\./);
- assert.match(section,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
+ assert.match(section,/Manual, displaced local edits and unsynced account-switch copies stay until you delete them/);
+ // #2333 review (#2335): a save now clears a draft or other-browser copy that repeats another copy, and a draft the board holds.
+ assert.match(section,/Stale tab drafts and other-browser copies stay until you delete them too, unless a save clears a repeat of another copy or a draft the saved board holds\./);
  assert.doesNotMatch(section,/Automatic copies stay on this device for up to seven calendar days/);
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const backups=markup.split('<dt>How do backups and Restore work?</dt><dd>')[1]?.split('</dd>')[0]||'';
