@@ -1765,6 +1765,9 @@ its RISK test; the map follows.
 - RISK missing-task save loop: a deleted task stays deleted and Undo after a kept task settles as before
 - RISK missing-task save loop: on the older browser storage, a repeated same-day worked-on row is not kept back as a missing task either
 - RISK missing-task save loop: two signed-in devices with a repeated same-day worked-on row settle instead of saving and syncing each other forever
+- RISK missing-task save loop: the repair before a cloud push is logged with its count and source, and its message shows only when a task was kept
+- RISK missing-task save loop: two signed-in devices that hold one day’s two same-time worked-on sessions in opposite orders keep the same one, so History never loses both
+- RISK missing-task save loop: a worked-on session listed twice under one id stays in History after the tidy-up and later saves
 - RISK missing-task save loop: one app on its own never conflicts with its own saves, so a slow device write adds no stale-tab draft
 - RISK missing-task save loop: a title changed back while this tab’s earlier save is still answering stays changed back on the saved and the live board
 - RISK redundant backups: exact-duplicate automatic copies already on the device are reduced to one by the next save, and every distinct board stays listed and restorable
@@ -1774,11 +1777,16 @@ its RISK test; the map follows.
 - RISK redundant backups: nothing is cleared while a recovery hold is stored on the device
 - RISK redundant backups: a save whose device write fails or is interrupted removes nothing, and the next successful save completes the clean-up
 - RISK redundant backups: when another tab deletes the copy a repeat was kept by, the save keeps the repeat
-- RISK redundant backups: a copy kept before taking a cloud board reuses a longer-kept copy of the same board instead of adding another
+- RISK redundant backups: a copy kept before taking a cloud board reuses a longer-kept copy of the same board that no save clears, never a stale-tab draft a later save may clear
 - RISK redundant backups: on the older browser backup list, repeated and contained automatic copies are cleared by the next save and the rest stay
-- RISK redundant backups: on the older browser backup list, an automatic copy of a board a kept draft already holds adds no row
+- RISK redundant backups: on the older browser backup list, a copy of a board a kept copy no save clears already holds adds no row, and a stale-tab draft a later save may clear never stands in
 - RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays
 - RISK redundant backups: a stale-tab draft holding an edit that lost to another tab’s newer change stays after later saves, on the device and in the older browser list
+- RISK redundant backups: a stale-tab draft whose scan mode lost to another tab’s newer change stays after later saves, on the device and in the older browser list
+- RISK redundant backups: a copy is never cleared as a repeat of a stale-tab draft a later save may clear, so the board kept before taking a cloud board stays
+- RISK redundant backups: on the older browser backup list, a save whose board write fails removes nothing, and the next successful save completes the clean-up
+- RISK redundant backups: on the older browser backup list, a draft found not contained is checked again only after the app reopens, and then cleared once the board holds it
+- RISK redundant backups: on the older browser backup list, a copy is never cleared as a repeat of a stale-tab draft a later save may clear
 
 ## tests/repository-process.test.js
 
