@@ -11633,7 +11633,12 @@ test('RISK redundant backups guidance: the mounted FAQ and changelog say repeate
  assert.match(answer,/^Yes, by itself, after a successful save\./);
  assert.match(answer,/stale tab draft whose tasks, History, decisions, comparisons and completions are all already in the saved board/);
  assert.match(answer,/Manual, restore, reset, import and recovery copies, pinned copies and unreadable backups are never removed this way/);
- assert.match(answer,/an edit that lost to another tab’s newer change/,'a draft keeping a losing edit is named as staying');
+ // #2333 release review: only drafts this version saves carry the losing-edit mark. A draft saved
+ // before the update, or by an older open copy, follows the containment rule even with a losing edit.
+ const losingEdit=text=>text.replace(/<[^>]+>/g,' ').split(/(?<=\.)\s+/).filter(sentence=>/lost to another (?:tab|copy)’s newer change/.test(sentence));
+ assert.ok(losingEdit(answer).length>0,'positive control: the answer names a draft holding a losing edit');
+ assert.deepEqual(losingEdit(answer).filter(sentence=>!/since this update/.test(sentence)),[],'only a draft saved since this update is promised to stay for a losing edit');
+ assert.match(answer,/one saved earlier, or by an older open copy, follows the rule above/,'and one saved earlier, or by an older open copy, follows the containment rule');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
  // #2333 review: the answer on how long backups stay must not still promise that
  // drafts and other-browser copies stay until deleted, now that a save clears them.
@@ -11644,6 +11649,8 @@ test('RISK redundant backups guidance: the mounted FAQ and changelog say repeate
  assert.ok(retention.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the retention answer stays within the 130-word limit');
  const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 10, 2026</h3>')[0];
  assert.match(notes,/Data and backups no longer fills up with copies that add nothing\./);
+ assert.ok(losingEdit(notes).length>0,'positive control: the changelog names a draft holding a losing edit');
+ assert.deepEqual(losingEdit(notes).filter(sentence=>!/since this update/.test(sentence)),[],'the changelog limits that promise the same way');
 });
 
 test('RISK redundant backups: a stale-tab draft holding an edit that lost to another tab’s newer change stays after later saves, on the device and in the older browser list',async t=>{
