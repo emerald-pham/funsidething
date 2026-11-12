@@ -9994,7 +9994,8 @@ test('RISK acknowledged recovery trim: after an adoption the cloud confirms, the
  // a row of a kind this app does not know, and a migrated older backup list
  // with an unreadable entry. The readable migrated list is a migrated copy.
  await makeManualBackup2254(app);
- const draft=await ctx.saveDurableBackup('stale-tab-draft',JSON.stringify(ctx.state));assert.ok(draft?.id,'fixture: a kept draft copy');
+ // #2335: the kept draft holds a task the board lacks, so a save does not clear it as contained in the board.
+ const draft=await ctx.saveDurableBackup('stale-tab-draft',JSON.stringify({...ctx.state,tasks:[...ctx.state.tasks,syncTask('only-in-kept-draft-2254','Only in the kept draft')]}));assert.ok(draft?.id,'fixture: a kept draft copy');
  const olderList=shim.localStorage.getItem(LOCAL_BACKUPS_KEY);assert.ok(olderList,'fixture: the older backup list holds a daily copy');
  const unknown={key:'future-kind:kept-2254',raw:JSON.stringify({format:'chain-scanner.future-kind',opaque:['keep',2254]}),order:1};
  const migrated={key:'0:'+LOCAL_BACKUPS_KEY,raw:olderList,order:0},damagedList={key:'1:'+LOCAL_BACKUPS_KEY,raw:'[{"id":"daily:unreadable-2254"}]',order:0};
