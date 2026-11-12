@@ -1826,6 +1826,9 @@ its RISK test; the map follows.
 - RISK cloud save loop guard: signing out and in again with the same account after a stop is a deliberate run that tries again and settles synced
 - RISK cloud save loop guard: the cloud error after a stop says the board is saved on this device and what to do next, not to keep the tab open for unsaved edits
 - RISK cloud save loop guard: the support report lists a cloud merge that was held, deferred by an open editor or stopped by an error, not only completed ones
+- RISK cloud save loop guard: while saves keep failing on this device, returning to the app again and again keeps the save error showing, never stops as a save loop, and the edit saves once storage recovers
+- RISK sign-in settles: a task deleted, restored with Undo while synced, then deleted again while signed out saves and pushes once after sign-in, and the cloud copy has the deletion
+- RISK cloud save loop guard: when a save on this device fails after a stop, the status shows the save error and the cloud error no longer says the board is saved on this device
 
 ## tests/repository-process.test.js
 

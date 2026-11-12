@@ -12870,3 +12870,106 @@ test('RISK cloud save loop guard: the support report lists a cloud merge that wa
  assert.deepEqual(merges(device,errorBefore),[['failed','error']],'a merge an error stopped is listed as failed');
  assert.equal(device.status().text,'☁ error','positive control: the read shows the error');
 });
+
+// #2346 release review (B1): the guard counted save runs that kept failing on
+// this device (storage full), because a failed save leaves the edit unsaved
+// and each return to the app retries it. After a few returns it replaced the
+// "save error" status with a save loop error and said the board was saved on
+// this device, which it was not. Device storage refuses every commit here (the
+// browser's quota answer), the person adds one task and then returns to the
+// app again and again without editing.
+function failingDeviceCommits2346(device){
+ const store=device.ctx.window.ScannerDeviceStore,realCommit=store.commitHead.bind(store),control={failing:true};
+ store.commitHead=async options=>control.failing?{error:true,code:'quota-exhausted'}:realCommit(options);
+ return control;
+}
+const UNSAVED_EDIT2346='Edit while storage is full';
+async function headHasUnsavedEdit2346(device){
+ return JSON.parse((await device.ctx.window.ScannerDeviceStore.readHead()).payload).tasks.some(task=>task.title===UNSAVED_EDIT2346);
+}
+
+test('RISK cloud save loop guard: while saves keep failing on this device, returning to the app again and again keeps the save error showing, never stops as a save loop, and the edit saves once storage recovers',async t=>{
+ const device=await signedInDevice2348(t,'failing-device'),{ctx,shim}=device;
+ await device.signIn();
+ assert.equal(device.status().text,'☁ synced','positive control: an ordinary sign-in settles synced');
+ const storage=failingDeviceCommits2346(device),mark=supportMark2346(device);
+ shim.document.getElementById('addInput').value=UNSAVED_EDIT2346;await ctx.onAction('add',{});
+ await savesSettled2334(device,400);await syncSettle(200);
+ assert.equal(device.status().text,'☁ save error','positive control: the edit could not be saved on this device: '+device.status().title);
+ assert.equal(await headHasUnsavedEdit2346(device),false,'positive control: the device does not hold the edit');
+ const seen=[];
+ for(let visit=1;visit<=7;visit++){
+  shim.window.dispatchEvent({type:'focus'});await savesSettled2334(device,400);await syncSettle(150);
+  seen.push({visit,...device.status()});
+ }
+ t.diagnostic(JSON.stringify(seen));
+ for(const row of seen){
+  assert.equal(row.text,'☁ save error','each return still shows the save error: '+JSON.stringify(row));
+  assert.equal(row.title,'The latest edit is not saved on this device. Keep this tab open.','and says the edit is not saved: '+JSON.stringify(row));
+ }
+ assert.deepEqual(supportEvents2346(device,'save-loop-stop',mark),[],'no save loop stop is recorded');
+ assert.ok(supportEvents2346(device,'cloud-pull',mark).length>=6,'positive control: each return read the cloud');
+ // Storage has room again; the next return saves the edit and syncs it.
+ storage.failing=false;
+ shim.window.dispatchEvent({type:'focus'});await savesSettled2334(device);await syncSettle(300);
+ assert.equal(await headHasUnsavedEdit2346(device),true,'the edit is saved on this device once storage recovers');
+ assert.equal(device.status().text,'☁ synced','and reaches the cloud: '+device.status().title);
+ const peer=await loadCloudBackendV2({sharedDocs:device.backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ assert.ok(JSON.parse((await peer.CS.pull()).payload).tasks.some(task=>task.title===UNSAVED_EDIT2346),'the cloud copy has the edit');
+});
+
+// #2346 release review (B2): the same loop as #2347, through the maps a merge
+// builds from the deletions and restores. A task deleted, brought back with
+// Undo while synced (so the cloud copy lists it as restored), then deleted
+// again while signed out, was listed first or last in those maps depending on
+// which copy was merged in, and sendPush saved and re-sent itself on every
+// pass after sign-in. The guard then stopped it and the re-deletion never
+// reached the cloud.
+test('RISK sign-in settles: a task deleted, restored with Undo while synced, then deleted again while signed out saves and pushes once after sign-in, and the cloud copy has the deletion',async t=>{
+ const device=await signedInDevice2348(t,'undo-redelete'),{ctx,shim,backend}=device;
+ await device.signIn();
+ const cloud=async()=>{const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());const read=await peer.CS.pull();return {rev:read.rev,board:JSON.parse(read.payload)};};
+ for(const title of ['Alpha 2346','Bravo 2346','Xray 2346']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ await savesSettled2334(device);await syncSettle(300);
+ const id=title=>ctx.state.tasks.find(task=>task.title===title).id,xray=id('Xray 2346');
+ for(const title of ['Alpha 2346','Bravo 2346','Xray 2346']){ctx.deleteTask(id(title));await savesSettled2334(device,600);}
+ await syncSettle(300);
+ await ctx.onAction('undo',{});await savesSettled2334(device);await syncSettle(300);
+ assert.equal(device.status().text,'☁ synced','positive control: the Undo is synced: '+device.status().title);
+ const restored=await cloud();
+ assert.ok(restored.board.tasks.some(task=>task.id===xray)&&Object.hasOwn(restored.board.restoredTaskIds||{},xray),'positive control: the cloud copy lists the task as restored');
+ // Signed out, the person deletes it again, then signs back in.
+ backend.emitAuth(null);await flush();await savesSettled2334(device);
+ ctx.deleteTask(xray);await savesSettled2334(device);
+ const before=device.saves(),mark=supportMark2346(device);
+ const after=await device.signIn();await syncSettle(300);
+ const runs=after.persistCalls.value-before.persistCalls.value,result=await cloud();
+ t.diagnostic(JSON.stringify({runs,status:device.status(),revisions:[restored.rev,result.rev]}));
+ assert.equal(after.acceptedRequests.value,before.acceptedRequests.value,'precondition: nobody asked for a save during sign-in');
+ assert.deepEqual(supportEvents2346(device,'save-loop-stop',mark),[],'no save loop stop is recorded');
+ assert.ok(runs<=3,'the sign-in saves a few times and stops: '+runs);
+ assert.equal(device.status().text,'☁ synced','the status reaches synced: '+device.status().title);
+ assert.ok(!result.board.tasks.some(task=>task.id===xray),'the cloud copy has the re-deletion');
+ assert.equal(result.rev,restored.rev+1,'at the next revision, in one push: '+JSON.stringify([restored.rev,result.rev]));
+});
+
+// #2346 release review (B1): after a genuine stop the board is saved, but a
+// later save on this device can still fail (Reload app saves first). Then the
+// save error is what the person needs to see, and nothing may say the board
+// is saved here.
+test('RISK cloud save loop guard: when a save on this device fails after a stop, the status shows the save error and the cloud error no longer says the board is saved on this device',async t=>{
+ const device=await guardStopped2346(t,'stop-then-reload-fails'),{ctx,shim}=device;
+ failingDeviceCommits2346(device);
+ const reloads=[];shim.window.location={reload:()=>reloads.push('Reload app')};
+ await ctx.onAction('sync-reload',{});await flush();await savesSettled2334(device,400);
+ assert.deepEqual(reloads,[],'positive control: Reload app is held because its save failed');
+ assert.ok(ctx.deviceSaveIssue(),'positive control: the save on this device failed');
+ assert.equal(device.status().text,'☁ save error','the status shows the save error: '+JSON.stringify(device.status()));
+ assert.equal(device.status().title,'The latest edit is not saved on this device. Keep this tab open.');
+ await ctx.onAction('sync',{});
+ const text=shim.document.getElementById('modalRoot').innerHTML.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+ assert.match(text,/Retry sync/,'positive control: the cloud error options are open: '+text);
+ assert.doesNotMatch(text,/board is saved on this device|nothing is lost/i,'nothing says the board is saved on this device: '+text);
+ assert.match(text,/latest edit is not saved on this device/,'it says the edit is not saved: '+text);
+});
+
