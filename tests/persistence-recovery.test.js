@@ -941,6 +941,60 @@ test('RISK device save settle: an older save that runs out of repairs after a ne
  assert.doesNotMatch(held,/isn't saved yet/,'no "isn\'t saved yet" message is held on screen');
 });
 
+// #2326 re-review (B3): Restore changes the board without an ordinary edit,
+// so no newer edit of this tab can have saved it. When another copy keeps the
+// save from finishing, Restore must say it is not saved and the tab must not
+// treat the restored board as durable.
+test('RISK device save settle: a Restore made while another copy keeps saving is reported as not saved',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-restore-churn',tasks:[syncTask('restore-churn-anchor','Anchor'),syncTask('restore-churn-task','Before restore')]});
+ assert.equal(await f.ctx.persist(),true);
+ f.edit('restore-churn-anchor','Ordinary edit');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);
+ assert.equal(await f.ctx.persist(),true,'the ordinary edit is durable');
+ const source=JSON.parse(JSON.stringify(f.ctx.state));source.tasks.find(task=>task.id==='restore-churn-task').title='Restored title';
+ const backup=await f.ctx.saveDurableBackup('manual',JSON.stringify(source));
+ assert.ok(backup?.id,'a manual backup to restore');
+ // Another copy saves before every commit of this tab.
+ let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead(),next=JSON.parse(head.payload);next.futureChurn2326=commits;
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:head.account??null})).ok,true);
+ };
+ const restored=await f.alive(f.ctx.restoreDurableBackupById(backup.id));
+ f.beforeCommit=null;
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='restore-churn-task').title,'Restored title','the restored board stays open in this tab');
+ const head=JSON.parse((await f.store.readHead()).payload);
+ assert.equal(head.tasks.find(task=>task.id==='restore-churn-task').title,'Before restore','the saved board never received the restored board');
+ assert.equal(restored,false,'Restore does not report success for a board that was not saved');
+ assert.ok(f.messages.some(message=>/Restore is open but could not be saved yet/.test(message)),'the person is told the Restore is not saved yet');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','Settings keeps the save issue');
+ assert.notEqual(vm.runInContext('lastPersistedRaw',f.ctx),JSON.stringify(f.ctx.state),'the tab does not mark the restored board durable');
+ f.ctx.onAction('view-support-diagnostics',{});
+ assert.notEqual(f.ctx.buildSupportDiagnosticsReport().save.localDurability.value,'durable','the Debug log does not call it durable');
+});
+
+// The same rule for any change saved without an ordinary edit (here the pin
+// release the pin test above uses): persist() succeeds only once that board
+// itself is durable.
+test('RISK device save settle: a change saved without an ordinary edit while another copy keeps saving is not reported as saved',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-unsaved-change',tasks:[syncTask('unsaved-change-anchor','Anchor'),syncTask('unsaved-change-task','Task')]});
+ f.ctx.state.protectedBackupIds=['pin-unsaved-2326'];
+ assert.equal(await f.ctx.persist(),true);
+ f.edit('unsaved-change-anchor','Ordinary edit');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);
+ assert.equal(await f.ctx.persist(),true,'the ordinary edit is durable');
+ assert.equal(vm.runInContext("releaseCloudRecoveryPins(['pin-unsaved-2326'])",f.ctx),true,'a change made without save()');
+ let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead(),next=JSON.parse(head.payload);next.futureChurn2326=commits;
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:head.account??null})).ok,true);
+ };
+ const result=await f.alive(f.ctx.persist());
+ f.beforeCommit=null;
+ const head=JSON.parse((await f.store.readHead()).payload);
+ assert.deepEqual(head.protectedBackupIds,['pin-unsaved-2326'],'the saved board still holds the released pin');
+ assert.equal(result,false,'the save is not reported as done');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','Settings keeps the save issue');
+});
+
 test('RISK device save settle: repeated edits of one task during slow device commits keep the newest edit',async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-same',tasks:[syncTask('settle-same-anchor','Anchor'),syncTask('settle-same-task','Version 0')]});
  assert.equal(await f.ctx.persist(),true);

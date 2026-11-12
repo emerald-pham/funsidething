@@ -4210,9 +4210,6 @@ const deviceOwnCommits=new Map();
 // Head commits of this tab's saves that have not returned yet. IndexedDB runs
 // them one after another, so a new save's first commit waits behind these.
 const deviceHeadCommitsInFlight=new Set();
-// The newest save request generation whose device save this tab verified.
-// Request generations count accepted edits in order, never by clock.
-let deviceDurableSaveGeneration=0;
 // The board this tab took a head from when the head is this tab's own save
 // (its last durable one, or a commit still in flight); undefined when another
 // writer produced it.
@@ -4388,11 +4385,13 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
             else{result={conflict:true,hash:head.hash};latestHint=head;}
           }
         }
-        // #2326 review: a save of this tab that began at this request
-        // generation or later took the live board, which already held this
-        // save's edits, and that save is durable. Refusing now would hold
-        // "isn't saved yet" over a saved edit until the next change.
-        if(result?.conflict&&!completionSourceBackup&&deviceDurableSaveGeneration>=requestGeneration)return true;
+        // #2326 review: this tab's saves finish out of order, so another save
+        // of this tab may already have made exactly the live board durable;
+        // refusing then would hold "isn't saved yet" over a saved board. Only
+        // that exact byte match counts: Restore, Reset, cloud adoption and
+        // other changes made without an ordinary edit must still be refused
+        // until their own board is written (#2326 re-review).
+        if(result?.conflict&&!completionSourceBackup&&JSON.stringify(state)===lastPersistedRaw)return true;
         if(result?.conflict)
           return reportDeviceSaveFailure("device-store","changed-during-save",DEVICE_SAVE_EXHAUSTED_MESSAGE,{plain:true,attempts:commitAttempts,repairs:{own:ownRepairs,other:peerRepairs}});
       }
@@ -4438,7 +4437,6 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         return persist(backupAlreadySafe,preserveBackupId,followUp?0:deviceRetry+1);
       }
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
-      deviceDurableSaveGeneration=Math.max(deviceDurableSaveGeneration,requestGeneration);
       clearDeviceSaveIssue();if(pendingDeviceCloudBackup)await acknowledgeDeviceCloudBackupSave(result.hash,committedPayload);return true;
     }catch(e){return reportDeviceSaveFailure("device-store","write-failed","The previous durable board remains unchanged; keep this tab open and try again.");}
   }
