@@ -2322,6 +2322,87 @@ function hydrateUnchangedEditorDraft(app,id){
  return task;
 }
 
+// #221: the buttons in rendered markup, in order, each attribute read by its
+// name so that attribute order in the markup does not matter. A button's text
+// is what it shows before any nested tag.
+function markupButtons(markup){
+ return [...String(markup).matchAll(/<button\b([^>]*)>([^<]*)(?:<\/button>)?/g)].map(([whole,attributes,text])=>{
+  const bare=attributes.replace(/"[^"]*"/g,'""'),flag=name=>new RegExp('\\s'+name+'(?=[\\s=]|$)').test(bare),dataset={};
+  for(const [,name,value] of attributes.matchAll(/\sdata-([a-z-]+)="([^"]*)"/g))dataset[name.replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase())]=value;
+  return {markup:whole,text,dataset,classes:(attributes.match(/\sclass="([^"]*)"/)?.[1]||'').split(/\s+/).filter(Boolean),
+   disabled:flag('disabled'),hidden:flag('hidden')};
+ });
+}
+// #221: the chain trail's pills in trail order, from the rendered scan panel.
+// The benchmark card's own Edit button is not one.
+function chainPills(scanHtml){
+ return markupButtons(scanHtml).filter(button=>button.classes.includes('crumb'))
+  .map(button=>({markup:button.markup,title:button.text,act:button.dataset.act,id:button.dataset.id}));
+}
+function chainPillIds(scanHtml){return chainPills(scanHtml).map(pill=>pill.id);}
+function chainPill(scanHtml,title){
+ const pill=chainPills(scanHtml).find(row=>row.title===title);
+ assert.ok(pill,`expected a pill titled ${title} in: ${scanHtml}`);
+ return pill;
+}
+// Edit on the benchmark card: the first Edit button after the card.
+function benchmarkEdit(scanHtml){
+ const at=String(scanHtml).indexOf('<div class="card bench">');
+ return at<0?null:markupButtons(String(scanHtml).slice(at)).find(button=>button.dataset.act==='edit')??null;
+}
+// The Node shim does not parse the editor's input values out of its markup,
+// so an untouched editor is given the task's own values, as a person sees them
+// (the same fields hydrateUnchangedEditorDraft fills).
+function keepEditorValues(ctx,shim,id){
+ const task=ctx.state.tasks.find(row=>row.id===id);
+ fillEditPane(ctx,shim,{title:task.title,url:task.url||'',due:task.due||'',start:task.startsAt||'',evergreen:task.evergreen,ctxIds:task.ctx});
+ shim.document.getElementById('etEverReset').checked=task.evergreenResetAtDay!==false;
+}
+function returnButton(modalHtml){
+ const button=markupButtons(modalHtml).find(row=>row.dataset.act==='return-candidate');
+ assert.ok(button,`expected a Return as candidate button in: ${modalHtml}`);
+ return button.markup;
+}
+// #221: returns a dot the way a person does. Its pill, or Edit on the
+// benchmark card for the newest dot, opens the editor, which keeps the task's
+// own values, and Return as candidate is pressed.
+function returnDotFromScan(ctx,shim,id){
+ const scan=shim.document.getElementById('scan').innerHTML;
+ const opener=chainPills(scan).find(pill=>pill.id===id)||(benchmarkEdit(scan)?.dataset.id===id?{act:'edit'}:null);
+ assert.ok(opener,'the chain trail or the benchmark card offers '+id);
+ ctx.onAction(opener.act,{dataset:{id}});
+ keepEditorValues(ctx,shim,id);
+ const button=returnButton(shim.document.getElementById('modalRoot').innerHTML);
+ assert.doesNotMatch(button,/\bdisabled\b/,'the editor offers Return as candidate');
+ ctx.onAction('return-candidate',{dataset:{id:markupButtons(button)[0].dataset.id}});
+}
+function returnFromPill(ctx,shim,title){
+ returnDotFromScan(ctx,shim,chainPill(shim.document.getElementById('scan').innerHTML,title).id);
+}
+function returnBenchmarkFromEdit(ctx,shim){
+ const edit=benchmarkEdit(shim.document.getElementById('scan').innerHTML);
+ assert.ok(edit,'the benchmark card offers Edit');
+ returnDotFromScan(ctx,shim,edit.dataset.id);
+}
+
+// #221 review: the Node shim keeps the scan panel as markup text. This gives
+// it the part of a DOM that focus moves through: the buttons the app drew
+// last, in order, each a control that can take focus. A control stays the
+// same object until the panel is drawn again, and any selector returns every
+// button, as the panel's controls are all buttons.
+function scanPanelDom221(shim){
+ const scan=shim.document.getElementById('scan');
+ let drawn=null,controls=[];
+ const parse=markup=>markupButtons(markup).map(({dataset,classes,disabled,hidden})=>{
+  const control={tagName:'BUTTON',dataset,disabled,hidden,classList:{contains:name=>classes.includes(name)},
+   closest:()=>control,focus(){shim.document.activeElement=control;}};
+  return control;
+ });
+ const current=()=>{if(scan.innerHTML!==drawn){drawn=scan.innerHTML;controls=parse(drawn);}return controls;};
+ scan.querySelectorAll=()=>current();
+ return {controls:current,find:predicate=>current().find(predicate)};
+}
+
 /* The weeks-old copy sitting in the stale browser. */
 const STALE_CHAIN = ["t_old"];
 const staleState = (updatedAt) => syncState({
@@ -3404,7 +3485,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  assert.equal(cloud.decisionEvents.filter(event=>event.kind==='completion'&&event.taskId===doneId).length,1);
  assert.equal(ctx.state.listOpen,true);assert.equal(search.value,'Independent peer');assert.equal(body.scrollTop,420);
  assert.ok(paints.length>0&&paints.every(row=>row.chain.every(id=>id!==doneId)
-  &&![...String(row.markup).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
+  &&!chainPillIds(row.markup).includes(doneId)),
   'every scan replacement while deferred recovery is released omits the completed member');
  assert.ok(durable.length>0&&durable.every(row=>row.chain.every(id=>id!==doneId)
   &&row.events.filter(event=>event.kind==='completion'&&event.taskId===doneId).length===1),
@@ -3441,7 +3522,7 @@ async function exerciseCompletionEditorBoundaries(t,nativeOnly=false,holdAcknowl
  assert.equal(JSON.stringify(h.remoteState().decisionEvents.find(event=>event.id===noFact.id)),JSON.stringify(noFact));
  assert.deepEqual([...ctx.state.chain],[peerId]);
  assert.ok(paints.every(row=>row.chain.every(id=>id!==doneId)
-  &&![...String(row.markup).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
+  &&!chainPillIds(row.markup).includes(doneId)),
   'scanner paints after the held control still exclude the completed member');
  assert.ok(durable.every(row=>row.chain.every(id=>id!==doneId)
   &&row.events.filter(event=>event.kind==='completion'&&event.taskId===doneId).length===1),
@@ -4004,3 +4085,5 @@ export {
   settleRecoveryOperations188, retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
   replaceIndependentServerPayload263,
 };
+export { scanPanelDom221, markupButtons, chainPills, chainPillIds, chainPill, benchmarkEdit, keepEditorValues, returnButton,
+  returnDotFromScan, returnFromPill, returnBenchmarkFromEdit };

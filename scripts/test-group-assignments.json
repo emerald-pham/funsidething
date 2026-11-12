@@ -1097,6 +1097,46 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2303 review round (parent #2298): with no Save settings button every field saves when committed, so returning to Settings from a recovery review shows the saved values rather than a repainted draft; the same three outcomes run, as recorded in the #2303 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "UI: the chain breadcrumb still reveals-in-list (untouched by the Edit swap)",
+      "currentRoot": "UI \\#221: tapping a pill in the chain trail opens that task's editor and leaves All Tasks as it was",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#221 (spec: a chain trail pill opens its task's editor instead of revealing it in All Tasks) replaced the pinned reveal-in-list pill contract with the new pill contract, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload",
+      "currentRoot": "UI \\#221: each chain pill is a native button whose accessible name says it opens that task",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used the reveal action) retired the reveal action this root exercised, and no test replaces it: nothing reveals a task any more. This row only keeps the baseline root assigned in the core group; the current root it names does not test what the old root tested. The list-open choice the reveal also saved stays covered through cloud adoption and reload by RISK saved view cloud adoption, through the real All Tasks toggle."
+    },
+    {
+      "baselineRoot": "RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal",
+      "currentRoot": "RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break opening the task",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#221 retired revealTask, so this root now opens the restored task's editor through the real edit action that chain pills use; every injection assertion is kept, as recorded in the #221 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "revealTask: clears the list filters so the task it reveals is actually visible",
+      "currentRoot": "UI \\#221: Return as candidate is enabled in the editor a chain pill opens, and its tooltip names the chain",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired revealTask, whose filter clearing this root tested, and no test replaces it: nothing reveals a task any more, so no list filter has to give way. This row only keeps the baseline root assigned in the core group; the current root it names does not test what the old root tested."
+    },
+    {
+      "baselineRoot": "Animation controls: revealing a task respects app and device reduced motion",
+      "currentRoot": "UI \\#221: returning an older dot from its pill takes only that dot off; the rest keep their order, benchmark and candidate",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired the reveal scroll whose motion choice this root tested, and no test replaces it: nothing scrolls to a task any more. This row only keeps the baseline root assigned in the core group; the current root it names does not test what the old root tested."
     }
   ]
 }

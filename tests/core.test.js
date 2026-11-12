@@ -58,6 +58,7 @@ import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
 import { backupRowsWithText } from "./shared.js";
+import { scanPanelDom221, chainPills, chainPillIds, chainPill, keepEditorValues, returnButton, returnFromPill, returnBenchmarkFromEdit } from "./shared.js";
 
 // #2281 CI: node:test keeps every finished test with its subtests and hooks,
 // so a hook or subtest that closed over an app kept that app's realm until the
@@ -5577,7 +5578,7 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commitHead=store.commitHead.bind(store),
   paints=[],deviceWrites=[];let phase='idle',markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
-  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
+  const visible=chainPillIds(value),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
   if(bench)visible.push(bench[1]);paints.push({phase,chain:Array.from(local.ctx.state.chain),visible,done:!!local.ctx.state.tasks.find(row=>row.id===targetId)?.done,markup:String(value)});
  }}});
  store.commitHead=async options=>{const result=await commitHead(options);if(result?.ok&&phase!=='idle'){
@@ -5711,7 +5712,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,originalCommit=store.commitHead.bind(store),paints=[],writes=[];
  let phase='idle',markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase==='stale-cloud'){
-  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
+  const visible=chainPillIds(value),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
   paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
  }}});
  store.commitHead=async options=>{const result=await originalCommit(options);if(result?.ok&&phase==='stale-cloud'){
@@ -12585,10 +12586,9 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
 /* ---------- Reveal -> direct Edit on the benchmark/candidate cards ----------
    These two siderail buttons used to scroll-and-flash the task in the
    (possibly collapsed) All-tasks list. That's now a direct Edit button, same
-   action as clicking a title in the list. The chain breadcrumb crumbs reuse
-   the old reveal-in-list behavior on purpose — they show the task's own
-   title, not a "Reveal" label, so they're a different affordance and stay
-   as-is. */
+   action as clicking a title in the list. The chain breadcrumb crumbs kept
+   reveal-in-list until #221 made them open the same editor; they still show
+   the task's own title, not an "Edit" label. */
 
 test("UI: the benchmark card shows a direct Edit button, not Reveal", async () => {
   const { ctx, shim } = await loadApp({ seed: 92 });
@@ -12626,15 +12626,961 @@ test("UI: clicking the benchmark's Edit button opens the edit pane for that task
   assert.match(html, /value="Dotted task"/);
 });
 
-test("UI: the chain breadcrumb still reveals-in-list (untouched by the Edit swap)", async () => {
-  const { ctx, shim } = await loadApp({ seed: 95 });
+// ---------- #221: a chain pill opens its task's editor ----------
+// The trail's pills used to scroll All Tasks to the row. They now open the
+// same editor as Edit on the benchmark card, where Return as candidate can
+// take that one dot back off the chain. Each test presses the pill a person
+// would see: the action and id are read from the rendered trail (chainPill and
+// the other pill helpers are in tests/shared.js).
+
+test("UI #221: tapping a pill in the chain trail opens that task's editor and leaves All Tasks as it was", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2211 });
   const first = ctx.addTask("First dot", true);
   ctx.addTask("Second dot", true);
+  ctx.addTask("Third dot", true);
+  ctx.state.listOpen = false;
   ctx.render();
-  const scanHtml = shim.elements.get("scan").innerHTML;
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "First dot");
+  assert.equal(pill.id, first.id, "the pill is bound to its own task");
 
-  assert.match(scanHtml, new RegExp(`class="crumb" data-act="reveal" data-id="${first.id}"`));
-  assert.match(scanHtml, />First dot</, "the crumb shows the task's own title, not the word Edit");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+
+  const modal = shim.elements.get("modalRoot").innerHTML;
+  assert.match(modal, /Edit task/, "the pill opens the task editor");
+  assert.match(modal, /id="etTitle" type="text" value="First dot"/, "for the pill's own task");
+  assert.equal(ctx.state.listOpen, false, "the pill no longer opens All Tasks to reveal the row");
+});
+
+test("UI #221: each chain pill is a native button whose accessible name says it opens that task", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2212 });
+  ctx.addTask("Water the ferns", true);
+  ctx.addTask("Call the bank", true);
+  ctx.render();
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Water the ferns");
+  assert.match(pill.markup, /^<button\b/, "a native button, reachable by keyboard");
+  assert.match(pill.markup, /aria-label="Open Water the ferns to edit it"/, "its name says what pressing it does");
+});
+
+test("UI #221: Return as candidate is enabled in the editor a chain pill opens, and its tooltip names the chain", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2213 });
+  ctx.addTask("Older dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Older dot");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  const button = returnButton(shim.elements.get("modalRoot").innerHTML);
+  assert.doesNotMatch(button, /\bdisabled\b/, "a dotted task can be returned");
+  assert.match(button, new RegExp(`data-id="${pill.id}"`));
+  assert.match(button, /title="[^"]*chain[^"]*"/i, "the tooltip says it takes the dot off the chain");
+});
+
+// What a person sees of the board: trail pills in order, the benchmark card
+// and the candidate card, read from the rendered scan panel.
+const renderedBoard = scanHtml => ({
+  pills: chainPills(scanHtml).map(pill => pill.title),
+  benchmark: String(scanHtml).match(/<div class="card bench"><span class="title">([^<]*)</)?.[1] ?? null,
+  candidate: String(scanHtml).match(/<div class="card cand"><span class="title">([^<]*)</)?.[1] ?? null,
+});
+
+test("UI #221: returning an older dot from its pill takes only that dot off; the rest keep their order, benchmark and candidate", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2214 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Middle dot", true);
+  ctx.addTask("Newest dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML),
+    { pills: ["First dot", "Middle dot"], benchmark: "Newest dot", candidate: "Waiting candidate" }, "precondition: a scan with three dots and a candidate");
+
+  returnFromPill(ctx, shim, "Middle dot");
+
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML),
+    { pills: ["First dot"], benchmark: "Newest dot", candidate: "Waiting candidate" });
+  assert.equal(ctx.state.mode, "scan", "the scan carries on");
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the editor closes behind the action");
+});
+
+const dotTitleOf = (ctx, id) => ctx.state.tasks.find(task => task.id === id)?.title;
+const answerShownCandidate = (ctx, answer) => {
+  const candidate = ctx.state.candidateId, benchmark = ctx.state.chain.at(-1);
+  assert.ok(candidate, "a candidate is showing");
+  ctx.onAction(answer, { dataset: { candidate, benchmark } });
+  return dotTitleOf(ctx, candidate);
+};
+
+test("UI #221: a returned dot stays off when later answers rebuild the chain from the recorded decisions", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2215 });
+  ["Oldest task", "Second task", "Third task", "Fourth task", "Fifth task"].forEach((title, i) => addTaskAged(ctx, title, 900000 - i * 1000));
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const second = answerShownCandidate(ctx, "yes"), third = answerShownCandidate(ctx, "yes");
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["Oldest task", second], "precondition: three dots made by Start and two Yes answers");
+
+  returnFromPill(ctx, shim, second);
+  const fourth = answerShownCandidate(ctx, "yes");
+
+  const board = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: ["Oldest task", third], benchmark: fourth },
+    "the returned dot does not come back when the next Yes replays the pass");
+});
+
+test("UI #221: returning the benchmark while its intervention is showing clears that intervention and the scan deals against the new benchmark", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2216 });
+  ctx.addTask("Earlier dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.state.interventionActive = true; ctx.state.interventionP = 0.1; ctx.state.candidateId = null;
+  ctx.render();
+  assert.match(shim.elements.get("scan").innerHTML, /Only 10% chance of finding a better task/, "precondition: the intervention about this benchmark is showing");
+
+  returnBenchmarkFromEdit(ctx, shim);
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.doesNotMatch(scan, /chance of finding a better task/, "the intervention about the returned benchmark is gone");
+  const board = renderedBoard(scan);
+  assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: [], benchmark: "Earlier dot" }, "the newest remaining dot is the benchmark");
+  assert.ok(["Pool task", "Benchmark dot"].includes(board.candidate), `the scan deals a candidate against the new benchmark, got ${board.candidate}`);
+});
+
+test("UI #221: returning the benchmark with dots remaining keeps the showing candidate, now weighed against the newest remaining dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2217 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Second dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Showing candidate", false);
+  ctx.render();
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML),
+    { pills: ["First dot", "Second dot"], benchmark: "Benchmark dot", candidate: "Showing candidate" }, "precondition");
+
+  returnBenchmarkFromEdit(ctx, shim);
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: ["First dot"], benchmark: "Second dot", candidate: "Showing candidate" });
+  const yes = scan.match(/<button\b[^>]*data-act="yes"[^>]*>/)?.[0] ?? "";
+  assert.match(yes, new RegExp(`data-benchmark="${ctx.state.tasks.find(task => task.title === "Second dot").id}"`), "Yes now weighs the candidate against the new benchmark");
+});
+
+test("UI #221: in work mode, returning an older dot keeps work mode on the same benchmark, and returning the benchmark works on from the newest remaining dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2218 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Second dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.onAction("start-working", {});
+  assert.match(shim.elements.get("scan").innerHTML, /Scanning paused/, "precondition: working the chain");
+
+  returnFromPill(ctx, shim, "Second dot");
+  let scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: ["First dot"], benchmark: "Benchmark dot", candidate: null });
+  assert.match(scan, /Scanning paused/, "still working, on the same benchmark");
+
+  returnBenchmarkFromEdit(ctx, shim);
+  scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: [], benchmark: "First dot", candidate: null });
+  assert.match(scan, /Scanning paused/, "still working, now from the newest remaining dot");
+  assert.equal(ctx.state.mode, "work");
+});
+
+// #2300 (merged from main) retired the skip-the-first-dot checkbox for Chain
+// starts with; both options dot one task at Start, so both return to Start.
+test("UI #221: returning the only dot leaves the existing empty-chain state with no replacement dot, whichever way the chain starts", async t => {
+  for (const chainStartsWith of ["oldest", "mostLikely"]) await t.test(`chainStartsWith ${chainStartsWith}`, async () => {
+    const app = await loadApp({ seed: 2219 }), { ctx, shim } = app;
+    chooseChainStart(app, chainStartsWith);
+    addTaskAged(ctx, "Oldest pool task", 900000);
+    addTaskAged(ctx, "Newer pool task", 1000);
+    ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+    const only = renderedBoard(shim.elements.get("scan").innerHTML).benchmark;
+    assert.ok(only, "precondition: one dot");
+    assert.equal(ctx.state.chain.length, 1, "precondition: Start dotted exactly one task");
+
+    returnBenchmarkFromEdit(ctx, shim);
+
+    const scan = shim.elements.get("scan").innerHTML, board = renderedBoard(scan);
+    assert.deepEqual({ pills: board.pills, benchmark: board.benchmark }, { pills: [], benchmark: null }, "no dot is chosen in its place");
+    assert.deepEqual(Array.from(ctx.state.chain), []);
+    assert.equal(board.candidate, null);
+    assert.match(scan, /Nothing dotted yet/, "the board waits for Start");
+    assert.match(scan, /data-act="start-scan"/);
+  });
+});
+
+test("UI #221: a returned dot keeps its rating, fields, completions and History, and History records Return as candidate with no rating change", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2220 });
+  ["Oldest task", "Second task", "Third task", "Fourth task"].forEach((title, i) => addTaskAged(ctx, title, 900000 - i * 1000));
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const second = answerShownCandidate(ctx, "yes");
+  answerShownCandidate(ctx, "yes");
+  const task = ctx.state.tasks.find(row => row.title === second);
+  const kept = row => JSON.stringify([row.id, row.title, row.url, row.due, row.startsAt, row.ctx, row.evergreen, row.evergreenHours, row.done, row.completedAt, row.lastDoneAt, row.createdAt, row.prerequisiteIds]);
+  const before = { ratings: JSON.stringify(ctx.state.tasks.map(row => [row.id, row.mu, row.sigma])), fields: ctx.state.tasks.map(kept), history: JSON.stringify(task.ratingHistory || []) };
+
+  returnFromPill(ctx, shim, second);
+
+  assert.equal(JSON.stringify(ctx.state.tasks.map(row => [row.id, row.mu, row.sigma])), before.ratings, "no rating moves, unlike Dislodge");
+  assert.deepEqual(ctx.state.tasks.map(kept), before.fields, "not completed, deleted or edited");
+  assert.equal(ctx.state.considered[task.id], undefined, "no skip mark or hold is added");
+  assert.ok(JSON.stringify(task.ratingHistory).startsWith(before.history.slice(0, -1)), "earlier History rows are kept as they were");
+  ctx.onAction("edit", { dataset: { id: task.id } });
+  const newest = shim.elements.get("modalRoot").innerHTML.match(/<li class="rating-event">[\s\S]*?<\/li>/)?.[0] ?? "";
+  assert.match(newest, /<summary><b>Return as candidate<\/b>/, "History shows the return");
+  assert.doesNotMatch(newest, /Own rating changed/, "with no rating change");
+});
+
+test("UI #221: a returned dot is dealt again in the same pass, but a returned task that is not yet eligible stays out of the scan", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2221 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Returned dot", true);
+  ctx.addTask("Future dot", true, [], { startsAt: "2999-01-01" });
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  assert.equal(renderedBoard(shim.elements.get("scan").innerHTML).candidate, null, "precondition: nothing left to deal");
+
+  returnFromPill(ctx, shim, "Returned dot");
+  assert.equal(renderedBoard(shim.elements.get("scan").innerHTML).candidate, "Returned dot", "the scanner deals it again this pass");
+
+  returnFromPill(ctx, shim, "Future dot");
+  const board = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual(board, { pills: ["First dot"], benchmark: "Benchmark dot", candidate: "Returned dot" },
+    "the future-dated task leaves the chain without becoming a candidate");
+  assert.equal(ctx.pool().some(task => task.title === "Future dot"), false, "its start date still keeps it out of the pool");
+});
+
+test("UI #221: Return as candidate saves the editor's unsaved edits with the return, like Done, Worked on it and Dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2222 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Middle dot");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  keepEditorValues(ctx, shim, pill.id);
+  fillEditPane(ctx, shim, { title: "Middle dot, renamed", url: "https://example.test/renamed" });
+
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });
+
+  const task = ctx.state.tasks.find(row => row.id === middle.id);
+  assert.deepEqual({ title: task.title, url: task.url }, { title: "Middle dot, renamed", url: "https://example.test/renamed" }, "the edits are saved");
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["First dot"], "and the dot is returned");
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the editor closes");
+});
+
+test("UI #221: header Undo puts a returned dot back in its original place in one step, edits included", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2223 });
+  ["Oldest task", "Second task", "Third task", "Fourth task", "Fifth task"].forEach((title, i) => addTaskAged(ctx, title, 900000 - i * 1000));
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const second = answerShownCandidate(ctx, "yes"), third = answerShownCandidate(ctx, "yes");
+  const before = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: before.pills, benchmark: before.benchmark }, { pills: ["Oldest task", second], benchmark: third }, "precondition");
+  const pill = chainPill(shim.elements.get("scan").innerHTML, second);
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  keepEditorValues(ctx, shim, pill.id);
+  fillEditPane(ctx, shim, { title: "Renamed on the way out" });
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["Oldest task"], "precondition: returned");
+
+  ctx.onAction("undo", {});
+
+  const after = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: after.pills, benchmark: after.benchmark }, { pills: ["Oldest task", second], benchmark: third }, "the dot is back between its neighbours");
+  assert.equal(ctx.state.tasks.find(task => task.id === pill.id).title, second, "the same Undo step reverses the edit saved with it");
+});
+
+test("UI #221 guidance: the mounted FAQ and Settings changelog say a chain pill opens the task and Return as candidate takes one dot off", async t => {
+  const app = await loadApp(); t.after(() => app.dispose());
+  for (const id of ["appChangelogCurrent", "appChangelog"]) app.shim.document.getElementById(id).innerHTML = html.match(new RegExp('<template id="' + id + '">([\\s\\S]*?)<\\/template>'))[1];
+  await app.ctx.onAction("help", {});
+  const help = app.shim.document.getElementById("modalRoot").innerHTML;
+  const answer = help.match(/<dt>Can I return a task early\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
+  assert.match(answer, /tap (?:a|the) task in the chain/i, "the FAQ names the chain trail as a way to the editor");
+  assert.match(answer, /takes (?:just|only) that dot off the chain/i);
+  assert.match(answer, /other dots keep their order/i);
+  assert.match(answer, /no rating change/i);
+  assert.match(answer, /Undo[^.]*puts (?:the|a returned) dot back/i);
+  const notes = help.match(/<details class="help-faq" data-help-changelog>([\s\S]*?)<\/details>/)?.[1] ?? "";
+  assert.match(notes, /Tapping a task in the chain opens its editor/i, "the changelog announces the change");
+  assert.match(notes, /Return as candidate now also takes a dotted task off the chain/i);
+  // #221 review: where focus goes when that editor closes, and the double tap.
+  assert.match(notes, /Closing that editor gives keyboard focus back to the scanner once Enter is released/i, "the changelog says where focus goes");
+  assert.match(notes, /for a moment after Return as candidate closes it, a second tap or key press does nothing, wherever it lands/i);
+  const keyboard = help.match(/<dt>How do keyboard decisions work\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
+  assert.match(keyboard, /An editor opened from a task in the chain or a card’s Edit gives focus back to that button, or to the benchmark’s Edit if it is gone/);
+  assert.match(keyboard, /After Enter, focus waits for the key’s release, so holding Enter presses nothing/);
+  const secondTap = help.match(/<dt>Why didn’t my second tap count\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
+  assert.match(secondTap, /For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/);
+});
+
+test("UI #221: returning a dot that also carries a hold takes only the dot; a later press of the same button ends the hold", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2225 });
+  ctx.addTask("First dot", true);
+  const resting = ctx.addTask("Resting evergreen dot", true, [], {}, { evergreen: true, evergreenHours: 18 });
+  ctx.addTask("Benchmark dot", true);
+  const doneAt = realNow(ctx) - 60000;
+  resting.lastDoneAt = doneAt;   // prior state: an evergreen rest that began while the task was dotted
+  ctx.render();
+
+  returnFromPill(ctx, shim, "Resting evergreen dot");
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["First dot"], "the dot is returned");
+  assert.equal(ctx.state.tasks.find(task => task.id === resting.id).lastDoneAt, doneAt, "its rest is left alone");
+  assert.equal(ctx.pool().some(task => task.id === resting.id), false, "so it is not dealt while it rests");
+
+  ctx.onAction("edit", { dataset: { id: resting.id } });
+  keepEditorValues(ctx, shim, resting.id);
+  assert.doesNotMatch(returnButton(shim.elements.get("modalRoot").innerHTML), /\bdisabled\b/, "the button still offers to end the rest");
+  ctx.onAction("return-candidate", { dataset: { id: resting.id } });
+  assert.equal(ctx.state.tasks.find(task => task.id === resting.id).lastDoneAt, null, "the later press ends the rest");
+  assert.equal(ctx.pool().some(task => task.id === resting.id), true);
+});
+
+test("UI #221: a repeated Return is one return and one Undo step, and a stale Return for a task that has left the chain changes nothing", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2224 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Middle dot", true);
+  const bench = ctx.addTask("Benchmark dot", true);
+  const pill = chainPill(shim.elements.get("scan").innerHTML, "Middle dot");
+  ctx.onAction(pill.act, { dataset: { id: pill.id } });
+  keepEditorValues(ctx, shim, pill.id);
+  const steps = readConst(ctx, "undoStack.length");
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });
+  const once = ctx.cloudPayload();
+  ctx.onAction("return-candidate", { dataset: { id: pill.id } });   // the second tap of a double tap
+  assert.equal(ctx.cloudPayload(), once, "the repeat changes nothing");
+  assert.equal(readConst(ctx, "undoStack.length"), steps + 1, "one Undo step");
+
+  ctx.onAction("edit", { dataset: { id: bench.id } });
+  keepEditorValues(ctx, shim, bench.id);
+  assert.doesNotMatch(returnButton(shim.elements.get("modalRoot").innerHTML), /\bdisabled\b/, "precondition: the editor offers the return");
+  ctx.onAction("bench-done", { dataset: { benchmark: bench.id } });   // the task leaves the chain while that editor is open
+  const done = ctx.cloudPayload(), doneSteps = readConst(ctx, "undoStack.length");
+  ctx.onAction("return-candidate", { dataset: { id: bench.id } });
+  assert.equal(ctx.cloudPayload(), done, "the stale control neither reopens the finished task nor changes anything else");
+  assert.equal(readConst(ctx, "undoStack.length"), doneSteps);
+  assert.equal(ctx.state.tasks.find(task => task.id === bench.id).done, true);
+});
+
+// #221 review: cases from the spec's inventory that had no test yet.
+test("UI #221: in work mode, returning the only dot leaves work mode's empty queue with no replacement dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2232 });
+  ctx.addTask("Only dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.onAction("start-working", {});
+  assert.match(shim.elements.get("scan").innerHTML, /Scanning paused/, "precondition: working the one dot");
+
+  returnBenchmarkFromEdit(ctx, shim);
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan), { pills: [], benchmark: null, candidate: null }, "no dot is chosen in its place");
+  assert.match(scan, /Queue’s empty — resume scanning whenever you’re ready/, "work mode's own empty state");
+  assert.equal(ctx.state.mode, "work", "still working, not scanning");
+});
+
+test("UI #221: returning an older dot while an intervention shows keeps the intervention about the unchanged benchmark", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2233 });
+  ctx.addTask("Older dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Pool task", false);
+  ctx.state.interventionActive = true; ctx.state.interventionP = 0.1; ctx.state.candidateId = null;
+  ctx.render();
+  assert.match(shim.elements.get("scan").innerHTML, /Only 10% chance of finding a better task/, "precondition: the intervention about this benchmark is showing");
+
+  returnFromPill(ctx, shim, "Older dot");
+
+  const scan = shim.elements.get("scan").innerHTML;
+  assert.deepEqual(renderedBoard(scan).pills, [], "precondition: the older dot is off the chain");
+  assert.equal(renderedBoard(scan).benchmark, "Benchmark dot");
+  assert.match(scan, /Only 10% chance of finding a better task/, "the intervention weighed this benchmark, which has not changed, so it stays");
+  assert.equal(ctx.state.interventionActive, true);
+});
+
+test("UI #221: a returned dot still waits on its contexts and dependencies before the scan deals it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2234 });
+  const [home] = ctx.state.contexts;
+  const blocker = ctx.addTask("Unfinished prerequisite", false);
+  ctx.addTask("First dot", true);
+  ctx.addTask("Context dot", true, [home.id]);
+  const dependent = ctx.addTask("Dependent dot", true);
+  ctx.addTask("Benchmark dot", true);
+  assert.equal(ctx.setTaskPrerequisites(dependent.id, [blocker.id]), true, "precondition: the dot waits on an unfinished task");
+  ctx.onAction("cycle-context", { dataset: { id: home.id } });
+  assert.equal(ctx.isEligible(ctx.state.tasks.find(task => task.title === "Context dot")), false, "precondition: its context is off");
+  assert.equal(ctx.isEligible(dependent), false, "precondition: its prerequisite is unfinished");
+
+  returnFromPill(ctx, shim, "Context dot");
+  returnFromPill(ctx, shim, "Dependent dot");
+
+  const board = renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual(board.pills, ["First dot"], "precondition: both dots are off the chain");
+  assert.equal(ctx.pool().some(task => ["Context dot", "Dependent dot"].includes(task.title)), false, "neither returned task joins the pool");
+  assert.ok(!["Context dot", "Dependent dot"].includes(board.candidate), `neither is dealt as the candidate, got ${board.candidate}`);
+});
+
+test("UI #221: a later Yes on a returned task puts it back on the chain as the newest dot, through the next answer and a reload", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2235 });
+  ctx.addTask("First dot", true);
+  const returned = ctx.addTask("Returned dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+  returnFromPill(ctx, shim, "Returned dot");
+  assert.equal(answerShownCandidate(ctx, "no"), "Waiting candidate", "precondition: the first candidate is answered");
+  assert.equal(ctx.state.candidateId, returned.id, "precondition: the scan deals the returned task again");
+
+  answerShownCandidate(ctx, "yes");
+
+  const board = () => renderedBoard(shim.elements.get("scan").innerHTML);
+  assert.deepEqual({ pills: board().pills, benchmark: board().benchmark }, { pills: ["First dot", "Benchmark dot"], benchmark: "Returned dot" }, "the Yes adds it back as the newest dot");
+  ctx.addTask("Later arrival", false);
+  answerShownCandidate(ctx, "no");   // the next answer rebuilds the chain from the recorded decisions
+  assert.deepEqual({ pills: board().pills, benchmark: board().benchmark }, { pills: ["First dot", "Benchmark dot"], benchmark: "Returned dot" }, "it stays on after the next answer");
+  assert.equal(await ctx.persist(), true);
+  const reopened = await loadApp({ seedStorage: { [STORE_KEY]: shim.localStorage.getItem(STORE_KEY) } });
+  assert.deepEqual(Array.from(reopened.ctx.state.chain), Array.from(ctx.state.chain), "and after a reload");
+});
+
+test("UI #221: Undo of a return shows in the task's History as Undo with no rating change, as Undo of a Yes does", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2236 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  returnFromPill(ctx, shim, "Middle dot");
+
+  ctx.onAction("undo", {});
+
+  assert.deepEqual(renderedBoard(shim.elements.get("scan").innerHTML).pills, ["First dot", "Middle dot"], "precondition: Undo put the dot back");
+  ctx.onAction("edit", { dataset: { id: middle.id } });
+  const rows = [...shim.elements.get("modalRoot").innerHTML.matchAll(/<li class="rating-event">[\s\S]*?<\/li>/g)].map(match => match[0]);
+  assert.match(rows[0] ?? "", /<summary><b>Undo<\/b>/, "the newest History row is the Undo");
+  assert.doesNotMatch(rows[0] ?? "", /Own rating changed/, "with no rating change");
+  assert.match(rows[1] ?? "", /<summary><b>Return as candidate<\/b>/, "and the return it reversed is the row before it");
+});
+
+// #221 review: where focus goes when the editor closes. A person presses a
+// control in the scan panel, which takes focus, and the editor opens; then a
+// control in the editor takes focus, and closing the editor removes it.
+const openFromScan221 = (ctx, shim, predicate, what) => {
+  const panel = scanPanelDom221(shim), control = panel.find(predicate);
+  assert.ok(control, `the scan panel offers ${what}`);
+  shim.document.activeElement = control;
+  ctx.onAction(control.dataset.act, control);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /Edit task/, `${what} opens the editor`);
+  return panel;
+};
+const editorControl221 = (act, id) => ({ dataset: { act, id }, classList: { contains: () => false }, matches: () => false });
+const closeEditor221 = (ctx, shim, route, id) => {
+  const pressed = editorControl221(route === "Save" ? "save-edit" : "close-modal", id);
+  shim.document.activeElement = pressed;
+  if (route === "Cancel") ctx.onAction("close-modal", pressed);
+  else if (route === "the backdrop") shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: name => name === "mback" } } });
+  else if (route === "Escape") {
+    const query = shim.document.querySelector;
+    shim.document.querySelector = selector => selector === ".mback" ? (shim.elements.get("modalRoot").innerHTML ? {} : null) : query(selector);
+    try { shim.document.dispatchEvent({ type: "keydown", key: "Escape", target: pressed }); } finally { shim.document.querySelector = query; }
+  } else {
+    keepEditorValues(ctx, shim, id);
+    ctx.onAction("save-edit", { dataset: { id } });
+  }
+};
+const pressInEditor221 = (ctx, shim, act, id) => {
+  keepEditorValues(ctx, shim, id);
+  const pressed = editorControl221(act, id);
+  shim.document.activeElement = pressed;
+  ctx.onAction(act, pressed);
+};
+const focusedScanControl221 = (shim, panel) => {
+  const focused = shim.document.activeElement;
+  return { inPanel: panel.controls().includes(focused), act: focused?.dataset?.act, id: focused?.dataset?.id, pill: !!focused?.classList?.contains("crumb") };
+};
+
+test("UI #221: closing the editor a chain pill opened gives focus back to that pill, however the editor closes", async t => {
+  for (const route of ["Cancel", "the backdrop", "Escape", "Save"]) await t.test(route, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2226 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+
+    closeEditor221(ctx, shim, route, middle.id);
+    await flush();
+
+    assert.equal(shim.elements.get("modalRoot").innerHTML, "", "precondition: the editor closed");
+    assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: middle.id, pill: true }, "the pill the editor came from has focus");
+  });
+});
+
+test("UI #221: when the control the editor came from is gone, focus goes to Edit on the benchmark card, and with no dot left to the first control of the scan panel", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2227 });
+  const first = ctx.addTask("First dot", true), middle = ctx.addTask("Middle dot", true), bench = ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+
+  let panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+  pressInEditor221(ctx, shim, "return-candidate", middle.id);
+  await flush();
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: bench.id, pill: false }, "a returned older dot has no pill, so Edit on the benchmark card");
+
+  const benchmarkEdit = id => control => control.dataset.act === "edit" && control.dataset.id === id && !control.classList.contains("crumb");
+  panel = openFromScan221(ctx, shim, benchmarkEdit(bench.id), "Edit on the benchmark card");
+  pressInEditor221(ctx, shim, "return-candidate", bench.id);
+  await flush();
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: first.id, pill: false }, "a returned benchmark's card now shows the newest remaining dot: its Edit");
+
+  panel = openFromScan221(ctx, shim, benchmarkEdit(first.id), "Edit on the benchmark card");
+  pressInEditor221(ctx, shim, "return-candidate", first.id);
+  await flush();
+  const offered = panel.controls().find(control => !control.disabled && !control.hidden);
+  assert.equal(offered?.dataset.act, "start-scan", "precondition: with no dot left the scan panel offers Start scanning first");
+  assert.equal(shim.document.activeElement, offered, "the first control the scan panel offers has focus");
+});
+
+test("UI #221: when Done or Delete in the editor a pill opened takes the pill away, Edit on the benchmark card has focus", async t => {
+  for (const [route, act] of [["Done", "done-task"], ["Delete", "delete-task"]]) await t.test(route, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2230 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true), bench = ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+
+    pressInEditor221(ctx, shim, act, middle.id);
+    await flush();
+
+    assert.equal(ctx.state.chain.includes(middle.id), false, `precondition: ${route} took the dot off the chain`);
+    assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: bench.id, pill: false });
+  });
+});
+
+test("UI #221: an editor opened from the candidate card gives focus back to its Edit, and after Dot to Edit on the benchmark card", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2228 });
+  ctx.addTask("First dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.addTask("Another candidate", false);
+  ctx.render();
+  const candidate = ctx.state.candidateId;
+  assert.ok(candidate, "precondition: a candidate is showing");
+  const candidateEdit = control => control.dataset.act === "edit" && control.dataset.id === candidate && !control.classList.contains("crumb");
+
+  let panel = openFromScan221(ctx, shim, candidateEdit, "Edit on the candidate card");
+  closeEditor221(ctx, shim, "Cancel", candidate);
+  await flush();
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: candidate, pill: false }, "Edit on the candidate card has focus again");
+
+  panel = openFromScan221(ctx, shim, candidateEdit, "Edit on the candidate card");
+  pressInEditor221(ctx, shim, "dot-task", candidate);
+  await flush();
+  assert.equal(ctx.state.chain.at(-1), candidate, "precondition: Dot made the candidate the benchmark");
+  assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: candidate, pill: false }, "the candidate card's Edit is gone, so Edit on the benchmark card");
+  assert.notEqual(ctx.state.candidateId, candidate);
+});
+
+// #221 review: a double tap on Return as candidate. WebKit touch reports
+// detail 1 for both taps, so only the time since the press decides.
+test("UI #221: the second tap of a double tap on Return as candidate cannot answer the candidate the closing editor uncovers", async t => {
+  for (const answer of ["yes", "no", "cant"]) await t.test(answer, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2231 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    await new Promise(resolve => setTimeout(resolve, 240));   // the board has been on screen long enough to read
+    const panel = scanPanelDom221(shim);
+    const tap = control => shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: () => false }, closest: () => control } });
+    tap(panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+    keepEditorValues(ctx, shim, middle.id);
+    const shown = { benchmark: ctx.state.chain.at(-1), candidate: ctx.state.candidateId };
+
+    tap(editorControl221("return-candidate", middle.id));
+    assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: the first tap returned the dot");
+    assert.deepEqual({ benchmark: ctx.state.chain.at(-1), candidate: ctx.state.candidateId }, shown, "precondition: the benchmark and candidate are the ones already on screen");
+    const board = ctx.cloudPayload(), answerControl = panel.find(control => control.dataset.act === answer);
+    assert.ok(answerControl, `precondition: the scan panel shows ${answer}`);
+
+    tap(answerControl);
+    assert.equal(ctx.cloudPayload(), board, `the second tap does not answer ${answer}`);
+
+    await new Promise(resolve => setTimeout(resolve, 240));
+    tap(panel.find(control => control.dataset.act === answer));
+    assert.notEqual(ctx.cloudPayload(), board, `a moment later ${answer} answers as usual`);
+  });
+});
+
+// #221 release review: what the closing editor uncovers depends on how far it
+// was scrolled, the screen and the text size, so the pause after Return as
+// candidate has to cover every press, wherever it lands.
+const tapControl221 = (shim, control) => shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: () => false }, closest: () => control } });
+const settledBoard221 = () => new Promise(resolve => setTimeout(resolve, 240));   // longer than the pause, as a person reading takes
+test("UI #221: for a moment after Return as candidate closes the editor, a press does nothing wherever it lands, and a moment later it works, Undo included", async t => {
+  const uncovered = [
+    ["done adding for now in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "start-working")],
+    ["the list toggle in the pinned row", ({ panel }) => panel.find(control => control.dataset.act === "toggle-list")],
+    ["a pill in the chain", ({ panel, first }) => panel.find(control => control.classList.contains("crumb") && control.dataset.id === first.id)],
+    ["Done on the benchmark card", ({ panel }) => panel.find(control => control.dataset.act === "bench-done")],
+    ["Edit on the candidate card", ({ panel, ctx }) => panel.find(control => control.dataset.act === "edit" && control.dataset.id === ctx.state.candidateId)],
+    ["Undo in the header", () => editorControl221("undo")],
+    ["a task's title in All Tasks", ({ waiting }) => editorControl221("edit", waiting.id)],
+  ];
+  for (const [where, locate] of uncovered) await t.test(where, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2239 });
+    const first = ctx.addTask("First dot", true), middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    const waiting = ctx.addTask("Waiting candidate", false);
+    ctx.addTask("Second candidate", false);
+    ctx.render();
+    await settledBoard221();
+    const panel = scanPanelDom221(shim), found = () => locate({ panel, ctx, first, waiting });
+    tapControl221(shim, panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+    keepEditorValues(ctx, shim, middle.id);
+    tapControl221(shim, editorControl221("return-candidate", middle.id));
+    assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: the first tap returned the dot");
+    assert.ok(found(), `precondition: the page shows ${where}`);
+    const returned = JSON.stringify(ctx.state);
+
+    tapControl221(shim, found());
+    assert.equal(JSON.stringify(ctx.state), returned, `the second tap, on ${where}, changes nothing`);
+    assert.equal(shim.elements.get("modalRoot").innerHTML, "", "and opens nothing");
+
+    await settledBoard221();
+    tapControl221(shim, found());
+    assert.ok(JSON.stringify(ctx.state) !== returned || shim.elements.get("modalRoot").innerHTML !== "", `a moment later a press on ${where} works`);
+    if (where === "Undo in the header") assert.equal(ctx.state.chain.includes(middle.id), true, "Undo puts the dot back");
+  });
+});
+
+test("UI #221: for a moment after Return as candidate takes the only dot off, a press on Start scanning places no first dot", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2240 });
+  addTaskAged(ctx, "Oldest task", 900000);
+  addTaskAged(ctx, "Newer task", 1000);
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const only = ctx.state.chain[0];
+  assert.equal(ctx.state.chain.length, 1, "precondition: Start placed one dot");
+  await settledBoard221();
+  const panel = scanPanelDom221(shim);
+  tapControl221(shim, panel.find(control => control.dataset.act === "edit" && control.dataset.id === only));
+  keepEditorValues(ctx, shim, only);
+  tapControl221(shim, editorControl221("return-candidate", only));
+  assert.deepEqual(Array.from(ctx.state.chain), [], "precondition: the only dot is off");
+  const start = () => panel.find(control => control.dataset.act === "start-scan");
+  assert.ok(start(), "precondition: the empty scan panel offers Start scanning");
+
+  tapControl221(shim, start());
+  assert.deepEqual(Array.from(ctx.state.chain), [], "the second press places no automatic first dot");
+
+  await settledBoard221();
+  tapControl221(shim, start());
+  assert.equal(ctx.state.chain.length, 1, "a moment later Start scanning works");
+});
+
+test("UI #221: for a moment after Return as candidate closes the editor, the scanner's keys do nothing either", async t => {
+  for (const [key, label] of [["w", "Worked on it (w)"], ["z", "Undo (z)"]]) await t.test(label, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2241 });
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    await settledBoard221();
+    const panel = scanPanelDom221(shim);
+    tapControl221(shim, panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+    keepEditorValues(ctx, shim, middle.id);
+    tapControl221(shim, editorControl221("return-candidate", middle.id));
+    const returned = JSON.stringify(ctx.state);
+    const press = () => shim.document.dispatchEvent({ type: "keydown", key, target: { matches: () => false } });
+
+    press();
+    assert.equal(JSON.stringify(ctx.state), returned, `${label} right after the return changes nothing`);
+
+    await settledBoard221();
+    press();
+    assert.notEqual(JSON.stringify(ctx.state), returned, `a moment later ${label} works`);
+  });
+});
+
+// #221 release review: the pause is for a person's presses. A browser marks a
+// click the page makes itself with element.click() as untrusted (isTrusted
+// false), and a person's tap or key press of a button as trusted. The shim's
+// events are plain objects: here a person's press is the plain click the other
+// tests use, and the app's own click carries isTrusted:false, as a browser's does.
+test("UI #221: the pause after Return as candidate never cancels a click the app makes itself, so a recovery file prepared meanwhile still downloads", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2244 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+  await settledBoard221();
+  const panel = scanPanelDom221(shim);
+  // A browser's download link: its click() is the page's own click, and the
+  // file is saved unless a listener cancels that click.
+  const files = { saved: [], cancelled: [] }, createElement = shim.document.createElement;
+  shim.document.createElement = tag => {
+    const element = createElement.call(shim.document, tag);
+    if (String(tag).toLowerCase() !== "a") return element;
+    element.closest = () => null; element.remove = () => {};
+    element.click = () => {
+      const event = { type: "click", isTrusted: false, detail: 0, target: element, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+      shim.document.dispatchEvent(event);
+      (event.defaultPrevented ? files.cancelled : files.saved).push(element.download);
+    };
+    return element;
+  };
+  ctx.URL = { createObjectURL: () => "blob:recovery-file", revokeObjectURL() {} };
+  ctx.Blob = class { constructor(parts) { this.parts = parts; } };
+  const now = ctx.performance.now();
+  ctx.performance = { now: () => now };   // the file is ready within the pause, however long preparing it takes here
+
+  const exporting = ctx.downloadRecoveryFile();   // Download recovery file: the board stays usable while it is prepared
+  tapControl221(shim, panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+  keepEditorValues(ctx, shim, middle.id);
+  tapControl221(shim, editorControl221("return-candidate", middle.id));
+  assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: a dot was returned while the file was prepared");
+
+  assert.equal(await exporting, true, "the export finished");
+  assert.deepEqual(files, { saved: ["chain-scanner-recovery-file.json"], cancelled: [] }, "its download was not cancelled by the pause");
+  assert.match(shim.document.getElementById("toast").textContent, /^Recovery file saved/, "and the message is true");
+  tapControl221(shim, editorControl221("undo"));
+  assert.equal(ctx.state.chain.includes(middle.id), false, "a person's press at that moment, on Undo in the header, is still paused");
+});
+
+// #221 release review: a held Enter. Browsers press a focused button as Enter
+// goes down, and a held key repeats to whatever has focus; the Node shim has
+// no native button presses, so this test makes them itself: each Enter keydown
+// clicks whichever control has focus. The app's own key handler ignores Enter.
+test("UI #221: a held Enter that pressed Return as candidate cannot press the control focus goes back to; focus moves there once the key is released", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2242 });
+  addTaskAged(ctx, "Oldest task", 900000);
+  addTaskAged(ctx, "Newer task", 1000);
+  ctx.onAction("start-scan", { dataset: { mode: "descending" } });
+  const only = ctx.state.chain[0];
+  await settledBoard221();
+  const panel = openFromScan221(ctx, shim, control => control.dataset.act === "edit" && control.dataset.id === only, "Edit on the benchmark card");
+  keepEditorValues(ctx, shim, only);
+  const page = { classList: { contains: () => false }, closest: () => null, matches: () => false };   // has focus once the editor's button leaves the page
+  const enter = repeat => {
+    const focused = shim.document.activeElement || page;
+    shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat, target: focused });
+    if (focused.dataset?.act) tapControl221(shim, focused);
+  };
+
+  shim.document.activeElement = editorControl221("return-candidate", only);
+  enter(false);
+  shim.document.activeElement = page;   // the editor closes, and Return with it
+  await flush();
+  assert.deepEqual(Array.from(ctx.state.chain), [], "precondition: Enter returned the only dot");
+  assert.equal(panel.controls().includes(shim.document.activeElement), false, "while Enter is still down, no control in the scan panel has focus");
+
+  await settledBoard221();   // held past the pause
+  enter(true);
+  enter(true);
+  assert.deepEqual(Array.from(ctx.state.chain), [], "the held key places no first dot");
+
+  shim.document.dispatchEvent({ type: "keyup", key: "Enter", target: shim.document.activeElement || page });
+  await flush();
+  assert.equal(shim.document.activeElement?.dataset?.act, "start-scan", "once Enter is released, focus goes back to Start scanning");
+  assert.ok(panel.controls().includes(shim.document.activeElement));
+
+  enter(false);
+  assert.equal(ctx.state.chain.length, 1, "a fresh press of Enter starts the scan");
+});
+
+// #221 review B3: when the focused button leaves the page, the page's body has focus.
+const pageBody221 = shim => Object.assign(shim.document.body, { classList: { contains: () => false }, closest: () => null, matches: () => false });
+// #221 release review: focus that waits for Enter's release goes back
+// promptly or not at all. Enter goes down on Return, as in the test above, and
+// the editor closes; what happens before the release decides.
+const enterOnReturn221 = async (shim, id) => {
+  const pressed = editorControl221("return-candidate", id), page = pageBody221(shim);
+  shim.document.activeElement = pressed;
+  shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat: false, target: pressed });
+  tapControl221(shim, pressed);
+  shim.document.activeElement = page;   // the editor closes, and Return with it
+  await flush();
+  return page;
+};
+const mousePress221 = (shim, pressed) => {   // a control, or the page around the controls
+  const target = pressed.dataset?.act ? { classList: { contains: () => false }, closest: () => pressed } : pressed;
+  for (const type of ["pointerdown", "pointerup", "click"]) shim.document.dispatchEvent({ type, detail: 1, target });
+};
+test("UI #221: focus waiting for the release of the Enter that pressed Return goes back at the release, or not at all if anything comes first", async t => {
+  const first = [
+    ["nothing: it goes back at the release", null],
+    ["a second passes", ({ wait }) => wait(1001)],
+    ["the person presses a pointer", ({ shim, page }) => mousePress221(shim, page)],
+    ["the person presses another key", ({ shim, page }) => { shim.document.dispatchEvent({ type: "keydown", key: "Shift", target: page }); }],
+    ["the window loses focus", ({ shim }) => { shim.window.dispatchEvent({ type: "blur" }); }],
+    ["focus has moved into a text field", ({ shim, field }) => { shim.document.activeElement = field; return field; }],
+  ];
+  for (const [what, meanwhile] of first) await t.test(what, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2245 });
+    let clock = ctx.performance.now();
+    ctx.performance = { now: () => clock };
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true), bench = ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+    keepEditorValues(ctx, shim, middle.id);
+    const page = await enterOnReturn221(shim, middle.id);
+    assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: Enter returned the dot");
+    assert.equal(panel.controls().includes(shim.document.activeElement), false, "precondition: focus waits while Enter is down");
+    clock += 300;
+    shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat: true, target: page });   // still held
+    const field = Object.assign(shim.document.getElementById("addInput"), { id: "addInput", matches: selector => /input/.test(selector) });
+    const stays = meanwhile?.({ shim, page, field, wait: ms => { clock += ms; } }) || page;
+
+    shim.document.dispatchEvent({ type: "keyup", key: "Enter", target: shim.document.activeElement });
+    await flush();
+    if (!meanwhile) assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: bench.id, pill: false }, "Edit on the benchmark card has focus");
+    else assert.equal(shim.document.activeElement, stays, "focus stays where it was, and the scan panel never takes it");
+  });
+});
+
+// #221 review B3: browsers on macOS deliver no keyup for a key released while
+// Cmd is held, so after one Cmd+Enter the page never hears Enter come up.
+test("UI #221: when the release of the Enter that pressed Return never reaches the page, nothing later is changed by it", async t => {
+  const later = {
+    "typing a task in Add a task keeps focus there": async ({ ctx, shim }) => {
+      const field = Object.assign(shim.document.getElementById("addInput"), { id: "addInput", matches: selector => /input/.test(selector) });
+      shim.document.activeElement = field;
+      field.value = "Buy milk";
+      for (const key of ["B", "u", "y", "k"]) shim.document.dispatchEvent({ type: "keydown", key, repeat: false, target: field });
+      shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat: false, target: field });
+      shim.document.dispatchEvent({ type: "keyup", key: "Enter", target: field });
+      await flush();
+      assert.equal(shim.document.activeElement, field, "focus stays in Add a task after its Enter is released");
+    },
+    "an editor opened and closed with the mouse hands focus back at once": async ({ ctx, shim, first }) => {
+      const panel = scanPanelDom221(shim), pill = panel.find(control => control.classList.contains("crumb") && control.dataset.id === first.id);
+      shim.document.activeElement = pill;
+      mousePress221(shim, pill);
+      assert.match(shim.elements.get("modalRoot").innerHTML, /Edit task/, "precondition: the pill opened the editor");
+      const cancel = editorControl221("close-modal", first.id);
+      shim.document.activeElement = cancel;
+      mousePress221(shim, cancel);
+      shim.document.activeElement = pageBody221(shim);
+      await flush();
+      assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: first.id, pill: true }, "the pill has focus again");
+    },
+  };
+  for (const [what, then] of Object.entries(later)) await t.test(what, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2246 });
+    const first = ctx.addTask("First dot", true), middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    const waiting = ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    await settledBoard221();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+    keepEditorValues(ctx, shim, middle.id);
+    await enterOnReturn221(shim, middle.id);
+    assert.equal(panel.controls().includes(shim.document.activeElement), false, "precondition: focus waits while Enter is down");
+    await settledBoard221();   // the release is lost; the person goes on
+
+    await then({ ctx, shim, first });
+    assert.equal(ctx.state.tasks.find(task => task.id === waiting.id)?.done ?? false, false, "and no scanner key was pressed on the candidate");
+  });
+});
+
+// #221 release review (specialist F7): only an editor that opened hands focus back.
+test("UI #221: a pill pressed after its task has gone opens no editor, and closing the dialog still open leaves focus where it was", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2243 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  const panel = scanPanelDom221(shim);
+  const pill = panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id);
+  ctx.onAction("help", {});   // a dialog is open; keyboard focus can still move on to the pills behind it
+  ctx.state.tasks = ctx.state.tasks.filter(task => task.id !== middle.id);   // the task goes before the panel is drawn again
+
+  shim.document.activeElement = pill;
+  ctx.onAction("edit", pill);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /FAQs/, "precondition: no editor opened; the dialog is still the one showing");
+
+  const inDialog = editorControl221("close-modal");
+  shim.document.activeElement = inDialog;
+  ctx.onAction("close-modal", inDialog);
+  await flush();
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "precondition: the dialog closed");
+  assert.equal(shim.document.activeElement, inDialog, "focus is left where it was");
+  assert.equal(panel.controls().includes(shim.document.activeElement), false, "nothing in the scan panel takes it");
+});
+
+// #221 release review (independent F3): two cases that already behaved.
+test("UI #221: a dialog that opens as the editor closes keeps focus; the scan panel does not take it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2237 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.render();
+  const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+
+  closeEditor221(ctx, shim, "Cancel", middle.id);
+  ctx.onAction("help", {});   // in the same moment another dialog opens, and focus goes into it
+  const inDialog = editorControl221("close-modal");
+  shim.document.activeElement = inDialog;
+  await flush();
+
+  assert.match(shim.elements.get("modalRoot").innerHTML, /FAQs/, "precondition: the other dialog is open");
+  assert.equal(shim.document.activeElement, inDialog, "focus stays in that dialog");
+  assert.equal(panel.controls().includes(shim.document.activeElement), false, "nothing in the scan panel takes it");
+});
+
+test("UI #221: the pause after Return as candidate also follows a return of a task that is not dotted", async t => {
+  for (const hold of ["a No mark", "a postponement", "an evergreen rest"]) await t.test(hold, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2238 });
+    ctx.addTask("First dot", true);
+    ctx.addTask("Benchmark dot", true);
+    const held = ctx.addTask("Held task", false, [], {}, hold === "an evergreen rest" ? { evergreen: true, evergreenHours: 18 } : {});
+    ctx.addTask("Waiting candidate", false);
+    if (hold === "a No mark") ctx.state.considered[held.id] = "no";
+    else if (hold === "a postponement") ctx.postponeTask(held.id);
+    else held.lastDoneAt = realNow(ctx) - 60000;
+    ctx.render();
+    assert.equal(ctx.pool().some(task => task.id === held.id), false, `precondition: ${hold} keeps it out of the scan`);
+    await new Promise(resolve => setTimeout(resolve, 240));   // the board has been on screen long enough to read
+    const panel = scanPanelDom221(shim);
+    const tap = control => shim.document.dispatchEvent({ type: "click", detail: 1, target: { classList: { contains: () => false }, closest: () => control } });
+    tap(editorControl221("edit", held.id));   // its title in All Tasks
+    keepEditorValues(ctx, shim, held.id);
+
+    tap(editorControl221("return-candidate", held.id));
+    assert.equal(ctx.pool().some(task => task.id === held.id), true, "precondition: the first tap returned it");
+    const board = ctx.cloudPayload();
+    tap(panel.find(control => control.dataset.act === "yes"));
+    assert.equal(ctx.cloudPayload(), board, "the second tap does not answer the candidate the editor uncovered");
+
+    await new Promise(resolve => setTimeout(resolve, 240));
+    tap(panel.find(control => control.dataset.act === "yes"));
+    assert.notEqual(ctx.cloudPayload(), board, "a moment later Yes answers as usual");
+  });
+});
+
+test("UI #221: an editor opened from All Tasks or with the e shortcut leaves focus where it was when it closes", async t => {
+  for (const opener of ["All Tasks", "the e shortcut"]) await t.test(opener, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2229 });
+    ctx.addTask("First dot", true);
+    const bench = ctx.addTask("Benchmark dot", true);
+    ctx.render();
+    const panel = scanPanelDom221(shim);
+    if (opener === "All Tasks") {
+      const title = editorControl221("edit", bench.id);   // a task title in All Tasks, outside the scan panel
+      shim.document.activeElement = title;
+      ctx.onAction("edit", title);
+    } else {
+      shim.document.activeElement = null;
+      shim.document.dispatchEvent({ type: "keydown", key: "e", target: { matches: () => false } });
+    }
+    assert.match(shim.elements.get("modalRoot").innerHTML, /Edit task/, "precondition: the editor opens");
+
+    const pressed = editorControl221("close-modal", bench.id);
+    shim.document.activeElement = pressed;
+    ctx.onAction("close-modal", pressed);
+    await flush();
+
+    assert.equal(shim.document.activeElement, pressed, "focus is left as it was");
+    assert.equal(panel.controls().includes(shim.document.activeElement), false, "nothing in the scan panel takes it");
+  });
 });
 
 /* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
@@ -14979,26 +15925,6 @@ test('RISK saved view cloud adoption: this device keeps its open All Tasks view 
   'new cloud task data is accepted while this browser retains its own open list and filters through adoption and reload');
 });
 
-test('RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload',async()=>{
- const task=syncTask('shared-reveal','Shared task');
- const local=syncState({tasks:[task],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
- const remote=syncState({tasks:[{...task}],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
- const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)}),h=makeSyncHarness({remote,rev:5});
- const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
- opened.ctx.onAction('reveal',{dataset:{id:'shared-reveal'}});
- const afterReveal={listOpen:opened.ctx.state.listOpen,cachedListOpen:JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null')?.listOpen??null,hidden:opened.shim.document.getElementById('listBody').hidden};
- vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
- await opened.ctx.cloudPull();
- const adopted={title:opened.ctx.state.tasks[0].title,listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden};
- await opened.ctx.cloudPull();
- const repeatedPull={listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden,remoteListOpen:h.remoteState().listOpen};
- vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
- const reopened=await loadApp({sharedStorage:storage});
- assert.deepEqual({afterReveal,adopted,repeatedPull,reloaded:{listOpen:reopened.ctx.state.listOpen,hidden:reopened.shim.document.getElementById('listBody').hidden}},
-  {afterReveal:{listOpen:true,cachedListOpen:true,hidden:false},adopted:{title:'Shared task',listOpen:true,hidden:false},repeatedPull:{listOpen:true,hidden:false,remoteListOpen:false},reloaded:{listOpen:true,hidden:false}},
-  'the actual reveal action records this device’s list-open choice and keeps it around newer cloud task data');
-});
-
 test('RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable',async()=>{
  const board=syncState({tasks:[syncTask('view-fallback','Keep task')],listOpen:true,seenQuickStart:true}),payload=JSON.stringify(board);
  const corrupt=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:payload,'fvp:chain-scanner:saved-view:v1':'{'})});
@@ -15095,7 +16021,12 @@ test('RISK opening board presentation: shared markup retains released cards cont
  const options={seed:493,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}};
  const old=await loadAppPinningNewDate(at,{...options,appSource:extractAppScript(baseline.stdout)}),current=await loadAppPinningNewDate(at,options);
  for(const app of [old,current]){app.ctx.state.listOpen=true;app.ctx.state.ctxOpen=true;app.ctx.state.histOpen=true;app.ctx.render();}
- for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,old.shim.document.getElementById(id).innerHTML,id+' keeps the released markup after sharing its pure formatter');
+ // #221 deliberately changed one thing here: a chain pill opens its task's
+ // editor (data-act="edit", with a name saying so) instead of revealing it.
+ // Everything else keeps the released markup byte for byte.
+ const releasedWith221Pills=markup=>markup.replace(/<button class="crumb" data-act="reveal" (data-id="[^"]*")([^>]*?) title="([^"]*)">/g,'<button class="crumb" data-act="edit" $1$2 title="$3" aria-label="Open $3 to edit it">');
+ assert.match(old.shim.document.getElementById('scan').innerHTML,/<button class="crumb" data-act="reveal"/,'the released scan panel has a trail pill to compare');
+ for(const id of ['ctxPanel','scan','listBody','histPanel','listEligibilityRow','listTagRow'])assert.equal(current.shim.document.getElementById(id).innerHTML,releasedWith221Pills(old.shim.document.getElementById(id).innerHTML),id+' keeps the released markup after sharing its pure formatter');
  for(const app of [old,current]){app.ctx.state.chain=[];app.ctx.state.settings.skipOldestFirstDot=false;app.ctx.renderList();}
  assert.equal(current.shim.document.getElementById('listBody').innerHTML,old.shim.document.getElementById('listBody').innerHTML,'the shared row facts retain next-dot placement');
  const before=JSON.stringify(current.ctx.state),keys=[SYNC_STORE_KEY,LOCAL_HEAD_KEY,LOCAL_BACKUPS_KEY],stored=keys.map(key=>current.shim.localStorage.getItem(key));
@@ -15579,23 +16510,6 @@ test("list filter: undoing the mark a filter points at takes the filter with it"
   ctx.undo();                          // takes the 'no' mark back off
   assert.deepEqual(litTags(shim), [], "with nothing marked no, the button and its filter both go");
   assert.equal(rowTitles(shim).length, 2, "and the full list comes back rather than showing nothing");
-});
-
-/* ---------- revealing a task has to beat the filter ---------- */
-
-test("revealTask: clears the list filters so the task it reveals is actually visible", async () => {
-  const { ctx, shim } = await loadApp({ seed: 967 });
-  const a = ctx.addTask("Shunted aside", false);
-  const scene = ctx.addTask("Write the scene", false);
-  ctx.state.considered[a.id] = "dislodged";
-  openList(ctx);
-  clickTag(ctx, "s:dislodged");
-  ctx.setListQuery("shunt");
-  assert.ok(!rowTitles(shim).includes("Write the scene"), "precondition: the scene is filtered out");
-
-  ctx.revealTask(scene.id);
-  assert.ok(rowTitles(shim).includes("Write the scene"),
-    "revealing a task you can't see is a no-op — the filters have to give way");
 });
 
 /* ---------- the surrounding chrome ---------- */
@@ -16622,7 +17536,7 @@ test('RISK deletion authority: real Delete defeats a stale saved and cloud Dot a
  earlier.ctx.suspendCloudSync();
 
  const scanChain=html=>{
-  const ids=[...String(html).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+  const ids=chainPillIds(html);
   const benchmark=String(html).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
   if(benchmark)ids.push(benchmark[1]);
   return ids;
@@ -19980,7 +20894,7 @@ test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratin
   assert.notEqual((await store.readHead()).hash,originalHead.hash,'the durable head reflects the explicit restore and Undo sequence');
 });
 
-test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal',async()=>{
+test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break opening the task',async()=>{
   const base=syncState({tasks:[syncTask('task" autofocus data-injected="yes','Restored task')],contexts:[
     {id:'ctx" autofocus data-injected="yes',name:'Restored context',active:true},
   ],listOpen:true});
@@ -19992,9 +20906,12 @@ test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or br
   assert.match(rendered,/&quot; autofocus data-injected=&quot;yes/,'the identifier remains data, not markup');
   ctx.openSettings();
   assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-(?:mgrctx|mgrname|id)="ctx" autofocus/);
-  shim.document.querySelector=selector=>{if(selector.includes('autofocus'))throw Error('invalid selector');return null;};
-  shim.document.querySelectorAll=selector=>{assert.equal(selector,'[data-row]');return [];};
-  assert.doesNotThrow(()=>ctx.revealTask(base.tasks[0].id));
+  // #221 retired reveal-in-list; a chain pill opens the editor through the
+  // same edit action, so the restored identifier must open its own task.
+  assert.doesNotThrow(()=>ctx.onAction('edit',{dataset:{id:base.tasks[0].id}}));
+  const editor=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(editor,/id="etTitle" type="text" value="Restored task"/);
+  assert.doesNotMatch(editor,/data-(?:id|act)="task" autofocus/);
 });
 
 test('LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched', async () => {
@@ -22172,7 +23089,7 @@ test('RISK steady scanner browser: a long chain keeps the dot trail to one row o
     await page.waitForTimeout(40);
     const trail=await page.evaluate(()=>{
      const row=document.querySelector('.crumbs');if(!row)return null;
-     const crumbs=[...row.querySelectorAll('[data-act="reveal"]:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
+     const crumbs=[...row.querySelectorAll('.crumb:not([hidden])')],visible=[...row.children].filter(c=>!c.hidden),tops=visible.map(c=>Math.round(c.getBoundingClientRect().top+c.getBoundingClientRect().height/2));
      return {chain:[...state.chain],shown:crumbs.map(c=>c.dataset.id),text:row.textContent,height:row.getBoundingClientRect().height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),spread:Math.max(...tops)-Math.min(...tops),narrowest:Math.min(...crumbs.map(c=>c.getBoundingClientRect().width)),overflow:row.scrollWidth-row.clientWidth,right:row.getBoundingClientRect().right,innerWidth};
     });
     if(!trail)continue;
@@ -22422,9 +23339,9 @@ const steadyTrailBoard=({dots,title=()=>STEADY_LONG_TITLE})=>steadyScannerBoard(
 const steadyReadTrail=page=>page.evaluate(()=>{
  const row=document.querySelector('.crumbs'),box=row.getBoundingClientRect(),font=parseFloat(getComputedStyle(row).fontSize);
  const visible=[...row.children].filter(c=>!c.hidden),pen=document.createElement('canvas').getContext('2d');
- const dots=visible.filter(c=>c.matches('[data-act="reveal"]')).map(dot=>{const style=getComputedStyle(dot);pen.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;return {id:dot.dataset.id,room:dot.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),natural:pen.measureText(dot.textContent).width};});
+ const dots=visible.filter(c=>c.matches('.crumb')).map(dot=>{const style=getComputedStyle(dot);pen.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;return {id:dot.dataset.id,room:dot.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight),natural:pen.measureText(dot.textContent).width};});
  const tops=visible.map(c=>{const r=c.getBoundingClientRect();return r.top+r.height/2;});
- return {chain:[...state.chain],everyDot:[...row.querySelectorAll('[data-act="reveal"]')].map(d=>d.dataset.id),dots,font,text:row.innerText,
+ return {chain:[...state.chain],everyDot:[...row.querySelectorAll('.crumb')].map(d=>d.dataset.id),dots,font,text:row.innerText,
   spread:Math.max(...tops)-Math.min(...tops),height:box.height,tallest:Math.max(...visible.map(c=>c.getBoundingClientRect().height)),
   overflow:row.scrollWidth-row.clientWidth,furthest:Math.max(...visible.map(c=>c.getBoundingClientRect().right))-box.right,past:box.right-document.querySelector('.card.bench').getBoundingClientRect().right,
   page:document.documentElement.scrollWidth-innerWidth};
@@ -23868,19 +24785,6 @@ test('Animation layering: all water visitors draw back to front regardless of ar
  }
 });
 
-test('Animation controls: revealing a task respects app and device reduced motion',()=>{
- const start=html.indexOf('function revealTask(id){');
- const end=html.indexOf('function commit(',start);
- assert.ok(end>start,'the revealTask snippet ends before the commit helper');
- const code=html.slice(start,end);
- for(const [preference,osReduced,expected] of [['normal',false,'smooth'],['reduced',false,'instant'],['normal',true,'instant'],[undefined,false,'instant']]){
-  const calls=[],viewCalls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
-  const ctx=vm.createContext({state:{listOpen:false},allTasksView:{setListOpen(value){viewCalls.push(value);}},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelectorAll(){return [Object.assign(row,{dataset:{row:'task'}})];}},window:{matchMedia(){return {matches:osReduced};}}});
-  vm.runInContext(code+';revealTask("task");',ctx);
-  assert.equal(calls[0].behavior,expected,`${preference}/${osReduced} must choose ${expected}`);
-  assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);assert.deepEqual(viewCalls,[true]);
- }
-});
 
 test('Animation state: flapping birds do not change the stroke caps of later scenery',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
@@ -29943,7 +30847,7 @@ test('RISK completion lifecycle Start: an unaware pass root cannot bypass comple
    const scan=app.shim.document.getElementById('scan'),CS=app.ctx.window.CloudSync,pull=CS.pull.bind(CS);let markup=scan.innerHTML,completionObserved=app.ctx.state.decisionEvents?.some(event=>event.id===completion.id)||false;
    CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.id===completion.id))completionObserved=true;return response;};
    Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-    const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+    const painted=chainPillIds(value);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
     const row={completionObserved,chain:Array.from(app.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
    }});
@@ -30003,7 +30907,7 @@ test('RISK completion lifecycle maintenance: the local day marker and Resume or 
  assert.equal(ctx.state.tasks.find(row=>row.id===task.id).evergreen,true);assert.ok(ctx.state.tasks.find(row=>row.id===task.id).lastDoneAt>0);
  const scan=shim.document.getElementById('scan').innerHTML;
  assert.match(scan,new RegExp(`data-act="bench-done" data-benchmark="${reference.id}"`),'the visible benchmark remains the legitimate current member');
- assert.doesNotMatch(scan,new RegExp(`data-act="reveal" data-id="${task.id}"`),'the completed task is not rendered as a dotted member');
+ assert.equal(chainPillIds(scan).includes(task.id),false,'the completed task is not rendered as a dotted member');
 });
 
 test('RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen',async t=>{
@@ -30023,7 +30927,7 @@ test('RISK completion lifecycle return: observed Dot and next Done survive stale
  const paints=[],observations=[],deviceWrites=[],scan=stale.shim.document.getElementById('scan'),CS=stale.ctx.window.CloudSync,pull=CS.pull.bind(CS);let completionObserved=false,markup=scan.innerHTML;
  CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.kind==='completion'&&event.taskId===taskId))completionObserved=true;return response;};
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
-  const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+  const painted=chainPillIds(value);
   const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
   const row={completionObserved,chain:Array.from(stale.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
  }});
@@ -30183,7 +31087,7 @@ test('RISK completion boundaries: delayed stale cloud adoption retains Done and 
  assert.equal(h.conflicts,1,'the stale base is rejected once by the revision-conditioned cloud boundary');
  assert.ok(h.calls.filter(call=>call==='push').length>=2,'the conflict is read back and retried from the newer revision');
  assert.ok(paints.length>0&&paints.every(row=>row.chain.every(id=>id!==doneId)
-  &&![...String(row.markup).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].some(match=>match[1]===doneId)),
+  &&!chainPillIds(row.markup).includes(doneId)),
   'each scanner paint during delayed adoption keeps the completed task out');
  const head=JSON.parse((await store.readHead()).payload);
  assert.deepEqual(head.chain,[peerId],'the exact repaired board is durable in production IndexedDB');

@@ -423,7 +423,6 @@ its RISK test; the map follows.
 - RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes
 - RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks
 - RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload
-- RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload
 - RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable
 - RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
 - RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available
@@ -570,7 +569,7 @@ its RISK test; the map follows.
 - RISK BACKUP FILE RESTORE: account, auth epoch, pending evidence, and cloud revision changes hold consent
 - RISK BACKUP FILE RESTORE: a released old client wins CAS before the prospective file board is published
 - RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratings, deletions, unknown data, and Undo
-- RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
+- RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break opening the task
 - RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client
 - RISK comparison replay: repeated same-pair Yes and No actions remain distinct and replay once by original action order
 - RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history
@@ -1760,6 +1759,22 @@ its RISK test; the map follows.
 - RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice
 - RISK debug log link #2309: Download debug log delivers the file while the link holds the opening
 - RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read
+- RISK chain return sync: a returned dot stays returned through cloud acknowledgement, a stale device save and reload
+- RISK chain return sync: a return on one device and a Dot of another task on the other are both honored in either publication order
+- RISK chain return sync: another device completing the returned task keeps it completed in either publication order
+- RISK chain return sync: a later explicit Dot of the returned task on the other device puts it back on the chain everywhere
+- RISK chain return Undo: Undo puts the dot back in place and keeps a Dot the other device made since, through stale delivery and reopen
+- RISK chain return offline: a return made offline is saved on this device, reaches the cloud on reconnect, and a duplicate delivery changes nothing
+- RISK chain return device save failure: a failed save warns honestly, keeps the earlier saved board and holds the cloud until a save succeeds
+- RISK chain return compatibility: a client from before #221 cannot push a returned dot back and keeps the return intact through its own saves
+- RISK chain return compatibility: a board saved before #221 opens with the same chain and saved bytes, and its dots can be returned
+- RISK chain return sync: returning the only dot Start placed leaves an empty chain through a peer merge and reload, with no replacement dot
+- RISK chain return sync: a return and a Postpone of a dot in a pass carried over the 2 AM reset reach the cloud and the other device, in either order
+- RISK chain return sync: a Postpone of a dot on the other device after it received the return reaches the cloud and the returning device
+- RISK chain return sync: once the postponement ends, the board with the return still syncs through an edit and the next answer, and the returned dot stays off
+- RISK chain return sync: a Postpone that empties the chain after a return does not dot the returned task, and the board reaches the cloud and the other device
+- RISK chain return compatibility: a cloud board whose chain row in its own pass is anything but one dot leaving is held as unsupported
+- RISK chain return sync: a cloud board that still shows a returned dot with no later Yes or Dot is held, not adopted
 - RISK missing-task save loop: a repeated same-day worked-on History row the board tidies away is not kept back as a missing task by every save
 - RISK missing-task save loop: a task missing from the board is kept once, the saves settle with only the usual backups, and the Debug log records the repair without task text
 - RISK missing-task save loop: a deleted task stays deleted and Undo after a kept task settles as before
