@@ -11266,6 +11266,41 @@ test('RISK missing-task save loop: two signed-in devices with a repeated same-da
  assert.deepEqual(saved,['worked-later'],'the cloud board keeps the day’s latest worked-on row');
 });
 
+// #2333 review: when a day's two worked-on sessions carry the same time, the
+// History tidy-up kept whichever came first in the list. Two devices holding
+// them in opposite orders each kept a different one and recorded the other as
+// cleared, so their merge cleared both.
+test('RISK missing-task save loop: two signed-in devices that hold one day’s two same-time worked-on sessions in opposite orders keep the same one, so History never loses both',async t=>{
+ const now=Date.now(),task=syncTask('worked-twice','Worked twice today');
+ const {sync,devices}=await twoSignedInDevices2334(t,syncState({tasks:[task],updatedAt:now-1000}));
+ // The same moment, as two copies of one session can carry after a merge or an import.
+ const session=id=>({id,taskId:task.id,title:task.title,kind:'worked',at:now-60000});
+ const [a,b]=devices;
+ a.ctx.state.workLog.push(session('worked-x'),session('worked-y'));a.ctx.commit();
+ b.ctx.state.workLog.push(session('worked-y'),session('worked-x'));b.ctx.commit();
+ for(const device of devices)await savesSettled2334(device);
+ await syncSettle(1500);
+ for(const device of devices)await savesSettled2334(device);
+ const rows=board=>JSON.parse(JSON.stringify(board)).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ const cloud=rows(JSON.parse(sync.doc.payload));
+ assert.equal(cloud.length,1,'the cloud board keeps one session for the day: '+JSON.stringify(cloud));
+ for(const device of devices)assert.deepEqual(rows(device.ctx.state),cloud,'and each device keeps that same one: '+JSON.stringify(devices.map(device=>rows(device.ctx.state))));
+});
+
+test('RISK missing-task save loop: a worked-on session listed twice under one id stays in History after the tidy-up and later saves',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-same-id-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Worked once, listed twice');assert.equal(await first.ctx.persist(),true);
+ const task=first.ctx.state.tasks[0],at=Date.now()-60000;
+ first.ctx.state.workLog.push({id:'worked-once',taskId:task.id,title:task.title,kind:'worked',at},{id:'worked-once',taskId:task.id,title:task.title,kind:'worked',at:at+1});
+ assert.equal(await first.ctx.persist(),true);await first.dispose();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());
+ const worked=board=>JSON.parse(JSON.stringify(board)).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ for(const title of ['First edit today','Second edit today']){app.ctx.addTask(title);await savesSettled2334(app);}
+ assert.deepEqual(worked(app.ctx.state),['worked-once'],'the live History keeps the session once');
+ assert.deepEqual(worked(await latestDeviceBoard2334(app)),['worked-once'],'and so does the saved board');
+});
+
 // #2334 (round 5): one home-screen app, signed out. A Settings change and a
 // Quick Add each start a save at once and another after the 350 ms edit
 // debounce. On a phone with a large board a device write takes longer than

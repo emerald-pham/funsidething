@@ -8838,14 +8838,21 @@ function reconcileWorkLog(){
     const i = at.get(k);
     if(i === undefined){ at.set(k, out.length); out.push(e); continue; }
     dropped++;
-    const kept = (e.at || 0) > (out[i].at || 0) ? e : out[i];   // keep the day's most recent session
+    // Keep the day's most recent session. #2333 review: a tie goes by the
+    // rows' own keys, never their order in the list, so every device that
+    // holds the same two rows keeps the same one.
+    const [newer, older] = (e.at || 0) !== (out[i].at || 0) ? [e.at || 0, out[i].at || 0] : [historyEntryKey(e), historyEntryKey(out[i])];
+    const kept = newer > older ? e : out[i];
     const gone = kept === e ? out[i] : e;
     out[i] = kept;
     // #2334: record the joined session as cleared History, so every merge
     // (a save's kept-missing repair, a cloud push or another device) leaves
     // it out. Without this the merge put it back, the next sweep dropped it
     // again, and two signed-in devices saved and synced each other forever.
-    noteDeleteIntent(state,historyEntryKey(gone),"clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps");
+    // #2333 review: a row listed twice under one key is one session, and
+    // clearing that key would clear the row kept as well.
+    if(historyEntryKey(gone) !== historyEntryKey(kept))
+      noteDeleteIntent(state,historyEntryKey(gone),"clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps");
   }
   if(dropped) state.workLog = out;
   return dropped;
