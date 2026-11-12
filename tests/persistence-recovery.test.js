@@ -10640,7 +10640,8 @@ test('RISK acknowledged recovery trim: after an adoption the cloud confirms, the
  // a row of a kind this app does not know, and a migrated older backup list
  // with an unreadable entry. The readable migrated list is a migrated copy.
  await makeManualBackup2254(app);
- const draft=await ctx.saveDurableBackup('stale-tab-draft',JSON.stringify(ctx.state));assert.ok(draft?.id,'fixture: a kept draft copy');
+ // #2335: the kept draft holds a task the board lacks, so a save does not clear it as contained in the board.
+ const draft=await ctx.saveDurableBackup('stale-tab-draft',JSON.stringify({...ctx.state,tasks:[...ctx.state.tasks,syncTask('only-in-kept-draft-2254','Only in the kept draft')]}));assert.ok(draft?.id,'fixture: a kept draft copy');
  const olderList=shim.localStorage.getItem(LOCAL_BACKUPS_KEY);assert.ok(olderList,'fixture: the older backup list holds a daily copy');
  const unknown={key:'future-kind:kept-2254',raw:JSON.stringify({format:'chain-scanner.future-kind',opaque:['keep',2254]}),order:1};
  const migrated={key:'0:'+LOCAL_BACKUPS_KEY,raw:olderList,order:0},damagedList={key:'1:'+LOCAL_BACKUPS_KEY,raw:'[{"id":"daily:unreadable-2254"}]',order:0};
@@ -11537,4 +11538,786 @@ test('RISK chain return sync: a cloud board that still shows a returned dot with
  assert.equal(local.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','the chain disagrees with the recorded return, so sync holds');
  assert.deepEqual(Array.from(local.ctx.state.chain),['carried-a','carried-c'],'this device keeps the return');
  assert.equal(h.doc.payload,cloud,'and writes nothing over the cloud copy');
+});
+
+// #2334: a save that keeps a missing task must settle. These load the app on a
+// device store with no cloud account, and read only what a person or support can
+// see: the toast, the backups the device lists and the Debug log's save counts.
+const KEPT_MISSING_TOAST2334='A missing task was kept in the saved board.';
+async function savesSettled2334(app,settleMs=1200){
+ // Bounded: the settle period is the claim. Saves still running after it fail the test.
+ const {ctx}=app,started=Date.now(),count=()=>JSON.parse(ctx.supportDiagnosticsText()).save;
+ while(Date.now()-started<settleMs*4){
+  const before=count();await new Promise(resolve=>setTimeout(resolve,settleMs));const after=count();
+  if(after.persistCalls.value===before.persistCalls.value&&after.activePersistCalls.value===0&&after.debouncePending.value===false)return after;
+ }
+ return count();
+}
+async function latestDeviceBoard2334(app){
+ const rows=await app.shim.window.ScannerDeviceStore.listBackups();
+ return JSON.parse(rows.filter(row=>row.kind==='latest').sort((a,b)=>b.at-a.at)[0].payload);
+}
+async function sameDayWorkedBoard2334(t){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ // An earlier save left two worked-on sessions for one task on one day, as a
+ // second session or a merge from another copy does before the board tidies them.
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Worked twice today');assert.equal(await first.ctx.persist(),true);
+ const task=first.ctx.state.tasks[0],now=Date.now();
+ first.ctx.state.workLog.push({id:'worked-morning',taskId:task.id,title:task.title,kind:'worked',at:now-2*60000},
+  {id:'worked-later',taskId:task.id,title:task.title,kind:'worked',at:now-60000});
+ assert.equal(await first.ctx.persist(),true);await first.dispose();
+ const open=async()=>{const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());return app;};
+ return {open,taskId:task.id};
+}
+
+test('RISK missing-task save loop: a repeated same-day worked-on History row the board tidies away is not kept back as a missing task by every save',async t=>{
+ const {open,taskId}=await sameDayWorkedBoard2334(t);
+ const app=await open(),{ctx,shim}=app,toast=()=>shim.document.getElementById('toast').textContent;
+ const workedRows=board=>board.workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===taskId).map(entry=>entry.id);
+ for(const title of ['First edit today','Second edit today']){
+  shim.document.getElementById('toast').textContent='';
+  ctx.addTask(title);await savesSettled2334(app);
+  assert.notEqual(toast(),KEPT_MISSING_TOAST2334,title+': no task was missing, so none is reported kept');
+  assert.deepEqual(workedRows(await latestDeviceBoard2334(app)),['worked-later'],title+': the saved board keeps one worked-on row for the day, the latest');
+ }
+ const reopened=await open();await savesSettled2334(reopened);
+ assert.deepEqual(workedRows(await latestDeviceBoard2334(reopened)),['worked-later'],'a reload still has the one row');
+});
+
+test('RISK missing-task save loop: a task missing from the board is kept once, the saves settle with only the usual backups, and the Debug log records the repair without task text',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-kept-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast');
+ for(const title of ['Private kept task title','Other task']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ const kept=ctx.state.tasks.find(task=>task.title==='Private kept task title').id;
+ const before=await savesSettled2334(app);
+ // The live board lacks a task the last save had, with no delete behind it.
+ ctx.state.tasks=ctx.state.tasks.filter(task=>task.id!==kept);toastBox.textContent='';
+ ctx.save();
+ const after=await savesSettled2334(app);
+ assert.equal(toastBox.textContent,KEPT_MISSING_TOAST2334,'the person is told the task was kept');
+ assert.equal(after.acceptedRequests.value-before.acceptedRequests.value,1,'one save request');
+ assert.ok(after.persistCalls.value-before.persistCalls.value<=2,'its save runs stop within the settle period: '+JSON.stringify([before.persistCalls,after.persistCalls]));
+ assert.deepEqual([...await shim.window.ScannerDeviceStore.listBackups()].map(row=>row.kind).sort(),['daily','latest'],'backups hold only the usual daily and latest copies');
+ assert.ok((await latestDeviceBoard2334(app)).tasks.some(task=>task.id===kept),'the saved board has the task');
+ toastBox.textContent='';ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(toastBox.textContent,'','a later save does not repeat the repair');
+ const report=ctx.supportDiagnosticsText(),repairs=JSON.parse(report).events.filter(event=>event.stage==='kept-missing-task');
+ assert.deepEqual(repairs.map(event=>event.metadata),[{keptTasks:1,keptFrom:'last-save'}],'the Debug log records one repair, its count and source');
+ assert.ok(!report.includes('Private kept task title'),'and no task text');
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.id===kept),'the kept task is still on the board after reload');
+});
+
+test('RISK missing-task save loop: a deleted task stays deleted and Undo after a kept task settles as before',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-delete-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast');
+ for(const title of ['Deleted on purpose','Kept then undone','Stays']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ const id=title=>ctx.state.tasks.find(task=>task.title===title)?.id,deleted=id('Deleted on purpose'),undone=id('Kept then undone');
+ await savesSettled2334(app);toastBox.textContent='';
+ // Delete leaves a tombstone: the save must not keep the task back.
+ ctx.deleteTask(deleted);await savesSettled2334(app);
+ assert.notEqual(toastBox.textContent,KEPT_MISSING_TOAST2334,'an explicit delete is not reported as a kept task');
+ assert.ok(!(await latestDeviceBoard2334(app)).tasks.some(task=>task.id===deleted),'the deleted task stays deleted in the saved board');
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ assert.ok(!reopened.ctx.state.tasks.some(task=>task.id===deleted),'and after reload the deleted task is still gone');
+ await reopened.dispose?.();
+ // A missing task is kept; Undo then steps back as it did before this fix.
+ ctx.state.tasks=ctx.state.tasks.filter(task=>task.id!==undone);ctx.save();
+ const kept=await savesSettled2334(app);
+ assert.ok(ctx.state.tasks.some(task=>task.id===undone),'the missing task is kept');
+ toastBox.textContent='';ctx.undo();
+ const settled=await savesSettled2334(app);
+ assert.ok(settled.persistCalls.value-kept.persistCalls.value<=2,'Undo saves once and settles');
+ assert.notEqual(toastBox.textContent,KEPT_MISSING_TOAST2334,'Undo does not set off another repair');
+ assert.equal((await latestDeviceBoard2334(app)).tasks.some(task=>task.id===undone),ctx.state.tasks.some(task=>task.id===undone),'the saved board matches the board Undo left');
+});
+
+test('RISK missing-task save loop: on the older browser storage, a repeated same-day worked-on row is not kept back as a missing task either',async t=>{
+ const storage=sharedScannerStorage();
+ const first=await loadApp({sharedStorage:storage});
+ first.ctx.addTask('Worked twice today');assert.equal(await first.ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',first.ctx),false,'precondition: no device store, so the older browser keys are the saved board');
+ const task=first.ctx.state.tasks[0],now=Date.now();
+ first.ctx.state.workLog.push({id:'worked-morning',taskId:task.id,title:task.title,kind:'worked',at:now-2*60000},
+  {id:'worked-later',taskId:task.id,title:task.title,kind:'worked',at:now-60000});
+ assert.equal(await first.ctx.persist(),true);await first.dispose?.();
+ const app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast');
+ const savedRows=()=>JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ for(const title of ['First edit today','Second edit today']){
+  toastBox.textContent='';ctx.addTask(title);await savesSettled2334(app);
+  assert.notEqual(toastBox.textContent,KEPT_MISSING_TOAST2334,title+': no task was missing');
+  assert.deepEqual(savedRows(),['worked-later'],title+': the saved board keeps the day’s latest worked-on row only');
+ }
+ const backups=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').map(row=>row.kind).sort();
+ assert.deepEqual(backups,['daily','latest'],'the older backup list holds only its usual daily and latest copies');
+});
+
+// #2334 (round 3): two signed-in devices sharing a cloud board. The fake backend
+// announces each accepted write to every device, as the Firestore listener does.
+async function twoSignedInDevices2334(t,remote){
+ const {indexedDB}=await import('fake-indexeddb');
+ const sync=makeSyncHarness({remote,rev:3}),shims=[];
+ const factory=()=>{const backend=sync.factory(),push=backend.push;
+  backend.push=async(...args)=>{const res=await push.apply(backend,args);
+   if(res?.ok)setTimeout(()=>{for(const shim of shims)shim.window.dispatchEvent({type:'cloudboardchange',detail:{user:backend.user,rev:res.rev}});},1);
+   return res;};
+  return backend;};
+ const open=async name=>{
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:'chain-scanner-2334-cloud-'+name+'-'+Date.now()+'-'+Math.random(),sharedStorage:sharedScannerStorage(),
+   cloudSyncFactory:factory,beforeStateReady:(ctx,shim)=>{shim.window.CLOUD_PUSH_DELAY_MS=20;}});
+  t.after(()=>app.dispose?.());shims.push(app.shim);return app;};
+ const devices=[await open('a'),await open('b')];
+ for(const device of devices)await device.ctx.cloudPull();
+ return {sync,devices};
+}
+
+test('RISK missing-task save loop: two signed-in devices with a repeated same-day worked-on row settle instead of saving and syncing each other forever',async t=>{
+ const now=Date.now(),task=syncTask('worked-twice','Worked twice today');
+ const remote=syncState({tasks:[task],updatedAt:now-1000,workLog:[
+  {id:'worked-morning',taskId:task.id,title:task.title,kind:'worked',at:now-2*60000},
+  {id:'worked-later',taskId:task.id,title:task.title,kind:'worked',at:now-60000}]});
+ const {sync,devices}=await twoSignedInDevices2334(t,remote);
+ const settled=[];for(const device of devices)settled.push(await savesSettled2334(device));
+ const revision=sync.doc.rev,backups=[];
+ for(const device of devices)backups.push([...await device.shim.window.ScannerDeviceStore.listBackups()].map(row=>row.kind));
+ await syncSettle(1500);
+ const after=devices.map(device=>JSON.parse(device.ctx.supportDiagnosticsText()).save);
+ devices.forEach((device,i)=>{
+  assert.equal(after[i].persistCalls.value,settled[i].persistCalls.value,'device '+i+': save runs stop with no save request: '+JSON.stringify([settled[i].persistCalls.value,after[i].persistCalls.value,after[i].acceptedRequests.value]));
+  assert.ok(backups[i].filter(kind=>kind==='before-cloud-adoption').length<=1,'device '+i+': adoption copies do not pile up: '+backups[i].length);
+ });
+ assert.equal(sync.doc.rev,revision,'the cloud revision stops advancing');
+ assert.ok(sync.doc.rev<=8,'the devices settle within a few writes: rev '+sync.doc.rev);
+ const saved=JSON.parse(sync.doc.payload).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ assert.deepEqual(saved,['worked-later'],'the cloud board keeps the day’s latest worked-on row');
+});
+
+// #2333 review: the repair a cloud push makes from the last cloud read showed
+// "A missing task was kept before cloud sync." for any merge change, and the
+// Debug log never recorded it.
+test('RISK missing-task save loop: the repair before a cloud push is logged with its count and source, and its message shows only when a task was kept',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),now=Date.now();
+ const kept=syncTask('private-cloud-kept','Private cloud kept title'),other=syncTask('other','Other task');
+ const sync=makeSyncHarness({rev:3,remote:syncState({tasks:[kept,other],updatedAt:now-1000,
+  workLog:[{id:'worked-in-cloud',taskId:other.id,title:other.title,kind:'worked',at:now-3*86400000}]})});
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:'chain-scanner-2334-push-'+Date.now()+'-'+Math.random(),sharedStorage:sharedScannerStorage(),
+  cloudSyncFactory:sync.factory,beforeStateReady:(ctx,shim)=>{shim.window.CLOUD_PUSH_DELAY_MS=20;}});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast'),message='A missing task was kept before cloud sync.';
+ await ctx.cloudPull();await savesSettled2334(app);await syncSettle(300);
+ assert.ok(ctx.state.tasks.some(task=>task.id===kept.id),'positive control: the cloud board is on the device');
+ const repairs=()=>JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='kept-missing-task').map(event=>event.metadata);
+ // A History row the last cloud read had is missing with no clear behind it: the push puts it back, but keeps no task.
+ ctx.state.workLog=ctx.state.workLog.filter(entry=>entry.id!=='worked-in-cloud');toastBox.textContent='';
+ ctx.save();await savesSettled2334(app);await syncSettle(300);
+ assert.ok(ctx.state.workLog.some(entry=>entry.id==='worked-in-cloud'),'positive control: the push put the History row back');
+ assert.notEqual(toastBox.textContent,message,'no task was kept, so none is reported kept');
+ assert.deepEqual(repairs(),[],'and no repair is logged');
+ // A task the last cloud read had is missing, with no delete behind it.
+ ctx.state.tasks=ctx.state.tasks.filter(task=>task.id!==kept.id);toastBox.textContent='';
+ ctx.save();await savesSettled2334(app);await syncSettle(300);
+ assert.ok(ctx.state.tasks.some(task=>task.id===kept.id),'the task is kept');
+ assert.equal(toastBox.textContent,message,'the person is told the task was kept');
+ assert.deepEqual(repairs(),[{keptTasks:1,keptFrom:'cloud-push'}],'the Debug log records the repair, its count and source');
+ assert.ok(!ctx.supportDiagnosticsText().includes('Private cloud kept title'),'and no task text');
+});
+
+// #2333 review: when a day's two worked-on sessions carry the same time, the
+// History tidy-up kept whichever came first in the list. Two devices holding
+// them in opposite orders each kept a different one and recorded the other as
+// cleared, so their merge cleared both.
+test('RISK missing-task save loop: two signed-in devices that hold one day’s two same-time worked-on sessions in opposite orders keep the same one, so History never loses both',async t=>{
+ const now=Date.now(),task=syncTask('worked-twice','Worked twice today');
+ const {sync,devices}=await twoSignedInDevices2334(t,syncState({tasks:[task],updatedAt:now-1000}));
+ // The same moment, as two copies of one session can carry after a merge or an import.
+ const session=id=>({id,taskId:task.id,title:task.title,kind:'worked',at:now-60000});
+ const [a,b]=devices;
+ a.ctx.state.workLog.push(session('worked-x'),session('worked-y'));a.ctx.commit();
+ b.ctx.state.workLog.push(session('worked-y'),session('worked-x'));b.ctx.commit();
+ for(const device of devices)await savesSettled2334(device);
+ await syncSettle(1500);
+ for(const device of devices)await savesSettled2334(device);
+ const rows=board=>JSON.parse(JSON.stringify(board)).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ const cloud=rows(JSON.parse(sync.doc.payload));
+ assert.equal(cloud.length,1,'the cloud board keeps one session for the day: '+JSON.stringify(cloud));
+ for(const device of devices)assert.deepEqual(rows(device.ctx.state),cloud,'and each device keeps that same one: '+JSON.stringify(devices.map(device=>rows(device.ctx.state))));
+});
+
+test('RISK missing-task save loop: a worked-on session listed twice under one id stays in History after the tidy-up and later saves',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-same-id-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Worked once, listed twice');assert.equal(await first.ctx.persist(),true);
+ const task=first.ctx.state.tasks[0],at=Date.now()-60000;
+ first.ctx.state.workLog.push({id:'worked-once',taskId:task.id,title:task.title,kind:'worked',at},{id:'worked-once',taskId:task.id,title:task.title,kind:'worked',at:at+1});
+ assert.equal(await first.ctx.persist(),true);await first.dispose();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());
+ const worked=board=>JSON.parse(JSON.stringify(board)).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ for(const title of ['First edit today','Second edit today']){app.ctx.addTask(title);await savesSettled2334(app);}
+ assert.deepEqual(worked(app.ctx.state),['worked-once'],'the live History keeps the session once');
+ assert.deepEqual(worked(await latestDeviceBoard2334(app)),['worked-once'],'and so does the saved board');
+});
+
+// #2334 (round 5): one home-screen app, signed out. A Settings change and a
+// Quick Add each start a save at once and another after the 350 ms edit
+// debounce. On a phone with a large board a device write takes longer than
+// that, so the device store's commit is slowed to 500 ms here.
+test('RISK missing-task save loop: one app on its own never conflicts with its own saves, so a slow device write adds no stale-tab draft',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-self-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:sharedScannerStorage()});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);await savesSettled2334(app);
+ const commit=store.commitHead.bind(store);
+ store.commitHead=async(...args)=>{await new Promise(resolve=>setTimeout(resolve,500));return commit(...args);};
+ // A Settings checkbox, through the Settings change handler.
+ ctx.openSettings();
+ const postpone=shim.document.getElementById('stShowPostpone');Object.assign(postpone,{id:'stShowPostpone',checked:!ctx.state.settings.showPostpone,matches:()=>false});
+ shim.document.dispatchEvent({type:'change',target:postpone});ctx.closeModal();
+ await savesSettled2334(app);
+ // Quick Add, through its submit path.
+ shim.document.getElementById('addInput').value='Added quickly';await ctx.submitQuickAdd();
+ await savesSettled2334(app);
+ const kinds=[...await store.listBackups()].map(row=>row.kind).sort();
+ assert.deepEqual(kinds,['daily','latest'],'only the usual copies: '+JSON.stringify(kinds));
+ const head=JSON.parse((await store.readHead()).payload);
+ assert.ok(head.tasks.some(task=>task.title==='Added quickly'),'the saved board has the Quick Add');
+ assert.equal(head.settings.showPostpone,ctx.state.settings.showPostpone,'and the Settings change');
+});
+
+// #2333 review (merge with #2324's own-save path): one app, signed out. A title
+// is changed and changed straight back while the device is still answering the
+// first save. The second save meets the head this tab has just written; its
+// repair must keep the title the person left, never bring the earlier one back.
+test('RISK missing-task save loop: a title changed back while this tab’s earlier save is still answering stays changed back on the saved and the live board',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-revert-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:sharedScannerStorage()});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Title A');assert.equal(await ctx.persist(),true);await savesSettled2334(app);
+ // The first save's device write lands at once, but its answer reaches the app late.
+ const commit=store.commitHead.bind(store);let landed,slowAnswer=true;const written=new Promise(resolve=>{landed=resolve;});
+ store.commitHead=async(...args)=>{
+  const result=await commit(...args);
+  if(slowAnswer){slowAnswer=false;landed();await new Promise(resolve=>setTimeout(resolve,800));}
+  return result;
+ };
+ ctx.state.tasks[0].title='Title B';const first=ctx.persist();
+ await written;
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks[0].title,'Title B','positive control: the first save is on the device');
+ ctx.state.tasks[0].title='Title A';const second=ctx.persist();
+ await Promise.all([first,second]);await savesSettled2334(app);
+ assert.equal(ctx.state.tasks[0].title,'Title A','the live board keeps the title the person left');
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks[0].title,'Title A','and so does the saved board');
+});
+
+// #2335: automatic backups that add nothing are cleared by the next save. These
+// load the app on a device store with no cloud account, seed backups the way an
+// earlier save loop or older build left them, save once, and read only what a
+// person or support sees: the backups the device lists and the support report.
+async function redundantBackupsApp2335(t){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2335-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const open=async()=>{const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());return app;};
+ const app=await open();
+ app.ctx.addTask('Board task');assert.equal(await app.ctx.persist(),true);await savesSettled2334(app);
+ return {app,open,storage};
+}
+// A copy of the live board with one more task the saved board never had.
+function boardWithExtraTask2335(ctx,id,title){
+ const board=JSON.parse(JSON.stringify(ctx.state));
+ board.tasks.push({...JSON.parse(JSON.stringify(ctx.state.tasks[0])),id,title,createdAt:Date.now()-60000});
+ return JSON.stringify(board);
+}
+async function seedDeviceBackups2335(app,rows){
+ const store=app.shim.window.ScannerDeviceStore,day=vm.runInContext('backupDay(Date.now())',app.ctx);let n=0;
+ for(const row of rows){
+  const head=await store.readHead(),at=Date.now()-60000+n++;
+  assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id:row.kind+':seed-'+n,day,at,...row}})).ok,'seeded '+row.kind);
+ }
+ await vm.runInContext('refreshDeviceBackupCache()',app.ctx);
+}
+const backupsReport2335=ctx=>JSON.parse(ctx.supportDiagnosticsText()).savedData.backups;
+
+test('RISK redundant backups: exact-duplicate automatic copies already on the device are reduced to one by the next save, and every distinct board stays listed and restorable',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const adoption=boardWithExtraTask2335(ctx,'only-before-adoption','Only before adoption');
+ const other=boardWithExtraTask2335(ctx,'only-in-other-browser','Only in the other browser');
+ await seedDeviceBackups2335(app,[
+  {kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft},
+  {kind:'before-cloud-adoption',payload:adoption},{kind:'before-cloud-adoption',payload:adoption},
+  {kind:'other-browser-copy',payload:other},
+ ]);
+ const before=backupsReport2335(ctx);
+ assert.equal(before.count.value,[...await store.listBackups()].length,'positive control: the report counts every seeded copy');
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const rows=[...await store.listBackups()],count=payload=>rows.filter(row=>row.payload===payload).length;
+ assert.deepEqual([count(draft),count(adoption),count(other)],[1,1,1],'each duplicated board is kept once: '+JSON.stringify(rows.map(row=>row.kind)));
+ const after=backupsReport2335(ctx);
+ assert.equal(before.count.value-after.count.value,3,'the support report counts three fewer backups');
+ assert.equal(after.totalCharacters.value,rows.reduce((sum,row)=>sum+row.payload.length,0),'and only the characters still kept');
+ assert.ok(after.totalCharacters.value<before.totalCharacters.value-2*draft.length,'so storage use drops');
+ // Every distinct board is still restorable from the copy that stayed.
+ assert.equal(await ctx.restoreDurableBackupById(rows.find(row=>row.payload===draft).id),true,'the kept draft restores');
+ assert.ok(ctx.state.tasks.some(task=>task.id==='only-in-drafts'));
+});
+
+test('RISK redundant backups: the Debug log records each clean-up with the rows removed and kept, and no task text',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'private-draft-task','Private draft task title');
+ await seedDeviceBackups2335(app,[{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft}]);
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const kept=[...await store.listBackups()].length;
+ const report=ctx.supportDiagnosticsText(),cleanups=JSON.parse(report).events.filter(event=>event.stage==='backup-cleanup');
+ assert.deepEqual(cleanups.map(event=>event.metadata),[{removedBackups:1,keptBackups:kept}],'one clean-up with its counts');
+ assert.ok(!report.includes('Private draft task title'),'and no task text');
+ ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='backup-cleanup').length,1,'a save that removes nothing logs no clean-up');
+});
+
+test('RISK redundant backups: a burst of stale-tab drafts the saved board already holds is cleared by the next save, and a draft holding a task, History entry or decision the board lacks is kept',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ // Same-minute drafts of this board as it grew: each holds an older value of a
+ // field edited later, or lacks what came after it.
+ const contained=[JSON.stringify(ctx.state)];
+ ctx.addTask('Second task');await savesSettled2334(app);contained.push(JSON.stringify(ctx.state));
+ ctx.state.tasks[0].title='Board task, renamed';ctx.save();await savesSettled2334(app);contained.push(JSON.stringify(ctx.state));
+ ctx.addTask('Third task');await savesSettled2334(app);contained.push(JSON.stringify(ctx.state));
+ // A decision that reached a draft but never the saved board: the live board
+ // goes back to the one before it, as a tab replaced by a newer copy does.
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await savesSettled2334(app);
+ const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark,'a scan deals a choice');
+ const undecided=JSON.stringify(ctx.state),decided=(ctx.state.decisionEvents||[]).length;
+ ctx.onAction('no',{dataset:{candidate,benchmark}});
+ const withDecision=JSON.stringify(ctx.state);assert.ok(JSON.parse(withDecision).decisionEvents.length>decided,'positive control: the draft holds a new decision');
+ vm.runInContext('state=JSON.parse('+JSON.stringify(undecided)+');hydrateState(state);',ctx);await savesSettled2334(app);
+ const missingTask=boardWithExtraTask2335(ctx,'only-in-a-draft','Only in a draft');
+ const history=JSON.parse(JSON.stringify(ctx.state)),task=history.tasks[0];
+ history.workLog.push({id:'worked-only-in-draft',taskId:task.id,title:task.title,kind:'worked',at:Date.now()-3*86400000});
+ const missingHistory=JSON.stringify(history);
+ const otherAccount=JSON.stringify({...JSON.parse(contained[0]),syncAccount:'other@example.com'});
+ await seedDeviceBackups2335(app,[...contained,missingTask,missingHistory,withDecision,otherAccount].map(payload=>({kind:'stale-tab-draft',payload})));
+ const head=JSON.parse((await store.readHead()).payload);
+ assert.ok(!head.tasks.some(row=>row.id==='only-in-a-draft')&&!head.workLog.some(row=>row.id==='worked-only-in-draft'),'positive control: the saved board lacks the kept drafts’ task and History entry');
+ assert.ok((head.decisionEvents||[]).length<JSON.parse(withDecision).decisionEvents.length,'and the undone decision');
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const drafts=[...await store.listBackups()].filter(row=>row.kind==='stale-tab-draft').map(row=>row.payload);
+ assert.deepEqual(contained.map(payload=>drafts.includes(payload)),[false,false,false,false],'every draft the saved board holds is cleared');
+ assert.deepEqual([missingTask,missingHistory,withDecision,otherAccount].map(payload=>drafts.includes(payload)),[true,true,true,true],
+  'a missing task, History entry or decision, or another account, keeps its draft');
+ assert.equal(drafts.length,4);
+});
+
+test('RISK redundant backups: manual, restore, reset, import, recovery-record, pinned and unreadable copies survive the clean-up even when their bytes repeat another copy',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const kept=['manual','before-restore','before-file-restore','restore-file-source','before-reset','before-import','decision-import-source',
+  'decision-recovery-device','decision-recovery-cloud'];
+ const seeded=[];
+ for(const kind of kept){
+  // The automatic copy is older, so a rule keeping the oldest of a set would take the protected one.
+  const payload=boardWithExtraTask2335(ctx,'only-in-'+kind,'Only in '+kind);
+  seeded.push({id:'draft-of-'+kind,kind:'stale-tab-draft',payload},{id:kind+'-copy',kind,payload});
+ }
+ const pinned=boardWithExtraTask2335(ctx,'only-in-pinned','Only in the pinned copy');
+ seeded.push({id:'unpinned-draft',kind:'stale-tab-draft',payload:pinned},{id:'pinned-draft',kind:'stale-tab-draft',payload:pinned});
+ seeded.push({id:'unreadable-a',kind:'stale-tab-draft',payload:'{"tasks":'},{id:'unreadable-b',kind:'stale-tab-draft',payload:'{"tasks":'});
+ await seedDeviceBackups2335(app,seeded);
+ ctx.state.protectedBackupIds=['pinned-draft'];
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const ids=new Set([...await store.listBackups()].map(row=>row.id));
+ assert.deepEqual([...kept.map(kind=>kind+'-copy'),'pinned-draft','unreadable-a','unreadable-b'].filter(id=>!ids.has(id)),[],'every protected copy stays');
+ assert.equal(ids.has('unpinned-draft'),false,'positive control: the unprotected repeat of the pinned copy is cleared');
+});
+
+test('RISK redundant backups: nothing is cleared while a recovery hold is stored on the device',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='chain-scanner-2335-hold-'+Math.random();
+ const offline={navigatorProvider:{onLine:false},fetchProvider:async()=>{throw Error('offline');}};
+ const board=tasks=>syncState({tasks,syncAccount:'e@example.com',syncIdentity:'owner',syncRev:4,syncDirty:false});
+ const original=JSON.stringify(board([syncTask('local-survivor','Surviving task')]));
+ const draft=JSON.stringify(board([syncTask('local-survivor','Surviving task'),syncTask('only-in-drafts','Only in the drafts')]));
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();t.after(()=>store.close());
+ assert.equal((await store.commitHead({expectedHash:null,payload:original,account:'e@example.com'})).ok,true);
+ const day=new Date().toISOString().slice(0,10);
+ for(const [id,kind,payload] of [['healthy-linked','manual',original],['draft-a','stale-tab-draft',draft],['draft-b','stale-tab-draft',draft],['draft-c','stale-tab-draft',draft]])
+  assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:{id,kind,at:Date.now()-60000,day,payload}})).ok,true);
+ // The saved board is lost, so the app opens from the linked backup and holds every recovery source.
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
+ const app=await loadApp({...offline,indexedDBProvider:indexedDB,deviceDbName,sharedStorage:sharedScannerStorage({'fvp:chain-scanner:device-store-v2':'1'})}),{ctx,shim}=app;t.after(()=>app.dispose());
+ assert.ok(await store.getRecoveryCloudHold(),'positive control: a recovery hold is stored');
+ shim.document.getElementById('addInput').value='Work during the recovery hold';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.title==='Work during the recovery hold'),'positive control: the save was written');
+ assert.ok(await store.getRecoveryCloudHold(),'and the hold is still stored');
+ const ids=[...await store.listBackups()].map(row=>row.id);
+ assert.deepEqual(['draft-a','draft-b','draft-c'].filter(id=>!ids.includes(id)),[],'every repeated draft stays while the hold is stored');
+});
+
+test('RISK redundant backups: a save whose device write fails or is interrupted removes nothing, and the next successful save completes the clean-up',async t=>{
+ const {IDBObjectStore}=await import('fake-indexeddb');
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const contained=JSON.stringify(ctx.state);
+ await seedDeviceBackups2335(app,[{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:contained}]);
+ const seeded=[...await store.listBackups()].map(row=>row.id).sort();
+ // The write of the new saved board fails inside the device transaction, after its removals were queued.
+ const put=IDBObjectStore.prototype.put;let faults=0;
+ IDBObjectStore.prototype.put=function(value,key){
+  if(this.name==='meta'&&key==='head'&&this.transaction.mode==='readwrite'&&faults++===0)throw Object.assign(Error('fixture interrupted write'),{name:'AbortError'});
+  return put.call(this,value,key);
+ };
+ t.after(()=>{IDBObjectStore.prototype.put=put;});
+ ctx.addTask('Edit while the device write fails');assert.equal(await ctx.persist(),false,'the failed save reports a failure');
+ IDBObjectStore.prototype.put=put;
+ assert.equal(faults,1,'positive control: the write was interrupted');
+ assert.deepEqual([...await store.listBackups()].map(row=>row.id).sort(),seeded,'the interrupted save removed nothing');
+ assert.ok(!JSON.parse((await store.readHead()).payload).tasks.some(task=>task.title==='Edit while the device write fails'),'and wrote no board');
+ assert.equal(await ctx.persist(),true,'the next save succeeds');
+ const drafts=[...await store.listBackups()].filter(row=>row.kind==='stale-tab-draft').map(row=>row.payload);
+ assert.deepEqual(drafts,[draft],'and completes the clean-up');
+});
+
+test('RISK redundant backups: when another tab deletes the copy a repeat was kept by, the save keeps the repeat',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ await seedDeviceBackups2335(app,[{id:'older-draft',kind:'stale-tab-draft',payload:draft},{id:'newer-draft',kind:'stale-tab-draft',payload:draft}]);
+ // Another tab's Delete lands after this save planned its clean-up and before its device write.
+ const commitHead=store.commitHead;let deleted=null;
+ store.commitHead=async function(options){
+  if(deleted===null){const target=[...await store.listBackups()].find(row=>row.kind==='stale-tab-draft'&&!JSON.stringify(options.removeRedundantBackups||[]).includes('"id":'+JSON.stringify(row.id)));
+   deleted=target?await store.deleteBackup(target.id,{payload:target.payload}):false;}
+  return commitHead.call(this,options);
+ };
+ t.after(()=>{store.commitHead=commitHead;});
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ assert.equal(deleted,true,'positive control: the other tab deleted one copy');
+ assert.equal([...await store.listBackups()].filter(row=>row.payload===draft).length,1,'the other copy of that board stays');
+});
+
+test('RISK redundant backups: a copy kept before taking a cloud board reuses a longer-kept copy of the same board that no save clears, never a stale-tab draft a later save may clear',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const board=JSON.stringify(ctx.state);
+ await seedDeviceBackups2335(app,[{id:'earlier-draft',kind:'stale-tab-draft',payload:board}]);
+ const safety=await ctx.saveDurableBackup('before-cloud-adoption',board);
+ assert.ok(safety?.id&&safety.id!=='earlier-draft','the cloud adoption gets its own safety copy, not a draft a later save may clear: '+safety?.id);
+ assert.equal(safety.kind,'before-cloud-adoption');
+ // The board is unchanged, so the next save clears the draft as contained, and the safety copy stays.
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const rows=[...await store.listBackups()];
+ assert.equal(rows.some(row=>row.id==='earlier-draft'),false,'positive control: the next save clears the draft');
+ assert.ok(rows.some(row=>row.id===safety.id&&row.payload===board),'the board from before the cloud adoption stays');
+ // A copy no save clears does stand in: an other-browser copy is kept until it is deleted.
+ const otherBoard=boardWithExtraTask2335(ctx,'other-only','Other only');
+ await seedDeviceBackups2335(app,[{id:'other-browser',kind:'other-browser-copy',payload:otherBoard}]);
+ assert.equal((await ctx.saveDurableBackup('before-cloud-adoption',otherBoard))?.id,'other-browser','an other-browser copy is the safety copy');
+ // A copy the person may delete on the Settings reminder does not stand in.
+ const manualBoard=boardWithExtraTask2335(ctx,'manual-only','Manual only');
+ await seedDeviceBackups2335(app,[{id:'manual-copy',kind:'manual',payload:manualBoard}]);
+ const second=await ctx.saveDurableBackup('before-cloud-adoption',manualBoard);
+ assert.ok(second?.id&&second.id!=='manual-copy','a manual copy does not stand in for the adoption copy');
+});
+
+test('RISK redundant backups: on the older browser backup list, repeated and contained automatic copies are cleared by the next save and the rest stay',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser list holds the backups');
+ const contained=JSON.stringify(ctx.state);
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const manual=boardWithExtraTask2335(ctx,'only-in-manual','Only in the manual copy');
+ const day=vm.runInContext('backupDay(Date.now())',ctx);let n=0;
+ const row=(kind,payload)=>({id:'seed-'+(++n),day,at:Date.now()-60000+n,kind,payload});
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),row('stale-tab-draft',draft),row('stale-tab-draft',draft),row('stale-tab-draft',contained),
+  row('manual',manual),row('stale-tab-draft',manual),row('manual',manual)]));
+ ctx.addTask('An ordinary edit');assert.equal(await ctx.persist(),true);
+ const rows=listed(),count=payload=>rows.filter(entry=>entry.payload===payload&&entry.kind!=='latest'&&entry.kind!=='daily').length;
+ assert.deepEqual([count(draft),count(contained)],[1,0],'the repeated draft is kept once and the contained one is cleared: '+JSON.stringify(rows.map(entry=>entry.kind)));
+ assert.equal(rows.filter(entry=>entry.kind==='manual').length,2,'manual copies stay even when they repeat each other');
+ assert.equal(count(manual),3,'and a manual copy does not stand in for an automatic one');
+});
+
+test('RISK redundant backups: on the older browser backup list, a copy of a board a kept copy no save clears already holds adds no row, and a stale-tab draft a later save may clear never stands in',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ const day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ const seed=(id,kind,payload)=>storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),{id,day,at:Date.now()-60000,kind,payload}]));
+ // A copy no save clears stands in: an other-browser copy is kept until it is deleted.
+ const kept=boardWithExtraTask2335(ctx,'only-in-the-copy','Only in the copy');
+ seed('earlier-copy','other-browser-copy',kept);
+ for(const kind of ['stale-tab-draft','cloud-merged','before-cloud-adoption'])assert.ok(await ctx.saveDurableBackup(kind,kept),kind+' is reported safe');
+ assert.deepEqual(listed().filter(row=>row.payload===kept).map(row=>row.id),['earlier-copy'],'the board is listed once');
+ // An unmarked stale-tab draft does not: a save clears it once the board holds everything in it.
+ for(const kind of ['other-browser-copy','cloud-merged','before-cloud-adoption','before-cloud-local-edit']){
+  const board=boardWithExtraTask2335(ctx,'only-before-'+kind,'Only before '+kind);
+  seed('draft-for-'+kind,'stale-tab-draft',board);
+  assert.ok(await ctx.saveDurableBackup(kind,board),kind+' is reported safe');
+  assert.deepEqual(listed().filter(row=>row.payload===board).map(row=>row.kind).sort(),[kind,'stale-tab-draft'].sort(),kind+' gets its own row beside the draft');
+ }
+});
+
+test('RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
+ const answer=answerTo('Does the app clear backups that repeat each other?');
+ assert.match(answer,/^Yes, by itself, after a successful save\./);
+ assert.match(answer,/stale tab draft whose tasks, History, decisions, comparisons and completions are all already in the saved board/);
+ assert.match(answer,/Manual, restore, reset, import and recovery copies, pinned copies and unreadable backups are never removed this way/);
+ // #2333 release review: only drafts this version saves carry the losing-edit mark. A draft saved
+ // before the update, or by an older open copy, follows the containment rule even with a losing edit.
+ const losingEdit=text=>text.replace(/<[^>]+>/g,' ').split(/(?<=\.)\s+/).filter(sentence=>/lost to another (?:tab|copy)’s newer change/.test(sentence));
+ assert.ok(losingEdit(answer).length>0,'positive control: the answer names a draft holding a losing edit');
+ assert.deepEqual(losingEdit(answer).filter(sentence=>!/since this update/.test(sentence)),[],'only a draft saved since this update is promised to stay for a losing edit');
+ assert.match(answer,/one saved earlier, or by an older open copy, follows the rule above/,'and one saved earlier, or by an older open copy, follows the containment rule');
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ // #2333 review: the answer on how long backups stay must not still promise that
+ // drafts and other-browser copies stay until deleted, now that a save clears them.
+ const retention=answerTo('How long do backups stay on this device?');
+ const promises=retention.split(/(?<=\.)\s+/).filter(sentence=>/stale.tab drafts?|other-browser cop/i.test(sentence)&&/until you delete/i.test(sentence));
+ assert.ok(promises.length>0,'positive control: the retention answer still says how long drafts and other-browser copies stay');
+ assert.deepEqual(promises.filter(sentence=>!/unless a save clears/i.test(sentence)),[],'no sentence promises a draft or other-browser copy stays until deleted without the clean-up');
+ assert.ok(retention.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the retention answer stays within the 130-word limit');
+ const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 10, 2026</h3>')[0];
+ assert.match(notes,/Data and backups no longer fills up with copies that add nothing\./);
+ assert.ok(losingEdit(notes).length>0,'positive control: the changelog names a draft holding a losing edit');
+ assert.deepEqual(losingEdit(notes).filter(sentence=>!/since this update/.test(sentence)),[],'the changelog limits that promise the same way');
+});
+
+test('RISK redundant backups: a stale-tab draft holding an edit that lost to another tab’s newer change stays after later saves, on the device and in the older browser list',async t=>{
+ // Device: another writer renames the task while this tab's own rename is saving.
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);
+ let calls=0;
+ store.commitHead=async options=>{
+  if(++calls===1){
+   const peer=JSON.parse((await store.readHead()).payload);peer.tasks[0].title='Peer title';
+   assert.equal((await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)})).ok,true);
+   return {conflict:true};
+  }
+  return original(options);
+ };
+ ctx.state.tasks[0].title='My losing title';ctx.commit();assert.equal(await ctx.persist(),true);
+ store.commitHead=original;
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks[0].title,'Peer title','positive control: the newer peer title wins');
+ const losing=()=>store.listBackups().then(rows=>[...rows].filter(row=>row.kind==='stale-tab-draft'&&row.payload.includes('My losing title')).length);
+ assert.equal(await losing(),1,'positive control: the repair kept the losing edit as a draft');
+ ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(await losing(),1,'the draft with the losing edit stays on the device');
+ // Older browser list: two tabs on one browser storage, the second rebased onto the first.
+ const initial=syncState({tasks:[syncTask('base','Original')]}),raw=JSON.stringify(initial);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});t.after(()=>{a.dispose?.();b.dispose?.();});
+ a.ctx.state.tasks[0].title='Peer title';a.ctx.commit();await a.ctx.persist();
+ b.ctx.state.tasks[0].title='My losing title';b.ctx.commit();await b.ctx.persist();
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').filter(row=>row.kind==='stale-tab-draft'&&row.payload.includes('My losing title')).length;
+ assert.equal(listed(),1,'positive control: the rebase kept the losing edit as a draft');
+ b.ctx.addTask('A later edit');assert.equal(await b.ctx.persist(),true);
+ assert.equal(listed(),1,'the draft with the losing edit stays in the older list');
+});
+
+// #2333 review: the mark that keeps a draft holding a losing edit covered only
+// task fields, settings and contexts, so a draft whose scan mode (or chain,
+// marks, chance) lost to another tab's newer change was cleared as contained.
+test('RISK redundant backups: a stale-tab draft whose scan mode lost to another tab’s newer change stays after later saves, on the device and in the older browser list',async t=>{
+ // Device: another writer changes the scan mode while this tab's own change is saving.
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);
+ const startMode=ctx.state.scanMode;
+ const [peerMode,myMode]=['halving','squared','chance','descending'].filter(mode=>mode!==startMode);
+ let calls=0;
+ store.commitHead=async options=>{
+  if(++calls===1){
+   const peer=JSON.parse((await store.readHead()).payload);peer.scanMode=peerMode;
+   assert.equal((await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)})).ok,true);
+   return {conflict:true};
+  }
+  return original(options);
+ };
+ ctx.state.scanMode=myMode;assert.equal(await ctx.persist(),true);
+ store.commitHead=original;
+ assert.equal(JSON.parse((await store.readHead()).payload).scanMode,peerMode,'positive control: the newer peer scan mode wins');
+ const losing=()=>store.listBackups().then(rows=>[...rows].filter(row=>row.kind==='stale-tab-draft'&&JSON.parse(row.payload).scanMode===myMode).length);
+ assert.equal(await losing(),1,'positive control: the repair kept the losing scan mode as a draft');
+ ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(await losing(),1,'the draft with the losing scan mode stays on the device');
+ // Older browser list: two tabs on one browser storage, the second rebased onto the first.
+ const initial=syncState({tasks:[syncTask('base','Original')]}),raw=JSON.stringify(initial);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});t.after(()=>{a.dispose?.();b.dispose?.();});
+ const [browserPeer,browserMine]=['halving','squared','chance','descending'].filter(mode=>mode!==a.ctx.state.scanMode);
+ a.ctx.state.scanMode=browserPeer;assert.equal(await a.ctx.persist(),true);
+ b.ctx.state.scanMode=browserMine;await b.ctx.persist();
+ assert.equal(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).scanMode,browserPeer,'positive control: the newer browser copy’s scan mode wins');
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').filter(row=>row.kind==='stale-tab-draft'&&JSON.parse(row.payload).scanMode===browserMine).length;
+ assert.equal(listed(),1,'positive control: the rebase kept the losing scan mode as a draft');
+ b.ctx.addTask('A later edit');assert.equal(await b.ctx.persist(),true);
+ assert.equal(listed(),1,'the draft with the losing scan mode stays in the older list');
+});
+
+// #2333 review: retention never shortens. A stale-tab draft the containment
+// proof may clear on a later save cannot be the copy that keeps another one,
+// or the board that copy promised to keep would go with the draft.
+test('RISK redundant backups: a copy is never cleared as a repeat of a stale-tab draft a later save may clear, so the board kept before taking a cloud board stays',async t=>{
+ const {app,open}=await redundantBackupsApp2335(t),{ctx}=app;
+ // The board before a cloud adoption: an older title and a task the saved board lacks, so no save can clear its draft yet.
+ const older=JSON.parse(boardWithExtraTask2335(ctx,'only-before-adoption','Only before adoption'));older.tasks[0].title='Older title only here';
+ const before=JSON.stringify(older),other=boardWithExtraTask2335(ctx,'only-in-other-browser','Only in the other browser');
+ await seedDeviceBackups2335(app,[
+  {id:'adoption-copy',kind:'before-cloud-adoption',payload:before},{id:'unmarked-draft',kind:'stale-tab-draft',payload:before},
+  {id:'draft-of-other',kind:'stale-tab-draft',payload:other},{id:'other-browser',kind:'other-browser-copy',payload:other}]);
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const ids=async board=>new Set([...await board.shim.window.ScannerDeviceStore.listBackups()].map(row=>row.id));
+ let kept=await ids(app);
+ assert.ok(kept.has('adoption-copy'),'the copy kept before taking a cloud board stays: '+JSON.stringify([...kept]));
+ assert.deepEqual(['draft-of-other','other-browser'].map(id=>kept.has(id)),[false,true],
+  'positive control: a draft repeating a copy the clean-up never clears goes, and that copy stays');
+ // The task reaches the board, so after a reload a save may clear the draft as contained.
+ ctx.state.tasks.push(JSON.parse(JSON.stringify(older.tasks.find(task=>task.id==='only-before-adoption'))));ctx.save();await savesSettled2334(app);
+ await app.dispose();
+ const reopened=await open();reopened.ctx.addTask('An edit after reopening');await savesSettled2334(reopened);
+ kept=await ids(reopened);
+ assert.equal(kept.has('unmarked-draft'),false,'positive control: the saved board now holds the draft, so it is cleared');
+ assert.ok([...await reopened.shim.window.ScannerDeviceStore.listBackups()].some(row=>row.payload===before),'the board from before the cloud adoption is still restorable');
+});
+
+// #2333 review: the older list's clean-up rewrote the list before the board's
+// own write, so a refused board write had already cleared drafts proved
+// contained in a board that was never saved.
+test('RISK redundant backups: on the older browser backup list, a save whose board write fails removes nothing, and the next successful save completes the clean-up',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser keys hold the board');
+ const contained=JSON.stringify(ctx.state),draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const day=vm.runInContext('backupDay(Date.now())',ctx);let n=0;
+ const row=(kind,payload)=>({id:'seed-'+(++n),day,at:Date.now()-60000+n,kind,payload});
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),row('stale-tab-draft',draft),row('stale-tab-draft',draft),row('stale-tab-draft',contained)]));
+ const seeded=()=>listed().filter(entry=>entry.id.startsWith('seed-'));
+ // The browser refuses the board's own write, once.
+ const setItem=storage.setItem;let refused=0;
+ storage.setItem=(key,value)=>{if(key===LOCAL_HEAD_KEY&&refused++===0)throw Object.assign(Error('fixture refused write'),{name:'SecurityError'});return setItem(key,value);};
+ t.after(()=>{storage.setItem=setItem;});
+ ctx.addTask('Edit while the board write fails');assert.equal(await ctx.persist(),false,'the failed save reports a failure');
+ assert.equal(refused,1,'positive control: the board write was refused');
+ assert.deepEqual(seeded().map(entry=>entry.id),['seed-1','seed-2','seed-3'],'the failed save removed nothing');
+ storage.setItem=setItem;
+ assert.equal(await ctx.persist(),true,'the next save succeeds');
+ assert.deepEqual(seeded().map(entry=>entry.payload),[draft],'and completes the clean-up');
+});
+
+// #2333 review: like the device list, the older list reads a draft that is not
+// contained once per opening, so a pile of large drafts is not parsed again by
+// every save. A draft the board comes to hold is cleared after the next opening.
+test('RISK redundant backups: on the older browser backup list, a draft found not contained is checked again only after the app reopens, and then cleared once the board holds it',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ const draft=boardWithExtraTask2335(ctx,'only-in-the-draft','Only in the draft'),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').some(row=>row.id==='uncontained-draft');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]'),
+  {id:'uncontained-draft',day,at:Date.now()-60000,kind:'stale-tab-draft',payload:draft}]));
+ ctx.addTask('An ordinary edit');assert.equal(await ctx.persist(),true);
+ assert.equal(listed(),true,'positive control: a draft holding a task the board lacks stays');
+ // The board comes to hold the draft's task; this opening already found the draft not contained.
+ ctx.state.tasks.push(JSON.parse(draft).tasks.find(task=>task.id==='only-in-the-draft'));ctx.save();assert.equal(await ctx.persist(),true);
+ assert.equal(listed(),true,'later saves of this opening do not read the draft again');
+ const reopened=await loadApp({sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ reopened.ctx.addTask('An edit after reopening');assert.equal(await reopened.ctx.persist(),true);
+ assert.equal(listed(),false,'the first save after reopening clears the draft the board now holds');
+});
+
+test('RISK redundant backups: on the older browser backup list, a copy is never cleared as a repeat of a stale-tab draft a later save may clear',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ const older=JSON.parse(JSON.stringify(ctx.state));older.tasks[0].title='Older title only here';const before=JSON.stringify(older);
+ const day=vm.runInContext('backupDay(Date.now())',ctx);let n=0;
+ const row=(id,kind,payload)=>({id,day,at:Date.now()-60000+(++n),kind,payload});
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),row('adoption-copy','before-cloud-adoption',before),row('unmarked-draft','stale-tab-draft',before)]));
+ ctx.addTask('An ordinary edit');assert.equal(await ctx.persist(),true);
+ const rows=listed();
+ assert.equal(rows.some(entry=>entry.id==='unmarked-draft'),false,'positive control: the draft the saved board holds is cleared');
+ assert.deepEqual(rows.filter(entry=>entry.payload===before).map(entry=>entry.id),['adoption-copy'],'the copy kept before taking a cloud board stays');
+});
+
+// #2333 release review: each check parses a whole draft while the save waits to
+// commit, so a save stops checking once its time budget is spent, after at
+// least one draft. The page's own clock moves on only when a draft is read here,
+// as a slow phone's would, so the test does not depend on real timing.
+test('RISK redundant backups: a save checks drafts only within its time budget, oldest first and always at least one, so a pile shrinks every save without holding the save',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ // Four drafts the saved board holds, each with an older title for the first task.
+ const drafts=[1,2,3,4].map(n=>{const board=JSON.parse(JSON.stringify(ctx.state));board.tasks[0].title='Older title '+n;return JSON.stringify(board);});
+ await seedDeviceBackups2335(app,drafts.map((payload,i)=>({id:'draft-'+(i+1),kind:'stale-tab-draft',payload})));
+ // Reading any one draft takes a minute by the page's clock, far past a save's budget.
+ let clock=0;ctx.performance={now:()=>clock};
+ const read=store.readBackups.bind(store);
+ store.readBackups=async ids=>{const rows=await read(ids);if(ids.some(id=>id.startsWith('draft-')))clock+=60000;return rows;};
+ t.after(()=>{store.readBackups=read;});
+ const left=async()=>[...await store.listBackups()].filter(row=>row.kind==='stale-tab-draft').map(row=>row.id).sort();
+ ctx.addTask('First edit');await savesSettled2334(app);
+ assert.deepEqual(await left(),['draft-2','draft-3','draft-4'],'the first save checks one draft, the oldest, and clears it');
+ ctx.addTask('Second edit');await savesSettled2334(app);
+ assert.deepEqual(await left(),['draft-3','draft-4'],'the next save clears the next oldest');
+});
+
+// #2333 release review: a draft whose stored text fails its check sends the
+// read into a full listing that reads every backup's text. That failure was not
+// remembered, so every save repeated it; now a save tries the draft once per
+// opening.
+test('RISK redundant backups: a draft whose stored text cannot be read is tried once per opening, not by every save',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2335-damaged-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:sharedScannerStorage()});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);await savesSettled2334(app);
+ await seedDeviceBackups2335(app,[{id:'damaged-draft',kind:'stale-tab-draft',payload:JSON.stringify(ctx.state)}]);
+ // The draft's stored text is damaged after the app measured it.
+ const {payloadHash}=(await store.listBackupFacts()).find(row=>row.id==='damaged-draft');
+ await editRawDevice187(indexedDB,dbName,tx=>tx.objectStore('snapshots').put({hash:payloadHash,payload:'{"tasks":[]}'},payloadHash));
+ const read=store.readBackups.bind(store);let reads=0;
+ store.readBackups=async ids=>{if(ids.includes('damaged-draft'))reads++;return read(ids);};
+ t.after(()=>{store.readBackups=read;});
+ for(const title of ['First edit','Second edit','Third edit']){ctx.addTask(title);await savesSettled2334(app);}
+ assert.equal(reads,1,'the damaged draft is read once in this opening');
+ assert.ok(JSON.parse(JSON.stringify(ctx.state)).tasks.some(task=>task.title==='Third edit'),'positive control: the saves went on');
+ const kept=await store.readRawRows({backups:['damaged-draft']},{keysOnly:['backups']});
+ assert.deepEqual(JSON.parse(JSON.stringify(kept.stores.backups.keys)),['damaged-draft'],'and the damaged draft stays for recovery');
+});
+
+// #2333 release review: a pin, a pending Restore or an adoption only stops a
+// copy from being removed, and it ends. A protected automatic copy then follows
+// its own three- or seven-day rule, so it can never be the copy that keeps one
+// the app keeps until it is deleted.
+test('RISK redundant backups: a copy kept until it is deleted is never cleared as a repeat of a copy a pin keeps only for now, so its board stays after the pin is released',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore,DAY=86400000,now=Date.now();
+ const board=boardWithExtraTask2335(ctx,'only-in-the-copy','Only in the copy');
+ await seedDeviceBackups2335(app,[
+  {id:'pinned-merged',kind:'cloud-merged',day:vm.runInContext('backupDay('+(now-5*DAY)+')',ctx),at:now-5*DAY,payload:board},
+  {id:'other-browser',kind:'other-browser-copy',payload:board}]);
+ const holding=async()=>[...await store.listBackups()].filter(row=>row.payload===board).map(row=>row.id).sort();
+ // A cloud recovery pins the automatic copy until the cloud confirms the board.
+ ctx.state.protectedBackupIds=['pinned-merged'];
+ ctx.addTask('An edit while the copy is pinned');await savesSettled2334(app);
+ assert.deepEqual(await holding(),['other-browser','pinned-merged'],'the copy kept until it is deleted stays beside the pinned one');
+ // The pin is released; three days later the automatic copy has passed its seven days.
+ ctx.state.protectedBackupIds=[];setFakeTime(ctx,now+3*DAY);
+ ctx.addTask('An edit three days later');await savesSettled2334(app);
+ assert.deepEqual(await holding(),['other-browser'],'the board is still restorable from the copy kept until it is deleted');
+});
+
+test('RISK redundant backups: on the older browser backup list, a copy kept until it is deleted is never cleared as a repeat of Restore’s safety copy, so the replaced board stays after that copy expires',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser list holds the backups');
+ const older=boardWithExtraTask2335(ctx,'older-only','Older only');
+ ctx.addTask('Second task');assert.equal(await ctx.persist(),true);
+ const replaced=JSON.stringify(ctx.state),now=Date.now(),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ // An older shell's write left an other-browser copy of exactly this board.
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),{id:'other-browser',day,at:now-60000,kind:'other-browser-copy',payload:replaced},
+  {id:'older-manual',day,at:now-120000,kind:'manual',payload:older}]));
+ assert.equal(await ctx.restoreDurableBackupById('older-manual'),true,'positive control: the restore succeeds');
+ await savesSettled2334(app);
+ const holding=()=>listed().filter(row=>row.payload===replaced).map(row=>row.kind).sort();
+ assert.deepEqual(holding(),['before-restore','other-browser-copy'],'Restore’s safety copy and the other-browser copy both hold the replaced board');
+ setFakeTime(ctx,now+8*86400000);
+ ctx.addTask('An edit eight days later');assert.equal(await ctx.persist(),true);
+ assert.deepEqual(holding(),['other-browser-copy'],'the replaced board is still restorable after Restore’s safety copy expires');
 });
