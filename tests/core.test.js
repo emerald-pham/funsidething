@@ -35952,6 +35952,21 @@ test('RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from a
  assert.match(faq,/Synced requires server acknowledgement of the latest save/);
 });
 
+test('Device save settle guidance: the FAQ and changelog say saves on one device settle by themselves (#2324)',()=>{
+ assert.match(html,/<dt>What if the app is open twice on this device\?<\/dt><dd>Each copy recognizes its own saves, so quick edits in one copy never clash with each other\. If another open copy of the app saves at the same moment, this copy combines both boards and keeps trying for about five seconds before it warns you\.<\/dd>/);
+ const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
+ assert.match(current,/<h3>November 10, 2026<\/h3><ul><li>Ordinary edits no longer fail to save on this device with “The saved board changed again while this tab was merging it”\. On a phone, saving can take longer than the pause between taps, and the app then mistook its own earlier save for a change from elsewhere\. It now recognizes its own saves and saves on top of them\./);
+});
+
+test('Device save plain message guidance: the FAQ and changelog explain the message for a save that ran out of repairs (#2325)',()=>{
+ assert.match(html,/<\/dd><dt>What if this copy still cannot save\?<\/dt><dd>If the other copy keeps saving for longer than that, a message says this edit isn’t saved yet\. Close the other copy, then make any change here to save again\. If both copies changed the same thing, the saved board keeps one version and Settings backups keep this tab’s\. The message stays until a save succeeds\. Settings shows Last device save issue, and the Debug log counts the save attempts and which copy’s save each repair met\.<\/dd>/);
+ const faq=html.slice(html.indexOf('<dt>What can I do if a save or sync fails?'),html.indexOf('<dt>What if the app is open twice on this device?'));
+ assert.match(faq,/Settings keeps each device-save warning’s stage and code\./);
+ assert.doesNotMatch(faq,/Device-save warnings name a stage and code\./,'the plain message does not lead with a code');
+ const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
+ assert.match(current,/<li>When a save on this device still cannot finish because another open copy keeps saving, the message now says plainly that the edit isn’t saved yet and that closing the other copy, then making any change here, saves again\. The message stays on screen until a save succeeds\. The support code moves to Settings → Last device save issue, and the Debug log also counts the save attempts and which copy’s save each repair met\.<\/li>/);
+});
+
 test('Firestore rules: production cleanup resumes deleting tombstones and protects active previous pending and young staging generations', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
  const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
  const F=await import('firebase/firestore');
@@ -40990,6 +41005,36 @@ test('RISK support diagnostics: event retention and malformed observer input sta
  const invalidClock=ctx.buildSupportDiagnosticsReport();
  assert.equal(invalidClock.capturedAt.status,'unavailable','an invalid local clock is reported unavailable');
  assert.doesNotThrow(()=>ctx.supportDiagnosticsText(),'a nonserializable clock cannot break local report generation');
+});
+
+// #2323 merge: the Debug log sheds its oldest events to fit 24 KiB. Main's
+// saved-data section and the device-save failure fields together pushed the
+// report over that cap one event earlier, and the record of why recovery
+// waited was the oldest event left, so it was the one dropped.
+test('RISK support diagnostics retention: a Debug log over its byte cap sheds routine events, oldest first, before the record of why recovery waited or ran',async t=>{
+ const app=await loadApp(),{ctx}=app;t.after(()=>app.dispose());
+ vm.runInContext('Date.now=()=>1000000',ctx);
+ const observe=ctx.window.__chainSupportDiagnosticsObserve,ROUTINE=60;
+ const budget=outcome=>observe('recovery-budget',outcome==='deferred'?'pending':'observed','current','source-1',null,null,null,null,null,null,null,null,'unknown',
+  null,null,null,null,null,{budgetOutcome:outcome,generationKiB:1967,boardKiB:2,decisionKiB:0,estimateKiB:1968,budgetKiB:1024});
+ // The opening waits, then routine saves run, then Retry sync runs deliberately, then more saves.
+ budget('deferred');
+ for(let i=1;i<=ROUTINE;i++)observe('persist',i%2?'started':'durable','current',null,i);
+ budget('deliberate');
+ for(let i=ROUTINE+1;i<=ROUTINE+4;i++)observe('persist',i%2?'started':'durable','current',null,i);
+ const text=ctx.supportDiagnosticsText(),report=JSON.parse(text);
+ // Positive controls: every event fits the count limit, so only the byte cap sheds them.
+ assert.ok(ROUTINE+6<=report.retention.eventLimit,'the count limit alone would keep every event');
+ assert.equal(report.retention.truncated.value,true,'the report had to shed events to fit its byte cap');
+ assert.ok(Buffer.byteLength(text,'utf8')<=24*1024,'the report stays within its byte cap');
+ // Behaviour under test: both budget records stay, in order, and routine events go oldest first.
+ assert.deepEqual(report.events.filter(event=>event.stage==='recovery-budget').map(event=>event.metadata.budgetOutcome),['deferred','deliberate'],
+  'the record of why recovery waited outlasts later routine events');
+ const kept=report.events.filter(event=>event.stage==='persist').map(event=>event.durationMs.value);
+ assert.ok(kept.length>0&&kept.length<ROUTINE+4,'some routine events are kept and some shed');
+ assert.deepEqual(kept,Array.from({length:kept.length},(_,index)=>ROUTINE+4-kept.length+1+index),'the routine events kept are the newest ones');
+ const order=report.events.map(event=>event.stage!=='recovery-budget'?event.durationMs.value:event.metadata.budgetOutcome==='deferred'?0:ROUTINE+.5);
+ assert.deepEqual(order,[...order].sort((a,b)=>a-b),'the kept events stay in the order they happened');
 });
 
 test('RISK support diagnostics worker: controller reports only its fixed shell identity',()=>{
