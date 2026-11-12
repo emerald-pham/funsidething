@@ -4280,10 +4280,12 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         // Two saves can send the same bytes (a follow-up and the next edit's
         // save); each holds its own reference until its commit returns.
         let result;const own=deviceOwnCommits.get(options.payload)||{base,count:0};own.count++;deviceOwnCommits.set(options.payload,own);
-        const sent=deviceWriteBeforeDiagnostics("commitHead",options);deviceHeadCommitsInFlight.add(sent);
-        try{result=await sent;}
+        // A separate signal marks this commit's return for later saves; the
+        // commit itself is awaited directly, as before.
+        let returned;const signal=new Promise(resolve=>{returned=resolve;});deviceHeadCommitsInFlight.add(signal);
+        try{result=await deviceWriteBeforeDiagnostics("commitHead",options);}
         catch(error){if(deviceQuotaFailure(error))result={error:true,code:"quota-exhausted"};else throw error;}
-        finally{deviceHeadCommitsInFlight.delete(sent);if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);}
+        finally{deviceHeadCommitsInFlight.delete(signal);returned();if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);}
         return result;
       };
       const legacyIndex=backupAlreadySafe?null:inspectBackupIndex();
@@ -4296,7 +4298,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       // not time spent on another copy: the budget starts once those commits
       // have returned, and never later than this save's first commit returns.
       const ahead=[...deviceHeadCommitsInFlight];let queueClearedAt=performance.now();
-      if(ahead.length)Promise.allSettled(ahead).then(()=>{queueClearedAt=performance.now();});
+      if(ahead.length)Promise.all(ahead).then(()=>{queueClearedAt=performance.now();});
       let result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,...automatic});
       const repairDeadline=queueClearedAt+DEVICE_REPAIR_BUDGET_MS;
       if(result?.code==="quota-exhausted"){
@@ -4349,15 +4351,6 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           const next=JSON.parse(latest.payload),mine=JSON.parse(draft);
           hydrateState(next);hydrateState(mine);
           if(!sameListOwner(next,mine)) return reportDeviceSaveFailure("device-store","account-changed","The signed-in account changed while this board was saving.");
-          // #2326 review: the head already holds this tab's exact live board,
-          // usually written by another save of this tab sending the same bytes
-          // while this one waited in IndexedDB's commit queue. Nothing is left
-          // to write, so this save has succeeded; re-committing the same bytes
-          // only met that save again until the deadline refused a durable board.
-          // A completion upgrade still commits its recovery copy below.
-          if(latest.payload===draft&&!completionSourceBackup){
-            result={ok:true,hash:latest.hash};committedPayload=draft;observedPayload=draft;mergedState=null;break;
-          }
           // One deadline for the whole save, checked before every repair onto
           // another writer's board. A repair onto this tab's own save is not
           // waiting for another copy: it only queued behind this tab's commits
