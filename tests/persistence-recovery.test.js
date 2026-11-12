@@ -10647,6 +10647,31 @@ test('RISK missing-task save loop: one app on its own never conflicts with its o
  assert.equal(head.settings.showPostpone,ctx.state.settings.showPostpone,'and the Settings change');
 });
 
+// #2333 review (merge with #2324's own-save path): one app, signed out. A title
+// is changed and changed straight back while the device is still answering the
+// first save. The second save meets the head this tab has just written; its
+// repair must keep the title the person left, never bring the earlier one back.
+test('RISK missing-task save loop: a title changed back while this tab’s earlier save is still answering stays changed back on the saved and the live board',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-revert-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:sharedScannerStorage()});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Title A');assert.equal(await ctx.persist(),true);await savesSettled2334(app);
+ // The first save's device write lands at once, but its answer reaches the app late.
+ const commit=store.commitHead.bind(store);let landed,slowAnswer=true;const written=new Promise(resolve=>{landed=resolve;});
+ store.commitHead=async(...args)=>{
+  const result=await commit(...args);
+  if(slowAnswer){slowAnswer=false;landed();await new Promise(resolve=>setTimeout(resolve,800));}
+  return result;
+ };
+ ctx.state.tasks[0].title='Title B';const first=ctx.persist();
+ await written;
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks[0].title,'Title B','positive control: the first save is on the device');
+ ctx.state.tasks[0].title='Title A';const second=ctx.persist();
+ await Promise.all([first,second]);await savesSettled2334(app);
+ assert.equal(ctx.state.tasks[0].title,'Title A','the live board keeps the title the person left');
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks[0].title,'Title A','and so does the saved board');
+});
+
 // #2335: automatic backups that add nothing are cleared by the next save. These
 // load the app on a device store with no cloud account, seed backups the way an
 // earlier save loop or older build left them, save once, and read only what a
