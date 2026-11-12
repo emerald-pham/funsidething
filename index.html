@@ -4191,8 +4191,10 @@ function deviceQuotaFailure(error){
   return error?.name==="QuotaExceededError"||error?.code==="quota-exhausted"||error?.code==="QuotaExceededError"||error?.causeCode==="quota-exhausted";
 }
 // #2324: device conflict repair. A save makes at most 8 repairs in all, onto
-// this tab's own earlier save or another copy's, and checks one deadline,
-// about 5 s after its first commit was sent, before each repair commit.
+// this tab's own earlier save or another copy's, and checks one deadline
+// before each repair onto another copy's save: about 5 s after its first
+// commit was sent, or after the commits this tab sent before it had returned
+// when it queued behind them (#2326 review).
 // A commit already sent cannot be aborted, so a refusal can land up to one
 // commit after that deadline (#2323). Between another copy's saves the
 // waits double from 50 ms up to 1 s.
@@ -4205,6 +4207,12 @@ const DEVICE_REPAIR_ATTEMPTS=8,DEVICE_REPAIR_FIRST_WAIT_MS=50,DEVICE_REPAIR_MAX_
    the tab's own saves until the owner, signed out on one iPhone, saw "The
    saved board changed again while this tab was merging it". */
 const deviceOwnCommits=new Map();
+// Head commits of this tab's saves that have not returned yet. IndexedDB runs
+// them one after another, so a new save's first commit waits behind these.
+const deviceHeadCommitsInFlight=new Set();
+// The newest save request generation whose device save this tab verified.
+// Request generations count accepted edits in order, never by clock.
+let deviceDurableSaveGeneration=0;
 // The board this tab took a head from when the head is this tab's own save
 // (its last durable one, or a commit still in flight); undefined when another
 // writer produced it.
@@ -4272,9 +4280,10 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         // Two saves can send the same bytes (a follow-up and the next edit's
         // save); each holds its own reference until its commit returns.
         let result;const own=deviceOwnCommits.get(options.payload)||{base,count:0};own.count++;deviceOwnCommits.set(options.payload,own);
-        try{result=await deviceWriteBeforeDiagnostics("commitHead",options);}
+        const sent=deviceWriteBeforeDiagnostics("commitHead",options);deviceHeadCommitsInFlight.add(sent);
+        try{result=await sent;}
         catch(error){if(deviceQuotaFailure(error))result={error:true,code:"quota-exhausted"};else throw error;}
-        finally{if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);}
+        finally{deviceHeadCommitsInFlight.delete(sent);if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);}
         return result;
       };
       const legacyIndex=backupAlreadySafe?null:inspectBackupIndex();
@@ -4282,8 +4291,14 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         return failCompletionRecovery();
       const automatic=backupAlreadySafe?{backups:[],removeBackupIds:[]}:deviceAutomaticBackupPlan(payload,preserveBackupId);
       if(completionSourceBackup)automatic.backups=[...automatic.backups,completionSourceBackup];
-      const repairDeadline=performance.now()+DEVICE_REPAIR_BUDGET_MS;
+      // #2326 review: IndexedDB runs this tab's commits one at a time, so the
+      // first one can wait behind commits this tab sent earlier. That wait is
+      // not time spent on another copy: the budget starts once those commits
+      // have returned, and never later than this save's first commit returns.
+      const ahead=[...deviceHeadCommitsInFlight];let queueClearedAt=performance.now();
+      if(ahead.length)Promise.allSettled(ahead).then(()=>{queueClearedAt=performance.now();});
       let result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,...automatic});
+      const repairDeadline=queueClearedAt+DEVICE_REPAIR_BUDGET_MS;
       if(result?.code==="quota-exhausted"){
         // Daily/latest rows are optional. If adding one reaches the device
         // quota, atomically retire only unprotected automatic references and
@@ -4334,8 +4349,20 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           const next=JSON.parse(latest.payload),mine=JSON.parse(draft);
           hydrateState(next);hydrateState(mine);
           if(!sameListOwner(next,mine)) return reportDeviceSaveFailure("device-store","account-changed","The signed-in account changed while this board was saving.");
-          // One deadline for the whole save, checked before every repair commit.
-          if(performance.now()>=repairDeadline)break;
+          // #2326 review: the head already holds this tab's exact live board,
+          // usually written by another save of this tab sending the same bytes
+          // while this one waited in IndexedDB's commit queue. Nothing is left
+          // to write, so this save has succeeded; re-committing the same bytes
+          // only met that save again until the deadline refused a durable board.
+          // A completion upgrade still commits its recovery copy below.
+          if(latest.payload===draft&&!completionSourceBackup){
+            result={ok:true,hash:latest.hash};committedPayload=draft;observedPayload=draft;mergedState=null;break;
+          }
+          // One deadline for the whole save, checked before every repair onto
+          // another writer's board. A repair onto this tab's own save is not
+          // waiting for another copy: it only queued behind this tab's commits
+          // (#2326 review), so the attempt cap alone bounds it.
+          if(ownBase===undefined&&performance.now()>=repairDeadline)break;
           if(ownBase===undefined)peerRepairs++;else ownRepairs++;
           // This tab's own earlier save: the live board already carries it,
           // so save the live board on top of it, as if the saves had queued.
@@ -4368,6 +4395,11 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
             else{result={conflict:true,hash:head.hash};latestHint=head;}
           }
         }
+        // #2326 review: a save of this tab that began at this request
+        // generation or later took the live board, which already held this
+        // save's edits, and that save is durable. Refusing now would hold
+        // "isn't saved yet" over a saved edit until the next change.
+        if(result?.conflict&&!completionSourceBackup&&deviceDurableSaveGeneration>=requestGeneration)return true;
         if(result?.conflict)
           return reportDeviceSaveFailure("device-store","changed-during-save",DEVICE_SAVE_EXHAUSTED_MESSAGE,{plain:true,attempts:commitAttempts,repairs:{own:ownRepairs,other:peerRepairs}});
       }
@@ -4413,6 +4445,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         return persist(backupAlreadySafe,preserveBackupId,followUp?0:deviceRetry+1);
       }
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
+      deviceDurableSaveGeneration=Math.max(deviceDurableSaveGeneration,requestGeneration);
       clearDeviceSaveIssue();if(pendingDeviceCloudBackup)await acknowledgeDeviceCloudBackupSave(result.hash,committedPayload);return true;
     }catch(e){return reportDeviceSaveFailure("device-store","write-failed","The previous durable board remains unchanged; keep this tab open and try again.");}
   }
