@@ -10579,3 +10579,43 @@ test('RISK missing-task save loop: on the older browser storage, a repeated same
  const backups=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').map(row=>row.kind).sort();
  assert.deepEqual(backups,['daily','latest'],'the older backup list holds only its usual daily and latest copies');
 });
+
+// #2334 (round 3): two signed-in devices sharing a cloud board. The fake backend
+// announces each accepted write to every device, as the Firestore listener does.
+async function twoSignedInDevices2334(t,remote){
+ const {indexedDB}=await import('fake-indexeddb');
+ const sync=makeSyncHarness({remote,rev:3}),shims=[];
+ const factory=()=>{const backend=sync.factory(),push=backend.push;
+  backend.push=async(...args)=>{const res=await push.apply(backend,args);
+   if(res?.ok)setTimeout(()=>{for(const shim of shims)shim.window.dispatchEvent({type:'cloudboardchange',detail:{user:backend.user,rev:res.rev}});},1);
+   return res;};
+  return backend;};
+ const open=async name=>{
+  const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:'chain-scanner-2334-cloud-'+name+'-'+Date.now()+'-'+Math.random(),sharedStorage:sharedScannerStorage(),
+   cloudSyncFactory:factory,beforeStateReady:(ctx,shim)=>{shim.window.CLOUD_PUSH_DELAY_MS=20;}});
+  t.after(()=>app.dispose?.());shims.push(app.shim);return app;};
+ const devices=[await open('a'),await open('b')];
+ for(const device of devices)await device.ctx.cloudPull();
+ return {sync,devices};
+}
+
+test('RISK missing-task save loop: two signed-in devices with a repeated same-day worked-on row settle instead of saving and syncing each other forever',async t=>{
+ const now=Date.now(),task=syncTask('worked-twice','Worked twice today');
+ const remote=syncState({tasks:[task],updatedAt:now-1000,workLog:[
+  {id:'worked-morning',taskId:task.id,title:task.title,kind:'worked',at:now-2*60000},
+  {id:'worked-later',taskId:task.id,title:task.title,kind:'worked',at:now-60000}]});
+ const {sync,devices}=await twoSignedInDevices2334(t,remote);
+ const settled=[];for(const device of devices)settled.push(await savesSettled2334(device));
+ const revision=sync.doc.rev,backups=[];
+ for(const device of devices)backups.push([...await device.shim.window.ScannerDeviceStore.listBackups()].map(row=>row.kind));
+ await syncSettle(1500);
+ const after=devices.map(device=>JSON.parse(device.ctx.supportDiagnosticsText()).save);
+ devices.forEach((device,i)=>{
+  assert.equal(after[i].persistCalls.value,settled[i].persistCalls.value,'device '+i+': save runs stop with no save request: '+JSON.stringify([settled[i].persistCalls.value,after[i].persistCalls.value,after[i].acceptedRequests.value]));
+  assert.ok(backups[i].filter(kind=>kind==='before-cloud-adoption').length<=1,'device '+i+': adoption copies do not pile up: '+backups[i].length);
+ });
+ assert.equal(sync.doc.rev,revision,'the cloud revision stops advancing');
+ assert.ok(sync.doc.rev<=8,'the devices settle within a few writes: rev '+sync.doc.rev);
+ const saved=JSON.parse(sync.doc.payload).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ assert.deepEqual(saved,['worked-later'],'the cloud board keeps the day’s latest worked-on row');
+});

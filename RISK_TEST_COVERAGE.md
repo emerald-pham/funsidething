@@ -1739,6 +1739,7 @@ its RISK test; the map follows.
 - RISK missing-task save loop: a task missing from the board is kept once, the saves settle with only the usual backups, and the Debug log records the repair without task text
 - RISK missing-task save loop: a deleted task stays deleted and Undo after a kept task settles as before
 - RISK missing-task save loop: on the older browser storage, a repeated same-day worked-on row is not kept back as a missing task either
+- RISK missing-task save loop: two signed-in devices with a repeated same-day worked-on row settle instead of saving and syncing each other forever
 
 ## tests/repository-process.test.js
 
