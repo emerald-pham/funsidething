@@ -12383,6 +12383,7 @@ test('RISK cloud save loop guard: a board that differs on every save after sign-
  const head=JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload);
  assert.deepEqual(head.tasks.filter(task=>!task.done).map(task=>task.title),[LOOP_KEPT_TITLE2348],'the board stays saved on the device');
  t.diagnostic(JSON.stringify({saveRuns:settled.persistCalls.value-signedIn.persistCalls.value,peerWrites:peer.writes(),revision,status:device.status(),toast:device.shim.document.getElementById('toast').textContent}));
+ assert.doesNotMatch(device.shim.document.getElementById('toast').textContent,/could not be saved on this device/,'the stop is not reported as a failed save on this device');
  // The stop holds no later work back: the next edit is a new save request.
  peer.stop();device.shim.document.getElementById('addInput').value='Edit after the stop';await ctx.onAction('add',{});
  await savesSettled2334(device);await syncSettle(300);
@@ -12449,4 +12450,24 @@ test('RISK cloud save loop guard: the support report names each cloud step with 
  assert.deepEqual(loopErrors.map(row=>row.stage),[stops[0].metadata.cloudStep==='push'?'push':'reconcile'],'the cloud error it set is in the report under that step');
  assert.ok(!report.includes(LOOP_KEPT_TITLE2348)&&!report.includes('Deleted before sign-in'),'the report holds no task text');
  assert.ok(Buffer.byteLength(report,'utf8')<=24*1024,'and stays within its 24 KiB limit: '+Buffer.byteLength(report,'utf8'));
+});
+
+test('RISK cloud save loop guard: Retry sync after a stop tries again once the loop has ended, and settles synced',async t=>{
+ const device=await signedInDevice2348(t,'retry'),{ctx}=device;
+ await device.signIn();
+ const peer=buggySecondClient2348(t,device);await peer.start();await savesSettled2334(device,1500);peer.stop();
+ assert.match(device.status().title,/failed \(save loop\)/,'positive control: the guard stopped the loop');
+ await ctx.onAction('sync-retry',{});await savesSettled2334(device);await syncSettle(300);
+ assert.equal(device.status().text,'☁ synced','Retry sync settles synced: '+device.status().title);
+});
+
+test('RISK cloud save loop guard: a later cloud read after a stop keeps the error showing instead of leaving the status on syncing',async t=>{
+ const device=await signedInDevice2348(t,'reread'),{ctx}=device;
+ await device.signIn();
+ const peer=buggySecondClient2348(t,device);await peer.start();await savesSettled2334(device,1500);peer.stop();
+ assert.match(device.status().title,/failed \(save loop\)/,'positive control: the guard stopped the loop');
+ // Returning to the app reads the cloud again; nothing new was asked to save.
+ await ctx.cloudPull();await savesSettled2334(device);await syncSettle(300);
+ assert.equal(device.status().text,'☁ error','the status still shows the error: '+device.status().title);
+ assert.match(device.status().title,/failed \(save loop\)/);
 });
