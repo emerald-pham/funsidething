@@ -4436,6 +4436,22 @@ const deviceHeadCommitsInFlight=new Set();
 function deviceOwnSaveBase(head){
   return head.payload===lastPersistedRaw?lastPersistedRaw:deviceOwnCommits.get(head.payload)?.base;
 }
+// #2334: puts back what {source} (the last saved board, or the last cloud
+// read before a push) holds that the live board lacks with no delete behind
+// it. Only a task coming back is news to the person, so the message and the
+// Debug log record (count and source, never titles or IDs) follow tasks, not
+// History rows or other evidence the same merge restores (#2333 review).
+function keepMissingTasks(source,keptFrom,message){
+  const live=new Set(state.tasks.map(task=>task.id));
+  const changed=mergeUndeletedTasks(state,source);
+  const keptTasks=state.tasks.filter(task=>!live.has(task.id)).length;
+  if(keptTasks){
+    toast(message,6000);
+    supportDiagnosticsObserve("kept-missing-task","completed","current",null,null,null,null,null,null,null,null,null,"unknown",
+      null,null,null,null,null,null,null,null,null,{keptTasks,keptFrom});
+  }
+  return changed;
+}
 /* The disk half of save(), on its own: writes what is in memory and does
    nothing else. save() also re-stamps updatedAt and schedules a cloud push,
    which is exactly right for an edit and exactly wrong for bookkeeping — the
@@ -4483,15 +4499,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   if(deviceStorageAuthority){if(!await reconcileDeviceLegacyCopy()) return reportDeviceSaveFailure("device-store","legacy-reconcile-failed","An older tab changed the board and its recovery copy could not be verified.");}
   else if(useLocal && !refreshBrowserCopy()) return false;
   if(lastPersistedRaw!==JSON.stringify(state) && validSavedPayload(lastPersistedRaw) && sameListOwner(state, JSON.parse(lastPersistedRaw))){
-    const liveTaskIds=new Set(state.tasks.map(task=>task.id));
-    const recovered=mergeUndeletedTasks(state, JSON.parse(lastPersistedRaw));
-    const keptTasks=state.tasks.filter(task=>!liveTaskIds.has(task.id)).length;
-    if(recovered){ recomputeRanks(); render(); }
-    if(keptTasks){
-      toast("A missing task was kept in the saved board.", 6000);
-      supportDiagnosticsObserve("kept-missing-task","completed","current",null,null,null,null,null,null,null,null,null,"unknown",
-        null,null,null,null,null,null,null,null,null,{keptTasks,keptFrom:"last-save"});
-    }
+    if(keepMissingTasks(JSON.parse(lastPersistedRaw),"last-save","A missing task was kept in the saved board.")){ recomputeRanks(); render(); }
   }
   const chanceSeed = state.chance?.seed;
   const requestGeneration = saveRequestGeneration;
@@ -5219,7 +5227,7 @@ function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schema
     // #2334: how many tasks a save kept that its board lacked, and from where. Counts only, never titles or IDs.
     if(stage==="kept-missing-task"&&keptDetails&&typeof keptDetails==="object"){
       if(Number.isSafeInteger(keptDetails.keptTasks)&&keptDetails.keptTasks>0&&keptDetails.keptTasks<=1000000)metadata.keptTasks=keptDetails.keptTasks;
-      if(keptDetails.keptFrom==="last-save")metadata.keptFrom=keptDetails.keptFrom;
+      if(["last-save","cloud-push"].includes(keptDetails.keptFrom))metadata.keptFrom=keptDetails.keptFrom;
     }
     // #2335: how many redundant backups a save removed and how many stayed. Counts only.
     if(stage==="backup-cleanup"&&keptDetails&&typeof keptDetails==="object")
@@ -6397,9 +6405,8 @@ async function sendPush(){
     }
     const sourceProjectionIssue=decisionProjectionIssue(state) || (knownCloud && decisionProjectionIssue(knownCloud));
     if(sourceProjectionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(sourceProjectionIssue);return;}
-    if(knownCloud && mergeUndeletedTasks(state,knownCloud)){
+    if(knownCloud && keepMissingTasks(knownCloud,"cloud-push","A missing task was kept before cloud sync.")){
       state.updatedAt=Date.now(); recomputeRanks(); render();
-      toast("A missing task was kept before cloud sync.", 6000);
     }
     const decisionIssue=decisionEvidenceIssue(state,pushAccount);
     if(decisionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(decisionIssue);return;}

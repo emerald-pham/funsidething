@@ -11266,6 +11266,35 @@ test('RISK missing-task save loop: two signed-in devices with a repeated same-da
  assert.deepEqual(saved,['worked-later'],'the cloud board keeps the day’s latest worked-on row');
 });
 
+// #2333 review: the repair a cloud push makes from the last cloud read showed
+// "A missing task was kept before cloud sync." for any merge change, and the
+// Debug log never recorded it.
+test('RISK missing-task save loop: the repair before a cloud push is logged with its count and source, and its message shows only when a task was kept',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),now=Date.now();
+ const kept=syncTask('private-cloud-kept','Private cloud kept title'),other=syncTask('other','Other task');
+ const sync=makeSyncHarness({rev:3,remote:syncState({tasks:[kept,other],updatedAt:now-1000,
+  workLog:[{id:'worked-in-cloud',taskId:other.id,title:other.title,kind:'worked',at:now-3*86400000}]})});
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:'chain-scanner-2334-push-'+Date.now()+'-'+Math.random(),sharedStorage:sharedScannerStorage(),
+  cloudSyncFactory:sync.factory,beforeStateReady:(ctx,shim)=>{shim.window.CLOUD_PUSH_DELAY_MS=20;}});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast'),message='A missing task was kept before cloud sync.';
+ await ctx.cloudPull();await savesSettled2334(app);await syncSettle(300);
+ assert.ok(ctx.state.tasks.some(task=>task.id===kept.id),'positive control: the cloud board is on the device');
+ const repairs=()=>JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='kept-missing-task').map(event=>event.metadata);
+ // A History row the last cloud read had is missing with no clear behind it: the push puts it back, but keeps no task.
+ ctx.state.workLog=ctx.state.workLog.filter(entry=>entry.id!=='worked-in-cloud');toastBox.textContent='';
+ ctx.save();await savesSettled2334(app);await syncSettle(300);
+ assert.ok(ctx.state.workLog.some(entry=>entry.id==='worked-in-cloud'),'positive control: the push put the History row back');
+ assert.notEqual(toastBox.textContent,message,'no task was kept, so none is reported kept');
+ assert.deepEqual(repairs(),[],'and no repair is logged');
+ // A task the last cloud read had is missing, with no delete behind it.
+ ctx.state.tasks=ctx.state.tasks.filter(task=>task.id!==kept.id);toastBox.textContent='';
+ ctx.save();await savesSettled2334(app);await syncSettle(300);
+ assert.ok(ctx.state.tasks.some(task=>task.id===kept.id),'the task is kept');
+ assert.equal(toastBox.textContent,message,'the person is told the task was kept');
+ assert.deepEqual(repairs(),[{keptTasks:1,keptFrom:'cloud-push'}],'the Debug log records the repair, its count and source');
+ assert.ok(!ctx.supportDiagnosticsText().includes('Private cloud kept title'),'and no task text');
+});
+
 // #2333 review: when a day's two worked-on sessions carry the same time, the
 // History tidy-up kept whichever came first in the list. Two devices holding
 // them in opposite orders each kept a different one and recorded the other as
