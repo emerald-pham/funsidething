@@ -11613,6 +11613,44 @@ test('RISK redundant backups: a stale-tab draft holding an edit that lost to ano
  assert.equal(listed(),1,'the draft with the losing edit stays in the older list');
 });
 
+// #2333 review: the mark that keeps a draft holding a losing edit covered only
+// task fields, settings and contexts, so a draft whose scan mode (or chain,
+// marks, chance) lost to another tab's newer change was cleared as contained.
+test('RISK redundant backups: a stale-tab draft whose scan mode lost to another tab’s newer change stays after later saves, on the device and in the older browser list',async t=>{
+ // Device: another writer changes the scan mode while this tab's own change is saving.
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);
+ const startMode=ctx.state.scanMode;
+ const [peerMode,myMode]=['halving','squared','chance','descending'].filter(mode=>mode!==startMode);
+ let calls=0;
+ store.commitHead=async options=>{
+  if(++calls===1){
+   const peer=JSON.parse((await store.readHead()).payload);peer.scanMode=peerMode;
+   assert.equal((await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)})).ok,true);
+   return {conflict:true};
+  }
+  return original(options);
+ };
+ ctx.state.scanMode=myMode;assert.equal(await ctx.persist(),true);
+ store.commitHead=original;
+ assert.equal(JSON.parse((await store.readHead()).payload).scanMode,peerMode,'positive control: the newer peer scan mode wins');
+ const losing=()=>store.listBackups().then(rows=>[...rows].filter(row=>row.kind==='stale-tab-draft'&&JSON.parse(row.payload).scanMode===myMode).length);
+ assert.equal(await losing(),1,'positive control: the repair kept the losing scan mode as a draft');
+ ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(await losing(),1,'the draft with the losing scan mode stays on the device');
+ // Older browser list: two tabs on one browser storage, the second rebased onto the first.
+ const initial=syncState({tasks:[syncTask('base','Original')]}),raw=JSON.stringify(initial);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});t.after(()=>{a.dispose?.();b.dispose?.();});
+ const [browserPeer,browserMine]=['halving','squared','chance','descending'].filter(mode=>mode!==a.ctx.state.scanMode);
+ a.ctx.state.scanMode=browserPeer;assert.equal(await a.ctx.persist(),true);
+ b.ctx.state.scanMode=browserMine;await b.ctx.persist();
+ assert.equal(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).scanMode,browserPeer,'positive control: the newer browser copy’s scan mode wins');
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').filter(row=>row.kind==='stale-tab-draft'&&JSON.parse(row.payload).scanMode===browserMine).length;
+ assert.equal(listed(),1,'positive control: the rebase kept the losing scan mode as a draft');
+ b.ctx.addTask('A later edit');assert.equal(await b.ctx.persist(),true);
+ assert.equal(listed(),1,'the draft with the losing scan mode stays in the older list');
+});
+
 // #2333 review: retention never shortens. A stale-tab draft the containment
 // proof may clear on a later save cannot be the copy that keeps another one,
 // or the board that copy promised to keep would go with the draft.

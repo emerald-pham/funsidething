@@ -3801,26 +3801,52 @@ const CONTAINED_DRAFT_CHECK_CHARS=24000000;
 // this device or any other recovery state that keeps daily backups longer.
 function redundantBackupsAllowed(){return !deviceRecoveryCloudHold&&!dailyBackupsHeldForRecovery();}
 const uncontainedDraftHashes=new Set(); // not contained when checked; rechecked after a reload
-// A draft written because another tab's newer change to the same field won
-// holds an edit no saved board has, which is not an older value the board
-// later replaced. Such a draft is marked when it is written and is never
-// cleared as contained. Drafts from before this mark follow the rule above.
-// Without the board both copies started from, any difference counts.
-function draftConflictsWithPeer(draft,peer,base){
-  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-  const changedBoth=(mine,theirs,before)=>!same(mine,theirs)&&(!base||!same(mine,before)&&!same(theirs,before));
-  const peerTasks=new Map((peer?.tasks||[]).map(task=>[task.id,task])),baseTasks=new Map((base?.tasks||[]).map(task=>[task.id,task]));
-  for(const task of draft?.tasks||[]){
-    const theirs=peerTasks.get(task.id),before=baseTasks.get(task.id);
-    // A task the other tab deleted after this tab edited it: the edit lost.
-    if(!theirs){if(before&&!same(task,before))return true;continue;}
-    for(const key of new Set([...Object.keys(task),...Object.keys(theirs)]))
-      if(changedBoth(task[key],theirs[key],before?.[key]))return true;
-  }
-  const settings=draft?.settings||{},peerSettings=peer?.settings||{},baseSettings=base?.settings||{};
-  for(const key of new Set([...Object.keys(settings),...Object.keys(peerSettings)]))
-    if(changedBoth(settings[key],peerSettings[key],baseSettings[key]))return true;
-  return changedBoth(draft?.contexts,peer?.contexts,base?.contexts);
+// A draft written because a merge kept another copy's value over an edit it
+// made holds that edit and no saved board does: it is not an older value the
+// board later replaced. Such a draft is marked when it is written and is
+// never cleared as contained. Drafts from before this mark follow the rule
+// above. #2333 review: the mark comes from the merge itself. After the merge,
+// mergeLosesDraftEdits compares what the draft changed from the board both
+// copies started from (base) with what the merged board kept: every task and
+// context field, settings, considered, cantAt and workedAt key by key (the
+// way rebasePendingBoardFields resolves them), and every other board field
+// whole, so chain, scan mode and chance count too. A task or context the merge
+// dropped after the draft changed it counts. Without a base nothing is
+// rebased, so any difference counts. Membership, History, deletions and
+// decisions merge by their own evidence and are left to the containment proof.
+const MERGE_EVIDENCE_FIELDS=["updatedAt","tasks","contexts","workLog","deletionLog",
+  "deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps","clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps",
+  "decisionEvents","decisionEventsRecovery","decisionBaseline","decisionBaselineRecovery"];
+function mergeLosesDraftEdits(draft,merged,base){
+  if(!sameListOwner(draft,merged))return true;
+  const evidence=new Set([...DEVICE_LOCAL_KEYS,...MERGE_EVIDENCE_FIELDS]);
+  const same=(a,b,key)=>Object.hasOwn(a,key)===Object.hasOwn(b,key)&&JSON.stringify(a[key])===JSON.stringify(b[key]);
+  const record=value=>value&&typeof value==="object"&&!Array.isArray(value);
+  // A field the draft changed from base that the merged board holds otherwise.
+  const fieldsLost=(mine,kept,before,skip=new Set(),nested=new Set())=>{
+    for(const key of new Set([...Object.keys(mine),...Object.keys(before||{})])){
+      if(skip.has(key)||before&&same(mine,before,key))continue;
+      if(nested.has(key)&&record(mine[key])&&record(kept[key])&&(!before||record(before[key]))){
+        if(fieldsLost(mine[key],kept[key],before?.[key]||null))return true;
+      }else if(!same(mine,kept,key))return true;
+    }
+    return false;
+  };
+  // Tasks and contexts by id: a changed item the merge dropped, or one of its fields.
+  const itemsLost=list=>{
+    const byId=board=>new Map((Array.isArray(board?.[list])?board[list]:[]).map(item=>[item.id,item]));
+    const mine=byId(draft),kept=byId(merged),before=base?byId(base):null;
+    for(const [id,item] of mine){
+      const prior=before?.get(id)||null,now=kept.get(id);
+      if(!now){if(!prior||JSON.stringify(item)!==JSON.stringify(prior))return true;continue;}
+      if(fieldsLost(item,now,base?prior||{}:null,new Set(["id"])))return true;
+    }
+    // A context the draft removed that the merge kept.
+    if(list==="contexts"&&before)for(const id of before.keys())if(!mine.has(id)&&kept.has(id))return true;
+    return false;
+  };
+  return itemsLost("tasks")||itemsLost("contexts")||
+    fieldsLost(draft,merged,base,evidence,new Set(["settings","considered","cantAt","workedAt"]));
 }
 function draftContainedInBoard(draftRaw,boardRaw){
   const board=JSON.parse(boardRaw),draft=JSON.parse(draftRaw);
@@ -4093,9 +4119,10 @@ async function reconcileDeviceLegacyCopy(){
    to the same field wins, with the displaced draft retained for recovery.
    Completion, deletion, rating observations and prerequisites keep their causal merge.
    Effective rating values follow the same observed-field conflict policy. */
+const TASK_EDITOR_FIELDS=["title","url","due","startsAt","evergreen","evergreenHours","evergreenResetAtDay","ctx","mu","sigma","woopPlan"];
 function rebaseTaskEditorFields(peer,local,base){
   if(!base || !sameListOwner(peer,local) || !sameListOwner(peer,base)) return false;
-  const fields=["title","url","due","startsAt","evergreen","evergreenHours","evergreenResetAtDay","ctx","mu","sigma","woopPlan"];
+  const fields=TASK_EDITOR_FIELDS;
   const originals=new Map(base.tasks.map(t=>[t.id,t])),drafts=new Map(local.tasks.map(t=>[t.id,t]));
   const equal=(a,b,key)=>Object.hasOwn(a,key)===Object.hasOwn(b,key) && JSON.stringify(a[key])===JSON.stringify(b[key]);
   let changed=false;
@@ -4214,11 +4241,13 @@ function refreshBrowserCopy(){
   if(recoveredHead!==lastPersistedRaw){
     // This tab may have an edit that has not reached disk. Keep it restorable
     // before adopting the newer browser copy and cancelling its stale push.
+    // #2333 review: the mark comes from the merge below, run here on copies.
     let displaced=true;
     try{
       const peer=JSON.parse(recoveredHead),base=validSavedPayload(lastPersistedRaw)?JSON.parse(lastPersistedRaw):null,mine=JSON.parse(JSON.stringify(state));
-      hydrateState(peer);hydrateState(mine);if(base)hydrateState(base);
-      displaced=draftConflictsWithPeer(mine,peer,base);
+      dropRemovedFields(peer);hydrateState(peer);hydrateState(mine);if(base)hydrateState(base);
+      if(sameListOwner(peer,mine)){rebasePendingBoardFields(peer,mine,base);mergeUndeletedTasks(peer,mine);}
+      displaced=mergeLosesDraftEdits(mine,peer,base);
     }catch(e){}
     if(state && !saveLocalBackup("stale-tab-draft", JSON.stringify(state),false,0,null,null,displaced?{displacedEdits:true}:null)){
       toast("Browser copy changed, but its draft could not be backed up. Save stopped.", 7000);
@@ -4566,10 +4595,10 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           }else{
             const base=ownBase??ancestorRaw,ancestor=validSavedPayload(base)?JSON.parse(base):null;
             if(ancestor) hydrateState(ancestor);
-            const displaced=draftConflictsWithPeer(mine,next,ancestor);
             rebasePendingBoardFields(next,mine,ancestor);
             if(mergeUndeletedTasks(next,mine))next.syncDirty=true;carryProtectedBackupIds(next,mine);
             retainConfirmedDeviceRevision(next,mine);
+            const displaced=mergeLosesDraftEdits(mine,next,ancestor);
             const merged=JSON.stringify(next),at=Date.now();
             result=await commit({expectedHash:latest.hash,payload:merged,account:next.syncAccount??null,
               ...(completionSourceBackup?{backups:[completionSourceBackup]}:{}),
@@ -4603,6 +4632,9 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           if(tailAttempt>=3) return reportDeviceSaveFailure("device-store","changed-during-save","The recovery draft kept changing; keep this tab open and try again.");
           // The first CAS backup predates this gesture. Preserve its exact
           // bytes before a peer-conflicting field can leave the live board.
+          // #2335: always marked, so the containment proof never clears it:
+          // the CAS contracts keep this exact draft after the save, and the
+          // follow-up save below would otherwise clear it at once.
           const at=Date.now();
           const saved=await deviceWriteBeforeDiagnostics("putBackup",{expectedHash:result.hash,
             backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:liveRaw,displacedEdits:true}});
