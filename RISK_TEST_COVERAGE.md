@@ -1787,6 +1787,10 @@ its RISK test; the map follows.
 - RISK redundant backups: on the older browser backup list, a save whose board write fails removes nothing, and the next successful save completes the clean-up
 - RISK redundant backups: on the older browser backup list, a draft found not contained is checked again only after the app reopens, and then cleared once the board holds it
 - RISK redundant backups: on the older browser backup list, a copy is never cleared as a repeat of a stale-tab draft a later save may clear
+- RISK redundant backups: a save checks drafts only within its time budget, oldest first and always at least one, so a pile shrinks every save without holding the save
+- RISK redundant backups: a draft whose stored text cannot be read is tried once per opening, not by every save
+- RISK redundant backups: a copy kept until it is deleted is never cleared as a repeat of a copy a pin keeps only for now, so its board stays after the pin is released
+- RISK redundant backups: on the older browser backup list, a copy kept until it is deleted is never cleared as a repeat of Restore’s safety copy, so the replaced board stays after that copy expires
 
 ## tests/repository-process.test.js
 
