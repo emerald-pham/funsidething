@@ -12321,3 +12321,232 @@ test('RISK redundant backups: on the older browser backup list, a copy kept unti
  ctx.addTask('An edit eight days later');assert.equal(await ctx.persist(),true);
  assert.deepEqual(holding(),['other-browser-copy'],'the replaced board is still restorable after Restore’s safety copy expires');
 });
+
+// #2347 (spec #2346): signing in settles. Each case loads the whole app on fake
+// device storage (IndexedDB) with the fake Firebase SDK and signs in through the
+// SDK's auth emitter, which runs the app's own pull just as the browser does
+// (there the app's cloudPull is a window global). The cases read only what the
+// person or the support report sees: the save counts, the sync button, the
+// writes that reach the cloud copy and the device's backups.
+const ACCOUNT2347={uid:'owner',email:'e@example.com'};
+async function device2347(t,{docs=new Map(),indexedDB,dbName,storage=sharedScannerStorage(),signedIn=false,pushDelayMs=20}={}){
+ if(!indexedDB)({indexedDB}=await import('fake-indexeddb'));
+ dbName??='chain-scanner-2347-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ const {ctx}=app;
+ const faults={authPending:true};
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:docs,failures:faults,timeoutMs:5000,recordSyncError:ctx.recordSyncError});
+ ctx.window.cloudPull=ctx.cloudPull;ctx.window.CLOUD_PUSH_DELAY_MS=pushDelayMs;ctx.closeModal();
+ let closed=false;
+ const close=async()=>{if(closed)return;closed=true;backend.CS.suspend();
+  try{vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}await app.dispose?.();};
+ t.after(close);
+ const device={...app,backend,faults,docs,indexedDB,dbName,storage,close,
+  signIn(){backend.emitAuth(ACCOUNT2347);},signOut(){backend.emitAuth(null);},
+  status(){return app.shim.document.getElementById('syncBtn').textContent;},
+  saves(){const save=JSON.parse(ctx.supportDiagnosticsText()).save;return {runs:save.persistCalls.value,accepted:save.acceptedRequests.value,active:save.activePersistCalls.value};},
+  async backups(){return (await ctx.window.ScannerDeviceStore.listBackups()).length;},
+  async cloud(){const read=await backend.CS.pull();return {rev:read.rev,board:JSON.parse(read.payload)};}};
+ if(signedIn){device.signIn();await signInSettled2347(device);}
+ return device;
+}
+// Bounded: the settle period is the claim. Save runs still starting at the
+// limit, or a status still short of synced, are what the case reports.
+async function signInSettled2347(device,{quietMs=1200,limitMs=8000}={}){
+ const started=Date.now();let last=device.saves();
+ while(Date.now()-started<limitMs){
+  await new Promise(resolve=>setTimeout(resolve,quietMs));
+  const now=device.saves();
+  if(now.runs===last.runs&&now.active===0&&device.status()==='☁ synced')return {...now,settled:true};
+  last=now;
+ }
+ return {...device.saves(),settled:false};
+}
+function cloudRevisions2347(device,from=0){return device.backend.writes.slice(from).map(write=>write.rev);}
+function increasing2347(revisions){return revisions.every((rev,i)=>i===0||rev>revisions[i-1]);}
+// The reporter's shape: a phone, signed out, deletes one task and then another,
+// while a laptop signed in to the same account deletes only the second. The
+// phone's deletion evidence then lists its keys in another order than the
+// cloud copy's. The phone is left signed out and settled, ready to sign in.
+async function divergentDeletions2347(t){
+ const docs=new Map(),phone=await device2347(t,{docs,signedIn:true});
+ for(const title of ['Deleted on the phone first','Deleted on both','Kept'])phone.ctx.addTask(title);
+ await signInSettled2347(phone);
+ const id=title=>phone.ctx.state.tasks.find(task=>task.title===title).id;
+ const first=id('Deleted on the phone first'),both=id('Deleted on both'),kept=id('Kept');
+ assert.ok((await phone.cloud()).board.tasks.some(task=>task.id===both),'positive control: the cloud copy has the tasks');
+ phone.signOut();await signInSettled2347(phone,{limitMs:1500});
+ phone.ctx.deleteTask(first);phone.ctx.deleteTask(both);
+ const laptop=await device2347(t,{docs,signedIn:true});
+ laptop.ctx.deleteTask(both);await signInSettled2347(laptop);await laptop.close();
+ const before=await signInSettled2347(phone,{limitMs:1500});
+ return {docs,phone,first,both,kept,before,backupsBefore:await phone.backups(),writesBefore:phone.backend.writes.length};
+}
+async function assertDeletionsSynced2347(device,{first,both},message){
+ const cloud=await device.cloud();
+ assert.ok(!cloud.board.tasks.some(task=>task.id===first||task.id===both),message+': the cloud copy has both deletions');
+ assert.ok(!device.ctx.state.tasks.some(task=>task.id===first||task.id===both),message+': and so does the board');
+ assert.equal(device.ctx.cloudPayload(),JSON.stringify(cloud.board),message+': the cloud copy is the board');
+ return cloud;
+}
+
+test('RISK sign-in settles: a board whose deletions are listed in another order than the cloud copy saves and pushes once after sign-in instead of re-sending the push from sendPush forever',async t=>{
+ // The reporter's phone: from sign-in on, a save ran every 1.4 s with no save
+ // request and no cloud write, and the status stayed on syncing. The path was
+ // sendPush -> persist() -> "payload !== cloudPayload()" -> pendingPush, then
+ // sendPush's finally block calling sendPush again: the merge from the last
+ // cloud read before the push and the merge from the last saved board inside
+ // persist() each put the deletion evidence back in their own key order.
+ const {phone,first,both,before,backupsBefore,writesBefore}=await divergentDeletions2347(t);
+ phone.signIn();
+ const after=await signInSettled2347(phone);t.diagnostic(JSON.stringify({before,after}));
+ assert.equal(after.accepted,before.accepted,'signing in is no save request');
+ assert.ok(after.runs-before.runs<=4,'save runs stop within the settle period after sign-in, not re-sent by sendPush: '+JSON.stringify({before,after}));
+ assert.equal(phone.status(),'☁ synced','the status reaches synced');
+ assert.equal(cloudRevisions2347(phone,writesBefore).length,1,'one push reaches the cloud copy: '+JSON.stringify(cloudRevisions2347(phone,writesBefore)));
+ await assertDeletionsSynced2347(phone,{first,both},'after sign-in');
+ assert.ok((await phone.backups())-backupsBefore<=1,'sign-in adds at most the one safety copy adoption makes');
+});
+
+// Reopened on its saved board, as an installed app is: the session that first
+// opened an empty app adopts the cloud copy at each sign-in (freshClient).
+async function reopened2347(t,device){
+ await device.close();
+ return device2347(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage});
+}
+
+test('RISK sign-in settles: opening and signing in, and signing in again, with a board equal to the cloud copy makes no save and no push',async t=>{
+ const first=await device2347(t,{signedIn:true});
+ for(const title of ['One','Two'])first.ctx.addTask(title);
+ assert.equal((await signInSettled2347(first)).settled,true,'positive control: the board reaches the cloud');
+ const phone=await reopened2347(t,first);
+ const before=phone.saves(),backups=await phone.backups();
+ for(const step of ['opening signed in','signing in again']){
+  if(step==='signing in again'){phone.signOut();await signInSettled2347(phone,{limitMs:1500});}
+  phone.signIn();
+  const after=await signInSettled2347(phone);
+  assert.equal(after.settled,true,step+': the status reaches synced');
+  assert.deepEqual([after.runs,after.accepted],[before.runs,before.accepted],step+': no save runs and no save request: '+JSON.stringify({before,after}));
+  assert.equal(phone.backend.writes.length,0,step+': nothing is pushed');
+  assert.equal(await phone.backups(),backups,step+': the backup list does not grow');
+ }
+});
+
+test('RISK sign-in settles: a cloud copy with repeated deletion rows is repaired, saved and pushed once, and reading the pushed copy back reports nothing more to repair',async t=>{
+ const docs=new Map(),phone=await device2347(t,{docs,signedIn:true});
+ for(const title of ['Deleted','Kept'])phone.ctx.addTask(title);
+ await signInSettled2347(phone);
+ phone.ctx.deleteTask(phone.ctx.state.tasks.find(task=>task.title==='Deleted').id);
+ await signInSettled2347(phone);phone.signOut();await signInSettled2347(phone,{limitMs:1500});
+ // An older client repeats the deletion row in the cloud copy, as the
+ // September 2026 replacement bug did.
+ const older=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000});t.after(()=>older.CS.suspend());
+ const read=await older.CS.pull(),board=JSON.parse(read.payload);
+ assert.equal(board.deletionLog.length,1,'positive control: the cloud copy has the one deletion row');
+ board.deletionLog=[board.deletionLog[0],board.deletionLog[0]];
+ assert.ok((await older.CS.push(JSON.stringify(board),Date.now(),read.rev))?.ok,'the older client writes the repeated row');
+ const before=phone.saves(),writes=phone.backend.writes.length;
+ phone.signIn();
+ const after=await signInSettled2347(phone);t.diagnostic(JSON.stringify({before,after}));
+ assert.equal(after.accepted,before.accepted,'signing in is no save request');
+ assert.ok(after.runs-before.runs<=4,'save runs stop within the settle period: '+JSON.stringify({before,after}));
+ assert.equal(phone.status(),'☁ synced','the status reaches synced');
+ assert.equal(cloudRevisions2347(phone,writes).length,1,'the repair is pushed once');
+ const repaired=await phone.cloud();
+ assert.equal(repaired.board.deletionLog.length,1,'the cloud copy holds the deletion row once');
+ const reopened=await reopened2347(t,phone),again=reopened.saves();
+ reopened.signIn();
+ const settled=await signInSettled2347(reopened);
+ assert.equal(settled.settled,true,'reading the pushed copy back settles at synced');
+ assert.equal(settled.runs,again.runs,'reading the pushed copy back saves nothing');
+ assert.equal(reopened.backend.writes.length,0,'and pushes nothing');
+});
+
+test('RISK sign-in settles: opening the app already signed in, with deletions listed in another order than the cloud copy, settles after one save and one push',async t=>{
+ const {phone,first,both,writesBefore}=await divergentDeletions2347(t);
+ await phone.close();
+ const reopened=await device2347(t,{docs:phone.docs,indexedDB:phone.indexedDB,dbName:phone.dbName,storage:phone.storage});
+ const before=reopened.saves();
+ reopened.signIn(); // the restored session, as the auth emitter reports it at startup
+ const after=await signInSettled2347(reopened);t.diagnostic(JSON.stringify({before,after}));
+ assert.equal(after.accepted,before.accepted,'opening is no save request');
+ assert.ok(after.runs-before.runs<=4,'save runs stop within the settle period: '+JSON.stringify({before,after}));
+ assert.equal(reopened.status(),'☁ synced','the status reaches synced');
+ assert.equal(cloudRevisions2347(reopened).length,1,'one push reaches the cloud copy');
+ await assertDeletionsSynced2347(reopened,{first,both},'after opening');
+ assert.ok(phone.backend.writes.length===writesBefore,'the closed app pushed nothing more');
+});
+
+test('RISK sign-in settles: a change from a second signed-in device causes one read and one save here and no push back',async t=>{
+ const {docs,phone,first,both}=await divergentDeletions2347(t);
+ phone.signIn();await signInSettled2347(phone);
+ await assertDeletionsSynced2347(phone,{first,both},'positive control');
+ const laptop=await device2347(t,{docs,signedIn:true});
+ laptop.ctx.addTask('Added on the laptop');await signInSettled2347(laptop);
+ const revision=docs.get('users/owner').rev,before=phone.saves(),writes=phone.backend.writes.length;
+ // The phone's live listener reports the laptop's write, as Firestore does.
+ const root=phone.backend.subscriptions.find(entry=>entry.active&&entry.reference.path==='users/owner');
+ assert.ok(root,'positive control: the phone listens to the cloud copy');
+ phone.backend.emitSnapshot(root,docs.get('users/owner'));
+ const after=await signInSettled2347(phone);await signInSettled2347(laptop);t.diagnostic(JSON.stringify({before,after}));
+ assert.ok(phone.ctx.state.tasks.some(task=>task.title==='Added on the laptop'),'the phone has the laptop’s task');
+ assert.ok(after.runs-before.runs<=1,'one save here: '+JSON.stringify({before,after}));
+ assert.equal(phone.backend.writes.length,writes,'and no push back');
+ await new Promise(resolve=>setTimeout(resolve,1500));
+ assert.equal(docs.get('users/owner').rev,revision,'the cloud revision stops: no ping-pong');
+});
+
+test('RISK sign-in settles: going offline right after sign-in waits quietly and settles once after reconnecting',async t=>{
+ const {phone,first,both,before,writesBefore}=await divergentDeletions2347(t);
+ const offline=Object.assign(Error('offline'),{code:'unavailable'});
+ phone.faults.serverOffline=true;phone.faults.push=offline;
+ phone.signIn();
+ const waiting=await signInSettled2347(phone,{limitMs:3000});
+ assert.notEqual(phone.status(),'☁ synced','positive control: offline, the first sync cannot finish');
+ assert.ok(waiting.runs-before.runs<=2,'offline, the phone does not keep saving: '+JSON.stringify({before,waiting}));
+ assert.equal(phone.backend.writes.length,writesBefore,'and nothing reaches the cloud');
+ delete phone.faults.serverOffline;delete phone.faults.push;
+ phone.shim.window.dispatchEvent({type:'online'});
+ const after=await signInSettled2347(phone);t.diagnostic(JSON.stringify({before,waiting,after}));
+ assert.equal(after.accepted,before.accepted,'no save request');
+ assert.ok(after.runs-before.runs<=4,'save runs stop within the settle period after reconnecting: '+JSON.stringify({before,after}));
+ assert.equal(phone.status(),'☁ synced','the status reaches synced');
+ assert.equal(cloudRevisions2347(phone,writesBefore).length,1,'one push reaches the cloud copy');
+ await assertDeletionsSynced2347(phone,{first,both},'after reconnecting');
+});
+
+test('RISK sign-in settles: reloading in the middle of the first sync settles once on the next opening',async t=>{
+ const {phone,first,both}=await divergentDeletions2347(t);
+ phone.signIn();await new Promise(resolve=>setTimeout(resolve,40));
+ await phone.close();
+ const reopened=await device2347(t,{docs:phone.docs,indexedDB:phone.indexedDB,dbName:phone.dbName,storage:phone.storage});
+ const before=reopened.saves();
+ reopened.signIn();
+ const after=await signInSettled2347(reopened);t.diagnostic(JSON.stringify({before,after}));
+ assert.ok(after.runs-before.runs<=4,'save runs stop within the settle period: '+JSON.stringify({before,after}));
+ assert.equal(reopened.status(),'☁ synced','the status reaches synced');
+ assert.ok(cloudRevisions2347(reopened).length<=1,'at most one push from the reopened app');
+ await assertDeletionsSynced2347(reopened,{first,both},'after reloading');
+});
+
+test('RISK sign-in settles: a completion and its Undo during the first sync both apply once and reach the cloud in revision order',async t=>{
+ const {phone,first,both,kept,before,writesBefore}=await divergentDeletions2347(t);
+ phone.signIn();
+ await new Promise(resolve=>setTimeout(resolve,40));
+ phone.ctx.doneTask(kept);
+ assert.equal(phone.ctx.state.tasks.find(task=>task.id===kept).done,true,'positive control: the task is done');
+ await new Promise(resolve=>setTimeout(resolve,200));
+ phone.ctx.undo();
+ assert.equal(phone.ctx.state.tasks.find(task=>task.id===kept).done,false,'Undo reopens it');
+ const after=await signInSettled2347(phone);t.diagnostic(JSON.stringify({before,after,revisions:cloudRevisions2347(phone,writesBefore)}));
+ assert.ok(after.accepted>before.accepted,'the completion and Undo are save requests');
+ assert.equal(after.settled,true,'save runs stop within the settle period and the status reaches synced: '+JSON.stringify({before,after}));
+ const revisions=cloudRevisions2347(phone,writesBefore);
+ // Each request saves once; each push saves before it is sent and again for
+ // its acknowledgement; the sign-in adoption saves once.
+ assert.ok(after.runs-before.runs<=(after.accepted-before.accepted)+2*revisions.length+1,'no save beyond those: '+JSON.stringify({before,after,revisions}));
+ assert.ok(revisions.length>=1&&increasing2347(revisions),'pushes reach the cloud at increasing revisions: '+JSON.stringify(revisions));
+ const cloud=await assertDeletionsSynced2347(phone,{first,both},'after the completion and Undo');
+ assert.equal(cloud.board.tasks.find(task=>task.id===kept).done,false,'the cloud copy has the Undo, not the completion');
+ assert.equal(cloud.rev,revisions.at(-1),'the last push is the cloud copy');
+});

@@ -1806,6 +1806,14 @@ its RISK test; the map follows.
 - RISK redundant backups: a draft whose stored text cannot be read is tried once per opening, not by every save
 - RISK redundant backups: a copy kept until it is deleted is never cleared as a repeat of a copy a pin keeps only for now, so its board stays after the pin is released
 - RISK redundant backups: on the older browser backup list, a copy kept until it is deleted is never cleared as a repeat of Restore’s safety copy, so the replaced board stays after that copy expires
+- RISK sign-in settles: a board whose deletions are listed in another order than the cloud copy saves and pushes once after sign-in instead of re-sending the push from sendPush forever
+- RISK sign-in settles: opening and signing in, and signing in again, with a board equal to the cloud copy makes no save and no push
+- RISK sign-in settles: a cloud copy with repeated deletion rows is repaired, saved and pushed once, and reading the pushed copy back reports nothing more to repair
+- RISK sign-in settles: opening the app already signed in, with deletions listed in another order than the cloud copy, settles after one save and one push
+- RISK sign-in settles: a change from a second signed-in device causes one read and one save here and no push back
+- RISK sign-in settles: going offline right after sign-in waits quietly and settles once after reconnecting
+- RISK sign-in settles: reloading in the middle of the first sync settles once on the next opening
+- RISK sign-in settles: a completion and its Undo during the first sync both apply once and reach the cloud in revision order
 
 ## tests/repository-process.test.js
 
