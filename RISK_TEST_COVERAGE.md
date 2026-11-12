@@ -1541,7 +1541,7 @@ its RISK test; the map follows.
 - RISK device save settle: ordinary signed-out edits during slow device commits never collide with the same tab saving
 - RISK device save settle: ordinary signed-out edits during slow serialised device commits save every edit and show no save warning
 - RISK device save settle: actions saved at once during slow serialised device commits are all saved with no save warning
-- RISK device save settle: a save queued behind a slow commit of this tab still merges another copy\
+- RISK device save settle: a save queued behind a slow commit of this tab still merges the save of another copy instead of refusing
 - RISK device save settle: a save of this tab whose own commit takes over five seconds still saves its edit with no warning
 - RISK device save settle: an older save that runs out of repairs after a newer save of this tab made its edit durable shows no warning
 - RISK device save settle: repeated edits of one task during slow device commits keep the newest edit

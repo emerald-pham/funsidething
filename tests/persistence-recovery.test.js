@@ -860,7 +860,7 @@ test('RISK device save settle: actions saved at once during slow serialised devi
 // can first wait in IndexedDB's queue behind this tab's own slow commit; that
 // wait is not time spent on another copy, so the budget starts when the save's
 // first commit returns.
-test('RISK device save settle: a save queued behind a slow commit of this tab still merges another copy\'s save instead of refusing',{timeout:60000},async t=>{
+test('RISK device save settle: a save queued behind a slow commit of this tab still merges the save of another copy instead of refusing',{timeout:60000},async t=>{
  const f=await deviceSaveSettleApp2324(t,{name:'settle-queued-peer',tasks:[syncTask('queued-peer-anchor','Anchor'),syncTask('queued-peer-first','First'),syncTask('queued-peer-second','Second'),syncTask('queued-peer-theirs','Theirs')]});
  assert.equal(await f.ctx.persist(),true);
  const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
@@ -937,7 +937,8 @@ test('RISK device save settle: an older save that runs out of repairs after a ne
  await f.alive(new Promise(resolve=>setTimeout(resolve,50)));
  const toast=f.shim.document.getElementById('toast');
  assert.equal(f.ctx.deviceSaveIssue(),null,'no device save issue for edits already saved; the older save returned '+older);
- assert.equal(toast.classList.contains('show')&&/isn't saved yet/.test(toast.textContent),false,'no "isn\'t saved yet" message is held on screen');
+ const held=toast.classList.contains('show')?toast.textContent:'';
+ assert.doesNotMatch(held,/isn't saved yet/,'no "isn\'t saved yet" message is held on screen');
 });
 
 test('RISK device save settle: repeated edits of one task during slow device commits keep the newest edit',async t=>{
