@@ -13297,6 +13297,52 @@ test("UI #221: for a moment after Return as candidate closes the editor, the sca
   });
 });
 
+// #221 release review: the pause is for a person's presses. A browser marks a
+// click the page makes itself with element.click() as untrusted (isTrusted
+// false), and a person's tap or key press of a button as trusted. The shim's
+// events are plain objects: here a person's press is the plain click the other
+// tests use, and the app's own click carries isTrusted:false, as a browser's does.
+test("UI #221: the pause after Return as candidate never cancels a click the app makes itself, so a recovery file prepared meanwhile still downloads", async () => {
+  const { ctx, shim } = await loadApp({ seed: 2244 });
+  ctx.addTask("First dot", true);
+  const middle = ctx.addTask("Middle dot", true);
+  ctx.addTask("Benchmark dot", true);
+  ctx.addTask("Waiting candidate", false);
+  ctx.render();
+  await settledBoard221();
+  const panel = scanPanelDom221(shim);
+  // A browser's download link: its click() is the page's own click, and the
+  // file is saved unless a listener cancels that click.
+  const files = { saved: [], cancelled: [] }, createElement = shim.document.createElement;
+  shim.document.createElement = tag => {
+    const element = createElement.call(shim.document, tag);
+    if (String(tag).toLowerCase() !== "a") return element;
+    element.closest = () => null; element.remove = () => {};
+    element.click = () => {
+      const event = { type: "click", isTrusted: false, detail: 0, target: element, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+      shim.document.dispatchEvent(event);
+      (event.defaultPrevented ? files.cancelled : files.saved).push(element.download);
+    };
+    return element;
+  };
+  ctx.URL = { createObjectURL: () => "blob:recovery-file", revokeObjectURL() {} };
+  ctx.Blob = class { constructor(parts) { this.parts = parts; } };
+  const now = ctx.performance.now();
+  ctx.performance = { now: () => now };   // the file is ready within the pause, however long preparing it takes here
+
+  const exporting = ctx.downloadRecoveryFile();   // Download recovery file: the board stays usable while it is prepared
+  tapControl221(shim, panel.find(control => control.classList.contains("crumb") && control.dataset.id === middle.id));
+  keepEditorValues(ctx, shim, middle.id);
+  tapControl221(shim, editorControl221("return-candidate", middle.id));
+  assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: a dot was returned while the file was prepared");
+
+  assert.equal(await exporting, true, "the export finished");
+  assert.deepEqual(files, { saved: ["chain-scanner-recovery-file.json"], cancelled: [] }, "its download was not cancelled by the pause");
+  assert.match(shim.document.getElementById("toast").textContent, /^Recovery file saved/, "and the message is true");
+  tapControl221(shim, editorControl221("undo"));
+  assert.equal(ctx.state.chain.includes(middle.id), false, "a person's press at that moment, on Undo in the header, is still paused");
+});
+
 // #221 release review: a held Enter. Browsers press a focused button as Enter
 // goes down, and a held key repeats to whatever has focus; the Node shim has
 // no native button presses, so this test makes them itself: each Enter keydown

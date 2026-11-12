@@ -8943,9 +8943,11 @@ function answerBeforeCandidateCouldBeRead(){return performance.now()-tasksOnScre
 // second tap or keypress lands on then depends on how far the editor was
 // scrolled, the screen and the text size: done adding for now, Start scanning
 // once the only dot is gone, a pill, a card, Undo. A list of buttons cannot know
-// which, so for a moment every press is ignored, wherever it lands. Every tap and
-// every key that presses a button reaches the app as one click on the document,
-// and the scanner's keys are the only other way in; both check here.
+// which, so for a moment every press a person makes is ignored, wherever it lands.
+// Every tap and every key that presses a button reaches the app as one click on
+// the document, and the scanner's keys are the only other way in; both check here.
+// A click the app makes itself, for a download or the restore file picker, is no
+// one's second press: browsers mark it untrusted, and it always goes through.
 let returnClosedEditorAt=-Infinity;
 function holdPressesAfterReturn(){returnClosedEditorAt=performance.now();}
 function pressTooSoonAfterReturn(){return performance.now()-returnClosedEditorAt<=TASK_PRESS_GUARD_MS;}
@@ -18458,8 +18460,9 @@ window.addEventListener("beforeinstallprompt", e=>{
 window.addEventListener("appinstalled", ()=>{ deferredInstallPrompt = null; });
 
 document.addEventListener("click", e=>{
-  // A press the closing editor uncovered, on any control, link or box (#221).
-  if(pressTooSoonAfterReturn()){e.preventDefault?.();return;}
+  // A person's press the closing editor uncovered, on any control, link or box,
+  // but never the app's own click (#221).
+  if(e.isTrusted!==false&&pressTooSoonAfterReturn()){e.preventDefault?.();return;}
   const back = e.target.classList && e.target.classList.contains("mback");
   if(back){ closeModal(); return; }
   const el = e.target.closest("[data-act]");
