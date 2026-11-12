@@ -11807,6 +11807,27 @@ test('RISK redundant backups: on the older browser backup list, a copy is never 
  assert.deepEqual(rows.filter(entry=>entry.payload===before).map(entry=>entry.id),['adoption-copy'],'the copy kept before taking a cloud board stays');
 });
 
+// #2333 release review: each check parses a whole draft while the save waits to
+// commit, so a save stops checking once its time budget is spent, after at
+// least one draft. The page's own clock moves on only when a draft is read here,
+// as a slow phone's would, so the test does not depend on real timing.
+test('RISK redundant backups: a save checks drafts only within its time budget, oldest first and always at least one, so a pile shrinks every save without holding the save',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ // Four drafts the saved board holds, each with an older title for the first task.
+ const drafts=[1,2,3,4].map(n=>{const board=JSON.parse(JSON.stringify(ctx.state));board.tasks[0].title='Older title '+n;return JSON.stringify(board);});
+ await seedDeviceBackups2335(app,drafts.map((payload,i)=>({id:'draft-'+(i+1),kind:'stale-tab-draft',payload})));
+ // Reading any one draft takes a minute by the page's clock, far past a save's budget.
+ let clock=0;ctx.performance={now:()=>clock};
+ const read=store.readBackups.bind(store);
+ store.readBackups=async ids=>{const rows=await read(ids);if(ids.some(id=>id.startsWith('draft-')))clock+=60000;return rows;};
+ t.after(()=>{store.readBackups=read;});
+ const left=async()=>[...await store.listBackups()].filter(row=>row.kind==='stale-tab-draft').map(row=>row.id).sort();
+ ctx.addTask('First edit');await savesSettled2334(app);
+ assert.deepEqual(await left(),['draft-2','draft-3','draft-4'],'the first save checks one draft, the oldest, and clears it');
+ ctx.addTask('Second edit');await savesSettled2334(app);
+ assert.deepEqual(await left(),['draft-3','draft-4'],'the next save clears the next oldest');
+});
+
 // #2333 release review: a pin, a pending Restore or an adoption only stops a
 // copy from being removed, and it ends. A protected automatic copy then follows
 // its own three- or seven-day rule, so it can never be the copy that keeps one

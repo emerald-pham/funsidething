@@ -2688,8 +2688,11 @@ function clearRedundantLocalBackups(board,boardStillSaved,preserveBackupId=null)
     // A row's own bytes key it here: its length and the list's archive hash.
     // Two drafts sharing a key could only make a contained one wait for a reload.
     const keyOf=row=>"local:"+row.payload.length+":"+backupArchiveHash(row.payload);
-    for(const row of containedDraftCandidates(rows.filter(row=>!cleared.has(row)&&readableBackupRow(row)),keep,new Set(),{charsOf:row=>row.payload.length,keyOf}))
+    const more=draftCheckBudget();
+    for(const row of containedDraftCandidates(rows.filter(row=>!cleared.has(row)&&readableBackupRow(row)),keep,new Set(),{charsOf:row=>row.payload.length,keyOf})){
+      if(!more())break;
       if(draftContained(row.payload,board,keyOf(row))) cleared.add(row);
+    }
     if(!cleared.size)return 0;
     const kept=rows.filter(row=>!cleared.has(row));
     if(!writeBackupIndexIfCurrent(stored,encodeBackupIndex(kept,packedBackupIndex(stored))))return 0;
@@ -3802,14 +3805,25 @@ function backupKeptUntil(row,today,{longest=false}={}){
 // the ordinary save merge: merging the draft into a copy of the board being
 // committed changes nothing. Field values are not compared, so an older title
 // or setting a later edit replaced does not keep a draft. Drafts are read one
-// at a time, within a character budget per save; anything the check cannot
-// finish, read or attribute to this board's account stays for a later save.
-// The budget: the reporter's board was about 400,000 characters and their
-// device held about 1.0 billion characters of backups (#2333). Each check
-// parses a whole draft and merges it into a copy of the board on a phone, so a
-// save checks about 60 such drafts (24M characters) and leaves the rest of a
-// pile to the saves after it, rather than holding one save for all of them.
-const CONTAINED_DRAFT_CHECK_CHARS=24000000;
+// at a time, within a character budget and a time budget per save; anything
+// the check cannot finish, read or attribute to this board's account stays for
+// a later save.
+// The budgets (#2333 release review): the reporter's device held about 1.0
+// billion characters in 151 backups, about 6.6M characters a row, so 24M
+// characters is three or four such drafts held in memory one at a time. Each
+// check parses a whole draft and merges it into a copy of the board: about
+// 0.1 to 0.26 s for a 2.4M to 8M character board on desktop, several times
+// that on a phone, and a device save's commit waits for its checks. So a save
+// also stops once 200 ms have passed (the app's goal for visible feedback),
+// though it always checks one draft so a pile still shrinks every save, and
+// it leaves the rest to the saves after it.
+const CONTAINED_DRAFT_CHECK_CHARS=24000000,CONTAINED_DRAFT_CHECK_MS=200;
+// Whether one save may check another draft: always the first, then others
+// only while the save's time budget lasts.
+function draftCheckBudget(){
+  const started=performance.now();let checked=0;
+  return ()=>checked++===0||performance.now()-started<CONTAINED_DRAFT_CHECK_MS;
+}
 // Nothing is cleared while recovery may still need a copy: a recovery hold on
 // this device or any other recovery state that keeps daily backups longer.
 function redundantBackupsAllowed(){return !deviceRecoveryCloudHold&&!dailyBackupsHeldForRecovery();}
@@ -3892,9 +3906,10 @@ function draftContainedInBoard(draftRaw,boardRaw){
 async function containedStaleTabDraftProofs(payload,protectedIds,removing){
   // The head commit removes nothing while a recovery hold is stored, so a held device reads no drafts.
   if(!deviceStore||!deviceBackupCacheReadable||!redundantBackupsAllowed())return [];
-  const out=[];
+  const out=[],more=draftCheckBudget();
   for(const row of containedDraftCandidates(deviceBackupCache.filter(row=>row.payloadFacts?.readable===true),protectedIds,removing,
     {charsOf:row=>row.payloadChars,keyOf:row=>row.payloadHash})){
+    if(!more())break;
     let stored;
     try{[stored]=await deviceBackupsWithText([row.id]);}catch(e){continue;}
     if(typeof stored?.payload==="string"&&draftContained(stored.payload,payload,row.payloadHash))
