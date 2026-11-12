@@ -749,6 +749,651 @@ test('RISK rapid action durability: ten distinct actions remain pending through 
  const head=await store.readHead();await app.dispose();const reopened=await loadAppAtTime(at,{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:()=>({configured:false,ready:false,user:null,status:'off',async pull(){return{error:true};},async push(){return{error:true};}})});apps.push(reopened);assertFacts(reopened.ctx.state);assert.equal((await reopened.ctx.window.ScannerDeviceStore.readHead()).payload,head.payload);assert.equal(JSON.stringify(reopened.ctx.state),head.payload);
 });
 
+// #2324: the owner's iPhone, signed out, showed "The saved board changed again
+// while this tab was merging it". These fixtures drive the loaded app against a
+// real device store; a phone's slower IndexedDB is modelled by holding each
+// head commit before it reaches the store.
+const settleQuietCloud2324=()=>({configured:false,ready:false,user:null,status:'off',async pull(){return {error:true};},async push(){return {error:true};}});
+async function deviceSaveSettleApp2324(t,{name,tasks,options={}}){
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=options.indexedDBProvider||new IDBFactory(),dbName=options.deviceDbName||name+'-'+Math.random(),at=Date.parse('2026-11-10T14:16:00Z');
+ const board=syncState({tasks,chain:[tasks[0].id],syncAccount:null,syncRev:0,syncDirty:false,updatedAt:at-HOUR}),raw=JSON.stringify(board);
+ const app=await loadAppAtTime(at,{seed:2324,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:settleQuietCloud2324,...options});
+ const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),inFlight=new Set(),messages=[],toast=shim.document.getElementById('toast');
+ let message=toast.textContent;
+ Object.defineProperty(toast,'textContent',{configurable:true,get:()=>message,set(value){message=value;messages.push(value);}});
+ const fixture={app,ctx,shim,store,indexedDB,dbName,at,messages,commitDelayMs:0,beforeCommit:null,storeCommit:commit,
+  async settled(label,limitMs=20000){
+   const end=performance.now()+limitMs;let head;
+   do{
+    head=await store.readHead();
+    if(!inFlight.size&&!vm.runInContext('saveTimer',ctx)&&!vm.runInContext('deviceSavesInFlight.size',ctx)&&head?.payload===JSON.stringify(ctx.state)&&vm.runInContext('lastPersistedRaw',ctx)===head.payload)return head;
+    await new Promise(resolve=>setTimeout(resolve,25));
+   }while(performance.now()<end);
+   assert.fail(label+': device saves did not settle; issue '+JSON.stringify(ctx.deviceSaveIssue())+'; messages '+JSON.stringify(messages));
+  },
+  // App timers are unref'd; keep Node's loop alive while a save waits on one.
+  async alive(promise){const timer=setInterval(()=>{},50);try{return await promise;}finally{clearInterval(timer);}},
+  edit(id,title){hydrateUnchangedEditorDraft(app,id);shim.document.getElementById('etTitle').value=title;ctx.onAction('save-edit',{dataset:{id}});assert.equal(ctx.state.tasks.find(task=>task.id===id).title,title,'the edit is accepted on screen');},
+ };
+ store.commitHead=async options=>{
+  const run=(async()=>{if(fixture.beforeCommit)await fixture.beforeCommit(options);if(fixture.commitDelayMs)await new Promise(resolve=>setTimeout(resolve,fixture.commitDelayMs));return commit(options);})();
+  inFlight.add(run);try{return await run;}finally{inFlight.delete(run);}
+ };
+ // IndexedDB runs readwrite transactions over the same stores one at a time.
+ // With queueCommits set (#2326 review) each head commit starts only after the
+ // previous one has finished, so queue time adds to every later commit.
+ const overlapping=store.commitHead;let commitQueue=Promise.resolve();
+ store.commitHead=async options=>{
+  if(!fixture.queueCommits)return overlapping(options);
+  const run=commitQueue.then(()=>overlapping(options));commitQueue=run.catch(()=>{});
+  inFlight.add(run);try{return await run;}finally{inFlight.delete(run);}
+ };
+ t.after(async()=>{fixture.commitDelayMs=0;fixture.beforeCommit=null;await Promise.allSettled([...inFlight]);vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);store.commitHead=commit;await app.dispose();});
+ return fixture;
+}
+
+test('RISK device save settle: ordinary signed-out edits during slow device commits never collide with the same tab saving',async t=>{
+ const ids=Array.from({length:6},(_,i)=>'settle-own-'+i);
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-own',tasks:[syncTask('settle-own-anchor','Anchor'),...ids.map((id,i)=>syncTask(id,'Original '+i))]});
+ assert.equal(await f.ctx.persist(),true);
+ // Each head commit takes longer than the 350 ms edit debounce, as on a phone.
+ f.commitDelayMs=400;
+ for(const [i,id] of ids.entries()){f.edit(id,'Edited '+i);await new Promise(resolve=>setTimeout(resolve,400));}
+ const head=await f.settled('own saves');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:|changed again while this tab was merging it/,'no save failure is shown for work the app finished itself');
+ assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet/,'nor the plain message for a save that ran out of repairs (#2325)');
+ assert.equal(f.ctx.deviceSaveIssue(),null);
+ // A merge with another copy keeps the displaced draft as a stale-tab backup.
+ // With one copy open there is nothing to merge, so none appears in Settings.
+ assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'this tab never has to merge with its own saves');
+ const durable=JSON.parse(head.payload);
+ for(const [i,id] of ids.entries())assert.equal(durable.tasks.find(task=>task.id===id).title,'Edited '+i,'every accepted edit is on the saved board');
+ const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows the settled board');
+ for(const [i,id] of ids.entries())assert.equal(reopened.ctx.state.tasks.find(task=>task.id===id).title,'Edited '+i);
+});
+
+// #2326 review: on a phone the commits above do not overlap; IndexedDB queues
+// them. Every edit still reaches the saved board, and a tab saving on top of its
+// own saves has nothing to warn about, at either commit time.
+test('RISK device save settle: ordinary signed-out edits during slow serialised device commits save every edit and show no save warning',{timeout:180000},async t=>{
+ for(const commitMs of [700,1500]){
+  const ids=Array.from({length:6},(_,i)=>'queued-'+commitMs+'-'+i);
+  const f=await deviceSaveSettleApp2324(t,{name:'settle-queued-'+commitMs,tasks:[syncTask('queued-'+commitMs+'-anchor','Anchor'),...ids.map((id,i)=>syncTask(id,'Original '+i))]});
+  assert.equal(await f.ctx.persist(),true);
+  f.queueCommits=true;f.commitDelayMs=commitMs;
+  for(const [i,id] of ids.entries()){f.edit(id,'Edited '+i);await f.alive(new Promise(resolve=>setTimeout(resolve,400)));}
+  const head=await f.alive(f.settled('queued own saves at '+commitMs+' ms',90000));
+  const toast=f.shim.document.getElementById('toast');
+  assert.equal(f.ctx.deviceSaveIssue(),null,'no device save issue at '+commitMs+' ms: '+JSON.stringify(f.ctx.deviceSaveIssue()));
+  assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet|device-save:/,'no save warning is shown for edits this tab saved itself at '+commitMs+' ms');
+  assert.equal(toast.classList.contains('show')&&/save/i.test(toast.textContent),false,'no save message is held on screen');
+  const durable=JSON.parse(head.payload);
+  assert.deepEqual(ids.map(id=>durable.tasks.find(task=>task.id===id).title),['Edited 0','Edited 1','Edited 2','Edited 3','Edited 4','Edited 5'],'every accepted edit is on the saved board');
+  assert.equal(head.payload,JSON.stringify(f.ctx.state),'the saved board is the board on screen');
+ }
+});
+
+// #2326 review: a save that is written at once (as a new random draw is) does
+// not wait for the debounce, so several saves of this tab queue together. Each
+// repair onto an earlier save of this tab waits behind the others' commits;
+// that is not another copy changing the board, and only the attempt cap bounds it.
+test('RISK device save settle: actions saved at once during slow serialised device commits are all saved with no save warning',{timeout:180000},async t=>{
+ const ids=Array.from({length:8},(_,i)=>'queued-now-'+i);
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-queued-now',tasks:[syncTask('queued-now-anchor','Anchor'),...ids.map((id,i)=>syncTask(id,'Original '+i))]});
+ assert.equal(await f.ctx.persist(),true);
+ f.queueCommits=true;f.commitDelayMs=1500;
+ const results=[];
+ for(const [i,id] of ids.entries()){
+  f.edit(id,'Edited '+i);vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);results.push(f.ctx.persist());
+  await f.alive(new Promise(resolve=>setTimeout(resolve,300)));
+ }
+ await f.alive(Promise.all(results));
+ const head=await f.alive(f.settled('queued immediate saves',90000));
+ assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet|device-save:/,'no save warning is shown for saves of this tab alone');
+ assert.equal(f.ctx.deviceSaveIssue(),null);
+ const durable=JSON.parse(head.payload);
+ assert.deepEqual(ids.map(id=>durable.tasks.find(task=>task.id===id).title),ids.map((id,i)=>'Edited '+i),'every action is on the saved board');
+ assert.equal(head.payload,JSON.stringify(f.ctx.state),'the saved board is the board on screen');
+});
+
+// #2326 review: the repair time budget bounds waiting for another copy. A save
+// can first wait in IndexedDB's queue behind this tab's own slow commit; that
+// wait is not time spent on another copy, so the budget starts when the save's
+// first commit returns.
+test('RISK device save settle: a save queued behind a slow commit of this tab still merges the save of another copy instead of refusing',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-queued-peer',tasks:[syncTask('queued-peer-anchor','Anchor'),syncTask('queued-peer-first','First'),syncTask('queued-peer-second','Second'),syncTask('queued-peer-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.queueCommits=true;
+ f.beforeCommit=async()=>{
+  const n=++commits;
+  // The first save's commit takes longer than the whole repair budget.
+  if(n===1)await new Promise(resolve=>setTimeout(resolve,5500));
+  // Once it lands, the other copy saves before the queued second commit runs.
+  if(n===2)await other.edit('queued-peer-theirs','Saved by the other copy');
+ };
+ f.edit('queued-peer-first','First edit here');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);const first=f.ctx.persist();
+ await f.alive(new Promise(resolve=>setTimeout(resolve,100)));
+ f.edit('queued-peer-second','Second edit here');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);const second=f.ctx.persist();
+ const results=await f.alive(Promise.all([first,second]));
+ const head=await f.alive(f.settled('queued save after another copy saved'));f.beforeCommit=null;
+ assert.ok(commits>=3,'the queued save met the other copy\'s save and merged it: '+commits+' commits');
+ assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet|device-save:/,'no save warning is shown');
+ assert.equal(f.ctx.deviceSaveIssue(),null);
+ assert.deepEqual(results,[true,true],'both saves succeed');
+ const durable=JSON.parse(head.payload),title=id=>durable.tasks.find(task=>task.id===id).title;
+ assert.deepEqual(['queued-peer-first','queued-peer-second','queued-peer-theirs'].map(title),['First edit here','Second edit here','Saved by the other copy'],'both copies\' edits are on the saved board');
+});
+
+// #2326 specialist review: a phone suspended mid-commit can hold one head
+// commit for more than the whole repair budget. Here a second save of this tab
+// is held that long and then meets only this tab's earlier save, with no other
+// copy open; it saves its edit instead of refusing without a single repair.
+test('RISK device save settle: a save of this tab whose own commit takes over five seconds still saves its edit with no warning',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-suspended',tasks:[syncTask('suspended-anchor','Anchor'),syncTask('suspended-first','First'),syncTask('suspended-second','Second')]});
+ assert.equal(await f.ctx.persist(),true);
+ let commits=0,entered;const firstEntered=new Promise(resolve=>{entered=resolve;});
+ f.beforeCommit=async()=>{const n=++commits;if(n===1){entered();await new Promise(resolve=>setTimeout(resolve,300));}else if(n===2)await new Promise(resolve=>setTimeout(resolve,5500));};
+ f.edit('suspended-first','First edit here');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);const first=f.ctx.persist();
+ await f.alive(firstEntered);
+ f.edit('suspended-second','Second edit here');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);const second=f.ctx.persist();
+ const results=await f.alive(Promise.all([first,second]));
+ const head=await f.alive(f.settled('a save held over five seconds'));f.beforeCommit=null;
+ assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet|device-save:/,'no save warning is shown with one copy open');
+ assert.equal(f.ctx.deviceSaveIssue(),null);
+ assert.deepEqual(results,[true,true],'both saves succeed');
+ const durable=JSON.parse(head.payload);
+ assert.deepEqual(['suspended-first','suspended-second'].map(id=>durable.tasks.find(task=>task.id===id).title),['First edit here','Second edit here'],'both edits are on the saved board');
+});
+
+// #2326 review: a newer save of this tab takes the live board, which already
+// holds every edit the older save was carrying. Once that newer save is
+// durable, the older save running out of repairs has nothing left unsaved.
+test('RISK device save settle: an older save that runs out of repairs after a newer save of this tab made its edit durable shows no warning',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-older-refusal',tasks:[syncTask('older-refusal-anchor','Anchor'),syncTask('older-refusal-first','First'),syncTask('older-refusal-second','Second'),syncTask('older-refusal-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0,newer=null,newerPhase=false;
+ // The other copy saves before every commit of the older save. Before its
+ // third, the newer save of this tab runs to the end, and the other copy saves
+ // again on top of it.
+ f.beforeCommit=async()=>{
+  if(newerPhase)return;
+  const n=++commits;
+  await other.edit('older-refusal-theirs','Other copy write '+n);
+  if(n===3){
+   newerPhase=true;
+   f.edit('older-refusal-second','Second edit here');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);
+   newer=await f.ctx.persist();
+   newerPhase=false;
+   await other.edit('older-refusal-theirs','Other copy write after the newer save');
+  }
+ };
+ f.edit('older-refusal-first','First edit here');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);
+ const older=await f.alive(f.ctx.persist());
+ f.beforeCommit=null;
+ assert.equal(newer,true,'the newer save of this tab succeeded');
+ const durable=JSON.parse((await f.store.readHead()).payload),title=id=>durable.tasks.find(task=>task.id===id).title;
+ assert.deepEqual(['older-refusal-first','older-refusal-second'].map(title),['First edit here','Second edit here'],'both edits of this tab are on the saved board');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,50)));
+ const toast=f.shim.document.getElementById('toast');
+ assert.equal(f.ctx.deviceSaveIssue(),null,'no device save issue for edits already saved; the older save returned '+older);
+ const held=toast.classList.contains('show')?toast.textContent:'';
+ assert.doesNotMatch(held,/isn't saved yet/,'no "isn\'t saved yet" message is held on screen');
+});
+
+// #2326 re-review (B3): Restore changes the board without an ordinary edit,
+// so no newer edit of this tab can have saved it. When another copy keeps the
+// save from finishing, Restore must say it is not saved and the tab must not
+// treat the restored board as durable.
+test('RISK device save settle: a Restore made while another copy keeps saving is reported as not saved',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-restore-churn',tasks:[syncTask('restore-churn-anchor','Anchor'),syncTask('restore-churn-task','Before restore')]});
+ assert.equal(await f.ctx.persist(),true);
+ f.edit('restore-churn-anchor','Ordinary edit');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);
+ assert.equal(await f.ctx.persist(),true,'the ordinary edit is durable');
+ const source=JSON.parse(JSON.stringify(f.ctx.state));source.tasks.find(task=>task.id==='restore-churn-task').title='Restored title';
+ const backup=await f.ctx.saveDurableBackup('manual',JSON.stringify(source));
+ assert.ok(backup?.id,'a manual backup to restore');
+ // Another copy saves before every commit of this tab.
+ let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead(),next=JSON.parse(head.payload);next.futureChurn2326=commits;
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:head.account??null})).ok,true);
+ };
+ const restored=await f.alive(f.ctx.restoreDurableBackupById(backup.id));
+ f.beforeCommit=null;
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='restore-churn-task').title,'Restored title','the restored board stays open in this tab');
+ const head=JSON.parse((await f.store.readHead()).payload);
+ assert.equal(head.tasks.find(task=>task.id==='restore-churn-task').title,'Before restore','the saved board never received the restored board');
+ assert.equal(restored,false,'Restore does not report success for a board that was not saved');
+ assert.ok(f.messages.some(message=>/Restore is open but could not be saved yet/.test(message)),'the person is told the Restore is not saved yet');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','Settings keeps the save issue');
+ assert.notEqual(vm.runInContext('lastPersistedRaw',f.ctx),JSON.stringify(f.ctx.state),'the tab does not mark the restored board durable');
+ f.ctx.onAction('view-support-diagnostics',{});
+ assert.notEqual(f.ctx.buildSupportDiagnosticsReport().save.localDurability.value,'durable','the Debug log does not call it durable');
+});
+
+// The same rule for any change saved without an ordinary edit (here the pin
+// release the pin test above uses): persist() succeeds only once that board
+// itself is durable.
+test('RISK device save settle: a change saved without an ordinary edit while another copy keeps saving is not reported as saved',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-unsaved-change',tasks:[syncTask('unsaved-change-anchor','Anchor'),syncTask('unsaved-change-task','Task')]});
+ f.ctx.state.protectedBackupIds=['pin-unsaved-2326'];
+ assert.equal(await f.ctx.persist(),true);
+ f.edit('unsaved-change-anchor','Ordinary edit');vm.runInContext('clearTimeout(saveTimer);saveTimer=null',f.ctx);
+ assert.equal(await f.ctx.persist(),true,'the ordinary edit is durable');
+ assert.equal(vm.runInContext("releaseCloudRecoveryPins(['pin-unsaved-2326'])",f.ctx),true,'a change made without save()');
+ let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead(),next=JSON.parse(head.payload);next.futureChurn2326=commits;
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:head.account??null})).ok,true);
+ };
+ const result=await f.alive(f.ctx.persist());
+ f.beforeCommit=null;
+ const head=JSON.parse((await f.store.readHead()).payload);
+ assert.deepEqual(head.protectedBackupIds,['pin-unsaved-2326'],'the saved board still holds the released pin');
+ assert.equal(result,false,'the save is not reported as done');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','Settings keeps the save issue');
+});
+
+test('RISK device save settle: repeated edits of one task during slow device commits keep the newest edit',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-same',tasks:[syncTask('settle-same-anchor','Anchor'),syncTask('settle-same-task','Version 0')]});
+ assert.equal(await f.ctx.persist(),true);
+ f.commitDelayMs=400;
+ const shown=[];
+ for(let i=1;i<=6;i++){f.edit('settle-same-task','Version '+i);await new Promise(resolve=>setTimeout(resolve,400));shown.push(f.ctx.state.tasks.find(task=>task.id==='settle-same-task').title);}
+ const head=await f.settled('same-task saves');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:/,'no save failure is shown');
+ assert.doesNotMatch(f.messages.join('\n'),/isn't saved yet/,'nor the plain message for a save that ran out of repairs (#2325)');
+ assert.deepEqual(shown,['Version 1','Version 2','Version 3','Version 4','Version 5','Version 6'],'an earlier save of this tab never puts an older title back on screen');
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='settle-same-task').title,'Version 6','the newest edit is the saved one');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-same-task').title,'Version 6');
+ assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'no edit of this tab is set aside as a displaced draft');
+});
+
+// A second same-origin copy of the app (a Safari tab beside the installed app)
+// on the same device database and browser storage.
+async function deviceSaveSettlePeer2324(t,f){
+ const peer=await loadAppAtTime(f.at,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});
+ t.after(async()=>{vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',peer.ctx);await peer.dispose();});
+ return {peer,async edit(id,title){
+  hydrateUnchangedEditorDraft(peer,id);peer.shim.document.getElementById('etTitle').value=title;peer.ctx.onAction('save-edit',{dataset:{id}});
+  vm.runInContext('clearTimeout(saveTimer)',peer.ctx);assert.equal(await peer.ctx.persist(),true,'the second copy saves its own edit');
+ }};
+}
+
+test('RISK device save settle: a second copy saving once during a save leaves both edits on the saved board',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-peer-once',tasks:[syncTask('settle-once-anchor','Anchor'),syncTask('settle-once-mine','Mine'),syncTask('settle-once-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{if(++commits===1)await other.edit('settle-once-theirs','Saved by the other copy');};
+ f.edit('settle-once-mine','Saved by this tab');
+ const head=await f.settled('one peer write');
+ assert.ok(commits>=2,'the other copy\'s write made this save merge onto the newer board');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:/,'no save failure is shown');assert.equal(f.ctx.deviceSaveIssue(),null);
+ const durable=JSON.parse(head.payload);
+ assert.equal(durable.tasks.find(task=>task.id==='settle-once-mine').title,'Saved by this tab');
+ assert.equal(durable.tasks.find(task=>task.id==='settle-once-theirs').title,'Saved by the other copy');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-once-theirs').title,'Saved by the other copy','the screen shows the merged board');
+ const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows both edits');
+});
+
+test('RISK device save settle: a second copy saving repeatedly but finitely during a save still settles with the work of every copy',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-peer-repeat',tasks:[syncTask('settle-repeat-anchor','Anchor'),syncTask('settle-repeat-mine','Mine'),syncTask('settle-repeat-later','Later'),syncTask('settle-repeat-gone','Deleted by the other copy'),...Array.from({length:4},(_,i)=>syncTask('settle-repeat-theirs-'+i,'Theirs '+i))]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0,draft=null;
+ // Four writes land before this tab's first four head commits: the initial
+ // commit and three back-to-back repairs all find a newer board.
+ f.beforeCommit=async options=>{
+  const n=++commits;
+  // A conflicting attempt writes nothing; the merge that commits keeps its draft.
+  if(options.backup?.kind==='stale-tab-draft')draft=options.backup.payload;
+  if(n<=4){
+   if(n===1){other.peer.ctx.onAction('delete-task',{dataset:{id:'settle-repeat-gone'}});vm.runInContext('clearTimeout(saveTimer)',other.peer.ctx);}
+   await other.edit('settle-repeat-theirs-'+(n-1),'Other copy write '+n);
+   if(n===2)f.edit('settle-repeat-later','Accepted while merging');
+  }
+ };
+ f.edit('settle-repeat-mine','Saved by this tab');
+ const head=await f.settled('finite peer writes');
+ assert.ok(commits>=5,'every peer write landed while this tab was saving');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:/,'no save failure is shown once the other copy stops');assert.equal(f.ctx.deviceSaveIssue(),null);
+ const durable=JSON.parse(head.payload),title=id=>durable.tasks.find(task=>task.id===id)?.title;
+ assert.equal(title('settle-repeat-mine'),'Saved by this tab');
+ assert.equal(title('settle-repeat-later'),'Accepted while merging','an edit accepted during the repair is saved');
+ for(let i=0;i<4;i++)assert.equal(title('settle-repeat-theirs-'+i),'Other copy write '+(i+1),'every write of the other copy is kept');
+ assert.equal(durable.tasks.some(task=>task.id==='settle-repeat-gone'),false,'a task deleted by the other copy stays deleted');
+ assert.ok(draft,'the repair kept a copy of this tab\'s draft');
+ assert.ok((await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft),'the exact superseded draft is kept as a backup');
+ const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows every copy\'s work');
+});
+
+test('RISK device save settle: a board that never stops changing still ends in a bounded refusal with no retry loop',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-churn',tasks:[syncTask('settle-churn-anchor','Anchor'),syncTask('settle-churn-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ // Unexplained churn: something advances the saved board before every commit.
+ let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead(),next=JSON.parse(head.payload);next.futureChurn2324=commits;
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:head.account??null})).ok,true);
+ };
+ f.edit('settle-churn-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const started=performance.now(),result=await f.alive(f.ctx.persist()),elapsed=performance.now()-started;
+ assert.equal(result,false,'the save is refused');assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','the integrity refusal keeps its code');
+ assert.ok(elapsed<8000,'the refusal arrives within the fixed time budget: '+Math.round(elapsed)+' ms');
+ const attempts=commits;assert.ok(attempts>1&&attempts<=12,'the repair made a bounded number of attempts: '+attempts);
+ // #2326 review: the real bounds are the first commit plus 8 repairs, and the
+ // 5 s deadline plus the fast commit already sent.
+ assert.ok(attempts<=9,'at most the first commit and 8 repairs: '+attempts);
+ assert.ok(elapsed<5500,'the refusal arrives within the 5 s deadline and one fast commit: '+Math.round(elapsed)+' ms');
+ await new Promise(resolve=>setTimeout(resolve,1500));
+ assert.equal(commits,attempts,'no save keeps retrying after the refusal');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-churn-mine').title,'Kept in this tab','the accepted edit stays in this tab');
+ const head=await f.store.readHead();assert.equal(JSON.parse(head.payload).futureChurn2324,attempts,'the newer saved board is not overwritten by the refused save');
+});
+
+// #2323 review: when the head is this tab's own earlier save, the save writes
+// the live board on top of it as a queued save would, without the peer merge's
+// carryProtectedBackupIds() or retainConfirmedDeviceRevision(). Both only copy
+// from the live board into the head, and the live board is what is written, so
+// every pin and the confirmed revision the live board holds are kept. A pin the
+// live board released after the earlier save stays released, exactly as the
+// ordinary save that follows a finished commit would write it.
+test('RISK device save settle: saving on top of an earlier save of this tab keeps the protected backups of the live board, and a released pin stays released',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-own-pins',tasks:[syncTask('settle-pins-anchor','Anchor'),syncTask('settle-pins-a','A'),syncTask('settle-pins-b','B')]});
+ f.ctx.state.protectedBackupIds=['pin-kept-2323','pin-released-2323'];
+ assert.equal(await f.ctx.persist(),true);
+ assert.deepEqual(JSON.parse((await f.store.readHead()).payload).protectedBackupIds,['pin-kept-2323','pin-released-2323'],'both pins start on the saved board');
+ const inner=f.store.commitHead,results=[];
+ f.store.commitHead=async options=>{const result=await inner(options);results.push(result);return result;};
+ t.after(()=>{f.store.commitHead=inner;});
+ f.commitDelayMs=400;
+ f.edit('settle-pins-a','Edited A');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,400)));
+ // The earlier save, with both pins, is still being written when the live
+ // board releases one pin and takes the next edit.
+ assert.equal(vm.runInContext("releaseCloudRecoveryPins(['pin-released-2323'])",f.ctx),true);
+ f.edit('settle-pins-b','Edited B');
+ const head=await f.settled('saves on top of this tab\'s own save');
+ assert.ok(results.some(result=>result?.conflict),'a save found the head moved by this tab\'s own earlier save');
+ assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'it saved on top of it rather than merging');
+ const durable=JSON.parse(head.payload);
+ assert.deepEqual(durable.protectedBackupIds,['pin-kept-2323'],'the kept pin stays protected and the released pin stays released');
+ assert.deepEqual(f.ctx.state.protectedBackupIds,['pin-kept-2323'],'the live board agrees');
+ assert.deepEqual([durable.syncRev,durable.syncAccount??null,durable.decisionBase??null],[f.ctx.state.syncRev,f.ctx.state.syncAccount??null,f.ctx.state.decisionBase??null],'the saved revision is the live board\'s');
+ assert.deepEqual(['settle-pins-a','settle-pins-b'].map(id=>durable.tasks.find(task=>task.id===id).title),['Edited A','Edited B']);
+});
+
+// #2323 review, pinned as found and not redesigned: a different save failure
+// after the held message replaces it with its own 9 s notice, and once that
+// ends nothing is on screen although the edit is still unsaved. Settings and
+// the Debug log keep the newer failure.
+test('RISK device save settle: a later different save failure replaces the held message for its own time only (current behaviour)',{timeout:60000},async t=>{
+ const {f,stop}=await deviceSaveExhausted2325(t,'replaced-exhausted');
+ const toast=f.shim.document.getElementById('toast'),shown=()=>toast.classList.contains('show')?toast.textContent:null,frame=()=>f.alive(new Promise(resolve=>setTimeout(resolve,30)));
+ await frame();assert.equal(shown(),deviceSaveExhaustedMessage2325);
+ stop();
+ // The device store now fails outright on the next change.
+ f.beforeCommit=async()=>{throw Object.assign(Error('device store unavailable'),{name:'UnknownError'});};
+ f.edit('replaced-exhausted-anchor','Change while the store fails');
+ const end=performance.now()+10000;
+ while(f.ctx.deviceSaveIssue()?.code!=='write-failed'){assert.ok(performance.now()<end,'the next save fails');await frame();}
+ await frame();
+ assert.match(shown()||'',/^Couldn't save this edit on this device \(device-save:device-store\/write-failed\)\./,'the coded notice replaces the held message');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,9500)));
+ assert.equal(shown(),null,'after its 9 s nothing is on screen');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'write-failed','Settings shows the newer failure');
+ const head=await f.store.readHead();
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='replaced-exhausted-mine').title,'Mine','the edit is still unsaved');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='replaced-exhausted-mine').title,'Kept in this tab','and still in this tab');
+ f.beforeCommit=null;
+});
+
+// #2323 review: the time budget covers the whole save, slow commits included.
+// A commit already sent cannot be aborted, so the refusal can land up to one
+// commit after the five seconds.
+test('RISK device save settle: with slow commits the refusal still arrives about five seconds after the save began',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-slow-budget',tasks:[syncTask('settle-slow-anchor','Anchor'),syncTask('settle-slow-mine','Mine'),syncTask('settle-slow-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{commits++;await other.edit('settle-slow-theirs','Other copy write '+commits);};
+ const commitMs=1500;f.commitDelayMs=commitMs;
+ f.edit('settle-slow-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const started=performance.now(),result=await f.alive(f.ctx.persist()),elapsed=performance.now()-started;
+ f.beforeCommit=null;f.commitDelayMs=0;
+ assert.equal(result,false,'the save is refused');assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save');
+ assert.ok(elapsed<=5000+commitMs+500,'the refusal arrives within about five seconds plus the one commit already sent: '+Math.round(elapsed)+' ms after '+commits+' commits');
+});
+
+// #2323 review: repairs onto this tab's own save and onto another writer's share
+// one attempt cap. Here the head alternates between another writer's board and
+// bytes identical to this tab's last save, so both kinds of repair keep coming.
+test('RISK device save settle: repairs of both kinds share one bounded attempt count',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-mixed-churn',tasks:[syncTask('settle-mixed-anchor','Anchor'),syncTask('settle-mixed-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ const saved=vm.runInContext('lastPersistedRaw',f.ctx);let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead();let payload=saved;
+  if(commits%2){const next=JSON.parse(head.payload);next.futureChurn2323=commits;payload=JSON.stringify(next);}
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload,account:head.account??null})).ok,true);
+ };
+ f.edit('settle-mixed-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const result=await f.alive(f.ctx.persist());
+ f.beforeCommit=null;
+ assert.equal(result,false,'the save is refused');assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save');
+ assert.ok(commits>1&&commits<=12,'the repair made a bounded number of attempts: '+commits);
+ // #2326 review: repairs onto this tab's own save have no time limit, so the
+ // attempt cap alone bounds them: the first commit and at most 8 repairs.
+ assert.ok(commits<=9,'at most the first commit and 8 repairs: '+commits);
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-mixed-mine').title,'Kept in this tab','the accepted edit stays in this tab');
+});
+
+// #2323 review: support can tell which writer each repair met. Before commit n
+// this fixture wrote another writer's board when n is odd and bytes equal to
+// this tab's last save when n is even; each later commit repaired onto that head.
+test('RISK device save settle: the Debug log counts repairs onto saves of this tab and onto saves of another writer, with no board content',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-repair-kinds',tasks:[syncTask('settle-kinds-anchor','Anchor'),syncTask('settle-kinds-mine','PRIVATE-KINDS-2323')]});
+ assert.equal(await f.ctx.persist(),true);
+ const saved=vm.runInContext('lastPersistedRaw',f.ctx);let commits=0;
+ f.beforeCommit=async()=>{
+  commits++;const head=await f.store.readHead();let payload=saved;
+  if(commits%2){const next=JSON.parse(head.payload);next.futureChurn2323=commits;payload=JSON.stringify(next);}
+  assert.equal((await f.storeCommit({expectedHash:head.hash,payload,account:head.account??null})).ok,true);
+ };
+ f.edit('settle-kinds-mine','PRIVATE-KINDS-EDIT-2323');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false);f.beforeCommit=null;
+ const repairedHeads=Array.from({length:commits-1},(_,i)=>i+1);
+ const own=repairedHeads.filter(n=>n%2===0).length,other=repairedHeads.filter(n=>n%2===1).length;
+ assert.ok(own>0&&other>0,'both kinds of repair happened: '+own+' own, '+other+' other');
+ f.ctx.onAction('view-support-diagnostics',{});const report=f.ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(report.localFailureAttempts.value,commits,'the existing attempt count is unchanged');
+ assert.equal(report.localFailureOwnSaveRepairs?.value,own,'repairs onto this tab\'s own save');
+ assert.equal(report.localFailureOtherWriterRepairs?.value,other,'repairs onto another writer\'s save');
+ assert.doesNotMatch(f.ctx.supportDiagnosticsText(),/PRIVATE-KINDS/,'no board content enters the report');
+ // A peer-only refusal counts every repair as another writer's.
+ const exhausted=await deviceSaveExhausted2325(t,'repair-kinds-peer');
+ exhausted.f.ctx.onAction('view-support-diagnostics',{});const peerOnly=exhausted.f.ctx.buildSupportDiagnosticsReport().save;
+ assert.deepEqual([peerOnly.localFailureOwnSaveRepairs.value,peerOnly.localFailureOtherWriterRepairs.value],[0,exhausted.commits()-1]);
+ // A verified save clears them with the rest of the failure record.
+ exhausted.stop();exhausted.f.edit('repair-kinds-peer-anchor','Next change here');await exhausted.f.settled('verified save');
+ const cleared=exhausted.f.ctx.buildSupportDiagnosticsReport().save;
+ assert.deepEqual([cleared.localFailureOwnSaveRepairs.value,cleared.localFailureOtherWriterRepairs.value],[null,null]);
+ assert.deepEqual([cleared.localFailureOwnSaveRepairs.status,cleared.localFailureOtherWriterRepairs.status],['unobserved','unobserved']);
+});
+
+test('RISK device save settle: an account change during the repair is still refused',async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'settle-account',tasks:[syncTask('settle-account-anchor','Anchor'),syncTask('settle-account-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ let commits=0;
+ f.beforeCommit=async()=>{
+  if(++commits===1){
+   const head=await f.store.readHead(),next=JSON.parse(head.payload);next.syncAccount='someone-else@example.com';
+   assert.equal((await f.storeCommit({expectedHash:head.hash,payload:JSON.stringify(next),account:'someone-else@example.com'})).ok,true);
+  }
+ };
+ f.edit('settle-account-mine','Signed-out edit');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false,'the save is refused');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'account-changed');
+ const head=await f.store.readHead();
+ assert.equal(head.account,'someone-else@example.com','the other account\'s board is not merged with this one');
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='settle-account-mine').title,'Mine','the signed-out edit is not written into the other account\'s board');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='settle-account-mine').title,'Signed-out edit','the edit stays in this tab');
+});
+
+// #2325: once the repair budget is genuinely spent, the person reads what
+// happened, what is protected and what to do, not an internal code.
+// The message claims only what the code guarantees: when the other copy changed
+// the same field, the existing merge may keep its value on the board and this
+// tab's version only as a stale-tab-draft backup (#2323 review).
+const deviceSaveExhaustedMessage2325="This edit isn't saved yet. Chain Scanner is probably open in another tab. Close that one, then make any change here to save again.";
+async function deviceSaveExhausted2325(t,name){
+ const f=await deviceSaveSettleApp2324(t,{name,tasks:[syncTask(name+'-anchor','Anchor'),syncTask(name+'-mine','Mine'),syncTask(name+'-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ // A second copy that never stops saving: it writes before every commit.
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{commits++;await other.edit(name+'-theirs','Other copy write '+commits);};
+ f.edit(name+'-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ const result=await f.alive(f.ctx.persist());
+ return {f,other,result,commits:()=>commits,stop(){f.beforeCommit=null;}};
+}
+
+test('RISK device save settle: a save that runs out of repairs says plainly what happened, what is protected and what to do next',async t=>{
+ const {f,result,commits}=await deviceSaveExhausted2325(t,'plain-exhausted');
+ assert.equal(result,false,'the save is still refused');
+ assert.ok(commits()>1,'the repair genuinely ran out after several attempts');
+ assert.equal(f.messages.at(-1),deviceSaveExhaustedMessage2325,'the person reads the plain message');
+ assert.doesNotMatch(f.messages.join('\n'),/device-save:|changed-during-save|merging it/,'no internal code or old wording leads the message');
+ assert.equal(f.ctx.state.tasks.find(task=>task.id==='plain-exhausted-mine').title,'Kept in this tab','the edit is still in this tab, as the message says');
+ const head=await f.store.readHead();
+ assert.equal(JSON.parse(head.payload).tasks.find(task=>task.id==='plain-exhausted-theirs').title,'Other copy write '+commits(),'the other copy\'s latest save was not overwritten, as the message says');
+});
+
+test('RISK device save settle: a save that runs out of repairs keeps its stage, code and attempt count for support',async t=>{
+ const {f,commits}=await deviceSaveExhausted2325(t,'support-exhausted');
+ const attempts=commits();
+ assert.deepEqual(JSON.parse(JSON.stringify(f.ctx.deviceSaveIssue())),{stage:'device-store',code:'changed-during-save',attempts},'the save issue record keeps the stage, code and every commit attempt');
+ f.ctx.onAction('view-support-diagnostics',{});const report=f.ctx.buildSupportDiagnosticsReport().save;
+ assert.equal(report.localFailureStage.value,'device-store','the Debug log names the stage');
+ assert.equal(report.localFailureCode.value,'changed-during-save','the Debug log keeps the code');
+ assert.equal(report.localFailureAttempts.value,attempts,'the Debug log counts the commit attempts');
+});
+
+test('RISK device save settle: the plain message stays until a later save verifiably succeeds, and the next change saves the kept edit',{timeout:60000},async t=>{
+ const {f,stop}=await deviceSaveExhausted2325(t,'stays-exhausted');
+ const toast=f.shim.document.getElementById('toast'),shown=()=>toast.classList.contains('show')?toast.textContent:null,frame=()=>f.alive(new Promise(resolve=>setTimeout(resolve,30)));
+ await frame();assert.equal(shown(),deviceSaveExhaustedMessage2325,'the plain message is on screen');
+ // An ordinary notice lasts 9 s at most; this one outlasts it.
+ await f.alive(new Promise(resolve=>setTimeout(resolve,9500)));
+ assert.equal(shown(),deviceSaveExhaustedMessage2325,'the message is still on screen while the edit is unsaved');
+ // Another notice can take the slot for its own time, then the message returns.
+ vm.runInContext("toast('A short unrelated notice.',50)",f.ctx);
+ await frame();assert.equal(toast.textContent,'A short unrelated notice.');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,200)));
+ assert.equal(shown(),deviceSaveExhaustedMessage2325,'the message comes back after a shorter notice');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','the save issue is still open');
+ // A change while the other copy is still saving starts a save that cannot
+ // finish either; the message stays through it, not just after it.
+ f.edit('stays-exhausted-anchor','Change while the other copy saves');
+ const seen=new Set(),end=performance.now()+15000;
+ while(vm.runInContext('!!saveTimer||deviceSavesInFlight.size>0',f.ctx)||!seen.size){
+  seen.add(shown());assert.ok(performance.now()<end,'the attempt finishes');await frame();
+ }
+ seen.add(shown());
+ assert.deepEqual([...seen],[deviceSaveExhaustedMessage2325],'the message never leaves the screen while no save has succeeded');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','the save issue is still open after another refused attempt');
+ // The next action the message names: the other copy closes, then any change here.
+ stop();
+ f.edit('stays-exhausted-anchor','Next change here');
+ const head=await f.settled('next change after the other copy closed');
+ assert.equal(f.ctx.deviceSaveIssue(),null,'the save issue clears after the verified save');
+ assert.equal(shown(),null,'the message is gone once the save is verified');
+ const durable=JSON.parse(head.payload),title=id=>durable.tasks.find(task=>task.id===id).title;
+ assert.equal(title('stays-exhausted-mine'),'Kept in this tab','the kept edit is saved');
+ assert.equal(title('stays-exhausted-anchor'),'Next change here','the next change is saved');
+ assert.match(title('stays-exhausted-theirs'),/^Other copy write \d+$/,'the other copy\'s save is kept');
+ const reopened=await loadAppAtTime(f.at+20000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
+ assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows the saved edits');
+});
+
+// The message asks for another change; that change must not wipe the support
+// record of the failure it is trying to repair.
+test('RISK device save settle: the Debug log keeps the stage, code and attempts of a failed save through the next change until a save is verified',{timeout:60000},async t=>{
+ const {f,stop,commits}=await deviceSaveExhausted2325(t,'diagnostics-kept');
+ const attempts=commits(),report=()=>f.ctx.buildSupportDiagnosticsReport().save;
+ f.ctx.onAction('view-support-diagnostics',{});
+ const failed=report();
+ assert.deepEqual([failed.localFailureStage.value,failed.localFailureCode.value,failed.localFailureAttempts.value],['device-store','changed-during-save',attempts]);
+ // The change the message asks for, while the other copy still saves.
+ f.edit('diagnostics-kept-anchor','Change while the other copy saves');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save','Settings still shows the open issue');
+ const pending=report();
+ assert.deepEqual([pending.localFailureStage.value,pending.localFailureCode.value,pending.localFailureAttempts.value],['device-store','changed-during-save',attempts],'the Debug log agrees with Settings while the next save is pending');
+ const end=performance.now()+15000;
+ while(vm.runInContext('!!saveTimer||deviceSavesInFlight.size>0',f.ctx)){
+  const during=report();
+  assert.deepEqual([during.localFailureStage.value,during.localFailureCode.value],['device-store','changed-during-save'],'and while it runs');
+  assert.ok(performance.now()<end,'the attempt finishes');await f.alive(new Promise(resolve=>setTimeout(resolve,30)));
+ }
+ const again=report();
+ assert.deepEqual([again.localFailureStage.value,again.localFailureCode.value],['device-store','changed-during-save'],'a second refusal records its own failure');
+ assert.ok(Number.isSafeInteger(again.localFailureAttempts.value)&&again.localFailureAttempts.value>1);
+ // The other copy closes; the next change saves and is verified.
+ stop();
+ f.edit('diagnostics-kept-anchor','Next change here');
+ await f.settled('next change after the other copy closed');
+ const durable=report();
+ assert.equal(durable.localDurability.value,'durable');
+ assert.deepEqual([durable.localFailureStage.value,durable.localFailureCode.value,durable.localFailureAttempts.value],['unknown','unknown',null],'a verified save clears the failure record');
+});
+
+// A hidden tab runs no animation frames, yet its saves still finish. The frame
+// that would show the message can then arrive after a verified save cleared it.
+test('RISK device save settle: a message cleared by a verified save while the tab was hidden does not appear when it is shown again',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'hidden-clear',tasks:[syncTask('hidden-clear-anchor','Anchor'),syncTask('hidden-clear-mine','Mine'),syncTask('hidden-clear-theirs','Theirs')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ const toast=f.shim.document.getElementById('toast'),shown=()=>toast.classList.contains('show')?toast.textContent:null;
+ const paused=[],running=vm.runInContext('requestAnimationFrame',f.ctx);
+ f.ctx.requestAnimationFrame=fn=>{paused.push(fn);return paused.length;};
+ t.after(()=>{f.ctx.requestAnimationFrame=running;});
+ f.beforeCommit=async()=>{commits++;await other.edit('hidden-clear-theirs','Other copy write '+commits);};
+ f.edit('hidden-clear-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false,'the save runs out of repairs while the tab is hidden');
+ assert.equal(f.ctx.deviceSaveIssue()?.code,'changed-during-save');
+ f.beforeCommit=null;
+ f.edit('hidden-clear-anchor','Next change here');
+ await f.settled('a verified save while hidden');
+ assert.equal(f.ctx.deviceSaveIssue(),null,'the verified save cleared the issue');
+ // The tab is shown again: the frames it missed run now.
+ f.ctx.requestAnimationFrame=running;for(const fn of paused.splice(0))fn();
+ await f.alive(new Promise(resolve=>setTimeout(resolve,50)));
+ assert.equal(shown(),null,'no save message appears once the save has been verified');
+ await f.alive(new Promise(resolve=>setTimeout(resolve,9500)));
+ assert.equal(shown(),null,'nor later');
+});
+
+// The FAQ says: "If both copies changed the same thing, the saved board keeps
+// one version and Settings backups keep this tab's." Which version the board
+// keeps is the existing merge's choice; either way this tab's exact draft stays.
+test('RISK device save settle: when both copies changed the same task, the board keeps one version and a backup keeps the version from this tab',{timeout:60000},async t=>{
+ const f=await deviceSaveSettleApp2324(t,{name:'same-field',tasks:[syncTask('same-field-anchor','Anchor'),syncTask('same-field-mine','Mine')]});
+ assert.equal(await f.ctx.persist(),true);
+ const other=await deviceSaveSettlePeer2324(t,f);let commits=0;
+ f.beforeCommit=async()=>{commits++;await other.edit('same-field-mine','Other copy write '+commits);};
+ f.edit('same-field-mine','Kept in this tab');vm.runInContext('clearTimeout(saveTimer)',f.ctx);
+ assert.equal(await f.alive(f.ctx.persist()),false,'the other copy kept saving the same task until the repair ran out');
+ const theirs='Other copy write '+commits;
+ f.beforeCommit=null;
+ f.edit('same-field-anchor','Next change here');
+ const head=await f.settled('next change after a same-task clash');
+ const board=JSON.parse(head.payload).tasks.find(task=>task.id==='same-field-mine').title;
+ assert.ok(board==='Kept in this tab'||board===theirs,'the saved board keeps one of the two versions: '+board);
+ const drafts=(await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').map(row=>JSON.parse(row.payload).tasks.find(task=>task.id==='same-field-mine')?.title);
+ assert.ok(drafts.includes('Kept in this tab'),'a stale-tab-draft backup, listed in Settings, keeps this tab\'s version');
+});
+
 // #2306: a save that had to be repaired over a head moved by another page merges
 // both pages' choices, and projecting the merged Start cleared the candidate. The
 // repaired board was drawn without dealing, leaving a chain with nothing to decide.

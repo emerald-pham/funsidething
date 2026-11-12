@@ -1455,6 +1455,7 @@ its RISK test; the map follows.
 - RISK support diagnostics: report names only a safe origin and separates build from executing-script identity
 - RISK support diagnostics: root, chunk, and final-root SDK stalls retain the correct stage and report owner
 - RISK support diagnostics: event retention and malformed observer input stay bounded and redacted
+- RISK support diagnostics retention: a Debug log over its byte cap sheds routine events, oldest first, before the record of why recovery waited or ran
 - RISK support diagnostics worker: controller reports only its fixed shell identity
 - RISK support diagnostics: executing document and observed worker/cache identities remain distinct and bounded
 - RISK support diagnostics: download bytes, selectable copy fallback, and Return preserve an unsaved Settings draft after slow worker capture
@@ -1536,6 +1537,30 @@ its RISK test; the map follows.
 - RISK cloud source recovery: complete-source details stay responsive bounded and exact
 - RISK cloud source recovery: preliminary inspection bounds large device task lists without changing saved work
 - RISK rapid action durability: ten distinct actions remain pending through a held cloud acknowledgement then reach peer and cold reopen
+- RISK device save settle: ordinary signed-out edits during slow device commits never collide with the same tab saving
+- RISK device save settle: ordinary signed-out edits during slow serialised device commits save every edit and show no save warning
+- RISK device save settle: actions saved at once during slow serialised device commits are all saved with no save warning
+- RISK device save settle: a save queued behind a slow commit of this tab still merges the save of another copy instead of refusing
+- RISK device save settle: a save of this tab whose own commit takes over five seconds still saves its edit with no warning
+- RISK device save settle: an older save that runs out of repairs after a newer save of this tab made its edit durable shows no warning
+- RISK device save settle: a Restore made while another copy keeps saving is reported as not saved
+- RISK device save settle: a change saved without an ordinary edit while another copy keeps saving is not reported as saved
+- RISK device save settle: repeated edits of one task during slow device commits keep the newest edit
+- RISK device save settle: a second copy saving once during a save leaves both edits on the saved board
+- RISK device save settle: a second copy saving repeatedly but finitely during a save still settles with the work of every copy
+- RISK device save settle: a board that never stops changing still ends in a bounded refusal with no retry loop
+- RISK device save settle: saving on top of an earlier save of this tab keeps the protected backups of the live board, and a released pin stays released
+- RISK device save settle: a later different save failure replaces the held message for its own time only (current behaviour)
+- RISK device save settle: with slow commits the refusal still arrives about five seconds after the save began
+- RISK device save settle: repairs of both kinds share one bounded attempt count
+- RISK device save settle: the Debug log counts repairs onto saves of this tab and onto saves of another writer, with no board content
+- RISK device save settle: an account change during the repair is still refused
+- RISK device save settle: a save that runs out of repairs says plainly what happened, what is protected and what to do next
+- RISK device save settle: a save that runs out of repairs keeps its stage, code and attempt count for support
+- RISK device save settle: the plain message stays until a later save verifiably succeeds, and the next change saves the kept edit
+- RISK device save settle: the Debug log keeps the stage, code and attempts of a failed save through the next change until a save is verified
+- RISK device save settle: a message cleared by a verified save while the tab was hidden does not appear when it is shown again
+- RISK device save settle: when both copies changed the same task, the board keeps one version and a backup keeps the version from this tab
 - RISK rapid action durability: answers repaired over another saved copy mid-sync still offer the next candidate with no extra tap
 - RISK corrupt cloud work budget: ordinary actions stay durable without rereading unchanged unrepairable generations
 - RISK corrupt cloud work budget: cold-opened sources without an ACK keep newer edits without repeated downloads
