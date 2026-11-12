@@ -2572,13 +2572,15 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     // explicit delete. Reuse one for cloud adoption when the same board is
     // already recoverable; duplicate full boards can exhaust browser quota.
     // "latest" is replaced by the next save, so it cannot satisfy this gate.
+    // #2333 review: nor can a stale-tab draft a later save may clear as
+    // contained (clearableAsContained), which would take this copy with it.
+    const pinned=protectedBackupIdSet();
     if(kind==="before-account-switch" && rows.some(row=>row.kind===kind && row.payload===payload)) return true;
-    if(kind==="before-cloud-local-edit" && rows.some(row=>row.kind!=="latest" && row.payload===payload)) return true;
+    if(kind==="before-cloud-local-edit" && rows.some(row=>row.kind!=="latest" && row.payload===payload && !clearableAsContained(row,pinned))) return true;
     // #2335: a copy the list already keeps at least as long holds these bytes.
     if(["stale-tab-draft","other-browser-copy","cloud-merged"].includes(kind)){
-      const keptFrom=automaticBackupRetention(),today=backupDayNumber(day),kept=protectedBackupIdSet();
-      const wanted=backupKeptUntil({id:"",kind,day},keptFrom,kept,today);
-      if(rows.some(row=>row.payload===payload && readableBackupRow(row) && (backupKeptUntil(row,keptFrom,kept,today)??-Infinity)>=wanted)) return true;
+      const standsIn=backupStandIn({kind,day,...(metadata?.displacedEdits===true?{displacedEdits:true}:{})},pinned);
+      if(rows.some(row=>row.payload===payload && readableBackupRow(row) && standsIn(row))) return true;
     }
     // #2264: a daily backup can't stand in for the cloud-adoption copy. This
     // account's daily backups keep three calendar days, but the copy kept
@@ -2590,7 +2592,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     // an earlier day, which retires before a copy made today would. Only a
     // copy kept at least as long as this one stands in: one the app keeps
     // until it is deleted, or one from today that keeps seven days.
-    if(kind==="before-cloud-adoption" && rows.some(row=>row.payload===payload && row.kind!=="latest" && row.kind!=="manual" &&
+    if(kind==="before-cloud-adoption" && rows.some(row=>row.payload===payload && row.kind!=="latest" && row.kind!=="manual" && !clearableAsContained(row,pinned) &&
       (!automaticBackupKinds.has(row.kind) || row.day===day && (row.kind!=="daily" || row.keptForCloudAdoption===true)))) return true;
     // #2268 review: a second full copy of the same board instead counted twice
     // against the automatic budget below, and for a board of about 400,000
@@ -2613,7 +2615,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
       ...(kind==="daily"?{account:dailyBackupAccount()}:kind==="manual"?{account:backupBoardAccount(parsed)}:{}),
       ...(metadata?.restoreFile?{restoreFile:metadata.restoreFile}:{}),
       ...(metadata?.displacedEdits===true?{displacedEdits:true}:{})};
-    const protectedIds=protectedBackupIdSet();
+    const protectedIds=pinned;
     if(kind==="daily"){
       if(existing<0) rows.push(entry); // keep the first good copy unless quota rotation must replace it
       if(!onlyIfMissing){
@@ -3870,6 +3872,17 @@ function duplicateBackupRows(rows,bytesOf,protectedIds,removing){
 function clearableAsContained(row,protectedIds){
   return row.kind==="stale-tab-draft"&&row.displacedEdits!==true&&!protectedIds.has(row.id);
 }
+// #2335: an existing row with the same bytes stands in for a new automatic
+// copy {kind, day, mark} when the app keeps it at least as long by itself,
+// the rule duplicateBackupRows clears repeats by. Returns that test.
+function backupStandIn(copy,protectedIds){
+  const keptFrom=automaticBackupRetention(),today=backupDayNumber(backupDay(Date.now()));
+  const wanted=backupKeptUntil({id:"",...copy},keptFrom,protectedIds,today),clearable=clearableAsContained({id:"",...copy},protectedIds);
+  return row=>{
+    const until=backupKeptUntil(row,keptFrom,protectedIds,today);
+    return until!==null&&wanted!==null&&until>=wanted&&(clearable||!clearableAsContained(row,protectedIds));
+  };
+}
 function persistedBackupRecord(row){
   if(!row||typeof row!=="object")return null;
   const record=Object.assign({},row);delete record.newRecovery;return record;
@@ -3979,11 +3992,10 @@ async function saveDurableBackup(kind,payload,metadata=null){
     // long adds nothing, so that copy is the safe one (duplicateBackupRows
     // would clear the new row on the next save anyway).
     if(REDUNDANT_BACKUP_KINDS.has(kind)&&kind!=="daily"){
-      const keptFrom=automaticBackupRetention(),today=backupDayNumber(backupDay(Date.now())),protectedIds=protectedBackupIdSet();
+      const protectedIds=protectedBackupIdSet();
       if(adoptedSafety?.backupId)protectedIds.add(adoptedSafety.backupId);
-      const wanted=backupKeptUntil({id:"",kind,day:backupDay(Date.now())},keptFrom,protectedIds,today);
-      const longer=row=>{const until=backupKeptUntil(row,keptFrom,protectedIds,today);return until!==null&&until>=wanted;};
-      const existing=(await deviceBackupsHoldingPayload(payload).catch(()=>[])).filter(row=>readableBackupRow(row)&&longer(row))[0];
+      const standsIn=backupStandIn({kind,day:backupDay(Date.now()),...(metadata?.displacedEdits===true?{displacedEdits:true}:{})},protectedIds);
+      const existing=(await deviceBackupsHoldingPayload(payload).catch(()=>[])).filter(row=>readableBackupRow(row)&&standsIn(row))[0];
       if(existing)return existing;
     }
     // #2254: a manual backup names its board's account (manualBackupReminderHtml).

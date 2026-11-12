@@ -11498,15 +11498,22 @@ test('RISK redundant backups: when another tab deletes the copy a repeat was kep
  assert.equal([...await store.listBackups()].filter(row=>row.payload===draft).length,1,'the other copy of that board stays');
 });
 
-test('RISK redundant backups: a copy kept before taking a cloud board reuses a longer-kept copy of the same board instead of adding another',async t=>{
+test('RISK redundant backups: a copy kept before taking a cloud board reuses a longer-kept copy of the same board that no save clears, never a stale-tab draft a later save may clear',async t=>{
  const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
  const board=JSON.stringify(ctx.state);
  await seedDeviceBackups2335(app,[{id:'earlier-draft',kind:'stale-tab-draft',payload:board}]);
  const safety=await ctx.saveDurableBackup('before-cloud-adoption',board);
- assert.ok(safety?.id,'the cloud adoption gets its safety copy');
- const copies=[...await store.listBackups()].filter(row=>row.payload===board&&row.kind!=='latest'&&row.kind!=='daily').map(row=>row.id);
- assert.deepEqual(copies,['earlier-draft'],'the board is kept once');
- assert.equal(safety.id,'earlier-draft','and that copy is the safety copy');
+ assert.ok(safety?.id&&safety.id!=='earlier-draft','the cloud adoption gets its own safety copy, not a draft a later save may clear: '+safety?.id);
+ assert.equal(safety.kind,'before-cloud-adoption');
+ // The board is unchanged, so the next save clears the draft as contained, and the safety copy stays.
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const rows=[...await store.listBackups()];
+ assert.equal(rows.some(row=>row.id==='earlier-draft'),false,'positive control: the next save clears the draft');
+ assert.ok(rows.some(row=>row.id===safety.id&&row.payload===board),'the board from before the cloud adoption stays');
+ // A copy no save clears does stand in: an other-browser copy is kept until it is deleted.
+ const otherBoard=boardWithExtraTask2335(ctx,'other-only','Other only');
+ await seedDeviceBackups2335(app,[{id:'other-browser',kind:'other-browser-copy',payload:otherBoard}]);
+ assert.equal((await ctx.saveDurableBackup('before-cloud-adoption',otherBoard))?.id,'other-browser','an other-browser copy is the safety copy');
  // A copy the person may delete on the Settings reminder does not stand in.
  const manualBoard=boardWithExtraTask2335(ctx,'manual-only','Manual only');
  await seedDeviceBackups2335(app,[{id:'manual-copy',kind:'manual',payload:manualBoard}]);
@@ -11533,14 +11540,24 @@ test('RISK redundant backups: on the older browser backup list, repeated and con
  assert.equal(count(manual),3,'and a manual copy does not stand in for an automatic one');
 });
 
-test('RISK redundant backups: on the older browser backup list, an automatic copy of a board a kept draft already holds adds no row',async t=>{
+test('RISK redundant backups: on the older browser backup list, a copy of a board a kept copy no save clears already holds adds no row, and a stale-tab draft a later save may clear never stands in',async t=>{
  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
  ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
- const board=boardWithExtraTask2335(ctx,'only-in-the-copy','Only in the copy'),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const day=vm.runInContext('backupDay(Date.now())',ctx);
  const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
- storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),{id:'earlier-draft',day,at:Date.now()-60000,kind:'stale-tab-draft',payload:board}]));
- assert.ok(await ctx.saveDurableBackup('other-browser-copy',board),'the copy is reported safe');
- assert.deepEqual(listed().filter(row=>row.payload===board).map(row=>row.id),['earlier-draft'],'the board is listed once');
+ const seed=(id,kind,payload)=>storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),{id,day,at:Date.now()-60000,kind,payload}]));
+ // A copy no save clears stands in: an other-browser copy is kept until it is deleted.
+ const kept=boardWithExtraTask2335(ctx,'only-in-the-copy','Only in the copy');
+ seed('earlier-copy','other-browser-copy',kept);
+ for(const kind of ['stale-tab-draft','cloud-merged','before-cloud-adoption'])assert.ok(await ctx.saveDurableBackup(kind,kept),kind+' is reported safe');
+ assert.deepEqual(listed().filter(row=>row.payload===kept).map(row=>row.id),['earlier-copy'],'the board is listed once');
+ // An unmarked stale-tab draft does not: a save clears it once the board holds everything in it.
+ for(const kind of ['other-browser-copy','cloud-merged','before-cloud-adoption','before-cloud-local-edit']){
+  const board=boardWithExtraTask2335(ctx,'only-before-'+kind,'Only before '+kind);
+  seed('draft-for-'+kind,'stale-tab-draft',board);
+  assert.ok(await ctx.saveDurableBackup(kind,board),kind+' is reported safe');
+  assert.deepEqual(listed().filter(row=>row.payload===board).map(row=>row.kind).sort(),[kind,'stale-tab-draft'].sort(),kind+' gets its own row beside the draft');
+ }
 });
 
 test('RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays',async t=>{
