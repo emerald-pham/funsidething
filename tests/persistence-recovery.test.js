@@ -10619,3 +10619,29 @@ test('RISK missing-task save loop: two signed-in devices with a repeated same-da
  const saved=JSON.parse(sync.doc.payload).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
  assert.deepEqual(saved,['worked-later'],'the cloud board keeps the day’s latest worked-on row');
 });
+
+// #2334 (round 5): one home-screen app, signed out. A Settings change and a
+// Quick Add each start a save at once and another after the 350 ms edit
+// debounce. On a phone with a large board a device write takes longer than
+// that, so the device store's commit is slowed to 500 ms here.
+test('RISK missing-task save loop: one app on its own never conflicts with its own saves, so a slow device write adds no stale-tab draft',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-self-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:sharedScannerStorage()});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);await savesSettled2334(app);
+ const commit=store.commitHead.bind(store);
+ store.commitHead=async(...args)=>{await new Promise(resolve=>setTimeout(resolve,500));return commit(...args);};
+ // A Settings checkbox, through the Settings change handler.
+ ctx.openSettings();
+ const postpone=shim.document.getElementById('stShowPostpone');Object.assign(postpone,{id:'stShowPostpone',checked:!ctx.state.settings.showPostpone,matches:()=>false});
+ shim.document.dispatchEvent({type:'change',target:postpone});ctx.closeModal();
+ await savesSettled2334(app);
+ // Quick Add, through its submit path.
+ shim.document.getElementById('addInput').value='Added quickly';await ctx.submitQuickAdd();
+ await savesSettled2334(app);
+ const kinds=[...await store.listBackups()].map(row=>row.kind).sort();
+ assert.deepEqual(kinds,['daily','latest'],'only the usual copies: '+JSON.stringify(kinds));
+ const head=JSON.parse((await store.readHead()).payload);
+ assert.ok(head.tasks.some(task=>task.title==='Added quickly'),'the saved board has the Quick Add');
+ assert.equal(head.settings.showPostpone,ctx.state.settings.showPostpone,'and the Settings change');
+});
