@@ -10827,6 +10827,40 @@ test('RISK chain return sync: once the postponement ends, the board with the ret
   assert.equal(chain.includes('carried-b'),false,label+': the returned dot stays off');
 });
 
+// #221 review B2: Postpone of the last dot puts the first candidate on the
+// empty chain without recording a decision. A task returned in this pass is a
+// candidate by the person's own recorded choice, so that automatic dot skips it.
+// The fixture scores in descending order, so the automatic dot is deterministic.
+test('RISK chain return sync: a Postpone that empties the chain after a return does not dot the returned task, and the board reaches the cloud and the other device',async t=>{
+ const orders={
+  'two dots returned, then Postpone of the last':async (local,at)=>{
+   returnDotFromBoard221(local,'carried-a',at+100);
+   returnDotFromBoard221(local,'carried-b',at+150);
+   assert.deepEqual(Array.from(local.ctx.state.chain),['carried-c'],'precondition: two dots returned, one left');
+   assert.equal(postponeBenchmark221(local,at+200),'carried-c');
+   return {returned:['carried-a','carried-b'],postponed:['carried-c']};
+  },
+  'the benchmark returned, then Postpone of each remaining dot':async (local,at)=>{
+   returnDotFromBoard221(local,'carried-c',at+100);
+   assert.equal(postponeBenchmark221(local,at+150),'carried-b');
+   assert.equal(postponeBenchmark221(local,at+200),'carried-a');
+   return {returned:['carried-c'],postponed:['carried-a','carried-b']};
+  },
+ };
+ for(const [order,act] of Object.entries(orders))await t.test(order,async t=>{
+  const {local,peer,h,at}=await carriedPassClients221(t);
+  const {returned,postponed}=await act(local,at);
+  await publish221(local);
+  // The oldest task neither returned nor postponed: the Waiting candidate.
+  confirmedSync221(local,h,['carried-d'],'the device that returned and postponed');
+  assert.deepEqual(Array.from(local.ctx.state.chain),['carried-d'],'the automatic dot is the first candidate that was not returned');
+  assert.deepEqual(returnFact221(h.remoteState()).map(row=>row.before.value[0]).sort(),returned,'every return reached the cloud');
+  await receive221(peer);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['carried-d'],'the other device shows the same chain');
+  for(const id of postponed)assert.equal(peer.ctx.taskPostponeUntil(peer.ctx.state.tasks.find(task=>task.id===id))>at+200,true,'and the Postpone of '+id);
+ });
+});
+
 test('RISK chain return compatibility: a cloud board whose chain row in its own pass is anything but one dot leaving is held as unsupported',async t=>{
  const shapes=[
   ['two dots leave',row=>{row.before.value=[...row.before.value,'carried-a'];}],
