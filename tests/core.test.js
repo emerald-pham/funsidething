@@ -17075,7 +17075,9 @@ test('RISK LOCAL BACKUPS: the Data and backups FAQ explains automatic early reti
  ctx.openHelp();
  const markup=shim.document.getElementById('modalRoot').innerHTML.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(markup,/older automatic copies may retire sooner/);
- assert.match(markup,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
+ assert.match(markup,/Manual, displaced local edits and unsynced account-switch copies stay until you delete them/);
+ // #2333 review (#2335): drafts and other-browser copies stay too, except the repeats and contained drafts a save clears.
+ assert.match(markup,/Stale tab drafts and other-browser copies stay until you delete them too, unless a save clears a repeat of another copy or a draft the saved board holds\./);
 });
 
 test('RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched',async()=>{
@@ -18159,7 +18161,8 @@ test('RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit st
 test('RISK LOCAL BACKUPS: aged stale-tab and other-browser recovery stays available',async()=>{
  const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
  const at=Date.parse('2026-09-01T12:00:00Z'),day=ctx.backupDay(at),payload=JSON.stringify(ctx.state);
- const rows=['stale-tab-draft','other-browser-copy'].map((kind,i)=>({id:'protected-'+i,day,at,kind,payload}));
+ // #2335: each copy holds a task the board lacks, so it is not a redundant copy a save may clear.
+ const rows=['stale-tab-draft','other-browser-copy'].map((kind,i)=>({id:'protected-'+i,day,at,kind,payload:JSON.stringify({...ctx.state,tasks:[...ctx.state.tasks,syncTask('only-in-'+kind,'Only in '+kind)]})}));
  storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
  setFakeTime(ctx,Date.parse('2026-09-23T12:00:00Z'));
  assert.equal(ctx.saveLocalBackup('daily',payload),true);
@@ -32921,9 +32924,11 @@ test('RISK daily backup retention: a successful save keeps this account’s dail
 // was saved before daily backups named one, keeps the seven-day rule, on the
 // device and in the older backup list alike.
 test('RISK daily backup retention scope: a save trims only this account’s daily backups to three calendar days, on this device and in the older backup list, while another account’s daily backups and those saved before daily backups named an account keep seven',async()=>{
- const f=await privateLegacyExpiryFixture({makeRows:row=>[
-  row('private-own-trimmed','daily','2026-10-04',{account:null}),row('private-own-kept','daily','2026-10-05',{account:null}),
-  row('private-other-account','daily','2026-10-04',{account:'another-account@example.test'}),row('private-unnamed','daily','2026-10-04'),
+ const dailyBoard2335=(raw,n)=>JSON.stringify({...JSON.parse(raw),futureData:{keep:'exact board facts '+n}});
+ const f=await privateLegacyExpiryFixture({makeRows:(row,raw)=>[
+  // #2335: distinct boards, so no daily backup is a redundant repeat of another one kept longer.
+  row('private-own-trimmed','daily','2026-10-04',{account:null,payload:dailyBoard2335(raw,1)}),row('private-own-kept','daily','2026-10-05',{account:null,payload:dailyBoard2335(raw,2)}),
+  row('private-other-account','daily','2026-10-04',{account:'another-account@example.test',payload:dailyBoard2335(raw,3)}),row('private-unnamed','daily','2026-10-04',{payload:dailyBoard2335(raw,4)}),
   row('private-expired','daily',PRIVATE_EXPIRY_OLD)]});try{
   assert.equal(f.ctx.state.syncAccount??null,null,'fixture: the board is signed out, so its daily backups name no account');
   assert.equal(await privateExpirySave(f),true);
@@ -33093,7 +33098,8 @@ test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved s
  assert.deepEqual(words,[],'every Help answer stays within the 130-word limit');
  assert.doesNotMatch(data,/Download recovery file|Save settings is at the bottom|Paste JSON/,'the FAQ names the controls Settings now shows');
  assert.doesNotMatch(markup.split('data-changelog-notes>')[0]+(markup.split('data-changelog-notes>')[1]||'').split('</details>').slice(1).join('</details>'),/Save settings applies|in Settings and Save settings/,'no FAQ answer sends anyone to the removed Save settings button');
- const current=(markup.split('data-changelog-notes>')[1]||'').split('</ul>')[0]||'';
+ // #2334: a later dated entry now sits above it, so read the November 10 entry by its date.
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 10, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(current,/<li>Settings is much shorter\./,'the newest changelog entry describes the simpler Settings');
  assert.match(current,/Every setting now saves as soon as you change it, and a number out of range returns to the last valid one\./);
  assert.match(current,/Download backup/);assert.match(current,/Download board only/);assert.match(current,/Troubleshooting/);
@@ -33109,7 +33115,9 @@ test('RISK daily backup retention guidance: the Data and backups FAQ and the Nov
  assert.match(section,/Daily copies stay on this device for today and the two calendar days before it, so at most three; other automatic copies stay for up to seven calendar days/);
  assert.match(section,/While cloud recovery waits or holds your board, before the cloud confirms it, daily copies keep the seven days\./);
  assert.match(section,/Daily copies saved before this update, or holding another account’s board, also keep seven days\./);
- assert.match(section,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
+ assert.match(section,/Manual, displaced local edits and unsynced account-switch copies stay until you delete them/);
+ // #2333 review (#2335): a save now clears a draft or other-browser copy that repeats another copy, and a draft the board holds.
+ assert.match(section,/Stale tab drafts and other-browser copies stay until you delete them too, unless a save clears a repeat of another copy or a draft the saved board holds\./);
  assert.doesNotMatch(section,/Automatic copies stay on this device for up to seven calendar days/);
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const backups=markup.split('<dt>How do backups and Restore work?</dt><dd>')[1]?.split('</dd>')[0]||'';
