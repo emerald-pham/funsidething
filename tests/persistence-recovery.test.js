@@ -12550,3 +12550,153 @@ test('RISK sign-in settles: a completion and its Undo during the first sync both
  assert.equal(cloud.board.tasks.find(task=>task.id===kept).done,false,'the cloud copy has the Undo, not the completion');
  assert.equal(cloud.rev,revisions.at(-1),'the last push is the cloud copy');
 });
+
+// #2348 (spec #2346): a safety net for cloud-path save loops. These sign in on
+// fake device storage with the fake Firebase SDK and read only what the person
+// or the support report sees: the save counts, the sync status, the cloud
+// revision, the board saved on the device and the report's events.
+const LOOP_KEPT_TITLE2348='Private kept task 2348';
+async function signedInDevice2348(t,name,{indexedDB=null,deviceDbName=null,sharedDocs=null}={}){
+ const reopening=!!indexedDB;
+ if(!indexedDB){const {IDBFactory}=await import('fake-indexeddb');indexedDB=new IDBFactory();deviceDbName='cloud-loop-2348-'+name+'-'+Math.random();}
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(app));
+ const {ctx,shim}=app,faults={authPending:true};ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs,failures:faults,timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>backend.CS.suspend());
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',ctx))await wait();},name+' opens');
+ if(!reopening){
+  for(const title of [LOOP_KEPT_TITLE2348,'Deleted before sign-in']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+  ctx.deleteTask(ctx.state.tasks.find(task=>task.title==='Deleted before sign-in').id);
+ }
+ await savesSettled2334(app);
+ const signIn=async()=>{backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();await flush();await ctx.cloudPull();return savesSettled2334(app);};
+ const status=()=>{const button=shim.document.getElementById('syncBtn');return {text:button.textContent,title:button.title};};
+ const saves=()=>JSON.parse(ctx.supportDiagnosticsText()).save;
+ return {...app,backend,faults,signIn,status,saves,indexedDB,deviceDbName};
+}
+// A second signed-in client with a bug: every time this device writes, it
+// writes the board back with one deletion record listed twice. This device
+// tidies the duplicate away, so its board never really changes, yet each copy
+// arrives as a new revision that differs from what it just saved.
+function buggySecondClient2348(t,device){
+ let armed=true,seen=device.backend.docs.get('users/owner')?.rev,writes=0;
+ const ready=loadCloudBackendV2({sharedDocs:device.backend.docs,timeoutMs:5000});
+ ready.then(peer=>t.after(()=>peer.CS.suspend()));
+ const rewrite=async()=>{
+  const peer=await ready,read=await peer.CS.pull();if(!armed||!read?.payload)return;
+  const board=JSON.parse(read.payload);board.deletionLog=[...board.deletionLog,board.deletionLog[0]];
+  const res=await peer.CS.push(JSON.stringify(board),1792323000000,read.rev);
+  if(res?.ok){writes++;device.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:res.rev}});}
+ };
+ device.faults.afterTransaction=docs=>{
+  const rev=docs.get('users/owner')?.rev;if(rev===seen)return;seen=rev;
+  if(armed)setTimeout(()=>rewrite().catch(()=>{}),5);
+ };
+ t.after(()=>{armed=false;});
+ return {start:rewrite,stop:()=>{armed=false;},writes:()=>writes};
+}
+
+test('RISK cloud save loop guard: a board that differs on every save after sign-in stops saving after a few runs, shows a cloud error naming the step and stays saved on the device',async t=>{
+ const device=await signedInDevice2348(t,'guard'),{ctx,backend}=device;
+ const signedIn=await device.signIn();
+ assert.equal(device.status().text,'☁ synced','positive control: an ordinary sign-in settles synced');
+ const peer=buggySecondClient2348(t,device);await peer.start();
+ const settled=await savesSettled2334(device,1500),revision=backend.docs.get('users/owner').rev;
+ assert.equal(settled.acceptedRequests.value,signedIn.acceptedRequests.value,'precondition: nobody asked for a save');
+ assert.ok(peer.writes()>=1,'precondition: the second client rewrote the board');
+ assert.ok(settled.persistCalls.value-signedIn.persistCalls.value<=8,'the save runs stop after a few: '+(settled.persistCalls.value-signedIn.persistCalls.value));
+ await syncSettle(1000);
+ assert.equal(device.saves().persistCalls.value,settled.persistCalls.value,'and stay stopped');
+ assert.equal(backend.docs.get('users/owner').rev,revision,'the cloud revision stops advancing');
+ assert.equal(device.status().text,'☁ error','the status shows an error');
+ assert.match(device.status().title,/^Cloud (pull|reconcile|push) failed \(save loop\)\./,'naming the step and the stop: '+device.status().title);
+ const head=JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload);
+ assert.deepEqual(head.tasks.filter(task=>!task.done).map(task=>task.title),[LOOP_KEPT_TITLE2348],'the board stays saved on the device');
+ t.diagnostic(JSON.stringify({saveRuns:settled.persistCalls.value-signedIn.persistCalls.value,peerWrites:peer.writes(),revision,status:device.status(),toast:device.shim.document.getElementById('toast').textContent}));
+ assert.doesNotMatch(device.shim.document.getElementById('toast').textContent,/could not be saved on this device/,'the stop is not reported as a failed save on this device');
+ // The stop holds no later work back: the next edit is a new save request.
+ peer.stop();device.shim.document.getElementById('addInput').value='Edit after the stop';await ctx.onAction('add',{});
+ await savesSettled2334(device);await syncSettle(300);
+ assert.ok(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).tasks.some(task=>task.title==='Edit after the stop'),'a later edit is saved on the device');
+ assert.equal(device.status().text,'☁ synced','and reaches the cloud: '+device.status().title);
+ assert.ok(backend.docs.get('users/owner').rev>revision,'at a later revision');
+});
+
+test('RISK cloud save loop guard: ordinary sign-in, edits, Undo, repeated reads, a second client’s change and a signed-in cold start never stop saving',async t=>{
+ const device=await signedInDevice2348(t,'ordinary'),{ctx,shim,backend}=device;
+ const synced=label=>{assert.equal(device.status().text,'☁ synced',label+' settles synced: '+device.status().title);};
+ await device.signIn();synced('sign-in');
+ const add=async title=>{shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});await savesSettled2334(device);await syncSettle(200);};
+ await add('First edit after sign-in');synced('an edit');
+ await add('Second edit after sign-in');synced('another edit');
+ await ctx.onAction('undo',{});await savesSettled2334(device);await syncSettle(200);synced('Undo');
+ assert.ok(!ctx.state.tasks.some(task=>task.title==='Second edit after sign-in'),'positive control: Undo removed the edit');
+ for(let read=0;read<4;read++){await ctx.cloudPull();await savesSettled2334(device);}
+ synced('repeated reads');
+ // A second client adds a task: one real change, read once here.
+ const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ for(const title of ['From the other device','Again from the other device']){
+  const read=await peer.CS.pull(),board=JSON.parse(read.payload);board.tasks.push({...board.tasks[0],id:'peer-'+title.length,title,createdAt:2});
+  const res=await peer.CS.push(JSON.stringify(board),1792323000000,read.rev);assert.equal(res.ok,true,'positive control: the other client writes');
+  ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:res.rev}});
+  await savesSettled2334(device);await syncSettle(200);
+  assert.ok(ctx.state.tasks.some(task=>task.title===title),'the other client’s task arrives');synced('a second client’s change');
+ }
+ await add('Edit after the other client');synced('an edit after the other client');
+ // A cold start while signed in, on the same device storage and cloud.
+ await closeLegacyApp173(device);backend.CS.suspend();
+ const reopened=await signedInDevice2348(t,'reopened',{indexedDB:device.indexedDB,deviceDbName:device.deviceDbName,sharedDocs:backend.docs});
+ await reopened.signIn();await syncSettle(200);
+ assert.equal(reopened.status().text,'☁ synced','a signed-in cold start settles synced: '+reopened.status().title);
+});
+
+test('RISK cloud save loop guard: the support report names each cloud step with its outcome, revision and duration, and records a guard stop with the step that started it, without task text and within its size limit',async t=>{
+ const device=await signedInDevice2348(t,'report'),{ctx,backend}=device;
+ const events=()=>JSON.parse(ctx.supportDiagnosticsText()).events;
+ // Sign-in reads an empty cloud and publishes the board; a later read finds that revision.
+ await device.signIn();await syncSettle(200);await ctx.cloudPull();await savesSettled2334(device);
+ const signInEvents=events(),revision=backend.docs.get('users/owner').rev,timed=event=>Number.isSafeInteger(event.durationMs?.value);
+ const step=stage=>signInEvents.filter(event=>event.stage===stage);
+ const pull=step('cloud-pull').filter(event=>event.status==='completed');
+ assert.ok(pull.length>=2&&pull.every(timed),'each cloud read is listed with how long it took: '+JSON.stringify(signInEvents.map(event=>event.stage)));
+ assert.equal(pull.at(-1).metadata.revision,revision,'with the revision it read');
+ const merge=step('cloud-merge');
+ assert.ok(merge.length>=2&&merge.every(event=>event.status==='completed'&&timed(event)&&Number.isSafeInteger(event.metadata?.revision)),'each merge is listed with its revision and duration: '+JSON.stringify(merge));
+ assert.deepEqual(merge.map(event=>event.metadata.mergeOutcome),['empty','equal'],'and its outcome: sign-in found an empty cloud, the later read matched');
+ const caused=step('cloud-save');
+ assert.ok(caused.length>=1&&caused.every(event=>['merge','push'].includes(event.metadata?.cloudStep)&&['durable','failed','unavailable'].includes(event.status)&&timed(event)&&Number.isSafeInteger(event.metadata?.revision)),
+  'each save a cloud step caused is listed with that step, its outcome, revision and duration: '+JSON.stringify(caused));
+ const pushed=step('push').filter(event=>event.status==='acknowledged');
+ assert.ok(pushed.some(event=>event.metadata?.revision===revision&&timed(event)),'the push is listed with the revision the cloud acknowledged: '+JSON.stringify(pushed));
+ assert.deepEqual(step('save-loop-stop'),[],'an ordinary sign-in records no guard stop');
+ // A loop: the guard's stop is its own event, naming the step that started it.
+ const peer=buggySecondClient2348(t,device);await peer.start();await savesSettled2334(device,1500);peer.stop();
+ const stops=events().filter(event=>event.stage==='save-loop-stop');
+ assert.equal(stops.length,1,'one guard stop is recorded: '+JSON.stringify(stops));
+ assert.equal(stops[0].status,'stopped');
+ assert.ok(['merge','push'].includes(stops[0].metadata?.cloudStep),'naming the cloud step that started the loop: '+JSON.stringify(stops[0]));
+ assert.ok(Number.isSafeInteger(stops[0].metadata?.saveRuns)&&stops[0].metadata.saveRuns>=1&&stops[0].metadata.saveRuns<=8,'and how many save runs it allowed: '+JSON.stringify(stops[0]));
+ const report=ctx.supportDiagnosticsText(),loopErrors=JSON.parse(report).recentErrors.filter(row=>row.code.value==='save-loop');
+ assert.deepEqual(loopErrors.map(row=>row.stage),[stops[0].metadata.cloudStep==='push'?'push':'reconcile'],'the cloud error it set is in the report under that step');
+ assert.ok(!report.includes(LOOP_KEPT_TITLE2348)&&!report.includes('Deleted before sign-in'),'the report holds no task text');
+ assert.ok(Buffer.byteLength(report,'utf8')<=24*1024,'and stays within its 24 KiB limit: '+Buffer.byteLength(report,'utf8'));
+});
+
+test('RISK cloud save loop guard: Retry sync after a stop tries again once the loop has ended, and settles synced',async t=>{
+ const device=await signedInDevice2348(t,'retry'),{ctx}=device;
+ await device.signIn();
+ const peer=buggySecondClient2348(t,device);await peer.start();await savesSettled2334(device,1500);peer.stop();
+ assert.match(device.status().title,/failed \(save loop\)/,'positive control: the guard stopped the loop');
+ await ctx.onAction('sync-retry',{});await savesSettled2334(device);await syncSettle(300);
+ assert.equal(device.status().text,'☁ synced','Retry sync settles synced: '+device.status().title);
+});
+
+test('RISK cloud save loop guard: a later cloud read after a stop keeps the error showing instead of leaving the status on syncing',async t=>{
+ const device=await signedInDevice2348(t,'reread'),{ctx}=device;
+ await device.signIn();
+ const peer=buggySecondClient2348(t,device);await peer.start();await savesSettled2334(device,1500);peer.stop();
+ assert.match(device.status().title,/failed \(save loop\)/,'positive control: the guard stopped the loop');
+ // Returning to the app reads the cloud again; nothing new was asked to save.
+ await ctx.cloudPull();await savesSettled2334(device);await syncSettle(300);
+ assert.equal(device.status().text,'☁ error','the status still shows the error: '+device.status().title);
+ assert.match(device.status().title,/failed \(save loop\)/);
+});

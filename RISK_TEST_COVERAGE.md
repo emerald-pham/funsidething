@@ -1814,6 +1814,11 @@ its RISK test; the map follows.
 - RISK sign-in settles: going offline right after sign-in waits quietly and settles once after reconnecting
 - RISK sign-in settles: reloading in the middle of the first sync settles once on the next opening
 - RISK sign-in settles: a completion and its Undo during the first sync both apply once and reach the cloud in revision order
+- RISK cloud save loop guard: a board that differs on every save after sign-in stops saving after a few runs, shows a cloud error naming the step and stays saved on the device
+- RISK cloud save loop guard: ordinary sign-in, edits, Undo, repeated reads, a second client’s change and a signed-in cold start never stop saving
+- RISK cloud save loop guard: the support report names each cloud step with its outcome, revision and duration, and records a guard stop with the step that started it, without task text and within its size limit
+- RISK cloud save loop guard: Retry sync after a stop tries again once the loop has ended, and settles synced
+- RISK cloud save loop guard: a later cloud read after a stop keeps the error showing instead of leaving the status on syncing
 
 ## tests/repository-process.test.js
 
