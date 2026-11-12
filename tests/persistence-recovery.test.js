@@ -10463,3 +10463,119 @@ test('RISK debug log link #2309: an installed offline shell opens the log from t
  }
  assert.deepEqual(failures,[],'the held opening raises no page errors');
 });
+
+// #2334: a save that keeps a missing task must settle. These load the app on a
+// device store with no cloud account, and read only what a person or support can
+// see: the toast, the backups the device lists and the Debug log's save counts.
+const KEPT_MISSING_TOAST2334='A missing task was kept in the saved board.';
+async function savesSettled2334(app,settleMs=1200){
+ // Bounded: the settle period is the claim. Saves still running after it fail the test.
+ const {ctx}=app,started=Date.now(),count=()=>JSON.parse(ctx.supportDiagnosticsText()).save;
+ while(Date.now()-started<settleMs*4){
+  const before=count();await new Promise(resolve=>setTimeout(resolve,settleMs));const after=count();
+  if(after.persistCalls.value===before.persistCalls.value&&after.activePersistCalls.value===0&&after.debouncePending.value===false)return after;
+ }
+ return count();
+}
+async function latestDeviceBoard2334(app){
+ const rows=await app.shim.window.ScannerDeviceStore.listBackups();
+ return JSON.parse(rows.filter(row=>row.kind==='latest').sort((a,b)=>b.at-a.at)[0].payload);
+}
+async function sameDayWorkedBoard2334(t){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ // An earlier save left two worked-on sessions for one task on one day, as a
+ // second session or a merge from another copy does before the board tidies them.
+ const first=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ first.ctx.addTask('Worked twice today');assert.equal(await first.ctx.persist(),true);
+ const task=first.ctx.state.tasks[0],now=Date.now();
+ first.ctx.state.workLog.push({id:'worked-morning',taskId:task.id,title:task.title,kind:'worked',at:now-2*60000},
+  {id:'worked-later',taskId:task.id,title:task.title,kind:'worked',at:now-60000});
+ assert.equal(await first.ctx.persist(),true);await first.dispose();
+ const open=async()=>{const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());return app;};
+ return {open,taskId:task.id};
+}
+
+test('RISK missing-task save loop: a repeated same-day worked-on History row the board tidies away is not kept back as a missing task by every save',async t=>{
+ const {open,taskId}=await sameDayWorkedBoard2334(t);
+ const app=await open(),{ctx,shim}=app,toast=()=>shim.document.getElementById('toast').textContent;
+ const workedRows=board=>board.workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===taskId).map(entry=>entry.id);
+ for(const title of ['First edit today','Second edit today']){
+  shim.document.getElementById('toast').textContent='';
+  ctx.addTask(title);await savesSettled2334(app);
+  assert.notEqual(toast(),KEPT_MISSING_TOAST2334,title+': no task was missing, so none is reported kept');
+  assert.deepEqual(workedRows(await latestDeviceBoard2334(app)),['worked-later'],title+': the saved board keeps one worked-on row for the day, the latest');
+ }
+ const reopened=await open();await savesSettled2334(reopened);
+ assert.deepEqual(workedRows(await latestDeviceBoard2334(reopened)),['worked-later'],'a reload still has the one row');
+});
+
+test('RISK missing-task save loop: a task missing from the board is kept once, the saves settle with only the usual backups, and the Debug log records the repair without task text',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-kept-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast');
+ for(const title of ['Private kept task title','Other task']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ const kept=ctx.state.tasks.find(task=>task.title==='Private kept task title').id;
+ const before=await savesSettled2334(app);
+ // The live board lacks a task the last save had, with no delete behind it.
+ ctx.state.tasks=ctx.state.tasks.filter(task=>task.id!==kept);toastBox.textContent='';
+ ctx.save();
+ const after=await savesSettled2334(app);
+ assert.equal(toastBox.textContent,KEPT_MISSING_TOAST2334,'the person is told the task was kept');
+ assert.equal(after.acceptedRequests.value-before.acceptedRequests.value,1,'one save request');
+ assert.ok(after.persistCalls.value-before.persistCalls.value<=2,'its save runs stop within the settle period: '+JSON.stringify([before.persistCalls,after.persistCalls]));
+ assert.deepEqual([...await shim.window.ScannerDeviceStore.listBackups()].map(row=>row.kind).sort(),['daily','latest'],'backups hold only the usual daily and latest copies');
+ assert.ok((await latestDeviceBoard2334(app)).tasks.some(task=>task.id===kept),'the saved board has the task');
+ toastBox.textContent='';ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(toastBox.textContent,'','a later save does not repeat the repair');
+ const report=ctx.supportDiagnosticsText(),repairs=JSON.parse(report).events.filter(event=>event.stage==='kept-missing-task');
+ assert.deepEqual(repairs.map(event=>event.metadata),[{keptTasks:1,keptFrom:'last-save'}],'the Debug log records one repair, its count and source');
+ assert.ok(!report.includes('Private kept task title'),'and no task text');
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.id===kept),'the kept task is still on the board after reload');
+});
+
+test('RISK missing-task save loop: a deleted task stays deleted and Undo after a kept task settles as before',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2334-delete-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast');
+ for(const title of ['Deleted on purpose','Kept then undone','Stays']){ctx.addTask(title);assert.equal(await ctx.persist(),true);}
+ const id=title=>ctx.state.tasks.find(task=>task.title===title)?.id,deleted=id('Deleted on purpose'),undone=id('Kept then undone');
+ await savesSettled2334(app);toastBox.textContent='';
+ // Delete leaves a tombstone: the save must not keep the task back.
+ ctx.deleteTask(deleted);await savesSettled2334(app);
+ assert.notEqual(toastBox.textContent,KEPT_MISSING_TOAST2334,'an explicit delete is not reported as a kept task');
+ assert.ok(!(await latestDeviceBoard2334(app)).tasks.some(task=>task.id===deleted),'the deleted task stays deleted in the saved board');
+ const reopened=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});
+ assert.ok(!reopened.ctx.state.tasks.some(task=>task.id===deleted),'and after reload the deleted task is still gone');
+ await reopened.dispose?.();
+ // A missing task is kept; Undo then steps back as it did before this fix.
+ ctx.state.tasks=ctx.state.tasks.filter(task=>task.id!==undone);ctx.save();
+ const kept=await savesSettled2334(app);
+ assert.ok(ctx.state.tasks.some(task=>task.id===undone),'the missing task is kept');
+ toastBox.textContent='';ctx.undo();
+ const settled=await savesSettled2334(app);
+ assert.ok(settled.persistCalls.value-kept.persistCalls.value<=2,'Undo saves once and settles');
+ assert.notEqual(toastBox.textContent,KEPT_MISSING_TOAST2334,'Undo does not set off another repair');
+ assert.equal((await latestDeviceBoard2334(app)).tasks.some(task=>task.id===undone),ctx.state.tasks.some(task=>task.id===undone),'the saved board matches the board Undo left');
+});
+
+test('RISK missing-task save loop: on the older browser storage, a repeated same-day worked-on row is not kept back as a missing task either',async t=>{
+ const storage=sharedScannerStorage();
+ const first=await loadApp({sharedStorage:storage});
+ first.ctx.addTask('Worked twice today');assert.equal(await first.ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',first.ctx),false,'precondition: no device store, so the older browser keys are the saved board');
+ const task=first.ctx.state.tasks[0],now=Date.now();
+ first.ctx.state.workLog.push({id:'worked-morning',taskId:task.id,title:task.title,kind:'worked',at:now-2*60000},
+  {id:'worked-later',taskId:task.id,title:task.title,kind:'worked',at:now-60000});
+ assert.equal(await first.ctx.persist(),true);await first.dispose?.();
+ const app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,toastBox=shim.document.getElementById('toast');
+ const savedRows=()=>JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).workLog.filter(entry=>entry.kind==='worked'&&entry.taskId===task.id).map(entry=>entry.id);
+ for(const title of ['First edit today','Second edit today']){
+  toastBox.textContent='';ctx.addTask(title);await savesSettled2334(app);
+  assert.notEqual(toastBox.textContent,KEPT_MISSING_TOAST2334,title+': no task was missing');
+  assert.deepEqual(savedRows(),['worked-later'],title+': the saved board keeps the day’s latest worked-on row only');
+ }
+ const backups=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').map(row=>row.kind).sort();
+ assert.deepEqual(backups,['daily','latest'],'the older backup list holds only its usual daily and latest copies');
+});

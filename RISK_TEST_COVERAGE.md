@@ -1735,6 +1735,10 @@ its RISK test; the map follows.
 - RISK debug log link #2309: a due motion check never traps the log, which closes into the board on a first visit or an old choice
 - RISK debug log link #2309: Download debug log delivers the file while the link holds the opening
 - RISK debug log link #2309: an installed offline shell opens the log from the link with no backup text read
+- RISK missing-task save loop: a repeated same-day worked-on History row the board tidies away is not kept back as a missing task by every save
+- RISK missing-task save loop: a task missing from the board is kept once, the saves settle with only the usual backups, and the Debug log records the repair without task text
+- RISK missing-task save loop: a deleted task stays deleted and Undo after a kept task settles as before
+- RISK missing-task save loop: on the older browser storage, a repeated same-day worked-on row is not kept back as a missing task either
 
 ## tests/repository-process.test.js
 
