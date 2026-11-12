@@ -11828,6 +11828,29 @@ test('RISK redundant backups: a save checks drafts only within its time budget, 
  assert.deepEqual(await left(),['draft-3','draft-4'],'the next save clears the next oldest');
 });
 
+// #2333 release review: a draft whose stored text fails its check sends the
+// read into a full listing that reads every backup's text. That failure was not
+// remembered, so every save repeated it; now a save tries the draft once per
+// opening.
+test('RISK redundant backups: a draft whose stored text cannot be read is tried once per opening, not by every save',async t=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2335-damaged-'+Date.now()+'-'+Math.random();
+ const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:sharedScannerStorage()});t.after(()=>app.dispose?.());
+ const {ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);await savesSettled2334(app);
+ await seedDeviceBackups2335(app,[{id:'damaged-draft',kind:'stale-tab-draft',payload:JSON.stringify(ctx.state)}]);
+ // The draft's stored text is damaged after the app measured it.
+ const {payloadHash}=(await store.listBackupFacts()).find(row=>row.id==='damaged-draft');
+ await editRawDevice187(indexedDB,dbName,tx=>tx.objectStore('snapshots').put({hash:payloadHash,payload:'{"tasks":[]}'},payloadHash));
+ const read=store.readBackups.bind(store);let reads=0;
+ store.readBackups=async ids=>{if(ids.includes('damaged-draft'))reads++;return read(ids);};
+ t.after(()=>{store.readBackups=read;});
+ for(const title of ['First edit','Second edit','Third edit']){ctx.addTask(title);await savesSettled2334(app);}
+ assert.equal(reads,1,'the damaged draft is read once in this opening');
+ assert.ok(JSON.parse(JSON.stringify(ctx.state)).tasks.some(task=>task.title==='Third edit'),'positive control: the saves went on');
+ const kept=await store.readRawRows({backups:['damaged-draft']},{keysOnly:['backups']});
+ assert.deepEqual(JSON.parse(JSON.stringify(kept.stores.backups.keys)),['damaged-draft'],'and the damaged draft stays for recovery');
+});
+
 // #2333 release review: a pin, a pending Restore or an adoption only stops a
 // copy from being removed, and it ends. A protected automatic copy then follows
 // its own three- or seven-day rule, so it can never be the copy that keeps one

@@ -3827,9 +3827,10 @@ function draftCheckBudget(){
 // Nothing is cleared while recovery may still need a copy: a recovery hold on
 // this device or any other recovery state that keeps daily backups longer.
 function redundantBackupsAllowed(){return !deviceRecoveryCloudHold&&!dailyBackupsHeldForRecovery();}
-// Drafts found not contained since this page opened, by their bytes' key, so
-// later saves do not parse the same large draft again. A draft the board comes
-// to hold is checked again after the next opening.
+// Drafts found not contained since this page opened, or whose text could not
+// be read, by their bytes' key, so later saves do not read or parse the same
+// draft again. A draft the board comes to hold is checked again after the next
+// opening.
 const uncontainedDrafts=new Set();
 // #2335: the scan both backup lists share. Of {rows}, the stale-tab drafts
 // the containment proof may clear, oldest first, skipping one already found
@@ -3910,9 +3911,13 @@ async function containedStaleTabDraftProofs(payload,protectedIds,removing){
   for(const row of containedDraftCandidates(deviceBackupCache.filter(row=>row.payloadFacts?.readable===true),protectedIds,removing,
     {charsOf:row=>row.payloadChars,keyOf:row=>row.payloadHash})){
     if(!more())break;
+    // A draft whose text cannot be read sends the read into a full listing of
+    // every backup's text, so this page does not try it again (#2333 release
+    // review). It stays, and the next opening checks it once more.
     let stored;
-    try{[stored]=await deviceBackupsWithText([row.id]);}catch(e){continue;}
-    if(typeof stored?.payload==="string"&&draftContained(stored.payload,payload,row.payloadHash))
+    try{[stored]=await deviceBackupsWithText([row.id]);}catch(e){uncontainedDrafts.add(row.payloadHash);continue;}
+    if(typeof stored?.payload!=="string"){uncontainedDrafts.add(row.payloadHash);continue;}
+    if(draftContained(stored.payload,payload,row.payloadHash))
       out.push({id:row.id,payloadHash:row.payloadHash,keptBy:ChainStorageV2.KEPT_BY_SAVED_BOARD});
   }
   return out;
