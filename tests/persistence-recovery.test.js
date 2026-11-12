@@ -11766,6 +11766,26 @@ test('RISK redundant backups: on the older browser backup list, a save whose boa
  assert.deepEqual(seeded().map(entry=>entry.payload),[draft],'and completes the clean-up');
 });
 
+// #2333 review: like the device list, the older list reads a draft that is not
+// contained once per opening, so a pile of large drafts is not parsed again by
+// every save. A draft the board comes to hold is cleared after the next opening.
+test('RISK redundant backups: on the older browser backup list, a draft found not contained is checked again only after the app reopens, and then cleared once the board holds it',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ const draft=boardWithExtraTask2335(ctx,'only-in-the-draft','Only in the draft'),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').some(row=>row.id==='uncontained-draft');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]'),
+  {id:'uncontained-draft',day,at:Date.now()-60000,kind:'stale-tab-draft',payload:draft}]));
+ ctx.addTask('An ordinary edit');assert.equal(await ctx.persist(),true);
+ assert.equal(listed(),true,'positive control: a draft holding a task the board lacks stays');
+ // The board comes to hold the draft's task; this opening already found the draft not contained.
+ ctx.state.tasks.push(JSON.parse(draft).tasks.find(task=>task.id==='only-in-the-draft'));ctx.save();assert.equal(await ctx.persist(),true);
+ assert.equal(listed(),true,'later saves of this opening do not read the draft again');
+ const reopened=await loadApp({sharedStorage:storage});t.after(()=>reopened.dispose?.());
+ reopened.ctx.addTask('An edit after reopening');assert.equal(await reopened.ctx.persist(),true);
+ assert.equal(listed(),false,'the first save after reopening clears the draft the board now holds');
+});
+
 test('RISK redundant backups: on the older browser backup list, a copy is never cleared as a repeat of a stale-tab draft a later save may clear',async t=>{
  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
  ctx.addTask('Board task');assert.equal(await ctx.persist(),true);

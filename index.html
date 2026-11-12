@@ -2582,7 +2582,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     if(kind==="before-cloud-local-edit" && rows.some(row=>row.kind!=="latest" && row.payload===payload && !clearableAsContained(row,pinned))) return true;
     // #2335: a copy the list already keeps at least as long holds these bytes.
     if(["stale-tab-draft","other-browser-copy","cloud-merged"].includes(kind)){
-      const standsIn=backupStandIn({kind,day,...(metadata?.displacedEdits===true?{displacedEdits:true}:{})},pinned);
+      const standsIn=backupStandIn({kind,day,...(metadata?.losingEdit===true?{losingEdit:true}:{})},pinned);
       if(rows.some(row=>row.payload===payload && readableBackupRow(row) && standsIn(row))) return true;
     }
     // #2264: a daily backup can't stand in for the cloud-adoption copy. This
@@ -2617,7 +2617,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     const entry = {id:String(at)+"-"+Math.random().toString(36).slice(2), day, at, kind, payload,
       ...(kind==="daily"?{account:dailyBackupAccount()}:kind==="manual"?{account:backupBoardAccount(parsed)}:{}),
       ...(metadata?.restoreFile?{restoreFile:metadata.restoreFile}:{}),
-      ...(metadata?.displacedEdits===true?{displacedEdits:true}:{})};
+      ...(metadata?.losingEdit===true?{losingEdit:true}:{})};
     const protectedIds=pinned;
     if(kind==="daily"){
       if(existing<0) rows.push(entry); // keep the first good copy unless quota rotation must replace it
@@ -2685,11 +2685,11 @@ function clearRedundantLocalBackups(board,boardStillSaved,preserveBackupId=null)
     if(!Array.isArray(savedRows)||!savedRows.every(readableBackupRow))return 0;
     const rows=readLegacyBackups(),keep=new Set([preserveBackupId,adoptedSafety?.backupId,...protectedBackupIdSet()].filter(Boolean)),cleared=new Set();
     for(const {row} of duplicateBackupRows(rows.filter(row=>row.kind!=="latest"),row=>row.payload,keep,new Set())) cleared.add(row);
-    let budget=CONTAINED_DRAFT_CHECK_CHARS;
-    for(const row of rows) if(clearableAsContained(row,keep) && !cleared.has(row) && readableBackupRow(row) && row.payload.length<=budget){
-      budget-=row.payload.length;
-      try{ if(draftContainedInBoard(row.payload,board)) cleared.add(row); }catch(e){}
-    }
+    // A row's own bytes key it here: its length and the list's archive hash.
+    // Two drafts sharing a key could only make a contained one wait for a reload.
+    const keyOf=row=>"local:"+row.payload.length+":"+backupArchiveHash(row.payload);
+    for(const row of containedDraftCandidates(rows.filter(row=>!cleared.has(row)&&readableBackupRow(row)),keep,new Set(),{charsOf:row=>row.payload.length,keyOf}))
+      if(draftContained(row.payload,board,keyOf(row))) cleared.add(row);
     if(!cleared.size)return 0;
     const kept=rows.filter(row=>!cleared.has(row));
     if(!writeBackupIndexIfCurrent(stored,encodeBackupIndex(kept,packedBackupIndex(stored))))return 0;
@@ -3796,11 +3796,38 @@ function backupKeptUntil(row,keptFrom,protectedIds,today){
 // or setting a later edit replaced does not keep a draft. Drafts are read one
 // at a time, within a character budget per save; anything the check cannot
 // finish, read or attribute to this board's account stays for a later save.
+// The budget: the reporter's board was about 400,000 characters and their
+// device held about 1.0 billion characters of backups (#2333). Each check
+// parses a whole draft and merges it into a copy of the board on a phone, so a
+// save checks about 60 such drafts (24M characters) and leaves the rest of a
+// pile to the saves after it, rather than holding one save for all of them.
 const CONTAINED_DRAFT_CHECK_CHARS=24000000;
 // Nothing is cleared while recovery may still need a copy: a recovery hold on
 // this device or any other recovery state that keeps daily backups longer.
 function redundantBackupsAllowed(){return !deviceRecoveryCloudHold&&!dailyBackupsHeldForRecovery();}
-const uncontainedDraftHashes=new Set(); // not contained when checked; rechecked after a reload
+// Drafts found not contained since this page opened, by their bytes' key, so
+// later saves do not parse the same large draft again. A draft the board comes
+// to hold is checked again after the next opening.
+const uncontainedDrafts=new Set();
+// #2335: the scan both backup lists share. Of {rows}, the stale-tab drafts
+// the containment proof may clear, oldest first, skipping one already found
+// not contained, within the character budget. The caller reads each one's
+// bytes in turn (device rows carry none) and checks them with draftContained.
+function containedDraftCandidates(rows,protectedIds,removing,{charsOf,keyOf}){
+  let budget=CONTAINED_DRAFT_CHECK_CHARS;
+  return rows.filter(row=>clearableAsContained(row,protectedIds)&&!removing.has(row.id)&&Number.isSafeInteger(charsOf(row))&&
+    !uncontainedDrafts.has(keyOf(row))).sort((a,b)=>a.at-b.at).filter(row=>{
+    if(charsOf(row)>budget)return false;
+    budget-=charsOf(row);return true;
+  });
+}
+function draftContained(draftRaw,board,key){
+  try{
+    if(draftContainedInBoard(draftRaw,board))return true;
+    uncontainedDrafts.add(key);
+  }catch(e){} // a draft the check cannot read stays, and is tried again
+  return false;
+}
 // A draft written because a merge kept another copy's value over an edit it
 // made holds that edit and no saved board does: it is not an older value the
 // board later replaced. Such a draft is marked when it is written and is
@@ -3857,18 +3884,13 @@ function draftContainedInBoard(draftRaw,boardRaw){
 async function containedStaleTabDraftProofs(payload,protectedIds,removing){
   // The head commit removes nothing while a recovery hold is stored, so a held device reads no drafts.
   if(!deviceStore||!deviceBackupCacheReadable||!redundantBackupsAllowed())return [];
-  const candidates=deviceBackupCache.filter(row=>row.kind==="stale-tab-draft"&&row.displacedEdits!==true&&!removing.has(row.id)&&!protectedIds.has(row.id)&&
-    row.payloadFacts?.readable===true&&Number.isSafeInteger(row.payloadChars)&&!uncontainedDraftHashes.has(row.payloadHash)).sort((a,b)=>a.at-b.at);
-  const out=[];let budget=CONTAINED_DRAFT_CHECK_CHARS;
-  for(const row of candidates){
-    if(row.payloadChars>budget)continue;
-    budget-=row.payloadChars;
-    try{
-      const [stored]=await deviceBackupsWithText([row.id]);
-      if(typeof stored?.payload!=="string")continue;
-      if(draftContainedInBoard(stored.payload,payload))out.push({id:row.id,payloadHash:row.payloadHash,keptBy:"board"});
-      else uncontainedDraftHashes.add(row.payloadHash);
-    }catch(e){}
+  const out=[];
+  for(const row of containedDraftCandidates(deviceBackupCache.filter(row=>row.payloadFacts?.readable===true),protectedIds,removing,
+    {charsOf:row=>row.payloadChars,keyOf:row=>row.payloadHash})){
+    let stored;
+    try{[stored]=await deviceBackupsWithText([row.id]);}catch(e){continue;}
+    if(typeof stored?.payload==="string"&&draftContained(stored.payload,payload,row.payloadHash))
+      out.push({id:row.id,payloadHash:row.payloadHash,keptBy:ChainStorageV2.KEPT_BY_SAVED_BOARD});
   }
   return out;
 }
@@ -3907,7 +3929,7 @@ function duplicateBackupRows(rows,bytesOf,protectedIds,removing){
 // never a copy the containment proof would not clear: a before-cloud-adoption
 // or daily copy kept "by" it would lose its board early when the draft went.
 function clearableAsContained(row,protectedIds){
-  return row.kind==="stale-tab-draft"&&row.displacedEdits!==true&&!protectedIds.has(row.id);
+  return row.kind==="stale-tab-draft"&&row.losingEdit!==true&&!protectedIds.has(row.id);
 }
 // #2335: an existing row with the same bytes stands in for a new automatic
 // copy {kind, day, mark} when the app keeps it at least as long by itself,
@@ -4031,7 +4053,7 @@ async function saveDurableBackup(kind,payload,metadata=null){
     if(REDUNDANT_BACKUP_KINDS.has(kind)&&kind!=="daily"){
       const protectedIds=protectedBackupIdSet();
       if(adoptedSafety?.backupId)protectedIds.add(adoptedSafety.backupId);
-      const standsIn=backupStandIn({kind,day:backupDay(Date.now()),...(metadata?.displacedEdits===true?{displacedEdits:true}:{})},protectedIds);
+      const standsIn=backupStandIn({kind,day:backupDay(Date.now()),...(metadata?.losingEdit===true?{losingEdit:true}:{})},protectedIds);
       const existing=(await deviceBackupsHoldingPayload(payload).catch(()=>[])).filter(row=>readableBackupRow(row)&&standsIn(row))[0];
       if(existing)return existing;
     }
@@ -4242,14 +4264,14 @@ function refreshBrowserCopy(){
     // This tab may have an edit that has not reached disk. Keep it restorable
     // before adopting the newer browser copy and cancelling its stale push.
     // #2333 review: the mark comes from the merge below, run here on copies.
-    let displaced=true;
+    let losing=true;
     try{
       const peer=JSON.parse(recoveredHead),base=validSavedPayload(lastPersistedRaw)?JSON.parse(lastPersistedRaw):null,mine=JSON.parse(JSON.stringify(state));
       dropRemovedFields(peer);hydrateState(peer);hydrateState(mine);if(base)hydrateState(base);
       if(sameListOwner(peer,mine)){rebasePendingBoardFields(peer,mine,base);mergeUndeletedTasks(peer,mine);}
-      displaced=mergeLosesDraftEdits(mine,peer,base);
+      losing=mergeLosesDraftEdits(mine,peer,base);
     }catch(e){}
-    if(state && !saveLocalBackup("stale-tab-draft", JSON.stringify(state),false,0,null,null,displaced?{displacedEdits:true}:null)){
+    if(state && !saveLocalBackup("stale-tab-draft", JSON.stringify(state),false,0,null,null,losing?{losingEdit:true}:null)){
       toast("Browser copy changed, but its draft could not be backed up. Save stopped.", 7000);
       return false;
     }
@@ -4606,11 +4628,11 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
             rebasePendingBoardFields(next,mine,ancestor);
             if(mergeUndeletedTasks(next,mine))next.syncDirty=true;carryProtectedBackupIds(next,mine);
             retainConfirmedDeviceRevision(next,mine);
-            const displaced=mergeLosesDraftEdits(mine,next,ancestor);
+            const losing=mergeLosesDraftEdits(mine,next,ancestor);
             const merged=JSON.stringify(next),at=Date.now();
             result=await commit({expectedHash:latest.hash,payload:merged,account:next.syncAccount??null,
               ...(completionSourceBackup?{backups:[completionSourceBackup]}:{}),
-              backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:draft,...(displaced?{displacedEdits:true}:{})}},draft);
+              backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:draft,...(losing?{losingEdit:true}:{})}},draft);
             committedPayload=merged;observedPayload=draft;mergedState=next;
           }
           if(result?.superseded){
@@ -4645,7 +4667,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           // follow-up save below would otherwise clear it at once.
           const at=Date.now();
           const saved=await deviceWriteBeforeDiagnostics("putBackup",{expectedHash:result.hash,
-            backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:liveRaw,displacedEdits:true}});
+            backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:liveRaw,losingEdit:true}});
           if(saved?.conflict && deviceRetry<3) return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1);
           if(!saved?.ok) return reportDeviceSaveFailure("device-store",saved?.code||"recovery-failed","The later draft could not be backed up; keep this tab open and try again.");
           if(JSON.stringify(state)===liveRaw) break;
@@ -5174,7 +5196,7 @@ function supportDiagnosticsTrimEvents(){
     supportDiagnosticsEvents.shift();supportDiagnosticsDroppedEvents++;
   }
 }
-function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schemaVersion,revision,generationState,declaredChunks,receivedChunks,declaredBytes,receivedBytes,code,encoding,validation,completeness,deadlineMs,deviceDetails,budgetDetails,sourceDetails,pushDetails,repairDetails,keptDetails){
+function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schemaVersion,revision,generationState,declaredChunks,receivedChunks,declaredBytes,receivedBytes,code,encoding,validation,completeness,deadlineMs,deviceDetails,budgetDetails,sourceDetails,pushDetails,repairDetails,savedDataDetails){
   try{
     const at=supportDiagnosticsNow();
     const event={at,stage:SUPPORT_DIAGNOSTICS_STAGES.has(stage)?stage:"unknown",
@@ -5225,14 +5247,14 @@ function supportDiagnosticsObserve(stage,status,role,operation,durationMs,schema
       if(typeof repairDetails.repairLimitReached==="boolean")metadata.repairLimitReached=repairDetails.repairLimitReached;
     }
     // #2334: how many tasks a save kept that its board lacked, and from where. Counts only, never titles or IDs.
-    if(stage==="kept-missing-task"&&keptDetails&&typeof keptDetails==="object"){
-      if(Number.isSafeInteger(keptDetails.keptTasks)&&keptDetails.keptTasks>0&&keptDetails.keptTasks<=1000000)metadata.keptTasks=keptDetails.keptTasks;
-      if(["last-save","cloud-push"].includes(keptDetails.keptFrom))metadata.keptFrom=keptDetails.keptFrom;
+    if(stage==="kept-missing-task"&&savedDataDetails&&typeof savedDataDetails==="object"){
+      if(Number.isSafeInteger(savedDataDetails.keptTasks)&&savedDataDetails.keptTasks>0&&savedDataDetails.keptTasks<=1000000)metadata.keptTasks=savedDataDetails.keptTasks;
+      if(["last-save","cloud-push"].includes(savedDataDetails.keptFrom))metadata.keptFrom=savedDataDetails.keptFrom;
     }
     // #2335: how many redundant backups a save removed and how many stayed. Counts only.
-    if(stage==="backup-cleanup"&&keptDetails&&typeof keptDetails==="object")
+    if(stage==="backup-cleanup"&&savedDataDetails&&typeof savedDataDetails==="object")
       for(const key of ["removedBackups","keptBackups"])
-        if(Number.isSafeInteger(keptDetails[key])&&keptDetails[key]>=0&&keptDetails[key]<=1000000)metadata[key]=keptDetails[key];
+        if(Number.isSafeInteger(savedDataDetails[key])&&savedDataDetails[key]>=0&&savedDataDetails[key]<=1000000)metadata[key]=savedDataDetails[key];
     if(Object.keys(metadata).length)event.metadata=metadata;
     if(supportDiagnosticsBytes(JSON.stringify(event))>SUPPORT_DIAGNOSTICS_EVENT_BYTES){
       delete event.metadata;delete event.durationMs;event.status="truncated";

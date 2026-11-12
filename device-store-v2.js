@@ -6,6 +6,9 @@
 
   const SCHEMA_VERSION=2;
   const DEFAULT_TARGET_BYTES=256*1024;
+  // #2335: the keeper a redundant-copy proof names when the board the same
+  // head commit writes holds the copy (see commitHead's removeRedundantBackups).
+  const KEPT_BY_SAVED_BOARD="board";
   // #2254: the acknowledged recovery trim's plan (a meta row) and the rows it
   // can never delete (see beginRecoveryTrim).
   const RECOVERY_TRIM_KEY="recoveryTrim",RECOVERY_TRIM_MAX_KEYS=4096;
@@ -979,8 +982,8 @@
       // Each proof is rechecked here against the rows as they are now: the
       // copy still holds the bytes the app checked, and the row that keeps
       // those bytes ({keptBy:id}) is still there and stays. A copy proved
-      // contained in the board being written ({keptBy:"board"}) needs only
-      // its bytes unchanged, since this transaction writes that board.
+      // contained in the board being written ({keptBy:KEPT_BY_SAVED_BOARD})
+      // needs only its bytes unchanged, since this transaction writes that board.
       let removedRedundant=0;
       if(!recoveryHold&&Array.isArray(removeRedundantBackups)){
         const rowById=new Map(backupRows.map(row=>[row?.id,row]));
@@ -988,8 +991,10 @@
           typeof proof.payloadHash==="string"&&rowById.get(proof.id)?.payloadHash===proof.payloadHash&&typeof proof.keptBy==="string");
         const removing=new Set(proofs.map(proof=>proof.id));
         for(const proof of proofs){
-          const keeper=proof.keptBy==="board"?null:rowById.get(proof.keptBy);
-          if(proof.keptBy!=="board"&&(!keeper||keeper.payloadHash!==proof.payloadHash||removeIds.has(keeper.id)||removing.has(keeper.id)))continue;
+          if(proof.keptBy!==KEPT_BY_SAVED_BOARD){
+            const keeper=rowById.get(proof.keptBy);
+            if(!keeper||keeper.payloadHash!==proof.payloadHash||removeIds.has(keeper.id)||removing.has(keeper.id))continue;
+          }
           removeIds.add(proof.id);removedRedundant++;
         }
       }
@@ -997,36 +1002,41 @@
       // the removals queued above never land without the head they go with.
       let committedHead;
       try{
-      for(const id of removeIds) backupStore.delete(id);
-      for(const prepared of preparedBackups){
-        snapshotStore.put({hash:prepared.payloadHash,payload:prepared.payload},prepared.payloadHash);
-        const {payload:ignored,...saved}=prepared;backupStore.put(saved,saved.id);
+        for(const id of removeIds) backupStore.delete(id);
+        for(const prepared of preparedBackups){
+          snapshotStore.put({hash:prepared.payloadHash,payload:prepared.payload},prepared.payloadHash);
+          const {payload:ignored,...saved}=prepared;backupStore.put(saved,saved.id);
+        }
+        snapshotStore.put({hash:nextHash,payload},nextHash);
+        committedHead={...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()};
+        metaStore.put(committedHead,"head");
+        if(releaseRecoveryHold)metaStore.delete("recoveryCloudHold");
+        // Snapshot payloads are immutable and shared by the live head and any
+        // number of recovery references. Retire only blobs that will have no
+        // reference after this transaction; interrupted commits keep the old
+        // graph because IndexedDB rolls the whole transaction back.
+        const nextBackupRows=backupRows.filter(row=>!removeIds.has(row?.id));
+        for(const prepared of preparedBackups){
+          const at=nextBackupRows.findIndex(row=>row?.id===prepared.id);
+          if(at>=0)nextBackupRows[at]=prepared;else nextBackupRows.push(prepared);
+        }
+        const referenced=new Set(nextBackupRows.map(row=>row?.payloadHash));
+        referenced.add(nextHash);
+        // Unknown recovery rows remain in place while the recovered workspace
+        // is awaiting a deliberate cloud choice, including during local edits.
+        if(!recoveryHold)for(const key of snapshotKeys)if(!referenced.has(key)&&typeof key==="string"&&/^[a-f0-9]{64}$/.test(key)){
+          const unused=await requestResult(snapshotStore.get(key));
+          // Unknown rows can be sole recovery evidence after a damaged source
+          // reopens. Retire only the two-field snapshots this codec owns.
+          if(unused?.hash===key&&typeof unused.payload==="string"&&Object.keys(unused).length===2)
+            snapshotStore.delete(key);
+        }
+      }catch(error){
+        // Roll back everything queued above, then report the write's own error.
+        try{tx.abort();}catch(e){}
+        try{await transactionDone(tx);}catch(e){}
+        throw error;
       }
-      snapshotStore.put({hash:nextHash,payload},nextHash);
-      committedHead={...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()};
-      metaStore.put(committedHead,"head");
-      if(releaseRecoveryHold)metaStore.delete("recoveryCloudHold");
-      // Snapshot payloads are immutable and shared by the live head and any
-      // number of recovery references. Retire only blobs that will have no
-      // reference after this transaction; interrupted commits keep the old
-      // graph because IndexedDB rolls the whole transaction back.
-      const nextBackupRows=backupRows.filter(row=>!removeIds.has(row?.id));
-      for(const prepared of preparedBackups){
-        const at=nextBackupRows.findIndex(row=>row?.id===prepared.id);
-        if(at>=0)nextBackupRows[at]=prepared;else nextBackupRows.push(prepared);
-      }
-      const referenced=new Set(nextBackupRows.map(row=>row?.payloadHash));
-      referenced.add(nextHash);
-      // Unknown recovery rows remain in place while the recovered workspace
-      // is awaiting a deliberate cloud choice, including during local edits.
-      if(!recoveryHold)for(const key of snapshotKeys)if(!referenced.has(key)&&typeof key==="string"&&/^[a-f0-9]{64}$/.test(key)){
-        const unused=await requestResult(snapshotStore.get(key));
-        // Unknown rows can be sole recovery evidence after a damaged source
-        // reopens. Retire only the two-field snapshots this codec owns.
-        if(unused?.hash===key&&typeof unused.payload==="string"&&Object.keys(unused).length===2)
-          snapshotStore.delete(key);
-      }
-      }catch(error){try{tx.abort();}catch(e){}try{await transactionDone(tx);}catch(e){}throw error;}
       await transactionDone(tx);
       const verified=await readHead();
       if(!verified) throw new Error("Device head verification failed");
@@ -1185,6 +1195,6 @@
     return api;
   }
 
-  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore,
+  root.ChainStorageV2={SCHEMA_VERSION,DEFAULT_TARGET_BYTES,KEPT_BY_SAVED_BOARD,hashPayload,encodeSnapshot,decodeSnapshot,isCorruptSnapshotError,createDeviceStore,
     canonicalRecoveryJson,cloudRecoverySummary,cloudRecoverySummaryKey,provedUnusableGeneration};
 })(globalThis);
