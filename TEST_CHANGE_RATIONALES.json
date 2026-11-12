@@ -22902,5 +22902,30 @@
       "command": "node --test --test-name-pattern=\"RISK simpler Settings guidance: the Data and backups FAQ\" tests/core.test.js (2026-11-12 about 00:55 UTC, after adding the November 11, 2026 changelog entry and before editing the test)",
       "failure": "AssertionError: the newest changelog entry describes the simpler Settings; actual '<h3>November 11, 2026</h3><ul><li>A task worked on twice in one day no longer makes every save repeat a repair ...</li>', expected /<li>Settings is much shorter\\./"
     }
+  },
+  {
+    "baseCommit": "e84defc6b7d668ddd3d74c292a19feaa1ec31e87",
+    "weakenedTestLines": [
+      "tests/core.test.js:-const current=(markup.split('data-changelog-notes>')[1]||'').split('</ul>')[0]||'';",
+      "tests/core.test.js:-const f=await privateLegacyExpiryFixture({makeRows:row=>[",
+      "tests/core.test.js:-const rows=['stale-tab-draft','other-browser-copy'].map((kind,i)=>({id:'protected-'+i,day,at,kind,payload}));",
+      "tests/core.test.js:-row('private-other-account','daily','2026-10-04',{account:'another-account@example.test'}),row('private-unnamed','daily','2026-10-04'),",
+      "tests/core.test.js:-row('private-own-trimmed','daily','2026-10-04',{account:null}),row('private-own-kept','daily','2026-10-05',{account:null}),"
+    ],
+    "reason": "#2335 (approved scope) makes every successful save clear automatic backups that repeat another kept copy byte for byte, and stale-tab drafts the saved board already holds. Two retention tests built every backup row from the very same board bytes as a fixture shortcut, so the new clean-up correctly removed rows they expect to survive for retention reasons. The changelog line is listed again because this diff also carries the #2334 change against the same comparison base.",
+    "previousBehavior": "RISK LOCAL BACKUPS (aged stale-tab and other-browser recovery) seeded a stale-tab draft and an other-browser copy that were exact copies of the current board; RISK daily backup retention scope seeded four daily backups with identical bytes on different days and accounts. Both asserted that those rows survive a save.",
+    "intendedBehavior": "Each seeded row now holds its own board (a task the board lacks, or distinct board facts), so no row is a redundant repeat, and both tests assert exactly what they asserted before: aged stale-tab and other-browser copies never expire, and only this account's daily backups are trimmed to three calendar days while other-account and unnamed ones keep seven.",
+    "preservedCoverage": [
+      "Every assertion in both tests is unchanged: stale-tab-draft and other-browser-copy rows are not routine expiring history, and the account-scoped three-day daily trim with seven days for other-account and unnamed dailies, on the device and in the older backup list.",
+      "The positive control that the seven-day rule still retires the expired copy, and the current-board check, are untouched."
+    ],
+    "replacementTests": [
+      "RISK redundant backups: exact-duplicate automatic copies already on the device are reduced to one by the next save, and every distinct board stays listed and restorable",
+      "RISK redundant backups: on the older browser backup list, repeated and contained automatic copies are cleared by the next save and the rest stay"
+    ],
+    "redEvidence": {
+      "command": "CHAIN_NATIVE_PORT=47736 node --test --test-name-pattern=\"RISK LOCAL BACKUPS: aged stale-tab|RISK daily backup retention scope: a save trims\" tests/core.test.js (2026-11-12 about 03:29 UTC, after the #2335 clean-up and before editing the fixtures; first seen in the core group run 2335-core-a2)",
+      "failure": "AssertionError: stale-tab-draft is not routine expiring history; AssertionError: this device: private-own-kept stays"
+    }
   }
 ]

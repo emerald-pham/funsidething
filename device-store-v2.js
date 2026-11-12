@@ -995,6 +995,7 @@
       }
       // #2335: a write that throws part way aborts the whole transaction, so
       // the removals queued above never land without the head they go with.
+      let committedHead;
       try{
       for(const id of removeIds) backupStore.delete(id);
       for(const prepared of preparedBackups){
@@ -1002,7 +1003,7 @@
         const {payload:ignored,...saved}=prepared;backupStore.put(saved,saved.id);
       }
       snapshotStore.put({hash:nextHash,payload},nextHash);
-      const committedHead={...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()};
+      committedHead={...current,hash:nextHash,account,schemaVersion:SCHEMA_VERSION,committedAt:Date.now()};
       metaStore.put(committedHead,"head");
       if(releaseRecoveryHold)metaStore.delete("recoveryCloudHold");
       // Snapshot payloads are immutable and shared by the live head and any

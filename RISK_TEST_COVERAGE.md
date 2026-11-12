@@ -1752,6 +1752,7 @@ its RISK test; the map follows.
 - RISK redundant backups: on the older browser backup list, repeated and contained automatic copies are cleared by the next save and the rest stay
 - RISK redundant backups: on the older browser backup list, an automatic copy of a board a kept draft already holds adds no row
 - RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays
+- RISK redundant backups: a stale-tab draft holding an edit that lost to another tab’s newer change stays after later saves, on the device and in the older browser list
 
 ## tests/repository-process.test.js
 

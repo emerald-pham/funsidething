@@ -10881,7 +10881,39 @@ test('RISK redundant backups guidance: the mounted FAQ and changelog say repeate
  assert.match(answer,/^Yes, by itself, after a successful save\./);
  assert.match(answer,/stale tab draft whose tasks, History, decisions, comparisons and completions are all already in the saved board/);
  assert.match(answer,/Manual, restore, reset, import and recovery copies, pinned copies and unreadable backups are never removed this way/);
+ assert.match(answer,/an edit that lost to another tab’s newer change/,'a draft keeping a losing edit is named as staying');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
  const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 10, 2026</h3>')[0];
  assert.match(notes,/Data and backups no longer fills up with copies that add nothing\./);
+});
+
+test('RISK redundant backups: a stale-tab draft holding an edit that lost to another tab’s newer change stays after later saves, on the device and in the older browser list',async t=>{
+ // Device: another writer renames the task while this tab's own rename is saving.
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);
+ let calls=0;
+ store.commitHead=async options=>{
+  if(++calls===1){
+   const peer=JSON.parse((await store.readHead()).payload);peer.tasks[0].title='Peer title';
+   assert.equal((await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)})).ok,true);
+   return {conflict:true};
+  }
+  return original(options);
+ };
+ ctx.state.tasks[0].title='My losing title';ctx.commit();assert.equal(await ctx.persist(),true);
+ store.commitHead=original;
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks[0].title,'Peer title','positive control: the newer peer title wins');
+ const losing=()=>store.listBackups().then(rows=>[...rows].filter(row=>row.kind==='stale-tab-draft'&&row.payload.includes('My losing title')).length);
+ assert.equal(await losing(),1,'positive control: the repair kept the losing edit as a draft');
+ ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(await losing(),1,'the draft with the losing edit stays on the device');
+ // Older browser list: two tabs on one browser storage, the second rebased onto the first.
+ const initial=syncState({tasks:[syncTask('base','Original')]}),raw=JSON.stringify(initial);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});t.after(()=>{a.dispose?.();b.dispose?.();});
+ a.ctx.state.tasks[0].title='Peer title';a.ctx.commit();await a.ctx.persist();
+ b.ctx.state.tasks[0].title='My losing title';b.ctx.commit();await b.ctx.persist();
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').filter(row=>row.kind==='stale-tab-draft'&&row.payload.includes('My losing title')).length;
+ assert.equal(listed(),1,'positive control: the rebase kept the losing edit as a draft');
+ b.ctx.addTask('A later edit');assert.equal(await b.ctx.persist(),true);
+ assert.equal(listed(),1,'the draft with the losing edit stays in the older list');
 });
