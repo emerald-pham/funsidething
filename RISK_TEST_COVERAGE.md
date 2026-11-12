@@ -1806,6 +1806,11 @@ its RISK test; the map follows.
 - RISK redundant backups: a draft whose stored text cannot be read is tried once per opening, not by every save
 - RISK redundant backups: a copy kept until it is deleted is never cleared as a repeat of a copy a pin keeps only for now, so its board stays after the pin is released
 - RISK redundant backups: on the older browser backup list, a copy kept until it is deleted is never cleared as a repeat of Restore’s safety copy, so the replaced board stays after that copy expires
+- RISK cloud save loop guard: a board that differs on every save after sign-in stops saving after a few runs, shows a cloud error naming the step and stays saved on the device
+- RISK cloud save loop guard: ordinary sign-in, edits, Undo, repeated reads, a second client’s change and a signed-in cold start never stop saving
+- RISK cloud save loop guard: the support report names each cloud step with its outcome, revision and duration, and records a guard stop with the step that started it, without task text and within its size limit
+- RISK cloud save loop guard: Retry sync after a stop tries again once the loop has ended, and settles synced
+- RISK cloud save loop guard: a later cloud read after a stop keeps the error showing instead of leaving the status on syncing
 
 ## tests/repository-process.test.js
 
