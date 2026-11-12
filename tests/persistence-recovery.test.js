@@ -11799,3 +11799,44 @@ test('RISK redundant backups: on the older browser backup list, a copy is never 
  assert.equal(rows.some(entry=>entry.id==='unmarked-draft'),false,'positive control: the draft the saved board holds is cleared');
  assert.deepEqual(rows.filter(entry=>entry.payload===before).map(entry=>entry.id),['adoption-copy'],'the copy kept before taking a cloud board stays');
 });
+
+// #2333 release review: a pin, a pending Restore or an adoption only stops a
+// copy from being removed, and it ends. A protected automatic copy then follows
+// its own three- or seven-day rule, so it can never be the copy that keeps one
+// the app keeps until it is deleted.
+test('RISK redundant backups: a copy kept until it is deleted is never cleared as a repeat of a copy a pin keeps only for now, so its board stays after the pin is released',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore,DAY=86400000,now=Date.now();
+ const board=boardWithExtraTask2335(ctx,'only-in-the-copy','Only in the copy');
+ await seedDeviceBackups2335(app,[
+  {id:'pinned-merged',kind:'cloud-merged',day:vm.runInContext('backupDay('+(now-5*DAY)+')',ctx),at:now-5*DAY,payload:board},
+  {id:'other-browser',kind:'other-browser-copy',payload:board}]);
+ const holding=async()=>[...await store.listBackups()].filter(row=>row.payload===board).map(row=>row.id).sort();
+ // A cloud recovery pins the automatic copy until the cloud confirms the board.
+ ctx.state.protectedBackupIds=['pinned-merged'];
+ ctx.addTask('An edit while the copy is pinned');await savesSettled2334(app);
+ assert.deepEqual(await holding(),['other-browser','pinned-merged'],'the copy kept until it is deleted stays beside the pinned one');
+ // The pin is released; three days later the automatic copy has passed its seven days.
+ ctx.state.protectedBackupIds=[];setFakeTime(ctx,now+3*DAY);
+ ctx.addTask('An edit three days later');await savesSettled2334(app);
+ assert.deepEqual(await holding(),['other-browser'],'the board is still restorable from the copy kept until it is deleted');
+});
+
+test('RISK redundant backups: on the older browser backup list, a copy kept until it is deleted is never cleared as a repeat of Restore’s safety copy, so the replaced board stays after that copy expires',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser list holds the backups');
+ const older=boardWithExtraTask2335(ctx,'older-only','Older only');
+ ctx.addTask('Second task');assert.equal(await ctx.persist(),true);
+ const replaced=JSON.stringify(ctx.state),now=Date.now(),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ // An older shell's write left an other-browser copy of exactly this board.
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),{id:'other-browser',day,at:now-60000,kind:'other-browser-copy',payload:replaced},
+  {id:'older-manual',day,at:now-120000,kind:'manual',payload:older}]));
+ assert.equal(await ctx.restoreDurableBackupById('older-manual'),true,'positive control: the restore succeeds');
+ await savesSettled2334(app);
+ const holding=()=>listed().filter(row=>row.payload===replaced).map(row=>row.kind).sort();
+ assert.deepEqual(holding(),['before-restore','other-browser-copy'],'Restore’s safety copy and the other-browser copy both hold the replaced board');
+ setFakeTime(ctx,now+8*86400000);
+ ctx.addTask('An edit eight days later');assert.equal(await ctx.persist(),true);
+ assert.deepEqual(holding(),['other-browser-copy'],'the replaced board is still restorable after Restore’s safety copy expires');
+});

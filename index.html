@@ -2579,10 +2579,10 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     // contained (clearableAsContained), which would take this copy with it.
     const pinned=protectedBackupIdSet();
     if(kind==="before-account-switch" && rows.some(row=>row.kind===kind && row.payload===payload)) return true;
-    if(kind==="before-cloud-local-edit" && rows.some(row=>row.kind!=="latest" && row.payload===payload && !clearableAsContained(row,pinned))) return true;
+    if(kind==="before-cloud-local-edit" && rows.some(row=>row.kind!=="latest" && row.payload===payload && !clearableAsContained(row))) return true;
     // #2335: a copy the list already keeps at least as long holds these bytes.
     if(["stale-tab-draft","other-browser-copy","cloud-merged"].includes(kind)){
-      const standsIn=backupStandIn({kind,day,...(metadata?.losingEdit===true?{losingEdit:true}:{})},pinned);
+      const standsIn=backupStandIn({kind,day,...(metadata?.losingEdit===true?{losingEdit:true}:{})});
       if(rows.some(row=>row.payload===payload && readableBackupRow(row) && standsIn(row))) return true;
     }
     // #2264: a daily backup can't stand in for the cloud-adoption copy. This
@@ -2595,7 +2595,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     // an earlier day, which retires before a copy made today would. Only a
     // copy kept at least as long as this one stands in: one the app keeps
     // until it is deleted, or one from today that keeps seven days.
-    if(kind==="before-cloud-adoption" && rows.some(row=>row.payload===payload && row.kind!=="latest" && row.kind!=="manual" && !clearableAsContained(row,pinned) &&
+    if(kind==="before-cloud-adoption" && rows.some(row=>row.payload===payload && row.kind!=="latest" && row.kind!=="manual" && !clearableAsContained(row) &&
       (!automaticBackupKinds.has(row.kind) || row.day===day && (row.kind!=="daily" || row.keptForCloudAdoption===true)))) return true;
     // #2268 review: a second full copy of the same board instead counted twice
     // against the automatic budget below, and for a board of about 400,000
@@ -3780,12 +3780,20 @@ function backupDayNumber(day){return Math.round(Date.parse(day+"T12:00:00Z")/864
 // How long the app keeps a row by itself, in day numbers. A latest copy is
 // replaced by the next save and a manual one is the person's to delete (the
 // Settings reminder asks them to), so neither can stand in for another row.
-function backupKeptUntil(row,keptFrom,protectedIds,today){
-  if(protectedIds.has(row.id))return Infinity;
+// #2333 release review: this is the row's kind alone. A pin, a pending
+// Restore or an adoption only stops a row being removed, and it ends, after
+// which the row follows its kind's rule; so protection never counts here. A
+// daily copy that names an account keeps seven days only for now (another
+// account's, or while recovery holds) and can drop back to three: as the copy
+// that keeps another ({longest} false) it counts three, and as the copy kept
+// ({longest} true) any daily counts seven, since a hold could begin later.
+function backupKeptUntil(row,today,{longest=false}={}){
   if(row.kind==="latest"||row.kind==="manual")return null;
   if(!automaticBackupKinds.has(row.kind))return Infinity;
   const day=backupDayNumber(row.day);
-  return Number.isFinite(day)?day+today-backupDayNumber(keptFrom(row)):null;
+  if(!Number.isFinite(day))return null;
+  const shrinks=!longest&&row.kind==="daily"&&Object.hasOwn(row,"account")&&row.keptForCloudAdoption!==true;
+  return day+today-backupDayNumber(shrinks?oldestDailyBackupDay():oldestBackupDay());
 }
 // #2335 (scope approved 2026-11-11): a stale-tab draft that differs from the
 // board by a few bytes is still redundant when the board being saved already
@@ -3815,7 +3823,7 @@ const uncontainedDrafts=new Set();
 // bytes in turn (device rows carry none) and checks them with draftContained.
 function containedDraftCandidates(rows,protectedIds,removing,{charsOf,keyOf}){
   let budget=CONTAINED_DRAFT_CHECK_CHARS;
-  return rows.filter(row=>clearableAsContained(row,protectedIds)&&!removing.has(row.id)&&Number.isSafeInteger(charsOf(row))&&
+  return rows.filter(row=>clearableAsContained(row)&&!protectedIds.has(row.id)&&!removing.has(row.id)&&Number.isSafeInteger(charsOf(row))&&
     !uncontainedDrafts.has(keyOf(row))).sort((a,b)=>a.at-b.at).filter(row=>{
     if(charsOf(row)>budget)return false;
     budget-=charsOf(row);return true;
@@ -3895,29 +3903,32 @@ async function containedStaleTabDraftProofs(payload,protectedIds,removing){
   return out;
 }
 function duplicateBackupRows(rows,bytesOf,protectedIds,removing){
-  const keptFrom=automaticBackupRetention(),today=backupDayNumber(backupDay(Date.now())),groups=new Map();
+  const today=backupDayNumber(backupDay(Date.now())),groups=new Map();
   for(const row of rows){
     const bytes=bytesOf(row);
     if(typeof bytes!=="string"||removing.has(row.id))continue;
     if(!groups.has(bytes))groups.set(bytes,[]);
     groups.get(bytes).push(row);
   }
+  // Protection only stops a row being removed (#2333 release review).
   const removable=row=>REDUNDANT_BACKUP_KINDS.has(row.kind)&&!protectedIds.has(row.id)&&
     (typeof row.payload==="string"?readableBackupRow(row):row.payloadFacts?.readable===true);
   const out=[];
   for(const group of groups.values()){
     if(group.length<2)continue;
-    const until=new Map(group.map(row=>[row,backupKeptUntil(row,keptFrom,protectedIds,today)]));
-    const clearable=new Map(group.map(row=>[row,clearableAsContained(row,protectedIds)]));
-    // Of a duplicate set the longest-kept row stays, preferring one the
-    // containment proof never clears, then one this clean-up never removes,
-    // then the oldest. A row goes only when one that stays keeps it at least
-    // as long, so retention never shortens.
-    const ranked=group.filter(row=>until.get(row)!==null).sort((a,b)=>until.get(a)!==until.get(b)?(until.get(a)<until.get(b)?1:-1):
+    const keeps=new Map(group.map(row=>[row,backupKeptUntil(row,today)]));
+    const needs=new Map(group.map(row=>[row,backupKeptUntil(row,today,{longest:true})]));
+    const clearable=new Map(group.map(row=>[row,clearableAsContained(row)]));
+    // Of a duplicate set the row its kind keeps longest stays, preferring one
+    // the containment proof never clears, then one this clean-up never
+    // removes, then the oldest. A row goes only when one that stays is kept
+    // by its own kind at least as long as the row could be, so retention never
+    // shortens.
+    const ranked=group.filter(row=>keeps.get(row)!==null).sort((a,b)=>keeps.get(a)!==keeps.get(b)?(keeps.get(a)<keeps.get(b)?1:-1):
       (clearable.get(a)-clearable.get(b))||(removable(a)-removable(b))||(a.at-b.at));
     const stays=[];
     for(const row of ranked){
-      const keeper=removable(row)&&stays.find(kept=>until.get(kept)>=until.get(row)&&(!clearable.get(kept)||clearable.get(row)));
+      const keeper=removable(row)&&stays.find(kept=>keeps.get(kept)>=needs.get(row)&&(!clearable.get(kept)||clearable.get(row)));
       if(keeper)out.push({row,keeper});else stays.push(row);
     }
   }
@@ -3928,18 +3939,21 @@ function duplicateBackupRows(rows,bytesOf,protectedIds,removing){
 // keep another one with the same bytes, which that save clears with it, but
 // never a copy the containment proof would not clear: a before-cloud-adoption
 // or daily copy kept "by" it would lose its board early when the draft went.
-function clearableAsContained(row,protectedIds){
-  return row.kind==="stale-tab-draft"&&row.losingEdit!==true&&!protectedIds.has(row.id);
+// A pin protects a draft only for now, so a pinned one counts here too; the
+// proof itself skips pinned drafts (containedDraftCandidates).
+function clearableAsContained(row){
+  return row.kind==="stale-tab-draft"&&row.losingEdit!==true;
 }
 // #2335: an existing row with the same bytes stands in for a new automatic
-// copy {kind, day, mark} when the app keeps it at least as long by itself,
-// the rule duplicateBackupRows clears repeats by. Returns that test.
-function backupStandIn(copy,protectedIds){
-  const keptFrom=automaticBackupRetention(),today=backupDayNumber(backupDay(Date.now()));
-  const wanted=backupKeptUntil({id:"",...copy},keptFrom,protectedIds,today),clearable=clearableAsContained({id:"",...copy},protectedIds);
+// copy {kind, day, mark} when its kind keeps it at least as long as the new
+// copy could be kept, the rule duplicateBackupRows clears repeats by. Returns
+// that test.
+function backupStandIn(copy){
+  const today=backupDayNumber(backupDay(Date.now()));
+  const wanted=backupKeptUntil({id:"",...copy},today,{longest:true}),clearable=clearableAsContained(copy);
   return row=>{
-    const until=backupKeptUntil(row,keptFrom,protectedIds,today);
-    return until!==null&&wanted!==null&&until>=wanted&&(clearable||!clearableAsContained(row,protectedIds));
+    const until=backupKeptUntil(row,today);
+    return until!==null&&wanted!==null&&until>=wanted&&(clearable||!clearableAsContained(row));
   };
 }
 function persistedBackupRecord(row){
@@ -4051,9 +4065,7 @@ async function saveDurableBackup(kind,payload,metadata=null){
     // long adds nothing, so that copy is the safe one (duplicateBackupRows
     // would clear the new row on the next save anyway).
     if(REDUNDANT_BACKUP_KINDS.has(kind)&&kind!=="daily"){
-      const protectedIds=protectedBackupIdSet();
-      if(adoptedSafety?.backupId)protectedIds.add(adoptedSafety.backupId);
-      const standsIn=backupStandIn({kind,day:backupDay(Date.now()),...(metadata?.losingEdit===true?{losingEdit:true}:{})},protectedIds);
+      const standsIn=backupStandIn({kind,day:backupDay(Date.now()),...(metadata?.losingEdit===true?{losingEdit:true}:{})});
       const existing=(await deviceBackupsHoldingPayload(payload).catch(()=>[])).filter(row=>readableBackupRow(row)&&standsIn(row))[0];
       if(existing)return existing;
     }
