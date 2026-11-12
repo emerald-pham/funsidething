@@ -1741,6 +1741,17 @@ its RISK test; the map follows.
 - RISK missing-task save loop: on the older browser storage, a repeated same-day worked-on row is not kept back as a missing task either
 - RISK missing-task save loop: two signed-in devices with a repeated same-day worked-on row settle instead of saving and syncing each other forever
 - RISK missing-task save loop: one app on its own never conflicts with its own saves, so a slow device write adds no stale-tab draft
+- RISK redundant backups: exact-duplicate automatic copies already on the device are reduced to one by the next save, and every distinct board stays listed and restorable
+- RISK redundant backups: the Debug log records each clean-up with the rows removed and kept, and no task text
+- RISK redundant backups: a burst of stale-tab drafts the saved board already holds is cleared by the next save, and a draft holding a task, History entry or decision the board lacks is kept
+- RISK redundant backups: manual, restore, reset, import, recovery-record, pinned and unreadable copies survive the clean-up even when their bytes repeat another copy
+- RISK redundant backups: nothing is cleared while a recovery hold is stored on the device
+- RISK redundant backups: a save whose device write fails or is interrupted removes nothing, and the next successful save completes the clean-up
+- RISK redundant backups: when another tab deletes the copy a repeat was kept by, the save keeps the repeat
+- RISK redundant backups: a copy kept before taking a cloud board reuses a longer-kept copy of the same board instead of adding another
+- RISK redundant backups: on the older browser backup list, repeated and contained automatic copies are cleared by the next save and the rest stay
+- RISK redundant backups: on the older browser backup list, an automatic copy of a board a kept draft already holds adds no row
+- RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays
 
 ## tests/repository-process.test.js
 

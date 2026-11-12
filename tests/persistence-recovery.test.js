@@ -10645,3 +10645,243 @@ test('RISK missing-task save loop: one app on its own never conflicts with its o
  assert.ok(head.tasks.some(task=>task.title==='Added quickly'),'the saved board has the Quick Add');
  assert.equal(head.settings.showPostpone,ctx.state.settings.showPostpone,'and the Settings change');
 });
+
+// #2335: automatic backups that add nothing are cleared by the next save. These
+// load the app on a device store with no cloud account, seed backups the way an
+// earlier save loop or older build left them, save once, and read only what a
+// person or support sees: the backups the device lists and the support report.
+async function redundantBackupsApp2335(t){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-2335-'+Date.now()+'-'+Math.random(),storage=sharedScannerStorage();
+ const open=async()=>{const app=await loadApp({indexedDBProvider:indexedDB,deviceDbName:dbName,sharedStorage:storage});t.after(()=>app.dispose?.());return app;};
+ const app=await open();
+ app.ctx.addTask('Board task');assert.equal(await app.ctx.persist(),true);await savesSettled2334(app);
+ return {app,open,storage};
+}
+// A copy of the live board with one more task the saved board never had.
+function boardWithExtraTask2335(ctx,id,title){
+ const board=JSON.parse(JSON.stringify(ctx.state));
+ board.tasks.push({...JSON.parse(JSON.stringify(ctx.state.tasks[0])),id,title,createdAt:Date.now()-60000});
+ return JSON.stringify(board);
+}
+async function seedDeviceBackups2335(app,rows){
+ const store=app.shim.window.ScannerDeviceStore,day=vm.runInContext('backupDay(Date.now())',app.ctx);let n=0;
+ for(const row of rows){
+  const head=await store.readHead(),at=Date.now()-60000+n++;
+  assert.ok((await store.putBackup({expectedHash:head.hash,backup:{id:row.kind+':seed-'+n,day,at,...row}})).ok,'seeded '+row.kind);
+ }
+ await vm.runInContext('refreshDeviceBackupCache()',app.ctx);
+}
+const backupsReport2335=ctx=>JSON.parse(ctx.supportDiagnosticsText()).savedData.backups;
+
+test('RISK redundant backups: exact-duplicate automatic copies already on the device are reduced to one by the next save, and every distinct board stays listed and restorable',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const adoption=boardWithExtraTask2335(ctx,'only-before-adoption','Only before adoption');
+ const other=boardWithExtraTask2335(ctx,'only-in-other-browser','Only in the other browser');
+ await seedDeviceBackups2335(app,[
+  {kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft},
+  {kind:'before-cloud-adoption',payload:adoption},{kind:'before-cloud-adoption',payload:adoption},
+  {kind:'other-browser-copy',payload:other},
+ ]);
+ const before=backupsReport2335(ctx);
+ assert.equal(before.count.value,[...await store.listBackups()].length,'positive control: the report counts every seeded copy');
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const rows=[...await store.listBackups()],count=payload=>rows.filter(row=>row.payload===payload).length;
+ assert.deepEqual([count(draft),count(adoption),count(other)],[1,1,1],'each duplicated board is kept once: '+JSON.stringify(rows.map(row=>row.kind)));
+ const after=backupsReport2335(ctx);
+ assert.equal(before.count.value-after.count.value,3,'the support report counts three fewer backups');
+ assert.equal(after.totalCharacters.value,rows.reduce((sum,row)=>sum+row.payload.length,0),'and only the characters still kept');
+ assert.ok(after.totalCharacters.value<before.totalCharacters.value-2*draft.length,'so storage use drops');
+ // Every distinct board is still restorable from the copy that stayed.
+ assert.equal(await ctx.restoreDurableBackupById(rows.find(row=>row.payload===draft).id),true,'the kept draft restores');
+ assert.ok(ctx.state.tasks.some(task=>task.id==='only-in-drafts'));
+});
+
+test('RISK redundant backups: the Debug log records each clean-up with the rows removed and kept, and no task text',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'private-draft-task','Private draft task title');
+ await seedDeviceBackups2335(app,[{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft}]);
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const kept=[...await store.listBackups()].length;
+ const report=ctx.supportDiagnosticsText(),cleanups=JSON.parse(report).events.filter(event=>event.stage==='backup-cleanup');
+ assert.deepEqual(cleanups.map(event=>event.metadata),[{removedBackups:1,keptBackups:kept}],'one clean-up with its counts');
+ assert.ok(!report.includes('Private draft task title'),'and no task text');
+ ctx.addTask('A later edit');await savesSettled2334(app);
+ assert.equal(JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='backup-cleanup').length,1,'a save that removes nothing logs no clean-up');
+});
+
+test('RISK redundant backups: a burst of stale-tab drafts the saved board already holds is cleared by the next save, and a draft holding a task, History entry or decision the board lacks is kept',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ // Same-minute drafts of this board as it grew: each holds an older value of a
+ // field edited later, or lacks what came after it.
+ const contained=[JSON.stringify(ctx.state)];
+ ctx.addTask('Second task');await savesSettled2334(app);contained.push(JSON.stringify(ctx.state));
+ ctx.state.tasks[0].title='Board task, renamed';ctx.save();await savesSettled2334(app);contained.push(JSON.stringify(ctx.state));
+ ctx.addTask('Third task');await savesSettled2334(app);contained.push(JSON.stringify(ctx.state));
+ // A decision that reached a draft but never the saved board: the live board
+ // goes back to the one before it, as a tab replaced by a newer copy does.
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});await savesSettled2334(app);
+ const candidate=ctx.state.candidateId,benchmark=ctx.state.chain.at(-1);assert.ok(candidate&&benchmark,'a scan deals a choice');
+ const undecided=JSON.stringify(ctx.state),decided=(ctx.state.decisionEvents||[]).length;
+ ctx.onAction('no',{dataset:{candidate,benchmark}});
+ const withDecision=JSON.stringify(ctx.state);assert.ok(JSON.parse(withDecision).decisionEvents.length>decided,'positive control: the draft holds a new decision');
+ vm.runInContext('state=JSON.parse('+JSON.stringify(undecided)+');hydrateState(state);',ctx);await savesSettled2334(app);
+ const missingTask=boardWithExtraTask2335(ctx,'only-in-a-draft','Only in a draft');
+ const history=JSON.parse(JSON.stringify(ctx.state)),task=history.tasks[0];
+ history.workLog.push({id:'worked-only-in-draft',taskId:task.id,title:task.title,kind:'worked',at:Date.now()-3*86400000});
+ const missingHistory=JSON.stringify(history);
+ const otherAccount=JSON.stringify({...JSON.parse(contained[0]),syncAccount:'other@example.com'});
+ await seedDeviceBackups2335(app,[...contained,missingTask,missingHistory,withDecision,otherAccount].map(payload=>({kind:'stale-tab-draft',payload})));
+ const head=JSON.parse((await store.readHead()).payload);
+ assert.ok(!head.tasks.some(row=>row.id==='only-in-a-draft')&&!head.workLog.some(row=>row.id==='worked-only-in-draft'),'positive control: the saved board lacks the kept drafts’ task and History entry');
+ assert.ok((head.decisionEvents||[]).length<JSON.parse(withDecision).decisionEvents.length,'and the undone decision');
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const drafts=[...await store.listBackups()].filter(row=>row.kind==='stale-tab-draft').map(row=>row.payload);
+ assert.deepEqual(contained.map(payload=>drafts.includes(payload)),[false,false,false,false],'every draft the saved board holds is cleared');
+ assert.deepEqual([missingTask,missingHistory,withDecision,otherAccount].map(payload=>drafts.includes(payload)),[true,true,true,true],
+  'a missing task, History entry or decision, or another account, keeps its draft');
+ assert.equal(drafts.length,4);
+});
+
+test('RISK redundant backups: manual, restore, reset, import, recovery-record, pinned and unreadable copies survive the clean-up even when their bytes repeat another copy',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const kept=['manual','before-restore','before-file-restore','restore-file-source','before-reset','before-import','decision-import-source',
+  'decision-recovery-device','decision-recovery-cloud'];
+ const seeded=[];
+ for(const kind of kept){
+  // The automatic copy is older, so a rule keeping the oldest of a set would take the protected one.
+  const payload=boardWithExtraTask2335(ctx,'only-in-'+kind,'Only in '+kind);
+  seeded.push({id:'draft-of-'+kind,kind:'stale-tab-draft',payload},{id:kind+'-copy',kind,payload});
+ }
+ const pinned=boardWithExtraTask2335(ctx,'only-in-pinned','Only in the pinned copy');
+ seeded.push({id:'unpinned-draft',kind:'stale-tab-draft',payload:pinned},{id:'pinned-draft',kind:'stale-tab-draft',payload:pinned});
+ seeded.push({id:'unreadable-a',kind:'stale-tab-draft',payload:'{"tasks":'},{id:'unreadable-b',kind:'stale-tab-draft',payload:'{"tasks":'});
+ await seedDeviceBackups2335(app,seeded);
+ ctx.state.protectedBackupIds=['pinned-draft'];
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const ids=new Set([...await store.listBackups()].map(row=>row.id));
+ assert.deepEqual([...kept.map(kind=>kind+'-copy'),'pinned-draft','unreadable-a','unreadable-b'].filter(id=>!ids.has(id)),[],'every protected copy stays');
+ assert.equal(ids.has('unpinned-draft'),false,'positive control: the unprotected repeat of the pinned copy is cleared');
+});
+
+test('RISK redundant backups: nothing is cleared while a recovery hold is stored on the device',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='chain-scanner-2335-hold-'+Math.random();
+ const offline={navigatorProvider:{onLine:false},fetchProvider:async()=>{throw Error('offline');}};
+ const board=tasks=>syncState({tasks,syncAccount:'e@example.com',syncIdentity:'owner',syncRev:4,syncDirty:false});
+ const original=JSON.stringify(board([syncTask('local-survivor','Surviving task')]));
+ const draft=JSON.stringify(board([syncTask('local-survivor','Surviving task'),syncTask('only-in-drafts','Only in the drafts')]));
+ const store=loadStorageV2({indexedDB}).createDeviceStore({indexedDB,crypto:webcrypto,dbName:deviceDbName});await store.open();t.after(()=>store.close());
+ assert.equal((await store.commitHead({expectedHash:null,payload:original,account:'e@example.com'})).ok,true);
+ const day=new Date().toISOString().slice(0,10);
+ for(const [id,kind,payload] of [['healthy-linked','manual',original],['draft-a','stale-tab-draft',draft],['draft-b','stale-tab-draft',draft],['draft-c','stale-tab-draft',draft]])
+  assert.equal((await store.putBackup({expectedHash:(await store.readHead()).hash,backup:{id,kind,at:Date.now()-60000,day,payload}})).ok,true);
+ // The saved board is lost, so the app opens from the linked backup and holds every recovery source.
+ await editRawDevice187(indexedDB,deviceDbName,tx=>tx.objectStore('meta').delete('head'));
+ const app=await loadApp({...offline,indexedDBProvider:indexedDB,deviceDbName,sharedStorage:sharedScannerStorage({'fvp:chain-scanner:device-store-v2':'1'})}),{ctx,shim}=app;t.after(()=>app.dispose());
+ assert.ok(await store.getRecoveryCloudHold(),'positive control: a recovery hold is stored');
+ shim.document.getElementById('addInput').value='Work during the recovery hold';await ctx.onAction('add',{});assert.equal(await ctx.persist(),true);
+ assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(row=>row.title==='Work during the recovery hold'),'positive control: the save was written');
+ assert.ok(await store.getRecoveryCloudHold(),'and the hold is still stored');
+ const ids=[...await store.listBackups()].map(row=>row.id);
+ assert.deepEqual(['draft-a','draft-b','draft-c'].filter(id=>!ids.includes(id)),[],'every repeated draft stays while the hold is stored');
+});
+
+test('RISK redundant backups: a save whose device write fails or is interrupted removes nothing, and the next successful save completes the clean-up',async t=>{
+ const {IDBObjectStore}=await import('fake-indexeddb');
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const contained=JSON.stringify(ctx.state);
+ await seedDeviceBackups2335(app,[{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:draft},{kind:'stale-tab-draft',payload:contained}]);
+ const seeded=[...await store.listBackups()].map(row=>row.id).sort();
+ // The write of the new saved board fails inside the device transaction, after its removals were queued.
+ const put=IDBObjectStore.prototype.put;let faults=0;
+ IDBObjectStore.prototype.put=function(value,key){
+  if(this.name==='meta'&&key==='head'&&this.transaction.mode==='readwrite'&&faults++===0)throw Object.assign(Error('fixture interrupted write'),{name:'AbortError'});
+  return put.call(this,value,key);
+ };
+ t.after(()=>{IDBObjectStore.prototype.put=put;});
+ ctx.addTask('Edit while the device write fails');assert.equal(await ctx.persist(),false,'the failed save reports a failure');
+ IDBObjectStore.prototype.put=put;
+ assert.equal(faults,1,'positive control: the write was interrupted');
+ assert.deepEqual([...await store.listBackups()].map(row=>row.id).sort(),seeded,'the interrupted save removed nothing');
+ assert.ok(!JSON.parse((await store.readHead()).payload).tasks.some(task=>task.title==='Edit while the device write fails'),'and wrote no board');
+ assert.equal(await ctx.persist(),true,'the next save succeeds');
+ const drafts=[...await store.listBackups()].filter(row=>row.kind==='stale-tab-draft').map(row=>row.payload);
+ assert.deepEqual(drafts,[draft],'and completes the clean-up');
+});
+
+test('RISK redundant backups: when another tab deletes the copy a repeat was kept by, the save keeps the repeat',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ await seedDeviceBackups2335(app,[{id:'older-draft',kind:'stale-tab-draft',payload:draft},{id:'newer-draft',kind:'stale-tab-draft',payload:draft}]);
+ // Another tab's Delete lands after this save planned its clean-up and before its device write.
+ const commitHead=store.commitHead;let deleted=null;
+ store.commitHead=async function(options){
+  if(deleted===null){const target=[...await store.listBackups()].find(row=>row.kind==='stale-tab-draft'&&!JSON.stringify(options.removeRedundantBackups||[]).includes('"id":'+JSON.stringify(row.id)));
+   deleted=target?await store.deleteBackup(target.id,{payload:target.payload}):false;}
+  return commitHead.call(this,options);
+ };
+ t.after(()=>{store.commitHead=commitHead;});
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ assert.equal(deleted,true,'positive control: the other tab deleted one copy');
+ assert.equal([...await store.listBackups()].filter(row=>row.payload===draft).length,1,'the other copy of that board stays');
+});
+
+test('RISK redundant backups: a copy kept before taking a cloud board reuses a longer-kept copy of the same board instead of adding another',async t=>{
+ const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+ const board=JSON.stringify(ctx.state);
+ await seedDeviceBackups2335(app,[{id:'earlier-draft',kind:'stale-tab-draft',payload:board}]);
+ const safety=await ctx.saveDurableBackup('before-cloud-adoption',board);
+ assert.ok(safety?.id,'the cloud adoption gets its safety copy');
+ const copies=[...await store.listBackups()].filter(row=>row.payload===board&&row.kind!=='latest'&&row.kind!=='daily').map(row=>row.id);
+ assert.deepEqual(copies,['earlier-draft'],'the board is kept once');
+ assert.equal(safety.id,'earlier-draft','and that copy is the safety copy');
+ // A copy the person may delete on the Settings reminder does not stand in.
+ const manualBoard=boardWithExtraTask2335(ctx,'manual-only','Manual only');
+ await seedDeviceBackups2335(app,[{id:'manual-copy',kind:'manual',payload:manualBoard}]);
+ const second=await ctx.saveDurableBackup('before-cloud-adoption',manualBoard);
+ assert.ok(second?.id&&second.id!=='manual-copy','a manual copy does not stand in for the adoption copy');
+});
+
+test('RISK redundant backups: on the older browser backup list, repeated and contained automatic copies are cleared by the next save and the rest stay',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser list holds the backups');
+ const contained=JSON.stringify(ctx.state);
+ const draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const manual=boardWithExtraTask2335(ctx,'only-in-manual','Only in the manual copy');
+ const day=vm.runInContext('backupDay(Date.now())',ctx);let n=0;
+ const row=(kind,payload)=>({id:'seed-'+(++n),day,at:Date.now()-60000+n,kind,payload});
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),row('stale-tab-draft',draft),row('stale-tab-draft',draft),row('stale-tab-draft',contained),
+  row('manual',manual),row('stale-tab-draft',manual),row('manual',manual)]));
+ ctx.addTask('An ordinary edit');assert.equal(await ctx.persist(),true);
+ const rows=listed(),count=payload=>rows.filter(entry=>entry.payload===payload&&entry.kind!=='latest'&&entry.kind!=='daily').length;
+ assert.deepEqual([count(draft),count(contained)],[1,0],'the repeated draft is kept once and the contained one is cleared: '+JSON.stringify(rows.map(entry=>entry.kind)));
+ assert.equal(rows.filter(entry=>entry.kind==='manual').length,2,'manual copies stay even when they repeat each other');
+ assert.equal(count(manual),3,'and a manual copy does not stand in for an automatic one');
+});
+
+test('RISK redundant backups: on the older browser backup list, an automatic copy of a board a kept draft already holds adds no row',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ const board=boardWithExtraTask2335(ctx,'only-in-the-copy','Only in the copy'),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),{id:'earlier-draft',day,at:Date.now()-60000,kind:'stale-tab-draft',payload:board}]));
+ assert.ok(await ctx.saveDurableBackup('other-browser-copy',board),'the copy is reported safe');
+ assert.deepEqual(listed().filter(row=>row.payload===board).map(row=>row.id),['earlier-draft'],'the board is listed once');
+});
+
+test('RISK redundant backups guidance: the mounted FAQ and changelog say repeated and contained automatic copies are cleared by a save, and what always stays',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.ok(answerTo('How do backups and Restore work?'),'positive control: the mounted Help has the backups answer');
+ const answer=answerTo('Does the app clear backups that repeat each other?');
+ assert.match(answer,/^Yes, by itself, after a successful save\./);
+ assert.match(answer,/stale tab draft whose tasks, History, decisions, comparisons and completions are all already in the saved board/);
+ assert.match(answer,/Manual, restore, reset, import and recovery copies, pinned copies and unreadable backups are never removed this way/);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 10, 2026</h3>')[0];
+ assert.match(notes,/Data and backups no longer fills up with copies that add nothing\./);
+});

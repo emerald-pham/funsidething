@@ -939,7 +939,7 @@
 
     // releaseRecoveryHold deletes the exact expected recovery hold in the same
     // transaction as the head, so a crash cannot leave one without the other.
-    async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[],releaseRecoveryHold=null}={}){
+    async function commitHead({expectedHash,expectedHead,encodeHead=pendingJSON,payload,account=null,backup=null,backups=[],removeBackupIds=[],removeRedundantBackups=[],releaseRecoveryHold=null}={}){
       ensureOpen();
       if(typeof payload!=="string") return {error:true,code:"invalid-payload"};
       const nextHash=await sha(payload);
@@ -974,6 +974,28 @@
         }
       }
       const removeIds=new Set(Array.isArray(removeBackupIds)?removeBackupIds.filter(id=>typeof id==="string"&&id):[]);
+      // #2335: copies the app proved redundant go only with this commit, and
+      // none while a recovery hold is stored: recovery may still need them.
+      // Each proof is rechecked here against the rows as they are now: the
+      // copy still holds the bytes the app checked, and the row that keeps
+      // those bytes ({keptBy:id}) is still there and stays. A copy proved
+      // contained in the board being written ({keptBy:"board"}) needs only
+      // its bytes unchanged, since this transaction writes that board.
+      let removedRedundant=0;
+      if(!recoveryHold&&Array.isArray(removeRedundantBackups)){
+        const rowById=new Map(backupRows.map(row=>[row?.id,row]));
+        const proofs=removeRedundantBackups.filter(proof=>proof&&typeof proof.id==="string"&&proof.id&&!removeIds.has(proof.id)&&
+          typeof proof.payloadHash==="string"&&rowById.get(proof.id)?.payloadHash===proof.payloadHash&&typeof proof.keptBy==="string");
+        const removing=new Set(proofs.map(proof=>proof.id));
+        for(const proof of proofs){
+          const keeper=proof.keptBy==="board"?null:rowById.get(proof.keptBy);
+          if(proof.keptBy!=="board"&&(!keeper||keeper.payloadHash!==proof.payloadHash||removeIds.has(keeper.id)||removing.has(keeper.id)))continue;
+          removeIds.add(proof.id);removedRedundant++;
+        }
+      }
+      // #2335: a write that throws part way aborts the whole transaction, so
+      // the removals queued above never land without the head they go with.
+      try{
       for(const id of removeIds) backupStore.delete(id);
       for(const prepared of preparedBackups){
         snapshotStore.put({hash:prepared.payloadHash,payload:prepared.payload},prepared.payloadHash);
@@ -1003,6 +1025,7 @@
         if(unused?.hash===key&&typeof unused.payload==="string"&&Object.keys(unused).length===2)
           snapshotStore.delete(key);
       }
+      }catch(error){try{tx.abort();}catch(e){}try{await transactionDone(tx);}catch(e){}throw error;}
       await transactionDone(tx);
       const verified=await readHead();
       if(!verified) throw new Error("Device head verification failed");
@@ -1011,10 +1034,10 @@
         // live head before this separate verification read; report that exact
         // current head so its caller can reconcile instead of calling the
         // already-committed write a failure.
-        return {ok:true,superseded:true,committedHash:nextHash,head:verified};
+        return {ok:true,superseded:true,committedHash:nextHash,head:verified,...(removedRedundant?{removedRedundant}:{})};
       }
       if(verified.payload!==payload) throw new Error("Device head verification failed");
-      return {ok:true,hash:nextHash,...(expectedHead===undefined?{}:{committedHead:{...committedHead,payload}})};
+      return {ok:true,hash:nextHash,...(removedRedundant?{removedRedundant}:{}),...(expectedHead===undefined?{}:{committedHead:{...committedHead,payload}})};
     }
 
     async function putBackup({expectedHash,backup}={}){
