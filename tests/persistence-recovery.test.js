@@ -11639,6 +11639,31 @@ test('RISK redundant backups: a copy is never cleared as a repeat of a stale-tab
  assert.ok([...await reopened.shim.window.ScannerDeviceStore.listBackups()].some(row=>row.payload===before),'the board from before the cloud adoption is still restorable');
 });
 
+// #2333 review: the older list's clean-up rewrote the list before the board's
+// own write, so a refused board write had already cleared drafts proved
+// contained in a board that was never saved.
+test('RISK redundant backups: on the older browser backup list, a save whose board write fails removes nothing, and the next successful save completes the clean-up',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser keys hold the board');
+ const contained=JSON.stringify(ctx.state),draft=boardWithExtraTask2335(ctx,'only-in-drafts','Only in the drafts');
+ const day=vm.runInContext('backupDay(Date.now())',ctx);let n=0;
+ const row=(kind,payload)=>({id:'seed-'+(++n),day,at:Date.now()-60000+n,kind,payload});
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),row('stale-tab-draft',draft),row('stale-tab-draft',draft),row('stale-tab-draft',contained)]));
+ const seeded=()=>listed().filter(entry=>entry.id.startsWith('seed-'));
+ // The browser refuses the board's own write, once.
+ const setItem=storage.setItem;let refused=0;
+ storage.setItem=(key,value)=>{if(key===LOCAL_HEAD_KEY&&refused++===0)throw Object.assign(Error('fixture refused write'),{name:'SecurityError'});return setItem(key,value);};
+ t.after(()=>{storage.setItem=setItem;});
+ ctx.addTask('Edit while the board write fails');assert.equal(await ctx.persist(),false,'the failed save reports a failure');
+ assert.equal(refused,1,'positive control: the board write was refused');
+ assert.deepEqual(seeded().map(entry=>entry.id),['seed-1','seed-2','seed-3'],'the failed save removed nothing');
+ storage.setItem=setItem;
+ assert.equal(await ctx.persist(),true,'the next save succeeds');
+ assert.deepEqual(seeded().map(entry=>entry.payload),[draft],'and completes the clean-up');
+});
+
 test('RISK redundant backups: on the older browser backup list, a copy is never cleared as a repeat of a stale-tab draft a later save may clear',async t=>{
  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
  ctx.addTask('Board task');assert.equal(await ctx.persist(),true);

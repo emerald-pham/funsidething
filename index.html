@@ -2627,22 +2627,6 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
         if(latest>=0) rows[latest]=current; else rows.push(current);
       }
     }else if(!keptDaily) rows.push(entry);
-    // #2335: an ordinary save also clears automatic copies that add nothing,
-    // in this same guarded rewrite of the list: repeats of a row kept at least
-    // as long, and stale-tab drafts the board saved here already holds. That
-    // board is this rewrite's latest copy, so if the rewrite fails nothing goes.
-    let clearedBackups=0;
-    if(kind==="daily" && !onlyIfMissing && redundantBackupsAllowed()){
-      const keep=new Set([preserveBackupId,adoptedSafety?.backupId].filter(Boolean)),cleared=new Set();
-      for(const id of protectedIds) keep.add(id);
-      for(const {row} of duplicateBackupRows(rows.filter(row=>row.kind!=="latest"),row=>row.payload,keep,new Set())) cleared.add(row);
-      let budget=CONTAINED_DRAFT_CHECK_CHARS;
-      for(const row of rows) if(row.kind==="stale-tab-draft" && row.displacedEdits!==true && !cleared.has(row) && !keep.has(row.id) && readableBackupRow(row) && row.payload.length<=budget){
-        budget-=row.payload.length;
-        try{ if(draftContainedInBoard(row.payload,payload)) cleared.add(row); }catch(e){}
-      }
-      if(cleared.size){ rows=rows.filter(row=>!cleared.has(row)); clearedBackups=cleared.size; }
-    }
     // Bound ordinary full-board history before it reaches browser quota. The
     // new snapshot and active cloud-adoption proof remain; manual, displaced
     // local edits, unsynced account-switch, stale-tab, other-browser, and
@@ -2666,15 +2650,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     const automaticBytes=()=>rows.filter(row=>automaticBackupKinds.has(row.kind))
       .reduce((bytes,row)=>bytes+JSON.stringify(row).length,0);
     while(automaticBytes()>1000000 && retireOldest()){}
-    const write=(compact=false)=>{
-      const written=writeBackupIndexIfCurrent(stored,encodeBackupIndex(rows,compact||packedBackupIndex(stored)));
-      if(written&&clearedBackups){
-        supportDiagnosticsObserve("backup-cleanup","completed","current",null,null,null,null,null,null,null,null,null,"unknown",
-          null,null,null,null,null,null,null,null,null,{removedBackups:clearedBackups,keptBackups:rows.length});
-        clearedBackups=0;
-      }
-      return written;
-    };
+    const write=(compact=false)=>writeBackupIndexIfCurrent(stored,encodeBackupIndex(rows,compact||packedBackupIndex(stored)));
     const retryChanged=()=>changedRetries<2 && saveLocalBackup(kind,payload,onlyIfMissing,changedRetries+1,preserveBackupId,onQuota,metadata);
     try{ return write() || retryChanged(); }
     catch(error){ if(!backupQuotaError(error)) return false; onQuota?.(); }
@@ -2693,6 +2669,38 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     }
     return false;
   }catch(e){ return false; }
+}
+// #2335: after an ordinary save the older backup list also clears the
+// automatic copies that add nothing: repeats of a row kept at least as long,
+// and stale-tab drafts the saved board already holds. #2333 review: this runs
+// only once the board's own write has succeeded, in its own guarded rewrite of
+// the list, and only while the saved board is still that board, so a refused
+// board write removes nothing and the next save finishes the job.
+function clearRedundantLocalBackups(board,boardStillSaved,preserveBackupId=null){
+  try{
+    if(!redundantBackupsAllowed()||!boardStillSaved())return 0;
+    const stored=localStorage.getItem(LOCAL_BACKUPS_KEY);
+    const savedRows=parseBackupIndex(stored);
+    // An unreadable row stops the clean-up, as it stops every rewrite of the list.
+    if(!Array.isArray(savedRows)||!savedRows.every(readableBackupRow))return 0;
+    const rows=readLegacyBackups(),keep=new Set([preserveBackupId,adoptedSafety?.backupId,...protectedBackupIdSet()].filter(Boolean)),cleared=new Set();
+    for(const {row} of duplicateBackupRows(rows.filter(row=>row.kind!=="latest"),row=>row.payload,keep,new Set())) cleared.add(row);
+    let budget=CONTAINED_DRAFT_CHECK_CHARS;
+    for(const row of rows) if(clearableAsContained(row,keep) && !cleared.has(row) && readableBackupRow(row) && row.payload.length<=budget){
+      budget-=row.payload.length;
+      try{ if(draftContainedInBoard(row.payload,board)) cleared.add(row); }catch(e){}
+    }
+    if(!cleared.size)return 0;
+    const kept=rows.filter(row=>!cleared.has(row));
+    if(!writeBackupIndexIfCurrent(stored,encodeBackupIndex(kept,packedBackupIndex(stored))))return 0;
+    logBackupCleanup(cleared.size,kept.length);
+    return cleared.size;
+  }catch(e){ return 0; } // optional clean-up never fails a saved board
+}
+// #2335: the Debug log counts each clean-up, never what the copies held.
+function logBackupCleanup(removedBackups,keptBackups){
+  supportDiagnosticsObserve("backup-cleanup","completed","current",null,null,null,null,null,null,null,null,null,"unknown",
+    null,null,null,null,null,null,null,null,null,{removedBackups,keptBackups});
 }
 function reclassifyCloudRecoveryBackup(id,payload,kind){
   try{
@@ -4621,8 +4629,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       deviceHeadHash=result.hash;lastPersistedRaw=committedPayload;persistedChanceSeed=JSON.parse(committedPayload).chance?.seed??null;
       rememberSavedBoardFacts(result.hash,committedPayload);
       await refreshDeviceBackupCache();
-      if(clearedBackups)supportDiagnosticsObserve("backup-cleanup","completed","current",null,null,null,null,null,null,null,null,null,"unknown",
-        null,null,null,null,null,null,null,null,null,{removedBackups:clearedBackups,keptBackups:deviceBackupCache.length});
+      if(clearedBackups)logBackupCleanup(clearedBackups,deviceBackupCache.length);
       if(!backupAlreadySafe)await retireExpiredLegacyBackups(result.hash,committedPayload,legacyIndex?.raw,preserveBackupId);
       if(JSON.stringify(state)!==committedPayload){
         // A newer accepted save request is follow-up work after this exact
@@ -4685,6 +4692,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       written=writeBrowserPairIfCurrent(expectedHead,expectedStore,payload,captureWriteFailure,checkSafety);
     }
     if(written){
+      if(!backupAlreadySafe) clearRedundantLocalBackups(payload,()=>localStorage.getItem(LOCAL_HEAD_KEY)===payload && localStorage.getItem(STORE_KEY)===payload,preserveBackupId);
       pendingRestoreSafetyIds.clear();
       if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
       lastPersistedRaw=payload; persistedChanceSeed = chanceSeed; clearDeviceSaveIssue(); return true;
@@ -4733,8 +4741,11 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
     return true;
   });
   persistQueue = write.catch(()=>{});
+  const lastQueued=persistQueue;
   try{
     if(!await write){ toast("Couldn't save this edit on this device. Keep this tab open and try again.",7000); return false; }
+    // The host holds this board until a later queued write replaces it.
+    clearRedundantLocalBackups(payload,()=>persistQueue===lastQueued);
     for(const [id,prior] of restoreProofs)
       if(pendingRestoreSafetyIds.get(id)===prior) pendingRestoreSafetyIds.delete(id);
     if(completionSourcePayload!==null&&pendingLegacyCompletionSource===completionSourcePayload)pendingLegacyCompletionSource=null;
