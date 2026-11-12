@@ -13384,6 +13384,103 @@ test("UI #221: a held Enter that pressed Return as candidate cannot press the co
   assert.equal(ctx.state.chain.length, 1, "a fresh press of Enter starts the scan");
 });
 
+// #221 review B3: when the focused button leaves the page, the page's body has focus.
+const pageBody221 = shim => Object.assign(shim.document.body, { classList: { contains: () => false }, closest: () => null, matches: () => false });
+// #221 release review: focus that waits for Enter's release goes back
+// promptly or not at all. Enter goes down on Return, as in the test above, and
+// the editor closes; what happens before the release decides.
+const enterOnReturn221 = async (shim, id) => {
+  const pressed = editorControl221("return-candidate", id), page = pageBody221(shim);
+  shim.document.activeElement = pressed;
+  shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat: false, target: pressed });
+  tapControl221(shim, pressed);
+  shim.document.activeElement = page;   // the editor closes, and Return with it
+  await flush();
+  return page;
+};
+const mousePress221 = (shim, pressed) => {   // a control, or the page around the controls
+  const target = pressed.dataset?.act ? { classList: { contains: () => false }, closest: () => pressed } : pressed;
+  for (const type of ["pointerdown", "pointerup", "click"]) shim.document.dispatchEvent({ type, detail: 1, target });
+};
+test("UI #221: focus waiting for the release of the Enter that pressed Return goes back at the release, or not at all if anything comes first", async t => {
+  const first = [
+    ["nothing: it goes back at the release", null],
+    ["a second passes", ({ wait }) => wait(1001)],
+    ["the person presses a pointer", ({ shim, page }) => mousePress221(shim, page)],
+    ["the person presses another key", ({ shim, page }) => { shim.document.dispatchEvent({ type: "keydown", key: "Shift", target: page }); }],
+    ["the window loses focus", ({ shim }) => { shim.window.dispatchEvent({ type: "blur" }); }],
+    ["focus has moved into a text field", ({ shim, field }) => { shim.document.activeElement = field; return field; }],
+  ];
+  for (const [what, meanwhile] of first) await t.test(what, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2245 });
+    let clock = ctx.performance.now();
+    ctx.performance = { now: () => clock };
+    ctx.addTask("First dot", true);
+    const middle = ctx.addTask("Middle dot", true), bench = ctx.addTask("Benchmark dot", true);
+    ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+    keepEditorValues(ctx, shim, middle.id);
+    const page = await enterOnReturn221(shim, middle.id);
+    assert.equal(ctx.state.chain.includes(middle.id), false, "precondition: Enter returned the dot");
+    assert.equal(panel.controls().includes(shim.document.activeElement), false, "precondition: focus waits while Enter is down");
+    clock += 300;
+    shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat: true, target: page });   // still held
+    const field = Object.assign(shim.document.getElementById("addInput"), { id: "addInput", matches: selector => /input/.test(selector) });
+    const stays = meanwhile?.({ shim, page, field, wait: ms => { clock += ms; } }) || page;
+
+    shim.document.dispatchEvent({ type: "keyup", key: "Enter", target: shim.document.activeElement });
+    await flush();
+    if (!meanwhile) assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: bench.id, pill: false }, "Edit on the benchmark card has focus");
+    else assert.equal(shim.document.activeElement, stays, "focus stays where it was, and the scan panel never takes it");
+  });
+});
+
+// #221 review B3: browsers on macOS deliver no keyup for a key released while
+// Cmd is held, so after one Cmd+Enter the page never hears Enter come up.
+test("UI #221: when the release of the Enter that pressed Return never reaches the page, nothing later is changed by it", async t => {
+  const later = {
+    "typing a task in Add a task keeps focus there": async ({ ctx, shim }) => {
+      const field = Object.assign(shim.document.getElementById("addInput"), { id: "addInput", matches: selector => /input/.test(selector) });
+      shim.document.activeElement = field;
+      field.value = "Buy milk";
+      for (const key of ["B", "u", "y", "k"]) shim.document.dispatchEvent({ type: "keydown", key, repeat: false, target: field });
+      shim.document.dispatchEvent({ type: "keydown", key: "Enter", repeat: false, target: field });
+      shim.document.dispatchEvent({ type: "keyup", key: "Enter", target: field });
+      await flush();
+      assert.equal(shim.document.activeElement, field, "focus stays in Add a task after its Enter is released");
+    },
+    "an editor opened and closed with the mouse hands focus back at once": async ({ ctx, shim, first }) => {
+      const panel = scanPanelDom221(shim), pill = panel.find(control => control.classList.contains("crumb") && control.dataset.id === first.id);
+      shim.document.activeElement = pill;
+      mousePress221(shim, pill);
+      assert.match(shim.elements.get("modalRoot").innerHTML, /Edit task/, "precondition: the pill opened the editor");
+      const cancel = editorControl221("close-modal", first.id);
+      shim.document.activeElement = cancel;
+      mousePress221(shim, cancel);
+      shim.document.activeElement = pageBody221(shim);
+      await flush();
+      assert.deepEqual(focusedScanControl221(shim, panel), { inPanel: true, act: "edit", id: first.id, pill: true }, "the pill has focus again");
+    },
+  };
+  for (const [what, then] of Object.entries(later)) await t.test(what, async () => {
+    const { ctx, shim } = await loadApp({ seed: 2246 });
+    const first = ctx.addTask("First dot", true), middle = ctx.addTask("Middle dot", true);
+    ctx.addTask("Benchmark dot", true);
+    const waiting = ctx.addTask("Waiting candidate", false);
+    ctx.render();
+    await settledBoard221();
+    const panel = openFromScan221(ctx, shim, control => control.classList.contains("crumb") && control.dataset.id === middle.id, "the Middle dot pill");
+    keepEditorValues(ctx, shim, middle.id);
+    await enterOnReturn221(shim, middle.id);
+    assert.equal(panel.controls().includes(shim.document.activeElement), false, "precondition: focus waits while Enter is down");
+    await settledBoard221();   // the release is lost; the person goes on
+
+    await then({ ctx, shim, first });
+    assert.equal(ctx.state.tasks.find(task => task.id === waiting.id)?.done ?? false, false, "and no scanner key was pressed on the candidate");
+  });
+});
+
 // #221 release review (specialist F7): only an editor that opened hands focus back.
 test("UI #221: a pill pressed after its task has gone opens no editor, and closing the dialog still open leaves focus where it was", async () => {
   const { ctx, shim } = await loadApp({ seed: 2243 });
