@@ -11588,3 +11588,43 @@ test('RISK redundant backups: a stale-tab draft holding an edit that lost to ano
  b.ctx.addTask('A later edit');assert.equal(await b.ctx.persist(),true);
  assert.equal(listed(),1,'the draft with the losing edit stays in the older list');
 });
+
+// #2333 review: retention never shortens. A stale-tab draft the containment
+// proof may clear on a later save cannot be the copy that keeps another one,
+// or the board that copy promised to keep would go with the draft.
+test('RISK redundant backups: a copy is never cleared as a repeat of a stale-tab draft a later save may clear, so the board kept before taking a cloud board stays',async t=>{
+ const {app,open}=await redundantBackupsApp2335(t),{ctx}=app;
+ // The board before a cloud adoption: an older title and a task the saved board lacks, so no save can clear its draft yet.
+ const older=JSON.parse(boardWithExtraTask2335(ctx,'only-before-adoption','Only before adoption'));older.tasks[0].title='Older title only here';
+ const before=JSON.stringify(older),other=boardWithExtraTask2335(ctx,'only-in-other-browser','Only in the other browser');
+ await seedDeviceBackups2335(app,[
+  {id:'adoption-copy',kind:'before-cloud-adoption',payload:before},{id:'unmarked-draft',kind:'stale-tab-draft',payload:before},
+  {id:'draft-of-other',kind:'stale-tab-draft',payload:other},{id:'other-browser',kind:'other-browser-copy',payload:other}]);
+ ctx.addTask('An ordinary edit');await savesSettled2334(app);
+ const ids=async board=>new Set([...await board.shim.window.ScannerDeviceStore.listBackups()].map(row=>row.id));
+ let kept=await ids(app);
+ assert.ok(kept.has('adoption-copy'),'the copy kept before taking a cloud board stays: '+JSON.stringify([...kept]));
+ assert.deepEqual(['draft-of-other','other-browser'].map(id=>kept.has(id)),[false,true],
+  'positive control: a draft repeating a copy the clean-up never clears goes, and that copy stays');
+ // The task reaches the board, so after a reload a save may clear the draft as contained.
+ ctx.state.tasks.push(JSON.parse(JSON.stringify(older.tasks.find(task=>task.id==='only-before-adoption'))));ctx.save();await savesSettled2334(app);
+ await app.dispose();
+ const reopened=await open();reopened.ctx.addTask('An edit after reopening');await savesSettled2334(reopened);
+ kept=await ids(reopened);
+ assert.equal(kept.has('unmarked-draft'),false,'positive control: the saved board now holds the draft, so it is cleared');
+ assert.ok([...await reopened.shim.window.ScannerDeviceStore.listBackups()].some(row=>row.payload===before),'the board from before the cloud adoption is still restorable');
+});
+
+test('RISK redundant backups: on the older browser backup list, a copy is never cleared as a repeat of a stale-tab draft a later save may clear',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+ ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+ const older=JSON.parse(JSON.stringify(ctx.state));older.tasks[0].title='Older title only here';const before=JSON.stringify(older);
+ const day=vm.runInContext('backupDay(Date.now())',ctx);let n=0;
+ const row=(id,kind,payload)=>({id,day,at:Date.now()-60000+(++n),kind,payload});
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),row('adoption-copy','before-cloud-adoption',before),row('unmarked-draft','stale-tab-draft',before)]));
+ ctx.addTask('An ordinary edit');assert.equal(await ctx.persist(),true);
+ const rows=listed();
+ assert.equal(rows.some(entry=>entry.id==='unmarked-draft'),false,'positive control: the draft the saved board holds is cleared');
+ assert.deepEqual(rows.filter(entry=>entry.payload===before).map(entry=>entry.id),['adoption-copy'],'the copy kept before taking a cloud board stays');
+});

@@ -3847,15 +3847,28 @@ function duplicateBackupRows(rows,bytesOf,protectedIds,removing){
   for(const group of groups.values()){
     if(group.length<2)continue;
     const until=new Map(group.map(row=>[row,backupKeptUntil(row,keptFrom,protectedIds,today)]));
-    // Of a duplicate set the longest-kept row stays, preferring one this
-    // clean-up never removes, then the oldest, so retention never shortens.
-    const keeper=group.filter(row=>until.get(row)!==null).sort((a,b)=>until.get(a)===until.get(b)?
-      (removable(a)-removable(b))||(a.at-b.at):until.get(a)<until.get(b)?1:-1)[0];
-    if(!keeper)continue;
-    for(const row of group)if(row!==keeper&&removable(row)&&until.get(row)!==null&&until.get(row)<=until.get(keeper))
-      out.push({row,keeper});
+    const clearable=new Map(group.map(row=>[row,clearableAsContained(row,protectedIds)]));
+    // Of a duplicate set the longest-kept row stays, preferring one the
+    // containment proof never clears, then one this clean-up never removes,
+    // then the oldest. A row goes only when one that stays keeps it at least
+    // as long, so retention never shortens.
+    const ranked=group.filter(row=>until.get(row)!==null).sort((a,b)=>until.get(a)!==until.get(b)?(until.get(a)<until.get(b)?1:-1):
+      (clearable.get(a)-clearable.get(b))||(removable(a)-removable(b))||(a.at-b.at));
+    const stays=[];
+    for(const row of ranked){
+      const keeper=removable(row)&&stays.find(kept=>until.get(kept)>=until.get(row)&&(!clearable.get(kept)||clearable.get(row)));
+      if(keeper)out.push({row,keeper});else stays.push(row);
+    }
   }
   return out;
+}
+// #2333 review: a stale-tab draft without the losing-edit mark stays only
+// until a save finds everything in it in the saved board. Such a draft can
+// keep another one with the same bytes, which that save clears with it, but
+// never a copy the containment proof would not clear: a before-cloud-adoption
+// or daily copy kept "by" it would lose its board early when the draft went.
+function clearableAsContained(row,protectedIds){
+  return row.kind==="stale-tab-draft"&&row.displacedEdits!==true&&!protectedIds.has(row.id);
 }
 function persistedBackupRecord(row){
   if(!row||typeof row!=="object")return null;
