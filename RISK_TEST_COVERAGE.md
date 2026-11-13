@@ -759,6 +759,7 @@ its RISK test; the map follows.
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
 - RISK CLOUD V2 unchanged pull: a pull naming the acknowledged revision and copy reads only the root while the root still names them, and downloads in full otherwise
+- RISK CLOUD V2 unchanged pull: an older-schema root and a known unreadable copy reused by request are never answered unchanged, even when unchangedSince names them
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
 - RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation
@@ -1836,6 +1837,11 @@ its RISK test; the map follows.
 - RISK unchanged cloud pull: a root moved by another device since the acknowledgement is downloaded and merged on launch
 - RISK unchanged cloud pull: damaged chunks of this device’s own acknowledged copy do not hold launch, and Retry sync repairs them
 - RISK unchanged cloud pull: an acknowledgement saved by an older build, one whose hash no longer matches its board, Retry sync and a different account all download in full
+- RISK unchanged cloud pull: after Retry sync repairs a damaged copy, a pull that finds the repaired copy unchanged clears the damage, so a later unrelated sync error does not offer cloud recovery sources
+- RISK unchanged cloud pull: a device that read its own acknowledged copy as damaged downloads it in full on the next launch even when the recovery check never finished
+- RISK unchanged cloud pull: a rebuild of a damaged acknowledged copy whose upload never lands is downloaded in full on the next launch and rebuilt
+- RISK unchanged cloud pull: another device publishing between a skipped pull and this device’s upload is merged, not overwritten
+- RISK unchanged cloud pull: signing in again and a same-email account with another user ID download in full
 
 ## tests/repository-process.test.js
 

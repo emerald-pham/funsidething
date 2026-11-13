@@ -34079,6 +34079,8 @@ test('RISK unchanged cloud pull guidance: the sync FAQ and the November 13 chang
  const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 13, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(current,/Opening the app syncs much faster when nothing changed in the cloud\./,'the November 13 changelog describes it');
  assert.match(current,/Debug log lists such a check as a cloud read with the outcome unchanged/);
+ // #2354 review: a copy this device found damaged is never skipped again.
+ assert.match(current,/and so does Retry sync\. A copy this device has found damaged downloads in full again until it is repaired\./,'the changelog says a damaged copy is not skipped: '+current);
 });
 
 test('RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{

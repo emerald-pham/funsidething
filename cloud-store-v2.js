@@ -56,6 +56,10 @@
     // read from the server still names both, a published copy is immutable, so
     // downloading it again cannot change the answer: the pull reads nothing
     // else and says unchanged. Any other root falls through to the full read.
+    // (#2354 review: a copy is immutable only because firestore.rules make it
+    // so: chunks are written only while it is staging and never updated, and
+    // removed only once it is deleting and no root names it. A rules change
+    // that lets a named copy change must revisit this shortcut.)
     // The caller proves it holds the board; this store never answers from a
     // cached root, and recovery, adoption and repair reads never pass it.
     async function pull(uid,{stillCurrent,reuseUnreadable=false,knownUnreadable:remembered=null,unchangedSince=null}={}){
