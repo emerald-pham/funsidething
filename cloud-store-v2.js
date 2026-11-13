@@ -51,7 +51,14 @@
     // chunks were restored in place is still seen.
     // A caller may also pass a conclusion it kept from an earlier launch for
     // this account; it is honoured only for the same fresh manifest.
-    async function pull(uid,{stillCurrent,reuseUnreadable=false,knownUnreadable:remembered=null}={}){
+    // #2354: a caller that holds the exact board of its acknowledged copy
+    // passes that copy's revision and ID as unchangedSince. When the root just
+    // read from the server still names both, a published copy is immutable, so
+    // downloading it again cannot change the answer: the pull reads nothing
+    // else and says unchanged. Any other root falls through to the full read.
+    // The caller proves it holds the board; this store never answers from a
+    // cached root, and recovery, adoption and repair reads never pass it.
+    async function pull(uid,{stillCurrent,reuseUnreadable=false,knownUnreadable:remembered=null,unchangedSince=null}={}){
       if(!uid) return {error:true,code:"missing-account"};
       let manifest=await adapter.readRoot(uid);
       if(!current(stillCurrent)) return {cancelled:true};
@@ -59,6 +66,11 @@
       if(manifest.schemaVersion!==SCHEMA_VERSION){
         return typeof manifest.payload==="string" ? manifest : {error:true,code:"invalid-manifest"};
       }
+      if(reuseUnreadable!==true&&Number.isSafeInteger(unchangedSince?.rev)&&unchangedSince.rev>=1&&
+        typeof unchangedSince.generationId==="string"&&unchangedSince.generationId&&
+        manifest.rev===unchangedSince.rev&&manifest.activeGeneration===unchangedSince.generationId)
+        return {unchanged:true,rev:manifest.rev,generationId:manifest.activeGeneration,updatedAt:manifest.updatedAt,
+          serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION};
       for(let attempt=0;attempt<3;attempt++){
         const generationId=manifest.activeGeneration;
         if(typeof generationId!=="string"||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
@@ -84,7 +96,7 @@
             manifest=latest;continue;
           }
           return {payload,rev:manifest.rev,updatedAt:manifest.updatedAt,
-            serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION,generationId};
+            serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION,generationId,hash:header.hash};
         }catch(error){
           if(!current(stillCurrent)) return {cancelled:true};
           // A failed network/auth read says nothing about snapshot integrity.
@@ -141,7 +153,9 @@
         if(!current(stillCurrent)) return {cancelled:true,generationId};
         const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,expectedHeader:header,stillCurrent,decisionCapability:needsDecisionCapability(payload)?1:undefined});
         if(!current(stillCurrent)) return {cancelled:true,generationId};
-        return {...result,generationId};
+        // #2354: the copy's ID and hash let the caller recognise this exact
+        // published copy on a later pull without downloading it.
+        return result?.ok?{...result,generationId,hash:encoded.hash}:{...result,generationId};
       }catch(error){
         return {error:true,code:safeFailureCode(error),generationId};
       }

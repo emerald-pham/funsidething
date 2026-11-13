@@ -23057,5 +23057,26 @@
       "command": "node --test --test-name-pattern=\"RISK daily backup retention guidance|RISK redundant backups guidance\" tests/core.test.js tests/persistence-recovery.test.js (2026-11-12T05:13:04Z) and node --test --test-name-pattern=\"RISK LOCAL BACKUPS: the Data and backups FAQ explains\" tests/core.test.js (05:13:32Z), each after editing the assertions and with the FAQ answer still unchanged",
       "failure": "AssertionError: The input did not match the regular expression /Manual, displaced local edits and unsynced account-switch copies stay until you delete them/ (both core tests); the extended guidance test failed 'no sentence promises a draft or other-browser copy stays until deleted without the clean-up' with the old sentence as the only promise. Chronology: the FAQ was first edited at 05:12, the core tests were then seen failing on the old wording; the FAQ edit was set aside, the assertions changed, these red runs observed, and the edit re-applied."
     }
+  },
+  {
+    "baseCommit": "43d5f020a3ecbad96a047b2ddcc97c2495357a4c",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-const pull=step('cloud-pull').filter(event=>event.status==='completed');"
+    ],
+    "reason": "#2354 (spec #2353): a pull that finds the root still naming this device’s acknowledged cloud copy reads only the root and the support report lists it as a cloud-pull event with outcome unchanged. The #2348 report test reads the cloud again right after sign-in published the board, so that later read is now unchanged rather than completed, and its filter for completed reads no longer found two.",
+    "previousBehavior": "RISK cloud save loop guard: the support report names each cloud step ... required at least two cloud-pull events with status completed after sign-in and a later read, every later read being a full download.",
+    "intendedBehavior": "The test counts cloud reads listed as completed or unchanged, still requires at least two with a duration and the last at the published revision, and now also requires the sign-in read to be completed and the later read of this device’s acknowledged copy to be unchanged.",
+    "preservedCoverage": [
+      "Every other assertion of the #2348 report test is unchanged: each read and merge is listed with its duration and revision, the merge outcomes are empty then equal, each caused save and the acknowledged push are listed, the guard stop is one event naming its step, the report holds no task text and stays within 24 KiB.",
+      "Full downloads stay covered: the moved-root, older-build acknowledgement, hash mismatch, Retry sync and account switch #2354 cases each require the chunks to be read and the report to list a completed read where it applies."
+    ],
+    "replacementTests": [
+      "RISK unchanged cloud pull: a root moved by another device since the acknowledgement is downloaded and merged on launch",
+      "RISK unchanged cloud pull: an edit saved on this device after the acknowledgement is uploaded after a skipped pull, under the revision guard"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK cloud save loop guard: the support report names each cloud step|RISK unchanged cloud pull: damaged chunks\" tests/persistence-recovery.test.js (2026-11-13T10:38Z), with index.html, cloud-store-v2.js and sw.js checked out at base 43d5f02 and the edited tests",
+      "failure": "AssertionError: sign-in downloads; the later read of the acknowledged copy is unchanged (the base build lists both reads as completed). Chronology: the implementation came first and the original assertion failed against it (each cloud read is listed with how long it took: only one completed read); the assertion was then edited and this red run observed on the base build, retrospectively."
+    }
   }
 ]

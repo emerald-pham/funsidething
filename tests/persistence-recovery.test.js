@@ -12718,9 +12718,11 @@ test('RISK cloud save loop guard: the support report names each cloud step with 
  await device.signIn();await syncSettle(200);await ctx.cloudPull();await savesSettled2334(device);
  const signInEvents=events(),revision=backend.docs.get('users/owner').rev,timed=event=>Number.isSafeInteger(event.durationMs?.value);
  const step=stage=>signInEvents.filter(event=>event.stage===stage);
- const pull=step('cloud-pull').filter(event=>event.status==='completed');
+ // #2354: the later read finds this device's own acknowledged copy, so it reads only the root and is listed as unchanged.
+ const pull=step('cloud-pull').filter(event=>['completed','unchanged'].includes(event.status));
  assert.ok(pull.length>=2&&pull.every(timed),'each cloud read is listed with how long it took: '+JSON.stringify(signInEvents.map(event=>event.stage)));
  assert.equal(pull.at(-1).metadata.revision,revision,'with the revision it read');
+ assert.deepEqual(pull.map(event=>event.status),['completed','unchanged'],'sign-in downloads; the later read of the acknowledged copy is unchanged');
  const merge=step('cloud-merge');
  assert.ok(merge.length>=2&&merge.every(event=>event.status==='completed'&&timed(event)&&Number.isSafeInteger(event.metadata?.revision)),'each merge is listed with its revision and duration: '+JSON.stringify(merge));
  assert.deepEqual(merge.map(event=>event.metadata.mergeOutcome),['empty','equal'],'and its outcome: sign-in found an empty cloud, the later read matched');
@@ -12973,3 +12975,138 @@ test('RISK cloud save loop guard: when a save on this device fails after a stop,
  assert.match(text,/latest edit is not saved on this device/,'it says the edit is not saved: '+text);
 });
 
+
+// #2354 (spec #2353): opening the app when the cloud has not moved since this
+// device's acknowledgement reads only the root. These relaunch a signed-in
+// device on the same fake device storage and cloud as the #2348 tests and read
+// only what the person, the server or the support report sees: which server
+// paths were read, the sync button, the board, the cloud copy and the report.
+async function acknowledgedDevice2354(t,name){
+ const device=await signedInDevice2348(t,name),{shim,ctx}=device;
+ await device.signIn();
+ shim.document.getElementById('addInput').value='Acknowledged task 2354';await ctx.onAction('add',{});
+ await savesSettled2334(device);await syncSettle(300);
+ assert.equal(device.status().text,'☁ synced','positive control: the board reached the cloud: '+device.status().title);
+ return device;
+}
+async function relaunch2354(t,device,name,{beforeSignIn=null,opened=null,user={uid:'owner',email:'e@example.com'}}={}){
+ await closeLegacyApp173(device);device.backend.CS.suspend();
+ if(beforeSignIn)await beforeSignIn();
+ const reopened=await signedInDevice2348(t,name,{indexedDB:device.indexedDB,deviceDbName:device.deviceDbName,sharedDocs:device.backend.docs});
+ if(opened)await opened(reopened);
+ const reads=[];reopened.faults.serverRead=async path=>{reads.push(path);};
+ // The restored sign-in, then the launch pull, as signIn() in the #2348 harness.
+ reopened.backend.emitAuth(user);reopened.ctx.closeModal();await flush();await reopened.ctx.cloudPull();
+ await savesSettled2334(reopened);await syncSettle(300);
+ return {reopened,reads};
+}
+const cloudPullEvents2354=device=>JSON.parse(device.ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='cloud-pull');
+const fullDownload2354=(reads,uid,root)=>reads.includes('users/'+uid+'/generations/'+root.activeGeneration+'/chunks');
+
+test('RISK unchanged cloud pull: opening the app when the cloud still holds this device’s acknowledged copy reads only the root, downloads nothing and shows synced',async t=>{
+ const device=await acknowledgedDevice2354(t,'launch'),revision=device.backend.docs.get('users/owner').rev;
+ const {reopened,reads}=await relaunch2354(t,device,'launch-reopened');
+ t.diagnostic(JSON.stringify({reads,status:reopened.status()}));
+ assert.deepEqual(reads.filter(path=>path==='users/owner'),['users/owner'],'exactly one server root read: '+JSON.stringify(reads));
+ assert.deepEqual(reads.filter(path=>path.includes('/generations/')),[],'no header or chunk reads: '+JSON.stringify(reads));
+ assert.equal(reopened.status().text,'☁ synced','the sync button ends at synced: '+reopened.status().title);
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='Acknowledged task 2354'),'the board is the acknowledged one');
+ assert.equal(device.backend.docs.get('users/owner').rev,revision,'nothing was written');
+ const pulls=cloudPullEvents2354(reopened);
+ assert.equal(pulls.at(-1)?.status,'unchanged','the support report records the skipped pull as unchanged: '+JSON.stringify(pulls));
+ assert.equal(pulls.at(-1).metadata.revision,revision,'with the revision it confirmed');
+ const report=reopened.ctx.supportDiagnosticsText();
+ assert.ok(!report.includes('Acknowledged task 2354')&&!report.includes(LOOP_KEPT_TITLE2348),'the report stays metadata only');
+});
+
+test('RISK unchanged cloud pull: an edit saved on this device after the acknowledgement is uploaded after a skipped pull, under the revision guard',async t=>{
+ const device=await acknowledgedDevice2354(t,'edited'),{shim,ctx,backend}=device;
+ const acknowledged=backend.docs.get('users/owner');
+ // The edit is saved on this device, and the app closes before it is uploaded.
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ shim.document.getElementById('addInput').value='Edited after the acknowledgement';await ctx.onAction('add',{});await savesSettled2334(device);
+ assert.equal(backend.docs.get('users/owner').rev,acknowledged.rev,'precondition: the edit has not reached the cloud');
+ const {reopened,reads}=await relaunch2354(t,device,'edited-reopened');
+ t.diagnostic(JSON.stringify({reads,status:reopened.status()}));
+ assert.deepEqual(reads.filter(path=>path.startsWith('users/owner/generations/'+acknowledged.activeGeneration)),[],
+  'the acknowledged copy is not downloaded: '+JSON.stringify(reads));
+ assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'unchanged','the pull was skipped');
+ const root=backend.docs.get('users/owner');
+ assert.equal(root.rev,acknowledged.rev+1,'the edit is published once, at the next revision');
+ const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ assert.ok(JSON.parse((await peer.CS.pull()).payload).tasks.some(task=>task.title==='Edited after the acknowledgement'),'the cloud copy has the edit');
+ assert.equal(reopened.status().text,'☁ synced','and the sync button ends at synced: '+reopened.status().title);
+});
+
+test('RISK unchanged cloud pull: a root moved by another device since the acknowledgement is downloaded and merged on launch',async t=>{
+ const device=await acknowledgedDevice2354(t,'moved'),{backend}=device;
+ const acknowledged=backend.docs.get('users/owner');
+ const {reopened,reads}=await relaunch2354(t,device,'moved-reopened',{beforeSignIn:async()=>{
+  const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});
+  const read=await peer.CS.pull(),board=JSON.parse(read.payload);board.tasks.push({...board.tasks[0],id:'peer-2354',title:'From the other device 2354',createdAt:2});
+  assert.equal((await peer.CS.push(JSON.stringify(board),1792323000000,read.rev)).ok,true,'positive control: the other device publishes');
+  peer.CS.suspend();
+ }});
+ const moved=backend.docs.get('users/owner');
+ t.diagnostic(JSON.stringify({reads,status:reopened.status()}));
+ assert.notEqual(moved.activeGeneration,acknowledged.activeGeneration,'precondition: the root moved');
+ assert.ok(reads.includes('users/owner/generations/'+moved.activeGeneration+'/chunks'),'the new copy is downloaded: '+JSON.stringify(reads));
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='From the other device 2354'),'and merged');
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='Acknowledged task 2354'),'keeping this device\'s board');
+ assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'completed','the report records a completed download');
+ assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+});
+
+// Spec #2353: a skipped pull does not re-check the chunks of a copy this device
+// holds exactly. If that copy is damaged in the cloud, nothing on this device is
+// lost, and Retry sync still downloads it in full and repairs it.
+test('RISK unchanged cloud pull: damaged chunks of this device’s own acknowledged copy do not hold launch, and Retry sync repairs them',async t=>{
+ const device=await acknowledgedDevice2354(t,'damaged'),{backend}=device,docs=backend.docs,root=docs.get('users/owner');
+ for(const key of [...docs.keys()])if(key.startsWith('users/owner/generations/'+root.activeGeneration+'/chunks/'))docs.delete(key);
+ const {reopened,reads}=await relaunch2354(t,device,'damaged-reopened');
+ assert.deepEqual(reads,['users/owner'],'launch reads only the root: '+JSON.stringify(reads));
+ assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='Acknowledged task 2354'),'the board is intact on this device');
+ await reopened.ctx.onAction('sync-retry',{});await savesSettled2334(reopened);await syncSettle(500);
+ const repaired=docs.get('users/owner');
+ t.diagnostic(JSON.stringify({status:reopened.status(),rev:[root.rev,repaired.rev]}));
+ assert.ok(fullDownload2354(reads,'owner',root),'Retry sync downloads the damaged copy: '+JSON.stringify(reads));
+ assert.ok(repaired.rev>root.rev&&repaired.activeGeneration!==root.activeGeneration,'and the repair publishes the board again');
+ const peer=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ assert.ok(JSON.parse((await peer.CS.pull()).payload).tasks.some(task=>task.title==='Acknowledged task 2354'),'as a readable copy holding the board');
+ assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+});
+
+// Without proof that this device holds the acknowledged copy for the signed-in
+// account, the launch pull downloads in full, as before #2354.
+test('RISK unchanged cloud pull: an acknowledgement saved by an older build, one whose hash no longer matches its board, Retry sync and a different account all download in full',async t=>{
+ await t.test('an acknowledgement saved before #2354 names no cloud copy',async sub=>{
+  const device=await acknowledgedDevice2354(sub,'older-build'),root=device.backend.docs.get('users/owner');
+  // The board as an older build saved it: the same acknowledgement, without the copy it names.
+  const {reopened,reads}=await relaunch2354(sub,device,'older-build-reopened',{opened:app=>{assert.ok(app.ctx.state.decisionBase?.copy,'positive control: this build saved the copy');delete app.ctx.state.decisionBase.copy;}});
+  assert.ok(fullDownload2354(reads,'owner',root),'downloads in full: '+JSON.stringify(reads));
+  assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+ });
+ await t.test('an acknowledged board whose hash does not match the copy it names',async sub=>{
+  const device=await acknowledgedDevice2354(sub,'hash-mismatch'),root=device.backend.docs.get('users/owner');
+  const {reopened,reads}=await relaunch2354(sub,device,'hash-mismatch-reopened',{opened:app=>{app.ctx.state.decisionBase.copy.hash='0'.repeat(64);}});
+  assert.ok(fullDownload2354(reads,'owner',root),'downloads in full: '+JSON.stringify(reads));
+  assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+ });
+ await t.test('Retry sync after a skipped launch pull',async sub=>{
+  const device=await acknowledgedDevice2354(sub,'retry'),root=device.backend.docs.get('users/owner');
+  const {reopened,reads}=await relaunch2354(sub,device,'retry-reopened');
+  assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'unchanged','positive control: the launch pull was skipped');
+  reads.length=0;await reopened.ctx.onAction('sync-retry',{});await savesSettled2334(reopened);await syncSettle(300);
+  assert.ok(fullDownload2354(reads,'owner',root),'Retry sync downloads in full: '+JSON.stringify(reads));
+  assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+ });
+ await t.test('a different account whose root names the same revision and copy ID',async sub=>{
+  const device=await acknowledgedDevice2354(sub,'account-switch'),docs=device.backend.docs,root=docs.get('users/owner');
+  // The other account's cloud holds a copy at the same revision under the same ID: only the account tells them apart.
+  for(const [key,value] of [...docs])if(key==='users/owner'||key.startsWith('users/owner/'))docs.set('users/second'+key.slice('users/owner'.length),value);
+  const {reopened,reads}=await relaunch2354(sub,device,'account-switch-reopened',{user:{uid:'second',email:'s@example.com'}});
+  assert.ok(fullDownload2354(reads,'second',root),'downloads in full: '+JSON.stringify(reads));
+  assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'completed');
+ });
+});

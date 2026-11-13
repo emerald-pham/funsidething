@@ -758,6 +758,7 @@ its RISK test; the map follows.
 - RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
+- RISK CLOUD V2 unchanged pull: a pull naming the acknowledged revision and copy reads only the root while the root still names them, and downloads in full otherwise
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
 - RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation
@@ -1829,6 +1830,11 @@ its RISK test; the map follows.
 - RISK cloud save loop guard: while saves keep failing on this device, returning to the app again and again keeps the save error showing, never stops as a save loop, and the edit saves once storage recovers
 - RISK sign-in settles: a task deleted, restored with Undo while synced, then deleted again while signed out saves and pushes once after sign-in, and the cloud copy has the deletion
 - RISK cloud save loop guard: when a save on this device fails after a stop, the status shows the save error and the cloud error no longer says the board is saved on this device
+- RISK unchanged cloud pull: opening the app when the cloud still holds this device’s acknowledged copy reads only the root, downloads nothing and shows synced
+- RISK unchanged cloud pull: an edit saved on this device after the acknowledgement is uploaded after a skipped pull, under the revision guard
+- RISK unchanged cloud pull: a root moved by another device since the acknowledgement is downloaded and merged on launch
+- RISK unchanged cloud pull: damaged chunks of this device’s own acknowledged copy do not hold launch, and Retry sync repairs them
+- RISK unchanged cloud pull: an acknowledgement saved by an older build, one whose hash no longer matches its board, Retry sync and a different account all download in full
 
 ## tests/repository-process.test.js
 

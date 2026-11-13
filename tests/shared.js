@@ -194,6 +194,14 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  const acknowledged=ctx.state.decisionBase.payload;
  assert.equal(createHash('sha256').update(acknowledged,'utf8').digest('hex'),originalHeader.hash,'the retained source is independently proved byte exact');
  const acknowledgedTasks=JSON.parse(acknowledged).tasks;
+ // #2354: since #2354 an acknowledgement names its cloud copy, and a pull that
+ // finds the root still naming that copy downloads nothing, so it would never
+ // see the damage below (spec #2353: this device holds exactly that board). The
+ // recovery these fixtures exercise is reached by a device whose saved
+ // acknowledgement names no copy, as every device saved before #2354 does; the
+ // copy-naming case has its own test (RISK unchanged cloud pull: damaged ...).
+ assert.ok(ctx.state.decisionBase.copy,'fixture: this build named the acknowledged copy');
+ delete ctx.state.decisionBase.copy;assert.equal(await ctx.persist(true),true,'fixture: the acknowledgement is saved as an older build saved it');
  const previousPath='users/owner/generations/'+originalRoot.previousGeneration;
  const previousSource=[...backend.docs].filter(([key])=>key===previousPath||key.startsWith(previousPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);
  assert.ok(previousSource.length>1,'the damaged root also names a complete previous source');

@@ -29053,6 +29053,45 @@ test('RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks
  const pulled=await store.pull('owner');assert.equal(pulled.payload,payload);assert.equal(pulled.rev,1);
 });
 
+// #2354 (spec #2353): a pull that names this device's acknowledged revision
+// and cloud copy reads only the root while the root still names them. The
+// fake adapter counts every server read the store makes.
+function countingCloudV2Adapter2354(){
+ const adapter=cloudV2Adapter(),reads={root:0,header:0,chunks:0};
+ const readRoot=adapter.readRoot,readGeneration=adapter.readGeneration,readChunks=adapter.readChunks;
+ adapter.readRoot=(...args)=>{reads.root++;return readRoot(...args);};
+ adapter.readGeneration=(...args)=>{reads.header++;return readGeneration(...args);};
+ adapter.readChunks=(...args)=>{reads.chunks++;return readChunks(...args);};
+ adapter.resetReads=()=>{reads.root=reads.header=reads.chunks=0;};
+ return {adapter,reads};
+}
+test('RISK CLOUD V2 unchanged pull: a pull naming the acknowledged revision and copy reads only the root while the root still names them, and downloads in full otherwise',async()=>{
+ const {adapter,reads}=countingCloudV2Adapter2354(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto,targetBytes:16*1024});
+ const payload=cloudV2Payload('acknowledged'),sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
+ const pushed=await store.push('owner',payload,1,0);assert.equal(pushed.ok,true);
+ assert.equal(pushed.hash,sha(payload),'the acknowledgement names the hash of the exact board it published');
+ const ack={rev:pushed.rev,generationId:pushed.generationId};
+ adapter.resetReads();
+ const skipped=await store.pull('owner',{unchangedSince:ack});
+ assert.equal(skipped.unchanged,true,'the root still names this device\'s acknowledged copy: '+JSON.stringify({...skipped,payload:undefined}));
+ assert.equal(skipped.rev,ack.rev);assert.equal(skipped.generationId,ack.generationId);
+ assert.equal(Object.hasOwn(skipped,'payload'),false,'nothing is downloaded');
+ assert.deepEqual(reads,{root:1,header:0,chunks:0},'exactly one root read and no header or chunk reads');
+ // Without the option, or naming a different copy at the same revision, the pull downloads as before.
+ adapter.resetReads();
+ const full=await store.pull('owner');assert.equal(full.payload,payload);assert.equal(full.hash,sha(payload),'a full pull names the downloaded copy\'s hash');
+ assert.ok(reads.header===1&&reads.chunks===1,'an ordinary pull still downloads: '+JSON.stringify(reads));
+ adapter.resetReads();
+ const otherCopy=await store.pull('owner',{unchangedSince:{rev:ack.rev,generationId:'another-copy'}});
+ assert.equal(otherCopy.payload,payload);assert.ok(reads.chunks===1,'a different copy at the same revision is downloaded: '+JSON.stringify(reads));
+ // Another device publishes: the root moved, so the new board is downloaded.
+ const moved=cloudV2Payload('other device'),published=await store.push('owner',moved,2,ack.rev);assert.equal(published.ok,true);
+ adapter.resetReads();
+ const changed=await store.pull('owner',{unchangedSince:ack});
+ assert.equal(changed.unchanged,undefined);assert.equal(changed.payload,moved,'the other device\'s board is downloaded');
+ assert.equal(changed.rev,published.rev);assert.ok(reads.chunks===1,'with its chunks: '+JSON.stringify(reads));
+});
+
 test('RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data',async()=>{
  const cloudV2=loadCloudV2(),adapter=cloudV2Adapter(),store=cloudV2.createCloudStore({adapter,crypto:webcrypto,targetBytes:64*1024,batchSize:2});
  const base=await store.push('owner',JSON.stringify({tasks:[{id:'base'}]}),1,0);assert.equal(base.ok,true);
