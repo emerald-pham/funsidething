@@ -13118,3 +13118,22 @@ test('RISK unchanged cloud pull: an acknowledgement saved by an older build, one
   assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'completed');
  });
 });
+
+// #2354 review finding 1: a damaged read marks the source known damaged until a
+// healthy read. After a repair, the next pull finds this device's own copy
+// unchanged and reads only the root: that is a healthy read too, so a later
+// unrelated sync error must not offer cloud recovery sources.
+test('RISK unchanged cloud pull: after Retry sync repairs a damaged copy, a pull that finds the repaired copy unchanged clears the damage, so a later unrelated sync error does not offer cloud recovery sources',async t=>{
+ const device=await acknowledgedDevice2354(t,'known-damaged'),{ctx,shim,backend}=device,docs=backend.docs,root=docs.get('users/owner');
+ for(const key of [...docs.keys()])if(key.startsWith('users/owner/generations/'+root.activeGeneration+'/chunks/'))docs.delete(key);
+ await ctx.onAction('sync-retry',{});await savesSettled2334(device);await syncSettle(500);
+ const repaired=docs.get('users/owner');
+ assert.ok(repaired.rev>root.rev&&repaired.activeGeneration!==root.activeGeneration,'positive control: Retry sync published the board again');
+ assert.equal(device.status().text,'☁ synced',device.status().title);
+ await ctx.cloudPull();await savesSettled2334(device);await syncSettle(300);
+ assert.equal(cloudPullEvents2354(device).at(-1)?.status,'unchanged','positive control: the next pull found the repaired copy unchanged');
+ backend.CS.reportError('reconcile','revision-conflict');ctx.onAction('sync',{});
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ t.diagnostic(JSON.stringify({known:backend.CS.knownDamagedSource,status:device.status()}));
+ assert.doesNotMatch(modal,/data-act="review-cloud-source-recovery"/,'a repaired, unchanged copy offers no cloud recovery sources');
+});

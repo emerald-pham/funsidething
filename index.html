@@ -20248,7 +20248,10 @@ if(configured){
           cloudFailure("pull",{code:result.code||"unknown"});return result;
         }
         if(result?.cancelled)return result;
-        if(typeof result?.payload==="string"||result?.empty===true)CS.knownDamagedSource=false;
+        // #2354 review: an unchanged reply is a healthy read too. The root still
+        // names the copy this device proved it holds byte for byte, so after a
+        // repair it clears the damage like a full download would.
+        if(typeof result?.payload==="string"||result?.empty===true||result?.unchanged===true)CS.knownDamagedSource=false;
         clearCloudError();CS.status = "ok"; ping();return result;
       }catch(e){
         if(auth.currentUser?.uid!==pullUid || operation!==pullOperation) return {cancelled:true};
