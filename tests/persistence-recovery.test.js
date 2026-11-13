@@ -13137,3 +13137,30 @@ test('RISK unchanged cloud pull: after Retry sync repairs a damaged copy, a pull
  t.diagnostic(JSON.stringify({known:backend.CS.knownDamagedSource,status:device.status()}));
  assert.doesNotMatch(modal,/data-act="review-cloud-source-recovery"/,'a repaired, unchanged copy offers no cloud recovery sources');
 });
+
+// #2354 review finding 2 (#2287 story 10): once this device has read its own
+// acknowledged copy as damaged, it never again treats that copy as unchanged.
+// Here the recovery check after the damaged read cannot finish (the network
+// drops), so no refusal or rebuild is remembered, and the app is closed.
+test('RISK unchanged cloud pull: a device that read its own acknowledged copy as damaged downloads it in full on the next launch even when the recovery check never finished',async t=>{
+ const device=await acknowledgedDevice2354(t,'seen-damaged'),{ctx,backend,faults}=device,docs=backend.docs,root=docs.get('users/owner');
+ const chunks='users/owner/generations/'+root.activeGeneration+'/chunks';
+ for(const key of [...docs.keys()])if(key.startsWith(chunks+'/'))docs.delete(key);
+ // Retry sync reads the copy in full and finds it damaged (its chunks, then the
+ // root again to confirm the copy is still current); every read after that fails.
+ let chunksRead=false,damageSeen=false;
+ faults.serverRead=async path=>{
+  if(damageSeen)throw Object.assign(Error('offline'),{code:'unavailable'});
+  if(path===chunks)chunksRead=true;else if(chunksRead&&path==='users/owner')damageSeen=true;
+ };
+ await ctx.onAction('sync-retry',{});await savesSettled2334(device);await syncSettle(500);
+ const pulls=cloudPullEvents2354(device);
+ t.diagnostic(JSON.stringify({pulls:pulls.map(event=>[event.status,event.metadata]),status:device.status()}));
+ assert.ok(damageSeen,'positive control: Retry sync read the damaged copy');
+ assert.match(device.status().title,/corrupt generation/,'positive control: and reported it damaged');
+ assert.equal(docs.get('users/owner').rev,root.rev,'positive control: nothing was repaired');
+ const {reopened,reads}=await relaunch2354(t,device,'seen-damaged-reopened');
+ t.diagnostic(JSON.stringify({reads,status:reopened.status()}));
+ assert.ok(reads.includes(chunks),'the next launch downloads the copy it saw damaged: '+JSON.stringify(reads));
+ assert.notEqual(cloudPullEvents2354(reopened).at(-1)?.status,'unchanged','and does not record it as unchanged');
+});

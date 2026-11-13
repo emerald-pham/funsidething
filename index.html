@@ -7709,6 +7709,18 @@ async function acknowledgedCloudCopyProof(account,identity){
     return {rev:base.revision,generationId:copy.generationId,hash:copy.hash,payload:base.payload};
   }catch{return null;}
 }
+// #2354 review: a read found the copy this device's acknowledgement names
+// damaged. The acknowledgement stops naming it, so no later pull treats that
+// copy as unchanged and skips the download that sees the damage, even when the
+// recovery check after the read never finishes (#2287 story 10). Only the
+// copy is dropped; the acknowledged board and revision stay as they were.
+function forgetDamagedAcknowledgedCopy(damaged){
+  const base=state?.decisionBase;
+  if(damaged?.code!=="corrupt-generation"||typeof damaged.generationId!=="string"||
+    !base?.copy||base.copy.generationId!==damaged.generationId)return false;
+  const {copy,...rest}=base;state.decisionBase=rest;
+  return true;
+}
 async function forgetConfirmedPendingUpload(remote,identity,stillCurrent,backend){
   try{
     if(typeof deviceStore?.getPendingUpload!=="function"||typeof deviceStore.clearPendingUploadIfCurrent!=="function"||
@@ -8163,6 +8175,8 @@ async function cloudPull(){
         // adoption, rebuild or wait that follows held them only in memory,
         // which hiding the page, a sign-out or the next read clears.
         holdDailyBackupsForCloudRecovery();
+        // #2354 review: saved before any recovery work, which may never finish.
+        if(forgetDamagedAcknowledgedCopy(remote))await persist(true);
         await boardBeforeCloudRecoveryWork();
         if(!pullStillCurrent())return;
         if(hasActiveEditor()||scannerGestureActive){deferPull();return;}
