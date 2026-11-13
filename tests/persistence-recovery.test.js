@@ -7619,7 +7619,15 @@ test('RISK contained board adoption: an upload whose reply was lost and that a l
    await e.add('Saved on E again');await e.save('E saves again');
    damaged=sharedCloudRoot2266(d.backend);
    assert.equal(damaged.rev,confirmed+3,'fixture: E saved a newer revision');
-  }else damaged=readable;
+  }else{
+   damaged=readable;
+   // #2354: D's read of E's revision named that copy in its acknowledgement,
+   // so D's next pull would read only the root and not see the damage (spec
+   // #2353: D holds exactly that board). The rebuild under test is reached by
+   // an acknowledgement saved as before #2354, naming no copy.
+   assert.ok(d.ctx.state.decisionBase.copy,'fixture: D\'s read named the copy');
+   delete d.ctx.state.decisionBase.copy;assert.equal(await d.ctx.persist(true),true);
+  }
   removeChunks2266(d.backend,damaged.activeGeneration);
   assert.equal((await d.backend.CS.pull()).code,'corrupt-generation','fixture: that revision cannot be read');
   await d.read('D reads the unreadable revision');
