@@ -971,6 +971,7 @@ its RISK test; the map follows.
 - RISK daily backup retention adoption copy: in browser storage, a large board a device had before taking another device’s newer cloud board stays restorable on that day
 - RISK daily backup retention adoption copy: a manual backup of the same board does not stand in for the copy kept before taking a newer cloud board, so deleting it keeps the earlier board restorable for seven calendar days
 - RISK simpler Settings guidance: the Data and backups FAQ holds the moved sync, retention and error explanations within 130 words, and the current changelog describes the simpler Settings
+- RISK unchanged cloud pull guidance: the sync FAQ and the November 13 changelog say an unchanged cloud copy is not downloaded and that Retry sync downloads it
 - RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted
 - RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering
 - RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections

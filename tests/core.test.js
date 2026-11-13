@@ -34048,6 +34048,18 @@ test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved s
  assert.match(current,/Download backup/);assert.match(current,/Download board only/);assert.match(current,/Troubleshooting/);
 });
 
+test('RISK unchanged cloud pull guidance: the sync FAQ and the November 13 changelog say an unchanged cloud copy is not downloaded and that Retry sync downloads it',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const data=markup.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('</details>')[0]||'';
+ const answer=data.split('<dt>When does cloud sync check for changes?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/still has that exact board, the check reads only a small record and downloads nothing; later edits upload as usual\. Retry sync always downloads the whole copy\.$/,'the FAQ says when nothing is downloaded: '+answer);
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 13, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(current,/Opening the app syncs much faster when nothing changed in the cloud\./,'the November 13 changelog describes it');
+ assert.match(current,/Debug log lists such a check as a cloud read with the outcome unchanged/);
+});
+
 test('RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
