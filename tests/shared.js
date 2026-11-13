@@ -201,6 +201,8 @@ async function damagedAcknowledgedApp187(t,{timeoutMs=5000,sourcePadding=0,timer
  // acknowledgement names no copy, as every device saved before #2354 does; the
  // copy-naming case has its own test (RISK unchanged cloud pull: damaged ...).
  // A fixture built from a released build's artifacts names no copy already.
+ // #2354 review: this build's must, or the strip below would prove nothing.
+ if(!artifacts)assert.ok(ctx.state.decisionBase.copy,'fixture: this build\'s acknowledgement named its copy before it is stripped');
  if(ctx.state.decisionBase.copy){delete ctx.state.decisionBase.copy;assert.equal(await ctx.persist(true),true,'fixture: the acknowledgement is saved as an older build saved it');}
  const previousPath='users/owner/generations/'+originalRoot.previousGeneration;
  const previousSource=[...backend.docs].filter(([key])=>key===previousPath||key.startsWith(previousPath+'/')).map(([key,value])=>[key,JSON.stringify(value)]);

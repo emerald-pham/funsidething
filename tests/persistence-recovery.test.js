@@ -13187,3 +13187,59 @@ test('RISK unchanged cloud pull: a rebuild of a damaged acknowledged copy whose 
  assert.ok(JSON.parse((await peer.CS.pull()).payload).tasks.some(task=>task.title==='Acknowledged task 2354'),'as a readable copy holding the board');
  assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
 });
+
+// #2354 review test gap: another device publishes after the skipped launch pull
+// and before this device's upload of an edit lands. The upload is refused by
+// the revision guard, the app downloads the other device's copy, merges, and
+// uploads both.
+test('RISK unchanged cloud pull: another device publishing between a skipped pull and this device’s upload is merged, not overwritten',async t=>{
+ const device=await acknowledgedDevice2354(t,'guarded'),{shim,ctx,backend}=device,docs=backend.docs;
+ const acknowledged=docs.get('users/owner');
+ ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ shim.document.getElementById('addInput').value='Edited on this device 2354';await ctx.onAction('add',{});await savesSettled2334(device);
+ assert.equal(docs.get('users/owner').rev,acknowledged.rev,'precondition: the edit has not reached the cloud');
+ let peerPublished=null;
+ const {reopened}=await relaunch2354(t,device,'guarded-reopened',{opened:app=>{
+  app.faults.beforeTransaction=async()=>{
+   if(peerPublished)return;peerPublished=true;
+   const peer=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000});
+   const read=await peer.CS.pull(),board=JSON.parse(read.payload);board.tasks.push({...board.tasks[0],id:'peer-guard-2354',title:'From the other device after the skip 2354',createdAt:3});
+   peerPublished=(await peer.CS.push(JSON.stringify(board),1792323000000,read.rev)).rev;peer.CS.suspend();
+  };
+ }});
+ const pulls=cloudPullEvents2354(reopened),root=docs.get('users/owner');
+ t.diagnostic(JSON.stringify({pulls:pulls.map(event=>event.status),peerPublished,rev:[acknowledged.rev,root.rev],status:reopened.status()}));
+ assert.equal(pulls[0]?.status,'unchanged','positive control: the launch pull was skipped');
+ assert.equal(peerPublished,acknowledged.rev+1,'positive control: the other device published before this device\'s upload');
+ const peer=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ const titles=JSON.parse((await peer.CS.pull()).payload).tasks.map(task=>task.title);
+ assert.ok(titles.includes('From the other device after the skip 2354'),'the other device\'s task is kept: '+JSON.stringify(titles));
+ assert.ok(titles.includes('Edited on this device 2354'),'and this device\'s edit is uploaded: '+JSON.stringify(titles));
+ assert.equal(root.rev,acknowledged.rev+2,'on top of the other device\'s revision');
+ assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+});
+
+// #2354 review test gaps: the acknowledgement is proof only for the account
+// that saved it, and signing in again proves the cloud copy again.
+test('RISK unchanged cloud pull: signing in again and a same-email account with another user ID download in full',async t=>{
+ await t.test('signing out and in again in the same session',async sub=>{
+  const device=await acknowledgedDevice2354(sub,'sign-in-again'),{ctx,backend,faults}=device,root=backend.docs.get('users/owner');
+  await ctx.cloudPull();await savesSettled2334(device);
+  assert.equal(cloudPullEvents2354(device).at(-1)?.status,'unchanged','positive control: a pull in the same sign-in is skipped');
+  backend.emitAuth(null);await flush();await savesSettled2334(device);
+  const reads=[];faults.serverRead=async path=>{reads.push(path);};
+  backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();await flush();await ctx.cloudPull();await savesSettled2334(device);await syncSettle(300);
+  sub.diagnostic(JSON.stringify({reads,status:device.status()}));
+  assert.ok(fullDownload2354(reads,'owner',root),'signing in again downloads in full: '+JSON.stringify(reads));
+  assert.equal(cloudPullEvents2354(device).at(-1)?.status,'completed');
+  assert.equal(device.status().text,'☁ synced',device.status().title);
+ });
+ await t.test('a same-email account with another user ID whose root names the same revision and copy ID',async sub=>{
+  const device=await acknowledgedDevice2354(sub,'uid-only'),docs=device.backend.docs,root=docs.get('users/owner');
+  for(const [key,value] of [...docs])if(key==='users/owner'||key.startsWith('users/owner/'))docs.set('users/second'+key.slice('users/owner'.length),value);
+  const {reopened,reads}=await relaunch2354(sub,device,'uid-only-reopened',{user:{uid:'second',email:'e@example.com'}});
+  sub.diagnostic(JSON.stringify({reads,status:reopened.status()}));
+  assert.ok(fullDownload2354(reads,'second',root),'downloads in full: '+JSON.stringify(reads));
+  assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'completed');
+ });
+});

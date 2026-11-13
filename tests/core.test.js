@@ -29092,6 +29092,27 @@ test('RISK CLOUD V2 unchanged pull: a pull naming the acknowledged revision and 
  assert.equal(changed.rev,published.rev);assert.ok(reads.chunks===1,'with its chunks: '+JSON.stringify(reads));
 });
 
+// #2354 review: unchangedSince never outranks the store's older checks. An
+// older-schema root is answered as it was, and a known unreadable copy asked
+// to be reused stays a refusal, even when unchangedSince names that root.
+test('RISK CLOUD V2 unchanged pull: an older-schema root and a known unreadable copy reused by request are never answered unchanged, even when unchangedSince names them',async()=>{
+ const {adapter,reads}=countingCloudV2Adapter2354(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto,targetBytes:16*1024});
+ const legacy=cloudV2Payload('older schema');
+ adapter.roots.set('legacy',{schemaVersion:1,payload:legacy,rev:3,activeGeneration:'legacy-copy',updatedAt:1});
+ const old=await store.pull('legacy',{unchangedSince:{rev:3,generationId:'legacy-copy'}});
+ assert.equal(old.unchanged,undefined,'an older-schema root is not unchanged: '+JSON.stringify({...old,payload:undefined}));
+ assert.equal(old.payload,legacy,'it is answered with its own board, as before');
+ const pushed=await store.push('owner',cloudV2Payload('damaged'),1,0);assert.equal(pushed.ok,true);
+ adapter.generations.get('owner/'+pushed.generationId).chunks.clear();
+ const damaged=await store.pull('owner');
+ assert.equal(damaged.code,'corrupt-generation','positive control: the copy is unreadable');
+ adapter.resetReads();
+ const reused=await store.pull('owner',{reuseUnreadable:true,unchangedSince:{rev:pushed.rev,generationId:pushed.generationId}});
+ assert.equal(reused.unchanged,undefined,'a known unreadable copy reused by request is not unchanged: '+JSON.stringify(reused));
+ assert.equal(reused.code,'corrupt-generation');assert.equal(reused.knownUnreadable,true,'it stays the remembered refusal');
+ assert.deepEqual(reads,{root:1,header:0,chunks:0},'from the root alone');
+});
+
 test('RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data',async()=>{
  const cloudV2=loadCloudV2(),adapter=cloudV2Adapter(),store=cloudV2.createCloudStore({adapter,crypto:webcrypto,targetBytes:64*1024,batchSize:2});
  const base=await store.push('owner',JSON.stringify({tasks:[{id:'base'}]}),1,0);assert.equal(base.ok,true);
