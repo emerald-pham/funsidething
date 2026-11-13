@@ -1806,6 +1806,29 @@ its RISK test; the map follows.
 - RISK redundant backups: a draft whose stored text cannot be read is tried once per opening, not by every save
 - RISK redundant backups: a copy kept until it is deleted is never cleared as a repeat of a copy a pin keeps only for now, so its board stays after the pin is released
 - RISK redundant backups: on the older browser backup list, a copy kept until it is deleted is never cleared as a repeat of Restore’s safety copy, so the replaced board stays after that copy expires
+- RISK sign-in settles: a board whose deletions are listed in another order than the cloud copy saves and pushes once after sign-in instead of re-sending the push from sendPush forever
+- RISK sign-in settles: a large board with many backups, its deletions listed in another order than the cloud copy, saves and pushes once after sign-in
+- RISK sign-in settles: opening and signing in, and signing in again, with a board equal to the cloud copy makes no save and no push
+- RISK sign-in settles: a cloud copy with repeated deletion rows is repaired, saved and pushed once, and reading the pushed copy back reports nothing more to repair
+- RISK sign-in settles: opening the app already signed in, with deletions listed in another order than the cloud copy, settles after one save and one push
+- RISK sign-in settles: a change from a second signed-in device causes one read and one save here and no push back
+- RISK sign-in settles: going offline right after sign-in waits quietly and settles once after reconnecting
+- RISK sign-in settles: reloading in the middle of the first sync settles once on the next opening
+- RISK sign-in settles: a completion and its Undo during the first sync both apply once and reach the cloud in revision order
+- RISK cloud save loop guard: a board that differs on every save after sign-in stops saving after a few runs, shows a cloud error naming the step and stays saved on the device
+- RISK cloud save loop guard: ordinary sign-in, edits, Undo, repeated reads, a second client’s change and a signed-in cold start never stop saving
+- RISK cloud save loop guard: the support report names each cloud step with its outcome, revision and duration, and records a guard stop with the step that started it, without task text and within its size limit
+- RISK cloud save loop guard: Retry sync after a stop tries again once the loop has ended, and settles synced
+- RISK cloud save loop guard: a later cloud read after a stop keeps the error showing instead of leaving the status on syncing
+- RISK cloud save loop guard: with the #2347 key-order fix undone, the push that re-sends itself and stamps the board on every pass stops after a few runs with an error naming the push, and the board stays saved on the device
+- RISK cloud save loop guard: after a stop, a downloaded app update still saves the board and reloads the app
+- RISK cloud save loop guard: Reload app in the cloud error after a stop saves the board and reloads the app
+- RISK cloud save loop guard: signing out and in again with the same account after a stop is a deliberate run that tries again and settles synced
+- RISK cloud save loop guard: the cloud error after a stop says the board is saved on this device and what to do next, not to keep the tab open for unsaved edits
+- RISK cloud save loop guard: the support report lists a cloud merge that was held, deferred by an open editor or stopped by an error, not only completed ones
+- RISK cloud save loop guard: while saves keep failing on this device, returning to the app again and again keeps the save error showing, never stops as a save loop, and the edit saves once storage recovers
+- RISK sign-in settles: a task deleted, restored with Undo while synced, then deleted again while signed out saves and pushes once after sign-in, and the cloud copy has the deletion
+- RISK cloud save loop guard: when a save on this device fails after a stop, the status shows the save error and the cloud error no longer says the board is saved on this device
 
 ## tests/repository-process.test.js
 
