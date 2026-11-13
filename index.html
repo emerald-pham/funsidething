@@ -6809,6 +6809,12 @@ function bindDecisionBase(account,revision,payload,copy=null){
   const named=cloudCopyOf(copy),next=named?{...made,copy:named}:made;
   const identity=cloudAccountIdentity(),identityChanged=identity!==null&&state.syncIdentity!==identity;
   if(identity!==null)state.syncIdentity=identity;
+  // #2354 review: a base that differs only in the copy it names is a change
+  // (true), and callers save it. Binding a rebuild's stand-in passes no copy,
+  // so the copy is dropped and saved before the rebuild's upload: a relaunch
+  // after that upload is interrupted downloads in full and sees the damage
+  // again. A read that finds the named copy damaged drops it first as well
+  // (forgetDamagedAcknowledgedCopy); keep both.
   if(JSON.stringify(state.decisionBase)===JSON.stringify(next))return identityChanged;
   forgetUnreadableCloudSourceHold();
   state.decisionBase=next;

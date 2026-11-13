@@ -13164,3 +13164,26 @@ test('RISK unchanged cloud pull: a device that read its own acknowledged copy as
  assert.ok(reads.includes(chunks),'the next launch downloads the copy it saw damaged: '+JSON.stringify(reads));
  assert.notEqual(cloudPullEvents2354(reopened).at(-1)?.status,'unchanged','and does not record it as unchanged');
 });
+
+// #2354 review finding 3: Retry sync finds this device's acknowledged copy
+// damaged and starts rebuilding it from this device's exact board, but the
+// rebuild's upload never lands (the app is closed while it waits). The next
+// launch must still download that copy in full, see the damage and rebuild.
+test('RISK unchanged cloud pull: a rebuild of a damaged acknowledged copy whose upload never lands is downloaded in full on the next launch and rebuilt',async t=>{
+ const device=await acknowledgedDevice2354(t,'rebuild-interrupted'),{ctx,backend,faults}=device,docs=backend.docs,root=docs.get('users/owner');
+ const chunks='users/owner/generations/'+root.activeGeneration+'/chunks';
+ for(const key of [...docs.keys()])if(key.startsWith(chunks+'/'))docs.delete(key);
+ // Every cloud write waits forever, as one does when the app is closed mid-upload.
+ faults.pushPending=new Promise(()=>{});
+ await ctx.onAction('sync-retry',{});await savesSettled2334(device);await syncSettle(500);
+ t.diagnostic(JSON.stringify({pulls:cloudPullEvents2354(device).map(event=>[event.status,event.metadata]),status:device.status()}));
+ assert.equal(docs.get('users/owner').rev,root.rev,'positive control: the rebuild did not land');
+ const {reopened,reads}=await relaunch2354(t,device,'rebuild-interrupted-reopened');
+ const repaired=docs.get('users/owner');
+ t.diagnostic(JSON.stringify({reads,status:reopened.status(),rev:[root.rev,repaired.rev]}));
+ assert.ok(reads.includes(chunks),'the next launch downloads the damaged copy: '+JSON.stringify(reads));
+ assert.ok(repaired.rev>root.rev&&repaired.activeGeneration!==root.activeGeneration,'and the rebuild publishes the board again');
+ const peer=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ assert.ok(JSON.parse((await peer.CS.pull()).payload).tasks.some(task=>task.title==='Acknowledged task 2354'),'as a readable copy holding the board');
+ assert.equal(reopened.status().text,'☁ synced',reopened.status().title);
+});
