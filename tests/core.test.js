@@ -29053,6 +29053,66 @@ test('RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks
  const pulled=await store.pull('owner');assert.equal(pulled.payload,payload);assert.equal(pulled.rev,1);
 });
 
+// #2354 (spec #2353): a pull that names this device's acknowledged revision
+// and cloud copy reads only the root while the root still names them. The
+// fake adapter counts every server read the store makes.
+function countingCloudV2Adapter2354(){
+ const adapter=cloudV2Adapter(),reads={root:0,header:0,chunks:0};
+ const readRoot=adapter.readRoot,readGeneration=adapter.readGeneration,readChunks=adapter.readChunks;
+ adapter.readRoot=(...args)=>{reads.root++;return readRoot(...args);};
+ adapter.readGeneration=(...args)=>{reads.header++;return readGeneration(...args);};
+ adapter.readChunks=(...args)=>{reads.chunks++;return readChunks(...args);};
+ adapter.resetReads=()=>{reads.root=reads.header=reads.chunks=0;};
+ return {adapter,reads};
+}
+test('RISK CLOUD V2 unchanged pull: a pull naming the acknowledged revision and copy reads only the root while the root still names them, and downloads in full otherwise',async()=>{
+ const {adapter,reads}=countingCloudV2Adapter2354(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto,targetBytes:16*1024});
+ const payload=cloudV2Payload('acknowledged'),sha=text=>createHash('sha256').update(text,'utf8').digest('hex');
+ const pushed=await store.push('owner',payload,1,0);assert.equal(pushed.ok,true);
+ assert.equal(pushed.hash,sha(payload),'the acknowledgement names the hash of the exact board it published');
+ const ack={rev:pushed.rev,generationId:pushed.generationId};
+ adapter.resetReads();
+ const skipped=await store.pull('owner',{unchangedSince:ack});
+ assert.equal(skipped.unchanged,true,'the root still names this device\'s acknowledged copy: '+JSON.stringify({...skipped,payload:undefined}));
+ assert.equal(skipped.rev,ack.rev);assert.equal(skipped.generationId,ack.generationId);
+ assert.equal(Object.hasOwn(skipped,'payload'),false,'nothing is downloaded');
+ assert.deepEqual(reads,{root:1,header:0,chunks:0},'exactly one root read and no header or chunk reads');
+ // Without the option, or naming a different copy at the same revision, the pull downloads as before.
+ adapter.resetReads();
+ const full=await store.pull('owner');assert.equal(full.payload,payload);assert.equal(full.hash,sha(payload),'a full pull names the downloaded copy\'s hash');
+ assert.ok(reads.header===1&&reads.chunks===1,'an ordinary pull still downloads: '+JSON.stringify(reads));
+ adapter.resetReads();
+ const otherCopy=await store.pull('owner',{unchangedSince:{rev:ack.rev,generationId:'another-copy'}});
+ assert.equal(otherCopy.payload,payload);assert.ok(reads.chunks===1,'a different copy at the same revision is downloaded: '+JSON.stringify(reads));
+ // Another device publishes: the root moved, so the new board is downloaded.
+ const moved=cloudV2Payload('other device'),published=await store.push('owner',moved,2,ack.rev);assert.equal(published.ok,true);
+ adapter.resetReads();
+ const changed=await store.pull('owner',{unchangedSince:ack});
+ assert.equal(changed.unchanged,undefined);assert.equal(changed.payload,moved,'the other device\'s board is downloaded');
+ assert.equal(changed.rev,published.rev);assert.ok(reads.chunks===1,'with its chunks: '+JSON.stringify(reads));
+});
+
+// #2354 review: unchangedSince never outranks the store's older checks. An
+// older-schema root is answered as it was, and a known unreadable copy asked
+// to be reused stays a refusal, even when unchangedSince names that root.
+test('RISK CLOUD V2 unchanged pull: an older-schema root and a known unreadable copy reused by request are never answered unchanged, even when unchangedSince names them',async()=>{
+ const {adapter,reads}=countingCloudV2Adapter2354(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto,targetBytes:16*1024});
+ const legacy=cloudV2Payload('older schema');
+ adapter.roots.set('legacy',{schemaVersion:1,payload:legacy,rev:3,activeGeneration:'legacy-copy',updatedAt:1});
+ const old=await store.pull('legacy',{unchangedSince:{rev:3,generationId:'legacy-copy'}});
+ assert.equal(old.unchanged,undefined,'an older-schema root is not unchanged: '+JSON.stringify({...old,payload:undefined}));
+ assert.equal(old.payload,legacy,'it is answered with its own board, as before');
+ const pushed=await store.push('owner',cloudV2Payload('damaged'),1,0);assert.equal(pushed.ok,true);
+ adapter.generations.get('owner/'+pushed.generationId).chunks.clear();
+ const damaged=await store.pull('owner');
+ assert.equal(damaged.code,'corrupt-generation','positive control: the copy is unreadable');
+ adapter.resetReads();
+ const reused=await store.pull('owner',{reuseUnreadable:true,unchangedSince:{rev:pushed.rev,generationId:pushed.generationId}});
+ assert.equal(reused.unchanged,undefined,'a known unreadable copy reused by request is not unchanged: '+JSON.stringify(reused));
+ assert.equal(reused.code,'corrupt-generation');assert.equal(reused.knownUnreadable,true,'it stays the remembered refusal');
+ assert.deepEqual(reads,{root:1,header:0,chunks:0},'from the root alone');
+});
+
 test('RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data',async()=>{
  const cloudV2=loadCloudV2(),adapter=cloudV2Adapter(),store=cloudV2.createCloudStore({adapter,crypto:webcrypto,targetBytes:64*1024,batchSize:2});
  const base=await store.push('owner',JSON.stringify({tasks:[{id:'base'}]}),1,0);assert.equal(base.ok,true);
@@ -34007,6 +34067,20 @@ test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved s
  assert.match(current,/<li>Settings is much shorter\./,'the newest changelog entry describes the simpler Settings');
  assert.match(current,/Every setting now saves as soon as you change it, and a number out of range returns to the last valid one\./);
  assert.match(current,/Download backup/);assert.match(current,/Download board only/);assert.match(current,/Troubleshooting/);
+});
+
+test('RISK unchanged cloud pull guidance: the sync FAQ and the November 13 changelog say an unchanged cloud copy is not downloaded and that Retry sync downloads it',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const data=markup.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('</details>')[0]||'';
+ const answer=data.split('<dt>When does cloud sync check for changes?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/still has that exact board, the check reads only a small record and downloads nothing; later edits upload as usual\. Retry sync always downloads the whole copy\.$/,'the FAQ says when nothing is downloaded: '+answer);
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 13, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(current,/Opening the app syncs much faster when nothing changed in the cloud\./,'the November 13 changelog describes it');
+ assert.match(current,/Debug log lists such a check as a cloud read with the outcome unchanged/);
+ // #2354 review: a copy this device found damaged is never skipped again.
+ assert.match(current,/and so does Retry sync\. A copy this device has found damaged downloads in full again until it is repaired\./,'the changelog says a damaged copy is not skipped: '+current);
 });
 
 test('RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted',async t=>{

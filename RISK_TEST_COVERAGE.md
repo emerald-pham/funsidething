@@ -758,6 +758,8 @@ its RISK test; the map follows.
 - RISK DEVICE STORAGE V2: a head commit releasing a recovery hold aborts on a different or missing stored hold and keeps head and hold exact
 - RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
 - RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
+- RISK CLOUD V2 unchanged pull: a pull naming the acknowledged revision and copy reads only the root while the root still names them, and downloads in full otherwise
+- RISK CLOUD V2 unchanged pull: an older-schema root and a known unreadable copy reused by request are never answered unchanged, even when unchangedSince names them
 - RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
 - RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
 - RISK CLOUD V2 RECOVERY FIXTURE: the captured unreadable active generation replays as corrupt-generation over an intact prior generation
@@ -970,6 +972,7 @@ its RISK test; the map follows.
 - RISK daily backup retention adoption copy: in browser storage, a large board a device had before taking another device’s newer cloud board stays restorable on that day
 - RISK daily backup retention adoption copy: a manual backup of the same board does not stand in for the copy kept before taking a newer cloud board, so deleting it keeps the earlier board restorable for seven calendar days
 - RISK simpler Settings guidance: the Data and backups FAQ holds the moved sync, retention and error explanations within 130 words, and the current changelog describes the simpler Settings
+- RISK unchanged cloud pull guidance: the sync FAQ and the November 13 changelog say an unchanged cloud copy is not downloaded and that Retry sync downloads it
 - RISK daily backup retention guidance: the Data and backups FAQ and the November 6 changelog say daily backups cover three calendar days and other automatic copies seven, that a cloud recovery keeps them until the cloud confirms the board, and that manual and kept copies stay until deleted
 - RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering
 - RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections
@@ -1829,6 +1832,16 @@ its RISK test; the map follows.
 - RISK cloud save loop guard: while saves keep failing on this device, returning to the app again and again keeps the save error showing, never stops as a save loop, and the edit saves once storage recovers
 - RISK sign-in settles: a task deleted, restored with Undo while synced, then deleted again while signed out saves and pushes once after sign-in, and the cloud copy has the deletion
 - RISK cloud save loop guard: when a save on this device fails after a stop, the status shows the save error and the cloud error no longer says the board is saved on this device
+- RISK unchanged cloud pull: opening the app when the cloud still holds this device’s acknowledged copy reads only the root, downloads nothing and shows synced
+- RISK unchanged cloud pull: an edit saved on this device after the acknowledgement is uploaded after a skipped pull, under the revision guard
+- RISK unchanged cloud pull: a root moved by another device since the acknowledgement is downloaded and merged on launch
+- RISK unchanged cloud pull: damaged chunks of this device’s own acknowledged copy do not hold launch, and Retry sync repairs them
+- RISK unchanged cloud pull: an acknowledgement saved by an older build, one whose hash no longer matches its board, Retry sync and a different account all download in full
+- RISK unchanged cloud pull: after Retry sync repairs a damaged copy, a pull that finds the repaired copy unchanged clears the damage, so a later unrelated sync error does not offer cloud recovery sources
+- RISK unchanged cloud pull: a device that read its own acknowledged copy as damaged downloads it in full on the next launch even when the recovery check never finished
+- RISK unchanged cloud pull: a rebuild of a damaged acknowledged copy whose upload never lands is downloaded in full on the next launch and rebuilt
+- RISK unchanged cloud pull: another device publishing between a skipped pull and this device’s upload is merged, not overwritten
+- RISK unchanged cloud pull: signing in again and a same-email account with another user ID download in full
 
 ## tests/repository-process.test.js
 
