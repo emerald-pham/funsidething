@@ -25294,6 +25294,67 @@ test('RISK PWA cache contract: fingerprints --write after a shell asset edit mak
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+// Runs the Pages job's own shell steps (#2380) in a disposable repository, so
+// the published site is what the actual deploy would upload for that commit.
+const deployPagesSite2380=repo=>{
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
+ const job=workflow.split('\n  deploy-pages:\n')[1];assert.ok(job,'the Pages deploy job exists');
+ const lines=job.split('\n'),steps=[];
+ for(let i=0;i<lines.length;i++){
+  const run=lines[i].match(/^(\s+)(?:- )?run: (.*)$/);if(!run)continue;
+  if(run[2].trim()!=='|'){steps.push(run[2]);continue;}
+  const body=[];while(i+1<lines.length&&(lines[i+1].trim()===''||lines[i+1].search(/\S/)>run[1].length))body.push(lines[++i].trim());
+  steps.push(body.join('\n'));
+ }
+ assert.ok(steps.some(step=>/git archive HEAD/.test(step)),'the deploy publishes the exact committed tree');
+ for(const step of steps){const result=spawnSync('bash',['-eo','pipefail','-c',step],{cwd:repo,encoding:'utf8'});assert.equal(result.status,0,'deploy step failed: '+step+'\n'+result.stderr);}
+ return path.join(repo,'site');
+};
+const shellCheckout2380=()=>{
+ const repo=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'deploy-shell-2380-'));
+ const {localPaths}=appShellContract(serviceWorkerSource());
+ const files=[...localPaths,'sw.js','package.json',...fs.readdirSync(path.join(__dirname,'scripts')).filter(file=>file.endsWith('.mjs')).map(file=>'scripts/'+file)];
+ for(const file of files){fs.mkdirSync(path.dirname(path.join(repo,file)),{recursive:true});fs.copyFileSync(path.join(__dirname,file),path.join(repo,file));}
+ const git=(...args)=>{const result=spawnSync('git',args,{cwd:repo,encoding:'utf8',maxBuffer:64*1024*1024});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
+ git('init','-q','-b','main');git('config','user.email','deploy-2380@example.invalid');git('config','user.name','Deploy fixture');
+ const commit=message=>{git('add','--all');git('-c','core.hooksPath=/dev/null','commit','-qm',message);return git('rev-parse','HEAD');};
+ return {repo,localPaths,git,commit};
+};
+const servedValues2380=site=>({
+ app:fs.readFileSync(path.join(site,'index.html'),'utf8').match(/<template id="appChangelogCurrent"><div data-app-fingerprint="([^"]*)"/)?.[1],
+ cacheName:fs.readFileSync(path.join(site,'sw.js'),'utf8').match(/const CACHE_NAME = "([^"]+)"/)?.[1],
+});
+
+test('RISK repository process: the Pages deploy after a shell-asset edit with no refresh serves values computed from the files it publishes',()=>{
+ const fixture=shellCheckout2380();
+ try{
+  const {repo,localPaths,git,commit}=fixture;
+  const deploy=label=>{const site=deployPagesSite2380(repo);const served=servedValues2380(site),expected=expectedShellIdentities2231(site);
+   // Only the two computed identities may differ from the exact committed bytes.
+   for(const file of git('ls-files').split('\n')){
+    const committed=spawnSync('git',['show','HEAD:'+file],{cwd:repo,encoding:'utf8',maxBuffer:64*1024*1024}).stdout,published=fs.readFileSync(path.join(site,file),'utf8');
+    const slots=text=>text.replace(/(<template id="appChangelogCurrent"><div data-app-fingerprint=")[^"]*"/,'$1SLOT"').replace(/(const CACHE_NAME = ")[^"]+"/,'$1SLOT"');
+    assert.equal(slots(published),slots(committed),label+': the deploy publishes committed bytes apart from the shell identities: '+file);
+   }
+   fs.rmSync(site,{recursive:true,force:true});return {served,expected};};
+  commit('baseline shell');
+  const baseline=deploy('unchanged shell');
+  assert.equal(baseline.served.app,baseline.expected.app,'an unchanged shell serves its computed app fingerprint');
+  assert.equal(baseline.served.cacheName,baseline.expected.cacheName,'an unchanged shell serves its computed cache key');
+
+  fs.writeFileSync(path.join(repo,'NOTES.md'),'A file outside the shell.\n');commit('non-shell change');
+  const unrelated=deploy('non-shell change');
+  assert.deepEqual(unrelated.served,baseline.served,'a change outside the shell keeps the installed cache and build id');
+
+  const edited=localPaths.find(file=>file.endsWith('.js'));assert.ok(edited,'precondition: the shell precaches a script asset');
+  fs.appendFileSync(path.join(repo,edited),'\n// shell edit with no fingerprint refresh (#2380)\n');commit('shell edit, no refresh');
+  const after=deploy('shell edit');
+  assert.notEqual(after.expected.cacheName,baseline.expected.cacheName,'precondition: the edit changes the computed cache key');
+  assert.equal(after.served.app,after.expected.app,'the deployed build id must match the files it serves');
+  assert.equal(after.served.cacheName,after.expected.cacheName,'the deployed CACHE_NAME must match the files it serves, so installed clients pick up the new shell');
+ }finally{fs.rmSync(fixture.repo,{recursive:true,force:true});}
+});
+
 test('Ducks: seeded occasional takeoffs lift continuously from the water and leave in either direction',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]])for(const reverse of [false,true]){

@@ -657,6 +657,7 @@ its RISK test; the map follows.
 - RISK landscape water: full-frame animation reuses its reflection buffers
 - RISK Animation audit: water and visitors keep a thirty-fps paint cap while time advances
 - RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current
+- RISK repository process: the Pages deploy after a shell-asset edit with no refresh serves values computed from the files it publishes
 - RISK scenery refresh characterization: start and resize compute the whole scene before painting it in the existing order
 - RISK Landscape browser: live scenery paints day, dusk, night, and dawn as time advances
 - RISK PWA session updates: a blurred unfinished Add draft prevents automatic document replacement
