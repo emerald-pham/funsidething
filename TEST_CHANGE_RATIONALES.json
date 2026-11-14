@@ -23127,5 +23127,66 @@
       "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=\"switching eligibility keeps\" tests/core.test.js (2026-11-14T15:46:42Z, agent-test-runs/issue-2373 under the git common dir) before the index.html fix; the two edited tests were updated after review and checked as later-baseline-sensitivity with main index.html restored, then with a mutant setEligibility that keeps the search but clears tagFilter.",
       "failure": "RED: AssertionError choosing Eligible keeps the typed search, actual empty string, expected Laundry. Baseline sensitivity: all three fail (Eligible drops the future row and keeps both narrowings; #2373: choosing Eligible keeps the postponed tag). Tag-dropping mutant: all three fail (Eligible narrows the searched, filtered rows). GREEN 3/3 after restoring the fix."
     }
+  },
+  {
+    "baseCommit": "ee087d95e6e6664f850634d35e9ed90723990e64",
+    "weakenedTestLines": [
+      "tests/core.test.js:-appFingerprint:{committed:before.committedApp,expected:after.app},",
+      "tests/core.test.js:-appFingerprint:{committed:expected.app,expected:expected.app},",
+      "tests/core.test.js:-assert.deepEqual([...pageAfter.matchAll(/data-app-fingerprint=\"([a-f0-9]{64})\"/g)].map(m=>m[1]).slice(1),historyBefore,'earlier changelog entries keep their fingerprints');",
+      "tests/core.test.js:-assert.deepEqual(report,{",
+      "tests/core.test.js:-assert.deepEqual(write.report,{",
+      "tests/core.test.js:-assert.equal(after.committedApp,after.app,'the written app fingerprint matches the changelog contract');",
+      "tests/core.test.js:-assert.equal(after.committedCacheName,after.cacheName,'the written cache key matches the CACHE_NAME contract');",
+      "tests/core.test.js:-assert.equal(again.status,0);assert.equal(again.report?.stale,false,'a second run finds nothing to refresh');",
+      "tests/core.test.js:-assert.equal(expected.committedApp,expected.app,'precondition: the committed app fingerprint is current');",
+      "tests/core.test.js:-assert.equal(expected.committedCacheName,expected.cacheName,'precondition: the committed shell cache key is current');",
+      "tests/core.test.js:-assert.equal(fs.readFileSync(path.join(dir,'index.html'),'utf8'),pageBefore,'reporting never writes');",
+      "tests/core.test.js:-assert.equal(pageAfter.replace(after.app,before.committedApp),pageBefore,'only the current fingerprint changes in index.html');",
+      "tests/core.test.js:-assert.equal(stale.report?.appFingerprint?.expected,before.app,'the report names the expected app fingerprint');",
+      "tests/core.test.js:-assert.equal(stale.report?.stale,true);assert.equal(stale.report?.written,false);",
+      "tests/core.test.js:-assert.equal(stale.status,1,'a stale tree fails without --write');",
+      "tests/core.test.js:-assert.equal(workerAfter.replace(after.cacheName,before.committedCacheName),workerBefore,'only CACHE_NAME changes in sw.js');",
+      "tests/core.test.js:-assert.notEqual(after.cacheName,before.committedCacheName,'the edit changes the shell cache key');",
+      "tests/core.test.js:-assert.notEqual(before.committedApp,before.app,'precondition: the edit makes the app fingerprint stale');",
+      "tests/core.test.js:-assert.ok(match[1].includes('data-app-fingerprint=\"'+expected+'\"'),'App shell changed: the current changelog entry needs data-app-fingerprint=\"'+expected+'\". Run `npm run fingerprints -- --write`, and add a dated changelog entry for a user-facing change (routine animation-frequency tuning stays out of the changelog, per AGENTS.md).');",
+      "tests/core.test.js:-cacheName:{committed:before.committedCacheName,expected:after.cacheName},",
+      "tests/core.test.js:-cacheName:{committed:expected.cacheName,expected:expected.cacheName},",
+      "tests/core.test.js:-const before=expectedShellIdentities2231(dir);",
+      "tests/core.test.js:-const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'shell-fingerprints-2231-'));",
+      "tests/core.test.js:-const historyBefore=[...pageBefore.matchAll(/data-app-fingerprint=\"([a-f0-9]{64})\"/g)].map(m=>m[1]).slice(1);",
+      "tests/core.test.js:-const stale=runFingerprints2231('--root',dir);",
+      "tests/core.test.js:-fs.appendFileSync(path.join(dir,edited),'\\n// edited by the #2231 fixture\\n');",
+      "tests/core.test.js:-stale:false,written:false,",
+      "tests/core.test.js:-stale:true,written:true,",
+      "tests/core.test.js:-test('PWA cache contract: the fingerprints command reports the committed app fingerprint and shell cache key as current',()=>{",
+      "tests/core.test.js:-test('RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current',()=>{",
+      "tests/core.test.js:-});",
+      "tests/core.test.js:-});",
+      "tests/shared.js:-await context.route('**/*',async route=>{const url=new URL(route.request().url()),file=url.pathname;if(url.origin!==origin)return route.abort();const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null)return route.fulfill({contentType:'application/javascript',body:automaticView&&file===prefix+'firebase-firestore.js'?module.replace(\"const rpc=(kind,args)=>window.__installedRPC(kind,args)\",\"const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Controlled SDK refusal'),{code:result.fixtureFailure});return result;}\"):module});const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return route.fulfill({status:404,body:''});return route.fulfill({body:fs.readFileSync(path.join(__dirname,relative)),contentType:relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined});});",
+      "tests/shared.js:-const html = fs.readFileSync(HTML_PATH, \"utf8\");",
+      "tests/shared.js:-fs.readFile(file,(error,bytes)=>{response.writeHead(error?404:200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});response.end(error?'Not found':bytes);});",
+      "tests/shared.js:-hash.update(fs.readFileSync(absolutePath));",
+      "tests/shared.js:-return fs.readFileSync(workerPath, \"utf8\");"
+    ],
+    "reason": "#2380 (owner-approved breakdown, 2026-11-14): the app fingerprint and CACHE_NAME are no longer committed. The checkout keeps the placeholders data-app-fingerprint=\"HASH\" and chain-scanner-shell-HASH, and every consumer that serves the shell (Pages deploy, npm run serve, the test harness, the installed-client native cases, Beta packaging) stamps values computed from the files it serves via scripts/shell-fingerprints.mjs. Tests that compared committed values with the computed ones now check the served values, and the #2231 command tests encoded a stale-tree exit and a report shape that no longer exist.",
+    "previousBehavior": "A shell edit had to be followed by npm run fingerprints -- --write and a commit of both values. The fingerprints command exited 1 on a stale checkout and reported {committed, expected, stale}; the harness read index.html and sw.js from disk, so the changelog and CACHE_NAME contract tests failed until the refresh was committed, and the harness servers served the committed bytes.",
+    "intendedBehavior": "A shell edit alone is complete. The fingerprints command reports {appFingerprint, cacheName, written} computed from the checkout and exits 0; --write stamps a published copy and refuses a Git checkout or a stale hand-committed value. tests/shared.js serves html, the worker source, the app-shell contract bytes and its two local servers through servedShellReader, so the existing changelog and CACHE_NAME contract tests now check the computed values a client is served.",
+    "preservedCoverage": [
+      "Settings changelog and PWA cache contract: CACHE_NAME is mechanically tied to every local app-shell byte keep their independent hash oracles; only their input is now the served page and worker, and the changelog message keeps the AGENTS.md animation-tuning exception.",
+      "Earlier changelog entries keep their fingerprints and only the current fingerprint and CACHE_NAME change when stamped: both assertions are kept in the replacement --write test, now against the placeholders.",
+      "The installed-client native cases still require an exact old 779defa shell and the exact candidate shell, now served as the deploy publishes it; Beta packaging keeps every existing test, including refusing a stale committed fingerprint."
+    ],
+    "replacementTests": [
+      "PWA cache contract: the checkout keeps placeholders and the fingerprints command and test harness serve the computed values",
+      "RISK PWA cache contract: fingerprints --write stamps only the computed values into a published copy and refuses a checkout or a stale committed value",
+      "RISK PWA cache contract: a shell-asset edit alone is complete, with no fingerprint refresh to commit",
+      "RISK repository process: the Pages deploy after a shell-asset edit with no refresh serves values computed from the files it publishes",
+      "RISK PWA delivery: local serving after a shell-asset edit with no refresh serves values computed from the files it serves"
+    ],
+    "redEvidence": {
+      "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK PWA cache contract: a shell-asset edit alone is complete\" tests/core.test.js (2026-11-14T21:07:07Z, agent-test-runs/issue-2380/2026-11-14T21-07-07-054Z-9a1c1e07); deploy RED 2026-11-14T21:05:51Z record 7073791b; local serving RED 2026-11-14T21:12:38Z record 819f179f.",
+      "failure": "AssertionError: an edited shell needs nothing refreshed or committed: Shell fingerprints are stale. Run `npm run fingerprints -- --write`. Deploy RED: the deployed build id must match the files it serves, actual 667c063d... (committed) expected f7bc2207... (computed). Local serving RED: the locally served build id must match the files it serves, actual HASH."
+    }
   }
 ]
