@@ -23131,39 +23131,6 @@
   {
     "baseCommit": "ee087d95e6e6664f850634d35e9ed90723990e64",
     "weakenedTestLines": [
-      "tests/repository-process.test.js:-'the committed RISK map matches the RISK tests');",
-      "tests/repository-process.test.js:-assert.equal(run('--check').status,0,'a freshly written map is current');",
-      "tests/repository-process.test.js:-assert.equal(run('--check').status,1,'a missing map is out of date');",
-      "tests/repository-process.test.js:-assert.equal(run('--write').status,0);",
-      "tests/repository-process.test.js:-assert.equal(spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs'),'--check'],{cwd:__dirname,encoding:'utf8'}).status,0,",
-      "tests/repository-process.test.js:-assert.equal(stale.status,1,'adding a RISK test makes the map stale');",
-      "tests/repository-process.test.js:-assert.match(map,/npm run risk-map -- --write/,'the map says how it is regenerated');",
-      "tests/repository-process.test.js:-assert.match(stale.stderr,/npm run risk-map -- --write/,'the stale message names the command');",
-      "tests/repository-process.test.js:-assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');",
-      "tests/repository-process.test.js:-const inventory=fs.readFileSync(inventoryPath,'utf8');",
-      "tests/repository-process.test.js:-const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');",
-      "tests/repository-process.test.js:-const map=fs.readFileSync(path.join(dir,'RISK_TEST_COVERAGE.md'),'utf8');",
-      "tests/repository-process.test.js:-const stale=run('--check');"
-    ],
-    "reason": "#2381 (owner-approved 2026-11-14, partially reversing #2233): the RISK map stops being committed and prints on demand. The assertions that compared a committed RISK_TEST_COVERAGE.md with the RISK tests, and the --check/--write modes they drove, have nothing left to compare.",
-    "previousBehavior": "scripts/risk-map.mjs --write wrote RISK_TEST_COVERAGE.md and --check exited 1 when the committed copy differed from the RISK test names. The generation test asserted a missing or stale map failed --check, and that the committed map matched; the feature-boundary test read the committed file. Adding a RISK test without a regeneration commit failed both.",
-    "intendedBehavior": "npm run risk-map prints the map to stdout from the RISK test names and writes no file; nothing is committed and nothing compares a copy. The generation test reads the printed map, the feature-boundary test reads the printed inventory, and an added RISK test appears in the next printed map with no regeneration step.",
-    "preservedCoverage": [
-      "RISK test inventory: the RISK map is generated from RISK test names still proves each RISK test is listed once, in source order, under its test file, that non-test files and non-RISK tests are excluded, and that the map names its command and explains how new features add RISK contracts.",
-      "RISK test inventory: every named risk contract maps to a feature boundary still checks every RISK name in the whole test surface against the inventory and that the inventory explains future work, now against the printed map.",
-      "RISK test inventory: risk map and source checks read every file in the test directory is unchanged."
-    ],
-    "replacementTests": [
-      "RISK test inventory: a new RISK test needs no committed map, which prints on demand"
-    ],
-    "redEvidence": {
-      "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=RISK.test.inventory tests/repository-process.test.js (2026-11-14T21:02:04Z, agent-test-runs/issue-2381 under the git common dir) with only the new RISK test added and no map regeneration, before any script, map or guidance edit.",
-      "failure": "RED: AssertionError the committed RISK map matches the RISK tests; AssertionError risk contract is missing from the feature inventory: RISK test inventory: a new RISK test needs no committed map, which prints on demand; AssertionError the checkout commits no RISK map. GREEN at 2026-11-14T21:02:58Z after removing the committed map, its check and its policy-file entry."
-    }
-  },
-  {
-    "baseCommit": "ee087d95e6e6664f850634d35e9ed90723990e64",
-    "weakenedTestLines": [
       "tests/core.test.js:-appFingerprint:{committed:before.committedApp,expected:after.app},",
       "tests/core.test.js:-appFingerprint:{committed:expected.app,expected:expected.app},",
       "tests/core.test.js:-assert.deepEqual([...pageAfter.matchAll(/data-app-fingerprint=\"([a-f0-9]{64})\"/g)].map(m=>m[1]).slice(1),historyBefore,'earlier changelog entries keep their fingerprints');",
@@ -23196,21 +23163,38 @@
       "tests/core.test.js:-test('RISK PWA cache contract: fingerprints --write after a shell asset edit makes the app fingerprint and shell cache key current',()=>{",
       "tests/core.test.js:-});",
       "tests/core.test.js:-});",
+      "tests/repository-process.test.js:-'the committed RISK map matches the RISK tests');",
+      "tests/repository-process.test.js:-assert.equal(run('--check').status,0,'a freshly written map is current');",
+      "tests/repository-process.test.js:-assert.equal(run('--check').status,1,'a missing map is out of date');",
+      "tests/repository-process.test.js:-assert.equal(run('--write').status,0);",
+      "tests/repository-process.test.js:-assert.equal(spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs'),'--check'],{cwd:__dirname,encoding:'utf8'}).status,0,",
+      "tests/repository-process.test.js:-assert.equal(stale.status,1,'adding a RISK test makes the map stale');",
+      "tests/repository-process.test.js:-assert.match(map,/npm run risk-map -- --write/,'the map says how it is regenerated');",
+      "tests/repository-process.test.js:-assert.match(stale.stderr,/npm run risk-map -- --write/,'the stale message names the command');",
+      "tests/repository-process.test.js:-assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');",
+      "tests/repository-process.test.js:-const inventory=fs.readFileSync(inventoryPath,'utf8');",
+      "tests/repository-process.test.js:-const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');",
+      "tests/repository-process.test.js:-const map=fs.readFileSync(path.join(dir,'RISK_TEST_COVERAGE.md'),'utf8');",
+      "tests/repository-process.test.js:-const stale=run('--check');",
       "tests/shared.js:-await context.route('**/*',async route=>{const url=new URL(route.request().url()),file=url.pathname;if(url.origin!==origin)return route.abort();const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null)return route.fulfill({contentType:'application/javascript',body:automaticView&&file===prefix+'firebase-firestore.js'?module.replace(\"const rpc=(kind,args)=>window.__installedRPC(kind,args)\",\"const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Controlled SDK refusal'),{code:result.fixtureFailure});return result;}\"):module});const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return route.fulfill({status:404,body:''});return route.fulfill({body:fs.readFileSync(path.join(__dirname,relative)),contentType:relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined});});",
       "tests/shared.js:-const html = fs.readFileSync(HTML_PATH, \"utf8\");",
       "tests/shared.js:-fs.readFile(file,(error,bytes)=>{response.writeHead(error?404:200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});response.end(error?'Not found':bytes);});",
       "tests/shared.js:-hash.update(fs.readFileSync(absolutePath));",
       "tests/shared.js:-return fs.readFileSync(workerPath, \"utf8\");"
     ],
-    "reason": "#2380 (owner-approved breakdown, 2026-11-14): the app fingerprint and CACHE_NAME are no longer committed. The checkout keeps the placeholders data-app-fingerprint=\"HASH\" and chain-scanner-shell-HASH, and every consumer that serves the shell (Pages deploy, npm run serve, the test harness, the installed-client native cases, Beta packaging) stamps values computed from the files it serves via scripts/shell-fingerprints.mjs. Tests that compared committed values with the computed ones now check the served values, and the #2231 command tests encoded a stale-tree exit and a report shape that no longer exist.",
-    "previousBehavior": "A shell edit had to be followed by npm run fingerprints -- --write and a commit of both values. The fingerprints command exited 1 on a stale checkout and reported {committed, expected, stale}; the harness read index.html and sw.js from disk, so the changelog and CACHE_NAME contract tests failed until the refresh was committed, and the harness servers served the committed bytes.",
-    "intendedBehavior": "A shell edit alone is complete. The fingerprints command reports {appFingerprint, cacheName, written} computed from the checkout and exits 0; --write stamps a published copy and refuses a Git checkout or a stale hand-committed value. tests/shared.js serves html, the worker source, the app-shell contract bytes and its two local servers through servedShellReader, so the existing changelog and CACHE_NAME contract tests now check the computed values a client is served.",
+    "reason": "#2380 and #2381 land together on integration/2380-2381-generated-shell-and-risk-map, so this one record covers the whole integration diff's weakening set (the #2381 lines in tests/repository-process.test.js and the #2380 lines). #2381 (owner-approved 2026-11-14, partially reversing #2233): the RISK map stops being committed and prints on demand. The assertions that compared a committed RISK_TEST_COVERAGE.md with the RISK tests, and the --check/--write modes they drove, have nothing left to compare. #2380 (owner-approved breakdown, 2026-11-14): the app fingerprint and CACHE_NAME are no longer committed. The checkout keeps the placeholders data-app-fingerprint=\"HASH\" and chain-scanner-shell-HASH, and every consumer that serves the shell (Pages deploy, npm run serve, the test harness, the installed-client native cases, Beta packaging) stamps values computed from the files it serves via scripts/shell-fingerprints.mjs. Tests that compared committed values with the computed ones now check the served values, and the #2231 command tests encoded a stale-tree exit and a report shape that no longer exist.",
+    "previousBehavior": "#2381: scripts/risk-map.mjs --write wrote RISK_TEST_COVERAGE.md and --check exited 1 when the committed copy differed from the RISK test names. The generation test asserted a missing or stale map failed --check, and that the committed map matched; the feature-boundary test read the committed file. Adding a RISK test without a regeneration commit failed both. #2380: A shell edit had to be followed by npm run fingerprints -- --write and a commit of both values. The fingerprints command exited 1 on a stale checkout and reported {committed, expected, stale}; the harness read index.html and sw.js from disk, so the changelog and CACHE_NAME contract tests failed until the refresh was committed, and the harness servers served the committed bytes.",
+    "intendedBehavior": "#2381: npm run risk-map prints the map to stdout from the RISK test names and writes no file; nothing is committed and nothing compares a copy. The generation test reads the printed map, the feature-boundary test reads the printed inventory, and an added RISK test appears in the next printed map with no regeneration step. #2380: A shell edit alone is complete. The fingerprints command reports {appFingerprint, cacheName, written} computed from the checkout and exits 0; --write stamps a published copy and refuses a Git checkout or a stale hand-committed value. tests/shared.js serves html, the worker source, the app-shell contract bytes and its two local servers through servedShellReader, so the existing changelog and CACHE_NAME contract tests now check the computed values a client is served.",
     "preservedCoverage": [
-      "Settings changelog and PWA cache contract: CACHE_NAME is mechanically tied to every local app-shell byte keep their independent hash oracles; only their input is now the served page and worker, and the changelog message keeps the AGENTS.md animation-tuning exception.",
-      "Earlier changelog entries keep their fingerprints and only the current fingerprint and CACHE_NAME change when stamped: both assertions are kept in the replacement --write test, now against the placeholders.",
-      "The installed-client native cases still require an exact old 779defa shell and the exact candidate shell, now served as the deploy publishes it; Beta packaging keeps every existing test, including refusing a stale committed fingerprint."
+      "#2381: RISK test inventory: the RISK map is generated from RISK test names still proves each RISK test is listed once, in source order, under its test file, that non-test files and non-RISK tests are excluded, and that the map names its command and explains how new features add RISK contracts.",
+      "#2381: RISK test inventory: every named risk contract maps to a feature boundary still checks every RISK name in the whole test surface against the inventory and that the inventory explains future work, now against the printed map.",
+      "#2381: RISK test inventory: risk map and source checks read every file in the test directory is unchanged.",
+      "#2380: Settings changelog and PWA cache contract: CACHE_NAME is mechanically tied to every local app-shell byte keep their independent hash oracles; only their input is now the served page and worker, and the changelog message keeps the AGENTS.md animation-tuning exception.",
+      "#2380: Earlier changelog entries keep their fingerprints and only the current fingerprint and CACHE_NAME change when stamped: both assertions are kept in the replacement --write test, now against the placeholders.",
+      "#2380: The installed-client native cases still require an exact old 779defa shell and the exact candidate shell, now served as the deploy publishes it; Beta packaging keeps every existing test, including refusing a stale committed fingerprint."
     ],
     "replacementTests": [
+      "RISK test inventory: a new RISK test needs no committed map, which prints on demand",
       "PWA cache contract: the checkout keeps placeholders and the fingerprints command and test harness serve the computed values",
       "RISK PWA cache contract: fingerprints --write stamps only the computed values into a published copy and refuses a checkout or a stale committed value",
       "RISK PWA cache contract: a shell-asset edit alone is complete, with no fingerprint refresh to commit",
@@ -23218,8 +23202,8 @@
       "RISK PWA delivery: local serving after a shell-asset edit with no refresh serves values computed from the files it serves"
     ],
     "redEvidence": {
-      "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK PWA cache contract: a shell-asset edit alone is complete\" tests/core.test.js (2026-11-14T21:07:07Z, agent-test-runs/issue-2380/2026-11-14T21-07-07-054Z-9a1c1e07); deploy RED 2026-11-14T21:05:51Z record 7073791b; local serving RED 2026-11-14T21:12:38Z record 819f179f.",
-      "failure": "AssertionError: an edited shell needs nothing refreshed or committed: Shell fingerprints are stale. Run `npm run fingerprints -- --write`. Deploy RED: the deployed build id must match the files it serves, actual 667c063d... (committed) expected f7bc2207... (computed). Local serving RED: the locally served build id must match the files it serves, actual HASH."
+      "command": "#2381: npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=RISK.test.inventory tests/repository-process.test.js (2026-11-14T21:02:04Z, agent-test-runs/issue-2381 under the git common dir) with only the new RISK test added and no map regeneration, before any script, map or guidance edit. #2380: npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK PWA cache contract: a shell-asset edit alone is complete\" tests/core.test.js (2026-11-14T21:07:07Z, agent-test-runs/issue-2380/2026-11-14T21-07-07-054Z-9a1c1e07); deploy RED 2026-11-14T21:05:51Z record 7073791b; local serving RED 2026-11-14T21:12:38Z record 819f179f.",
+      "failure": "#2381: RED: AssertionError the committed RISK map matches the RISK tests; AssertionError risk contract is missing from the feature inventory: RISK test inventory: a new RISK test needs no committed map, which prints on demand; AssertionError the checkout commits no RISK map. GREEN at 2026-11-14T21:02:58Z after removing the committed map, its check and its policy-file entry. #2380: AssertionError: an edited shell needs nothing refreshed or committed: Shell fingerprints are stale. Run `npm run fingerprints -- --write`. Deploy RED: the deployed build id must match the files it serves, actual 667c063d... (committed) expected f7bc2207... (computed). Local serving RED: the locally served build id must match the files it serves, actual HASH."
     }
   }
 ]
