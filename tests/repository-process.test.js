@@ -1611,32 +1611,45 @@ test('RISK test inventory: the RISK map is generated from RISK test names, one s
   fs.writeFileSync(path.join(dir,'tests','scenery.test.js'),"test('RISK sky: dawn stays warm',()=>{});\n");
   fs.writeFileSync(path.join(dir,'tests','shared.js'),"// test('RISK helper: not a test file',()=>{});\n");
   const run=(...args)=>spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs'),'--root',dir,...args],{encoding:'utf8'});
-  assert.equal(run('--check').status,1,'a missing map is out of date');
-  assert.equal(run('--write').status,0);
-  const map=fs.readFileSync(path.join(dir,'RISK_TEST_COVERAGE.md'),'utf8');
+  const printed=run();
+  assert.equal(printed.status,0,printed.stderr);
+  const map=printed.stdout;
   assert.deepEqual(map.split('\n').filter(line=>/^(?:## |- )/.test(line)),
    ['## tests/core.test.js','- RISK scan: b ranks second','- RISK scan: a ranks first','## tests/scenery.test.js','- RISK sky: dawn stays warm'],
    'each RISK test is listed once, in source order, under its test file');
-  assert.match(map,/npm run risk-map -- --write/,'the map says how it is regenerated');
+  assert.match(map,/npm run risk-map/,'the map says how it is printed');
   assert.match(map,/new feature/i,'the map explains how new features add risk contracts');
-  assert.equal(run('--check').status,0,'a freshly written map is current');
   fs.appendFileSync(path.join(dir,'tests','scenery.test.js'),"test('RISK sky: dusk fades',()=>{});\n");
-  const stale=run('--check');
-  assert.equal(stale.status,1,'adding a RISK test makes the map stale');
-  assert.match(stale.stderr,/npm run risk-map -- --write/,'the stale message names the command');
+  assert.deepEqual(run().stdout.split('\n').filter(line=>/^(?:## |- )/.test(line)).slice(-2),['- RISK sky: dawn stays warm','- RISK sky: dusk fades'],
+   'an added RISK test is in the next printed map with no regeneration step');
+  assert.equal(fs.existsSync(path.join(dir,'RISK_TEST_COVERAGE.md')),false,'printing the map writes no file to commit');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
- assert.equal(spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs'),'--check'],{cwd:__dirname,encoding:'utf8'}).status,0,
-  'the committed RISK map matches the RISK tests');
 });
 
 test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{
- const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');
- assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');
- const inventory=fs.readFileSync(inventoryPath,'utf8');
+ // #2381: the inventory is the map printed on demand, not a committed file.
+ const printed=spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs')],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(printed.status,0,'the repository must print a readable inventory of current risk contracts: '+printed.stderr);
+ const inventory=printed.stdout;
  const source=testSurfaceSource();
  const riskNames=[...source.matchAll(/^\s*test\(\s*(['"])(RISK\b[^'"]*)\1/gm)].map(match=>match[2]);
  for(const name of riskNames)assert.ok(inventory.includes(name),`risk contract is missing from the feature inventory: ${name}`);
  assert.match(inventory,/future|new feature/i,'the inventory must explain how future work adds risk contracts');
+});
+
+// #2381: the RISK map prints on demand and is not committed. The committed copy
+// was touched in 263 of 653 commits from 2026-11-01 and sat on the release
+// policy file list, so adding a RISK test meant a regeneration commit. This test
+// is itself a RISK test added with no map edit: every repository check passes.
+test('RISK test inventory: a new RISK test needs no committed map, which prints on demand',()=>{
+ const tracked=spawnSync('git',['ls-files','--','RISK_TEST_COVERAGE.md'],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(tracked.status,0,tracked.stderr);
+ assert.equal(tracked.stdout,'','the checkout commits no RISK map');
+ const printed=spawnSync('npm',['run','--silent','risk-map'],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(printed.status,0,'npm run risk-map prints the map: '+printed.stderr);
+ const section=printed.stdout.split('## tests/repository-process.test.js\n')[1]?.split('\n## ')[0]||'';
+ assert.ok(section.split('\n').includes('- RISK test inventory: a new RISK test needs no committed map, which prints on demand'),
+  'the printed map lists this RISK test under its file, though no map edit added it');
 });
 
 test('RISK repository process: backward compatibility is a mandatory fail-closed release gate',()=>{
