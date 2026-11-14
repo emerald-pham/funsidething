@@ -33,6 +33,13 @@ export function generateRiskMap(root) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
+  // The retired flags fail instead of being ignored, so an old habit or script
+  // that ran --check cannot pass vacuously (#2383).
+  const retired = args.find(arg => arg === '--check' || arg === '--write');
+  if (retired) {
+    process.stderr.write(`risk-map: ${retired} is retired. The RISK map is printed on demand by \`npm run risk-map\` and is no longer committed, so there is nothing to check or write (#2381).\n`);
+    process.exit(2);
+  }
   const rootIndex = args.indexOf('--root');
   const root = path.resolve(rootIndex >= 0 ? args[rootIndex + 1] ?? '' : process.cwd());
   process.stdout.write(generateRiskMap(root));

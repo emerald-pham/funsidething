@@ -1623,6 +1623,15 @@ test('RISK test inventory: the RISK map is generated from RISK test names, one s
   assert.deepEqual(run().stdout.split('\n').filter(line=>/^(?:## |- )/.test(line)).slice(-2),['- RISK sky: dawn stays warm','- RISK sky: dusk fades'],
    'an added RISK test is in the next printed map with no regeneration step');
   assert.equal(fs.existsSync(path.join(dir,'RISK_TEST_COVERAGE.md')),false,'printing the map writes no file to commit');
+  // #2383: the retired flags must not pass vacuously for an old habit or script.
+  for(const retired of ['--check','--write']){
+   const refused=run(retired);
+   assert.notEqual(refused.status,0,retired+' is refused instead of silently printing the map');
+   assert.match(refused.stderr,/printed on demand/i,retired+' says the map is printed on demand');
+   assert.match(refused.stderr,/no longer committed/i,retired+' says the map is no longer committed');
+   assert.equal(refused.stdout,'',retired+' prints no map that could be mistaken for a check');
+  }
+  assert.equal(fs.existsSync(path.join(dir,'RISK_TEST_COVERAGE.md')),false,'a refused --write writes no map file');
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
