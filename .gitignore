@@ -3,8 +3,3 @@ node_modules/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
-# Agent worktree setup (#2364): node_modules may be a symlink to the main
-# checkout's install, which node_modules/ above does not match, and the
-# worktree's claimed ports live in .chain-worktree.env.
-/node_modules
-/.chain-worktree.env
