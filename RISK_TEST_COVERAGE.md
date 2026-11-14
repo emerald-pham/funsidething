@@ -1433,6 +1433,7 @@ its RISK test; the map follows.
 - RISK debug log: unavailable diagnostic storage never blocks edits or claims persistence
 - RISK debug log: document and event limits expire without retaining injected private fields
 - RISK debug log: app reload reasons and lifecycle observations survive without private error text
+- RISK support diagnostics: recentErrors names each saved-decision, learning and completion reconcile code and still reads unknown for any other code
 - RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery
 - RISK debug log link #2309: the link opens the read-only log at opening without Settings or reading any backup text
 - RISK debug log link #2309: counting backups loads no backup rows, so a cold opening stays clear of retained file bytes
@@ -1596,6 +1597,7 @@ its RISK test; the map follows.
 - RISK saved view opening source preservation: invalid optional appearance keeps its bytes while one complete task opens
 - RISK saved view accepted handover: normal actions and exact local work survive repeated offline reopening
 - RISK saved view broken-board visibility: the complete saved board is readable while durable startup waits
+- RISK cloud sync dialog: Retry sync, Reload app and Review saved decisions look like enabled buttons with readable labels in light and dark themes
 - RISK backup delete focus: after deleting old backups by keyboard on a short screen, the focused Make backup is in view
 - RISK saved view opening: an empty chain shows Start, not a candidate an older client stored for the retired skip checkbox
 - RISK saved view full-board filters: opening preserves saved membership controls and cheap task facts
@@ -1829,6 +1831,7 @@ its RISK test; the map follows.
 - RISK cloud save loop guard: signing out and in again with the same account after a stop is a deliberate run that tries again and settles synced
 - RISK cloud save loop guard: the cloud error after a stop says the board is saved on this device and what to do next, not to keep the tab open for unsaved edits
 - RISK cloud save loop guard: the support report lists a cloud merge that was held, deferred by an open editor or stopped by an error, not only completed ones
+- RISK support diagnostics: a cloud read held by a saved-decision code names that code on the cloud-merge event and in recentErrors, with no board content
 - RISK cloud save loop guard: while saves keep failing on this device, returning to the app again and again keeps the save error showing, never stops as a save loop, and the edit saves once storage recovers
 - RISK sign-in settles: a task deleted, restored with Undo while synced, then deleted again while signed out saves and pushes once after sign-in, and the cloud copy has the deletion
 - RISK cloud save loop guard: when a save on this device fails after a stop, the status shows the save error and the cloud error no longer says the board is saved on this device
@@ -1842,6 +1845,13 @@ its RISK test; the map follows.
 - RISK unchanged cloud pull: a rebuild of a damaged acknowledged copy whose upload never lands is downloaded in full on the next launch and rebuilt
 - RISK unchanged cloud pull: another device publishing between a skipped pull and this device’s upload is merged, not overwritten
 - RISK unchanged cloud pull: signing in again and a same-email account with another user ID download in full
+- RISK started pass sync: a Postpone of a dot in a pass Start began reaches the cloud without holding sync
+- RISK started pass sync: opening the app after a Postpone in a pass Start began completes the launch merge and uploads the next edit
+- RISK started pass sync: a Postpone of the first dot Start placed dots the next task and keeps syncing through the next answer
+- RISK started pass sync: Undo of a Postpone in a pass Start began puts the dot back and keeps syncing, through the Postpone and the next answer
+- RISK started pass sync: going back to scanning after No — work the chain syncs, whichever control does it
+- RISK started pass sync: a cloud board whose Start root conflicts on pass id, start time or first dot is still held
+- RISK started pass sync compatibility: a board the released client held after a Postpone opens here and syncs, and the released client reads the work-mode records this one adds
 
 ## tests/repository-process.test.js
 

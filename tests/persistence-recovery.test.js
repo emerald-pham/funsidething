@@ -4103,6 +4103,84 @@ async function bulkDeleteFocusInBrowser(t,{width,height,mobile,troubleshootingOp
  if(troubleshootingOpen)assert.equal(await page.evaluate(()=>document.querySelector('#modalRoot details.settings-troubleshooting')?.open),true,'Troubleshooting stays open after the bulk delete');
  assert.deepEqual(errors,[]);
 }
+// #2360: in "Cloud sync needs attention", Retry sync, Reload app and Review
+// saved decisions had only the bare button class, so they painted as plain
+// text with no fill or edge, and in the dark theme as dark ink on the dark
+// dialog. Since 2026-09-29 they looked disabled; only Sign out looked usable,
+// and on 2026-11-13 the owner signed out for that reason. The theme is chosen
+// with the app's own theme button; the applied attribute, computed color
+// scheme and paint are checked before each button is read.
+const SYNC_DIALOG_ACTIONS2360=['review-decision-recovery','sync-retry','sync-reload'];
+async function cloudSyncDialogInBrowser2360(t,theme){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const board=JSON.stringify(syncState({seenQuickStart:true,tasks:[syncTask('sync-dialog-task','Sync dialog task')]}));
+ const browser=await chromium.launch({headless:true,...(openingBoardSelfHosted||!process.env.LANDSCAPE_BROWSER_CHANNEL?{}:{channel:process.env.LANDSCAPE_BROWSER_CHANNEL})});
+ t.after(()=>browser.close());
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block',reducedMotion:'reduce'});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await context.addInitScript(board=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+ },board);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:60000});
+ const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
+ await page.evaluate(()=>{for(let i=0;i<4&&document.querySelector('.mback');i++)closeModal();});
+ for(let i=0;i<3&&await page.evaluate(()=>document.documentElement.dataset.theme)!==theme;i++)await page.locator('#themeBtn').click();
+ // The sign-in is the cloud boundary: a signed-in account whose cloud read
+ // was held by a saved-decision code, as the sync status shows it.
+ await page.evaluate(()=>{
+  window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'error',errorStage:'reconcile',errorCode:'unprojectable-decision-evidence',signIn(){},signOut(){}};
+  renderSync();
+ });
+ await page.locator('#syncBtn').click();
+ await page.waitForSelector('#modalRoot [data-act="sync-retry"]');
+ const seen=await page.evaluate(actions=>{
+  const rgba=value=>{const parts=value.match(/[\d.]+/g).map(Number);return {rgb:parts.slice(0,3),alpha:parts.length>3?parts[3]:1};};
+  const lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+  const ratio=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const modal=document.querySelector('#modalRoot .modal'),modalPaint=rgba(getComputedStyle(modal).backgroundColor).rgb;
+  const same=(a,b)=>a.every((v,i)=>Math.abs(v-b[i])<2);
+  return {theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,
+   modal:getComputedStyle(modal).backgroundColor,
+   buttons:[...actions,'sync-signout'].map(act=>{
+    const button=modal.querySelector(`[data-act="${act}"]`);if(!button)return {act,missing:true};
+    const style=getComputedStyle(button),fill=rgba(style.backgroundColor),edge=rgba(style.borderTopColor),ink=rgba(style.color).rgb;
+    const paint=fill.alpha>=.99?fill.rgb:modalPaint;
+    return {act,label:button.textContent,disabled:button.disabled,background:style.backgroundColor,color:style.color,border:style.borderTopColor,
+     contrast:Math.round(ratio(ink,paint)*100)/100,
+     // A button shows its own shape: a fill or an edge apart from the dialog.
+     shaped:fill.alpha>=.99&&!same(fill.rgb,modalPaint)||parseFloat(style.borderTopWidth)>0&&edge.alpha>=.99&&!same(edge.rgb,modalPaint)};
+   })};
+ },SYNC_DIALOG_ACTIONS2360);
+ if(process.env.SYNC_DIALOG_VISUAL_DIR){fs.mkdirSync(process.env.SYNC_DIALOG_VISUAL_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.SYNC_DIALOG_VISUAL_DIR,`sync-dialog-${theme}-390x844.png`)});}
+ await context.close();
+ return {...seen,errors};
+}
+test('RISK cloud sync dialog: Retry sync, Reload app and Review saved decisions look like enabled buttons with readable labels in light and dark themes',async t=>{
+ await openingBoardFixture(t);
+ const modalPaints=new Set();
+ for(const theme of ['light','dark'])await t.test(theme,async sub=>{
+  const seen=await cloudSyncDialogInBrowser2360(sub,theme);sub.diagnostic(JSON.stringify(seen));
+  assert.equal(seen.theme,theme,'the theme button applied the theme');
+  assert.equal(seen.colorScheme,theme,'the computed color scheme follows it');
+  modalPaints.add(seen.modal);
+  assert.ok(seen.buttons.find(row=>row.act==='sync-signout')?.shaped,'positive control: Sign out looks like a button: '+JSON.stringify(seen.buttons));
+  for(const act of SYNC_DIALOG_ACTIONS2360){
+   const row=seen.buttons.find(row=>row.act===act);
+   assert.ok(row&&!row.missing&&!row.disabled,act+' is offered and enabled: '+JSON.stringify(row));
+   assert.ok(row.shaped,theme+': '+act+' has a fill or edge apart from the dialog: '+JSON.stringify(row));
+   assert.ok(row.contrast>=4.5,theme+': '+act+' label is readable on its background: '+JSON.stringify(row));
+  }
+  assert.deepEqual(seen.errors,[]);
+ });
+ assert.equal(modalPaints.size,2,'the dialog paints differently in the two themes: '+JSON.stringify([...modalPaints]));
+});
+
 test('RISK backup delete focus: after deleting old backups by keyboard on a short screen, the focused Make backup is in view',async t=>{
  await openingBoardFixture(t);
  for(const [width,height,mobile] of [[640,400,false],[320,568,true]])await t.test(width+'x'+height,async sub=>{await bulkDeleteFocusInBrowser(sub,{width,height,mobile});});
@@ -12881,6 +12959,33 @@ test('RISK cloud save loop guard: the support report lists a cloud merge that wa
  assert.equal(device.status().text,'☁ error','positive control: the read shows the error');
 });
 
+// #2360: the sync dialog names a held decision code on screen, but the copied
+// support report turned it into "unknown", so the report could not say why
+// sync was held. Another client writes a cloud copy whose saved-decision
+// baseline this app cannot read; the report names that fixed code on the
+// cloud-merge event and in recentErrors, and still carries no board content.
+test('RISK support diagnostics: a cloud read held by a saved-decision code names that code on the cloud-merge event and in recentErrors, with no board content',async t=>{
+ const device=await signedInDevice2348(t,'decision-code-2360'),{ctx}=device;
+ await device.signIn();
+ assert.equal(device.status().text,'☁ synced','positive control: an ordinary sign-in settles synced');
+ const peer=await loadCloudBackendV2({sharedDocs:device.backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ const read=await peer.CS.pull(),board=JSON.parse(read.payload),privateTitle='Private peer task 2360';
+ board.tasks.push({...board.tasks[0],id:'private-peer-2360',title:privateTitle});
+ board.decisionBaseline={v:999};
+ assert.equal((await peer.CS.push(JSON.stringify(board),1792323000000,read.rev))?.ok,true,'positive control: the other client writes');
+ const mark=supportMark2346(device);
+ await ctx.cloudPull();await savesSettled2334(device);
+ assert.equal(ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','positive control: sync is held for the saved-decision code');
+ assert.equal(device.status().text,'☁ error','positive control: the status shows the error');
+ const merges=supportEvents2346(device,'cloud-merge',mark);
+ assert.deepEqual(merges.map(event=>[event.status,event.metadata?.mergeOutcome,event.code?.value]),[['failed','error','unsupported-decision-evidence']],
+  'the cloud-merge event names the code: '+JSON.stringify(merges));
+ const text=ctx.supportDiagnosticsText(),report=JSON.parse(text);
+ assert.ok(report.recentErrors.some(row=>row.stage==='reconcile'&&row.code?.value==='unsupported-decision-evidence'),
+  'recentErrors names the code: '+JSON.stringify(report.recentErrors));
+ assert.doesNotMatch(text,new RegExp(privateTitle+'|private-peer-2360|'+LOOP_KEPT_TITLE2348+'|e@example\\.com'),'no task titles, task IDs or account appear in the report');
+});
+
 // #2346 release review (B1): the guard counted save runs that kept failing on
 // this device (storage full), because a failed save leaves the edit unsaved
 // and each return to the app retries it. After a few returns it replaced the
@@ -13241,5 +13346,278 @@ test('RISK unchanged cloud pull: signing in again and a same-email account with 
   sub.diagnostic(JSON.stringify({reads,status:reopened.status()}));
   assert.ok(fullDownload2354(reads,'second',root),'downloads in full: '+JSON.stringify(reads));
   assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'completed');
+ });
+});
+
+// ---------- #2359: a Postpone or unrecorded mode change in a pass Start began ----------
+// Start records the pass it begins and its first dot. Postpone takes a dot off
+// the chain without recording a decision, so a replay of the pass still has
+// it. Comparing that Start root on the whole chain held every push and pull,
+// as on the owner's phone on 2026-11-13, until the 2 AM reset. These sign in
+// on fake device storage with the fake Firebase SDK, as #2348 does.
+// appSource, when given, is an older released client's script.
+async function startedPassDevice2359(t,name,{appSource,...options}={}){
+ if(!appSource)return withSteps2359(await signedInDevice2348(t,name,options));
+ const {IDBFactory}=await import('fake-indexeddb');
+ const indexedDB=options.indexedDB||new IDBFactory(),deviceDbName=options.deviceDbName||'started-pass-2359-'+name+'-'+Math.random();
+ const app=await loadApp({appSource,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(app));
+ const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:options.sharedDocs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>backend.CS.suspend());
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',ctx))await wait();},name+' opens');
+ await savesSettled2334(app);
+ const signIn=async()=>{backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();await flush();await ctx.cloudPull();return savesSettled2334(app);};
+ const status=()=>{const button=shim.document.getElementById('syncBtn');return {text:button.textContent,title:button.title};};
+ return withSteps2359({...app,backend,signIn,status,indexedDB,deviceDbName});
+}
+function withSteps2359(device){
+ const act=async(action,el={dataset:{}})=>{await device.ctx.onAction(action,el);await flush();await savesSettled2334(device);await syncSettle(300);};
+ const steps=()=>JSON.parse(device.ctx.supportDiagnosticsText()).events.filter(e=>['cloud-pull','cloud-merge'].includes(e.stage)).map(e=>e.stage+':'+e.status);
+ return {...device,act,steps};
+}
+// The client released before #2359: the integration base it branched from.
+const BEFORE_STARTED_PASS_SYNC_RELEASE='b8fd2213148a99913551bed252e36643572b478e';
+function beforeStartedPassSyncApp2359(){
+ const released=spawnSync('git',['show',BEFORE_STARTED_PASS_SYNC_RELEASE+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:64*1024*1024});
+ assert.equal(released.status,0,released.stderr);
+ return extractAppScript(released.stdout);
+}
+async function startedPassWithTwoAnswers2359(t,name,options={}){
+ const device=await startedPassDevice2359(t,name,options),{ctx,shim}=device;
+ await device.signIn();
+ for(const title of ['Task A 2359','Task B 2359','Task C 2359','Task D 2359']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ await savesSettled2334(device);await syncSettle(300);
+ await device.act('start-scan');   // an empty chain: Start dots the first task
+ assert.equal(ctx.state.chain.length,1,'precondition: Start placed one dot');
+ await device.act('yes');await device.act('yes');
+ assert.equal(device.status().text,'☁ synced','positive control: Start and two Yes answers sync: '+device.status().title);
+ assert.equal(ctx.state.chain.length,3,'positive control: three dots');
+ return device;
+}
+
+test('RISK started pass sync: a Postpone of a dot in a pass Start began reaches the cloud without holding sync',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'postpone'),{ctx,backend}=device;
+ const revision=backend.docs.get('users/owner').rev,postponed=ctx.state.chain.at(-1);
+ await device.act('bench-postpone');
+ assert.equal(ctx.state.chain.length,2,'the Postpone took the newest dot off');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ assert.ok(backend.docs.get('users/owner').rev>revision,'the Postpone reaches the cloud');
+ const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+ const cloud=JSON.parse((await reader.CS.pull()).payload);
+ assert.equal(cloud.chain.includes(postponed),false,'the cloud chain no longer has the postponed dot');
+ assert.ok(ctx.taskPostponeUntil(cloud.tasks.find(task=>task.id===postponed))>Date.now(),'and the cloud keeps the postponement');
+});
+
+test('RISK started pass sync: opening the app after a Postpone in a pass Start began completes the launch merge and uploads the next edit',async t=>{
+ for(const acknowledgement of ['saved before #2354, naming no copy','naming the acknowledged copy'])await t.test(acknowledgement,async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'relaunch');
+  await device.act('bench-postpone');
+  // As on every device saved before #2354: the acknowledgement names no copy.
+  if(acknowledgement.startsWith('saved before')){delete device.ctx.state.decisionBase.copy;await device.ctx.persist();}
+  await closeLegacyApp173(device);device.backend.CS.suspend();
+  const reopened=await startedPassDevice2359(t,'relaunch-reopened',{indexedDB:device.indexedDB,deviceDbName:device.deviceDbName,sharedDocs:device.backend.docs});
+  await reopened.signIn();await syncSettle(300);
+  t.diagnostic(JSON.stringify({status:reopened.status(),steps:reopened.steps()}));
+  assert.equal(reopened.steps().includes('cloud-merge:failed'),false,'no launch merge fails: '+JSON.stringify(reopened.steps()));
+  if(acknowledgement.startsWith('saved before'))assert.deepEqual(reopened.steps().slice(-2),['cloud-pull:completed','cloud-merge:completed'],'a full download whose merge completes');
+  assert.equal(reopened.status().text,'☁ synced','the launch pull settles synced: '+reopened.status().title);
+  const revision=reopened.backend.docs.get('users/owner').rev;
+  reopened.shim.document.getElementById('addInput').value='Added after the relaunch 2359';await reopened.act('add');
+  assert.equal(reopened.status().text,'☁ synced','the next edit syncs: '+reopened.status().title);
+  const reader=await loadCloudBackendV2({sharedDocs:reopened.backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+  const read=await reader.CS.pull();
+  assert.ok(read.rev>revision,'at a later revision');
+  assert.ok(JSON.parse(read.payload).tasks.some(task=>task.title==='Added after the relaunch 2359'),'the edit reaches the cloud');
+ });
+});
+
+test('RISK started pass sync: a Postpone of the first dot Start placed dots the next task and keeps syncing through the next answer',async t=>{
+ const device=await startedPassDevice2359(t,'first-dot'),{ctx,shim,backend}=device;
+ await device.signIn();
+ for(const title of ['Task A 2359','Task B 2359','Task C 2359']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ await savesSettled2334(device);await syncSettle(300);
+ await device.act('start-scan');
+ const [first]=ctx.state.chain;
+ assert.equal(ctx.state.chain.length,1,'precondition: Start placed one dot');
+ assert.equal(device.status().text,'☁ synced','positive control: Start syncs: '+device.status().title);
+ await device.act('bench-postpone');
+ assert.equal(ctx.state.chain.length,1,'the Postpone emptied the chain, so the next task is dotted');
+ assert.notEqual(ctx.state.chain[0],first,'and it is another task');
+ assert.equal(device.status().text,'☁ synced','sync is not held after the Postpone: '+device.status().title);
+ const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+ assert.deepEqual(JSON.parse((await reader.CS.pull()).payload).chain,Array.from(ctx.state.chain),'the cloud has the new dot');
+ await device.act('yes');
+ assert.equal(ctx.state.chain.length,2,'positive control: the next Yes dots the candidate');
+ assert.equal(device.status().text,'☁ synced','sync is not held after the next answer: '+device.status().title);
+ assert.deepEqual(JSON.parse((await reader.CS.pull()).payload).chain,Array.from(ctx.state.chain),'the cloud has both dots');
+});
+
+test('RISK started pass sync: Undo of a Postpone in a pass Start began puts the dot back and keeps syncing, through the Postpone and the next answer',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'undo'),{ctx,backend}=device;
+ const chain=Array.from(ctx.state.chain),postponed=chain.at(-1);
+ const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+ await device.act('bench-postpone');
+ assert.equal(device.status().text,'☁ synced','the Postpone syncs: '+device.status().title);
+ assert.deepEqual(JSON.parse((await reader.CS.pull()).payload).chain,chain.slice(0,-1),'precondition: the cloud has the Postpone');
+ await device.act('undo');
+ assert.deepEqual(Array.from(ctx.state.chain),chain,'Undo puts the dot back in its place');
+ assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(task=>task.id===postponed)),0,'and ends the postponement');
+ assert.equal(device.status().text,'☁ synced','sync is not held after Undo: '+device.status().title);
+ const cloud=JSON.parse((await reader.CS.pull()).payload);
+ assert.deepEqual(cloud.chain,chain,'the cloud has the dot back');
+ assert.equal(ctx.taskPostponeUntil(cloud.tasks.find(task=>task.id===postponed)),0,'and no postponement');
+ await device.act('yes');
+ assert.equal(ctx.state.chain.length,chain.length+1,'positive control: the next Yes dots the candidate');
+ assert.equal(device.status().text,'☁ synced','sync is not held after the next answer: '+device.status().title);
+});
+
+// "No — work the chain" records work mode. Rescan skipped tasks, Start without
+// a new pass and Postpone each put the scanner back in scan mode; unrecorded,
+// a replay of the pass still says work, and every push and pull was held.
+test('RISK started pass sync: going back to scanning after No — work the chain syncs, whichever control does it',async t=>{
+ const controls={
+  'Rescan skipped tasks':device=>device.act('rescan'),
+  'Start, with dots already on the chain':device=>device.act('start-scan'),
+  'Postpone of the benchmark':device=>device.act('bench-postpone'),
+  'Resume scanning':device=>device.act('resume-scan'),
+  'Continue scanning':device=>device.act('continue-scan'),
+ };
+ for(const [control,act] of Object.entries(controls))await t.test(control,async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'mode'),{ctx,backend}=device;
+  const passId=ctx.state.passId,chain=Array.from(ctx.state.chain);
+  await device.act('start-working');
+  assert.equal(ctx.state.mode,'work','precondition: No — work the chain switched to work mode');
+  assert.equal(device.status().text,'☁ synced','positive control: work mode syncs: '+device.status().title);
+  const revision=backend.docs.get('users/owner').rev;
+  await act(device);
+  assert.equal(ctx.state.mode,'scan','the control went back to scanning');
+  assert.equal(ctx.state.passId,passId,'in the same pass');
+  if(control.startsWith('Start'))assert.deepEqual(Array.from(ctx.state.chain),chain,'Start placed no new dot');
+  assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+  const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+  const read=await reader.CS.pull();
+  assert.ok(read.rev>revision,'the change reaches the cloud');
+  assert.equal(JSON.parse(read.payload).mode,'scan','and the cloud is scanning');
+  await device.act('undo');
+  assert.equal(ctx.state.mode,'work','Undo goes back to work mode');
+  assert.equal(device.status().text,'☁ synced','and syncs: '+device.status().title);
+  assert.equal(JSON.parse((await reader.CS.pull()).payload).mode,'work','the cloud is back in work mode');
+ });
+});
+
+// The Start root is still checked on what it records. Another client that
+// writes a board contradicting it is held, and this device keeps its board.
+test('RISK started pass sync: a cloud board whose Start root conflicts on pass id, start time or first dot is still held',async t=>{
+ const rootOf=board=>board.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='chain'&&event.target.id!==event.passId);
+ const conflicts={
+  'a start time the Start root does not give':board=>{board.passStartedAt-=60000;},
+  'a pass the replay has moved past, from a later Start root for another pass':board=>{
+   const root=rootOf(board);
+   board.decisionEvents.push({...structuredClone(root),id:'later-root-2359',actionId:'later-root-action-2359',at:root.at+1,target:{...root.target,id:'later-pass-2359'}});
+  },
+  // A recorded Return of the first dot, contradicted by a board that shows it.
+  'the first dot put back with no record after a recorded Return of it':(board,first)=>{
+   assert.equal(board.chain.includes(first),false,'precondition: the cloud has the Return');board.chain.unshift(first);
+  },
+ };
+ for(const [conflict,write] of Object.entries(conflicts))await t.test(conflict,async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'conflict'),{ctx,shim,backend}=device;
+  const first=ctx.state.chain[0];
+  if(conflict.includes('Return')){
+   ctx.renderScan();returnDotFromScan(ctx,shim,first);await flush();await savesSettled2334(device);await syncSettle(300);
+   assert.equal(ctx.state.chain.includes(first),false,'precondition: the first dot was returned');
+   assert.equal(device.status().text,'☁ synced','positive control: the Return syncs: '+device.status().title);
+  }
+  const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+  const read=await peer.CS.pull(),board=JSON.parse(read.payload);write(board,first);
+  const res=await peer.CS.push(JSON.stringify(board),1792323000000,read.rev);
+  assert.equal(res.ok,true,'positive control: the other client writes');
+  const kept=ctx.cloudPayload();
+  ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:res.rev}});
+  await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.match(device.status().title,/unprojectable decision evidence/,'the pull is held: '+device.status().title);
+  assert.equal(ctx.cloudPayload(),kept,'and this device keeps its board');
+ });
+ // #2361 review M2/N2: the cases above are still held, by other checks, when the
+ // first-dot or the pass-id part of the Start-root check is removed. Each case
+ // below is held only by one part, so removing that part lets it sync.
+ const modeOf=(board,root)=>board.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='scanMode'&&event.actionId===root.actionId);
+ const onePart={
+  // Only the first-dot part (the board shows it, the replay leaves it off) holds this.
+  'the first dot put back with no record after a recorded Dislodge of it':{
+   setup:async(device,first)=>{
+    await device.act('dislodge');
+    assert.equal(device.ctx.state.chain.includes(first),false,'precondition: Dislodge took the first dot off');
+   },
+   write:(board,first)=>{assert.equal(board.chain.includes(first),false,'precondition: the cloud has the Dislodge');board.chain.unshift(first);},
+  },
+  // A well-formed Start group, so decisionStartIssue accepts it; only the pass-id part holds this.
+  'a complete second Start group for another pass, at the same start time and replayed last':{
+   setup:async()=>{},
+   write:board=>{
+    const root=rootOf(board),mode=modeOf(board,root);
+    assert.ok(root&&mode,'precondition: the cloud has a two-row Start group');
+    // Same time, so the event id orders the two groups: this one replays last.
+    const later={root:'zz-second-root-2361',mode:'zz-second-mode-2361'};
+    assert.ok(later.root>root.id&&later.mode>mode.id,'precondition: the second group sorts after the board\'s own');
+    board.decisionEvents.push(
+     {...structuredClone(root),id:later.root,actionId:'zz-second-start-2361',target:{...root.target,id:'second-pass-2361'}},
+     {...structuredClone(mode),id:later.mode,actionId:'zz-second-start-2361',target:{...mode.target,id:'second-pass-2361'}});
+   },
+  },
+ };
+ for(const [conflict,{setup,write}] of Object.entries(onePart))await t.test(conflict,async t=>{
+  const device=await startedPassDevice2359(t,'conflict-one-part'),{ctx,shim,backend}=device;
+  await device.signIn();
+  for(const title of ['Task A 2361','Task B 2361','Task C 2361']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+  await savesSettled2334(device);await syncSettle(300);
+  await device.act('start-scan');   // an empty chain: Start dots the first task
+  const first=ctx.state.chain[0];
+  await setup(device,first);
+  assert.equal(device.status().text,'☁ synced','positive control: the pass syncs before the other client writes: '+device.status().title);
+  const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+  const read=await peer.CS.pull(),board=JSON.parse(read.payload);write(board,first);
+  const res=await peer.CS.push(JSON.stringify(board),1792323000000,read.rev);
+  assert.equal(res.ok,true,'positive control: the other client writes');
+  const kept=ctx.cloudPayload();
+  ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:res.rev}});
+  await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.match(device.status().title,/unprojectable decision evidence/,'the pull is held: '+device.status().title);
+  assert.equal(ctx.cloudPayload(),kept,'and this device keeps its board');
+ });
+});
+
+test('RISK started pass sync compatibility: a board the released client held after a Postpone opens here and syncs, and the released client reads the work-mode records this one adds',async t=>{
+ const oldSource=beforeStartedPassSyncApp2359();
+ await t.test('a held board saved by the released client',async t=>{
+  const old=await startedPassWithTwoAnswers2359(t,'released-held',{appSource:oldSource});
+  const postponed=old.ctx.state.chain.at(-1);
+  await old.act('bench-postpone');
+  assert.match(old.status().title,/unprojectable decision evidence/,'positive control: the released client holds sync after the Postpone');
+  const {indexedDB,deviceDbName,backend}=old;
+  await closeLegacyApp173(old);backend.CS.suspend();
+  const reopened=await startedPassDevice2359(t,'released-held-reopened',{indexedDB,deviceDbName,sharedDocs:backend.docs});
+  await reopened.signIn();await syncSettle(300);
+  assert.equal(reopened.steps().includes('cloud-merge:failed'),false,'no launch merge fails: '+JSON.stringify(reopened.steps()));
+  assert.equal(reopened.status().text,'☁ synced','this client syncs the held board: '+reopened.status().title);
+  const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+  const cloud=JSON.parse((await reader.CS.pull()).payload);
+  assert.equal(cloud.chain.includes(postponed),false,'the Postpone the released client could not upload reaches the cloud');
+  assert.ok(reopened.ctx.taskPostponeUntil(cloud.tasks.find(task=>task.id===postponed))>Date.now(),'with its postponement');
+ });
+ await t.test('the released client reads a board with a recorded return to scanning',async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'released-reader');
+  await device.act('start-working');await device.act('rescan');
+  assert.equal(device.status().text,'☁ synced','precondition: this client syncs the recorded return to scanning: '+device.status().title);
+  const {IDBFactory}=await import('fake-indexeddb');
+  const old=await startedPassDevice2359(t,'released-reader-old',{appSource:oldSource,indexedDB:new IDBFactory(),sharedDocs:device.backend.docs});
+  await old.signIn();await syncSettle(300);
+  assert.equal(old.status().text,'☁ synced','the released client takes the board without a hold: '+old.status().title);
+  assert.equal(old.ctx.state.mode,'scan','and shows it scanning');
+  old.shim.document.getElementById('addInput').value='Added by the released client 2359';await old.act('add');
+  assert.equal(old.status().text,'☁ synced','the released client’s edit syncs: '+old.status().title);
+  device.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:device.backend.docs.get('users/owner').rev}});
+  await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.ok(device.ctx.state.tasks.some(task=>task.title==='Added by the released client 2359'),'this client receives it');
+  assert.equal(device.status().text,'☁ synced',device.status().title);
  });
 });

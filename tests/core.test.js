@@ -12908,6 +12908,25 @@ test("UI #221 guidance: the mounted FAQ and Settings changelog say a chain pill 
   assert.match(secondTap, /For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/);
 });
 
+test("UI #2359 guidance: the mounted FAQ and Settings changelog say a Postpone or going back to scanning in a started pass keeps cloud sync going", async t => {
+  const app = await loadApp(); t.after(() => app.dispose());
+  for (const id of ["appChangelogCurrent", "appChangelog"]) app.shim.document.getElementById(id).innerHTML = html.match(new RegExp('<template id="' + id + '">([\\s\\S]*?)<\\/template>'))[1];
+  await app.ctx.onAction("help", {});
+  const help = app.shim.document.getElementById("modalRoot").innerHTML;
+  const answer = help.match(/<dt>How is Postpone saved and reversed\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
+  assert.match(answer, /Postponing a dotted task syncs like any other change/i, "the FAQ says a Postpone syncs");
+  assert.doesNotMatch(answer, /[a-z]\.[A-Z]/, "every sentence in the answer is followed by a space");
+  const notes = help.match(/<details class="help-faq" data-help-changelog>([\s\S]*?)<\/details>/)?.[1] ?? "";
+  assert.match(notes, /Postponing a dotted task after Start no longer pauses cloud sync/i, "the changelog announces the fix");
+  assert.match(notes, /No — work the chain/, "and names the mode change it also fixes");
+  assert.match(notes, /unprojectable decision evidence/i, "with the error people saw");
+  // #2361 review M1: a board the released client paused after No — work the chain and a later
+  // Rescan or Postpone never recorded its return to scanning, so it stays paused after the update.
+  assert.doesNotMatch(notes, /A board already paused this way syncs/, "the changelog does not promise every paused board syncs on opening");
+  assert.match(notes, /A board already paused by a Postpone while scanning syncs once this update opens it/, "it promises that only for the Postpone case");
+  assert.match(notes, /One paused after No — work the chain and a later Rescan or Postpone can stay paused until the 2 AM pass reset or a fresh pass/, "and says when the mode-change case clears");
+});
+
 test("UI #221: returning a dot that also carries a hold takes only the dot; a later press of the same button ends the hold", async () => {
   const { ctx, shim } = await loadApp({ seed: 2225 });
   ctx.addTask("First dot", true);
@@ -41327,6 +41346,23 @@ test('RISK debug log: app reload reasons and lifecycle observations survive with
   const cold=await loadApp({sharedStorage:shim.localStorage});sub.after(()=>cold.dispose());
   assert.ok(cold.ctx.buildSupportDiagnosticsReport().restartDiagnostics.documents.some(row=>row.document!==cold.ctx.buildSupportDiagnosticsReport().restartDiagnostics.currentDocument&&row.reload?.detail===(kind==='manual'?'manual-recovery':'downloaded-update')));
  });
+});
+
+// #2360: every code a saved-decision, learning or completion check can hold
+// sync with (reportCloudReconcileError, from decisionEvidenceIssue,
+// decisionProjectionIssue and the pending recovery hold) is a fixed category
+// name the sync dialog shows. The copied report names each one; any other
+// code, even one shaped like a code, still reads "unknown".
+test('RISK support diagnostics: recentErrors names each saved-decision, learning and completion reconcile code and still reads unknown for any other code',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ const named=['unsupported-decision-evidence','decision-account-mismatch','conflicting-decision-evidence','ambiguous-legacy-completion',
+  'unprojectable-decision-evidence','unrepresented-legacy-learning','unprojectable-decision-undo','decision-recovery-pending'];
+ const other=['private-task-title-2360','decision-private-2360','learning-from-my-board'];
+ for(const code of [...named,...other])app.ctx.recordSyncError('reconcile',code);
+ const text=app.ctx.supportDiagnosticsText(),codes=JSON.parse(text).recentErrors.filter(row=>row.stage==='reconcile').map(row=>row.code?.value);
+ assert.deepEqual([...codes].filter(code=>code!=='unknown').sort(),[...named].sort(),'each reconcile code is named: '+JSON.stringify(codes));
+ assert.equal(codes.filter(code=>code==='unknown').length,other.length,'every other code reads unknown: '+JSON.stringify(codes));
+ assert.doesNotMatch(text,/private-task-title-2360|decision-private-2360|learning-from-my-board/,'no unrecognised text enters the report');
 });
 
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{
