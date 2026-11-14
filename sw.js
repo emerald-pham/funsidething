@@ -1,9 +1,11 @@
 /* The scanner is a static, local-first app. Keep the shell available when a
    standalone window is opened without a network connection, while allowing
    same-origin additions to fill the cache as they are requested. */
-// The shell key is a fingerprint of every local asset in the addAll list.
-// Update it with any shell change so installed workers cannot serve stale UI.
-const CACHE_NAME = "chain-scanner-shell-0c2db321dd13f6ba0cc421d24dbd8e29e45a56caca3ffe3fab07db363169fe91";
+// The shell key is a fingerprint of every local asset in the addAll list, so
+// installed workers cannot serve stale UI. It is never committed: whatever
+// serves this file stamps the value computed from the files it serves
+// (scripts/shell-fingerprints.mjs, #2380).
+const CACHE_NAME = "chain-scanner-shell-HASH";
 
 self.addEventListener("message", event => {
   if(event?.data?.type!=="chain-scanner-support-diagnostics-v1") return;

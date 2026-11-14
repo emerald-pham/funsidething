@@ -31,7 +31,7 @@ seen bank produces no skywriter; there is no AI fallback.
 Existing hourly, holiday, and airplane defaults in landscape-mood.js are AI-written.
 
 Save this file and reload while developing. For the installed/live app, deploy
-this file with a refreshed sw.js shell fingerprint so offline copies update too.
+this file; the deploy computes the sw.js shell fingerprint so offline copies update too.
 
 ## Any time of day
 

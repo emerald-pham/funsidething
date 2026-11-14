@@ -89,8 +89,8 @@ its nonrepeat history. Neither reading history nor human wording is newly synced
 Cloud movement, astronomical objects, and the clock are continuous scenery,
 not spawned visitors. Text itself is edited in HUMAN_WRITTEN_HOURLY_TAGS.md.
 
-When publishing edits, refresh the service-worker and changelog fingerprints
-and deploy this file with the app so installed offline copies receive it.
+When publishing edits, deploy this file with the app; the deploy computes the
+service-worker and changelog fingerprints so installed offline copies receive it.
 
 | Event | Rate |
 | --- | --- |

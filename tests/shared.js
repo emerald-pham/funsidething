@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
+import { servedShellReader } from "../scripts/shell-fingerprints.mjs";
 
 // Shared fixtures and helpers for the per-area test files. They moved here
 // unchanged from tests.js (#2213), in their original order.
@@ -538,7 +539,7 @@ async function runNativeRecoveryInspection226(t,width=390,holdDemoted=false,comp
  });
 
  await context.addInitScript(raw=>{if(!localStorage.getItem('fvp:chain-scanner:device-store-v2')){localStorage.setItem('fvp:chain-scanner:v1',raw);localStorage.setItem('fvp:chain-scanner:protected:v1',raw);localStorage.setItem('fvp:chain-scanner:daily-backups:v1','[]');}},raw);
- await context.route('**/*',async route=>{const url=new URL(route.request().url()),file=url.pathname;if(url.origin!==origin)return route.abort();const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null)return route.fulfill({contentType:'application/javascript',body:automaticView&&file===prefix+'firebase-firestore.js'?module.replace("const rpc=(kind,args)=>window.__installedRPC(kind,args)","const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Controlled SDK refusal'),{code:result.fixtureFailure});return result;}"):module});const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return route.fulfill({status:404,body:''});return route.fulfill({body:fs.readFileSync(path.join(__dirname,relative)),contentType:relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined});});
+ await context.route('**/*',async route=>{const url=new URL(route.request().url()),file=url.pathname;if(url.origin!==origin)return route.abort();const module=file===prefix+'firebase-app.js'?sdk.appModule:file===prefix+'firebase-auth.js'?sdk.authModule:file===prefix+'firebase-firestore.js'?sdk.firestoreModule:null;if(module!==null)return route.fulfill({contentType:'application/javascript',body:automaticView&&file===prefix+'firebase-firestore.js'?module.replace("const rpc=(kind,args)=>window.__installedRPC(kind,args)","const rpc=async(kind,args)=>{const result=await window.__installedRPC(kind,args);if(result?.fixtureFailure)throw Object.assign(Error('Controlled SDK refusal'),{code:result.fixtureFailure});return result;}"):module});const relative=file==='/'?'index.html':file.slice(1);if(relative.includes('..')||!fs.existsSync(path.join(__dirname,relative)))return route.fulfill({status:404,body:''});return route.fulfill({body:servedFile(relative),contentType:relative.endsWith('.html')?'text/html':relative.endsWith('.js')?'application/javascript':relative.endsWith('.css')?'text/css':undefined});});
  await page.goto(origin+'/');await page.locator('html[data-app-ready="true"]').waitFor();
  if(automaticView){
   page.on('pageerror',error=>{if(process.env.CHAIN_RECOVERY_UI_OUTPUT){fs.mkdirSync(process.env.CHAIN_RECOVERY_UI_OUTPUT,{recursive:true});fs.appendFileSync(path.join(process.env.CHAIN_RECOVERY_UI_OUTPUT,'debug.log'),error.stack+'\n');}});
@@ -877,7 +878,10 @@ async function ratingHistoryFixture(seed=613){
 // repository files from the root exactly as they did from tests.js.
 const __dirname = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const HTML_PATH = path.join(__dirname, "index.html");
-const html = fs.readFileSync(HTML_PATH, "utf8");
+// Tests see the shell as a client is served it: the checkout keeps placeholder
+// shell identities, and serving stamps values computed from these files (#2380).
+const servedFile = servedShellReader(file => fs.readFileSync(path.join(__dirname, file)));
+const html = servedFile("index.html").toString();
 const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0.min.js"), "utf8");
 
 const sceneTimelineScripts=new Map();
@@ -956,7 +960,7 @@ function serviceWorkerSource() {
   assert.ok(match, "service-worker source path must be discoverable from the app registration");
   const workerPath = path.resolve(__dirname, match[1]);
   assert.ok(workerPath.startsWith(`${__dirname}${path.sep}`), "service worker must stay inside the app repository");
-  return fs.readFileSync(workerPath, "utf8");
+  return servedFile(path.relative(__dirname, workerPath).split(path.sep).join("/")).toString();
 }
 
 function appShellContract(worker) {
@@ -988,7 +992,7 @@ function appShellContract(worker) {
     assert.ok(fs.existsSync(absolutePath), `precached local asset must exist: ${relativePath}`);
     hash.update(relativePath);
     hash.update("\0");
-    hash.update(fs.readFileSync(absolutePath));
+    hash.update(servedFile(relativePath));
     hash.update("\0");
   }
 
@@ -1850,7 +1854,8 @@ async function openingBoardFixture(t){
  const server=createServer((request,response)=>{
   const pathname=decodeURIComponent(new URL(request.url,'http://127.0.0.1').pathname),file=path.resolve(__dirname,'.'+(pathname==='/'?'/index.html':pathname));
   if(!file.startsWith(__dirname+path.sep)){response.writeHead(403);response.end();return;}
-  fs.readFile(file,(error,bytes)=>{response.writeHead(error?404:200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});response.end(error?'Not found':bytes);});
+  let bytes=null;try{bytes=servedFile(path.relative(__dirname,file).split(path.sep).join('/'));}catch{}
+  response.writeHead(bytes?200:404,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});response.end(bytes||'Not found');
  });
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
  const previous=process.env.LANDSCAPE_BROWSER_URL;openingBoardSelfHosted=true;

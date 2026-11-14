@@ -13,7 +13,7 @@ HTML pages, the service worker, the web manifest, release delivery
 persistence, backup, recovery, auth, session, Firestore, account, IndexedDB or
 migration), the lz-string archive codec, Firestore rules, and the test-first
 gate, hook or workflow. An HTML or worker change that only adds changelog text
-and refreshes the app fingerprint or `CACHE_NAME` does not count, unless it moves
+does not count, unless it moves
 a changelog marker or adds markup that loads or runs script. Other app changes,
 such as scenery, location and styling, need a direct test and use a `RISK` case
 when the failure cost warrants one.
@@ -40,8 +40,11 @@ undo, import or restore, deletion, and cross-device reconciliation when those
 paths touch the change. For a visual or motion change, cover the numerical
 geometry or paint contract, reduced motion, and relevant phone, tablet, and
 short-landscape viewports. For offline changes, check the asset fingerprint and
-offline reload. After any app-shell edit, `npm run fingerprints -- --write`
-refreshes the changelog app fingerprint and the worker `CACHE_NAME` together. A text or styling fix needs a direct UI assertion that would
+offline reload. The changelog app fingerprint and the worker `CACHE_NAME` are
+never committed: the checkout keeps placeholders, and the Pages deploy,
+`npm run serve`, the test harness and the installed-client native cases stamp
+values computed from the files they serve (`scripts/shell-fingerprints.mjs`,
+#2380), so a shell edit needs no refresh commit. A text or styling fix needs a direct UI assertion that would
 have failed before the edit. Run the focused tests and affected regression
 cohort; broaden to the full suite when risk or a required release gate warrants
 it. Inspect the rendered result when pixels or controls changed. Record test, browser,

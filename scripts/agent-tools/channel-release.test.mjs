@@ -187,6 +187,34 @@ test('Beta packaging rejects stale product fingerprint before staging changed co
   assert.match(fs.readFileSync(path.join(f.repository, 'index.html'), 'utf8'), /changed without refreshed/);
 });
 
+test('Beta packaging stages a source with uncommitted shell identities with the values computed from its bytes (#2380)', t => {
+  const f = editableFixture(t, root => {
+    const page = path.join(root, 'index.html'), worker = path.join(root, 'sw.js');
+    fs.writeFileSync(page, fs.readFileSync(page, 'utf8').replace(/(<template id="appChangelogCurrent"><div data-app-fingerprint=")[a-f0-9]{64}"/, '$1HASH"') + '\n<!-- shell edit with no refresh -->\n');
+    fs.writeFileSync(worker, fs.readFileSync(worker, 'utf8').replace(/(const CACHE_NAME = ")[^"]+"/, '$1chain-scanner-shell-HASH"'));
+  });
+  const result = prepare(f);
+  assert.equal(result.status, 0, result.stderr);
+  const staged = file => fs.readFileSync(path.join(f.output, 'public', file));
+  const envelope = JSON.parse(staged('channel-release.json'));
+  const page = staged('index.html').toString(), worker = staged('sw.js').toString();
+  // Independent expectations: the changelog and CACHE_NAME contracts over the staged bytes.
+  const assets = [...new Set([...worker.match(/\.addAll\(\[([\s\S]*?)\]\s*\.map/)[1].matchAll(/"([^"]+)"/g)].map(m => m[1] === './' ? 'index.html' : m[1].replace(/^\.\//, '')))].sort();
+  const app = createHash('sha256'), shell = createHash('sha256');
+  for (const file of [...assets, 'sw.js'].sort()) {
+    let bytes = staged(file);
+    if (file !== 'sw.js') shell.update(file + '\0').update(bytes).update('\0');
+    if (file === 'index.html') bytes = Buffer.from(bytes.toString().replace(/<!-- changelog:start -->[\s\S]*?<!-- changelog:end -->/, '<!-- changelog -->'));
+    if (file === 'sw.js') bytes = Buffer.from(bytes.toString().replace(/chain-scanner-shell-[a-f0-9]+/, 'chain-scanner-shell-HASH'));
+    app.update(file + '\0').update(bytes).update('\0');
+  }
+  const appFingerprint = app.digest('hex');
+  assert.equal(page.match(/<template id="appChangelogCurrent"><div data-app-fingerprint="([^"]*)"/)?.[1], appFingerprint, 'the staged build id is computed from the staged shell');
+  assert.equal(envelope.product.appFingerprint, appFingerprint, 'the channel identity names the computed build id');
+  assert.equal(worker.match(/const CACHE_NAME = "([^"]+)"/)?.[1], 'chain-scanner-shell-' + shell.digest('hex'), 'the staged worker carries the computed cache key');
+  assert.match(page, /shell edit with no refresh/);
+});
+
 test('Beta packaging rejects committed symlinks before archive extraction and keeps the target untouched', t => {
   const f = editableFixture(t, root => fs.symlinkSync('../protected-neighbor', path.join(root, 'escape')));
   fs.writeFileSync(path.join(f.root, 'protected-neighbor'), 'exact protected bytes');
