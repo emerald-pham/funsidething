@@ -66,7 +66,10 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
     const files=[...new Set(entries.map(p=>p==='./'?'index.html':p.replace(/^\.\//,'')))];
     const identities=Object.fromEntries([...files,'sw.js'].map(file=>[file,hash(bytes(sha,file))]));
     const sources=Object.fromEntries([...files,'sw.js'].map(file=>[file,hash(committed(sha,file))]));
-    const cacheName=sw.match(/const CACHE_NAME = "([^"]+)"/)?.[1];assert.match(cacheName||'',/^chain-scanner-shell-[a-f0-9]{64}$/,'served shell carries its computed cache key');
+    // Recomputed here over the served bytes, independently of shell-fingerprints.mjs,
+    // so a stamping bug that serves an incoherent key cannot pass its own check (#2383).
+    const fingerprint=createHash('sha256');for(const file of [...files].sort()){fingerprint.update(file);fingerprint.update('\0');fingerprint.update(bytes(sha,file));fingerprint.update('\0');}
+    const cacheName=sw.match(/const CACHE_NAME = "([^"]+)"/)?.[1];assert.equal(cacheName,'chain-scanner-shell-'+fingerprint.digest('hex'),'immutable shell metadata must cohere');
     const html=bytes(sha,'index.html').toString(),inline=html.match(/<script>((?:\s*)"use strict";[\s\S]*?)<\/script>/)?.[1];
     assert.ok(inline,'actual inline app source');
     return {sha,entries,files,identities,sources,cacheName,build:html.match(/data-app-fingerprint="([^"]+)"/)?.[1],inlineSha256:hash(inline)};
