@@ -420,6 +420,7 @@ its RISK test; the map follows.
 - RISK quick Add browser: the retired button stays absent on phone tablet and desktop through chain changes
 - RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules
 - RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position
+- RISK saved view eligibility: switching eligibility keeps the typed search and context filter and both survive reopening
 - RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes
 - RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks
 - RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload

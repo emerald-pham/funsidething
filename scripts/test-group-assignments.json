@@ -1137,6 +1137,14 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#221 (spec: scroll-to-row is retired from the trail, and nothing else used it) retired the reveal scroll whose motion choice this root tested, and no test replaces it: nothing scrolls to a task any more. This row only keeps the baseline root assigned in the core group; the current root it names does not test what the old root tested."
+    },
+    {
+      "baselineRoot": "Eligibility filter: selecting Eligible clears stale narrowings and shows every eligible task",
+      "currentRoot": "Eligibility filter: selecting Eligible keeps the search and status filter and shows their intersection",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2373 changed the rule this root tested: choosing an eligibility control now keeps the search and the context or status filter instead of clearing them. The same test, renamed, now asserts Eligible narrows the evergreen filter to its eligible match and leaves the tag selected."
     }
   ]
 }

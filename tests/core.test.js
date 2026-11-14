@@ -15928,6 +15928,41 @@ test('RISK saved view restoration: a reopened All Tasks list retains its local s
  assert.equal(JSON.stringify(reopened.ctx.state),initialBoard,'saved-view restoration cannot alter the authoritative board');
 });
 
+// #2373: clicking Eligible, Ineligible or All used to blank the search field and drop the context filter.
+test('RISK saved view eligibility: switching eligibility keeps the typed search and context filter and both survive reopening',async()=>{
+ const board=syncState({
+  contexts:[{id:'home',name:'Home',active:true},{id:'other',name:'Other',active:true}],
+  tasks:[{...syncTask('open-home','Laundry at home'),ctx:['home']},{...syncTask('dotted-home','Laundry folding at home'),ctx:['home']},{...syncTask('open-other','Laundry elsewhere'),ctx:['other']},{...syncTask('control-home','Dishes at home'),ctx:['home']},{...syncTask('dotted-other','Laundry pile elsewhere'),ctx:['other']}],
+  chain:['dotted-home','dotted-other'],listOpen:true,seenQuickStart:true
+ });
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ const search=shim.document.getElementById('listSearch');search.id='listSearch';search.value='Laundry';
+ shim.document.dispatchEvent({type:'input',target:search});
+ ctx.onAction('list-tag',{dataset:{id:'c:home'}});
+ const visible=()=>Array.from(ctx.filteredListTasks(),t=>t.id);
+ assert.deepEqual(visible(),['open-home','dotted-home'],'search and context filter combine before eligibility changes');
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});
+ assert.equal(search.value,'Laundry','choosing Eligible keeps the typed search');
+ assert.deepEqual(visible(),['open-home'],'Eligible narrows the searched, filtered rows');
+ assert.equal(shim.document.getElementById('listCount').textContent,'(1 of 5)','the header counts rows matching all three');
+ assert.match(shim.document.getElementById('listTagRow').innerHTML,/data-id="c:home"[^>]*aria-pressed="true"/,'the context filter stays selected');
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});
+ assert.equal(search.value,'Laundry','choosing Ineligible keeps the typed search');
+ assert.deepEqual(visible(),['dotted-home'],'Ineligible shows only the dotted searched row in the context');
+ assert.match(shim.document.getElementById('listTagRow').innerHTML,/data-id="c:home"[^>]*aria-pressed="true"/,'the context filter stays selected through Ineligible');
+ ctx.onAction('list-eligibility',{dataset:{id:'all'}});
+ assert.equal(search.value,'Laundry','choosing All keeps the typed search');
+ assert.deepEqual(visible(),['open-home','dotted-home']);
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});
+ shim.window.dispatchEvent({type:'pagehide'});
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.equal(reopened.shim.document.getElementById('listSearch').value,'Laundry','reopening restores the search kept across the eligibility switch');
+ assert.deepEqual(Array.from(reopened.ctx.filteredListTasks(),t=>t.id),['open-home'],'reopening reapplies search, context and eligibility together');
+ assert.equal(reopened.shim.document.getElementById('listCount').textContent,'(1 of 5)');
+ assert.match(reopened.shim.document.getElementById('listTagRow').innerHTML,/data-id="c:home"[^>]*aria-pressed="true"/,'the restored context filter remains selected');
+});
+
 test('RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes',async()=>{
  const board=syncState({syncAccount:'account-a',tasks:[syncTask('account-a-task','Matching private account A task')],listOpen:true,seenQuickStart:true});
  const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)})});
@@ -27294,11 +27329,13 @@ test('RISK iOS native date chrome: WebKit Add and Edit dates keep usable inset b
   }
  }finally{await browser.close();}
 });
-test('Eligibility filter: selecting Eligible clears stale narrowings and shows every eligible task',async()=>{
+// #2373: choosing Eligible used to clear the search and status filter; it now narrows them.
+test('Eligibility filter: selecting Eligible keeps the search and status filter and shows their intersection',async()=>{
  const {ctx,shim}=await loadApp();const a=ctx.addTask('Ready'),b=ctx.addTask('Also ready');b.evergreen=true;
- ctx.addTask('Future').startsAt='2099-01-01';openList(ctx);ctx.toggleListTag('s:evergreen');ctx.setListQuery('missing');
- ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim).sort(),['Also ready','Ready']);
- assert.equal(shim.document.getElementById('listSearch').value,'');
+ const future=ctx.addTask('Future ready');future.startsAt='2099-01-01';future.evergreen=true;openList(ctx);ctx.toggleListTag('s:evergreen');ctx.setListQuery('ready');
+ assert.deepEqual(rowTitles(shim).sort(),['Also ready','Future ready'],'search and the evergreen filter combine before eligibility changes');
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim),['Also ready'],'Eligible drops the future row and keeps both narrowings');
+ assert.ok(litTags(shim).includes('s:evergreen'),'the status filter stays selected');assert.equal(listCount(shim),'(1 of 3)');
 });
 test('Landscape waterfront: small water visitors stay readable at harbor scale', () => {
   const ctx = vm.createContext({ Math });
@@ -37357,7 +37394,7 @@ test('RISK Postponed filter: mounted tag combines search eligibility and filtere
  const {ctx,shim}=await loadApp({seed:1010});const at=Date.parse('2026-10-12T12:00:00Z');setFakeTime(ctx,at);
  const a=ctx.addTask('Alpha held'),b=ctx.addTask('Beta held'),plain=ctx.addTask('Alpha ready'),expired=ctx.addTask('Expired hold'),done=ctx.addTask('Completed hold');ctx.state.chain=[plain.id];ctx.state.mode='scan';ctx.state.candidateId=a.id;ctx.onAction('postpone',{dataset:{candidate:a.id}});ctx.writeTaskPostpone(b,at+7200000);ctx.writeTaskPostpone(expired,at-1);ctx.writeTaskPostpone(done,at+7200000);done.done=true;openList(ctx);const before=JSON.stringify(ctx.state);
  assert.ok(tagKeys(shim).includes('s:postponed'),'active holds must offer the existing-style postponed tag filter');clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim).sort(),['Alpha held','Beta held']);assert.match(tagRowHTML(shim),/data-id="s:postponed" aria-pressed="true">postponed/);
- ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim).sort(),['Alpha held','Alpha ready']);clickTag(ctx,'s:postponed');ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),[]);ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);ctx.setListQuery('');ctx.onAction('bulk-select-all',{dataset:{}});assert.deepEqual(selectedListIds(shim).sort(),[a.id,b.id].sort());assert.equal(JSON.stringify(ctx.state),before,'tag search eligibility and selection are view-only');
+ ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim).sort(),['Alpha held','Alpha ready']);clickTag(ctx,'s:postponed');ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.ok(litTags(shim).includes('s:postponed'),'#2373: choosing Eligible keeps the postponed tag');assert.deepEqual(rowTitles(shim),[]);ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.ok(litTags(shim).includes('s:postponed'),'#2373: choosing Ineligible keeps the postponed tag');assert.deepEqual(rowTitles(shim),['Alpha held'],'#2373: Ineligible keeps the alpha search and postponed tag');ctx.setListQuery('');ctx.onAction('bulk-select-all',{dataset:{}});assert.deepEqual(selectedListIds(shim).sort(),[a.id,b.id].sort());assert.equal(JSON.stringify(ctx.state),before,'tag search eligibility and selection are view-only');
  ctx.returnAsCandidate(a.id);assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);assert.deepEqual(selectedListIds(shim),[b.id],'a returned task leaves the held filter and hidden selection');ctx.undo();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id).sort(),[a.id,b.id].sort(),'Undo restores the held task to the still-active filter');ctx.setListQuery('alpha');ctx.returnAsCandidate(a.id);ctx.returnAsCandidate(b.id);assert.ok(!tagKeys(shim).includes('s:postponed'));assert.ok(!litTags(shim).includes('s:postponed'));assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[plain.id],'clearing the last hold retains search and Ineligible, leaving the dotted Alpha row');assert.equal(listCount(shim),'(1 of 4)');
 });
 test('RISK Postponed filter: scan-clock expiry removes matches at the deadline and clears an unavailable last filter',async()=>{
