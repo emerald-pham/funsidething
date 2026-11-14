@@ -312,9 +312,11 @@ function changedDiffLines(repoRoot, baseSha, commitSha, file) {
   return lines;
 }
 
-// Every app change adds a changelog entry and refreshes the app fingerprint
-// inside the changelog block plus the worker CACHE_NAME. That bookkeeping is
-// prose and hashes, so it never decides which reviewers a change needs (#2234).
+// Every app change adds a changelog entry. Diffs from before #2380 also refresh
+// the then-committed app fingerprint inside the changelog block plus the worker
+// CACHE_NAME; both are now computed when the shell is served, but older
+// candidates still carry them. That bookkeeping is prose and hashes, so it never
+// decides which reviewers a change needs (#2234).
 const shellCacheNameLine = /^\s*const\s+CACHE_NAME\s*=\s*["']chain-scanner-shell-[a-f0-9]+["'];?\s*$/;
 function changelogLines(text) {
   const inside = new Set();
