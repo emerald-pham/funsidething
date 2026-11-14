@@ -1977,6 +1977,7 @@ its RISK test; the map follows.
 - RISK repository process: every test file keeps inherited git variables away from the fixtures it spawns
 - RISK repository process: the Nightly root list stays valid whether or not its pending roots have landed
 - RISK test inventory: the group CPU-load option stays local, guided and off in every required entry point
+- RISK support diagnostics: every literal code passed to a sync error reporter is named in the Debug log or deliberately excluded with a reason
 
 ## tests/scenery.test.js
 

@@ -23081,5 +23081,25 @@
       "command": "node --test --test-name-pattern=\"RISK cloud save loop guard: the support report names each cloud step|RISK unchanged cloud pull: damaged chunks\" tests/persistence-recovery.test.js (2026-11-13T10:38Z), with index.html, cloud-store-v2.js and sw.js checked out at base 43d5f02 and the edited tests",
       "failure": "AssertionError: sign-in downloads; the later read of the acknowledged copy is unchanged (the base build lists both reads as completed). Chronology: the implementation came first and the original assertion failed against it (each cloud read is listed with how long it took: only one completed read); the assertion was then edited and this red run observed on the base build, retrospectively."
     }
+  },
+  {
+    "baseCommit": "dcc96d8dbd59e8f2ffea469ce8afdf4f977e621b",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.doesNotMatch(answer, /[a-z]\\.[A-Z]/, \"every sentence in the answer is followed by a space\");"
+    ],
+    "reason": "#2366 (spec #2363): the spacing check added for #2359 read only the Postpone FAQ answer, so a sentence run into the next anywhere else in Help or the changelog would still reach review. The spec folds that single-answer assertion into one test that reads every mounted FAQ answer and changelog item.",
+    "previousBehavior": "UI #2359 guidance asserted that the How is Postpone saved and reversed? answer has no lowercase letter, period and uppercase letter without a space between.",
+    "intendedBehavior": "UI #2366 guidance reads every FAQ answer and every changelog item of both changelog templates in the mounted Help, including the Postpone answer, and fails naming each place where a lowercase letter or closing bracket or quote, then a period, ! or ?, runs into an uppercase letter or opening quote.",
+    "preservedCoverage": [
+      "UI #2359 guidance keeps every other assertion: the Postpone answer says a Postpone syncs, and the changelog announces the fix, names the mode change and the error, and promises the opening sync only for the Postpone case.",
+      "The Postpone answer's spacing stays covered: UI #2366 guidance asserts that answer is among those it reads, and its RED run named it (FAQ How is Postpone saved and reversed?: began.Return)."
+    ],
+    "replacementTests": [
+      "UI #2366 guidance: no mounted FAQ answer or Settings changelog item runs one sentence into the next without a space"
+    ],
+    "redEvidence": {
+      "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test \"--test-name-pattern=#2366 guidance|#2359 guidance\" tests/core.test.js (2026-11-14T10:54:25Z, record 2026-11-14T10-54-25-523Z-9c3a523f in agent-test-runs/issue-2366 under the git common dir), with the new test written and began.Return temporarily put back in index.html",
+      "failure": "AssertionError: every sentence is followed by a space; actual ['FAQ How is Postpone saved and reversed?: began.Return'], expected []. A later-baseline-sensitivity run (10:54:41Z) with Synced.Edits put into a November 13 changelog item failed with ['changelog: Synced.Edits'], a case the old assertion did not read. Both temporary index.html edits were reverted before GREEN (10:54:53Z)."
+    }
   }
 ]

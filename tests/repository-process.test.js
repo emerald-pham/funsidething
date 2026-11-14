@@ -2457,3 +2457,90 @@ test('RISK test inventory: the group CPU-load option stays local, guided and off
  assert.match(guide,/timer, debounce and race/,'it says when to reach for a loaded run');
  assert.match(guide,/host coordination/i,'it says to respect the host coordination ledger');
 });
+
+// #2365 (spec #2363): the Debug log turned the live
+// unprojectable-decision-evidence hold into "unknown" until #2360 named it, and
+// other sync error codes still read "unknown". This gathers every literal code
+// passed to a sync error reporter in index.html: reportCloudReconcileError,
+// recordSyncError, CloudSync's reportError and cloudFailure, and the cloud step
+// observer's code argument, including fallbacks such as `result.code||"x"`.
+// Each must be on SUPPORT_DIAGNOSTICS_ERROR_CODES with an identity alias, or
+// below with a reason. Codes a helper computes (decisionEvidenceIssue and its
+// neighbours) are not literals here; #2360's support diagnostics test names them.
+const SYNC_ERROR_REPORTERS2365=[['reportCloudReconcileError',0],['recordSyncError',1],['reportError',1],['cloudFailure',1],['supportDiagnosticsObserveCloudStep',4]];
+const SYNC_ERROR_CODE_EXCLUSIONS2365={
+ 'unknown':'the report\'s own name for a code it does not recognise, so it already reads unknown',
+ 'recovery-source-changed':'its alias names it concurrent-change, the category the report has listed since #2278',
+};
+function callArguments2365(source,open){
+ const found=[];let depth=0,start=open+1,quote=null;
+ for(let i=open;i<source.length;i++){
+  const c=source[i];
+  if(quote){if(c==='\\')i++;else if(c===quote)quote=null;continue;}
+  if(c==='"'||c==="'"||c==='`'){quote=c;continue;}
+  if('([{'.includes(c)){depth++;continue;}
+  if(')]}'.includes(c)){if(--depth===0){found.push(source.slice(start,i));return found;}continue;}
+  if(c===','&&depth===1){found.push(source.slice(start,i));start=i+1;}
+ }
+ return found;
+}
+function syncReporterCodes2365(source){
+ const codes=new Map();
+ for(const [name,index] of SYNC_ERROR_REPORTERS2365){
+  for(const call of source.matchAll(new RegExp('(?<![\\w$])'+name+'\\s*(?:\\?\\.)?\\s*\\(','g'))){
+   const argument=callArguments2365(source,call.index+call[0].length-1)[index];
+   for(const literal of (argument??'').matchAll(/(["'])([^"'\\\n]*)\1/g)){
+    const line=source.slice(0,call.index).split('\n').length;
+    if(!codes.has(literal[2]))codes.set(literal[2],[]);
+    codes.get(literal[2]).push(name+' at index.html:'+line);
+   }
+  }
+ }
+ return codes;
+}
+function supportDiagnosticsCodeList2365(source){
+ const listed=source.match(/const SUPPORT_DIAGNOSTICS_ERROR_CODES=new Set\(\[([\s\S]*?)\]\);/)?.[1];
+ const aliases=source.match(/const SUPPORT_DIAGNOSTICS_ERROR_ALIASES=Object\.freeze\(\{([\s\S]*?)\}\);/)?.[1];
+ assert.ok(listed&&aliases,'index.html still declares the support diagnostics code list and aliases');
+ const strip=text=>text.replace(/\/\/[^\n]*/g,'');
+ return {codes:[...strip(listed).matchAll(/"([^"]*)"/g)].map(match=>match[1]),
+  aliases:Object.fromEntries([...strip(aliases).matchAll(/"([^"]*)"\s*:\s*"([^"]*)"/g)].map(match=>[match[1],match[2]]))};
+}
+function unnamedSyncErrorCodes2365(source){
+ const {codes,aliases}=supportDiagnosticsCodeList2365(source),listed=new Set(codes);
+ return [...syncReporterCodes2365(source)].filter(([code])=>!Object.hasOwn(SYNC_ERROR_CODE_EXCLUSIONS2365,code)&&!(listed.has(code)&&aliases[code]===code))
+  .map(([code,sites])=>code+' ('+sites.join(', ')+')');
+}
+test('RISK support diagnostics: every literal code passed to a sync error reporter is named in the Debug log or deliberately excluded with a reason',async t=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),gathered=syncReporterCodes2365(source);
+ for(const code of ['save-loop','unprojectable-decision-evidence','invalid-revision','unknown'])
+  assert.ok(gathered.has(code),'positive control: the gatherer finds '+code+' at its reporter: '+JSON.stringify([...gathered.keys()]));
+ assert.deepEqual(unnamedSyncErrorCodes2365(source),[],'name each code on SUPPORT_DIAGNOSTICS_ERROR_CODES with an identity alias, or add it to SYNC_ERROR_CODE_EXCLUSIONS2365 with a reason');
+ for(const [code,reason] of Object.entries(SYNC_ERROR_CODE_EXCLUSIONS2365)){
+  assert.ok(gathered.has(code),'an exclusion names a code a reporter still passes: '+code);
+  assert.ok(reason.length>=20,'an exclusion states its reason: '+code);
+ }
+ // Fixed code names only: nothing on the list or its aliases can carry board text.
+ const {codes,aliases}=supportDiagnosticsCodeList2365(source);
+ for(const code of [...codes,...Object.keys(aliases),...Object.values(aliases)])
+  assert.match(code,/^(?:[a-z]+\/)?[a-z0-9]+(?:-[a-z0-9]+)*$/,'the list holds code names only: '+JSON.stringify(code));
+ await t.test('negative control: a new code at any reporter fails until it is named or excluded',()=>{
+  const added=['reportCloudReconcileError("new-reconcile-code-2365");','window.recordSyncError?.("push","new-recorded-code-2365");',
+   'CS.reportError("push","new-reported-code-2365");','cloudFailure("pull",{code:result.code||"new-fallback-code-2365"});',
+   'supportDiagnosticsObserveCloudStep("cloud-merge","failed",null,1,"new-step-code-2365",{});'];
+  const unnamed=unnamedSyncErrorCodes2365(source+'\n'+added.join('\n'));
+  for(const code of ['new-reconcile-code-2365','new-recorded-code-2365','new-reported-code-2365','new-fallback-code-2365','new-step-code-2365'])
+   assert.ok(unnamed.some(row=>row.startsWith(code+' ')),'the check names the unlisted '+code+': '+JSON.stringify(unnamed));
+ });
+ // The copied report applies the list: each named code reads as itself, and a
+ // code-shaped string on neither list still reads unknown.
+ const named=[...gathered.keys()].filter(code=>!Object.hasOwn(SYNC_ERROR_CODE_EXCLUSIONS2365,code));
+ for(let start=0;start<named.length;start+=19){
+  const batch=named.slice(start,start+19),app=await loadApp();t.after(()=>app.dispose());
+  for(const code of [...batch,'unlisted-sync-code-2365'])app.ctx.recordSyncError('reconcile',code);
+  const text=app.ctx.supportDiagnosticsText(),seen=JSON.parse(text).recentErrors.map(row=>row.code?.value);
+  assert.deepEqual(seen.filter(code=>code!=='unknown').sort(),[...batch].sort(),'the copied report names each code: '+JSON.stringify(seen));
+  assert.equal(seen.filter(code=>code==='unknown').length,1,'an unrecognised code still reads unknown: '+JSON.stringify(seen));
+  assert.doesNotMatch(text,/unlisted-sync-code-2365/,'an unrecognised code never enters the report');
+ }
+});
