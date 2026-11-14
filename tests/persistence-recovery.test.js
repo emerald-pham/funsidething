@@ -13115,6 +13115,9 @@ test('RISK sign-in settles: a task finished in the cloud copy, then restored, ma
  assert.equal(backend.docs.get('users/owner').rev,finishedRev,'positive control: nothing reached the cloud before sign-in');
  const cloudTask=async()=>{const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
   return JSON.parse((await peer.CS.pull()).payload).tasks.find(task=>task.id===id);};
+ // #2372 review N2: the cloud copy itself, not only the status, has the task finished and never saw the restore.
+ const finishedInCloud=await cloudTask();
+ assert.deepEqual({done:finishedInCloud?.done,restored:finishedInCloud?.restoredRunOp??null},{done:true,restored:null},'positive control: the cloud copy has the task finished, with no restore run');
  const savedTask=async device=>JSON.parse((await device.ctx.window.ScannerDeviceStore.readHead()).payload).tasks.find(task=>task.id===id);
 
  const before=phone.saves(),mark=supportMark2346(phone);
@@ -13136,6 +13139,7 @@ test('RISK sign-in settles: a task finished in the cloud copy, then restored, ma
  await phone.signIn();await syncSettle(300);
  assert.deepEqual(supportEvents2346(phone,'save-loop-stop',again),[],'signing in again stops no loop');
  assert.match(phone.status().title,/^Synced as /,'signing in again settles synced: '+phone.status().title);
+ assert.equal(backend.docs.get('users/owner').rev,finishedRev+1,'signing in again has nothing more to upload (#2372 review N3)');
  assert.deepEqual(restoredDoneAgain2371(restoredTask2371(phone),doneAt),KEPT_PROOF2371,'and keeps the Done date and proof');
 
  // Reopening the app signed in.

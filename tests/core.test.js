@@ -17425,6 +17425,30 @@ test('RESTORE INTENT: merging a finished copy that never saw the restore keeps t
   assert.equal(ctx.mergeUndeletedTasks(merged,saved),false,'merging the saved board back changes nothing either');
 });
 
+test('RESTORE INTENT: merging a finished copy with its own restore run the open Done never saw still drops the partial proof (#2371 review M1)', async () => {
+  // The negative control for #2371: a proof is kept only when it covers both
+  // copies' runs. Here the finished copy brings run-b, which the open copy's
+  // Done (proof run-a) never saw, so that proof no longer covers the merged
+  // run and is dropped, while the open copy keeps its Done date.
+  const {ctx}=await loadApp();
+  const base=syncTask('restored-evergreen','Restored Evergreen');
+  const finishedOtherRun=syncState({tasks:[{...base,done:true,completedAt:2000,lastDoneAt:2000,
+    restoredAt:1500,restoredRunOp:'run-b',completedAfterRestoreOp:'run-b'}]});
+  const open=syncState({tasks:[{...base,evergreen:true,done:false,completedAt:null,lastDoneAt:4000,
+    restoredAt:3000,restoredRunOp:'run-a',completedAfterRestoreOp:'run-a'}]});
+  // As in the #2371 test, a first merge fills in what this hand-built board lacks.
+  const merged=JSON.parse(JSON.stringify(open));
+  ctx.mergeUndeletedTasks(merged,open);
+  const saved=JSON.parse(JSON.stringify(merged));
+  assert.equal(ctx.mergeUndeletedTasks(merged,saved),false,'positive control: the saved open board alone is settled');
+  assert.equal(ctx.mergeUndeletedTasks(merged,finishedOtherRun),true,'merging the finished copy with another run is a change');
+  const task=merged.tasks[0];
+  assert.equal(task.done,false,'the open run stays open');
+  assert.equal(task.restoredRunOp,'run-a|run-b','its run now holds both copies’ runs');
+  assert.equal(Object.hasOwn(task,'completedAfterRestoreOp'),false,'the partial proof is dropped');
+  assert.equal(task.lastDoneAt,4000,'and the open copy keeps its Done date');
+});
+
 test('RESTORE INTENT: merging independent completed runs settles both stale open copies', async () => {
   const {ctx}=await loadApp();
   const base=syncTask('parallel-done','Parallel completions');
