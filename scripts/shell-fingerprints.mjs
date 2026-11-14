@@ -5,9 +5,10 @@
 //     new shell. A stale key leaves installed workers serving the old UI.
 // Neither is committed any more. The checkout carries placeholders, and every
 // consumer that serves the shell stamps values computed from the exact files it
-// serves: the Pages deploy, local serving, the test harness, the installed-client
-// native cases and Beta packaging. They used to be committed by hand after every
-// shell edit, which cost a refresh commit and a merge conflict each time (#2380).
+// serves; docs/agents/tdd-and-regression.md names those consumers. They used to
+// be committed by hand after every shell edit, which cost a refresh commit and a
+// merge conflict each time (#2380). The rules here mirror the changelog and
+// CACHE_NAME contract tests, which stay the safety net.
 //
 //   node scripts/shell-fingerprints.mjs [--root <dir>] [--write]
 //
@@ -25,8 +26,9 @@ export const CACHE_NAME_PLACEHOLDER = 'chain-scanner-shell-HASH';
 const CURRENT_FINGERPRINT = /(<template id="appChangelogCurrent"><div data-app-fingerprint=")([^"]*)(")/;
 const CACHE_NAME_LINE = /(const CACHE_NAME = ")([^"]+)(")/;
 
-// Remote URLs are not part of the shell, the root navigation and index.html are
-// one file, and the worker cannot fingerprint itself.
+// Same local-path rules as the shell contract tests: remote URLs are not part
+// of the shell, the root navigation and index.html are one file, and the worker
+// cannot fingerprint itself.
 export function shellPaths(worker) {
   const list = worker.match(/\.addAll\(\s*\[([\s\S]*?)\]/);
   if (!list) throw new Error('sw.js must precache a literal app-shell path list.');
