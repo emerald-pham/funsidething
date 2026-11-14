@@ -141,11 +141,14 @@ function assertAncestor(repoRoot, baseSha, commitSha) {
   if (result.status !== 0) throw new Error('Candidate base must be an existing ancestor of the exact candidate commit.');
 }
 
+// The RISK map left this list when it stopped being committed (#2381). Under
+// the scaled policy its entry changed no plan: its name already keeps it out
+// of documentation-only diffs (riskDocumentationPath), and the receipts that
+// predate that policy derive the same plan without it.
 const policyFiles = new Set([
   'AGENTS.md',
   'CLAUDE.md',
   'RELEASE_GATES.md',
-  'RISK_TEST_COVERAGE.md',
   'TEST_CHANGE_RATIONALES.json',
   'scripts/test-first-gate.mjs',
   'scripts/release-evidence.mjs',

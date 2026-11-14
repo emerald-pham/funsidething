@@ -56,10 +56,9 @@ A root `tests.js` is not a test file: nothing runs it, the hook refuses writing
 it, and the CI gate rejects a diff that adds or changes one. Port such edits as
 [test groups](test-groups.md#test-files) describes.
 
-`RISK_TEST_COVERAGE.md` lists the `RISK` tests by file and is generated from
-their names: run `npm run risk-map -- --write` after adding, renaming or
-removing one. A test in `tests/repository-process.test.js` checks that the
-committed map matches. Changes to
+The `RISK` coverage map lists the `RISK` tests by file. `npm run risk-map`
+prints it on demand from their names, and it is not committed, so adding,
+renaming or removing a `RISK` test needs no map edit (#2381). Changes to
 the diff gate, edit hook, or CI workflow also need a new process-focused
 `RISK` test, named under the test-first gate, regression gate, test inventory,
 or repository process boundary. An unrelated feature risk test cannot satisfy

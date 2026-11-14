@@ -155,7 +155,7 @@ version 2) requires:
   state, Firestore rules, callable/auth behavior, deployment or authentication
   infrastructure (including the release receipt verifier, pre-push gate and
   workflows) and data migration. Ambiguous auth, state and session persistence
-  still fail closed to the specialist. Process files such as the RISK map, test
+  still fail closed to the specialist. Process files such as test
   rationales, hooks and guidance keep the code review but no longer derive the
   `release-process` specialist; `additionalSpecialistDomains` can still add it.
 - `requiresTypographyReview` is true only when rendered markup or stylesheet

@@ -23127,5 +23127,38 @@
       "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=\"switching eligibility keeps\" tests/core.test.js (2026-11-14T15:46:42Z, agent-test-runs/issue-2373 under the git common dir) before the index.html fix; the two edited tests were updated after review and checked as later-baseline-sensitivity with main index.html restored, then with a mutant setEligibility that keeps the search but clears tagFilter.",
       "failure": "RED: AssertionError choosing Eligible keeps the typed search, actual empty string, expected Laundry. Baseline sensitivity: all three fail (Eligible drops the future row and keeps both narrowings; #2373: choosing Eligible keeps the postponed tag). Tag-dropping mutant: all three fail (Eligible narrows the searched, filtered rows). GREEN 3/3 after restoring the fix."
     }
+  },
+  {
+    "baseCommit": "ee087d95e6e6664f850634d35e9ed90723990e64",
+    "weakenedTestLines": [
+      "tests/repository-process.test.js:-'the committed RISK map matches the RISK tests');",
+      "tests/repository-process.test.js:-assert.equal(run('--check').status,0,'a freshly written map is current');",
+      "tests/repository-process.test.js:-assert.equal(run('--check').status,1,'a missing map is out of date');",
+      "tests/repository-process.test.js:-assert.equal(run('--write').status,0);",
+      "tests/repository-process.test.js:-assert.equal(spawnSync(process.execPath,[path.join(__dirname,'scripts','risk-map.mjs'),'--check'],{cwd:__dirname,encoding:'utf8'}).status,0,",
+      "tests/repository-process.test.js:-assert.equal(stale.status,1,'adding a RISK test makes the map stale');",
+      "tests/repository-process.test.js:-assert.match(map,/npm run risk-map -- --write/,'the map says how it is regenerated');",
+      "tests/repository-process.test.js:-assert.match(stale.stderr,/npm run risk-map -- --write/,'the stale message names the command');",
+      "tests/repository-process.test.js:-assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');",
+      "tests/repository-process.test.js:-const inventory=fs.readFileSync(inventoryPath,'utf8');",
+      "tests/repository-process.test.js:-const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');",
+      "tests/repository-process.test.js:-const map=fs.readFileSync(path.join(dir,'RISK_TEST_COVERAGE.md'),'utf8');",
+      "tests/repository-process.test.js:-const stale=run('--check');"
+    ],
+    "reason": "#2381 (owner-approved 2026-11-14, partially reversing #2233): the RISK map stops being committed and prints on demand. The assertions that compared a committed RISK_TEST_COVERAGE.md with the RISK tests, and the --check/--write modes they drove, have nothing left to compare.",
+    "previousBehavior": "scripts/risk-map.mjs --write wrote RISK_TEST_COVERAGE.md and --check exited 1 when the committed copy differed from the RISK test names. The generation test asserted a missing or stale map failed --check, and that the committed map matched; the feature-boundary test read the committed file. Adding a RISK test without a regeneration commit failed both.",
+    "intendedBehavior": "npm run risk-map prints the map to stdout from the RISK test names and writes no file; nothing is committed and nothing compares a copy. The generation test reads the printed map, the feature-boundary test reads the printed inventory, and an added RISK test appears in the next printed map with no regeneration step.",
+    "preservedCoverage": [
+      "RISK test inventory: the RISK map is generated from RISK test names still proves each RISK test is listed once, in source order, under its test file, that non-test files and non-RISK tests are excluded, and that the map names its command and explains how new features add RISK contracts.",
+      "RISK test inventory: every named risk contract maps to a feature boundary still checks every RISK name in the whole test surface against the inventory and that the inventory explains future work, now against the printed map.",
+      "RISK test inventory: risk map and source checks read every file in the test directory is unchanged."
+    ],
+    "replacementTests": [
+      "RISK test inventory: a new RISK test needs no committed map, which prints on demand"
+    ],
+    "redEvidence": {
+      "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=RISK.test.inventory tests/repository-process.test.js (2026-11-14T21:02:04Z, agent-test-runs/issue-2381 under the git common dir) with only the new RISK test added and no map regeneration, before any script, map or guidance edit.",
+      "failure": "RED: AssertionError the committed RISK map matches the RISK tests; AssertionError risk contract is missing from the feature inventory: RISK test inventory: a new RISK test needs no committed map, which prints on demand; AssertionError the checkout commits no RISK map. GREEN at 2026-11-14T21:02:58Z after removing the committed map, its check and its policy-file entry."
+    }
   }
 ]
