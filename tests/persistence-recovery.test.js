@@ -4103,6 +4103,84 @@ async function bulkDeleteFocusInBrowser(t,{width,height,mobile,troubleshootingOp
  if(troubleshootingOpen)assert.equal(await page.evaluate(()=>document.querySelector('#modalRoot details.settings-troubleshooting')?.open),true,'Troubleshooting stays open after the bulk delete');
  assert.deepEqual(errors,[]);
 }
+// #2360: in "Cloud sync needs attention", Retry sync, Reload app and Review
+// saved decisions had only the bare button class, so they painted as plain
+// text with no fill or edge, and in the dark theme as dark ink on the dark
+// dialog. Since 2026-09-29 they looked disabled; only Sign out looked usable,
+// and on 2026-11-13 the owner signed out for that reason. The theme is chosen
+// with the app's own theme button; the applied attribute, computed color
+// scheme and paint are checked before each button is read.
+const SYNC_DIALOG_ACTIONS2360=['review-decision-recovery','sync-retry','sync-reload'];
+async function cloudSyncDialogInBrowser2360(t,theme){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const {resolveExpectedFirstRunHelp}=await import('../scripts/browser-fixture-setup.mjs');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const board=JSON.stringify(syncState({seenQuickStart:true,tasks:[syncTask('sync-dialog-task','Sync dialog task')]}));
+ const browser=await chromium.launch({headless:true,...(openingBoardSelfHosted||!process.env.LANDSCAPE_BROWSER_CHANNEL?{}:{channel:process.env.LANDSCAPE_BROWSER_CHANNEL})});
+ t.after(()=>browser.close());
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block',reducedMotion:'reduce'});
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await context.addInitScript(board=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  if(localStorage.getItem('fvp:chain-scanner:v1')===null)localStorage.setItem('fvp:chain-scanner:v1',board);
+ },board);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true',null,{timeout:60000});
+ const motion=page.locator('#motionDialog [data-landscape-motion="reduced"]');if(await motion.isVisible())await motion.click();await resolveExpectedFirstRunHelp(page);
+ await page.evaluate(()=>{for(let i=0;i<4&&document.querySelector('.mback');i++)closeModal();});
+ for(let i=0;i<3&&await page.evaluate(()=>document.documentElement.dataset.theme)!==theme;i++)await page.locator('#themeBtn').click();
+ // The sign-in is the cloud boundary: a signed-in account whose cloud read
+ // was held by a saved-decision code, as the sync status shows it.
+ await page.evaluate(()=>{
+  window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'error',errorStage:'reconcile',errorCode:'unprojectable-decision-evidence',signIn(){},signOut(){}};
+  renderSync();
+ });
+ await page.locator('#syncBtn').click();
+ await page.waitForSelector('#modalRoot [data-act="sync-retry"]');
+ const seen=await page.evaluate(actions=>{
+  const rgba=value=>{const parts=value.match(/[\d.]+/g).map(Number);return {rgb:parts.slice(0,3),alpha:parts.length>3?parts[3]:1};};
+  const lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+  const ratio=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+  const modal=document.querySelector('#modalRoot .modal'),modalPaint=rgba(getComputedStyle(modal).backgroundColor).rgb;
+  const same=(a,b)=>a.every((v,i)=>Math.abs(v-b[i])<2);
+  return {theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,
+   modal:getComputedStyle(modal).backgroundColor,
+   buttons:[...actions,'sync-signout'].map(act=>{
+    const button=modal.querySelector(`[data-act="${act}"]`);if(!button)return {act,missing:true};
+    const style=getComputedStyle(button),fill=rgba(style.backgroundColor),edge=rgba(style.borderTopColor),ink=rgba(style.color).rgb;
+    const paint=fill.alpha>=.99?fill.rgb:modalPaint;
+    return {act,label:button.textContent,disabled:button.disabled,background:style.backgroundColor,color:style.color,border:style.borderTopColor,
+     contrast:Math.round(ratio(ink,paint)*100)/100,
+     // A button shows its own shape: a fill or an edge apart from the dialog.
+     shaped:fill.alpha>=.99&&!same(fill.rgb,modalPaint)||parseFloat(style.borderTopWidth)>0&&edge.alpha>=.99&&!same(edge.rgb,modalPaint)};
+   })};
+ },SYNC_DIALOG_ACTIONS2360);
+ if(process.env.SYNC_DIALOG_VISUAL_DIR){fs.mkdirSync(process.env.SYNC_DIALOG_VISUAL_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.SYNC_DIALOG_VISUAL_DIR,`sync-dialog-${theme}-390x844.png`)});}
+ await context.close();
+ return {...seen,errors};
+}
+test('RISK cloud sync dialog: Retry sync, Reload app and Review saved decisions look like enabled buttons with readable labels in light and dark themes',async t=>{
+ await openingBoardFixture(t);
+ const modalPaints=new Set();
+ for(const theme of ['light','dark'])await t.test(theme,async sub=>{
+  const seen=await cloudSyncDialogInBrowser2360(sub,theme);sub.diagnostic(JSON.stringify(seen));
+  assert.equal(seen.theme,theme,'the theme button applied the theme');
+  assert.equal(seen.colorScheme,theme,'the computed color scheme follows it');
+  modalPaints.add(seen.modal);
+  assert.ok(seen.buttons.find(row=>row.act==='sync-signout')?.shaped,'positive control: Sign out looks like a button: '+JSON.stringify(seen.buttons));
+  for(const act of SYNC_DIALOG_ACTIONS2360){
+   const row=seen.buttons.find(row=>row.act===act);
+   assert.ok(row&&!row.missing&&!row.disabled,act+' is offered and enabled: '+JSON.stringify(row));
+   assert.ok(row.shaped,theme+': '+act+' has a fill or edge apart from the dialog: '+JSON.stringify(row));
+   assert.ok(row.contrast>=4.5,theme+': '+act+' label is readable on its background: '+JSON.stringify(row));
+  }
+  assert.deepEqual(seen.errors,[]);
+ });
+ assert.equal(modalPaints.size,2,'the dialog paints differently in the two themes: '+JSON.stringify([...modalPaints]));
+});
+
 test('RISK backup delete focus: after deleting old backups by keyboard on a short screen, the focused Make backup is in view',async t=>{
  await openingBoardFixture(t);
  for(const [width,height,mobile] of [[640,400,false],[320,568,true]])await t.test(width+'x'+height,async sub=>{await bulkDeleteFocusInBrowser(sub,{width,height,mobile});});
@@ -12879,6 +12957,33 @@ test('RISK cloud save loop guard: the support report lists a cloud merge that wa
  await ctx.cloudPull();await savesSettled2334(device);
  assert.deepEqual(merges(device,errorBefore),[['failed','error']],'a merge an error stopped is listed as failed');
  assert.equal(device.status().text,'☁ error','positive control: the read shows the error');
+});
+
+// #2360: the sync dialog names a held decision code on screen, but the copied
+// support report turned it into "unknown", so the report could not say why
+// sync was held. Another client writes a cloud copy whose saved-decision
+// baseline this app cannot read; the report names that fixed code on the
+// cloud-merge event and in recentErrors, and still carries no board content.
+test('RISK support diagnostics: a cloud read held by a saved-decision code names that code on the cloud-merge event and in recentErrors, with no board content',async t=>{
+ const device=await signedInDevice2348(t,'decision-code-2360'),{ctx}=device;
+ await device.signIn();
+ assert.equal(device.status().text,'☁ synced','positive control: an ordinary sign-in settles synced');
+ const peer=await loadCloudBackendV2({sharedDocs:device.backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ const read=await peer.CS.pull(),board=JSON.parse(read.payload),privateTitle='Private peer task 2360';
+ board.tasks.push({...board.tasks[0],id:'private-peer-2360',title:privateTitle});
+ board.decisionBaseline={v:999};
+ assert.equal((await peer.CS.push(JSON.stringify(board),1792323000000,read.rev))?.ok,true,'positive control: the other client writes');
+ const mark=supportMark2346(device);
+ await ctx.cloudPull();await savesSettled2334(device);
+ assert.equal(ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','positive control: sync is held for the saved-decision code');
+ assert.equal(device.status().text,'☁ error','positive control: the status shows the error');
+ const merges=supportEvents2346(device,'cloud-merge',mark);
+ assert.deepEqual(merges.map(event=>[event.status,event.metadata?.mergeOutcome,event.code?.value]),[['failed','error','unsupported-decision-evidence']],
+  'the cloud-merge event names the code: '+JSON.stringify(merges));
+ const text=ctx.supportDiagnosticsText(),report=JSON.parse(text);
+ assert.ok(report.recentErrors.some(row=>row.stage==='reconcile'&&row.code?.value==='unsupported-decision-evidence'),
+  'recentErrors names the code: '+JSON.stringify(report.recentErrors));
+ assert.doesNotMatch(text,new RegExp(privateTitle+'|private-peer-2360|'+LOOP_KEPT_TITLE2348+'|e@example\\.com'),'no task titles, task IDs or account appear in the report');
 });
 
 // #2346 release review (B1): the guard counted save runs that kept failing on

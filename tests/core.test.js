@@ -41342,6 +41342,23 @@ test('RISK debug log: app reload reasons and lifecycle observations survive with
  });
 });
 
+// #2360: every code a saved-decision, learning or completion check can hold
+// sync with (reportCloudReconcileError, from decisionEvidenceIssue,
+// decisionProjectionIssue and the pending recovery hold) is a fixed category
+// name the sync dialog shows. The copied report names each one; any other
+// code, even one shaped like a code, still reads "unknown".
+test('RISK support diagnostics: recentErrors names each saved-decision, learning and completion reconcile code and still reads unknown for any other code',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ const named=['unsupported-decision-evidence','decision-account-mismatch','conflicting-decision-evidence','ambiguous-legacy-completion',
+  'unprojectable-decision-evidence','unrepresented-legacy-learning','unprojectable-decision-undo','decision-recovery-pending'];
+ const other=['private-task-title-2360','decision-private-2360','learning-from-my-board'];
+ for(const code of [...named,...other])app.ctx.recordSyncError('reconcile',code);
+ const text=app.ctx.supportDiagnosticsText(),codes=JSON.parse(text).recentErrors.filter(row=>row.stage==='reconcile').map(row=>row.code?.value);
+ assert.deepEqual([...codes].filter(code=>code!=='unknown').sort(),[...named].sort(),'each reconcile code is named: '+JSON.stringify(codes));
+ assert.equal(codes.filter(code=>code==='unknown').length,other.length,'every other code reads unknown: '+JSON.stringify(codes));
+ assert.doesNotMatch(text,/private-task-title-2360|decision-private-2360|learning-from-my-board/,'no unrecognised text enters the report');
+});
+
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{
  const secret='private-account-leak-94fce7';
  const raw=JSON.stringify(syncState({tasks:[syncTask('private-task-id','PRIVATE-TASK-CONTENT-94fce7')],syncAccount:secret}));
