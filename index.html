@@ -8967,11 +8967,14 @@ function replaceTaskPostpone(task,current){
 }
 function postponeTask(id){
   const task=taskById(id);if(!task || task.done || !supportedPostponeEvidence(task))return;
+  const choiceGesture=captureCurrentChoiceGesture(),beforeMode=state.mode;
   pushUndo();writeTaskPostpone(task,Date.now()+postponeDurationHours(state.settings.postponeHours)*3600000);
   state.chain=state.chain.filter(id=>id!==task.id);
   delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
   if(state.candidateId===id)state.candidateId=null;
-  state.mode="scan";state.interventionActive=false;
+  // #2359: leaving work mode is recorded, as Resume records it. Unrecorded, a
+  // replay of the pass still says work after No — work the chain, and sync held.
+  state.mode="scan";state.interventionActive=false;recordCurrentScannerMode(choiceGesture,beforeMode);
   if(!state.chain.length){
     // This automatic dot is not a recorded decision, like the Postpone itself:
     // the cloud keeps it as board state, and a replay of the pass never sees
@@ -9538,7 +9541,7 @@ function applyScanPreference(mode){
   state.interventionActive = false;
 }
 function startScan(mode){
-  const choiceGesture=captureCurrentChoiceGesture(),beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+  const choiceGesture=captureCurrentChoiceGesture(),beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance),beforeMode=state.mode;
   pushUndo();
   // Timer/focus sweeps may not have run yet. Reconcile today's eligible
   // pool before starting with either an automatic dot or an unpaired candidate.
@@ -9562,6 +9565,9 @@ function startScan(mode){
   if(t||JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.unshift({
     target:{type:"pass",id:state.passId||choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
     before:{present:true,value:beforePassMode}});
+  // #2359: a Start that keeps this pass records leaving work mode, as Resume
+  // does. A Start that begins a new pass leaves the old pass's mode behind.
+  if(!t)recordCurrentScannerMode(choiceGesture,beforeMode);
   appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture));
   commit(true, !!t);   // a dot syncs to the cloud right away
 }
@@ -10130,13 +10136,14 @@ function clearCompleted(){ // completed tasks and logged worked-on/evergreen-don
   commit();
 }
 function rescanSkipped(){ // clear only the no/can't marks, keep 'done' — an explicit override, ignores the can't timer on purpose
-  const choiceGesture=captureCurrentChoiceGesture(),before=new Map();
+  const choiceGesture=captureCurrentChoiceGesture(),before=new Map(),beforeMode=state.mode;
   for(const [id,value] of Object.entries(state.considered))if(["no","cant","dislodged","worked"].includes(value))before.set(id,currentChoiceDispositionSnapshot(id));
   pushUndo();
   for(const [id,v] of Object.entries(state.considered)){
     if(v==="no"||v==="cant"||v==="dislodged"||v==="worked"){ delete state.considered[id]; delete state.cantAt[id]; delete state.workedAt[id]; }
   }
-  state.mode="scan"; state.interventionActive=false; state.snooze = 6;
+  // #2359: leaving work mode is recorded, as Resume records it.
+  state.mode="scan"; state.interventionActive=false; state.snooze = 6; recordCurrentScannerMode(choiceGesture,beforeMode);
   const choices=[];
   for(const [id,snapshot] of before){
     const change=currentChoiceDispositionChange(id,snapshot);

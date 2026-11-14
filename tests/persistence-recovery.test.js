@@ -13344,3 +13344,37 @@ test('RISK started pass sync: Undo of a Postpone in a pass Start began puts the 
  assert.equal(ctx.state.chain.length,chain.length+1,'positive control: the next Yes dots the candidate');
  assert.equal(device.status().text,'☁ synced','sync is not held after the next answer: '+device.status().title);
 });
+
+// "No — work the chain" records work mode. Rescan skipped tasks, Start without
+// a new pass and Postpone each put the scanner back in scan mode; unrecorded,
+// a replay of the pass still says work, and every push and pull was held.
+test('RISK started pass sync: going back to scanning after No — work the chain syncs, whichever control does it',async t=>{
+ const controls={
+  'Rescan skipped tasks':device=>device.act('rescan'),
+  'Start, with dots already on the chain':device=>device.act('start-scan'),
+  'Postpone of the benchmark':device=>device.act('bench-postpone'),
+  'Resume scanning':device=>device.act('resume-scan'),
+  'Continue scanning':device=>device.act('continue-scan'),
+ };
+ for(const [control,act] of Object.entries(controls))await t.test(control,async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'mode'),{ctx,backend}=device;
+  const passId=ctx.state.passId,chain=Array.from(ctx.state.chain);
+  await device.act('start-working');
+  assert.equal(ctx.state.mode,'work','precondition: No — work the chain switched to work mode');
+  assert.equal(device.status().text,'☁ synced','positive control: work mode syncs: '+device.status().title);
+  const revision=backend.docs.get('users/owner').rev;
+  await act(device);
+  assert.equal(ctx.state.mode,'scan','the control went back to scanning');
+  assert.equal(ctx.state.passId,passId,'in the same pass');
+  if(control.startsWith('Start'))assert.deepEqual(Array.from(ctx.state.chain),chain,'Start placed no new dot');
+  assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+  const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+  const read=await reader.CS.pull();
+  assert.ok(read.rev>revision,'the change reaches the cloud');
+  assert.equal(JSON.parse(read.payload).mode,'scan','and the cloud is scanning');
+  await device.act('undo');
+  assert.equal(ctx.state.mode,'work','Undo goes back to work mode');
+  assert.equal(device.status().text,'☁ synced','and syncs: '+device.status().title);
+  assert.equal(JSON.parse((await reader.CS.pull()).payload).mode,'work','the cloud is back in work mode');
+ });
+});
