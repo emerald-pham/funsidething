@@ -12915,6 +12915,7 @@ test("UI #2359 guidance: the mounted FAQ and Settings changelog say a Postpone o
   const help = app.shim.document.getElementById("modalRoot").innerHTML;
   const answer = help.match(/<dt>How is Postpone saved and reversed\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
   assert.match(answer, /Postponing a dotted task syncs like any other change/i, "the FAQ says a Postpone syncs");
+  assert.doesNotMatch(answer, /[a-z]\.[A-Z]/, "every sentence in the answer is followed by a space");
   const notes = help.match(/<details class="help-faq" data-help-changelog>([\s\S]*?)<\/details>/)?.[1] ?? "";
   assert.match(notes, /Postponing a dotted task after Start no longer pauses cloud sync/i, "the changelog announces the fix");
   assert.match(notes, /No — work the chain/, "and names the mode change it also fixes");
