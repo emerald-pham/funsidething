@@ -41365,6 +41365,17 @@ test('RISK support diagnostics: recentErrors names each saved-decision, learning
  assert.doesNotMatch(text,/private-task-title-2360|decision-private-2360|learning-from-my-board/,'no unrecognised text enters the report');
 });
 
+// #2365: the November 14 changelog says which further reasons a copied Debug
+// log now names. The sync FAQ already says the log keeps safe codes and is at
+// its 130-word limit. The repository-process completeness test checks each code.
+test('Sync error guidance: the November 14 changelog says the Debug log names more reasons cloud sync stopped',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 14, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(current,/A copied Debug log now names more reasons cloud sync stopped, instead of “unknown”: a cloud save that kept conflicting with a newer revision, a cloud reply the app could not read, a cloud recovery whose starting revision changed before it saved, and a cloud copy that changed while it was being repaired\. It still holds no task content\./,'the November 14 changelog describes it: '+current);
+});
+
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{
  const secret='private-account-leak-94fce7';
  const raw=JSON.stringify(syncState({tasks:[syncTask('private-task-id','PRIVATE-TASK-CONTENT-94fce7')],syncAccount:secret}));
