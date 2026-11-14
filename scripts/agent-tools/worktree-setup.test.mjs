@@ -215,56 +215,132 @@ test('worktree setup installs dependencies when the main checkout lockfile diffe
   assert.equal(claimedPorts(ledgerEntry(fixture, worktree)).length, 2);
 });
 
-test('a worktree setup that cannot claim ports undoes the worktree and keeps other claims', async (t) => {
+test('a worktree setup that cannot claim ports keeps the worktree without ports, closes its entry and keeps other claims', async (t) => {
   const fixture = await createFixture(t);
   const first = createWorktree(fixture, 'alpha');
   const second = createWorktree(fixture, 'beta');
   const held = [...claimedPorts(ledgerEntry(fixture, first)), ...claimedPorts(ledgerEntry(fixture, second))].sort();
 
+  // The range is full. Setup still always makes the worktree (#2364 owner
+  // decision, 2026-11-14); only the ports are skipped.
   const result = runHook(fixture, 'create', { cwd: fixture.main, name: 'gamma' });
-  assert.notEqual(result.status, 0, 'the range is full, so setup fails');
-  assert.match(result.stderr, /No two loopback ports/);
   const gamma = join(fixture.main, '.claude', 'worktrees', 'gamma');
-  assert.equal(existsSync(gamma), false, 'the partial worktree is removed');
-  assert.equal(git(fixture.main, 'branch', '--list', 'worktree-gamma'), '', 'the new branch is removed');
+  assert.equal(result.status, 0, `create succeeds: ${result.stderr}`);
+  assert.equal(result.stdout.trim().split('\n').at(-1), gamma, 'the worktree path is the last stdout line');
+  assert.equal(git(gamma, 'rev-parse', '--abbrev-ref', 'HEAD'), 'worktree-gamma');
+  const warnings = warningLines(result.stderr);
+  assert.equal(warnings.length, 1, `exactly one warning line: ${result.stderr}`);
+  assert.match(warnings[0], /no ports claimed.*No two loopback ports/, 'the warning names the reason');
+  assert.equal(existsSync(join(gamma, '.chain-worktree.env')), false, 'no env file without claimed ports');
   const state = JSON.parse(readFileSync(fixture.ledger, 'utf8'));
   assert.deepEqual(state.entries.filter((entry) => entry.worktree === gamma && entry.status !== 'complete'), [], 'the partial entry no longer owns anything');
   assert.deepEqual([...claimedPorts(ledgerEntry(fixture, first)), ...claimedPorts(ledgerEntry(fixture, second))].sort(), held, 'existing claims are untouched');
 });
 
-test('worktree setup stops and writes nothing on a missing or conflicting ledger or in CI', async (t) => {
-  const fixture = await createFixture(t);
+// The ways the hook can find no usable ledger. Each still gets a worktree
+// (#2364 owner decision, 2026-11-14): the Claude app does not inherit
+// CODEX_COORDINATION_FILE from a shell profile, and refusing there blocked
+// every agent worktree on the host. `unset ledger` is that incident: no ledger
+// variable, so the client discovers the legacy temporary default, which TMPDIR
+// keeps inside the fixture.
+function unusableLedgerCases(fixture) {
   const missing = join(fixture.root, 'host', 'missing-coordination.json');
   const other = join(fixture.root, 'other-host', 'coordination.json');
-  const cases = [
-    { label: 'missing ledger', env: { CODEX_COORDINATION_FILE: missing }, message: /does not exist.*will not create one/ },
-    { label: 'conflicting ledger', env: { DOW_EMULATOR_COORDINATION_FILE: other }, message: /could not select one ledger.*Conflicting coordination paths/ },
-    { label: 'CI', env: { CI: 'true' }, message: /never runs in CI/ },
-  ];
+  const temporary = join(fixture.root, 'tmp');
+  mkdirSync(temporary, { recursive: true });
+  const ledgerFix = /CODEX_COORDINATION_FILE.*\.claude\/settings\.local\.json/;
+  return {
+    secondLedgers: [missing, other, join(temporary, 'den-of-wolves-new-eden-coordination.json')],
+    cases: [
+      { label: 'unset ledger', env: { CODEX_COORDINATION_FILE: '', TMPDIR: temporary }, reason: /den-of-wolves-new-eden-coordination\.json does not exist/, fix: ledgerFix },
+      { label: 'missing ledger', env: { CODEX_COORDINATION_FILE: missing }, reason: /missing-coordination\.json does not exist/, fix: ledgerFix },
+      { label: 'conflicting ledger', env: { DOW_EMULATOR_COORDINATION_FILE: other }, reason: /Conflicting coordination paths/, fix: ledgerFix },
+      { label: 'missing client', env: { HOME: join(fixture.root, 'empty-home') }, reason: /coordination client is not installed/, fix: /coordination\.mjs install/ },
+      { label: 'CI', env: { CI: 'true' }, reason: /CI is set/, fix: /local agent worktrees/ },
+    ],
+  };
+}
+
+function warningLines(stderr) {
+  return stderr.split('\n').filter((line) => /^worktree-setup: warning:/.test(line));
+}
+
+test('worktree setup without a usable ledger still creates a test-ready worktree, warns once and claims nothing', async (t) => {
+  const fixture = await createFixture(t);
+  const { cases, secondLedgers } = unusableLedgerCases(fixture);
   const ledgerBefore = readFileSync(fixture.ledger, 'utf8');
-  for (const { label, env, message } of cases) {
-    const name = `refused-${label.replaceAll(' ', '-').toLowerCase()}`;
+  const sessionEnvironment = join(fixture.root, 'claude-session-env.sh');
+  writeFileSync(sessionEnvironment, '');
+  for (const { label, env, reason, fix } of cases) {
+    const name = `portless-${label.replaceAll(' ', '-').toLowerCase()}`;
+    const expected = join(fixture.main, '.claude', 'worktrees', name);
     const result = runHook(fixture, 'create', { cwd: fixture.main, name }, { env });
-    assert.notEqual(result.status, 0, `${label}: create must fail`);
-    assert.match(result.stderr, message, `${label}: the refusal says why`);
-    assert.equal(result.stdout.trim(), '', `${label}: no worktree path is printed`);
-    assert.equal(existsSync(join(fixture.main, '.claude', 'worktrees', name)), false, `${label}: no worktree directory`);
-    assert.equal(git(fixture.main, 'branch', '--list', `worktree-${name}`), '', `${label}: no branch`);
+    assert.equal(result.status, 0, `${label}: create succeeds: ${result.stderr}`);
+    assert.equal(result.stdout.trim().split('\n').at(-1), expected, `${label}: the worktree path is the last stdout line`);
+    assert.equal(git(expected, 'rev-parse', '--abbrev-ref', 'HEAD'), `worktree-${name}`, `${label}: the worktree is on its new branch`);
+
+    const dependency = spawnSync(process.execPath, ['--input-type=module', '-e', "const m = await import('fixture-dep'); process.stdout.write(m.value);"], { cwd: expected, encoding: 'utf8' });
+    assert.equal(dependency.status, 0, `${label}: ${dependency.stderr}`);
+    assert.equal(dependency.stdout, 'linked-from-main', `${label}: dependencies are available`);
+
+    const warnings = warningLines(result.stderr);
+    assert.equal(warnings.length, 1, `${label}: exactly one warning line: ${result.stderr}`);
+    assert.match(warnings[0], reason, `${label}: the warning names the reason`);
+    assert.match(warnings[0], fix, `${label}: the warning names the fix`);
+    assert.match(warnings[0], /no ports/i, `${label}: the warning says no ports were claimed`);
+
+    assert.equal(existsSync(join(expected, '.chain-worktree.env')), false, `${label}: no env file without claimed ports`);
+    assert.equal(git(expected, 'status', '--porcelain', '--untracked-files=all'), '', `${label}: the worktree is clean`);
     assert.equal(readFileSync(fixture.ledger, 'utf8'), ledgerBefore, `${label}: the fixture ledger is unchanged`);
-    assert.equal(existsSync(missing), false, `${label}: no second ledger is created`);
-    assert.equal(existsSync(other), false, `${label}: no second ledger is created`);
+    for (const second of secondLedgers) assert.equal(existsSync(second), false, `${label}: no other ledger is created at ${second}`);
+
+    // SessionStart touches no ledger, and its loader exports nothing where
+    // there is no env file.
+    const started = runHook(fixture, 'session-start', { hook_event_name: 'SessionStart', cwd: expected, source: 'startup' },
+      { env: { ...env, CLAUDE_ENV_FILE: sessionEnvironment } });
+    assert.equal(started.status, 0, `${label}: session-start succeeds: ${started.stderr}`);
+    const shell = spawnSync('bash', ['-c', '. "$SESSION_ENV"; printf "%s|%s" "$CHAIN_NATIVE_PORT" "$CHAIN_NATIVE_SMOKE_PORT"'],
+      { cwd: expected, encoding: 'utf8', env: { ...process.env, SESSION_ENV: sessionEnvironment, CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '' } });
+    assert.equal(shell.status, 0, `${label}: a shell command in the portless worktree runs: ${shell.stderr}`);
+    assert.equal(shell.stdout, '|', `${label}: the loader exports no ports there`);
+  }
+});
+
+test('removing a worktree without a usable ledger still removes the checkout, keeps unlanded work and leaves the ledger alone', async (t) => {
+  const fixture = await createFixture(t);
+  const { cases, secondLedgers } = unusableLedgerCases(fixture);
+  // A worktree that claimed ports while the ledger was usable, with a commit
+  // that exists only on its branch.
+  const claimed = createWorktree(fixture, 'alpha');
+  writeFileSync(join(claimed, 'work.txt'), 'unlanded\n');
+  git(claimed, 'add', 'work.txt');
+  git(claimed, 'commit', '--quiet', '-m', 'unlanded work');
+  const unlanded = git(claimed, 'rev-parse', 'HEAD');
+  for (const { label, env } of cases) runHook(fixture, 'create', { cwd: fixture.main, name: `portless-${label.replaceAll(' ', '-').toLowerCase()}` }, { env });
+  const ledgerBefore = readFileSync(fixture.ledger, 'utf8');
+
+  for (const { label, env, reason } of cases) {
+    const worktree = join(fixture.main, '.claude', 'worktrees', `portless-${label.replaceAll(' ', '-').toLowerCase()}`);
+    assert.equal(existsSync(worktree), true, `${label}: the fixture worktree exists`);
+    const result = runHook(fixture, 'remove', { cwd: fixture.main, worktree_path: worktree }, { env });
+    assert.equal(result.status, 0, `${label}: remove succeeds: ${result.stderr}`);
+    assert.equal(existsSync(worktree), false, `${label}: the checkout is removed`);
+    const warnings = warningLines(result.stderr);
+    assert.equal(warnings.length, 1, `${label}: exactly one warning line: ${result.stderr}`);
+    assert.match(warnings[0], reason, `${label}: the warning names the reason`);
+    assert.match(warnings[0], /no claims released/i, `${label}: the warning says nothing was released`);
+    assert.equal(readFileSync(fixture.ledger, 'utf8'), ledgerBefore, `${label}: the fixture ledger is unchanged`);
+    for (const second of secondLedgers) assert.equal(existsSync(second), false, `${label}: no other ledger is created at ${second}`);
   }
 
-  const worktree = createWorktree(fixture, 'alpha');
-  const ledgerWithWorktree = readFileSync(fixture.ledger, 'utf8');
-  for (const { label, env, message } of cases) {
-    const result = runHook(fixture, 'remove', { cwd: fixture.main, worktree_path: worktree }, { env });
-    assert.notEqual(result.status, 0, `${label}: remove must fail`);
-    assert.match(result.stderr, message, `${label}: the refusal says why`);
-    assert.equal(existsSync(worktree), true, `${label}: the worktree stays`);
-    assert.equal(readFileSync(fixture.ledger, 'utf8'), ledgerWithWorktree, `${label}: the worktree keeps its claims`);
-    assert.equal(existsSync(missing), false, `${label}: no second ledger is created`);
-  }
+  const { env } = cases.find(({ label }) => label === 'missing ledger');
+  const result = runHook(fixture, 'remove', { cwd: fixture.main, worktree_path: claimed }, { env });
+  assert.equal(result.status, 0, `removing a worktree with claims succeeds without the ledger: ${result.stderr}`);
+  assert.equal(existsSync(claimed), false, 'its checkout is removed');
+  assert.equal(git(fixture.main, 'rev-parse', 'refs/heads/worktree-alpha'), unlanded, 'its branch keeps the unlanded commit');
+  assert.match(warningLines(result.stderr).join('\n'), /release them by hand/, 'the warning says how to free claims it may still hold');
+  assert.equal(readFileSync(fixture.ledger, 'utf8'), ledgerBefore, 'its claims stay in the ledger until released by hand');
+  assert.equal(claimedPorts(ledgerEntry(fixture, claimed)).length, 2);
 });
 
 test('the project settings run worktree setup as the Claude Code worktree hooks', async (t) => {

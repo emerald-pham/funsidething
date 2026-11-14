@@ -9,11 +9,18 @@
 // Ledger safety: the hook talks to the host ledger only through the installed
 // coordination client, and only to the ledger that client discovers. The
 // client treats a missing ledger file as empty and would create it on the
-// first write, so the hook checks first and refuses instead: a second ledger
-// is how ownership got split before (docs/agents/host-coordination.md).
+// first write, so the hook checks first and never writes to a ledger that does
+// not already exist: a second ledger is how ownership got split before
+// (docs/agents/host-coordination.md).
+//
+// Without a usable ledger the hook still makes the worktree, with its
+// dependencies, and only skips the ports, warning once on stderr. Refusing
+// there blocked every agent worktree on the host, because the Claude app does
+// not inherit CODEX_COORDINATION_FILE from a shell profile (#2364 owner
+// decision, 2026-11-14).
 
 import { spawnSync } from 'node:child_process';
-import { accessSync, constants, existsSync, lstatSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, lstatSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -57,47 +64,58 @@ function readInput() {
   }
 }
 
-function refuseInCI() {
-  for (const variable of ['CI', 'GITHUB_ACTIONS']) {
-    const value = String(process.env[variable] ?? '').trim().toLowerCase();
-    if (value && value !== 'false' && value !== '0') {
-      throw new SetupError(`${variable} is set: worktree setup prepares local agent worktrees and never runs in CI.`);
-    }
-  }
+const LEDGER_FIX = 'Export CODEX_COORDINATION_FILE with the host ledger path to the Claude app, for example in the "env" of the untracked .claude/settings.local.json, then create the worktree again (docs/agents/host-coordination.md).';
+
+function oneLine(text) {
+  return String(text).replace(/\s+/g, ' ').trim();
 }
 
-function coordinationClient() {
-  const client = join(homedir(), '.local', 'bin', 'chain-coordination.mjs');
-  try {
-    accessSync(client, constants.X_OK);
-  } catch {
-    throw new SetupError(`The coordination client is not installed at ${client}. Install it once from a checkout with: node scripts/agent-tools/coordination.mjs install --to "${client}"`);
-  }
-  return client;
+function warn(reason, fix) {
+  log(`warning: no ports claimed for this worktree: ${oneLine(reason)} ${oneLine(fix)}`);
+}
+
+function ciVariable() {
+  return ['CI', 'GITHUB_ACTIONS'].find((variable) => {
+    const value = String(process.env[variable] ?? '').trim().toLowerCase();
+    return value && value !== 'false' && value !== '0';
+  });
 }
 
 function runClient(client, args, cwd) {
   return run(process.execPath, [client, ...args], { cwd });
 }
 
-// The ledger the client discovers (CODEX_COORDINATION_FILE, its legacy alias,
-// or the legacy default). A conflict between those settings makes discover
-// fail, and setup stops with the client's message.
-function canonicalLedger(client, cwd) {
+// The installed client and the existing ledger it discovers
+// (CODEX_COORDINATION_FILE, its legacy alias, or the legacy default), or why
+// there is none. Nothing here creates, guesses or falls back to a ledger.
+function ledgerAccess(cwd) {
+  const variable = ciVariable();
+  if (variable) return { reason: `${variable} is set.`, fix: 'Ports are claimed only for local agent worktrees; CI needs none.' };
+  const client = join(homedir(), '.local', 'bin', 'chain-coordination.mjs');
+  try {
+    accessSync(client, constants.X_OK);
+  } catch {
+    return { reason: `The coordination client is not installed at ${client}.`, fix: `Install it once from a checkout with: node scripts/agent-tools/coordination.mjs install --to "${client}"` };
+  }
   const discovered = spawnSync(process.execPath, [client, 'discover'], { cwd, encoding: 'utf8' });
   if (discovered.error || discovered.status !== 0) {
     const reason = discovered.error?.message ?? (discovered.stderr || discovered.stdout || '').trim();
-    throw new SetupError(`The coordination client could not select one ledger, so setup stopped and wrote nothing: ${reason}`);
+    return { reason: `The coordination client could not select one ledger: ${reason}`, fix: LEDGER_FIX };
   }
   const ledger = discovered.stdout.trim();
   let metadata;
   try {
     metadata = statSync(ledger);
   } catch {
-    throw new SetupError(`The coordination ledger ${ledger} does not exist. Setup uses only the existing host ledger and will not create one, so it stopped and wrote nothing. Export CODEX_COORDINATION_FILE for the host ledger (docs/agents/host-coordination.md).`);
+    return { reason: `The coordination ledger ${ledger} does not exist, and setup never creates one.`, fix: LEDGER_FIX };
   }
-  if (!metadata.isFile()) throw new SetupError(`The coordination ledger ${ledger} is not a regular file; setup stopped and wrote nothing.`);
-  return ledger;
+  if (!metadata.isFile()) return { reason: `The coordination ledger ${ledger} is not a regular file.`, fix: LEDGER_FIX };
+  try {
+    accessSync(ledger, constants.R_OK | constants.W_OK);
+  } catch {
+    return { reason: `The coordination ledger ${ledger} is not readable and writable.`, fix: LEDGER_FIX };
+  }
+  return { client, ledger };
 }
 
 function mainCheckout(cwd) {
@@ -202,12 +220,10 @@ function ownedEntries(client, ledger, worktree) {
   return (state.entries ?? []).filter((entry) => entry?.worktree === worktree && (entry.status === 'active' || entry.status === 'parked'));
 }
 
-// Frees what setup claimed and closes the entry, then deletes the checkout.
-// The branch goes too only when it has no commits beyond where setup started
-// it, so removal never loses work that exists only on that branch.
-function tearDown(client, ledger, worktree, main, { newBranchStart } = {}) {
-  const branch = git(worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
-  const tip = git(worktree, 'rev-parse', 'HEAD');
+// Frees the loopback ports of the worktree's entries and finishes a still-active
+// one as discarded. Returns the entries it found.
+function releaseEntries({ client, ledger }, worktree, reason) {
+  if (!ledger) return [];
   const entries = ownedEntries(client, ledger, worktree);
   for (const entry of entries) {
     const loopback = (entry.resources ?? []).filter((resource) => /^loopback:127\.0\.0\.1:\d+$/i.test(String(resource).trim()));
@@ -217,11 +233,21 @@ function tearDown(client, ledger, worktree, main, { newBranchStart } = {}) {
     }
     if (entry.status !== 'active') continue;
     const finished = spawnSync(process.execPath, [client, 'finish', '--file', ledger, '--id', entry.id, '--adapter', 'chain-scanner',
-      '--outcome', 'discarded', '--reason', `Claude Code removed worktree ${worktree}; branch ${branch} at ${tip} was not checked for landing.`],
-    { cwd: worktree, encoding: 'utf8' });
+      '--outcome', 'discarded', '--reason', reason], { cwd: worktree, encoding: 'utf8' });
     if (finished.status === 0) log(`finished ${entry.id} as discarded.`);
-    else log(`warning: ${entry.id} stays active without its ports; finish it by hand: ${(finished.stderr || finished.stdout || '').trim()}`);
+    else log(`warning: ${entry.id} stays active without its ports; finish it by hand: ${oneLine(finished.stderr || finished.stdout || '')}`);
   }
+  return entries;
+}
+
+// Frees what setup claimed and closes the entry when there is a ledger, then
+// deletes the checkout. The branch goes too only when it has no commits beyond
+// where setup started it, so removal never loses work that exists only on that
+// branch.
+function tearDown(access, worktree, main, { newBranchStart } = {}) {
+  const branch = git(worktree, 'rev-parse', '--abbrev-ref', 'HEAD');
+  const tip = git(worktree, 'rev-parse', 'HEAD');
+  const entries = releaseEntries(access, worktree, `Claude Code removed worktree ${worktree}; branch ${branch} at ${tip} was not checked for landing.`);
   run('git', ['worktree', 'remove', '--force', worktree], { cwd: main });
   const unchanged = tip === newBranchStart || entries.some((entry) => entry.branchName === branch && entry.startBranchSha === tip);
   if (unchanged && branch !== 'HEAD') {
@@ -232,8 +258,28 @@ function tearDown(client, ledger, worktree, main, { newBranchStart } = {}) {
   }
 }
 
+// Registers the worktree and claims its two ports. A failure here, such as a
+// full port range, leaves the worktree usable without ports: the partial entry
+// is closed and the warning says why.
+async function registerPorts(access, worktree, name) {
+  const { client, ledger } = access;
+  try {
+    const entry = beginEntry(client, ledger, worktree, name);
+    const ports = await claimPorts(client, ledger, worktree, entry.id);
+    writeFileSync(join(worktree, ENV_FILE), environmentText(entry.id, ports));
+    log(`claimed CHAIN_NATIVE_PORT=${ports[0]} and CHAIN_NATIVE_SMOKE_PORT=${ports[1]} in ${ledger}.`);
+  } catch (error) {
+    rmSync(join(worktree, ENV_FILE), { force: true });
+    try {
+      releaseEntries(access, worktree, `Setup of Claude Code worktree ${worktree} could not claim its ports: ${oneLine(error.message)}`);
+    } catch (releaseError) {
+      log(`warning: could not close the partial ledger entry of ${worktree}; check it with the coordination client's status: ${oneLine(releaseError.message)}`);
+    }
+    warn(error.message, `Check the host ledger ${ledger} with the coordination client's status, free stale claims or widen CHAIN_WORKTREE_PORT_RANGE, then create the worktree again.`);
+  }
+}
+
 async function remove(input) {
-  refuseInCI();
   const requested = typeof input.worktree_path === 'string' ? input.worktree_path : '';
   if (!isAbsolute(requested)) throw new SetupError('The WorktreeRemove input needs an absolute worktree_path.');
   if (!existsSync(requested)) throw new SetupError(`${requested} is already gone; any ledger claims it held must be released by hand.`);
@@ -242,20 +288,22 @@ async function remove(input) {
   if (top !== worktree) throw new SetupError(`${worktree} is not a worktree root; nothing was removed.`);
   const main = mainCheckout(worktree);
   if (main === worktree) throw new SetupError(`${worktree} is the main checkout; worktree setup never removes it.`);
-  const client = coordinationClient();
-  const ledger = canonicalLedger(client, worktree);
-  tearDown(client, ledger, worktree, main);
+  // Without a ledger the checkout still goes, but no claim can be released and
+  // the branch is kept: only a ledger entry shows where it started.
+  const access = ledgerAccess(worktree);
+  if (!access.ledger) {
+    log(`warning: no claims released for ${worktree}: ${oneLine(access.reason)} Any ports it holds stay claimed in the host ledger; release them by hand with the coordination client's release-claim and finish. ${oneLine(access.fix)}`);
+  }
+  tearDown(access, worktree, main);
 }
 
 async function create(input) {
-  refuseInCI();
   const name = String(input.name ?? '').trim();
   if (!WORKTREE_NAME.test(name) || name.includes('..')) throw new SetupError(`Invalid worktree name: ${JSON.stringify(input.name ?? '')}.`);
   const from = resolve(typeof input.cwd === 'string' && isAbsolute(input.cwd) ? input.cwd : process.cwd());
   const top = git(from, 'rev-parse', '--show-toplevel');
   const main = mainCheckout(top);
-  const client = coordinationClient();
-  const ledger = canonicalLedger(client, main);
+  const access = ledgerAccess(main);
   const worktree = join(main, '.claude', 'worktrees', name);
   const branch = `worktree-${name}`;
   if (existsSync(worktree)) throw new SetupError(`${worktree} already exists; setup stopped and wrote nothing.`);
@@ -267,18 +315,16 @@ async function create(input) {
   log(run('git', ['worktree', 'add', '-b', branch, worktree, start], { cwd: top }).stderr.trim());
   try {
     provideDependencies(main, worktree);
-    const entry = beginEntry(client, ledger, worktree, name);
-    const ports = await claimPorts(client, ledger, worktree, entry.id);
-    writeFileSync(join(worktree, ENV_FILE), environmentText(entry.id, ports));
-    log(`claimed CHAIN_NATIVE_PORT=${ports[0]} and CHAIN_NATIVE_SMOKE_PORT=${ports[1]} in ${ledger}.`);
   } catch (error) {
     try {
-      tearDown(client, ledger, worktree, main, { newBranchStart: start });
+      tearDown(access, worktree, main, { newBranchStart: start });
     } catch (cleanupError) {
       log(`warning: could not undo the partial setup of ${worktree}: ${cleanupError.message}`);
     }
     throw error;
   }
+  if (access.ledger) await registerPorts(access, worktree, name);
+  else warn(access.reason, access.fix);
   process.stdout.write(`${worktree}\n`);
 }
 
@@ -308,10 +354,9 @@ unset __chain_wt_env __chain_wt_key __chain_wt_value
 function sessionStart() {
   const target = String(process.env.CLAUDE_ENV_FILE ?? '').trim();
   if (!target) return;
-  try {
-    refuseInCI();
-  } catch (error) {
-    log(`${error.message} The port loader was not added.`);
+  const variable = ciVariable();
+  if (variable) {
+    log(`${variable} is set: no worktree ports exist in CI, so the port loader was not added.`);
     return;
   }
   const existing = existsSync(target) ? readFileSync(target, 'utf8') : '';
