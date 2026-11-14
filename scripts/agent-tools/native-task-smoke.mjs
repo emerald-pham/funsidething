@@ -7,6 +7,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { waitForTruthyProbe } from './async-probe.mjs';
+import { servedShellReader } from '../shell-fingerprints.mjs';
 
 export const PUBLIC_ORIGINS = Object.freeze([
   'https://emerald-pham.github.io/funsidething/',
@@ -88,9 +89,12 @@ async function runNativeSmoke(options) {
   assert.equal(execFileSync('git', ['rev-parse', source + '^{tree}'], { cwd: repo, encoding: 'utf8' }).trim(), tree,
     'Explicit source commit must resolve to the declared tree');
   const shellFiles = productShell(repo, source);
-  const sourceAssets = new Map(shellFiles.map(relative => [relative, gitBytes(repo, source, relative)]));
-  for (const [relative, expected] of sourceAssets) {
-    assert.deepEqual(fs.readFileSync(path.join(repo, relative)), expected,
+  // The source is served, and expected from the public origin, as the Pages
+  // deploy publishes it: committed bytes with computed shell identities (#2380).
+  const served = servedShellReader(relative => gitBytes(repo, source, relative));
+  const sourceAssets = new Map(shellFiles.map(relative => [relative, served(relative)]));
+  for (const relative of shellFiles) {
+    assert.deepEqual(fs.readFileSync(path.join(repo, relative)), gitBytes(repo, source, relative),
       'Checkout product asset differs from the explicit Git source: ' + relative);
   }
   const expectedDocument = sourceAssets.get('index.html');
@@ -142,9 +146,9 @@ async function runNativeSmoke(options) {
           }
           const relative = decodeURIComponent(requestUrl.pathname.slice(1)) || 'index.html';
           assert.ok(!relative.split('/').includes('..') && !path.isAbsolute(relative), 'Fixture asset path must stay inside the repository');
-          const bytes = sourceAssets.get(relative) ?? gitBytes(repo, source, relative);
+          const bytes = sourceAssets.get(relative) ?? served(relative);
           const checkout = fs.readFileSync(path.join(repo, relative));
-          assert.deepEqual(checkout, bytes, 'Every served app byte must match the explicit Git source: ' + relative);
+          assert.deepEqual(checkout, gitBytes(repo, source, relative), 'Every served app byte must match the explicit Git source: ' + relative);
           sourceAssets.set(relative, bytes);
           response.writeHead(200, { 'Content-Type': contentType(relative), 'Cache-Control': 'no-store', 'Service-Worker-Allowed': '/' });
           response.end(bytes);
