@@ -25296,7 +25296,7 @@ test('RISK PWA cache contract: fingerprints --write stamps only the computed val
 });
 
 // Runs the Pages job's own shell steps (#2380) in a disposable repository, so
-// the published site is what the actual deploy would upload for that commit.
+// the published site is what the actual deploy would publish for that commit.
 const deployPagesSite2380=repo=>{
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
  const job=workflow.split('\n  deploy-pages:\n')[1];assert.ok(job,'the Pages deploy job exists');
@@ -25318,7 +25318,7 @@ const shellCheckout2380=()=>{
  for(const file of files){fs.mkdirSync(path.dirname(path.join(repo,file)),{recursive:true});fs.copyFileSync(path.join(__dirname,file),path.join(repo,file));}
  const git=(...args)=>{const result=spawnSync('git',args,{cwd:repo,encoding:'utf8',maxBuffer:64*1024*1024});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
  git('init','-q','-b','main');git('config','user.email','deploy-2380@example.invalid');git('config','user.name','Deploy fixture');
- const commit=message=>{git('add','--all');git('-c','core.hooksPath=/dev/null','commit','-qm',message);return git('rev-parse','HEAD');};
+ const commit=message=>{git('add','--all');git('-c','core.hooksPath=/dev/null','commit','-qm',message);};
  return {repo,localPaths,git,commit};
 };
 const servedValues2380=site=>({
@@ -25356,28 +25356,6 @@ test('RISK repository process: the Pages deploy after a shell-asset edit with no
  }finally{fs.rmSync(fixture.repo,{recursive:true,force:true});}
 });
 
-test('RISK PWA delivery: local serving after a shell-asset edit with no refresh serves values computed from the files it serves',async()=>{
- const port=process.env.CI==='true'?0:Number(process.env.CHAIN_NATIVE_PORT);
- assert.ok(Number.isInteger(port)&&port>=0&&(port>0||process.env.CI==='true'),'allocate CHAIN_NATIVE_PORT for local serving');
- const fixture=shellCheckout2380(),fetched=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'served-shell-2380-'));
- const {createShellServer}=await import('../scripts/serve-shell.mjs');
- const server=createShellServer(fixture.repo);
- try{
-  const edited=fixture.localPaths.find(file=>file.endsWith('.js'));assert.ok(edited,'precondition: the shell precaches a script asset');
-  fs.appendFileSync(path.join(fixture.repo,edited),'\n// shell edit with no fingerprint refresh (#2380)\n');
-  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
-  const origin='http://127.0.0.1:'+server.address().port;
-  for(const file of [...fixture.localPaths,'sw.js']){
-   const response=await fetch(origin+'/'+file);assert.equal(response.status,200,'served: '+file);
-   fs.mkdirSync(path.dirname(path.join(fetched,file)),{recursive:true});fs.writeFileSync(path.join(fetched,file),Buffer.from(await response.arrayBuffer()));
-  }
-  const root=await fetch(origin+'/');assert.equal(Buffer.from(await root.arrayBuffer()).equals(fs.readFileSync(path.join(fetched,'index.html'))),true,'the root navigation serves the same page');
-  const served=servedValues2380(fetched),expected=expectedShellIdentities2231(fetched);
-  assert.equal(served.app,expected.app,'the locally served build id must match the files it serves');
-  assert.equal(served.cacheName,expected.cacheName,'the locally served CACHE_NAME must match the files it serves');
- }finally{await new Promise(resolve=>server.close(resolve));fs.rmSync(fixture.repo,{recursive:true,force:true});fs.rmSync(fetched,{recursive:true,force:true});}
-});
-
 test('RISK PWA cache contract: a shell-asset edit alone is complete, with no fingerprint refresh to commit',()=>{
  const fixture=shellCheckout2380();
  try{
@@ -25411,6 +25389,30 @@ test('Ducks: seeded occasional takeoffs lift continuously from the water and lea
   assert.notEqual(g.duckPose({...e,age:start+.2},start+.2,0).flying,g.duckPose({...e,age:start+.2},start+.2,1).flying,'companions take off with a slight stagger');
  }
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.duckPose\(/);
+});
+
+// Kept after the shell-identity helpers' region: its async body is not part of
+// the #2231 tooling fixture that review-plan tests read (#2380).
+test('RISK PWA delivery: local serving after a shell-asset edit with no refresh serves values computed from the files it serves',async()=>{
+ const port=process.env.CI==='true'?0:Number(process.env.CHAIN_NATIVE_PORT);
+ assert.ok(Number.isInteger(port)&&port>=0&&(port>0||process.env.CI==='true'),'allocate CHAIN_NATIVE_PORT for local serving');
+ const fixture=shellCheckout2380(),fetched=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'served-shell-2380-'));
+ const {createShellServer}=await import('../scripts/serve-shell.mjs');
+ const server=createShellServer(fixture.repo);
+ try{
+  const edited=fixture.localPaths.find(file=>file.endsWith('.js'));assert.ok(edited,'precondition: the shell precaches a script asset');
+  fs.appendFileSync(path.join(fixture.repo,edited),'\n// shell edit with no fingerprint refresh (#2380)\n');
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
+  const origin='http://127.0.0.1:'+server.address().port;
+  for(const file of [...fixture.localPaths,'sw.js']){
+   const response=await fetch(origin+'/'+file);assert.equal(response.status,200,'served: '+file);
+   fs.mkdirSync(path.dirname(path.join(fetched,file)),{recursive:true});fs.writeFileSync(path.join(fetched,file),Buffer.from(await response.arrayBuffer()));
+  }
+  const root=await fetch(origin+'/');assert.equal(Buffer.from(await root.arrayBuffer()).equals(fs.readFileSync(path.join(fetched,'index.html'))),true,'the root navigation serves the same page');
+  const served=servedValues2380(fetched),expected=expectedShellIdentities2231(fetched);
+  assert.equal(served.app,expected.app,'the locally served build id must match the files it serves');
+  assert.equal(served.cacheName,expected.cacheName,'the locally served CACHE_NAME must match the files it serves');
+ }finally{await new Promise(resolve=>server.close(resolve));fs.rmSync(fixture.repo,{recursive:true,force:true});fs.rmSync(fetched,{recursive:true,force:true});}
 });
 
 test('Scene scale: water depth and vessel class preserve small-craft versus ship proportions',()=>{

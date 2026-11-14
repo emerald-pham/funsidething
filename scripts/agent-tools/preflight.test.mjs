@@ -2,7 +2,8 @@ import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { shellPaths } from '../shell-fingerprints.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -34,7 +35,10 @@ async function createAppFixture(t, suffix) {
   const fixtureFiles = [
     ...testSurface, 'index.html', 'app-release.js', 'location.js', 'vendor/lz-string-1.5.0.min.js',
     'scripts/test-first-gate.mjs',
+    // The shared helpers serve the shell with computed identities (#2380).
+    'scripts/shell-fingerprints.mjs', 'sw.js',
   ];
+  for (const file of shellPaths(readFileSync(path.join(repositoryRoot, 'sw.js'), 'utf8'))) if (!fixtureFiles.includes(file)) fixtureFiles.push(file);
   for (const relative of fixtureFiles) {
     const target = path.join(fixtureRoot, relative);
     await mkdir(path.dirname(target), { recursive: true });
