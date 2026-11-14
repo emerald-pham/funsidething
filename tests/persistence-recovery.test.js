@@ -13243,3 +13243,104 @@ test('RISK unchanged cloud pull: signing in again and a same-email account with 
   assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'completed');
  });
 });
+
+// ---------- #2359: a Postpone or unrecorded mode change in a pass Start began ----------
+// Start records the pass it begins and its first dot. Postpone takes a dot off
+// the chain without recording a decision, so a replay of the pass still has
+// it. Comparing that Start root on the whole chain held every push and pull,
+// as on the owner's phone on 2026-11-13, until the 2 AM reset. These sign in
+// on fake device storage with the fake Firebase SDK, as #2348 does.
+async function startedPassDevice2359(t,name,options={}){
+ const device=await signedInDevice2348(t,name,options);
+ const act=async(action,el={dataset:{}})=>{await device.ctx.onAction(action,el);await flush();await savesSettled2334(device);await syncSettle(300);};
+ const steps=()=>JSON.parse(device.ctx.supportDiagnosticsText()).events.filter(e=>['cloud-pull','cloud-merge'].includes(e.stage)).map(e=>e.stage+':'+e.status);
+ return {...device,act,steps};
+}
+async function startedPassWithTwoAnswers2359(t,name){
+ const device=await startedPassDevice2359(t,name),{ctx,shim}=device;
+ await device.signIn();
+ for(const title of ['Task A 2359','Task B 2359','Task C 2359','Task D 2359']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ await savesSettled2334(device);await syncSettle(300);
+ await device.act('start-scan');   // an empty chain: Start dots the first task
+ assert.equal(ctx.state.chain.length,1,'precondition: Start placed one dot');
+ await device.act('yes');await device.act('yes');
+ assert.equal(device.status().text,'☁ synced','positive control: Start and two Yes answers sync: '+device.status().title);
+ assert.equal(ctx.state.chain.length,3,'positive control: three dots');
+ return device;
+}
+
+test('RISK started pass sync: a Postpone of a dot in a pass Start began reaches the cloud without holding sync',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'postpone'),{ctx,backend}=device;
+ const revision=backend.docs.get('users/owner').rev,postponed=ctx.state.chain.at(-1);
+ await device.act('bench-postpone');
+ assert.equal(ctx.state.chain.length,2,'the Postpone took the newest dot off');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ assert.ok(backend.docs.get('users/owner').rev>revision,'the Postpone reaches the cloud');
+ const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+ const cloud=JSON.parse((await reader.CS.pull()).payload);
+ assert.equal(cloud.chain.includes(postponed),false,'the cloud chain no longer has the postponed dot');
+ assert.ok(ctx.taskPostponeUntil(cloud.tasks.find(task=>task.id===postponed))>Date.now(),'and the cloud keeps the postponement');
+});
+
+test('RISK started pass sync: opening the app after a Postpone in a pass Start began completes the launch merge and uploads the next edit',async t=>{
+ for(const acknowledgement of ['saved before #2354, naming no copy','naming the acknowledged copy'])await t.test(acknowledgement,async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'relaunch');
+  await device.act('bench-postpone');
+  // As on every device saved before #2354: the acknowledgement names no copy.
+  if(acknowledgement.startsWith('saved before')){delete device.ctx.state.decisionBase.copy;await device.ctx.persist();}
+  await closeLegacyApp173(device);device.backend.CS.suspend();
+  const reopened=await startedPassDevice2359(t,'relaunch-reopened',{indexedDB:device.indexedDB,deviceDbName:device.deviceDbName,sharedDocs:device.backend.docs});
+  await reopened.signIn();await syncSettle(300);
+  t.diagnostic(JSON.stringify({status:reopened.status(),steps:reopened.steps()}));
+  assert.equal(reopened.steps().includes('cloud-merge:failed'),false,'no launch merge fails: '+JSON.stringify(reopened.steps()));
+  if(acknowledgement.startsWith('saved before'))assert.deepEqual(reopened.steps().slice(-2),['cloud-pull:completed','cloud-merge:completed'],'a full download whose merge completes');
+  assert.equal(reopened.status().text,'☁ synced','the launch pull settles synced: '+reopened.status().title);
+  const revision=reopened.backend.docs.get('users/owner').rev;
+  reopened.shim.document.getElementById('addInput').value='Added after the relaunch 2359';await reopened.act('add');
+  assert.equal(reopened.status().text,'☁ synced','the next edit syncs: '+reopened.status().title);
+  const reader=await loadCloudBackendV2({sharedDocs:reopened.backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+  const read=await reader.CS.pull();
+  assert.ok(read.rev>revision,'at a later revision');
+  assert.ok(JSON.parse(read.payload).tasks.some(task=>task.title==='Added after the relaunch 2359'),'the edit reaches the cloud');
+ });
+});
+
+test('RISK started pass sync: a Postpone of the first dot Start placed dots the next task and keeps syncing through the next answer',async t=>{
+ const device=await startedPassDevice2359(t,'first-dot'),{ctx,shim,backend}=device;
+ await device.signIn();
+ for(const title of ['Task A 2359','Task B 2359','Task C 2359']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ await savesSettled2334(device);await syncSettle(300);
+ await device.act('start-scan');
+ const [first]=ctx.state.chain;
+ assert.equal(ctx.state.chain.length,1,'precondition: Start placed one dot');
+ assert.equal(device.status().text,'☁ synced','positive control: Start syncs: '+device.status().title);
+ await device.act('bench-postpone');
+ assert.equal(ctx.state.chain.length,1,'the Postpone emptied the chain, so the next task is dotted');
+ assert.notEqual(ctx.state.chain[0],first,'and it is another task');
+ assert.equal(device.status().text,'☁ synced','sync is not held after the Postpone: '+device.status().title);
+ const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+ assert.deepEqual(JSON.parse((await reader.CS.pull()).payload).chain,Array.from(ctx.state.chain),'the cloud has the new dot');
+ await device.act('yes');
+ assert.equal(ctx.state.chain.length,2,'positive control: the next Yes dots the candidate');
+ assert.equal(device.status().text,'☁ synced','sync is not held after the next answer: '+device.status().title);
+ assert.deepEqual(JSON.parse((await reader.CS.pull()).payload).chain,Array.from(ctx.state.chain),'the cloud has both dots');
+});
+
+test('RISK started pass sync: Undo of a Postpone in a pass Start began puts the dot back and keeps syncing, through the Postpone and the next answer',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'undo'),{ctx,backend}=device;
+ const chain=Array.from(ctx.state.chain),postponed=chain.at(-1);
+ const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+ await device.act('bench-postpone');
+ assert.equal(device.status().text,'☁ synced','the Postpone syncs: '+device.status().title);
+ assert.deepEqual(JSON.parse((await reader.CS.pull()).payload).chain,chain.slice(0,-1),'precondition: the cloud has the Postpone');
+ await device.act('undo');
+ assert.deepEqual(Array.from(ctx.state.chain),chain,'Undo puts the dot back in its place');
+ assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(task=>task.id===postponed)),0,'and ends the postponement');
+ assert.equal(device.status().text,'☁ synced','sync is not held after Undo: '+device.status().title);
+ const cloud=JSON.parse((await reader.CS.pull()).payload);
+ assert.deepEqual(cloud.chain,chain,'the cloud has the dot back');
+ assert.equal(ctx.taskPostponeUntil(cloud.tasks.find(task=>task.id===postponed)),0,'and no postponement');
+ await device.act('yes');
+ assert.equal(ctx.state.chain.length,chain.length+1,'positive control: the next Yes dots the candidate');
+ assert.equal(device.status().text,'☁ synced','sync is not held after the next answer: '+device.status().title);
+});

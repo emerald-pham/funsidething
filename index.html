@@ -7088,6 +7088,16 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     // own, which a Postpone may then take off again without a record, so that
     // is not held either.
     const returned=compared.map(event=>event.target?.type==="pass"&&event.target.property==="chain"?currentChoiceChainReturnId(event):null);
+    // #2359: a Start root records the pass it began and its first dot, so its
+    // row is checked on those, like a Return. Later dots come from answers,
+    // which are checked as comparisons, and a Postpone takes a dot off with no
+    // record: comparing the whole chain held every push and pull of a Started
+    // pass after a Postpone until the 2 AM reset, as it did on the owner's
+    // phone on 2026-11-13. A pass id or start time the replay does not give is
+    // still held, and so is a first dot the board shows while the replay
+    // leaves it off. A pass carried over 2 AM has no root and already works
+    // this way.
+    const rooted=compared.map((event,index)=>returned[index]===null?currentChoiceStartRootId(event):null);
     const comparedFacts=(source,event,index)=>{
       const {type,id,property}=event.target;
       if(type==="task" && property==="disposition"){
@@ -7095,6 +7105,11 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
         return ["considered","cantAt","workedAt"].map(key=>canonicalDecisionFact(field(key)));
       }
       if(returned[index]!==null)return [Array.isArray(source.chain)&&source.chain.includes(returned[index])];
+      if(rooted[index]!==null){
+        const field=key=>[Object.hasOwn(source,key),source[key]??null];
+        return [canonicalDecisionFact(field("passId")),canonicalDecisionFact(field("passStartedAt")),
+          Array.isArray(source.chain)&&source.chain.includes(rooted[index])];
+      }
       if(type==="pass"){
         const field=key=>[Object.hasOwn(source,key),source[key]??null];
         return (property==="chain"?["chain","passId","passStartedAt"]:property==="mode"?["mode"]:["scanMode","chance"]).map(key=>canonicalDecisionFact(field(key)));
@@ -7137,6 +7152,10 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
       const expected=expectedFacts[index].facts;
       if(returned[index]!==null){
         if(actual[0]&&!expected[0])return "unprojectable-decision-evidence";
+        continue;
+      }
+      if(rooted[index]!==null){
+        if(actual[0]!==expected[0]||actual[1]!==expected[1]||actual[2]&&!expected[2])return "unprojectable-decision-evidence";
         continue;
       }
       if(type!=="task"||event.target.property!=="disposition"){
@@ -11498,6 +11517,12 @@ function currentChoiceChainReturn(passId,id){
 function currentChoiceChainReturnId(event){
   return event?.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain"&&
     event.target.id===event.passId&&supportedCurrentChoiceEvent(event)?event.before.value[0]:null;
+}
+// #2359: the Start root of a pass, [] to [id] into the new pass it began.
+// supportedCurrentChoiceEvent pins that shape for a row naming another pass.
+function currentChoiceStartRootId(event){
+  return event?.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain"&&
+    event.target.id!==event.passId&&supportedCurrentChoiceEvent(event)?event.value[0]:null;
 }
 function currentChoiceDispositionValueSupported(value){
   if(value?.kind==="no"&&Object.keys(value).length===1)return true;
