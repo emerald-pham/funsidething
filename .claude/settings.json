@@ -12,6 +12,41 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/agent-tools/worktree-setup.mjs\" session-start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/agent-tools/worktree-setup.mjs\" create",
+            "timeout": 600,
+            "statusMessage": "Preparing the agent worktree"
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/agent-tools/worktree-setup.mjs\" remove",
+            "timeout": 120,
+            "statusMessage": "Releasing the agent worktree"
+          }
+        ]
+      }
     ]
   }
 }

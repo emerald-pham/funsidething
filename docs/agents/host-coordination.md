@@ -21,6 +21,12 @@ Run new `begin` commands at the actual Git worktree root; subdirectory invocatio
 
 This entry point supports shared lifecycle and ownership plus Chain Scanner completion. Den of Wolves keeps its existing completion client, validation, version and changelog gates. Adoption does not migrate that repository or replace its release contract. Slot allocation and repository-specific validation commands remain with their existing clients on the same ledger.
 
+## Agent worktree setup
+
+Claude Code's WorktreeCreate, WorktreeRemove and SessionStart hooks in `.claude/settings.json` run `scripts/agent-tools/worktree-setup.mjs` (#2364). `create` adds `.claude/worktrees/<name>` on a new `worktree-<name>` branch from the invoking checkout's `HEAD`. It links the main checkout's `node_modules` when both lockfiles are byte-identical and otherwise runs `npm ci`. It registers the worktree with `begin`, claims two loopback ports that are free and unclaimed in the ledger (default range 42100-42999; `CHAIN_WORKTREE_PORT_RANGE=<start>-<end>` overrides it) and writes them as `CHAIN_NATIVE_PORT` and `CHAIN_NATIVE_SMOKE_PORT` to the ignored `.chain-worktree.env`. The SessionStart hook adds a loader to the session's environment file that exports those two values before every Bash command run inside a worktree; in another shell, run `set -a; . ./.chain-worktree.env; set +a`. `remove` releases the ports, finishes a still-active entry as discarded, removes the checkout and deletes its branch only when the branch has no new commits. Claude Code keeps subagent worktrees without running the remove hook, so clean those up through the same command, from the main checkout: `printf '{"worktree_path":"%s"}' "$WORKTREE" | node scripts/agent-tools/worktree-setup.mjs remove`, where `WORKTREE` is the worktree's absolute path.
+
+The hook uses the installed stable client at `$HOME/.local/bin/chain-coordination.mjs` and the ledger it discovers. Before writing anything, it stops on a missing client, a missing ledger file, conflicting ledger settings or `CI`/`GITHUB_ACTIONS`. A setup that fails later removes its partial worktree and claims.
+
 Tests and examples use an explicit fixture ledger. Never point tests at the live host ledger, and never create a repository-local coordination file for convenience. If the stable copy cannot load or the configured paths conflict, report that state rather than falling back to a second ledger.
 
 ## Durable host migration
