@@ -41,9 +41,9 @@ paths touch the change. For a visual or motion change, cover the numerical
 geometry or paint contract, reduced motion, and relevant phone, tablet, and
 short-landscape viewports. For offline changes, check the asset fingerprint and
 offline reload. The changelog app fingerprint and the worker `CACHE_NAME` are
-never committed: the checkout keeps placeholders, and the Pages deploy,
-`npm run serve`, the test harness and the installed-client native cases stamp
-values computed from the files they serve (`scripts/shell-fingerprints.mjs`,
+never committed: the checkout keeps placeholders, and every consumer that
+serves the shell (the Pages deploy, `npm run serve`, the test harness, the native
+cases and Beta packaging) stamps values computed from the files it serves (`scripts/shell-fingerprints.mjs`,
 #2380), so a shell edit needs no refresh commit. A text or styling fix needs a direct UI assertion that would
 have failed before the edit. Run the focused tests and affected regression
 cohort; broaden to the full suite when risk or a required release gate warrants
