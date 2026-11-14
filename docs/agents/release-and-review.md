@@ -194,8 +194,9 @@ One independent reviewer, distinct from the owner, covers in one pass:
 1. Code behavior: the full exact base-to-candidate diff, including error paths,
    compatibility with older saved data and clients, and anything the diff removes.
 2. Relevant tests: an observed behavioral RED and GREEN for each functional
-   change, discriminating assertions with independent expected values, and no
-   removed or weakened protection without a recorded rationale.
+   change, discriminating assertions with independent expected values, a test
+   for every case each FAQ answer or changelog line promises, and no removed or
+   weakened protection without a recorded rationale.
 3. User-visible and data safety: what users see and do, saved boards, backups,
    cloud sync, Undo and offline behavior affected by the change, and the
    extended FAQ where behavior changed.

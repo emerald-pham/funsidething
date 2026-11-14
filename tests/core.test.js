@@ -12915,7 +12915,6 @@ test("UI #2359 guidance: the mounted FAQ and Settings changelog say a Postpone o
   const help = app.shim.document.getElementById("modalRoot").innerHTML;
   const answer = help.match(/<dt>How is Postpone saved and reversed\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
   assert.match(answer, /Postponing a dotted task syncs like any other change/i, "the FAQ says a Postpone syncs");
-  assert.doesNotMatch(answer, /[a-z]\.[A-Z]/, "every sentence in the answer is followed by a space");
   const notes = help.match(/<details class="help-faq" data-help-changelog>([\s\S]*?)<\/details>/)?.[1] ?? "";
   assert.match(notes, /Postponing a dotted task after Start no longer pauses cloud sync/i, "the changelog announces the fix");
   assert.match(notes, /No — work the chain/, "and names the mode change it also fixes");
@@ -12925,6 +12924,28 @@ test("UI #2359 guidance: the mounted FAQ and Settings changelog say a Postpone o
   assert.doesNotMatch(notes, /A board already paused this way syncs/, "the changelog does not promise every paused board syncs on opening");
   assert.match(notes, /A board already paused by a Postpone while scanning syncs once this update opens it/, "it promises that only for the Postpone case");
   assert.match(notes, /One paused after No — work the chain and a later Rescan or Postpone can stay paused until the 2 AM pass reset or a fresh pass/, "and says when the mode-change case clears");
+});
+
+// #2366 (spec #2363): "began.Return", one sentence run into the next, reached review in the
+// #2359 Postpone answer, whose own spacing check this replaces. Every FAQ answer and changelog
+// item is read as the mounted Help shows it. Numbers (12.5%, 02:30) and a lowercase letter
+// after the period (index.html) fall outside the pattern, so no dotted form needs an allowlist yet.
+test("UI #2366 guidance: no mounted FAQ answer or Settings changelog item runs one sentence into the next without a space", async t => {
+  const app = await loadApp(); t.after(() => app.dispose());
+  const templates = ["appChangelogCurrent", "appChangelog"].map(id => [id, html.match(new RegExp('<template id="' + id + '">([\\s\\S]*?)<\\/template>'))[1]]);
+  for (const [id, source] of templates) app.shim.document.getElementById(id).innerHTML = source;
+  await app.ctx.onAction("help", {});
+  const help = app.shim.document.getElementById("modalRoot").innerHTML;
+  const notes = help.match(/<details class="help-faq" data-help-changelog>([\s\S]*?)<\/details>/)?.[1] ?? "";
+  // Inline tags sit inside a sentence, so they join the text around them; block tags separate it.
+  const read = markup => markup.replace(/<\/?(?:a|b|code|em|i|kbd|span|strong)\b[^>]*>/g, "").replace(/<[^>]+>/g, " ");
+  const answers = [...help.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(m => ({ where: "FAQ " + read(m[1]).trim(), text: read(m[2]) }));
+  const items = [...notes.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(m => ({ where: "changelog", text: read(m[1]) }));
+  assert.equal(answers.length, (help.match(/<dd>/g) ?? []).length, "every FAQ answer is read");
+  assert.ok(answers.some(answer => answer.where === "FAQ How is Postpone saved and reversed?"), "including the #2359 Postpone answer");
+  assert.equal(items.length, templates.reduce((count, [, source]) => count + (source.match(/<li>/g) ?? []).length, 0), "every changelog item of both templates is read");
+  const unspaced = [...answers, ...items].flatMap(({ where, text }) => [...text.matchAll(/\S{0,24}[a-z)”’][.!?][A-Z“‘]\S{0,24}/g)].map(m => where + ": " + m[0]));
+  assert.deepEqual(unspaced, [], "every sentence is followed by a space");
 });
 
 test("UI #221: returning a dot that also carries a hold takes only the dot; a later press of the same button ends the hold", async () => {
@@ -41363,6 +41384,20 @@ test('RISK support diagnostics: recentErrors names each saved-decision, learning
  assert.deepEqual([...codes].filter(code=>code!=='unknown').sort(),[...named].sort(),'each reconcile code is named: '+JSON.stringify(codes));
  assert.equal(codes.filter(code=>code==='unknown').length,other.length,'every other code reads unknown: '+JSON.stringify(codes));
  assert.doesNotMatch(text,/private-task-title-2360|decision-private-2360|learning-from-my-board/,'no unrecognised text enters the report');
+});
+
+// #2365: the November 14 changelog says which further reasons a copied Debug
+// log now names. The sync FAQ already says the log keeps safe codes and is at
+// its 130-word limit. The repository-process completeness test checks each code.
+test('Sync error guidance: the November 14 changelog says the Debug log names more reasons cloud sync stopped',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 14, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(current,/A copied Debug log now names more reasons cloud sync stopped, instead of “unknown”: a cloud save that kept conflicting with a newer revision, a cloud reply the app could not read, a cloud recovery whose starting revision changed before it saved, and a cloud copy that changed while it was being repaired\./,'the November 14 changelog describes it: '+current);
+ assert.match(current,/It also names a cloud save that stopped partway, could not be checked or sealed, or found its cloud copy did not match what it wrote, and a cloud sync that started with no signed-in account\. It still holds no task content\./,'the November 14 changelog names the cloud store reasons');
+ // #2365 review M3: the reasons CloudSync itself creates, outside the adapter.
+ assert.match(current,/while it was being repaired\. Cloud sync’s own stops are named too: a cloud copy in a format this version can’t read yet, a cloud copy that could not be read, a repair that found more protected cloud copies than it can check at once, a cloud read or save that started before the app’s cloud storage code loaded, and a cloud request the app interrupted\. It also names a cloud save/,'the November 14 changelog names the reasons CloudSync creates');
 });
 
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{

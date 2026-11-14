@@ -3,7 +3,8 @@
 ## Forced risk-based TDD and regression gates
 
 Before editing any scanner, landscape, location, or offline-shell behavior,
-write a discriminating test in the matching `tests/` area file, run it, and
+write a discriminating test in the matching `tests/` area file, run it through
+the recorder [workflow](workflow.md#strict-tdd-at-agreed-seams) names, and
 keep the red output for the release record. The edit guard covers every app module. The CI diff gate
 also rejects app changes without changed tests. A new `RISK` test is required in
 the same diff only where saved data, the offline shell or enforcement can break:

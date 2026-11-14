@@ -69,6 +69,9 @@ rather than removing tests because a skill recommends a different style.
 
 For each functional slice, write a discriminating behavioral test and actually
 observe its assertion fail on the intended baseline BEFORE functional code.
+Run that RED, the later GREEN and any sensitivity check through the test-run
+recorder, `npm run agent:record-test-run --`, as
+[test-run provenance](test-run-provenance.md) shows.
 Missing modules, import/compile errors, syntax failures, absent credentials or
 broken test infrastructure do not count as feature RED. Establish a runnable
 boundary and observe the intended behavioral mismatch first. Then implement the
@@ -85,8 +88,9 @@ can preserve bounded existing contracts, but do not replace consumer interaction
 or actual rendered acceptance. Flag gaps, vacuous fixtures, tautologies and
 implementation-coupled assertions for review without weakening passing contracts.
 
-Keep actual commands, baseline/candidate identity, timestamps and observed RED
-and GREEN output with task evidence, redacting secrets and personal data. Label
+Keep the recorder's records with task evidence: they hold the actual commands,
+baseline/candidate identity, timestamps and observed RED and GREEN output.
+Redact secrets and personal data the built-in redaction misses. Label
 retrospective mutants/base comparisons honestly: they cannot restore chronology.
 Reviewers verify the actual order and assertion quality, not just a rationale or
 CI pass. Repair new review findings through their own meaningful RED→GREEN.
