@@ -103,11 +103,16 @@ function validateOriginalProduct(repository, manifest, publicDirectory) {
   if (!isDeepStrictEqual(Object.keys(manifest.files).sort(), [...assets, 'channel-release.json'].sort())) {
     fail('original artifact inventory does not match its committed worker shell and channel metadata.');
   }
-  const committed = file => git('show', product.sourceRevision + ':' + file);
-  let identity;
-  try { identity = computeShell(committed); } catch { fail('original product fingerprint or worker shell identity does not match its committed bytes.'); }
+  // Check every inventory path before computeShell reads any of them from Git.
   for (const file of assets) {
     if (!safeRelativeFile(file)) fail('original committed worker inventory contains an unsafe path.');
+  }
+  const committed = file => git('show', product.sourceRevision + ':' + file);
+  let identity;
+  try { identity = computeShell(committed); } catch (error) {
+    fail('original product fingerprint or worker shell identity does not match its committed bytes: ' + error.message);
+  }
+  for (const file of assets) {
     const staged = fs.readFileSync(path.join(publicDirectory, file));
     if (!staged.equals(identity.files[file] ?? committed(file))) fail('original artifact differs from its committed product bytes: ' + file);
   }

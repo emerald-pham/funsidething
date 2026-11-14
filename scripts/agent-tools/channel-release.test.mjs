@@ -362,6 +362,56 @@ test('Beta packaging refuses traversal in the committed worker inventory before 
   assert.equal(fs.existsSync(f.output), false);
 });
 
+test('Beta continuation names the actual worker shell fault in its original product instead of a byte mismatch (#2383)', t => {
+  const f = reviewedFixture(t);
+  const originalOutput = path.join(f.root, 'original-reviewed');
+  const original = prepare({ ...f, output: originalOutput }, [], false);
+  assert.equal(original.status, 0, original.stderr);
+  // The original product's committed worker gains a comment naming a path
+  // outside the checkout inside its precache list. The double-quoted inventory
+  // is unchanged, so only the shell computation reaches the traversal; a
+  // comment-only diff keeps the fixture's owner-only release receipt valid.
+  const workerPath = path.join(f.repository, 'sw.js');
+  fs.writeFileSync(workerPath, fs.readFileSync(workerPath, 'utf8').replace('"./icon.svg",', "/* '../protected-neighbor' */\"./icon.svg\","));
+  git(f.repository, 'add', 'sw.js');
+  git(f.repository, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture unsafe original worker');
+  const unsafe = git(f.repository, 'rev-parse', 'HEAD');
+  const unsafeTree = git(f.repository, 'rev-parse', 'HEAD^{tree}');
+  const report = path.join(f.root, 'fixture-unsafe-review.md');
+  fs.writeFileSync(report, 'Disposable fixture report for the real receipt verifier; not product release approval.\n');
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+  const { receiptPath, receipt } = recordReleaseEvidence(f.repository, { schemaVersion: 2,
+    candidate: { commitSha: unsafe, treeSha: unsafeTree, baseSha: f.source },
+    ownerReview: { task: '/fixture/beta-owner', outcome: 'approved', reviewedSha: unsafe, completedAt: '2026-10-19T15:00:00.000Z',
+      summary: 'Disposable comment-only worker fixture exercises the continuation shell guard.',
+      scope: { fullDiff: true, rationale: 'This isolated source adds only a worker comment and preserves every product byte.' },
+      evidencePath: report, evidenceSha256: digest(fs.readFileSync(report)) } });
+  // Rebind the retained original artifact to that product, keeping every digest valid.
+  const manifestPath = path.join(originalOutput, 'artifact.json');
+  const envelopePath = path.join(originalOutput, 'public/channel-release.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.product = { ...manifest.product, sourceRevision: unsafe, tree: unsafeTree };
+  manifest.releaseEvidence = { candidate: receipt.candidate, receiptSha256: digest(fs.readFileSync(receiptPath)) };
+  const envelope = JSON.parse(fs.readFileSync(envelopePath, 'utf8'));
+  envelope.product = manifest.product;
+  const envelopeBytes = Buffer.from(JSON.stringify(envelope, null, 2) + '\n');
+  fs.writeFileSync(envelopePath, envelopeBytes);
+  manifest.files['channel-release.json'] = { sha256: digest(envelopeBytes), bytes: envelopeBytes.length };
+  delete manifest.artifactSha256;
+  manifest.artifactSha256 = digest(Buffer.from(JSON.stringify(manifest)));
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+  const proofPath = path.join(f.root, 'continuation-proof.json');
+  fs.writeFileSync(proofPath, JSON.stringify({ artifactDirectory: originalOutput,
+    publicationPath: path.join(f.root, 'fixture-review.md'), publicVerificationPath: path.join(f.root, 'fixture-review.md') }) + '\n');
+
+  const output = path.join(f.root, 'continued-preview');
+  const result = prepare({ ...f, output, deployedAt: '2026-10-20T21:00:00.000Z' }, ['--continue-notice', proofPath]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Precached shell path leaves the checkout: \.\.\/protected-neighbor/,
+    'the failure must carry the underlying shell error, not only a generic byte mismatch');
+  assert.equal(fs.existsSync(output), false);
+});
+
 test('Beta packaging refuses unsafe tab-bearing committed paths even outside the public inventory', t => {
   const f = editableFixture(t, root => fs.writeFileSync(path.join(root, 'outside\tunsafe'), 'synthetic source'));
   const result = prepare(f);
