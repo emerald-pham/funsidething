@@ -13250,14 +13250,34 @@ test('RISK unchanged cloud pull: signing in again and a same-email account with 
 // it. Comparing that Start root on the whole chain held every push and pull,
 // as on the owner's phone on 2026-11-13, until the 2 AM reset. These sign in
 // on fake device storage with the fake Firebase SDK, as #2348 does.
-async function startedPassDevice2359(t,name,options={}){
- const device=await signedInDevice2348(t,name,options);
+// appSource, when given, is an older released client's script.
+async function startedPassDevice2359(t,name,{appSource,...options}={}){
+ if(!appSource)return withSteps2359(await signedInDevice2348(t,name,options));
+ const {IDBFactory}=await import('fake-indexeddb');
+ const indexedDB=options.indexedDB||new IDBFactory(),deviceDbName=options.deviceDbName||'started-pass-2359-'+name+'-'+Math.random();
+ const app=await loadApp({appSource,indexedDBProvider:indexedDB,deviceDbName});t.after(()=>closeLegacyApp173(app));
+ const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ const backend=await loadCloudBackendV2({runtimeWindow:ctx.window,sharedDocs:options.sharedDocs,failures:{authPending:true},timeoutMs:5000,recoveryTimeoutMs:5000});t.after(()=>backend.CS.suspend());
+ await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',ctx))await wait();},name+' opens');
+ await savesSettled2334(app);
+ const signIn=async()=>{backend.emitAuth({uid:'owner',email:'e@example.com'});ctx.closeModal();await flush();await ctx.cloudPull();return savesSettled2334(app);};
+ const status=()=>{const button=shim.document.getElementById('syncBtn');return {text:button.textContent,title:button.title};};
+ return withSteps2359({...app,backend,signIn,status,indexedDB,deviceDbName});
+}
+function withSteps2359(device){
  const act=async(action,el={dataset:{}})=>{await device.ctx.onAction(action,el);await flush();await savesSettled2334(device);await syncSettle(300);};
  const steps=()=>JSON.parse(device.ctx.supportDiagnosticsText()).events.filter(e=>['cloud-pull','cloud-merge'].includes(e.stage)).map(e=>e.stage+':'+e.status);
  return {...device,act,steps};
 }
-async function startedPassWithTwoAnswers2359(t,name){
- const device=await startedPassDevice2359(t,name),{ctx,shim}=device;
+// The client released before #2359: the integration base it branched from.
+const BEFORE_STARTED_PASS_SYNC_RELEASE='b8fd2213148a99913551bed252e36643572b478e';
+function beforeStartedPassSyncApp2359(){
+ const released=spawnSync('git',['show',BEFORE_STARTED_PASS_SYNC_RELEASE+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:64*1024*1024});
+ assert.equal(released.status,0,released.stderr);
+ return extractAppScript(released.stdout);
+}
+async function startedPassWithTwoAnswers2359(t,name,options={}){
+ const device=await startedPassDevice2359(t,name,options),{ctx,shim}=device;
  await device.signIn();
  for(const title of ['Task A 2359','Task B 2359','Task C 2359','Task D 2359']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
  await savesSettled2334(device);await syncSettle(300);
@@ -13376,5 +13396,76 @@ test('RISK started pass sync: going back to scanning after No — work the chain
   assert.equal(ctx.state.mode,'work','Undo goes back to work mode');
   assert.equal(device.status().text,'☁ synced','and syncs: '+device.status().title);
   assert.equal(JSON.parse((await reader.CS.pull()).payload).mode,'work','the cloud is back in work mode');
+ });
+});
+
+// The Start root is still checked on what it records. Another client that
+// writes a board contradicting it is held, and this device keeps its board.
+test('RISK started pass sync: a cloud board whose Start root conflicts on pass id, start time or first dot is still held',async t=>{
+ const rootOf=board=>board.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='chain'&&event.target.id!==event.passId);
+ const conflicts={
+  'a start time the Start root does not give':board=>{board.passStartedAt-=60000;},
+  'a pass the replay has moved past, from a later Start root for another pass':board=>{
+   const root=rootOf(board);
+   board.decisionEvents.push({...structuredClone(root),id:'later-root-2359',actionId:'later-root-action-2359',at:root.at+1,target:{...root.target,id:'later-pass-2359'}});
+  },
+  // A recorded Return of the first dot, contradicted by a board that shows it.
+  'the first dot put back with no record after a recorded Return of it':(board,first)=>{
+   assert.equal(board.chain.includes(first),false,'precondition: the cloud has the Return');board.chain.unshift(first);
+  },
+ };
+ for(const [conflict,write] of Object.entries(conflicts))await t.test(conflict,async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'conflict'),{ctx,shim,backend}=device;
+  const first=ctx.state.chain[0];
+  if(conflict.includes('Return')){
+   ctx.renderScan();returnDotFromScan(ctx,shim,first);await flush();await savesSettled2334(device);await syncSettle(300);
+   assert.equal(ctx.state.chain.includes(first),false,'precondition: the first dot was returned');
+   assert.equal(device.status().text,'☁ synced','positive control: the Return syncs: '+device.status().title);
+  }
+  const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+  const read=await peer.CS.pull(),board=JSON.parse(read.payload);write(board,first);
+  const res=await peer.CS.push(JSON.stringify(board),1792323000000,read.rev);
+  assert.equal(res.ok,true,'positive control: the other client writes');
+  const kept=ctx.cloudPayload();
+  ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:res.rev}});
+  await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.match(device.status().title,/unprojectable decision evidence/,'the pull is held: '+device.status().title);
+  assert.equal(ctx.cloudPayload(),kept,'and this device keeps its board');
+ });
+});
+
+test('RISK started pass sync compatibility: a board the released client held after a Postpone opens here and syncs, and the released client reads the work-mode records this one adds',async t=>{
+ const oldSource=beforeStartedPassSyncApp2359();
+ await t.test('a held board saved by the released client',async t=>{
+  const old=await startedPassWithTwoAnswers2359(t,'released-held',{appSource:oldSource});
+  const postponed=old.ctx.state.chain.at(-1);
+  await old.act('bench-postpone');
+  assert.match(old.status().title,/unprojectable decision evidence/,'positive control: the released client holds sync after the Postpone');
+  const {indexedDB,deviceDbName,backend}=old;
+  await closeLegacyApp173(old);backend.CS.suspend();
+  const reopened=await startedPassDevice2359(t,'released-held-reopened',{indexedDB,deviceDbName,sharedDocs:backend.docs});
+  await reopened.signIn();await syncSettle(300);
+  assert.equal(reopened.steps().includes('cloud-merge:failed'),false,'no launch merge fails: '+JSON.stringify(reopened.steps()));
+  assert.equal(reopened.status().text,'☁ synced','this client syncs the held board: '+reopened.status().title);
+  const reader=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>reader.CS.suspend());
+  const cloud=JSON.parse((await reader.CS.pull()).payload);
+  assert.equal(cloud.chain.includes(postponed),false,'the Postpone the released client could not upload reaches the cloud');
+  assert.ok(reopened.ctx.taskPostponeUntil(cloud.tasks.find(task=>task.id===postponed))>Date.now(),'with its postponement');
+ });
+ await t.test('the released client reads a board with a recorded return to scanning',async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'released-reader');
+  await device.act('start-working');await device.act('rescan');
+  assert.equal(device.status().text,'☁ synced','precondition: this client syncs the recorded return to scanning: '+device.status().title);
+  const {IDBFactory}=await import('fake-indexeddb');
+  const old=await startedPassDevice2359(t,'released-reader-old',{appSource:oldSource,indexedDB:new IDBFactory(),sharedDocs:device.backend.docs});
+  await old.signIn();await syncSettle(300);
+  assert.equal(old.status().text,'☁ synced','the released client takes the board without a hold: '+old.status().title);
+  assert.equal(old.ctx.state.mode,'scan','and shows it scanning');
+  old.shim.document.getElementById('addInput').value='Added by the released client 2359';await old.act('add');
+  assert.equal(old.status().text,'☁ synced','the released client’s edit syncs: '+old.status().title);
+  device.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:device.backend.docs.get('users/owner').rev}});
+  await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.ok(device.ctx.state.tasks.some(task=>task.title==='Added by the released client 2359'),'this client receives it');
+  assert.equal(device.status().text,'☁ synced',device.status().title);
  });
 });

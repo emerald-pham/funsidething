@@ -1842,6 +1842,13 @@ its RISK test; the map follows.
 - RISK unchanged cloud pull: a rebuild of a damaged acknowledged copy whose upload never lands is downloaded in full on the next launch and rebuilt
 - RISK unchanged cloud pull: another device publishing between a skipped pull and this device’s upload is merged, not overwritten
 - RISK unchanged cloud pull: signing in again and a same-email account with another user ID download in full
+- RISK started pass sync: a Postpone of a dot in a pass Start began reaches the cloud without holding sync
+- RISK started pass sync: opening the app after a Postpone in a pass Start began completes the launch merge and uploads the next edit
+- RISK started pass sync: a Postpone of the first dot Start placed dots the next task and keeps syncing through the next answer
+- RISK started pass sync: Undo of a Postpone in a pass Start began puts the dot back and keeps syncing, through the Postpone and the next answer
+- RISK started pass sync: going back to scanning after No — work the chain syncs, whichever control does it
+- RISK started pass sync: a cloud board whose Start root conflicts on pass id, start time or first dot is still held
+- RISK started pass sync compatibility: a board the released client held after a Postpone opens here and syncs, and the released client reads the work-mode records this one adds
 
 ## tests/repository-process.test.js
 

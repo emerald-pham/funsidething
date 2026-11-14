@@ -12908,6 +12908,19 @@ test("UI #221 guidance: the mounted FAQ and Settings changelog say a chain pill 
   assert.match(secondTap, /For a moment after Return as candidate closes the editor, every tap, click and key press is ignored, wherever it lands/);
 });
 
+test("UI #2359 guidance: the mounted FAQ and Settings changelog say a Postpone or going back to scanning in a started pass keeps cloud sync going", async t => {
+  const app = await loadApp(); t.after(() => app.dispose());
+  for (const id of ["appChangelogCurrent", "appChangelog"]) app.shim.document.getElementById(id).innerHTML = html.match(new RegExp('<template id="' + id + '">([\\s\\S]*?)<\\/template>'))[1];
+  await app.ctx.onAction("help", {});
+  const help = app.shim.document.getElementById("modalRoot").innerHTML;
+  const answer = help.match(/<dt>How is Postpone saved and reversed\?<\/dt><dd>(.*?)<\/dd>/)?.[1] ?? "";
+  assert.match(answer, /Postponing a dotted task syncs like any other change/i, "the FAQ says a Postpone syncs");
+  const notes = help.match(/<details class="help-faq" data-help-changelog>([\s\S]*?)<\/details>/)?.[1] ?? "";
+  assert.match(notes, /Postponing a dotted task after Start no longer pauses cloud sync/i, "the changelog announces the fix");
+  assert.match(notes, /No — work the chain/, "and names the mode change it also fixes");
+  assert.match(notes, /unprojectable decision evidence/i, "with the error people saw");
+});
+
 test("UI #221: returning a dot that also carries a hold takes only the dot; a later press of the same button ends the hold", async () => {
   const { ctx, shim } = await loadApp({ seed: 2225 });
   ctx.addTask("First dot", true);
