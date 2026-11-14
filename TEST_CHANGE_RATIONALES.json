@@ -23101,5 +23101,31 @@
       "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test \"--test-name-pattern=#2366 guidance|#2359 guidance\" tests/core.test.js (2026-11-14T10:54:25Z, record 2026-11-14T10-54-25-523Z-9c3a523f in agent-test-runs/issue-2366 under the git common dir), with the new test written and began.Return temporarily put back in index.html",
       "failure": "AssertionError: every sentence is followed by a space; actual ['FAQ How is Postpone saved and reversed?: began.Return'], expected []. A later-baseline-sensitivity run (10:54:41Z) with Synced.Edits put into a November 13 changelog item failed with ['changelog: Synced.Edits'], a case the old assertion did not read. Both temporary index.html edits were reverted before GREEN (10:54:53Z)."
     }
+  },
+  {
+    "baseCommit": "376bf922b7f48249f8166d20ce96a39ae346620f",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.equal(shim.document.getElementById('listSearch').value,'');",
+      "tests/core.test.js:-ctx.addTask('Future').startsAt='2099-01-01';openList(ctx);ctx.toggleListTag('s:evergreen');ctx.setListQuery('missing');",
+      "tests/core.test.js:-ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim).sort(),['Also ready','Ready']);",
+      "tests/core.test.js:-ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim).sort(),['Alpha held','Alpha ready']);clickTag(ctx,'s:postponed');ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),[]);ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);ctx.setListQuery('');ctx.onAction('bulk-select-all',{dataset:{}});assert.deepEqual(selectedListIds(shim).sort(),[a.id,b.id].sort());assert.equal(JSON.stringify(ctx.state),before,'tag search eligibility and selection are view-only');",
+      "tests/core.test.js:-test('Eligibility filter: selecting Eligible clears stale narrowings and shows every eligible task',async()=>{"
+    ],
+    "reason": "#2373: the user asked that choosing All, Eligible or Ineligible in All tasks keep the search text and the context or status filter. Two existing tests encoded the old rule that an eligibility click clears both narrowings.",
+    "previousBehavior": "Clicking an eligibility control blanked #listSearch and reset the saved query and tagFilter. Eligibility filter asserted the search box was empty and every eligible task showed; the Postponed filter test re-clicked s:postponed and re-typed alpha after each eligibility click to restore them.",
+    "intendedBehavior": "Clicking an eligibility control changes only eligibility. The typed search and the context or status tag stay applied, the list and (n of m) count show their intersection, and reopening restores all three. An account change still resets them through ensurePresentationOwner.",
+    "preservedCoverage": [
+      "Eligibility filter still proves Eligible drops a future-dated task and shows the eligible evergreen match; it now also asserts the evergreen tag stays lit and the (1 of 3) count.",
+      "The Postponed filter test keeps every other assertion: tag offer, held rows, search narrowing, filtered Select all, view-only board, return, Undo and clearing the last hold. Its Eligible and Ineligible steps now assert the postponed tag stays lit and Ineligible plus alpha plus postponed shows only Alpha held.",
+      "RISK saved view account boundary and the browser RISK saved view full-board filters case are unchanged and still pass."
+    ],
+    "replacementTests": [
+      "Eligibility filter: selecting Eligible keeps the search and status filter and shows their intersection",
+      "RISK saved view eligibility: switching eligibility keeps the typed search and context filter and both survive reopening"
+    ],
+    "redEvidence": {
+      "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-name-pattern=\"switching eligibility keeps\" tests/core.test.js (2026-11-14T15:46:42Z, agent-test-runs/issue-2373 under the git common dir) before the index.html fix; the two edited tests were updated after review and checked as later-baseline-sensitivity with main index.html restored, then with a mutant setEligibility that keeps the search but clears tagFilter.",
+      "failure": "RED: AssertionError choosing Eligible keeps the typed search, actual empty string, expected Laundry. Baseline sensitivity: all three fail (Eligible drops the future row and keeps both narrowings; #2373: choosing Eligible keeps the postponed tag). Tag-dropping mutant: all three fail (Eligible narrows the searched, filtered rows). GREEN 3/3 after restoring the fix."
+    }
   }
 ]
