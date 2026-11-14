@@ -15928,6 +15928,37 @@ test('RISK saved view restoration: a reopened All Tasks list retains its local s
  assert.equal(JSON.stringify(reopened.ctx.state),initialBoard,'saved-view restoration cannot alter the authoritative board');
 });
 
+// #2373: clicking Eligible, Ineligible or All used to blank the search field and drop the context filter.
+test('RISK saved view eligibility: switching eligibility keeps the typed search and context filter and both survive reopening',async()=>{
+ const board=syncState({
+  contexts:[{id:'home',name:'Home',active:true},{id:'other',name:'Other',active:true}],
+  tasks:[{...syncTask('open-home','Laundry at home'),ctx:['home']},{...syncTask('dotted-home','Laundry folding at home'),ctx:['home']},{...syncTask('open-other','Laundry elsewhere'),ctx:['other']},{...syncTask('control-home','Dishes at home'),ctx:['home']}],
+  chain:['dotted-home'],listOpen:true,seenQuickStart:true
+ });
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ const search=shim.document.getElementById('listSearch');search.id='listSearch';search.value='Laundry';
+ shim.document.dispatchEvent({type:'input',target:search});
+ ctx.onAction('list-tag',{dataset:{id:'c:home'}});
+ const visible=()=>Array.from(ctx.filteredListTasks(),t=>t.id);
+ assert.deepEqual(visible(),['open-home','dotted-home'],'search and context filter combine before eligibility changes');
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});
+ assert.equal(search.value,'Laundry','choosing Eligible keeps the typed search');
+ assert.deepEqual(visible(),['open-home'],'Eligible narrows the searched, filtered rows');
+ assert.match(shim.document.getElementById('listTagRow').innerHTML,/data-id="c:home"[^>]*aria-pressed="true"/,'the context filter stays selected');
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});
+ assert.equal(search.value,'Laundry','choosing Ineligible keeps the typed search');
+ assert.deepEqual(visible(),['dotted-home'],'Ineligible shows only the dotted searched row in the context');
+ ctx.onAction('list-eligibility',{dataset:{id:'all'}});
+ assert.equal(search.value,'Laundry','choosing All keeps the typed search');
+ assert.deepEqual(visible(),['open-home','dotted-home']);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});
+ shim.window.dispatchEvent({type:'pagehide'});
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.equal(reopened.shim.document.getElementById('listSearch').value,'Laundry','reopening restores the search kept across the eligibility switch');
+ assert.deepEqual(Array.from(reopened.ctx.filteredListTasks(),t=>t.id),['dotted-home'],'reopening reapplies search, context and eligibility together');
+});
+
 test('RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes',async()=>{
  const board=syncState({syncAccount:'account-a',tasks:[syncTask('account-a-task','Matching private account A task')],listOpen:true,seenQuickStart:true});
  const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)})});
