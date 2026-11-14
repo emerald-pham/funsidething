@@ -13537,6 +13537,53 @@ test('RISK started pass sync: a cloud board whose Start root conflicts on pass i
   assert.match(device.status().title,/unprojectable decision evidence/,'the pull is held: '+device.status().title);
   assert.equal(ctx.cloudPayload(),kept,'and this device keeps its board');
  });
+ // #2361 review M2/N2: the cases above are still held, by other checks, when the
+ // first-dot or the pass-id part of the Start-root check is removed. Each case
+ // below is held only by one part, so removing that part lets it sync.
+ const modeOf=(board,root)=>board.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='scanMode'&&event.actionId===root.actionId);
+ const onePart={
+  // Only the first-dot part (the board shows it, the replay leaves it off) holds this.
+  'the first dot put back with no record after a recorded Dislodge of it':{
+   setup:async(device,first)=>{
+    await device.act('dislodge');
+    assert.equal(device.ctx.state.chain.includes(first),false,'precondition: Dislodge took the first dot off');
+   },
+   write:(board,first)=>{assert.equal(board.chain.includes(first),false,'precondition: the cloud has the Dislodge');board.chain.unshift(first);},
+  },
+  // A well-formed Start group, so decisionStartIssue accepts it; only the pass-id part holds this.
+  'a complete second Start group for another pass, at the same start time and replayed last':{
+   setup:async()=>{},
+   write:board=>{
+    const root=rootOf(board),mode=modeOf(board,root);
+    assert.ok(root&&mode,'precondition: the cloud has a two-row Start group');
+    // Same time, so the event id orders the two groups: this one replays last.
+    const later={root:'zz-second-root-2361',mode:'zz-second-mode-2361'};
+    assert.ok(later.root>root.id&&later.mode>mode.id,'precondition: the second group sorts after the board\'s own');
+    board.decisionEvents.push(
+     {...structuredClone(root),id:later.root,actionId:'zz-second-start-2361',target:{...root.target,id:'second-pass-2361'}},
+     {...structuredClone(mode),id:later.mode,actionId:'zz-second-start-2361',target:{...mode.target,id:'second-pass-2361'}});
+   },
+  },
+ };
+ for(const [conflict,{setup,write}] of Object.entries(onePart))await t.test(conflict,async t=>{
+  const device=await startedPassDevice2359(t,'conflict-one-part'),{ctx,shim,backend}=device;
+  await device.signIn();
+  for(const title of ['Task A 2361','Task B 2361','Task C 2361']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+  await savesSettled2334(device);await syncSettle(300);
+  await device.act('start-scan');   // an empty chain: Start dots the first task
+  const first=ctx.state.chain[0];
+  await setup(device,first);
+  assert.equal(device.status().text,'☁ synced','positive control: the pass syncs before the other client writes: '+device.status().title);
+  const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+  const read=await peer.CS.pull(),board=JSON.parse(read.payload);write(board,first);
+  const res=await peer.CS.push(JSON.stringify(board),1792323000000,read.rev);
+  assert.equal(res.ok,true,'positive control: the other client writes');
+  const kept=ctx.cloudPayload();
+  ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:res.rev}});
+  await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.match(device.status().title,/unprojectable decision evidence/,'the pull is held: '+device.status().title);
+  assert.equal(ctx.cloudPayload(),kept,'and this device keeps its board');
+ });
 });
 
 test('RISK started pass sync compatibility: a board the released client held after a Postpone opens here and syncs, and the released client reads the work-mode records this one adds',async t=>{

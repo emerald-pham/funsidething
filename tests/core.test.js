@@ -12920,6 +12920,11 @@ test("UI #2359 guidance: the mounted FAQ and Settings changelog say a Postpone o
   assert.match(notes, /Postponing a dotted task after Start no longer pauses cloud sync/i, "the changelog announces the fix");
   assert.match(notes, /No — work the chain/, "and names the mode change it also fixes");
   assert.match(notes, /unprojectable decision evidence/i, "with the error people saw");
+  // #2361 review M1: a board the released client paused after No — work the chain and a later
+  // Rescan or Postpone never recorded its return to scanning, so it stays paused after the update.
+  assert.doesNotMatch(notes, /A board already paused this way syncs/, "the changelog does not promise every paused board syncs on opening");
+  assert.match(notes, /A board already paused by a Postpone while scanning syncs once this update opens it/, "it promises that only for the Postpone case");
+  assert.match(notes, /One paused after No — work the chain and a later Rescan or Postpone can stay paused until the 2 AM pass reset or a fresh pass/, "and says when the mode-change case clears");
 });
 
 test("UI #221: returning a dot that also carries a hold takes only the dot; a later press of the same button ends the hold", async () => {
