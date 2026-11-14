@@ -41396,6 +41396,8 @@ test('Sync error guidance: the November 14 changelog says the Debug log names mo
  const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 14, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(current,/A copied Debug log now names more reasons cloud sync stopped, instead of “unknown”: a cloud save that kept conflicting with a newer revision, a cloud reply the app could not read, a cloud recovery whose starting revision changed before it saved, and a cloud copy that changed while it was being repaired\./,'the November 14 changelog describes it: '+current);
  assert.match(current,/It also names a cloud save that stopped partway, could not be checked or sealed, or found its cloud copy did not match what it wrote, and a cloud sync that started with no signed-in account\. It still holds no task content\./,'the November 14 changelog names the cloud store reasons');
+ // #2365 review M3: the reasons CloudSync itself creates, outside the adapter.
+ assert.match(current,/while it was being repaired\. Cloud sync’s own stops are named too: a cloud copy in a format this version can’t read yet, a cloud copy that could not be read, a repair that found more protected cloud copies than it can check at once, a cloud read or save that started before the app’s cloud storage code loaded, and a cloud request the app interrupted\. It also names a cloud save/,'the November 14 changelog names the reasons CloudSync creates');
 });
 
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{

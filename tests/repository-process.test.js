@@ -2536,6 +2536,62 @@ function unnamedCloudStoreCodes2365(store,html){
  return [...cloudStoreCodes2365(store,html)].filter(([code])=>!Object.hasOwn(SYNC_ERROR_CODE_EXCLUSIONS2365,code)&&!(listed.has(code)&&aliases[code]===code))
   .map(([code,sites])=>code+' ('+sites.join(', ')+')');
 }
+// #2365 review M3: CloudSync creates codes outside the adapter block too. It
+// throws codec-unavailable inside pull and push, and its remote repair returns
+// recovery-source-budget and throws recovery-source-unsupported. They reach
+// cloudFailure only through a variable (`cloudFailure("pull",e)`,
+// `{code:result.code||…}`), so neither gatherer above saw them and the copied
+// Debug log read them as "unknown". This gathers every fixed code the whole
+// CloudSync module (from `const CS = window.CloudSync` to the end of its
+// script) and the cloud store module can create: the value of each `code:`
+// property, `.code=` assignment or `code=` binding, every branch of a ternary
+// or `||` fallback included. A literal the value only compares against
+// (`error?.code==="unavailable"?…`) is a code it reads, not one it creates.
+function cloudSyncModuleSource2365(html){
+ const start=html.indexOf('const CS = window.CloudSync = {'),end=html.indexOf('</script>',start);
+ assert.ok(start>=0&&end>start,'index.html still declares the CloudSync module');
+ return {text:html.slice(start,end),offset:start};
+}
+function createdCodeLiterals2365(text){
+ // Line and block comments are prose, not code. A `//` after a colon is a URL.
+ const source=text.replace(/\/\*[\s\S]*?\*\//g,match=>match.replace(/[^\n]/g,' ')).replace(/(^|[^:"'\\])\/\/[^\n]*/g,(match,lead)=>lead+' '.repeat(match.length-lead.length));
+ const found=[];
+ for(const key of source.matchAll(/(?<![\w$])code\s*(?::|=(?![=>]))/g)){
+  let depth=0,quote=null,end=key.index+key[0].length;
+  for(;end<source.length;end++){
+   const c=source[end];
+   if(quote){if(c==='\\')end++;else if(c===quote)quote=null;continue;}
+   if(c==='"'||c==="'"||c==='`'){quote=c;continue;}
+   if('([{'.includes(c)){depth++;continue;}
+   if(')]}'.includes(c)){if(--depth<0)break;continue;}
+   if(depth===0&&(c===','||c===';'||c==='\n'))break;
+  }
+  const value=source.slice(key.index+key[0].length,end);
+  for(const literal of value.matchAll(/(["'])([^"'\\\n]*)\1/g)){
+   const before=value.slice(0,literal.index),after=value.slice(literal.index+literal[0].length);
+   if(/[=!]==?\s*$/.test(before)||/^\s*[=!]==?/.test(after)||literal[2]==='')continue;
+   found.push({code:literal[2],index:key.index});
+  }
+ }
+ return found;
+}
+function cloudSyncCodes2365(store,html){
+ const codes=new Map(),gather=(text,file,offset,whole)=>{
+  for(const {code,index} of createdCodeLiterals2365(text)){
+   if(!codes.has(code))codes.set(code,[]);
+   codes.get(code).push(file+':'+whole.slice(0,offset+index).split('\n').length);
+  }
+ };
+ const module=cloudSyncModuleSource2365(html);
+ gather(module.text,'index.html CloudSync',module.offset,html);
+ gather(store,'cloud-store-v2.js',0,store);
+ return codes;
+}
+function unnamedCloudSyncCodes2365(store,html){
+ const {codes,aliases}=supportDiagnosticsCodeList2365(html),listed=new Set(codes);
+ return [...cloudSyncCodes2365(store,html)].filter(([code])=>!Object.hasOwn(SYNC_ERROR_CODE_EXCLUSIONS2365,code)&&!(listed.has(code)&&aliases[code]===code))
+  .map(([code,sites])=>code+' ('+sites.join(', ')+')');
+}
 test('RISK support diagnostics: every literal code passed to a sync error reporter is named in the Debug log or deliberately excluded with a reason',async t=>{
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),gathered=syncReporterCodes2365(source);
  for(const code of ['save-loop','unprojectable-decision-evidence','invalid-revision','unknown'])
@@ -2591,5 +2647,36 @@ test('RISK support diagnostics: every literal code passed to a sync error report
   assert.deepEqual(seen.filter(code=>code!=='unknown').sort(),[...batch].sort(),'the copied report names each cloud store code: '+JSON.stringify(seen));
   assert.equal(seen.filter(code=>code==='unknown').length,1,'an unrecognised store code still reads unknown: '+JSON.stringify(seen));
   assert.doesNotMatch(text,/unlisted-store-code-2365/,'an unrecognised store code never enters the report');
+ }
+ // #2365 review M3: every fixed code the CloudSync module or the cloud store
+ // creates, wherever it is created, since any of them can reach cloudFailure.
+ const moduleCodes=cloudSyncCodes2365(store,source);
+ for(const code of ['codec-unavailable','recovery-source-budget','recovery-source-unsupported','recovery-source-read-failed','deadline-exceeded','missing-account'])
+  assert.ok(moduleCodes.has(code),'positive control: the CloudSync gatherer finds '+code+': '+JSON.stringify([...moduleCodes.keys()]));
+ for(const code of ['string','unavailable'])
+  assert.ok(!moduleCodes.has(code),'a literal a code is only compared against is not gathered: '+code);
+ assert.deepEqual(unnamedCloudSyncCodes2365(store,source),[],'name each code CloudSync or the cloud store creates on SUPPORT_DIAGNOSTICS_ERROR_CODES with an identity alias, or add it to SYNC_ERROR_CODE_EXCLUSIONS2365 with a reason');
+ await t.test('negative control: a new code CloudSync creates anywhere in its module fails until it is named or excluded',()=>{
+  const pull='CS.pull = async';
+  assert.ok(source.includes(pull),'index.html still declares CloudSync pull');
+  const added=source.replace(pull,'if(!generationStore)throw Object.assign(Error("x"),{code:"new-cloudsync-throw-2365"});\n'+
+   'if(budget)return {error:true,code:"new-cloudsync-return-2365"};\n'+
+   'const late=Error("x");late.code="new-cloudsync-assigned-2365";\n'+
+   'const stopped=()=>Object.assign(Error("x"),{code:remaining()<=0?"new-cloudsync-ternary-2365":"cancelled"});\n'+
+   'cloudFailure("pull",{code:result.code||(result.cancelled?"recovery-source-changed":"new-cloudsync-fallback-2365")});\n'+pull);
+  const unnamed=unnamedCloudSyncCodes2365(store,added);
+  for(const code of ['new-cloudsync-throw-2365','new-cloudsync-return-2365','new-cloudsync-assigned-2365','new-cloudsync-ternary-2365','new-cloudsync-fallback-2365'])
+   assert.ok(unnamed.some(row=>row.startsWith(code+' ')),'the check names the unlisted '+code+': '+JSON.stringify(unnamed));
+  const outside=source.replace('const SUPPORT_DIAGNOSTICS_ERROR_CODES=','const outsideCloudSync2365={code:"outside-cloudsync-code-2365"};\nconst SUPPORT_DIAGNOSTICS_ERROR_CODES=');
+  assert.ok(!cloudSyncCodes2365(store,outside).has('outside-cloudsync-code-2365'),'the CloudSync gatherer reads the CloudSync module only');
+ });
+ const moduleNamed=[...moduleCodes.keys()].filter(code=>!Object.hasOwn(SYNC_ERROR_CODE_EXCLUSIONS2365,code));
+ for(let start=0;start<moduleNamed.length;start+=19){
+  const batch=moduleNamed.slice(start,start+19),app=await loadApp();t.after(()=>app.dispose());
+  for(const code of [...batch,'unlisted-cloudsync-code-2365'])app.ctx.recordSyncError('pull',code);
+  const text=app.ctx.supportDiagnosticsText(),seen=JSON.parse(text).recentErrors.map(row=>row.code?.value);
+  assert.deepEqual(seen.filter(code=>code!=='unknown').sort(),[...batch].sort(),'the copied report names each CloudSync code: '+JSON.stringify(seen));
+  assert.equal(seen.filter(code=>code==='unknown').length,1,'an unrecognised CloudSync code still reads unknown: '+JSON.stringify(seen));
+  assert.doesNotMatch(text,/unlisted-cloudsync-code-2365/,'an unrecognised CloudSync code never enters the report');
  }
 });
