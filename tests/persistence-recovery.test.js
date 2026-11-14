@@ -13068,6 +13068,88 @@ test('RISK sign-in settles: a task deleted, restored with Undo while synced, the
  assert.equal(result.rev,restored.rev+1,'at the next revision, in one push: '+JSON.stringify([restored.rev,result.rev]));
 });
 
+// #2371: the owner's phone (2026-11-14, build 2a9dcf) stopped with "Cloud push
+// failed (save loop)" after six saves and no upload. A task finished in the
+// cloud copy was restored on the phone, made Evergreen and done again before
+// the phone synced, so it was open there with its done-after-restore proof.
+// The push merged the cloud copy (still finished, never saw the restore) into
+// the board and dropped that proof; the save then merged the saved board back
+// and put the proof back. The board sendPush saved never matched, so the push
+// re-sent itself until the #2348 guard stopped it.
+const RESTORED_TITLE2371='Finished, restored and done again 2371';
+function restoredTask2371(device){return device.ctx.state.tasks.find(task=>task.title===RESTORED_TITLE2371);}
+// The person's own controls: the completed list's Restore, the editor's
+// Evergreen box with Save, and the editor's Done.
+async function restoreEvergreenDone2371(device){
+ const {ctx,shim}=device,id=restoredTask2371(device).id;
+ await ctx.onAction('restore',{dataset:{id}});await flush();await savesSettled2334(device,600);
+ hydrateUnchangedEditorDraft(device,id);shim.document.getElementById('etEver').checked=true;
+ await ctx.onAction('save-edit',{dataset:{id}});ctx.closeModal();await flush();await savesSettled2334(device,600);
+ hydrateUnchangedEditorDraft(device,id);await ctx.onAction('done-task',{dataset:{id}});ctx.closeModal();await flush();
+ await savesSettled2334(device,600);
+}
+// The restored run is open, Evergreen, carries this device's Done date and
+// the proof that the Done came after the restore.
+function restoredDoneAgain2371(task,doneAt){
+ return {evergreen:!!task?.evergreen,done:!!task?.done,doneDate:task?.lastDoneAt===doneAt,proof:!!task?.completedAfterRestoreOp&&task.completedAfterRestoreOp===task.restoredRunOp};
+}
+const KEPT_PROOF2371={evergreen:true,done:false,doneDate:true,proof:true};
+
+test('RISK sign-in settles: a task finished in the cloud copy, then restored, made Evergreen and done again before this device synced, uploads once after sign-in instead of stopping as a save loop, and keeps its Done date and proof',async t=>{
+ const first=await signedInDevice2348(t,'restore-proof'),{backend}=first;
+ await first.signIn();
+ first.shim.document.getElementById('addInput').value=RESTORED_TITLE2371;await first.ctx.onAction('add',{});
+ await savesSettled2334(first);await syncSettle(300);
+ const id=restoredTask2371(first).id;
+ hydrateUnchangedEditorDraft(first,id);await first.ctx.onAction('done-task',{dataset:{id}});first.ctx.closeModal();await flush();
+ await savesSettled2334(first);await syncSettle(300);
+ const finishedRev=backend.docs.get('users/owner').rev;
+ assert.equal(restoredTask2371(first).done,true,'positive control: the task is finished');
+ assert.match(first.status().title,/^Synced as /,'positive control: its completion reached the cloud: '+first.status().title);
+ // The phone opens again; its sign-in has not finished yet.
+ await closeLegacyApp173(first);backend.CS.suspend();
+ const phone=await signedInDevice2348(t,'restore-proof-reopened',{indexedDB:first.indexedDB,deviceDbName:first.deviceDbName,sharedDocs:backend.docs});
+ await restoreEvergreenDone2371(phone);
+ const doneAt=restoredTask2371(phone).lastDoneAt;
+ assert.deepEqual(restoredDoneAgain2371(restoredTask2371(phone),doneAt),KEPT_PROOF2371,'positive control: restored, Evergreen and done again on this device');
+ assert.equal(backend.docs.get('users/owner').rev,finishedRev,'positive control: nothing reached the cloud before sign-in');
+ const cloudTask=async()=>{const peer=await loadCloudBackendV2({sharedDocs:backend.docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+  return JSON.parse((await peer.CS.pull()).payload).tasks.find(task=>task.id===id);};
+ const savedTask=async device=>JSON.parse((await device.ctx.window.ScannerDeviceStore.readHead()).payload).tasks.find(task=>task.id===id);
+
+ const before=phone.saves(),mark=supportMark2346(phone);
+ const after=await phone.signIn();await syncSettle(500);
+ const runs=after.persistCalls.value-before.persistCalls.value,pushes=supportEvents2346(phone,'push',mark).filter(event=>event.status==='acknowledged');
+ t.diagnostic(JSON.stringify({runs,status:phone.status(),pushes:pushes.map(event=>event.metadata?.revision),stops:supportEvents2346(phone,'save-loop-stop',mark).map(event=>event.metadata)}));
+ assert.deepEqual(supportEvents2346(phone,'save-loop-stop',mark).map(event=>event.metadata?.cloudStep),[],'the save loop guard never has to stop a loop');
+ assert.match(phone.status().title,/^Synced as /,'the status settles synced: '+phone.status().title);
+ assert.equal(after.acceptedRequests.value,before.acceptedRequests.value,'precondition: nobody asked for a save during sign-in');
+ assert.ok(runs<=3,'the sign-in saves a few times and stops: '+runs);
+ assert.equal(pushes.length,1,'one upload is acknowledged: '+JSON.stringify(pushes.map(event=>event.metadata)));
+ assert.equal(backend.docs.get('users/owner').rev,finishedRev+1,'the restore, Evergreen and Done reach the cloud at the next revision');
+ assert.deepEqual(restoredDoneAgain2371(await cloudTask(),doneAt),KEPT_PROOF2371,'the cloud copy keeps the Done date and proof');
+ assert.deepEqual(restoredDoneAgain2371(await savedTask(phone),doneAt),KEPT_PROOF2371,'and so does the board saved on this device');
+
+ // Signing in again, as the owner would after the stop.
+ const again=supportMark2346(phone);
+ backend.emitAuth(null);await flush();await savesSettled2334(phone);
+ await phone.signIn();await syncSettle(300);
+ assert.deepEqual(supportEvents2346(phone,'save-loop-stop',again),[],'signing in again stops no loop');
+ assert.match(phone.status().title,/^Synced as /,'signing in again settles synced: '+phone.status().title);
+ assert.deepEqual(restoredDoneAgain2371(restoredTask2371(phone),doneAt),KEPT_PROOF2371,'and keeps the Done date and proof');
+
+ // Reopening the app signed in.
+ const settledRev=backend.docs.get('users/owner').rev;
+ await closeLegacyApp173(phone);backend.CS.suspend();
+ const reopened=await signedInDevice2348(t,'restore-proof-again',{indexedDB:phone.indexedDB,deviceDbName:phone.deviceDbName,sharedDocs:backend.docs});
+ await reopened.signIn();await syncSettle(300);
+ assert.deepEqual(supportEvents2346(reopened,'save-loop-stop'),[],'reopening stops no loop');
+ assert.match(reopened.status().title,/^Synced as /,'reopening settles synced: '+reopened.status().title);
+ assert.equal(backend.docs.get('users/owner').rev,settledRev,'reopening has nothing more to upload');
+ assert.deepEqual(restoredDoneAgain2371(restoredTask2371(reopened),doneAt),KEPT_PROOF2371,'the reopened board keeps the Done date and proof');
+ assert.deepEqual(restoredDoneAgain2371(await cloudTask(),doneAt),KEPT_PROOF2371,'and so does the cloud copy');
+});
+
 // #2346 release review (B1): after a genuine stop the board is saved, but a
 // later save on this device can still fail (Reload app saves first). Then the
 // save error is what the person needs to see, and nothing may say the board

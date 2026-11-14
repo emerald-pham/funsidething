@@ -17401,6 +17401,30 @@ test('RESTORE INTENT: merging independent open runs retains both through the fin
   }
 });
 
+test('RESTORE INTENT: merging a finished copy that never saw the restore keeps the open Evergreen run’s Done proof and reports no change (#2371)', async () => {
+  // The device restored a task the cloud copy still has finished, made it
+  // Evergreen and did it again. Merging the cloud copy in must keep that
+  // Done's proof: dropping it (and calling that a change) made sendPush and
+  // the device save undo each other until the save loop guard stopped them.
+  const {ctx}=await loadApp();
+  const base=syncTask('restored-evergreen','Restored Evergreen');
+  const finished=syncState({tasks:[{...base,done:true,completedAt:2000,lastDoneAt:2000}]});
+  const open=syncState({tasks:[{...base,evergreen:true,done:false,completedAt:null,lastDoneAt:4000,
+    restoredAt:3000,restoredRunOp:'run-a',completedAfterRestoreOp:'run-a'}]});
+  // A first merge fills in the board-level maps and decision records this
+  // hand-built board lacks, as a saved board has them; only what the finished
+  // copy brings is measured.
+  const merged=JSON.parse(JSON.stringify(open));
+  ctx.mergeUndeletedTasks(merged,open);
+  const saved=JSON.parse(JSON.stringify(merged));
+  assert.equal(ctx.mergeUndeletedTasks(merged,saved),false,'positive control: the saved open board alone is settled');
+  assert.equal(ctx.mergeUndeletedTasks(merged,finished),false,'merging the finished copy is not a change');
+  const task=merged.tasks[0];
+  assert.deepEqual([task.done,task.lastDoneAt,task.restoredRunOp,task.completedAfterRestoreOp],[false,4000,'run-a','run-a'],
+    'the open run keeps its Done date and proof');
+  assert.equal(ctx.mergeUndeletedTasks(merged,saved),false,'merging the saved board back changes nothing either');
+});
+
 test('RESTORE INTENT: merging independent completed runs settles both stale open copies', async () => {
   const {ctx}=await loadApp();
   const base=syncTask('parallel-done','Parallel completions');
@@ -41398,6 +41422,16 @@ test('Sync error guidance: the November 14 changelog says the Debug log names mo
  assert.match(current,/It also names a cloud save that stopped partway, could not be checked or sealed, or found its cloud copy did not match what it wrote, and a cloud sync that started with no signed-in account\. It still holds no task content\./,'the November 14 changelog names the cloud store reasons');
  // #2365 review M3: the reasons CloudSync itself creates, outside the adapter.
  assert.match(current,/while it was being repaired\. Cloud sync’s own stops are named too: a cloud copy in a format this version can’t read yet, a cloud copy that could not be read, a repair that found more protected cloud copies than it can check at once, a cloud read or save that started before the app’s cloud storage code loaded, and a cloud request the app interrupted\. It also names a cloud save/,'the November 14 changelog names the reasons CloudSync creates');
+});
+
+// #2371: the November 14 changelog says sync no longer stops as a save loop
+// after a task was restored and done again before the device synced.
+test('Sync error guidance: the November 14 changelog says sync no longer stops with “save loop” after a finished task was restored and done again',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 14, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(current,/<li>Sync no longer stops with “save loop” after a finished task was restored, made Evergreen and done again before this device synced\. The upload goes through once, and the task keeps its Evergreen Done date\.<\/li>/,'the November 14 changelog describes it: '+current);
 });
 
 test('RISK support diagnostics: local report stays redacted, bounded, and separate from board recovery',async t=>{

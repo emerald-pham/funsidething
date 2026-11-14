@@ -1834,6 +1834,7 @@ its RISK test; the map follows.
 - RISK support diagnostics: a cloud read held by a saved-decision code names that code on the cloud-merge event and in recentErrors, with no board content
 - RISK cloud save loop guard: while saves keep failing on this device, returning to the app again and again keeps the save error showing, never stops as a save loop, and the edit saves once storage recovers
 - RISK sign-in settles: a task deleted, restored with Undo while synced, then deleted again while signed out saves and pushes once after sign-in, and the cloud copy has the deletion
+- RISK sign-in settles: a task finished in the cloud copy, then restored, made Evergreen and done again before this device synced, uploads once after sign-in instead of stopping as a save loop, and keeps its Done date and proof
 - RISK cloud save loop guard: when a save on this device fails after a stop, the status shows the save error and the cloud error no longer says the board is saved on this device
 - RISK unchanged cloud pull: opening the app when the cloud still holds this device’s acknowledged copy reads only the root, downloads nothing and shows synced
 - RISK unchanged cloud pull: an edit saved on this device after the acknowledgement is uploaded after a skipped pull, under the revision guard
