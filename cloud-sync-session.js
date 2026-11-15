@@ -35,7 +35,20 @@
                        base's version, ID and bytes alone; it parses the whole
                        board, so the session asks it at most once per read and
                        never for a reply.
-     events            the window: the session listens for "cloudread" */
+     events            the window: the session listens for "cloudread"
+     unsent()          optional (#2378): why this board's unsent change waits
+                       (a hold such as "hold:editor", "hidden" or "pending"),
+                       or null when nothing waits to be sent
+
+   Settled (#2378). The page counts each sync step it starts or schedules with
+   track(kind), from the moment the step is called or its timer set until it
+   finishes or the timer is cleared. snapshot().settled is true only while no
+   step runs and none is scheduled, so the page will do no more sync work on
+   its own. Work that waits on something outside the page (a hold, a hidden
+   page, a read this page still owes) is listed under waiting and is not
+   pending. turn grows by one on every change. Only the test driver reads
+   work, waiting, settled and turn: no page code does, and nothing is shown.
+   The ledger is in memory only, and track() adds no timer and no await. */
 (function(root){
   "use strict";
 
@@ -46,7 +59,15 @@
   const knownCopy=(payload,account,revision)=>Object.freeze({payload:typeof payload==="string"?payload:null,account,
     revision:Number.isSafeInteger(revision)?revision:null});
 
-  function createSyncSession({backend,identity,acknowledgement,events}={}){
+  // The closed list of sync work (#2378), so a misspelt kind throws instead of
+  // going uncounted. Steps that run: a cloud read, a cloud write, a device save
+  // and a recovery flow. Steps that are scheduled: the save and push debounces,
+  // the live-revision and backup-conflict reads, the retry after a device save
+  // recovers, the cloud retry backoff and #2339's device-save retry.
+  const WORK_KINDS=new Set(["pull","push","device-save","recovery","save-debounce","push-debounce","live-pull","backup-pull",
+    "recovery-retry","cloud-retry","device-save-retry"]);
+
+  function createSyncSession({backend,identity,acknowledgement,events,unsent=null}={}){
     if(typeof backend!=="function"||typeof identity!=="function"||typeof acknowledgement?.get!=="function"||
       typeof acknowledgement.valid!=="function"||typeof acknowledgement.save!=="function")
       throw new TypeError("The sync session needs its backend, identity and acknowledgement ports.");
@@ -69,11 +90,28 @@
     // At most one write ticket is open at a time.
     let writer=null;
     const listeners=new Set();
+    // #2378: the sync work now running or scheduled, and a count of changes.
+    const work=new Set();
+    let turn=0;
+    function waiting(){
+      const user=account(),list=[];
+      if(!user)return list;
+      const reason=typeof unsent==="function"?text(read(unsent)):null;
+      if(reason!==null)list.push(Object.freeze({kind:"push",reason}));
+      if(authority!==user)list.push(Object.freeze({kind:"read",reason:"read"}));
+      return list;
+    }
     function snapshot(){
       const id=signedIn(),record=id===null?null:damage.get(id)??null;
-      return {damaged:record?{...record}:null,authority,known,owner,writing:writer!==null};
+      const view={damaged:record?{...record}:null,authority,known,owner,writing:writer!==null,
+        work:[...work].map(item=>Object.freeze({kind:item.kind,state:item.state})),waiting:null,settled:work.size===0,turn};
+      // Worked out when read, so the page's own listeners, which never read
+      // it, pay nothing for it.
+      Object.defineProperty(view,"waiting",{get:waiting,enumerable:true});
+      return view;
     }
     function changed(){
+      turn++;
       const view=snapshot();
       for(const listener of [...listeners]){try{listener(view);}catch{ /* A listener never stops the session. */ }}
     }
@@ -289,7 +327,29 @@
     }
 
     events?.addEventListener?.("cloudread",event=>{observeRead(event?.detail);});
-    return {startRead,observeRead,mayPush,bindOwner,requireRead,snapshot,onChange};
+    // #2378: count one sync step. It is scheduled from now; run(promise) marks
+    // it running and returns that same promise, ending the step when it
+    // settles either way, so callers await exactly what they awaited before;
+    // a value that is not a promise ends it at once. end() clears a step that
+    // will not run. A step that starts the next one counts it before its own
+    // promise settles, so settled never turns true between the two.
+    function track(kind){
+      if(!WORK_KINDS.has(kind))throw new TypeError("Unknown sync work: "+kind);
+      const item={kind,state:"scheduled"};
+      work.add(item);changed();
+      const end=()=>{if(work.delete(item))changed();};
+      return {
+        run(step){
+          if(!work.has(item))return step;
+          if(typeof step?.then!=="function"){end();return step;}
+          item.state="running";changed();
+          step.then(end,end);
+          return step;
+        },
+        end,
+      };
+    }
+    return {startRead,observeRead,mayPush,bindOwner,requireRead,snapshot,onChange,track};
   }
 
   root.ChainSyncSession={createSyncSession};

@@ -23436,5 +23436,34 @@
       "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK sync session\" tests/persistence-recovery.test.js (record 2026-11-15T08-10-26-107Z-b0dd01bc, with accept() in the order sendPush used before #2377)",
       "failure": "AssertionError: a save that reports failure: the cloud copy is not recorded as this device’s (RISK sync session: a Cloud acknowledgement whose board save is refused is not accepted ...): the acknowledgement was recorded and the owner bound before its board save, which failed."
     }
+  },
+  {
+    "baseCommit": "544f90e16af78193eb84fabc21f145765c25e041",
+    "weakenedTestLines": [
+      "tests/core.test.js:-test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload',async()=>{",
+      "tests/core.test.js:-const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});",
+      "tests/core.test.js:-await syncSettle(30);",
+      "tests/core.test.js:-ctx.cloudPushNow();await syncSettle(30);",
+      "tests/core.test.js:-});"
+    ],
+    "reason": "#2378 (owner-agreed interface and overnight decision of 2026-11-15, closes #2257): the cloud recovery retry test waited a fixed syncSettle(30) for the retry that a durable device save starts, and failed on slow CI runners when that retry's read took longer (#2257). The sync session now reports when sync has settled (nothing running, nothing scheduled), and the test driver's settled() waits for that instead of a fixed time. The test also gains a one-time stall inside the retry's first cloud read (25 ms and 100 ms cases), which reproduces #2257 on every run. The test body moved into a helper so the same test also runs as a new root with a 100 ms stall, named for it; the 25 ms case keeps the original name.",
+    "previousBehavior": "RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload opened the app with loadApp, waited syncSettle(30) after the durable save for the automatic retry's read, and syncSettle(30) after cloudPushNow() for the push.",
+    "intendedBehavior": "The test, now run twice with the retry's read stalled 25 and 100 ms, opens the app through the driver (openApp). After the durable save it waits for the retry's own read (the app's cloudPull promise), or for sync to settle if no retry starts, then checks the same intermediate screen; after cloudPushNow() it waits for sync to settle. Every assertion, expected value and message is unchanged.",
+    "preservedCoverage": [
+      "Every assertion of the original test is kept: the failed then durable device saves, two pulls, the cleared error stage and code, the '☁ syncing' button and its accessible title before the push, one push carrying the recovered edit, and '☁ synced' after the acknowledgement."
+    ],
+    "replacementTests": [
+      "RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload",
+      "RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload (retry read stalled 100 ms)",
+      "RISK CLOUD RECOVERY: sync settles only after a durable save’s retry and the recovered edit’s push (retry read stalled 25 ms)",
+      "RISK CLOUD RECOVERY: sync settles only after a durable save’s retry and the recovered edit’s push (retry read stalled 100 ms)",
+      "RISK sync session settled: every kind of sync work keeps sync unsettled from the moment it is scheduled until it finishes or is cleared",
+      "RISK sync session settled: a step that starts the next one never shows sync settled between the two",
+      "RISK sync session settled: the settled signal changes nothing on screen, in the Debug log or in saved data, and no page code reads it"
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"a durable ordinary save retries and clears its stale cloud error\" tests/core.test.js (record 2026-11-15T16-25-17-340Z-1b1a9601, on 544f90e1 with only the stall added and the fixed syncSettle(30) kept)",
+      "failure": "25 ms stall: AssertionError, cloud.CS.errorStage actual 'reconcile', expected null. 100 ms stall: AssertionError 'the successful local recovery retries the failed reconciliation automatically', pulls actual 1, expected 2."
+    }
   }
 ]

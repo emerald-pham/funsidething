@@ -24,6 +24,7 @@ import {
   LARGE_BOARD_SHAPE, largeBoardFixture, webProcessMemoryEnv, webProcessMemorySampler, backupRowsWithText,
   largeSignedInBoardFixture,
 } from "./shared.js";
+import { openApp } from "./shared.js"; // #2378 app driver
 import { rewriteGenerationFixture } from "./shared.js";
 import { createDeviceBudgetClock, expireDeviceBudget } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
@@ -14419,6 +14420,152 @@ test('RISK sync session: a refused save whose acceptance bound no owner never br
  assert.equal(session.snapshot().owner,null,'the refused save leaves the sign-out’s unbinding');
  assert.equal(session.snapshot().authority,null,'and its end of read authority');
  assert.deepEqual({...session.snapshot().known},{...bound.known},'and withdraws the copy it recorded');
+});
+
+// #2378: the settled signal at the sync session's seam. The app counts each
+// sync step it starts or schedules with track(kind); the session reports it
+// under work, and settled only when nothing runs and nothing is scheduled.
+// Work that waits on something outside the app (a hold, a hidden page, a read
+// still owed) is listed under waiting and never blocks settled. No app code
+// reads these fields; the test driver's settled() does.
+function syncSession2378({unsent=()=>null,user='e@example.com'}={}){
+ const context=vm.createContext({crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,structuredClone,console,setTimeout,clearTimeout});
+ context.globalThis=context;
+ for(const file of ['device-store-v2.js','cloud-sync-session.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
+ const connection={current:user?{user,ready:true}:null},ack={account:null,identity:null,revision:0,base:null};
+ const session=context.ChainSyncSession.createSyncSession({backend:()=>connection.current,identity:()=>user?'owner':null,
+  acknowledgement:{get:()=>ack,valid:()=>false,save:async()=>true},unsent,events:null});
+ const views=[];session.onChange(view=>views.push({settled:view.settled,turn:view.turn,work:view.work.map(item=>({...item}))}));
+ return {session,views,connection};
+}
+const deferred2378=()=>{let resolve,reject;const promise=new Promise((res,rej)=>{resolve=res;reject=rej;});return {promise,resolve,reject};};
+const SYNC_WORK_KINDS2378=['pull','push','device-save','recovery','save-debounce','push-debounce','live-pull','backup-pull','recovery-retry','cloud-retry','device-save-retry'];
+
+test('RISK sync session settled: every kind of sync work keeps sync unsettled from the moment it is scheduled until it finishes or is cleared',async()=>{
+ const {session}=syncSession2378();
+ assert.equal(session.snapshot().settled,true,'positive control: a new session has nothing pending');
+ assert.deepEqual([...session.snapshot().work],[],'and lists no work');
+ for(const kind of SYNC_WORK_KINDS2378){
+  const handle=session.track(kind);
+  assert.deepEqual([...session.snapshot().work].map(item=>({...item})),[{kind,state:'scheduled'}],`${kind} is pending once scheduled`);
+  assert.equal(session.snapshot().settled,false,`${kind} keeps sync unsettled while scheduled`);
+  const step=deferred2378(),running=handle.run(step.promise);
+  assert.equal(running,step.promise,`${kind}: run() hands back the caller's own promise`);
+  assert.deepEqual([...session.snapshot().work].map(item=>({...item})),[{kind,state:'running'}],`${kind} is running once run`);
+  assert.equal(session.snapshot().settled,false,`${kind} keeps sync unsettled while running`);
+  step.resolve('done');assert.equal(await running,'done');await null;
+  assert.equal(session.snapshot().settled,true,`${kind} settles once its step finishes`);
+  const cleared=session.track(kind);cleared.end();cleared.end();
+  assert.equal(session.snapshot().settled,true,`${kind} cleared before it runs is no longer pending, and ending twice changes nothing`);
+ }
+ const failing=deferred2378(),failed=session.track('push').run(failing.promise);
+ failing.reject(Error('offline'));await assert.rejects(failed,/offline/,'a failed step still fails for its caller');
+ assert.equal(session.snapshot().settled,true,'and is no longer pending');
+ assert.throws(()=>session.track('pul'),error=>error?.name==='TypeError'&&/Unknown sync work: pul/.test(error.message),'an unknown kind is refused, so a misspelt call cannot go uncounted');
+});
+
+test('RISK sync session settled: a step that starts the next one never shows sync settled between the two',async()=>{
+ const {session,views}=syncSession2378();
+ // A pull that ends by scheduling a push, as a read with a pending edit does.
+ let pushTimer=null;
+ const pull=session.track('pull').run((async()=>{await null;pushTimer=session.track('push-debounce');return 'read';})());
+ await pull;await null;
+ assert.ok(views.length>=3,'positive control: the pull and the push were both seen: '+JSON.stringify(views));
+ assert.equal(views.some(view=>view.settled),false,'sync never reads as settled between the pull and the push it scheduled');
+ const push=deferred2378();pushTimer.run(push.promise);push.resolve();await push.promise;await null;
+ assert.equal(session.snapshot().settled,true,'it settles once the push finishes');
+ const turns=views.map(view=>view.turn);
+ assert.deepEqual(turns,[...turns].sort((a,b)=>a-b),'the turn only grows');
+ assert.equal(new Set(turns).size,turns.length,'and changes on every change');
+});
+
+test('RISK sync session settled: work that waits on a hold or on a read is listed as waiting and does not keep sync unsettled',async()=>{
+ let reason=null;
+ const {session,connection}=syncSession2378({unsent:()=>reason});
+ // No read has given this page read authority for the signed-in account.
+ assert.deepEqual([...session.snapshot().waiting].map(item=>({...item})),[{kind:'read',reason:'read'}],'a read this page still owes is listed');
+ assert.equal(session.snapshot().settled,true,'and does not count as pending');
+ const read=await session.startRead({full:true});read.read.accept({payload:'board',revision:1});read.read.end();
+ assert.deepEqual([...session.snapshot().waiting],[],'once read, nothing waits');
+ reason='hold:editor';
+ assert.deepEqual([...session.snapshot().waiting].map(item=>({...item})),[{kind:'push',reason:'hold:editor'}],'an edit held by an open editor is listed with its reason');
+ assert.equal(session.snapshot().settled,true,'and does not count as pending');
+ connection.current=null;reason=null;
+ assert.deepEqual([...session.snapshot().waiting],[],'signed out, nothing waits on the cloud');
+});
+
+// #2378 D3: the settled signal changes nothing for the person. The session's
+// factory is wrapped, at the module's own boundary, so a read of work,
+// waiting, settled or turn made directly by page code (index.html) is
+// recorded. The same sync story runs twice on a pinned clock: once waited for
+// with no listener on the session, once through the driver's settled(), which
+// listens, plus a listener reading every view. The screen, the Debug log, the
+// saved board and the cloud's copy must be identical, and the page must read
+// none of the new fields either time.
+const SETTLED_FIELDS2378=['work','waiting','settled','turn'];
+const guardedSession2378=fs.readFileSync(path.join(__dirname,'cloud-sync-session.js'),'utf8')+`
+;(()=>{
+ const create=ChainSyncSession.createSyncSession,reads=globalThis.__pageReads2378=[];
+ const guard=view=>{
+  for(const key of ${JSON.stringify(SETTLED_FIELDS2378)}){
+   const field=Object.getOwnPropertyDescriptor(view,key);
+   Object.defineProperty(view,key,{enumerable:true,configurable:true,get(){
+    const caller=String(Error().stack||'').split('\\n')[2]||'';
+    if(caller.includes('index.html#app'))reads.push(key+' '+caller.trim());
+    return field.get?field.get.call(view):field.value;
+   }});
+  }
+  return view;
+ };
+ ChainSyncSession.createSyncSession=ports=>{
+  const session=create(ports);
+  return {...session,snapshot:()=>guard(session.snapshot()),onChange:listener=>session.onChange(view=>listener(guard(view)))};
+ };
+})();`;
+async function settledStory2378(t,{listen}){
+ const at=1794700000000,initial=syncState({tasks:[syncTask('base','Base task')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:3,delayMs:2});
+ const app=await openApp(t,{appSource:'Date.now=()=>'+at+';\n'+appSrc,seed:2378,artifacts:{session:guardedSession2378},
+  seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>h.factory()});
+ const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=10;
+ const session=vm.runInContext('syncSession',ctx),views=[];
+ if(listen)session.onChange(view=>views.push(Object.fromEntries(SETTLED_FIELDS2378.map(key=>[key,JSON.stringify(view[key])]))));
+ // Without a listener, the run waits by asking the session, never subscribing.
+ const quiet=async()=>{
+  if(listen)return app.settled();
+  for(const deadline=Date.now()+5000;Date.now()<deadline;){
+   const view=session.snapshot();
+   if(view.settled){const {turn}=view;await new Promise(resolve=>setImmediate(resolve));if(session.snapshot().turn===turn)return;}
+   else await new Promise(resolve=>setImmediate(resolve));
+  }
+  assert.fail('the story did not settle: '+JSON.stringify([...session.snapshot().work]));
+ };
+ await ctx.cloudPull();await quiet();
+ ctx.state.tasks.push(syncTask('counted','Counted edit'));ctx.save();await quiet();
+ h.writeBehindBack(syncState({...JSON.parse(h.doc.payload),tasks:[...JSON.parse(h.doc.payload).tasks,syncTask('peer','Peer edit')]}));
+ await ctx.cloudPull();await quiet();
+ const screen=Object.fromEntries([...shim.elements].map(([id,element])=>[id,
+  {text:element.textContent,html:element.innerHTML,title:element.title??null,hidden:element.hidden??null,className:element.className??null}]));
+ // Each page load names its document at random; nothing else may differ.
+ const report=ctx.supportDiagnosticsText(),documentId=report.match(/"currentDocument":"([^"]+)"/)?.[1];
+ assert.ok(documentId,'positive control: the Debug log names this page');
+ return {screen,report:report.replaceAll(documentId,'this-page'),saved:shim.localStorage.getItem(SYNC_STORE_KEY),cloud:h.doc.payload,
+  calls:[...h.calls],pageReads:[...ctx.__pageReads2378],views};
+}
+
+test('RISK sync session settled: the settled signal changes nothing on screen, in the Debug log or in saved data, and no page code reads it',async t=>{
+ const quietRun=await settledStory2378(t,{listen:false}),heard=await settledStory2378(t,{listen:true});
+ assert.ok(heard.views.length>0,'positive control: the listener heard the work change');
+ assert.ok(heard.views.some(view=>view.settled==='false'),'positive control: sync was busy at times');
+ assert.deepEqual(quietRun.calls.slice(0,3),['pull','push','pull'],'positive control: the story read, pushed the edit and read the peer’s change: '+quietRun.calls);
+ assert.deepEqual(heard.calls,quietRun.calls,'both runs made the same cloud calls');
+ assert.match(quietRun.saved,/Counted edit/,'positive control: the edit was saved');assert.match(quietRun.saved,/Peer edit/,'and the peer’s change adopted');
+ assert.deepEqual(quietRun.pageReads,[],'no page code reads the new fields when nothing listens');
+ assert.deepEqual(heard.pageReads,[],'nor while the driver listens');
+ assert.deepEqual(heard.screen,quietRun.screen,'the screen is the same with and without a listener');
+ assert.equal(heard.report,quietRun.report,'and so is the Debug log');
+ assert.equal(heard.saved,quietRun.saved,'and the saved board');
+ assert.equal(heard.cloud,quietRun.cloud,'and the cloud’s copy');
 });
 
 // #2377 slice 2 (#2350): Help's "What does Synced confirm?" already says the

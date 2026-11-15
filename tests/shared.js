@@ -4048,6 +4048,50 @@ async function replaceIndependentServerPayload263(app,id,payload){
  for(const chunk of encoded.chunks)app.backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
 }
 
+// ---------- App driver (#2378) ----------
+// Cloud and recovery tests open the app here and wait for sync to settle
+// through the sync session's own signal (cloud-sync-session.js: nothing
+// running and nothing scheduled), instead of a fixed sleep or a poll of the
+// app's busy flags. settled() fails, rather than waiting longer, when sync is
+// still busy at its deadline, and names the work still pending.
+async function openApp(t,options={}){
+ const app=await loadApp(options);
+ t?.after?.(()=>app.dispose());
+ return driveApp(app);
+}
+// The same calls for an app opened some other way (loadAppAtTime and friends).
+function driveApp(app){
+ return {...app,settled:options=>syncSettled(app.ctx,options)};
+}
+const describeSyncWork2378=view=>JSON.stringify({work:[...view.work].map(item=>item.kind+':'+item.state),
+ waiting:[...view.waiting].map(item=>item.kind+':'+item.reason)});
+// Resolves once the session reports settled and nothing changed one macrotask
+// later (a step hands over to the next before it ends, so a settled view that
+// survives that turn is not a gap between two steps). synced also needs
+// nothing waiting: no unsent edit and no read this page still owes.
+async function syncSettled(ctx,{within=5000,synced=false}={}){
+ const session=vm.runInContext('typeof syncSession==="undefined"?null:syncSession',ctx);
+ assert.ok(session&&typeof session.track==='function','the app under test has a sync session that counts its work');
+ const deadline=Date.now()+within;
+ for(;;){
+  const view=session.snapshot();
+  if(view.settled&&(!synced||view.waiting.length===0)){
+   const {turn}=view;
+   await new Promise(resolve=>setImmediate(resolve));
+   const after=session.snapshot();
+   if(after.turn===turn)return {waiting:[...after.waiting].map(item=>({...item})),turn};
+   continue;
+  }
+  const left=deadline-Date.now();
+  if(left<=0)assert.fail(`sync did not settle within ${within} ms: ${describeSyncWork2378(view)}`);
+  await new Promise(resolve=>{
+   let off=()=>{};
+   const timer=setTimeout(()=>{off();resolve();},left);
+   off=session.onChange(()=>{off();clearTimeout(timer);resolve();});
+  });
+ }
+}
+
 export { createDeviceBudgetClock, expireDeviceBudget };
 export {
   appFixtureScope, test, injectRecoveryDatabaseFailure187, editRawDevice187, deviceFaultProvider187,
@@ -4113,5 +4157,6 @@ export {
   replaceIndependentServerPayload263,
 };
 export { releaseKnownCloudCopy2377 };
+export { openApp, driveApp, syncSettled };
 export { scanPanelDom221, markupButtons, chainPills, chainPillIds, chainPill, benchmarkEdit, keepEditorValues, returnButton,
   returnDotFromScan, returnFromPill, returnBenchmarkFromEdit };
