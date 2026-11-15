@@ -187,6 +187,34 @@ test('Beta packaging rejects stale product fingerprint before staging changed co
   assert.match(fs.readFileSync(path.join(f.repository, 'index.html'), 'utf8'), /changed without refreshed/);
 });
 
+test('Beta packaging stages a source with uncommitted shell identities with the values computed from its bytes (#2380)', t => {
+  const f = editableFixture(t, root => {
+    const page = path.join(root, 'index.html'), worker = path.join(root, 'sw.js');
+    fs.writeFileSync(page, fs.readFileSync(page, 'utf8').replace(/(<template id="appChangelogCurrent"><div data-app-fingerprint=")[a-f0-9]{64}"/, '$1HASH"') + '\n<!-- shell edit with no refresh -->\n');
+    fs.writeFileSync(worker, fs.readFileSync(worker, 'utf8').replace(/(const CACHE_NAME = ")[^"]+"/, '$1chain-scanner-shell-HASH"'));
+  });
+  const result = prepare(f);
+  assert.equal(result.status, 0, result.stderr);
+  const staged = file => fs.readFileSync(path.join(f.output, 'public', file));
+  const envelope = JSON.parse(staged('channel-release.json'));
+  const page = staged('index.html').toString(), worker = staged('sw.js').toString();
+  // Independent expectations: the changelog and CACHE_NAME contracts over the staged bytes.
+  const assets = [...new Set([...worker.match(/\.addAll\(\[([\s\S]*?)\]\s*\.map/)[1].matchAll(/"([^"]+)"/g)].map(m => m[1] === './' ? 'index.html' : m[1].replace(/^\.\//, '')))].sort();
+  const app = createHash('sha256'), shell = createHash('sha256');
+  for (const file of [...assets, 'sw.js'].sort()) {
+    let bytes = staged(file);
+    if (file !== 'sw.js') shell.update(file + '\0').update(bytes).update('\0');
+    if (file === 'index.html') bytes = Buffer.from(bytes.toString().replace(/<!-- changelog:start -->[\s\S]*?<!-- changelog:end -->/, '<!-- changelog -->'));
+    if (file === 'sw.js') bytes = Buffer.from(bytes.toString().replace(/chain-scanner-shell-[a-f0-9]+/, 'chain-scanner-shell-HASH'));
+    app.update(file + '\0').update(bytes).update('\0');
+  }
+  const appFingerprint = app.digest('hex');
+  assert.equal(page.match(/<template id="appChangelogCurrent"><div data-app-fingerprint="([^"]*)"/)?.[1], appFingerprint, 'the staged build id is computed from the staged shell');
+  assert.equal(envelope.product.appFingerprint, appFingerprint, 'the channel identity names the computed build id');
+  assert.equal(worker.match(/const CACHE_NAME = "([^"]+)"/)?.[1], 'chain-scanner-shell-' + shell.digest('hex'), 'the staged worker carries the computed cache key');
+  assert.match(page, /shell edit with no refresh/);
+});
+
 test('Beta packaging rejects committed symlinks before archive extraction and keeps the target untouched', t => {
   const f = editableFixture(t, root => fs.symlinkSync('../protected-neighbor', path.join(root, 'escape')));
   fs.writeFileSync(path.join(f.root, 'protected-neighbor'), 'exact protected bytes');
@@ -332,6 +360,56 @@ test('Beta packaging refuses traversal in the committed worker inventory before 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Unsafe shell asset path/);
   assert.equal(fs.existsSync(f.output), false);
+});
+
+test('Beta continuation names the actual worker shell fault in its original product instead of a byte mismatch (#2383)', t => {
+  const f = reviewedFixture(t);
+  const originalOutput = path.join(f.root, 'original-reviewed');
+  const original = prepare({ ...f, output: originalOutput }, [], false);
+  assert.equal(original.status, 0, original.stderr);
+  // The original product's committed worker gains a comment naming a path
+  // outside the checkout inside its precache list. The double-quoted inventory
+  // is unchanged, so only the shell computation reaches the traversal; a
+  // comment-only diff keeps the fixture's owner-only release receipt valid.
+  const workerPath = path.join(f.repository, 'sw.js');
+  fs.writeFileSync(workerPath, fs.readFileSync(workerPath, 'utf8').replace('"./icon.svg",', "/* '../protected-neighbor' */\"./icon.svg\","));
+  git(f.repository, 'add', 'sw.js');
+  git(f.repository, '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture unsafe original worker');
+  const unsafe = git(f.repository, 'rev-parse', 'HEAD');
+  const unsafeTree = git(f.repository, 'rev-parse', 'HEAD^{tree}');
+  const report = path.join(f.root, 'fixture-unsafe-review.md');
+  fs.writeFileSync(report, 'Disposable fixture report for the real receipt verifier; not product release approval.\n');
+  const digest = bytes => createHash('sha256').update(bytes).digest('hex');
+  const { receiptPath, receipt } = recordReleaseEvidence(f.repository, { schemaVersion: 2,
+    candidate: { commitSha: unsafe, treeSha: unsafeTree, baseSha: f.source },
+    ownerReview: { task: '/fixture/beta-owner', outcome: 'approved', reviewedSha: unsafe, completedAt: '2026-10-19T15:00:00.000Z',
+      summary: 'Disposable comment-only worker fixture exercises the continuation shell guard.',
+      scope: { fullDiff: true, rationale: 'This isolated source adds only a worker comment and preserves every product byte.' },
+      evidencePath: report, evidenceSha256: digest(fs.readFileSync(report)) } });
+  // Rebind the retained original artifact to that product, keeping every digest valid.
+  const manifestPath = path.join(originalOutput, 'artifact.json');
+  const envelopePath = path.join(originalOutput, 'public/channel-release.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.product = { ...manifest.product, sourceRevision: unsafe, tree: unsafeTree };
+  manifest.releaseEvidence = { candidate: receipt.candidate, receiptSha256: digest(fs.readFileSync(receiptPath)) };
+  const envelope = JSON.parse(fs.readFileSync(envelopePath, 'utf8'));
+  envelope.product = manifest.product;
+  const envelopeBytes = Buffer.from(JSON.stringify(envelope, null, 2) + '\n');
+  fs.writeFileSync(envelopePath, envelopeBytes);
+  manifest.files['channel-release.json'] = { sha256: digest(envelopeBytes), bytes: envelopeBytes.length };
+  delete manifest.artifactSha256;
+  manifest.artifactSha256 = digest(Buffer.from(JSON.stringify(manifest)));
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+  const proofPath = path.join(f.root, 'continuation-proof.json');
+  fs.writeFileSync(proofPath, JSON.stringify({ artifactDirectory: originalOutput,
+    publicationPath: path.join(f.root, 'fixture-review.md'), publicVerificationPath: path.join(f.root, 'fixture-review.md') }) + '\n');
+
+  const output = path.join(f.root, 'continued-preview');
+  const result = prepare({ ...f, output, deployedAt: '2026-10-20T21:00:00.000Z' }, ['--continue-notice', proofPath]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Precached shell path leaves the checkout: \.\.\/protected-neighbor/,
+    'the failure must carry the underlying shell error, not only a generic byte mismatch');
+  assert.equal(fs.existsSync(output), false);
 });
 
 test('Beta packaging refuses unsafe tab-bearing committed paths even outside the public inventory', t => {

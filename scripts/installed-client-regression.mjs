@@ -5,6 +5,7 @@ import http from 'node:http';
 import {execFileSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
 import {browserInit,appModule,authModule,firestoreModule,fixture} from './installed-client-fixture.mjs';
+import {servedShellReader} from './shell-fingerprints.mjs';
 
 const OLD='779defa4e8c3465fdf535fe17dbe2227d2b76ea1';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -55,23 +56,29 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
   assert.equal(git('rev-parse',candidateCommit+'^{tree}').toString().trim(),candidateTree,'explicit candidate tree');
   git('merge-base','--is-ancestor',candidateCommit,'HEAD');
   assert.notEqual(candidateCommit,OLD,'old source cannot be the candidate');
-  const bytes=(sha,file)=>git('show',sha+':'+file);
+  const committed=(sha,file)=>git('show',sha+':'+file);
+  // A client is served each commit's shell as the deploy publishes it: committed
+  // bytes with the app fingerprint and CACHE_NAME computed from them (#2380).
+  const readers=new Map(),bytes=(sha,file)=>{if(!readers.has(sha))readers.set(sha,servedShellReader(name=>committed(sha,name)));return readers.get(sha)(file);};
   function shell(sha){
     const sw=bytes(sha,'sw.js').toString(),match=sw.match(/\.addAll\(\[([\s\S]*?)\]\s*\.map/);assert.ok(match,'actual worker shell list');
     const entries=[...match[1].matchAll(/"([^"]+)"/g)].map(m=>m[1]);
     const files=[...new Set(entries.map(p=>p==='./'?'index.html':p.replace(/^\.\//,'')))];
     const identities=Object.fromEntries([...files,'sw.js'].map(file=>[file,hash(bytes(sha,file))]));
+    const sources=Object.fromEntries([...files,'sw.js'].map(file=>[file,hash(committed(sha,file))]));
+    // Recomputed here over the served bytes, independently of shell-fingerprints.mjs,
+    // so a stamping bug that serves an incoherent key cannot pass its own check (#2383).
     const fingerprint=createHash('sha256');for(const file of [...files].sort()){fingerprint.update(file);fingerprint.update('\0');fingerprint.update(bytes(sha,file));fingerprint.update('\0');}
     const cacheName=sw.match(/const CACHE_NAME = "([^"]+)"/)?.[1];assert.equal(cacheName,'chain-scanner-shell-'+fingerprint.digest('hex'),'immutable shell metadata must cohere');
     const html=bytes(sha,'index.html').toString(),inline=html.match(/<script>((?:\s*)"use strict";[\s\S]*?)<\/script>/)?.[1];
     assert.ok(inline,'actual inline app source');
-    return {sha,entries,files,identities,cacheName,build:html.match(/data-app-fingerprint="([^"]+)"/)?.[1],inlineSha256:hash(inline)};
+    return {sha,entries,files,identities,sources,cacheName,build:html.match(/data-app-fingerprint="([^"]+)"/)?.[1],inlineSha256:hash(inline)};
   }
   const old=shell(OLD),candidate=shell(candidateCommit);
   assert.notEqual(old.cacheName,candidate.cacheName,'delivery must cross a real shell version');
   if(control==='stale-byte')assert.notEqual(old.identities['device-store-v2.js'],candidate.identities['device-store-v2.js'],'stale-byte control requires genuinely different Git blobs');
   // Dirty tests may serve a committed app, but the app assets themselves must be equal.
-  for(const [file,digest] of Object.entries(candidate.identities))assert.equal(hash(fs.readFileSync(path.join(repo,file))),digest,'checkout app asset differs from explicit candidate: '+file);
+  for(const [file,digest] of Object.entries(candidate.sources))assert.equal(hash(fs.readFileSync(path.join(repo,file))),digest,'checkout app asset differs from explicit candidate: '+file);
   fs.mkdirSync(outputDir,{recursive:true});
   const reportPath=path.join(outputDir,mode+'-'+randomUUID()+'.json');
   const report={mode,control,oldCommit,candidateCommit,candidateTree,startedAt:new Date().toISOString(),status:'prepared',shells:{old,candidate},checkout:git('rev-parse','HEAD').toString().trim(),runnerDiff:hash(git('diff','HEAD')),requests:[],responses:[],observations:{},cleanup:{},limits:['Synthetic external SDK only; real app, IDB, worker and cache.','Local ephemeral Chromium profile, not physical-device or deployed acceptance.','Dirty runner serving explicit committed app is not final clean-candidate proof.']};
@@ -122,7 +129,7 @@ export async function runInstalledClientCase({mode,repo,oldCommit,candidateCommi
     await context.exposeBinding('__installedRPC',(_,kind,args)=>{calls.push({kind,args});if(kind==='get')return structuredClone(remote.get(args[0])??null);if(kind==='list')return [...remote].filter(([key])=>key.startsWith(args[0]+'/'));throw Error('Unexpected cloud write');});
     await context.addInitScript(browserInit,{dbName,authMode:mode,sdkBase:origin+sdkPrefix});
     await context.route('**/*',async route=>{const request=route.request(),u=new URL(request.url());if(u.origin===origin)return route.continue();external.push(u.origin+u.pathname);return route.abort();});
-    const observer=await context.newPage();await observer.goto(origin+'/observer');await observer.addScriptTag({content:bytes(OLD,'device-store-v2.js').toString()});
+    const observer=await context.newPage();await observer.goto(origin+'/observer');await observer.addScriptTag({content:committed(OLD,'device-store-v2.js').toString()});
     report.seed=await observer.evaluate(async({dbName,raw,account})=>{
       const store=ChainStorageV2.createDeviceStore({dbName});await store.open();
       const backups=[{id:'synthetic-manual',kind:'manual',at:2,day:'2026-10-18',payload:raw},{id:'synthetic-protected',kind:'before-decision-replacement',at:3,day:'2026-10-18',payload:raw}];

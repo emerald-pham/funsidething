@@ -141,11 +141,14 @@ function assertAncestor(repoRoot, baseSha, commitSha) {
   if (result.status !== 0) throw new Error('Candidate base must be an existing ancestor of the exact candidate commit.');
 }
 
+// The RISK map left this list when it stopped being committed (#2381). Under
+// the scaled policy its entry changed no plan: its name already keeps it out
+// of documentation-only diffs (riskDocumentationPath), and the receipts that
+// predate that policy derive the same plan without it.
 const policyFiles = new Set([
   'AGENTS.md',
   'CLAUDE.md',
   'RELEASE_GATES.md',
-  'RISK_TEST_COVERAGE.md',
   'TEST_CHANGE_RATIONALES.json',
   'scripts/test-first-gate.mjs',
   'scripts/release-evidence.mjs',
@@ -309,9 +312,11 @@ function changedDiffLines(repoRoot, baseSha, commitSha, file) {
   return lines;
 }
 
-// Every app change adds a changelog entry and refreshes the app fingerprint
-// inside the changelog block plus the worker CACHE_NAME. That bookkeeping is
-// prose and hashes, so it never decides which reviewers a change needs (#2234).
+// Every app change adds a changelog entry. Diffs from before #2380 also refresh
+// the then-committed app fingerprint inside the changelog block plus the worker
+// CACHE_NAME; both are now computed when the shell is served, but older
+// candidates still carry them. That bookkeeping is prose and hashes, so it never
+// decides which reviewers a change needs (#2234).
 const shellCacheNameLine = /^\s*const\s+CACHE_NAME\s*=\s*["']chain-scanner-shell-[a-f0-9]+["'];?\s*$/;
 function changelogLines(text) {
   const inside = new Set();

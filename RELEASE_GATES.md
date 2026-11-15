@@ -217,6 +217,14 @@ candidate already has a valid receipt but lacks the specialist-compatibility
 status, republish statuses for that same exact head before merge/deployment.
 Missing, stale, mismatched, or failed evidence stops deployment.
 
+When a live check compares served assets with Git after deployment, the served
+bytes equal the deployed tree except two stamped slots: index.html's current
+`data-app-fingerprint` and sw.js's `CACHE_NAME` (#2380). The tree keeps their
+placeholders, so compare those two files against computed values: run
+`git archive <sha> | tar -x -C <dir>`, then
+`node scripts/shell-fingerprints.mjs --root <dir>`, which prints both. A build id
+is no longer committed, so `git log -S` cannot find the commit that carries it.
+
 GitHub Actions cannot read a developer's local Git metadata receipt. Deployment
 therefore validates status descriptions bound to the immutable receipt digest
 and review-plan marker. A repository writer with permission to publish commit

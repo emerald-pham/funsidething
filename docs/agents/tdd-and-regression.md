@@ -13,7 +13,7 @@ HTML pages, the service worker, the web manifest, release delivery
 persistence, backup, recovery, auth, session, Firestore, account, IndexedDB or
 migration), the lz-string archive codec, Firestore rules, and the test-first
 gate, hook or workflow. An HTML or worker change that only adds changelog text
-and refreshes the app fingerprint or `CACHE_NAME` does not count, unless it moves
+does not count, unless it moves
 a changelog marker or adds markup that loads or runs script. Other app changes,
 such as scenery, location and styling, need a direct test and use a `RISK` case
 when the failure cost warrants one.
@@ -40,8 +40,11 @@ undo, import or restore, deletion, and cross-device reconciliation when those
 paths touch the change. For a visual or motion change, cover the numerical
 geometry or paint contract, reduced motion, and relevant phone, tablet, and
 short-landscape viewports. For offline changes, check the asset fingerprint and
-offline reload. After any app-shell edit, `npm run fingerprints -- --write`
-refreshes the changelog app fingerprint and the worker `CACHE_NAME` together. A text or styling fix needs a direct UI assertion that would
+offline reload. The changelog app fingerprint and the worker `CACHE_NAME` are
+never committed: the checkout keeps placeholders, and every consumer that
+serves the shell (the Pages deploy, `npm run serve`, the test harness, the native
+cases and Beta packaging) stamps values computed from the files it serves (`scripts/shell-fingerprints.mjs`,
+#2380), so a shell edit needs no refresh commit. A text or styling fix needs a direct UI assertion that would
 have failed before the edit. Run the focused tests and affected regression
 cohort; broaden to the full suite when risk or a required release gate warrants
 it. Inspect the rendered result when pixels or controls changed. Record test, browser,
@@ -56,10 +59,9 @@ A root `tests.js` is not a test file: nothing runs it, the hook refuses writing
 it, and the CI gate rejects a diff that adds or changes one. Port such edits as
 [test groups](test-groups.md#test-files) describes.
 
-`RISK_TEST_COVERAGE.md` lists the `RISK` tests by file and is generated from
-their names: run `npm run risk-map -- --write` after adding, renaming or
-removing one. A test in `tests/repository-process.test.js` checks that the
-committed map matches. Changes to
+The `RISK` coverage map lists the `RISK` tests by file. `npm run risk-map`
+prints it on demand from their names, and it is not committed, so adding,
+renaming or removing a `RISK` test needs no map edit (#2381). Changes to
 the diff gate, edit hook, or CI workflow also need a new process-focused
 `RISK` test, named under the test-first gate, regression gate, test inventory,
 or repository process boundary. An unrelated feature risk test cannot satisfy

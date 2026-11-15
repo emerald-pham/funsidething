@@ -44,9 +44,10 @@ const hasAddedProcessRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RIS
 // deletedFiles lets the split itself through: against a base from before
 // #2213, the diff deletes tests.js, and those deleted lines stay protected by
 // the rationale check below. Adding or editing a root tests.js is rejected.
-// bookkeepingOnly names shell files whose diff only adds changelog text and
-// refreshes the app fingerprint or CACHE_NAME. Every app change does that, so it
-// must not make a scenery fix high-risk (#2233 review).
+// bookkeepingOnly names shell files whose diff only adds changelog text (and,
+// in diffs from before #2380, refreshes the then-committed app fingerprint or
+// CACHE_NAME; both are now computed when the shell is served). Every app change
+// adds changelog text, so it must not make a scenery fix high-risk (#2233 review).
 export function validateTestFirst(changedFiles,addedTestLines,deletedFiles=[],bookkeepingOnly=[]){
   const errors=[];
   if(changedFiles.includes(LEGACY_TEST_FILE)&&!deletedFiles.includes(LEGACY_TEST_FILE))

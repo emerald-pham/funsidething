@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// This command stages committed bytes. It never invokes Firebase or publishes.
+// This command stages committed bytes, with the app fingerprint and CACHE_NAME
+// computed from them as every deploy does (#2380). It never invokes Firebase or publishes.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { verifyReleaseEvidence } from './release-evidence.mjs';
+import { computeShell } from './shell-fingerprints.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const git = (...args) => execFileSync('git', args, { maxBuffer: 32 * 1024 * 1024 });
@@ -101,22 +103,20 @@ function validateOriginalProduct(repository, manifest, publicDirectory) {
   if (!isDeepStrictEqual(Object.keys(manifest.files).sort(), [...assets, 'channel-release.json'].sort())) {
     fail('original artifact inventory does not match its committed worker shell and channel metadata.');
   }
-  const shellHash = createHash('sha256');
-  const productHash = createHash('sha256');
+  // Check every inventory path before computeShell reads any of them from Git.
   for (const file of assets) {
     if (!safeRelativeFile(file)) fail('original committed worker inventory contains an unsafe path.');
-    const committed = git('show', product.sourceRevision + ':' + file);
-    const staged = fs.readFileSync(path.join(publicDirectory, file));
-    if (!staged.equals(committed)) fail('original artifact differs from its committed product bytes: ' + file);
-    if (file !== 'sw.js') shellHash.update(file + '\0').update(committed).update('\0');
-    let bytes = committed;
-    if (file === 'index.html') bytes = Buffer.from(bytes.toString().replace(/<!-- changelog:start -->[\s\S]*?<!-- changelog:end -->/, '<!-- changelog -->'));
-    if (file === 'sw.js') bytes = Buffer.from(bytes.toString().replace(/chain-scanner-shell-[a-f0-9]+/, 'chain-scanner-shell-HASH'));
-    productHash.update(file + '\0').update(bytes).update('\0');
   }
-  if (productHash.digest('hex') !== product.appFingerprint ||
-      worker.match(/const CACHE_NAME = "([^"]+)"/)?.[1] !== 'chain-scanner-shell-' + shellHash.digest('hex') ||
-      git('show', product.sourceRevision + ':index.html').toString().match(/data-app-fingerprint="([a-f0-9]{64})"/)?.[1] !== product.appFingerprint) {
+  const committed = file => git('show', product.sourceRevision + ':' + file);
+  let identity;
+  try { identity = computeShell(committed); } catch (error) {
+    fail('original product fingerprint or worker shell identity does not match its committed bytes: ' + error.message);
+  }
+  for (const file of assets) {
+    const staged = fs.readFileSync(path.join(publicDirectory, file));
+    if (!staged.equals(identity.files[file] ?? committed(file))) fail('original artifact differs from its committed product bytes: ' + file);
+  }
+  if (identity.appFingerprint !== product.appFingerprint) {
     fail('original product fingerprint or worker shell identity does not match its committed bytes.');
   }
 }
@@ -329,20 +329,11 @@ const assets = [...new Set([...list[1].matchAll(/"([^"]+)"/g)].map(m => m[1] ===
 for (const file of assets) {
   if (!/^[A-Za-z0-9_][A-Za-z0-9_./-]*$/.test(file) || file.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('Unsafe shell asset path.');
 }
-const shellHash = createHash('sha256');
-const productHash = createHash('sha256');
-for (const file of assets) {
-  let bytes = git('show', source + ':' + file);
-  if (file !== 'sw.js') shellHash.update(file + '\0').update(bytes).update('\0');
-  if (file === 'index.html') bytes = Buffer.from(bytes.toString().replace(/<!-- changelog:start -->[\s\S]*?<!-- changelog:end -->/, '<!-- changelog -->'));
-  if (file === 'sw.js') bytes = Buffer.from(bytes.toString().replace(/chain-scanner-shell-[a-f0-9]+/, 'chain-scanner-shell-HASH'));
-  productHash.update(file + '\0').update(bytes).update('\0');
-}
-const appFingerprint = productHash.digest('hex');
-if (sw.match(/const CACHE_NAME = "([^"]+)"/)?.[1] !== 'chain-scanner-shell-' + shellHash.digest('hex') ||
-    git('show', source + ':index.html').toString().match(/data-app-fingerprint="([a-f0-9]{64})"/)?.[1] !== appFingerprint) {
-  throw new Error('Committed product fingerprint or worker shell identity is stale.');
-}
+const committedBytes = file => git('show', source + ':' + file);
+let shell;
+try { shell = computeShell(committedBytes); } catch (error) { throw new Error('Committed product fingerprint or worker shell identity is stale: ' + error.message); }
+const appFingerprint = shell.appFingerprint;
+const servedBytes = file => shell.files[file] ?? committedBytes(file);
 fs.mkdirSync(output, { mode: 0o700 });
 const reservation = fs.lstatSync(output);
 let staging;
@@ -353,10 +344,14 @@ try {
   fs.mkdirSync(publicDir);
   const archive = git('archive', '--format=tar', source, '--', ...assets);
   execFileSync('tar', ['-x', '-C', publicDir], { input: archive });
+  for (const file of Object.keys(shell.files)) {
+    if (!fs.readFileSync(path.join(publicDir, file)).equals(committedBytes(file))) throw new Error('Archive changed committed asset bytes: ' + file);
+    fs.writeFileSync(path.join(publicDir, file), shell.files[file]);
+  }
   const files = {};
   for (const file of assets) {
     const bytes = fs.readFileSync(path.join(publicDir, file));
-    if (!bytes.equals(git('show', source + ':' + file))) throw new Error('Archive changed committed asset bytes: ' + file);
+    if (!bytes.equals(servedBytes(file))) throw new Error('Archive changed committed asset bytes: ' + file);
     files[file] = { sha256: hash(bytes), bytes: bytes.length };
   }
   const notice = { startsAt: option('--notice-starts-at') };

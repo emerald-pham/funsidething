@@ -1,7 +1,8 @@
 import '../../tests/isolate-git-env.js';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -91,6 +92,17 @@ if (process.env.CHAIN_NATIVE_SMOKE_CHILD !== '1') test('native smoke cohort requ
   assert.equal(report.offlineTransport.offlineProbeReachedListener, false);
   assert.deepEqual(report.fixtureRpc, []);
   assert.deepEqual(report.externalRequestsEscaped, []);
+  // The smoke serves and expects the document exactly as the Pages deploy
+  // publishes this source: committed bytes with computed shell identities (#2380).
+  const site = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'native-smoke-site-'));
+  try {
+    const archive = spawnSync('bash', ['-eo', 'pipefail', '-c', 'git archive "$0" | tar -x -C "$1"', source, site], { cwd: repo, encoding: 'utf8' });
+    assert.equal(archive.status, 0, archive.stderr);
+    const stamp = spawnSync(process.execPath, [path.join(repo, 'scripts/shell-fingerprints.mjs'), '--root', site, '--write'], { encoding: 'utf8' });
+    assert.equal(stamp.status, 0, stamp.stderr);
+    assert.equal(report.documentSha256, createHash('sha256').update(fs.readFileSync(path.join(site, 'index.html'))).digest('hex'),
+      'the local fixture serves the document the deploy publishes for this source');
+  } finally { fs.rmSync(site, { recursive: true, force: true }); }
 });
 
 test('native smoke permits owned ephemeral loopback only for the isolated CI runner', () => {

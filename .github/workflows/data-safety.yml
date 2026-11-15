@@ -341,9 +341,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/configure-pages@v5
       - run: mkdir site
       - run: git archive HEAD | tar -x -C site
+      # The app fingerprint and CACHE_NAME are not committed (#2380): computed
+      # from exactly these published files, so anyone can recompute them from
+      # the deployed commit, and a shell edit needs no refresh commit.
+      - run: node scripts/shell-fingerprints.mjs --root site --write
       - uses: actions/upload-pages-artifact@v4
         with:
           path: site

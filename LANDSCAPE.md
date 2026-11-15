@@ -28,7 +28,7 @@ Distant facades have restrained, stable color variation. Shorter buildings favor
 
 ## Validation
 
-Run `npm test` for core, scanner and PWA contracts. Browser coverage is opt-in because this repository has no browser package dependency. Serve this directory, then run with an installed Playwright module:
+Run `npm test` for core, scanner and PWA contracts. Browser coverage is opt-in because this repository has no browser package dependency. Serve the checkout with `npm run serve -- --port 8766` (a plain static server would serve the `HASH` placeholders and a constant cache key), then run with an installed Playwright module:
 
 ```sh
 LANDSCAPE_BROWSER_URL=http://127.0.0.1:8766/ \
