@@ -9973,11 +9973,17 @@ const taskActionOwnerBundle=(()=>{
     //   every action before #2376 keep it, while it is still in the pool.
     //   Redrawing it would score tasks added since Start into the pass's saved
     //   draw, which holds sync (a separate cause the next Yes also reaches).
+    // - The replay of a pass Start began also ends an intervention prompt. One
+    //   the action did not end stays up while the board scans the same
+    //   benchmark, with no candidate, as maybeIntervene leaves it (review B2).
     function settle(replay,direct){
-      const offered=state.candidateId;let path="direct";
+      const offered=state.candidateId,intervening=state.interventionActive,weighed=benchmark()?.id;let path="direct";
       if(replay&&decisionReplayReady(state)){
         projectDecisionEvents(state,null,{refreshRanks:false});expireCants();expireWorked();path="replay";
       }else direct();
+      if(intervening&&!state.interventionActive&&state.mode==="scan"&&benchmark()?.id===weighed){
+        state.interventionActive=true;state.candidateId=null;
+      }
       if(offered&&state.candidateId===null&&!state.interventionActive&&pool().some(task=>task.id===offered))state.candidateId=offered;
       return path;
     }

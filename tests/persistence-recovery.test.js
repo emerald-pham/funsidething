@@ -15638,3 +15638,41 @@ test('RISK started pass sync: a scanner control that adds no rating evidence doe
   assert.equal(work[30],work[6],'rows checked with 30 recorded answers ('+work[30]+') and with 6 ('+work[6]+')');
  });
 });
+
+// #2376 review B2: while the intervention prompt shows, Return as candidate of
+// an earlier dot leaves the prompt up and draws no candidate, as before #2376.
+// Drawing one after a task was added to a pass Start began holds sync (#2395).
+test('RISK started pass sync: Return as candidate of an earlier dot while the intervention prompt shows keeps the prompt and keeps syncing, with and without a task added after Start',async t=>{
+ for(const added of [false,true])await t.test(added?'a task added after Start':'no task added',async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'intervention-'+(added?'added':'plain')),{ctx,shim}=device;
+  if(added){shim.document.getElementById('addInput').value='Task E 2376';await device.act('add');}
+  // As maybeIntervene leaves it: the prompt replaces the candidate.
+  ctx.state.interventionActive=true;ctx.state.candidateId=null;ctx.renderScan();
+  const chain0=Array.from(ctx.state.chain),returned=chain0[0];
+  returnDotFromScan(ctx,shim,returned);await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.deepEqual(Array.from(ctx.state.chain),chain0.slice(1),'positive control: the Return took the dot off');
+  assert.equal(ctx.state.interventionActive,true,'the prompt is still showing');
+  assert.equal(ctx.state.candidateId,null,'and no candidate was drawn');
+  assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ });
+});
+
+// The same for a decision that replays: Done on a task in the pool, from its
+// editor, ends no intervention, so the prompt stays up over the same benchmark.
+test('RISK started pass sync: Done from the editor on a task in the pool while the intervention prompt shows keeps the prompt',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const board=syncState({tasks:['a','b','c','d','e','f'].map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+  chain:[],candidateId:null,mode:'scan',scanMode:'descending',seenQuickStart:true,
+  settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ const raw=JSON.stringify(board),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+ setFakeTime(ctx,at+10);ctx.onAction('start-scan',{dataset:{}});
+ for(const when of [at+20,at+30]){setFakeTime(ctx,when);ctx.renderScan();ctx.onAction('yes',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});}
+ assert.equal(ctx.state.chain.length,3,'precondition: Start and two Yes answers');
+ ctx.state.interventionActive=true;ctx.state.candidateId=null;ctx.renderScan();
+ const done=ctx.state.tasks.find(task=>!ctx.state.chain.includes(task.id)&&!task.done).id,chain0=Array.from(ctx.state.chain);
+ setFakeTime(ctx,at+40);hydrateUnchangedEditorDraft(app,done);ctx.onAction('done-task',{dataset:{id:done}});
+ assert.equal(ctx.state.tasks.find(task=>task.id===done).done,true,'positive control: the task is done');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0,'and the chain is unchanged');
+ assert.equal(ctx.state.interventionActive,true,'the prompt is still showing');
+ assert.equal(ctx.state.candidateId,null,'with no candidate');
+});
