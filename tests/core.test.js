@@ -39894,6 +39894,25 @@ test('RISK held decision recovery: recorded light minimized empty-cloud and clou
  });
 });
 
+// #2375: a dotted board that never saved a pass id. The appearance choice is
+// a decision for the recovered board; capturing it must not change this
+// device's own source while the choice is being saved.
+test('RISK held decision recovery: a dotted board with no saved pass id saves the appearance choice without changing its own source',async t=>{
+ const fixture=heldDecisionFixture188();
+ fixture.local={tasks:fixture.local.tasks,chain:['a'],decisionBaseline:fixture.local.decisionBaseline,decisionEvents:fixture.local.decisionEvents};fixture.remote=null;
+ delete fixture.local.decisionEvents[0].actionId;for(const key of ['considered','cantAt','workedAt','observedRatingHistoryIds'])delete fixture.local.decisionBaseline[key];
+ assert.equal(Object.hasOwn(fixture.local,'passId'),false,'precondition: no saved pass id');
+ const app=await heldDecisionApp188(t,{fixture}),{ctx,shim,backend}=app;
+ assert.equal(backend.CS.errorCode,'unprojectable-decision-evidence');
+ assert.deepEqual(Array.from(ctx.state.chain),['a'],'precondition: a dotted chain');
+ await ctx.onAction('review-decision-recovery',{});
+ ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});
+ assert.equal(await ctx.onAction('apply-decision-recovery',{}),true,shim.document.getElementById('modalRoot').innerHTML);
+ const {remote,head}=await settleRecovery188(app);
+ assert.equal(JSON.parse(remote.payload).settings.theme,'light');assert.equal(JSON.parse(head.payload).settings.theme,'light');
+ assert.deepEqual(JSON.parse(head.payload).chain,['a'],'the dot is kept');
+});
+
 test('RISK held decision recovery: native peer edits independent comparisons ratings and History survive the appearance choice',async t=>{
  const original=heldDecisionFixture188();original.local.settings.theme='light';
  const raw=JSON.stringify(original.local),base=await loadAppAtTime(1792322900000,{seed:1880,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
