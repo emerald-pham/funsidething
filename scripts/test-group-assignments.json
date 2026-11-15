@@ -458,13 +458,13 @@
       "registration": "dynamic"
     },
     {
-      "root": "RISK backup retention (browser list): an automatic backup whose day is not a calendar day, or whose board can't be read, is never removed",
+      "root": "RISK backup retention (browser list): an automatic backup whose day is not a calendar day, or whose board can't be read, never expires",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js",
       "registration": "dynamic"
     },
     {
-      "root": "RISK backup retention (device store): an automatic backup whose day is not a calendar day, or whose board can't be read, is never removed",
+      "root": "RISK backup retention (device store): an automatic backup whose day is not a calendar day, or whose board can't be read, never expires",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js",
       "registration": "dynamic"

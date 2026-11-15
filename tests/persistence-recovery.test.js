@@ -13821,7 +13821,7 @@ for(const store of RETENTION_STORES_2379){
 }
 
 for(const store of RETENTION_STORES_2379){
- test(`RISK backup retention (${store.name}): an automatic backup whose day is not a calendar day, or whose board can't be read, is never removed`,async t=>{
+ test(`RISK backup retention (${store.name}): an automatic backup whose day is not a calendar day, or whose board can't be read, never expires`,async t=>{
   const s=await store.open(t),old=s.daysAgo(10);
   const boards=['empty','impossible','word','old'].map(name=>boardWithExtraTask2335(s.ctx,'only-in-'+name,'Only in '+name));
   await s.seed([
@@ -13939,17 +13939,20 @@ for(const store of RETENTION_STORES_2379){
  });
 }
 
-test('RISK backup retention guidance: the mounted FAQ and changelog say unreadable or misdated automatic copies stay, and the changelog promises no browser local-edit change',async t=>{
+test('RISK backup retention guidance: the mounted FAQ and changelog say unreadable or misdated automatic copies never expire, and the changelog promises no browser local-edit change',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answer=markup.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
  assert.match(answer,/Daily copies stay on this device for today/,'positive control: the mounted Help has the retention answer');
- assert.match(answer,/Unreadable or misdated automatic copies stay\./);
+ // #2379 review N2: the size cap and quota rotation can still remove them, so the promise is only that they never expire.
+ assert.match(answer,/Unreadable or misdated automatic copies never expire\./);
+ assert.doesNotMatch(answer,/Unreadable or misdated automatic copies stay/);
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
  const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 14, 2026</h3>')[0];
  assert.match(notes,/<h3>November 15, 2026<\/h3>/);
  assert.match(notes,/Automatic backups now follow one retention rule in browser storage and device storage\./);
- assert.match(notes,/an automatic copy whose date or board can’t be read is no longer removed/);
+ assert.match(notes,/an automatic copy whose date or board can’t be read no longer expires/);
+ assert.doesNotMatch(notes,/can’t be read is no longer removed/);
  // #2379 decision (option b): the browser list keeps its local-edit stand-in, so nothing promises every safety copy the own-kind rule.
  assert.match(notes,/A copy made before taking a newer cloud board is no longer satisfied by an older copy of the same board that would be removed sooner/);
  assert.doesNotMatch(notes,/A safety copy reuses an existing copy of the same board only when/);
