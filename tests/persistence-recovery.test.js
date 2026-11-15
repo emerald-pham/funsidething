@@ -13915,3 +13915,16 @@ for(const store of RETENTION_STORES_2379){
   assert.deepEqual(ids(S),['adoption-s-old','daily-s'],'S stays in both copies: neither is kept as long as the other could be');
  });
 }
+
+test('RISK backup retention guidance: the mounted FAQ and changelog say unreadable or misdated automatic copies stay, and a safety copy is reused only from one kept as long',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=markup.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/Daily copies stay on this device for today/,'positive control: the mounted Help has the retention answer');
+ assert.match(answer,/Unreadable or misdated automatic copies stay\./);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 14, 2026</h3>')[0];
+ assert.match(notes,/<h3>November 15, 2026<\/h3>/);
+ assert.match(notes,/Automatic backups now follow one retention rule in browser storage and device storage\./);
+ assert.match(notes,/an automatic copy whose date or board can’t be read is no longer removed/);
+});
