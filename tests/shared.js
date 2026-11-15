@@ -3239,6 +3239,13 @@ function exactPaddedBoard(board,field,byteLength){
  assert.ok(unpadded<byteLength,'the synthetic board must fit the captured size');board[field].opaque='p'.repeat(byteLength-unpadded);
  const payload=JSON.stringify(board);assert.equal(Buffer.byteLength(payload,'utf8'),byteLength);return payload;
 }
+// #2377 review N1: a finished realm's sync session still holds the known
+// cloud copy, a board of several megabytes in these fixtures, and the app no
+// longer has a variable of its own for it. Release it through the session, as
+// a full read that found nothing records it.
+async function releaseKnownCloudCopy2377(ctx){
+ try{await vm.runInContext('syncSession?.startRead({full:true}).then(ticket=>{ticket.read.accept();ticket.read.end();})',ctx);}catch{}
+}
 async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_RECOVERY_BUDGET_MS,priorVariant=null,defect=true}={}){
  const {active,prior}=CAPTURED_UNREADABLE_GENERATION;
  // The unproxied factory lets the multi-megabyte database be deleted below.
@@ -3252,8 +3259,9 @@ async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_R
  t.after(async()=>{try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
   backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
   await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
-  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+  for(const name of ['state','undoStack','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
    'unrepairableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  await releaseKnownCloudCopy2377(ctx);
   try{vm.runInContext('decisionBaseIdentityCache.length=0',ctx);}catch{}
   await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
  const activePath='users/owner/generations/'+originalRoot.activeGeneration,priorPath='users/owner/generations/'+originalRoot.previousGeneration;
@@ -3342,8 +3350,9 @@ async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
  // megabyte transaction log until it is deleted after this connection closes.
  t.after(async()=>{backend.CS.suspend();try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',reopened.ctx);}catch{}
   try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();backend.docs.clear();try{reopened.shim.localStorage.clear();}catch{}
-  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+  for(const name of ['state','undoStack','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
    'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',reopened.ctx);}catch{}
+  await releaseKnownCloudCopy2377(reopened.ctx);
   try{vm.runInContext('decisionBaseIdentityCache.length=0',reopened.ctx);}catch{}
   await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});
   // This retained hook must not keep the relaunched realm or its backend alive.
@@ -4103,5 +4112,6 @@ export {
   settleRecoveryOperations188, retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
   replaceIndependentServerPayload263,
 };
+export { releaseKnownCloudCopy2377 };
 export { scanPanelDom221, markupButtons, chainPills, chainPillIds, chainPill, benchmarkEdit, keepEditorValues, returnButton,
   returnDotFromScan, returnFromPill, returnBenchmarkFromEdit };

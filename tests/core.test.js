@@ -58,6 +58,7 @@ import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
 import { backupRowsWithText } from "./shared.js";
+import { releaseKnownCloudCopy2377 } from "./shared.js";
 import { scanPanelDom221, chainPills, chainPillIds, chainPill, keepEditorValues, returnButton, returnFromPill, returnBenchmarkFromEdit } from "./shared.js";
 
 // #2281 CI: node:test keeps every finished test with its subtests and hooks,
@@ -3108,8 +3109,9 @@ function releaseLargeRecovery2281(t,app){
   try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
   try{backend.CS.suspend();}catch{}try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
   try{await app.dispose();}catch{}try{backend.docs.clear();}catch{}try{shim.localStorage.clear();}catch{}
-  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+  for(const name of ['state','undoStack','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
    'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  await releaseKnownCloudCopy2377(ctx);
   try{vm.runInContext('decisionBaseIdentityCache.length=0',ctx);}catch{}
   await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});
  });
