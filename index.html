@@ -11073,7 +11073,10 @@ function captureDecisionGesture(actionId=null,at=null,options={}){
     :typeof window.CloudSync?.user==="string"&&window.CloudSync.user?window.CloudSync.user:null;
   const base=account&&validDecisionBase(state.decisionBase,account,state.syncRev)?state.decisionBase:null;
   const gestureAt=Number.isFinite(at)&&at>=0?at:Date.now();
-  const passId=decisionId(options?.passId)?options.passId:PassChain.pin(state);
+  // #2375: a gesture on this board saves its pass id (PassChain.pin). A caller
+  // recording a choice for another board passes pin:false, so this device's
+  // own source does not change under it.
+  const passId=decisionId(options?.passId)?options.passId:options?.pin===false?PassChain.passId(state):PassChain.pin(state);
   const passAt=Number.isFinite(options?.passAt)&&options.passAt>=0?options.passAt:Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0;
   const gesture={actionId:decisionId(actionId)?actionId:uid(),at:gestureAt,account,
     baseId:base?.id??null,passId,passAt,
@@ -11557,9 +11560,13 @@ const PassChain=Object.freeze({
   // the pass keeps it until Start, a Dot onto an empty chain or 2 AM begins a
   // new one. The saved value is the id the board already reported, so no row
   // changes pass, and older clients read it like the id No already saves.
+  // An empty chain has no first dot for the id to follow, and every way of
+  // dotting it (Start, Dot, Add & dot) begins a new pass, so nothing is saved
+  // there and Undo still gives that board back byte for byte.
   pin(board){
     const id=PassChain.passId(board);
-    if(board&&typeof board==="object"&&!(typeof board.passId==="string"&&board.passId))board.passId=id;
+    if(board&&typeof board==="object"&&!(typeof board.passId==="string"&&board.passId)
+      &&typeof board.chain?.[0]==="string")board.passId=id;
     return id;
   },
   read(row){
@@ -13962,7 +13969,7 @@ async function applyDecisionRecovery(){
     let choiceId=uid(),choiceAt=Date.now();
     if(p.mode!=="ratings"){
       const before=currentChoiceTargetRead(JSON.parse(p.local),{type:"setting",id:"board",property:"theme"});
-      const gesture={...captureCurrentChoiceGesture(),observedActionIds:decisionActionFrontier(next.decisionEvents)};
+      const gesture={...captureDecisionGesture(null,null,{pin:false}),observedActionIds:decisionActionFrontier(next.decisionEvents)};
       const events=prepareCurrentChoiceEvents([{target:{type:"setting",id:"board",property:"theme"},value:p.choice,after:{present:true},before}],gesture);
       if(events.length!==1)throw decisionRecoveryProblem("This appearance cannot be represented safely. Both sources remain protected.");
       next.decisionEvents=[...(next.decisionEvents||[]),events[0]];next.settings.theme=p.choice;choiceId=events[0].id;choiceAt=gesture.at;
