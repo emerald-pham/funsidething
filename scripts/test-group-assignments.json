@@ -432,6 +432,102 @@
       "root": "RISK cloud source recovery \\#2281: after failed attempts saved by the previous release on the large phone board, Apply and a later save read about the same device storage at once however many there were",
       "group": "persistence-recovery",
       "file": "tests/core.test.js"
+    },
+    {
+      "root": "RISK backup retention (browser list): a copy kept before a cloud local edit is reused only from a copy the app keeps until it is deleted",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): a copy kept before a cloud local edit is reused only from a copy the app keeps until it is deleted",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (browser list): a copy kept before taking a cloud board is reused only from a copy kept at least seven days from today",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): a copy kept before taking a cloud board is reused only from a copy kept at least seven days from today",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (browser list): an automatic backup whose day is not a calendar day, or whose board can't be read, is never removed",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): an automatic backup whose day is not a calendar day, or whose board can't be read, is never removed",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (browser list): each automatic backup expires after its own kind's days, and every other backup stays",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): each automatic backup expires after its own kind's days, and every other backup stays",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (browser list): while a recovery holds daily backups, they keep seven days and no repeated copy is cleared",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): while a recovery holds daily backups, they keep seven days and no repeated copy is cleared",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (browser list): a pinned copy never expires, is never cleared as a repeat and never stands in for another copy",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): a pinned copy never expires, is never cleared as a repeat and never stands in for another copy",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (browser list): exact repeats are reduced to the copy its own kind keeps longest, and copies no save clears stay",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): exact repeats are reduced to the copy its own kind keeps longest, and copies no save clears stay",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (browser list): backups saved before this update load unchanged after reopening, and the next save removes only expired automatic copies",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
+    },
+    {
+      "root": "RISK backup retention (device store): backups saved before this update load unchanged after reopening, and the next save removes only expired automatic copies",
+      "group": "persistence-recovery",
+      "file": "tests/persistence-recovery.test.js",
+      "registration": "dynamic"
     }
   ],
   "nightlyRoots": [
