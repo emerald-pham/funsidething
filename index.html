@@ -10259,6 +10259,9 @@ const taskActionOwnerBundle=(()=>{
       const task=taskById(command.taskId);if(!task||task.done||!supportedPostponeEvidence(task))return false;
       const gesture=captureDecisionGesture();
       pushUndo();
+      // Postpone writes no Task history, so its Undo writes none either
+      // (#2376 review N2), though its rows look like a Return and a Dot.
+      undoStack.at(-1).writesHistory=false;
       const result=BoardDecision.apply(gesture,{kind:"postpone",taskId:task.id});
       // No rating moves, so ranks are not refreshed, as before #2376: a refresh
       // scores every task into the pass's saved draw (see the issue on #2376).
@@ -10411,8 +10414,9 @@ const taskActionOwnerBundle=(()=>{
     const replayLearning=targets.some(event=>event.kind==="no"||event.kind==="comparison");
     // #221: undoing a return puts its dot back, which History shows as it
     // showed the return, though no rating moves.
-    const returnedDots=targets.map(event=>PassChain.read(event)).filter(row=>row?.kind==="return").map(row=>row.taskId);
-    const ids=[...next.tasks.filter(t=>replayLearning||JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id),...returnedDots];
+    const quiet=frame.writesHistory===false;
+    const returnedDots=quiet?[]:targets.map(event=>PassChain.read(event)).filter(row=>row?.kind==="return").map(row=>row.taskId);
+    const ids=quiet?[]:[...next.tasks.filter(t=>replayLearning||JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id),...returnedDots];
     const observation=captureRatingObservation("undo",ids);
     if(cancellation)observation.id=cancellation.id;
     undoStack.pop();

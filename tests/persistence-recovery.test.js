@@ -15731,3 +15731,25 @@ test('RISK chain return Undo: Undo after 2 AM of a Yes or an editor Dot made bef
   assert.deepEqual(undone,['a','b','c'],'Undo takes the added dot off');
  });
 });
+
+// #2376 independent review N2: Postpone writes no Task history, and neither
+// does its Undo, as before #2376. Its rows (a Return and the automatic dot's
+// Dot with no rating) are not a Return as candidate or a comparison to show.
+test('RISK chain return Undo: Undo of a Postpone writes no Task history, also when the Postpone placed an automatic dot',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ for(const chain of [['a','b','c'],['a']])await t.test(chain.length>1?'Postpone of the benchmark':'Postpone of the only dot',async()=>{
+  const board=syncState({tasks:['a','b','c','d','e','f'].map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+   chain,candidateId:'d',mode:'scan',scanMode:'descending',passId:'history-pass',passStartedAt:at-60000,
+   settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,postponeHours:1,showPostpone:true}});
+  const raw=JSON.stringify(board),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+  const rows=()=>ctx.state.tasks.map(task=>(task.ratingHistory||[]).length).reduce((a,b)=>a+b,0);
+  const start=rows();
+  assert.equal(postponeBenchmark221(app,at+100),chain.at(-1));
+  if(chain.length===1)assert.equal(ctx.state.chain.length,1,'precondition: Postpone placed an automatic dot');
+  assert.equal(rows(),start,'positive control: the Postpone itself writes no Task history');
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(ctx,at+2000);assert.equal(await ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(ctx.state.chain),chain,'positive control: Undo put the chain back');
+  assert.equal(rows(),start,'Undo of the Postpone writes no Task history either');
+ });
+});
