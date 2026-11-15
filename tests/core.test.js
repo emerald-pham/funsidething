@@ -43131,3 +43131,16 @@ test('RISK help save-repair guidance: the current changelog says the Data and ba
  assert.doesNotMatch(latest,/They no longer explain/);
  assert.match(latest,/<li>Help’s Data and backups answers are shorter overall and say what you see and can do: whether your work is saved on this device, whether cloud saving is pending, and what to choose when the app needs you\. Most no longer explain how saves are repaired behind the scenes\. Answers that only retold earlier fixes are gone; this changelog keeps that history\.<\/li>/);
 });
+
+// #2376: Done on the benchmark ends scanning in every pass, also one Start
+// began. Help's Done answer says so, within the 130-word answer limit.
+test("RISK help scanning guidance: the Done answer says Done on the newest dot ends scanning", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openHelp();
+  const faq = shim.elements.get("modalRoot").innerHTML.match(/<details class="help-faq"><summary><h3>Scanning and recurrence<\/h3><\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(faq, "precondition: the scanning chapter renders");
+  const answer = new Map([...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(([, question, text]) => [question, text])).get("What happens when I choose Done?");
+  assert.match(answer, /ordinary task.*active task list.*crossed out in History/, "the existing guidance stays");
+  assert.match(answer, /Done on the newest dot.*ends scanning/, "Done on the benchmark ends scanning");
+  assert.ok(answer.replace(/<[^>]+>/g, " ").trim().split(/\s+/).length <= 130, "the answer stays within 130 words");
+});
