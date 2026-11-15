@@ -14292,7 +14292,7 @@ const RETENTION_STORES_2379=[
    async reopen(){
     await app.dispose?.();const next=await open();store=next.shim.window.ScannerDeviceStore;
     assert.equal(vm.runInContext('deviceStorageAuthority',next.ctx),true,'the reopened app holds the board on the device');
-    return {ctx:next.ctx,async save(){next.ctx.addTask('An edit after reopening');await savesSettled2334(next);}};
+    return {ctx:next.ctx,store,async save(){next.ctx.addTask('An edit after reopening');await savesSettled2334(next);}};
    },
    async seed(rows){
     for(const row of rows){
@@ -14666,4 +14666,43 @@ test('RISK backup retention (browser list): a copy kept before taking a cloud bo
  await s.seed([s.row('other-p-old','other-browser-copy',P,{day:s.daysAgo(10)})]);
  assert.ok(await s.copy('before-cloud-adoption',P),'the adoption copy of P is reported safe');
  assert.deepEqual((await s.holding(P)).map(row=>row.id),['other-p-old'],'the ten-day-old other-browser copy stands in, so no row is added');
+});
+
+// #2379 specialist review R2: on a phone a board can be millions of characters,
+// so the first save after an opening reads the unmeasured expiring copies one
+// at a time, each released before the next, rather than all at once.
+test('RISK backup retention (device store): the first save after reopening reads unmeasured expiring copies one at a time',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t),old=s.daysAgo(10);
+ await s.seed([s.row('restore-unreadable-1','before-restore','{"tasks":[',{day:old}),s.row('restore-unreadable-2','before-restore','{"tasks":[1',{day:old}),
+  s.row('restore-readable-old','before-restore',boardWithExtraTask2335(s.ctx,'only-in-readable-old','Only in readable old'),{day:old})]);
+ const reopened=await s.reopen(),read=reopened.store.readBackups;
+ // A fake around the device read: how many copies one read asks for, and how many reads are in flight.
+ let inFlight=0,mostInFlight=0,mostCopies=0,reads=0;
+ reopened.store.readBackups=async ids=>{
+  reads++;inFlight++;mostInFlight=Math.max(mostInFlight,inFlight);mostCopies=Math.max(mostCopies,Array.from(ids||[]).length);
+  try{await new Promise(resolve=>setTimeout(resolve,5));return await read(ids);}finally{inFlight--;}
+ };
+ t.after(()=>{reopened.store.readBackups=read;});
+ reopened.ctx.addTask('An edit right after reopening');assert.equal(await reopened.ctx.persist(),true);
+ const ids=(await s.list()).map(row=>row.id);
+ assert.ok(reads>=1,'positive control: the save read the unmeasured expiring copies');
+ assert.equal(mostCopies,1,'each read asks for one copy ('+reads+' reads)');
+ assert.equal(mostInFlight,1,'and no two reads are in flight together');
+ assert.equal(ids.includes('restore-readable-old'),false,'the readable expired copy still expires');
+ assert.ok(ids.includes('restore-unreadable-1')&&ids.includes('restore-unreadable-2'),'and both unreadable ones stay');
+});
+
+test('RISK backup retention (device store): when a read of an unmeasured expiring copy fails after reopening, that copy and every one not yet read stay',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t),old=s.daysAgo(10);
+ const ids=['restore-old-1','restore-old-2','restore-old-3'];
+ await s.seed(ids.map(id=>s.row(id,'before-restore',boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id),{day:old})));
+ // As on the first opening after #2310, no backup's measured facts are remembered.
+ s.storage.removeItem('fvp:chain-scanner:backup-facts');
+ const reopened=await s.reopen(),read=reopened.store.readBackups;let reads=0;
+ // The second read fails, as an iOS database connection ended under a read would.
+ reopened.store.readBackups=async list=>{if(++reads===2)throw Object.assign(new Error('read failed'),{name:'InvalidStateError'});return read(list);};
+ t.after(()=>{reopened.store.readBackups=read;});
+ reopened.ctx.addTask('An edit right after reopening');assert.equal(await reopened.ctx.persist(),true);
+ const kept=(await s.list()).map(row=>row.id).filter(id=>ids.includes(id));
+ assert.equal(kept.length,2,'the copy read before the failure expires, and the other two stay: '+JSON.stringify(kept));
 });
