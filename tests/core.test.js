@@ -163,10 +163,13 @@ test('RISK recovery device diagnostics: FAQ explains read categories without cla
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});
- const measures=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>What does the debug log measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ // #234: the field list moved out of Help to the comment above the Debug
+ // log's limits; Help keeps what a person needs in "What does the debug log contain?".
+ assert.doesNotMatch(app.shim.document.getElementById('modalRoot').innerHTML,/<dt>What does the debug log measure\?<\/dt>/,'Help no longer lists what the Debug log measures');
+ const measures=html.split('const SUPPORT_DIAGNOSTICS_MAX_AGE=')[0].split('\n').slice(-24).join('\n').replace(/\n\/\/ /g,' ');
  assert.match(measures,/which saved-data read failed/i);
- assert.match(measures,/fixed error categories.*temporary connection numbers/i);
- assert.match(measures,/does not repair saved data or confirm that recovery succeeded/i);
+ assert.match(measures,/fixed error category and temporary connection number/i);
+ assert.match(measures,/None of this repairs saved data or confirms that recovery succeeded/i);
  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/Debug log now distinguishes saved-data read failures and reconnections without including private error text/i);
  app.ctx.openSettings();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="view-support-diagnostics"/);
 });
@@ -294,30 +297,34 @@ test('RISK cloud recovery reconnect guidance: mounted help explains reconnecting
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/The recheck reconnects to this device’s saved data if its earlier connection failed/);
- assert.match(markup,/It never clears or replaces the saved database/);
+ // #234: Help says the outcome (one recheck by itself) without the reconnect mechanism.
+ assert.match(markup,/If a read fails for a moment or a source changes, the review checks again once by itself\./);
+ assert.match(markup,/It never clears or replaces your saved data\./);
  assert.match(markup,/<li>Cloud recovery now reconnects to saved device data after an interrupted read/);
- assert.match(markup,/original one-minute limit/);
+ assert.match(markup,/The whole review, including that recheck, takes at most a minute/);
 });
 
 test('RISK cloud recovery memory guidance: mounted FAQ and changelog explain lower memory use and retained originals',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/Why did my app reload while checking cloud recovery/);
- assert.match(markup,/use less memory while still checking every saved source/);
- assert.match(markup,/Original copies are retained/);assert.match(markup,/copy the Debug log/);
- assert.match(markup,/may explain a restart, but does not establish why a particular device restarted/);
- assert.match(markup,/Debug log as evidence for investigation/);
- assert.match(markup,/<li>Cloud recovery uses less memory when many saved copies are present/);
+ // #234: the history answer is gone (its history stays in this changelog and
+ // docs/investigations/cloud-review-reload-20261022.md); its guidance, copy the
+ // Debug log and share it, is in "Why did the app reload?".
+ assert.doesNotMatch(markup,/Why did my app reload while checking cloud recovery/);
+ const reload=markup.split('<dt>Why did the app reload?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(reload,/then Copy debug log or Download debug log, and share it\./);
+ assert.match(reload,/It can’t prove why a page closed; a phone can close a page that uses too much memory\./);
+ assert.match(markup,/<li>Cloud recovery uses less memory when many saved copies are present, reducing the risk of the app restarting during checks\. Saved originals remain protected\./);
 });
 
 test('RISK cloud recovery device read guidance: mounted FAQ and changelog explain the bounded device recheck',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/<dt>Why does a recovery check retry or stop\?<\/dt><dd>A temporary device database failure/);
- assert.match(markup,/one safe automatic recheck/i);assert.match(markup,/original one-minute limit/i);
+ // #234: the answer says the outcome in plain words.
+ assert.match(markup,/<dt>Why does a recovery check retry or stop\?<\/dt><dd>If a read fails for a moment or a source changes, the review checks again once by itself\./);
+ assert.match(markup,/takes at most a minute, and Cancel stays available/i);
  assert.match(markup,/<li>Cloud recovery retries a temporary device database failure without changing saved sources/,'the mounted changelog includes the released behavior');
 });
 
@@ -326,9 +333,11 @@ test('RISK large board opening guidance: mounted FAQ and changelog explain that 
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/<dt>Why could a large board fail to open\?<\/dt><dd>/);
- assert.match(markup,/checks its saved decisions without repeating work for every earlier decision/);
- assert.match(markup,/<li>A large saved board opens from this device with less memory/,'the mounted changelog includes the released behavior');
+ // #234: the history answer is gone; the November 4 changelog keeps it, and
+ // "Why did the app reload?" says to copy the Debug log.
+ assert.doesNotMatch(markup,/<dt>Why could a large board fail to open\?<\/dt>/);
+ assert.match(markup,/<li>A large saved board opens from this device with less memory\. Opening checks its saved decisions without repeating work for every earlier decision/,'the mounted changelog includes the released behavior');
+ assert.match(markup.split('<dt>Why did the app reload?</dt><dd>')[1]?.split('</dd>')[0]||'',/Copy debug log or Download debug log, and share it/);
 });
 
 // #2227 (spec #2224): recovering a large board onto an older complete cloud copy.
@@ -336,8 +345,11 @@ test('RISK large board recovery guidance: mounted FAQ and changelog explain that
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/<dt>Why could cloud recovery of a large board close the app\?<\/dt><dd>/);
- assert.match(markup,/compares each saved copy once/);
+ // #234: the history answer is gone with its "Every saved source is still
+ // kept" claim (#2270 N6); the changelog keeps the history and the
+ // recovery-waiting answer says what a large board does now.
+ assert.doesNotMatch(markup,/<dt>Why could cloud recovery of a large board close the app\?<\/dt>/);
+ assert.match(markup,/It compares each saved copy once and lets go of copies it no longer needs/);
  assert.match(markup,/<li>Cloud recovery of a large board onto an older complete copy finishes in seconds with less memory/,'the mounted changelog includes the released behavior');
 });
 
@@ -350,8 +362,9 @@ test('RISK large board recovery wait guidance: mounted FAQ and changelog explain
  assert.match(markup,/stays open and saves on this device/);assert.match(markup,/Review cloud recovery/);assert.match(markup,/Retry sync/);assert.match(markup,/signing in again/i);
  const answer=markup.match(/<dt>Why does the cloud button say “recovery waiting”\?<\/dt><dd>(.*?)<\/dd>/)[1];
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the Help length every answer keeps');
- // Release review of spec #2224 (B1): a deliberate run this device cannot remember keeps waiting.
- assert.match(answer,/storage is too full[^.]*keeps waiting/,'the answer says a full device keeps the recovery waiting');
+ // Release review of spec #2224 (B1): a deliberate run that stops, or one a
+ // full device cannot note, keeps waiting, and the answer says what to do.
+ assert.match(answer,/If it stops early, or this device’s storage is full, it waits again; free up space, then try again\./,'the answer says a full device keeps the recovery waiting');
  assert.match(markup,/<li>When rebuilding a large board from an older cloud copy could need more memory than a phone allows, cloud recovery now waits/,'the mounted changelog includes the released behavior');
 });
 
@@ -366,11 +379,12 @@ test('RISK large board recovery wait guidance: mounted FAQ and changelog explain
  const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  const after=answer('Why does a large board wait for Retry sync after recovery?');
  assert.ok(after,'Help answers why a large board waits for Retry sync after recovery');
- assert.match(after,/opening the app, returning to it, reconnecting or editing does not try again/);
+ assert.match(after,/opening the app, returning, reconnecting or editing doesn’t try again/);
  assert.match(after,/Retry sync or signing in again does/);
- assert.match(after,/checking earlier incomplete cloud copies again/);
+ // #234: the incomplete-copies recheck reason is a mechanism; it left Help.
+ assert.doesNotMatch(after,/checking earlier incomplete cloud copies again/);
  const incomplete=answer('What happens when an incomplete cloud copy becomes readable?');
- assert.match(incomplete,/After Retry sync rebuilds a large board, only Retry sync checks it again/);
+ assert.match(incomplete,/After Retry sync rebuilds a large board, only Retry sync or signing in again checks it\./);
  // The answer that names every cloud button label names this one too.
  const labels=answer('What do the cloud button labels mean?');
  assert.match(labels,/<b>recovery waiting<\/b>: /,'Help explains the recovery waiting label');
@@ -390,14 +404,14 @@ test('RISK large board deliberate recovery guidance: mounted FAQ and changelog e
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answer=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
  const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
- const close=answer('Why could cloud recovery of a large board close the app?');
- assert.match(close,/reads and checks each one less often/);
- assert.match(close,/A large board still waits until you tap Retry sync\./);
+ // #234: the large-board history answer is gone; the November 6 changelog
+ // below keeps it.
+ assert.doesNotMatch(markup,/<dt>Why could cloud recovery of a large board close the app\?<\/dt>/);
  const waiting=answer('Why does the cloud button say “recovery waiting”?');
- assert.match(waiting,/If that run stops early or this device’s storage is too full to note it, it keeps waiting\./);
+ assert.match(waiting,/If it stops early, or this device’s storage is full, it waits again; free up space, then try again\./);
  const after=answer('Why does a large board wait for Retry sync after recovery?');
  assert.match(after,/^After Retry sync rebuilds a large board from an older cloud copy,/);
- for(const [name,text] of [['close',close],['waiting',waiting],['after',after]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
+ for(const [name,text] of [['waiting',waiting],['after',after]])assert.ok(words(text)<=130,name+' answer stays within the 130-word limit: '+words(text));
  assert.doesNotMatch(markup,/on its own, once|rebuilds on its own|recovers on its own/,'nothing says a large board recovers on its own');
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(release,/<li>Cloud recovery of a large board reads, encodes and checks each saved copy less often, so Retry sync rebuilds it with less memory\. A large board still waits for Retry sync\./,'the mounted changelog includes the released behavior');
@@ -523,20 +537,20 @@ test('RISK cloud generation recovery guidance: mounted FAQ and the November 4 ch
 test('RISK device database repair guidance: mounted FAQ distinguishes offline exact-copy repair from protected unresolved sources',async()=>{
  const app=await loadApp();app.ctx.openHelp();
  const markup=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/reopen its saved board while offline/);
- assert.match(markup,/temporary problem opening saved data is retried once/);
- assert.match(markup,/exact matching copy already retained on this device/);
- assert.match(markup,/damaged originals stay protected/);
- assert.match(markup,/not an empty recovered board/);
+ // #234: the same outcomes in plain words, without the retry-once mechanism.
+ assert.match(markup,/Offline, the app reopens your saved board and repairs a damaged save by itself from a matching copy on this device, keeping the damaged one\./);
+ assert.doesNotMatch(markup,/temporary problem opening saved data is retried once/);
+ assert.match(markup,/Your saved copies stay protected either way\./);
+ assert.match(markup,/which is not your recovered board/);
 });
 
 test('RISK offline repair guidance: help distinguishes a working workspace cloud repair and exact preserved originals',async()=>{
  const app=await loadApp();app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/new offline workspace/i,'help explains useful new work when no complete original survives');
- assert.match(help,/original sources remain protected/i,'a new workspace is not described as a recovered empty board');
- assert.match(help,/repair a damaged cloud board from complete retained cloud copies/i);
- assert.match(help,/does not confirm edits still waiting on this device/i,'server repair and local edit acknowledgement remain separate');
- assert.match(help,/one Restore action: choose a file or paste board data/i,'automatic repair retains the established deliberate Restore route');
+ assert.match(help,/it opens a new workspace for new work, which is not your recovered board/i,'help explains useful new work when no complete original survives');
+ assert.match(help,/Your saved copies stay protected either way/i,'a new workspace is not described as a recovered empty board');
+ assert.match(help,/repair a damaged cloud board from complete cloud copies/i);
+ assert.match(help,/Edits waiting on this device still need to save here before the cloud can confirm them/i,'server repair and local edit acknowledgement remain separate');
+ assert.match(help,/In Settings, choose Restore, then a file or Paste board data, check the preview and confirm/i,'automatic repair retains the established deliberate Restore route');
 });
 
 test('RISK unreadable device recovery: an unsupported original remains protected while a distinct working workspace accepts saving',async t=>{
@@ -761,11 +775,13 @@ test('RISK unreadable device recovery: Quick start and current Changelog explain
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML,answer=help.match(/<dt>What if my saved device source cannot be read\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(answer,'the extended FAQ covers unreadable missing unsupported and partial device sources');
- assert.match(answer,/one Restore action.*choose a file or paste board data/i);assert.match(answer,/Download backup saves the readable sources as evidence, never a restorable board/i);
- assert.match(answer,/not an empty recovered board/);assert.match(answer,/Cloud recovery stays pending/);
- assert.match(answer,/When cloud sync is configured, the header shows disabled syncing while the board is still opening; this does not confirm cloud saving\./);
- assert.match(answer,/After the board opens, genuine recovery warnings and cloud errors remain visible\./);
- assert.match(answer,/Cloud recovery stays pending until a validated source choice confirms cloud saving/);
+ // #234: the Restore path stays first; header-state detail left Help.
+ assert.match(answer,/choose Restore, then a file or Paste board data/i);assert.match(answer,/Download backup keeps the readable saved copies as evidence, but can’t restore this board/i);
+ // #234 review B4: with no complete copy it can prove, the app opens a new
+ // workspace, so Help says it is not an empty recovered board.
+ assert.match(answer,/the app opens recovery, not an empty recovered board/);
+ assert.match(answer,/cloud saving stays pending until a source is chosen and the cloud confirms it/);
+ assert.match(answer,/If a read or save fails, keep the tab open and try again\./);
  assert.match(html,/one guarded Restore action for a file or pasted JSON/,'the current changelog describes the consolidated restore route');
  assert.match(html,/unreadable device data offers a source-only archive/,'the current changelog preserves the raw-source recovery limit');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
@@ -1782,16 +1798,17 @@ test('RISK automatic recovery guidance: mounted FAQ explains reversible defaults
  const app=await loadApp();t.after(()=>app.dispose());for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];app.ctx.openHelp();
  const help=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.ok(help.includes('Cloud saves keep their confirmation when earlier saves finish. Later edits still wait for their own confirmation.'),'mounted changelog retains the previously released cloud acknowledgement item');
- assert.match(help,/Saved working boards reopen automatically/i,'accepted cold reopening is part of the automatic recovery policy');
- assert.match(help,/An automatic recovery waiting for cloud confirmation resumes after reopening/i);
+ // #234: the same rules in plain words.
+ assert.match(help,/Your working board reopens by itself with the changes already recovered/i,'accepted cold reopening is part of the automatic recovery policy');
+ assert.match(help,/a recovery waiting for cloud confirmation carries on once this device has checked its saved work and your account/i);
  assert.match(help,/Shared cloud originals with anything left remain protected permanently/i);
- assert.match(help,/Cloud confirmation is checked again after edits or account changes/i,'the FAQ distinguishes current authority from an earlier completed recovery');
- assert.match(help,/An earlier source can remain unsupported or unresolved while your current board stays usable/i,'unsupported retained history does not require an unavailable picker');
- assert.match(help,/<dt>Will recovered work reopen and finish saving automatically\?<\/dt><dd>Saved working boards reopen automatically/i,'reopening guidance has its own concise reachable FAQ topic');
- assert.match(help,/protection does not recreate missing data/i,'retention is never described as reconstructing an unavailable original');
- assert.match(help,/recorded decision order first/i);assert.match(help,/accepted device value/i);assert.match(help,/fixed source order/i);
- assert.match(help,/other values remain protected/i);assert.match(help,/exact cloud confirmation/i);
- assert.match(help,/File or paste Restore replaces the selected snapshot/,'explicit manual replacement remains distinct');
+ assert.match(help,/You don’t need to choose a source just to keep working, even while an earlier copy is unresolved/i,'unsupported retained history does not require an unavailable picker');
+ assert.match(help,/<dt>Will recovered work reopen and finish saving automatically\?<\/dt><dd>Yes\. Your working board reopens by itself/i,'reopening guidance has its own concise reachable FAQ topic');
+ assert.match(help,/Nothing missing is recreated/i,'retention is never described as reconstructing an unavailable original');
+ assert.match(help,/It follows the order the decisions were made/i);assert.match(help,/it keeps this device’s value/i);assert.match(help,/picks the same default every time/i);
+ assert.match(help,/The other values stay protected/i);
+ assert.match(help,/File and paste Restore still show a preview before replacing your board/,'explicit manual replacement remains distinct');
+ assert.match(help,/With file or paste Restore, you choose whether the board keeps its saved ratings/,'explicit manual replacement remains distinct');
  assert.match(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Recovery resolves compatible disagreements automatically/);
 });
 
@@ -2032,7 +2049,8 @@ test('RISK iOS source replay: a modal opened during exact-copy inspection defers
  const {remote}=await settleRecovery188(app);
  assert.ok(remote.rev>originalRoot.rev,'safe close resumes exact repair without requiring a new accepted task');
  assert.deepEqual(JSON.parse(remote.payload).tasks,app.acknowledgedTasks);
- ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Closing a dialog that paused an exact-copy check starts a fresh safe check; no new task is needed/);
+ // #234: the dialog-pause mechanism left Help; the changelog below keeps it.
+ ctx.openHelp();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Closing a dialog that paused an exact-copy check/);
  assert.match(html,/Closing a dialog resumes a paused exact-copy repair check without another edit/);
 });
 
@@ -2345,8 +2363,9 @@ test('RISK cloud source states: retry and terminal explanations never substitute
 test('RISK cloud source lifecycle guidance: mounted Help explains inspection and bounded read failure',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(html,/Recovery refuses stale choices when protected device information changes/);
- assert.match(help,/Changed protected information needs a fresh choice/);assert.match(help,/If cloud saving finishes but local recovery stays held, the message says so/);
- assert.match(help,/Can I inspect one cloud copy when another cannot be read/);assert.match(help,/A readable copy does not make it eligible to replace your board/);assert.match(help,/Why does a recovery check retry or stop/);assert.match(help,/All share the original one-minute limit/);assert.match(html,/Recovery can recheck an unavailable cloud read once/);
+ // #234: the same outcomes in plain words.
+ assert.match(help,/If the account or board changes, review again/);assert.match(help,/If cloud saving finishes but this device still holds recovery, the message says so/);
+ assert.match(help,/Can I inspect one cloud copy when another cannot be read/);assert.match(help,/Being readable doesn’t make a copy safe to apply/);assert.match(help,/Why does a recovery check retry or stop/);assert.match(help,/The whole review, including that recheck, takes at most a minute/);assert.match(html,/Recovery can recheck an unavailable cloud read once/);
 });
 
 test('RISK cloud source fresh check: a transient root change inside the first capture verifies automatically',async t=>{
@@ -2509,8 +2528,8 @@ test('RISK cloud source fresh check: partial captures retain typed pending and h
 
 test('RISK cloud source partial-read guidance: mounted Help explains the same bounded recheck',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/That includes a cloud change during or between reads\./);
- assert.match(help,/When safe, changed sources get one fresh check within that minute; nothing is chosen automatically\./);
+ // #234: "while it is read" covers a change during or between reads.
+ assert.match(help,/If a source changes while it is read, the app checks once more within that minute; it never chooses for you\./);
  assert.match(html,/A cloud change during a recovery read now gets the same safe recheck as a change between reads\./);
 });
 
@@ -3038,11 +3057,13 @@ test('RISK cloud source recovery #2278 guidance: mounted Help and the November 7
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(html,/data-act="apply-cloud-source-recovery"[^>]*>Apply selected source</,'positive control: the button the copy names');
  const answer=(help.match(/<dt>What if Apply selected source can’t save\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
- assert.match(answer,/Recovery saves, including Apply selected source, can wait up to a minute for each step, the same limit as the review, because the whole board is uploaded again\./);
- assert.match(answer,/If the save still can’t finish, the message says why, for example that the cloud did not answer in time, the cloud could not protect the original sources, or this device could not record the upload\./,'examples, not a complete list');
- assert.match(answer,/The active board and prepared choice stay protected in each case\./);
- assert.match(answer,/Once it saves, the cloud button shows synced, also when cloud recovery was waiting\./);
- assert.match(answer,/The local debug log names the reason and the step that stopped\./);
+ // #234: the same outcome without the whole-board-upload reason.
+ assert.match(answer,/^Apply selected source can wait up to a minute for each step\./);
+ assert.doesNotMatch(answer,/because the whole board is uploaded again/);
+ assert.match(answer,/If it still can’t save, the message says why, for example that the cloud didn’t answer in time or this device couldn’t record the upload\./,'examples, not a complete list');
+ assert.match(answer,/Your board and your choice stay protected\. Choose Read sources again, then try again\./);
+ assert.match(answer,/Once it saves, the cloud button shows synced, even if cloud recovery was waiting\./);
+ assert.match(answer,/The Debug log records the reason\./);
  assert.doesNotMatch(help,/chosen source can’t save|up to one minute/,'no earlier wording');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
  const changelog=(html.match(/<h3>November 7, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
@@ -3207,16 +3228,12 @@ test('RISK cloud source recovery #2281: after failed attempts saved by the previ
 const changelog2281Guidance=()=>(html.match(/<h3>November 8, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
 test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8 changelog say Apply no longer needs more memory with earlier attempts, including ones earlier versions saved, and name a full device',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- const answer=(help.match(/<dt>Why did the app close when I tapped Apply selected source\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
- assert.match(answer,/On a large board, after many earlier attempts that could not save, Apply selected source most likely needed more memory than a phone allows, so the app closed\./,'the cause is not stated as confirmed');
- assert.match(answer,/Each attempt copied every earlier attempt’s prepared choice into its protected originals again\./);
- assert.match(answer,/Apply now names earlier prepared choices by an exact fingerprint instead\./);
- assert.match(answer,/When you next read sources in the review, unless an older copy is in use or a restored-device hold remains, originals that earlier versions saved are summarized once; otherwise that waits for a later review\. Apply and later saves then read those summaries, and read an original whole only when it still needs protecting\./,'the summaries are qualified: none while an older copy is in use or a restored-device hold remains, and an unprotected original is still read whole');
- assert.doesNotMatch(answer+changelog2281Guidance(),/read only the summaries|read only those summaries|no longer add to what they hold|another recovery is waiting/,'no unqualified or misnamed qualifier');
- assert.match(answer,/Every original stays saved exactly\./);
- assert.match(answer,/If this device’s storage is too full to protect the copies, Apply says so and nothing is applied\./);
- assert.doesNotMatch(answer+help,/the phone allows|changes nothing|its saved originals|gets heavier/,'no earlier wording');
- assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ // #234: the history answer is gone; the November 8 changelog below keeps
+ // it, and the Apply message itself says when storage is full.
+ assert.doesNotMatch(help,/<dt>Why did the app close when I tapped Apply selected source\?<\/dt>/);
+ assert.match(html,/const deviceFull="This device’s storage is full, so Apply could not finish protecting its copies and nothing was applied\. Free up space on this device, then read sources again\.";/,'the storage-full case is said where Apply stops');
+ assert.doesNotMatch(changelog2281Guidance(),/read only the summaries|read only those summaries|no longer add to what they hold|another recovery is waiting/,'no unqualified or misnamed qualifier');
+ assert.doesNotMatch(help,/the phone allows|changes nothing|its saved originals|gets heavier/,'no earlier wording');
  const notes=(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)||[])[1]||'';
  assert.ok(notes.indexOf('<h3>November 8, 2026</h3>')>=0&&notes.indexOf('<h3>November 8, 2026</h3>')<notes.indexOf('<h3>November 7, 2026</h3>'),'November 7 is live, so this release has its own newer heading');
  const changelog=(html.match(/<h3>November 8, 2026<\/h3><ul>([\s\S]*?)<\/ul>/)||[])[1]||'';
@@ -3225,7 +3242,7 @@ test('RISK cloud source recovery #2281 guidance: mounted Help and the November 8
  assert.match(changelog,/Earlier prepared choices are now named by an exact fingerprint instead\. When you next read sources in the review, unless an older copy is in use or a restored-device hold remains, originals that earlier versions saved are summarized once \(otherwise that waits for a later review\), and Apply and later saves then read those summaries, reading an original whole only when it still needs protecting; every original stays saved exactly\./);
  assert.match(changelog,/If this device’s storage is too full to protect the copies, Apply now says so and nothing is applied\.<\/li>/);
  assert.doesNotMatch(changelog,/changes nothing|its saved originals|gets heavier/,'no earlier wording');
- assert.doesNotMatch((answer+changelog).replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,'Help never sends anyone to another device');
+ assert.doesNotMatch(changelog.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,'the changelog never sends anyone to another device');
 });
 
 // #2281: a confirmed choice now names its archive by key instead of
@@ -3456,14 +3473,15 @@ test('RISK cloud source review #2272 guidance: mounted Help and the November 7 c
  // The finished review labels such a row "Unavailable:"; Help and the changelog use that word.
  assert.match(html,/'<p role="status">Unavailable: '\+esc\(candidate\.issue\)/,'positive control: the review modal labels the row Unavailable');
  const answer=(help.match(/<dt>Why does the review show a cloud source as Unavailable\?<\/dt><dd>([\s\S]*?)<\/dd>/)||[])[1]||'';
- assert.match(answer,/Reading the same sources again is not a change: a cloud source one read could not read completely is shown as Unavailable and cannot be chosen, and the review still finishes with the others\./);
+ // #234: the outcome without the same-sources-is-not-a-change mechanism.
+ assert.match(answer,/^A cloud copy the review couldn’t read completely shows as Unavailable and can’t be chosen; the review finishes with the others\./);
  assert.doesNotMatch(answer,/Unknown/,'the answer uses the word the review shows');
  assert.match(html,/a cloud copy that one read could not read completely is shown as Unavailable, which cannot be chosen, instead of stopping the review/);
  assert.doesNotMatch(help,/Why does the review show a cloud source as Unknown/);
- assert.match(answer,/Cloud saves from this tab wait until the sources have been read; another open tab of the app does not wait\./,'the wait is per tab');
+ assert.match(answer,/While the review reads, cloud saves from this tab wait; another open tab of the app doesn’t\./,'the wait is per tab');
  assert.doesNotMatch(help,/This device’s own cloud saves wait/,'no claim that every tab on the device waits');
  assert.match(html,/A cloud save this tab starts while the sources are read waits until the reading ends; another open tab of the app does not wait\./);
- assert.match(answer,/A new cloud save, an edit or another account still stops the review\./);
+ assert.match(answer,/A new cloud save, an edit or another account stops the review; read the sources again\./);
  assert.match(html,/<h3>November 7, 2026<\/h3><ul><li>Review cloud recovery sources no longer says the sources changed while they were read when nothing changed\./);
 });
 
@@ -3533,8 +3551,9 @@ test('RISK cloud source fresh check: a draft changed as fresh progress opens can
 test('RISK cloud source fresh check guidance: mounted Help explains one fresh check without choosing',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=help.split('<dt>What can I inspect while cloud checks wait?</dt><dd>')[1]?.split('</dd>')[0];
- assert.ok(answer);assert.match(answer,/When safe, changed sources get one fresh check within that minute; nothing is chosen automatically/);
- assert.match(answer,/Cancel stops the review without choosing or changing a source/);assert.match(answer,/The whole source review has a one-minute limit/);
+ // #234: the same outcome in plain words.
+ assert.ok(answer);assert.match(answer,/If a source changes while it is read, the app checks once more within that minute; it never chooses for you/);
+ assert.match(answer,/Cancel stops it without choosing or changing anything/);assert.match(answer,/The review takes at most a minute/);
  assert.match(html,/Recovery rechecks changed sources once within the original minute, without choosing a source/);
 });
 
@@ -3683,7 +3702,7 @@ test('RISK recovery read minute: native recovery entry survives an ordinary time
  const fresh=ctx.onAction('review-cloud-source-recovery',{});gate.resolve();assert.equal(await fixtureDeadline(fresh,'fresh native minute recovery remains reachable'),true);
  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="choose-cloud-recovery-source"[^>]*aria-pressed="true"/);
  assert.equal(JSON.stringify(ctx.state),before);assert.equal(JSON.stringify([...backend.docs]),cloud);assert.equal((await ctx.window.ScannerDeviceStore.readHead()).hash,head.hash);assert.deepEqual(await ctx.window.ScannerDeviceStore.getPendingUpload('owner'),pending);
- ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/The recovery entry stays available after timeouts for a cloud copy already found damaged/);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/After a timeout, Review cloud recovery sources stays available from the cloud error for a cloud copy already found damaged/);
  assert.match(html,/Timeouts keep recovery reachable for cloud copies already found damaged/);
 });
 
@@ -3737,7 +3756,8 @@ test('RISK recovery read minute guidance: pending native review offers Cancel an
  assert.match(pending,/data-act="close-modal">Cancel<\/button>/,'Cancel is visible while discovery is pending');
  assert.match(pending,/data-cloud-source-readonly/);
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/The whole source review has a one-minute limit/);assert.match(help,/Cancel stops the review without choosing or changing a source/);assert.match(help,/Ordinary saves keep their existing wait limit/);
+ // #234: the ordinary-save wait is a mechanism; it left Help.
+ assert.match(help,/The review takes at most a minute/);assert.match(help,/Cancel stops it without choosing or changing anything/);assert.doesNotMatch(help,/Ordinary saves keep their existing wait limit/);
  const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(notes,/Recovery source checks allow up to one minute, with Cancel available throughout the check/);
 });
 
@@ -3773,8 +3793,8 @@ test('RISK cloud source recovery: readable device work stays visible read-only d
  assert.equal(JSON.stringify([...backend.docs]),originalCloud);assert.deepEqual(await store.getPendingUpload('owner'),originalPending);
  ctx.openHelp();
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/A read-only device preview stays visible during cloud checks or timeouts/,'extended Help must explain the available local preview and its limits');
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/Large device boards show at most 50 task titles in this preliminary preview/);
- assert.match(shim.document.getElementById('modalRoot').innerHTML,/Changing accounts hides this preview immediately/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/A read-only preview shows this device’s board with its task and History counts, and up to 50 task titles on a large board\./);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Changing accounts hides the preview at once; your work and drafts stay protected\./);
  assert.match(html,/Cloud recovery keeps the open device board visible while cloud source checks are pending or time out/,'release notes must describe the actual available preview');
 });
 
@@ -3905,9 +3925,10 @@ test('RISK rapid action guidance: mounted Help distinguishes later accepted work
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const help=app.shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/<dt>Can I make several changes quickly\?<\/dt>/);
- assert.match(help,/Later accepted actions follow the snapshot already saving; you do not need to wait between actions/);
- assert.match(help,/A real device-save failure keeps its warning and unsaved work in this tab/);
- assert.match(help,/Cloud confirmation is separate: Synced requires acknowledgement of the latest saved board/);
+ // #234: the same outcomes in plain words.
+ assert.match(help,/You don’t need to wait between actions: each one saves after the one before it/);
+ assert.match(help,/If saving on this device fails, a warning stays and your unsaved work stays in this tab/);
+ assert.match(help,/Synced appears only once the cloud has confirmed your latest board/);
  assert.match(html,/Rapid valid actions keep saving without a false repeated-change warning/);
 });
 
@@ -3916,8 +3937,9 @@ test('RISK sync responsiveness guidance: mounted Help explains large boards and 
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const rapid=help.split('<dt>Can I make several changes quickly?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid);
- assert.match(rapid,/Large boards keep the same ranking, History and Undo rules/);
- assert.match(rapid,/A completed cloud confirmation is kept when an earlier device save finishes/);
+ // #234: acknowledgement ordering left Help; the changelog below keeps it.
+ assert.match(rapid,/a large board follows the same ranking, History and Undo rules/);
+ assert.doesNotMatch(rapid,/A completed cloud confirmation is kept when an earlier device save finishes/);
  assert.match(help,/Cloud saves keep their confirmation when earlier saves finish/);
  const failed=help.split('<dt>Can I keep working with a damaged cloud save?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(failed,'damaged cloud saving has its own brief actionable answer');
  assert.match(failed,/do not download that same source for every edit/);assert.match(failed,/newer cloud update/);assert.match(failed,/Supported saved sources are reconciled automatically/);assert.match(failed,/unsafe or unsupported recovery can still need your review/);
@@ -5000,7 +5022,8 @@ test('RISK legacy completion released Start: normally acknowledged expired retur
   assert.deepEqual(Array.from(candidate.ctx.state.chain),['expiry-recurring'],'a normally published supported old Start after expiry must not be silently removed and acknowledged');
   assert.deepEqual(h.remoteState().chain,['expiry-recurring']);
  }
- candidate.ctx.openHelp();assert.match(candidate.shim.document.getElementById('modalRoot').innerHTML,/If an older Start and completion cannot be ordered safely, recovery waits/);
+ // #234: the same rule in plain words.
+ candidate.ctx.openHelp();assert.match(candidate.shim.document.getElementById('modalRoot').innerHTML,/If the app can’t tell whether a Start or a completion came first, it keeps the dot and waits rather than upload a guess\./);
  t.diagnostic(JSON.stringify({exactOldRev,sourceChain:JSON.parse(exactOldCloud).chain,candidateChain:Array.from(candidate.ctx.state.chain),remoteRev:h.doc.rev,error:candidate.ctx.window.CloudSync.errorCode}));
  const retryDraft=candidate.ctx.addTask('New draft while old cloud chronology waits');await candidate.ctx.onAction('sync-retry',{});await candidate.ctx.cloudPull();await candidate.ctx.cloudPushNow();assert.equal(h.doc.payload,exactOldCloud);assert.equal(h.doc.rev,exactOldRev);assert.ok(candidate.ctx.state.tasks.some(row=>row.id===retryDraft.id));assert.equal(candidate.ctx.state.decisionEvents.some(row=>row.kind==='completion-boundary'),false);
  await t.test('completed source without a returned member still upgrades and acknowledges',async t=>{
@@ -5074,9 +5097,10 @@ test('RISK legacy completion guest adoption: actual modern guest Done remains ob
 test('RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return',async()=>{
  const app=await loadApp(),{ctx,shim}=app;ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=help.match(/<dt>How are older completions recovered\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer,'the existing older-completion FAQ stays mounted');
- for(const pattern of [/older saved board leaves completed tasks out of the dotted chain/i,/after an Evergreen rest ends/i,/Dot, Yes, or Start/i,
-  /Ratings and History stay as saved/i,/exact older board remains in local backups/i,/If a safety copy cannot be saved, the app waits/i,
-  /Changes this version cannot safely read stay protected/i])assert.match(answer,pattern);
+ // #234: safety-copy reuse mechanics left Help; the outcomes stay.
+ for(const pattern of [/board saved by an older version keeps completed tasks out of the dotted chain/i,/after an Evergreen rest ends/i,/Dot, Yes or Start/i,
+  /Ratings and History stay as saved/i,/The older board stays in Settings backups/i,/it keeps the dot and waits rather than upload a guess/i])assert.match(answer,pattern);
+ assert.doesNotMatch(answer,/verified exact copy can be reused|If a safety copy cannot be saved/i);
  assert.doesNotMatch(answer,/imported completion boundary|recovery observation|observes that boundary|sourceEvidence/i,'players see outcomes rather than internal recovery terms');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the existing word limit');await closeLegacyApp173(app);
 });
@@ -5085,7 +5109,7 @@ test('RISK completion awareness FAQ: unseen completion defeats later clock or up
  const answer=help.match(/<dt>How are conflicting choices resolved\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
  assert.match(answer,/Dot.*device that has not seen the completion.*cannot put the task back in the chain/i);
  assert.match(answer,/even with a later clock or upload/i);assert.match(answer,/comparison still counts toward ratings/i);
- assert.match(help,/After seeing a completion, you can return an eligible task with Dot, Yes, or Start/i);
+ assert.match(help,/Once you have seen a completion, you can return an eligible task with Dot, Yes or Start/i);
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130);await closeLegacyApp173(app);
 });
 test('RISK completion lifecycle Changelog: the mounted release notes describe older-board recovery in player language',async()=>{
@@ -16045,8 +16069,9 @@ test('RISK saved view broken-board guidance: opening status does not imply cloud
  assert.match(answer,/The temporary “syncing” label means the board is still opening; it does not confirm cloud saving\./i);
  assert.match(answer,/Real cloud errors and recovery warnings remain visible\./i);
  const full=help.split('<dt>Can my full board stay visible while it opens?</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(full,/complete local copy.*retained copies agree/i);assert.match(full,/chain, contexts and complete matching list/i);assert.match(full,/even without a saved appearance/i);assert.match(full,/Saved searches and panel choices/i);assert.match(full,/read-only.*does not choose a recovery source or confirm cloud saving/i);assert.match(full,/conflicting or different-account/i);assert.match(full,/Rank and chance values refresh after opening/i);
- assert.match(full,/device storage cannot finish opening.*stays read-only.*Settings.*Reload app/i,'the FAQ explains the terminal read-only board and reachable recovery/retry controls');
+ // #234: retained-copy agreement wording left Help; the outcomes stay.
+ assert.match(full,/when this device has a complete saved copy/i);assert.match(full,/chain, contexts and list/i);assert.match(full,/saved searches and panel choices in place/i);assert.match(full,/Until the board opens it is read-only/i);assert.match(full,/cloud saving still needs confirmation/i);assert.match(full,/disagrees with another or belongs to another account isn’t shown/i);assert.match(full,/rank and chance values refresh after/i);
+ assert.match(full,/storage can’t finish opening, the board stays read-only; Settings keeps its recovery options, and Reload app tries again/i,'the FAQ explains the terminal read-only board and reachable recovery/retry controls');
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
  assert.ok(chapter.includes('<h3>October 28, 2026</h3>'),'the current dated release note is visible in Help');
  assert.match(chapter,/complete agreeing local copy can show your saved tasks, chain, contexts and full matching list/i);
@@ -16955,9 +16980,10 @@ test('RISK CLOUD TRANSACTION: an expired verification cannot publish after its d
 
 test('RISK CLOUD TRANSACTION guidance: mounted help explains incomplete saves without claiming damaged source recovery',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Cloud saves recheck the complete uploaded board before making it current/);
- assert.match(help,/Missing or damaged upload data stops that save and keeps its pending evidence/);
- assert.match(help,/does not reconstruct a cloud copy that is already damaged or choose an older board/);
+ // #234: the same outcomes in plain words.
+ assert.match(help,/Before a cloud save becomes your current board, the cloud checks that all of it arrived/);
+ assert.match(help,/If any is missing or damaged, that save is rejected, your cloud board stays as it was and the save stays pending on this device/);
+ assert.match(help,/doesn’t repair a cloud copy that is already damaged or choose an older board/);
  const notes=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
  assert.match(notes,/Cloud saves check uploaded data again before publication, so incomplete uploads stay pending/);
 });
@@ -19809,9 +19835,11 @@ test('RISK DATABASE REPAIR EXPORT: a damaged saved source is retained without in
 test('RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diagnostics and partial-report limits',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const answer=help.match(/<dt>What does Download backup contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
-  assert.match(answer,/current board.*saved.*sources.*Debug log/i);assert.match(answer,/build.*storage|storage.*build/i);
-  assert.match(answer,/partial.*cannot.*restore/i);assert.match(answer,/only.*current board.*pending.*never replayed/i);
-  assert.match(answer,/read.only|never saves or syncs/i);assert.match(answer,/one source at a time/);
+  // #234: storage-format and one-source-at-a-time detail left Help.
+  assert.match(answer,/current board.*every readable saved copy.*Debug log/i);assert.match(answer,/build details/i);
+  assert.match(answer,/a partial file can’t restore a board/i);assert.match(answer,/Restore uses only a complete file’s current board and never replays pending work/i);
+  assert.match(answer,/never saves, syncs or reads the cloud/i);assert.match(answer,/It works on a phone even with a large board\./);
+  assert.doesNotMatch(answer,/storage format|one source at a time/);
   const log=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.doesNotMatch(log,/copy, or download the report/,'the FAQ no longer advertises removed standalone exporters');
   assert.match(log,/Download backup/);
@@ -19820,9 +19848,9 @@ test('RISK DATABASE REPAIR EXPORT: FAQ explains the recovery file database, diag
 test('RISK DATABASE REPAIR EXPORT: reload help routes users to the metadata-only Debug log export and keeps the recovery file for repairs',async t=>{
   const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
   const reload=help.match(/<dt>Why did the app reload\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(reload);
-  assert.match(reload,/View debug log, then Copy debug log or Download debug log/);assert.match(reload,/metadata only/);
+  assert.match(reload,/View debug log, then Copy debug log or Download debug log/);assert.match(reload,/without task content or account IDs, so it stays small/);
   assert.match(reload,/Troubleshooting → View debug log, then Copy debug log or Download debug log/,'#2303: the log is under Troubleshooting');
-  assert.match(reload,/Download backup/);assert.match(reload,/partial|unreadable/i);
+  assert.match(reload,/Download backup adds your board and saved copies when they are needed for repair\./);
 });
 
 // #2303 (owner decision of 2026-11-10): Download backup saves the recovery file.
@@ -29587,7 +29615,7 @@ test('RISK review fixes guidance: mounted Help explains when the decline is avai
  assert.match(damagedSave,/use Review cloud recovery sources from the cloud warning or restored-device hold; original sources stay protected\. There, choices await verification; none is selected by default/,'the no-default sentence is scoped to the review');
  // Its neighbouring answer keeps its protected wording; it is already scoped
  // to the review by the sentence before it.
- assert.match(answer('What can I inspect while cloud checks wait?'),/The whole source review has a one-minute limit\. When safe, changed sources get one fresh check within that minute; nothing is chosen automatically\./);
+ assert.match(answer('What can I inspect while cloud checks wait?'),/The review takes at most a minute, and Cancel stops it without choosing or changing anything\. If a source changes while it is read, the app checks once more within that minute; it never chooses for you\./);
  // S2 and S3: which checks are remembered, and the separate incomplete-copy recheck.
  const working=answer('Can I keep working with a damaged cloud save?');
  assert.match(working,/Once a finished check finds a cloud copy unreadable/,'only a completed check is remembered');
@@ -31305,7 +31333,7 @@ test('RISK completion lifecycle FAQ: expired rest and saved-chain return match t
 
 test('RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/After a lost reply, Retry sync checks the current saved cloud board before trying again/i);
+ assert.match(help,/After a lost reply, the save may or may not have reached the cloud, so Retry sync checks first before trying again/i);
 });
 
 test('RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement',async t=>{
@@ -33858,7 +33886,8 @@ test('RISK device backup final guard: rejected throwing and asynchronous guards 
 
 test('RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Matching duplicate backups appear once/);
+ // #234: duplicate-listing detail left the backups answer; the changelog below keeps it.
+ assert.doesNotMatch(help,/Matching duplicate backups appear once/);
  assert.match(help,/Backup deletion asks for confirmation and keeps the current board/);
  assert.match(help,/deletion is unavailable.*reopen Settings.*recovery options/);
  assert.match(help,/copy changes during confirmation, reopen Settings/);
@@ -33884,11 +33913,11 @@ test('RISK backup help: expiry, protected-copy deletion, the two downloads and a
  assert.match(taskHelp,/copy changes during confirmation, reopen Settings/);
  assert.match(taskHelp,/red Delete button.*more than seven days old/);
  assert.match(taskHelp,/opening Settings does not delete it/i);
- assert.match(backups,/Automatic backups cover today and the previous six local dates/);
- assert.match(backups,/older automatic entries.*removed after a successful save, without Undo/);
- assert.match(backups,/Manual and protected recovery copies remain/);
- assert.match(backups,/Matching duplicate backups appear once/);
- assert.match(backups,/Long before-and-after values wrap inside the preview\./);
+ // #234: the backups answer points to the retention answer instead of
+ // repeating it; cleanup is said in "When are old backups cleaned up?".
+ assert.match(backups,/Automatic backups stay for up to seven days, daily ones for three, and manual and recovery copies until you delete them; “How long do backups stay on this device\?” has the details\./);
+ assert.match(answer('When are old backups cleaned up?'),/After a successful save, the app removes expired automatic backups by itself; this can’t be undone\./);
+ assert.doesNotMatch(backups,/Matching duplicate backups appear once/);
  assert.match(exports,/appears beside Download backup when a backup comes out partial/);
  assert.match(exports,/It saves ordinary board JSON/);
  assert.match(exports,/adding every readable saved source, build details and the Debug log/i);
@@ -33897,11 +33926,17 @@ test('RISK backup help: expiry, protected-copy deletion, the two downloads and a
  assert.match(exports,/pending work is never replayed/);
  assert.match(exports,/File restore keeps supported recorded choices and protects displaced decisions\./);
  assert.match(worked,/It leaves the dotted chain and stays off it through saving and syncing\./);
- assert.match(backups,/File restore protects exact bytes and the current board in Settings backups/);
- assert.match(backups,/Cancel or close during source checks stops before adoption/);
- assert.match(backups,/Disabled Restore and close controls look subdued/);
- assert.match(backups,/Archives apply only their current board/);
- assert.match(backups,/offline or held sync leaves the board unchanged/);
+ assert.match(answer('Can I restore raw backup files?'),/Your file and current board are kept on this device before the preview\./);
+ // #234 review B1: a listed backup restores after a confirm with no preview
+ // and keeps undeleted tasks; a file or pasted board shows a preview and
+ // removes current tasks it lacks (markReplacementDeletes).
+ assert.match(backups,/Restore first backs up your current board\. A listed backup restores once you confirm, keeping tasks you haven’t deleted\. A file or pasted board shows a preview first, including tasks it would remove; Cancel or closing stops it\./);
+ assert.doesNotMatch(backups,/Disabled Restore and close controls look subdued/);
+ assert.match(backups,/A file restores only its current board\./);
+ // #234 review B1: Restore keeps tasks on the current board that were not
+ // deleted (mergeUndeletedTasks), so Help says so.
+ assert.doesNotMatch(backups,/Tasks on your current board that you haven’t deleted stay/,'not every Restore keeps undeleted tasks');
+ assert.match(backups,/offline or while sync is held, your board stays unchanged/);
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
  assert.match(chapter,/Expired Can’t and Worked holds now stay expired through save, reopen, and cloud refresh, while their original decision times and Worked History remain unchanged\. Worked items stay off the dotted chain after saving and syncing\./);
  assert.match(chapter,/Settings can restore a board JSON file with an explicit preview[\s\S]*?Supported recorded choices, including Theme and inherited account choices, now travel with a file when source and account checks pass\./);
@@ -34043,15 +34078,21 @@ test('RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is
 
 test('RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Automatic backups cover today and the previous six local dates/);assert.match(help,/older automatic entries.*successful save/);assert.match(help,/Manual and protected recovery copies remain/i);assert.match(help,/opening Settings does not delete it/i);assert.match(help,/more than seven days old/);
- assert.match(help,/removed after a successful save, without Undo/);assert.match(help,/protected recovery copies remain until you delete/);
+ // #234: the same outcomes in plain words; the backups answer points to the retention answer.
+ assert.match(help,/Automatic backups stay for up to seven days, daily ones for three/);assert.match(help,/After a successful save, the app removes expired automatic backups by itself/);assert.match(help,/manual and recovery copies until you delete them/i);assert.match(help,/opening Settings does not delete it/i);assert.match(help,/more than seven days old/);
+ assert.match(help,/removes expired automatic backups by itself; this can’t be undone/);assert.match(help,/Manual backups, recovery copies, and backups it can’t read or can’t identify stay/);
  // #2303: the cleanup notes moved from Settings to the Data and backups FAQ.
- const settings=help.split('<dt>When are old backups cleaned up?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(settings,/removed permanently from the active backup list.*successful save/);
+ const settings=help.split('<dt>When are old backups cleaned up?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(settings,/^After a successful save, the app removes expired automatic backups by itself; this can’t be undone\./);
  // #2254 release review (B3): the acknowledged trim (owner authorization on
  // #2254, 2026-11-07, "migrated legacy copies") clears the storage upgrade's
  // copy of the older backup list once the cloud confirms the board, so
  // Settings no longer says that copy remains intact.
- assert.match(settings,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
+ // #234 (#2270): that sentence was unconditional, but the app keeps the copy
+ // while any entry in it can't be read. It is a mechanism, so it left Help;
+ // the answer points to the recovery-copies answer for what the cloud
+ // confirmation clears.
+ assert.doesNotMatch(settings,/clears the copy of the older backup list/);
+ assert.match(settings,/“What happens to old recovery copies on this device\?” says what is cleared once the cloud confirms your board\./);
  assert.doesNotMatch(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
 });
@@ -34283,11 +34324,11 @@ test('RISK simpler Settings guidance: the Data and backups FAQ holds the moved s
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const data=markup.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('</details>')[0]||'';
  const answer=question=>data.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(answer('When does cloud sync check for changes?'),/Cloud sync refreshes on load, when you return, and when another device saves\. Independent decisions combine; conflicting current choices use when each choice was made\. Drafts and pressed controls wait until you finish\./);
+ assert.match(answer('When does cloud sync check for changes?'),/Cloud sync checks when the app opens, when you return to it and when another device saves\. Independent decisions combine; conflicting current choices use when each choice was made\. Drafts and pressed controls wait until you finish\./);
  assert.match(answer('How long do backups stay on this device?'),/Daily copies stay on this device for today and the two calendar days before it/);
- assert.match(answer('When are old backups cleaned up?'),/Cleanup waits if the board or backup list changes or storage refuses the write\./);
+ assert.match(answer('When are old backups cleaned up?'),/If the board or backup list changes, or storage refuses the write, cleanup waits for a later save\./);
  assert.match(answer('How do Settings save?'),/Every setting saves as soon as you change it[\s\S]*returns to the last valid value/);
- assert.match(answer('What can I do if a save or sync fails?'),/Recent sync errors, in the Debug log under Troubleshooting,/);
+ assert.match(answer('What can I do if a save or sync fails?'),/Recent sync errors, in the Debug log, lists the past hour’s errors/);
  const words=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].filter(m=>m[2].replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length>130).map(m=>m[1]);
  assert.deepEqual(words,[],'every Help answer stays within the 130-word limit');
  assert.doesNotMatch(data,/Download recovery file|Save settings is at the bottom|Paste JSON/,'the FAQ names the controls Settings now shows');
@@ -34305,7 +34346,8 @@ test('RISK unchanged cloud pull guidance: the sync FAQ and the November 13 chang
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const data=markup.split('<summary><h3>Data and backups</h3></summary>')[1]?.split('</details>')[0]||'';
  const answer=data.split('<dt>When does cloud sync check for changes?</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(answer,/still has that exact board, the check reads only a small record and downloads nothing; later edits upload as usual\. Retry sync always downloads the whole copy\.$/,'the FAQ says when nothing is downloaded: '+answer);
+ // #234: the small-record mechanism left Help; the visible outcome stays.
+ assert.match(answer,/When nothing has changed in the cloud, the check is usually quick and downloads nothing\. Retry sync always downloads the whole board\.$/,'the FAQ says when nothing is downloaded: '+answer);
  const current=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 13, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(current,/Opening the app syncs much faster when nothing changed in the cloud\./,'the November 13 changelog describes it');
  assert.match(current,/Debug log lists such a check as a cloud read with the outcome unchanged/);
@@ -34329,8 +34371,7 @@ test('RISK daily backup retention guidance: the Data and backups FAQ and the Nov
  assert.doesNotMatch(section,/Automatic copies stay on this device for up to seven calendar days/);
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const backups=markup.split('<dt>How do backups and Restore work?</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(backups,/Automatic backups cover today and the previous six local dates, daily backups only the previous two;/);
- assert.match(backups,/Manual and protected recovery copies remain until you delete them\./);
+ assert.match(backups,/^Automatic backups stay for up to seven days, daily ones for three, and manual and recovery copies until you delete them;/);
  const answers=[...markup.matchAll(/<dt>([\s\S]*?)<\/dt><dd>([\s\S]*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2].replace(/<[^>]+>/g,' ')}));
  assert.deepEqual(answers.filter(row=>row.text.split(/\s+/).filter(Boolean).length>130).map(row=>row.question),[],'every Help answer stays within the 130-word limit');
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
@@ -37163,9 +37204,10 @@ test('RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without
 
 test('RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup',()=>{
  const faq=html.slice(html.indexOf("<dt>What can I do if a save or sync fails?"),html.indexOf("<dt>How do I switch accounts?"));
- assert.match(faq,/Recorded errors describe failed attempts and can remain after a later successful sync/);
- assert.match(faq,/Interrupted cloud cleanup resumes without changing your current or previous synced board/);
- assert.match(faq,/Synced requires server acknowledgement of the latest save/);
+ // #234: the same outcomes in plain words; interrupted-cleanup mechanics left Help.
+ assert.match(faq,/Recent sync errors, in the Debug log, lists the past hour’s errors, including ones that later recovered\./);
+ assert.doesNotMatch(faq,/Interrupted cloud cleanup resumes/);
+ assert.match(faq,/Only Synced confirms a save\./);
 });
 
 test('Device save settle guidance: the FAQ and changelog say saves on one device settle by themselves (#2324)',()=>{
@@ -37175,9 +37217,10 @@ test('Device save settle guidance: the FAQ and changelog say saves on one device
 });
 
 test('Device save plain message guidance: the FAQ and changelog explain the message for a save that ran out of repairs (#2325)',()=>{
- assert.match(html,/<\/dd><dt>What if this copy still cannot save\?<\/dt><dd>If the other copy keeps saving for longer than that, a message says this edit isn’t saved yet\. Close the other copy, then make any change here to save again\. If both copies changed the same thing, the saved board keeps one version and Settings backups keep this tab’s\. The message stays until a save succeeds\. Settings shows Last device save issue, and the Debug log counts the save attempts and which copy’s save each repair met\.<\/dd>/);
+ // #234: the repair-attempt counter left Help; the changelog below keeps it.
+ assert.match(html,/<\/dd><dt>What if this copy still cannot save\?<\/dt><dd>If the other copy keeps saving for longer than that, a message says this edit isn’t saved yet\. Close the other copy, then make any change here to save again\. If both copies changed the same thing, the saved board keeps one version and Settings backups keep this tab’s\. The message stays until a save succeeds, and Settings shows Last device save issue\.<\/dd>/);
  const faq=html.slice(html.indexOf('<dt>What can I do if a save or sync fails?'),html.indexOf('<dt>What if the app is open twice on this device?'));
- assert.match(faq,/Settings keeps each device-save warning’s stage and code\./);
+ assert.match(faq,/Settings shows each device-save warning with its stage and code\./);
  assert.doesNotMatch(faq,/Device-save warnings name a stage and code\./,'the plain message does not lead with a code');
  const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
  assert.match(current,/<li>When a save on this device still cannot finish because another open copy keeps saving, the message now says plainly that the edit isn’t saved yet and that closing the other copy, then making any change here, saves again\. The message stays on screen until a save succeeds\. The support code moves to Settings → Last device save issue, and the Debug log also counts the save attempts and which copy’s save each repair met\.<\/li>/);
@@ -39618,7 +39661,7 @@ test('RISK independent decision guidance: the rendered FAQ distinguishes retaine
  assert.match(answer('Can I use the app offline or on another device?'),/offline decisions.*closing and reopening/i);
  assert.match(answer('How are conflicting choices resolved?'),/original decision times/i);
  assert.match(answer('How are conflicting choices resolved?'),/missing.*held|untrusted.*held/i);
- assert.match(answer('What does Synced confirm?'),/saved on this device.*acknowledged by the server/i);
+ assert.match(answer('What does Synced confirm?'),/saved on this device and the cloud has confirmed it/i);
  assert.match(answer('What happens to older boards and tabs?'),/ratings.*baseline/i);
  assert.match(answer('What happens to older boards and tabs?'),/update.*cannot reconstruct|cannot reconstruct.*update/i);
  assert.match(answer('Can I undo, restore, or remove a task?'),/keeping unrelated decisions/i);
@@ -39733,8 +39776,9 @@ test('RISK device save warning browser: actual held Add keeps every text line on
 
 test('RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Long save warnings wrap on a solid background/);
- assert.match(help,/Settings.*Last device save issue/);
+ // #234: warning layout detail left Help; the changelog below keeps it.
+ assert.doesNotMatch(help,/Long save warnings wrap on a solid background/);
+ assert.match(help,/Settings → Data and backups shows Last device save issue/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
  assert.match(current,/Long device-save warnings stay readable on narrow screens and with enlarged text/);
 });
@@ -39951,8 +39995,9 @@ test('RISK held decision recovery: cold reopen protects a pending choice from or
 
 test('RISK held decision recovery: help and visible recovery explain deliberate appearance choices and protected limits',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/What can I do when saved appearances disagree/);assert.match(help,/no choice is selected/i);assert.match(help,/pending choice.*reload/i);assert.match(help,/unknown.*compatible/i);
- assert.match(help,/active board stays unchanged until.*cloud.*confirmed/i,'help distinguishes a prepared choice from an applied board');assert.match(help,/field paths.*values/i);
+ // #234: the same outcomes in plain words; field paths left Help.
+ assert.match(help,/What can I do when saved appearances disagree/);assert.match(help,/Nothing is chosen for you: Save choice and sync stays disabled until you pick System, Light or Dark/i);assert.match(help,/the choice stays protected through closing, reloading and reconnecting/i);assert.match(help,/unknown.*compatible/i);
+ assert.match(help,/your board changes only after the cloud confirms the save and this device applies it/i,'help distinguishes a prepared choice from an applied board');assert.match(help,/“What stays with either appearance” lists what each choice keeps and which values stay in backups/i);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Review saved decisions/);assert.match(current,/appearance/);
 });
 
@@ -41334,21 +41379,24 @@ test('RISK support diagnostics: Settings names Download backup and the FAQ names
  assert.match(help.match(/<dt>What does Download board only contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1]||'',/It saves ordinary board JSON for the board open in this tab/i,'the board-only download is distinct from the backup');
  const faq=help.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.ok(faq,'the extended FAQ describes the separate report');
- assert.match(faq,/local metadata report/i);assert.match(faq,/never includes task or recovery-source contents, account IDs, paths, cached app bodies, or arbitrary error text/i);
- assert.match(faq,/does not start a cloud read or change saved data/i);assert.match(faq,/clears an idle, unverified source-review preview/i);
- assert.match(faq,/During an accepted source save, you can view and select the report inside the existing recovery preview/i);
- assert.match(faq,/never cancels that publication/i);assert.match(faq,/never uploaded/i);assert.match(faq,/does not create a board backup/i);
- const measures=help.match(/<dt>What does the debug log measure\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ // #234: the same outcomes in plain words. The measured fields moved to
+ // the comment above the Debug log's limits.
+ assert.match(faq,/^A small report about sync and unexpected reloads\./i);assert.match(faq,/It never includes your tasks, recovery copies, account IDs or raw error messages\./i);
+ assert.match(faq,/Opening it never reads the cloud or changes saved data\./i);assert.match(faq,/If a recovery review is open but idle, opening the log closes its preview, so read the sources again before choosing/i);
+ assert.match(faq,/a save already under way keeps running/i);assert.match(faq,/never uploaded/i);assert.match(faq,/It isn’t a board backup; Download backup includes it\./i);
+ assert.doesNotMatch(help,/<dt>What does the debug log measure\?<\/dt>/);
+ const measures=html.split('const SUPPORT_DIAGNOSTICS_MAX_AGE=')[0].split('\n').slice(-24).join('\n').replace(/\n\/\/ /g,' ');
  assert.match(measures,/effective cloud-read deadline/i);assert.match(measures,/Recovery-copy availability and matching reflect existing checks only/i);
- assert.match(measures,/Account changes clear current acknowledgement observations/i);
+ assert.match(measures,/an account change clears the current acknowledgement observations/i);
 });
 
 test('RISK debug log: FAQ distinguishes an idle preview from accepted recovery verification',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());app.ctx.openHelp();
  const faq=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>What does the debug log contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
- assert.match(faq,/clears an idle, unverified source-review preview/i);
- assert.match(faq,/accepted recovery action is being verified.*log also opens inline.*leaves that work running/i);
- assert.match(faq,/During an accepted source save, you can view and select the report inside the existing recovery preview/i);
+ // #234: inline-preview mechanics left Help; the outcome stays.
+ assert.match(faq,/If a recovery review is open but idle, opening the log closes its preview, so read the sources again before choosing/i);
+ assert.match(faq,/a save already under way keeps running/i);
+ assert.doesNotMatch(faq,/log also opens inline|inside the existing recovery preview/i);
 });
 
 test('RISK debug log: shared storage capacity belongs to accepted board saves before diagnostics',async t=>{
@@ -41699,7 +41747,7 @@ test('Help answers how the steady scanner, backup list, Debug log link and rank 
   [/Why didn’t my second tap count\?<\/dt>/,/ignored for a moment after a new task appears/],
   [/Why does the page move after I answer\?<\/dt>/,/scrolls just enough to show the next task/],
   [/Why does the rank column take a moment after an answer\?<\/dt>/,/catch up at most once a second/],
-  [/Does Settings load every backup\?<\/dt>/,/read only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
+  [/Does Settings load every backup\?<\/dt>/,/opened only when you download, restore or delete it[^<]*damaged after it was saved, Restore refuses it/],
   [/How do I open the debug log if Settings will not open\?<\/dt>/,/opens the Debug log directly, without going through Settings/],
  ]){assert.match(help,topic);assert.match(help,answer);}
 });
@@ -42878,4 +42926,135 @@ test('RISK shared protection changed originals: deliberate current recovery sele
   }
   const after=await list();for(const row of originals)assert.ok(after.some(saved=>saved.key===row.key&&saved.raw===row.raw),'every historical raw archive stays exact');
  });
+});
+
+// ---------- #234: Help says what a person sees and can do, not how saves are repaired ----------
+// The approved keep, move and rewrite list (issue #234, 2026-11-15) is the
+// spec: each rewritten answer below is its approved wording. Answers owned by
+// other open fixes (#2358 L2: "What if a cloud save is damaged?" and "Can I
+// keep working with a damaged cloud save?"; #2269: the adoption answer) are
+// not pinned here.
+async function mountedHelp234(t){
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ // Help opens with the changelog; the FAQ sections follow it.
+ const faq=markup.slice(markup.indexOf('<summary>Quick start</summary>'));
+ assert.ok(markup.includes('<summary>Quick start</summary>'),'positive control: the mounted Help has its FAQ');
+ const answerTo=question=>faq.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0];
+ const release=date=>(markup.split('data-changelog-notes>')[1]||'').split('<h3>'+date+'</h3>')[1]?.split('</ul>')[0]||'';
+ const dataSection=faq.split('<summary><h3>Data and backups</h3></summary><dl>')[1]?.split('</dl>')[0]||'';
+ const dataAnswers=[...dataSection.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(match=>({question:match[1],text:match[2]}));
+ return {app,markup,faq,answerTo,release,dataAnswers};
+}
+
+// #2270, folded into #234: Help said without condition that the app clears the
+// storage upgrade's copy of the older backup list, but the code keeps it while
+// any entry in it can't be read; "Every saved source is still kept" had a limit
+// once the cloud confirms; and the incomplete-copy answer could be read as
+// covering a copy the app saved over. The dated changelog gets the condition.
+test('RISK help save-repair guidance: Help no longer says the older backup list copy is always cleared or that every saved source is still kept, the incomplete-copy answer covers only copies kept when an older copy opened, and the November 6 changelog says that copy is cleared once every entry in it can be read',async t=>{
+ const {faq,answerTo,release}=await mountedHelp234(t);
+ assert.ok(answerTo('How long do backups stay on this device?'),'positive control: the mounted Help has the Data and backups answers');
+ assert.equal(answerTo('When are old backups cleaned up?'),'After a successful save, the app removes expired automatic backups by itself; this can’t be undone. Manual backups, recovery copies, and backups it can’t read or can’t identify stay. If the board or backup list changes, or storage refuses the write, cleanup waits for a later save. “What happens to old recovery copies on this device?” says what is cleared once the cloud confirms your board.');
+ assert.equal(answerTo('What happens to old recovery copies on this device?'),'Once the cloud confirms your board, the app clears by itself the copies earlier cloud recoveries kept on this device, so it stays fast and the recovery file stays small. It keeps your board, the copy the cloud confirmed, every backup, and a short note naming any cloud copy it still could not read. In the cloud, a copy with anything left stays protected; one with nothing left is retired once your board has moved past it. Until the cloud confirms a board, every recovery copy stays on this device. Nothing needs your choice.');
+ assert.equal(answerTo('What happens when an incomplete cloud copy becomes readable?'),'If an earlier cloud copy was incomplete when an older copy opened, the app checks it again when you reconnect or return. After Retry sync rebuilds a large board, only Retry sync or signing in again checks it. While it is still incomplete, your board stays saved and usable. Once it is complete and its changes can be combined safely, they are combined with your board and saved to the cloud, and the button shows synced when the cloud confirms; otherwise it stays protected and Settings says it is unresolved. Nothing missing is recreated. A copy the app saved your board over is covered by “Does the app fix an unreadable cloud copy by itself?” File and Paste Restore stay your own choices.');
+ assert.doesNotMatch(faq,/clears the copy of the older backup list/,'Help no longer states the unconditional clearing');
+ assert.doesNotMatch(faq,/Every saved source is still kept/,'Help no longer says every saved source is kept');
+ const november6=release('November 6, 2026');
+ assert.ok(november6,'positive control: the mounted changelog has the November 6 release');
+ assert.match(november6,/It also clears the copy of the older backup list that a storage upgrade kept, once every entry in it can be read\. This keeps the app fast/);
+ assert.doesNotMatch(november6,/a storage upgrade kept\. This keeps/,'the dated entry no longer states it without the condition');
+});
+
+// #234: answers that retold earlier fixes are gone (their history stays in the
+// changelog and docs/investigations/cloud-review-reload-20261022.md), the
+// protection answer is merged into the reviewed-source answer, and the Debug
+// log's field list and the restart-record limits move to the code that sets
+// them. What a person needs from them (copy the Debug log, the Retry sync wait,
+// a protected choice) stays in Help.
+test('RISK help save-repair guidance: answers that only retold fixes or listed Debug log fields leave Help, their guidance lives in the remaining answers, and the moved limits are documented beside the code that sets them',async t=>{
+ const {faq,answerTo,dataAnswers}=await mountedHelp234(t);
+ assert.ok(dataAnswers.length>50,'positive control: the mounted Help has the Data and backups answers');
+ for(const question of ['How are recovery sources and pending choices protected?','Why did the app close when I tapped Apply selected source?','Why did my app reload while checking cloud recovery?','Why could a large board fail to open?','Why could cloud recovery of a large board close the app?','What does the debug log measure?'])
+  assert.equal(answerTo(question),undefined,question+' is no longer a Help answer');
+ assert.equal(answerTo('When does a reviewed recovery source become synced?'),'When you apply a source, the app first saves copies of both sources on this device; your board changes only after the cloud confirms the save and this device applies it. Until then the choice stays protected through closing, reloading and reconnecting, and its backup can’t be deleted. If the board, a draft, the account or a source changes, review again. If the cloud confirms but this device can’t apply it, the message says so and keeps the copies. A failed save can be retried without clearing storage or reinstalling; Retry sync alone never applies a choice. Your board stays usable meanwhile, and leaving the review keeps unfinished Settings changes unsaved.');
+ assert.equal(answerTo('Why did the app reload?'),'Choose Settings → Data and backups → Troubleshooting → View debug log, then Copy debug log or Download debug log, and share it. It records what the app was doing before a reload, for about the last hour, without task content or account IDs, so it stays small. It can’t prove why a page closed; a phone can close a page that uses too much memory. If Settings won’t open, use the Debug log link at the bottom of Help. Download backup adds your board and saved copies when they are needed for repair.');
+ assert.doesNotMatch(faq,/8 KiB|24 KiB|512 bytes|four recent documents|eight steps/,'no Debug log or restart-record limit stays in Help');
+ const comment=marker=>html.split(marker)[0].split('\n').slice(-24).filter(line=>line.startsWith('//')).join(' ').replace(/\/\/ ?/g,'');
+ const support=comment('const SUPPORT_DIAGNOSTICS_MAX_AGE=');
+ assert.match(support,/80 one-hour events of 512 bytes each, 8 source operations and 24 KiB in total/,'the Debug log limits are documented where they are set');
+ assert.match(support,/Source generations show their observed encoding, declared and received counts, and validation\/completeness status/);
+ assert.match(html,/const SUPPORT_DIAGNOSTICS_EVENT_LIMIT=80;\nconst SUPPORT_DIAGNOSTICS_EVENT_BYTES=512;\nconst SUPPORT_DIAGNOSTICS_REPORT_BYTES=24\*1024;\nconst SUPPORT_DIAGNOSTICS_SOURCE_LIMIT=8;/,'the documented limits match the code');
+ const restart=comment('const RESTART_DIAGNOSTICS_BYTES=8192,');
+ assert.match(restart,/four recent documents of up to eight steps each, within 8 KiB and one hour/,'the restart-record limits are documented where they are set');
+ assert.match(restart,/board and recovery copies take priority/);
+ assert.match(html,/const RESTART_DIAGNOSTICS_BYTES=8192,RESTART_DIAGNOSTICS_DOCUMENTS=4,RESTART_DIAGNOSTICS_EVENTS=8;/,'the documented limits match the code');
+});
+
+// #234: the approved rewrites for Data and backups. Each says what a person
+// sees and can do, in plain words, within the 130-word limit.
+test('RISK help save-repair guidance: Data and backups answers say what is saved, what happens by itself and what you can do, in the approved wording',async t=>{
+ const {answerTo}=await mountedHelp234(t);
+ const approved=[
+ ['What does Download backup contain?','Settings → Data and backups → Download backup saves one file with your current board, including edits not yet saved on this device, every readable saved copy, build details and the Debug log. It works on a phone even with a large board. Downloading never saves, syncs or reads the cloud. If a saved copy can’t be read or changes while the file is written, the file may leave out other saved copies too, lists what it couldn’t read and is marked partial; a partial file can’t restore a board. With a board open, Download board only appears beside it. Restore uses only a complete file’s current board and never replays pending work.'],
+ ['Can I use the app offline or on another device?','Tasks save on this device, and the installed app works offline. Sign in to share your board: offline decisions stay saved through closing and reopening, then combine when you reconnect. Independent choices from both devices survive, including their effects on ratings and dotted tasks, and each comparison you make counts, even when it repeats a pair or gives a different answer. Sending the same action again counts it once. Updates from another device wait until you finish an edit or release a control.'],
+ ['Can I make several changes quickly?','Yes. You don’t need to wait between actions: each one saves after the one before it and keeps its own time, and a large board follows the same ranking, History and Undo rules. If saving on this device fails, a warning stays and your unsaved work stays in this tab; keep the tab open until saving succeeds. Synced appears only once the cloud has confirmed your latest board.'],
+ ['What if an edit cannot save on this device?','Keep this tab open: your newer edit is still here, and a warning closing does not mean it saved. Settings → Data and backups shows Last device save issue, and Download backup saves the board open in this tab, including that edit. The Debug log is a report for troubleshooting, not a board you can restore. Your earlier saved board stays protected, and the app waits rather than save over it unsafely.'],
+ ['What does Synced confirm?','Synced means this board is saved on this device and the cloud has confirmed it. Reading the cloud, or seeing an action in History, does not confirm the action is saved. While work is unsaved, a cloud save failed or the app isn’t sure a save arrived, the button doesn’t show synced.'],
+ ['How are older completions recovered?','A board saved by an older version keeps completed tasks out of the dotted chain, even after an Evergreen rest ends. Ratings and History stay as saved; the app doesn’t make up earlier completions or comparisons. Once you have seen a completion, you can return an eligible task with Dot, Yes or Start, and earlier returns and Undo still work. If the app can’t tell whether a Start or a completion came first, it keeps the dot and waits rather than upload a guess. The older board stays in Settings backups.'],
+ ['Can my full board stay visible while it opens?','Yes, when this device has a complete saved copy: your tasks, chain, contexts and list show while device storage opens, with saved searches and panel choices in place. Until the board opens it is read-only, and rank and chance values refresh after. A copy that can’t be read, disagrees with another or belongs to another account isn’t shown. If storage can’t finish opening, the board stays read-only; Settings keeps its recovery options, and Reload app tries again. Your saved copies stay protected, and cloud saving still needs confirmation.'],
+ ['What if my saved device source cannot be read?','If this device’s saved board can’t be read, the app opens recovery, not an empty recovered board. In Settings, choose Restore, then a file or Paste board data, check the preview and confirm. Your damaged saves stay protected; Cancel keeps them and anything you pasted. Download backup keeps the readable saved copies as evidence, but can’t restore this board. The restored board and later edits save on this device. If cloud sync is set up, cloud saving stays pending until a source is chosen and the cloud confirms it. If a read or save fails, keep the tab open and try again.'],
+ ['Can damaged data be repaired while I am offline?','Yes. Offline, the app reopens your saved board and repairs a damaged save by itself from a matching copy on this device, keeping the damaged one. Without a matching copy it opens another complete saved copy; if none is complete, it opens a new workspace for new work, which is not your recovered board. Your saved copies stay protected either way. New work saves on this device and survives reopening. If this device refuses every save, the app says your work is unsaved; keep the tab open. Cloud saving is confirmed only after you reconnect.'],
+ ['Can cloud storage be repaired if this device cannot save?','Yes. If this device’s storage isn’t answering, the app can still repair a damaged cloud board from complete cloud copies, keeping the originals. Edits waiting on this device still need to save here before the cloud can confirm them. If no complete copy exists, cloud recovery stays pending while you keep working on this device.'],
+ ['How do backups and Restore work?','Automatic backups stay for up to seven days, daily ones for three, and manual and recovery copies until you delete them; “How long do backups stay on this device?” has the details. Restore first backs up your current board. A listed backup restores once you confirm, keeping tasks you haven’t deleted. A file or pasted board shows a preview first, including tasks it would remove; Cancel or closing stops it. If a save fails, or the board or account changes, Restore stops and keeps your newer work. A file restores only its current board. Signed in, a restored file syncs once the cloud confirms it; offline or while sync is held, your board stays unchanged. If this device’s board can’t be read, Restore saves locally and cloud recovery stays pending.'],
+ ['When does cloud sync check for changes?','Cloud sync checks when the app opens, when you return to it and when another device saves. Independent decisions combine; conflicting current choices use when each choice was made. Drafts and pressed controls wait until you finish. The status line at the top of Settings → Data and backups says where this board saves and whether cloud sync is on. When nothing has changed in the cloud, the check is usually quick and downloads nothing. Retry sync always downloads the whole board.'],
+ ['Can I restore raw backup files?','Yes. Choose the file in Restore, then pick a board from its list; none is picked for you. Damaged, unknown and pending entries can’t be chosen and stay in the saved copy of your file. Your file and current board are kept on this device before the preview. Current-board files and complete recovery files use their current board.'],
+ ['Does Settings load every backup?','No. Settings lists every backup by date, time and kind without opening each one, so it opens just as quickly however many backups this device holds, and every backup stays saved exactly. A backup is opened only when you download, restore or delete it, and it is checked first. One that can’t be read is listed as Unreadable backup and can’t be restored. If a backup was damaged after it was saved, Restore refuses it and your current board stays as it is.'],
+ ['What if saved ratings disagree with recorded comparisons?','With file or paste Restore, you choose whether the board keeps its saved ratings or recalculates them from its recorded comparisons. Review saved decisions instead combines this device’s and the cloud’s decisions; you make one choice: keep one side’s saved ratings for the tasks it lists, or use the recorded ratings. Other tasks keep their combined ratings. Nothing is chosen for you, no comparison is invented, and History is kept. Preview and Cancel leave your board unchanged, and cancelling a paste keeps its text. Earlier copies stay in Settings backups. If the account, a source or storage changes before the cloud confirms, the choice stays held; Retry sync alone never applies it.'],
+ ['What can I do when saved appearances disagree?','Choose Review saved decisions from the cloud error, or Settings → Data and backups → Troubleshooting. It shows this device’s and the cloud’s appearance, with when each was saved where known. “What stays with either appearance” lists what each choice keeps and which values stay in backups. Nothing is chosen for you: Save choice and sync stays disabled until you pick System, Light or Dark. Your pick becomes a new appearance decision and keeps earlier decisions, task edits, comparisons, ratings and History.'],
+ ['What if Apply selected source can’t save?','Apply selected source can wait up to a minute for each step. If it still can’t save, the message says why, for example that the cloud didn’t answer in time or this device couldn’t record the upload. Your board and your choice stay protected. Choose Read sources again, then try again. Once it saves, the cloud button shows synced, even if cloud recovery was waiting. The Debug log records the reason.'],
+ ['How does automatic recovery choose between compatible changes?','It follows the order the decisions were made. When that order isn’t known, it keeps this device’s value, or otherwise picks the same default every time. The other values stay protected, and saving, uploading or reopening a copy doesn’t make its decisions newer. File and paste Restore still show a preview before replacing your board.'],
+ ['Will recovered work reopen and finish saving automatically?','Yes. Your working board reopens by itself with the changes already recovered, and a recovery waiting for cloud confirmation carries on once this device has checked its saved work and your account. You don’t need to choose a source just to keep working, even while an earlier copy is unresolved. Shared cloud originals with anything left remain protected permanently; one with nothing left is retired once your board has moved past it. Nothing missing is recreated. If protection is refused, your work stays saved on this device and cloud saving stays pending.'],
+ ['What can I inspect while cloud checks wait?','A read-only preview shows this device’s board with its task and History counts, and up to 50 task titles on a large board. Cloud copies can’t be chosen until they are checked. Changing accounts hides the preview at once; your work and drafts stay protected. The review takes at most a minute, and Cancel stops it without choosing or changing anything. If a source changes while it is read, the app checks once more within that minute; it never chooses for you. After a timeout, Review cloud recovery sources stays available from the cloud error for a cloud copy already found damaged.'],
+ ['Why does the review show a cloud source as Unavailable?','A cloud copy the review couldn’t read completely shows as Unavailable and can’t be chosen; the review finishes with the others. While the review reads, cloud saves from this tab wait; another open tab of the app doesn’t. A new cloud save, an edit or another account stops the review; read the sources again.'],
+ ['Can I inspect one cloud copy when another cannot be read?','Yes. Each copy that arrives and checks out shows on its own, read-only, with task and History counts and up to 50 task titles. A copy that couldn’t be read shows unknown counts; that doesn’t mean it is empty. Being readable doesn’t make a copy safe to apply: it must pass every check first, and until then you can look but not choose it. Looking never selects, applies or uploads anything. If the account or board changes, review again; your newer work and the originals stay protected. If cloud saving finishes but this device still holds recovery, the message says so.'],
+ ['Why does the cloud button say “recovery waiting”?','When the newest cloud copy can’t be read, the app usually rebuilds your board from an older complete copy. On a large board that can need more memory than a phone allows, so the app waits instead. Your board stays open and saves on this device, and every readable copy stays protected. Opening, returning or reconnecting doesn’t start the rebuild; Retry sync or signing in again does, and it can close the app. If it stops early, or this device’s storage is full, it waits again; free up space, then try again. If the copy before the unreadable one is the one this device last confirmed, the app saves your board by itself. Settings keeps Review cloud recovery and Restore. A newer cloud save ends the wait.'],
+ ['Why does a large board wait for Retry sync after recovery?','After Retry sync rebuilds a large board from an older cloud copy, saving it to the cloud needs about as much memory as the rebuild. So until the cloud confirms the board, opening the app, returning, reconnecting or editing doesn’t try again; Retry sync or signing in again does. Your board saves on this device meanwhile, and every readable copy stays protected.'],
+ ['Why does a recovery check retry or stop?','If a read fails for a moment or a source changes, the review checks again once by itself. It never clears or replaces your saved data. The whole review, including that recheck, takes at most a minute, and Cancel stays available. If reading keeps failing, time runs out, the account changes, access is denied or a source isn’t supported, the review stops and the message says what to do next; that doesn’t mean recovery or cloud saving finished. Your work, unfinished drafts and original copies stay protected.'],
+ ['What cannot this appearance recovery resolve?','Saved appearances that are unknown, damaged, from another account or not appearance data stay held for a compatible app; the review doesn’t guess. It shows where the app was opened from and the kind of problem, without your account or board contents. The Debug log stays on this device and is never uploaded.'],
+ ['Why can an incomplete cloud upload stay pending?','Before a cloud save becomes your current board, the cloud checks that all of it arrived. If any is missing or damaged, that save is rejected, your cloud board stays as it was and the save stays pending on this device. This check doesn’t repair a cloud copy that is already damaged or choose an older board for you.'],
+ ['What if this copy still cannot save?','If the other copy keeps saving for longer than that, a message says this edit isn’t saved yet. Close the other copy, then make any change here to save again. If both copies changed the same thing, the saved board keeps one version and Settings backups keep this tab’s. The message stays until a save succeeds, and Settings shows Last device save issue.'],
+ ];
+ assert.ok(answerTo('Can I undo, restore, or remove a task?'),'positive control: the mounted Help has the Data and backups answers');
+ for(const [question,text] of approved)assert.equal(answerTo(question),text,question);
+});
+
+// #234: Troubleshooting (answers 59 to 64 in Data and backups) keeps the
+// safe action first and drops the Debug log's field lists. No ordinary answer
+// teaches save-corruption internals; the answers owned by other open fixes
+// (#2358 L2 and #2269) are left to them.
+test('RISK help save-repair guidance: Troubleshooting answers keep the safe action first, and no Data and backups answer outside the ones other fixes own teaches save-repair internals',async t=>{
+ const {answerTo,dataAnswers}=await mountedHelp234(t);
+ const approved=[
+ ['What does the debug log contain?','A small report about sync and unexpected reloads. It never includes your tasks, recovery copies, account IDs or raw error messages. Opening it never reads the cloud or changes saved data. If a recovery review is open but idle, opening the log closes its preview, so read the sources again before choosing; a save already under way keeps running. It stays on this device and is never uploaded; Copy debug log and Download debug log share only this report. It isn’t a board backup; Download backup includes it.'],
+ ['What can I do if a save or sync fails?','If the latest edit couldn’t save on this device, keep the tab open; Download backup keeps it, with your saved copies. Settings shows each device-save warning with its stage and code. The cloud error button offers Retry sync, Reload app and Sign out; Reload waits for edits to save. After a lost reply, the save may or may not have reached the cloud, so Retry sync checks first before trying again. Only Synced confirms a save. Recent sync errors, in the Debug log, lists the past hour’s errors, including ones that later recovered.'],
+ ['What does a “save loop” sync error mean?','If cloud sync keeps saving the board with nothing new to save, the app stops by itself after a few saves and shows a cloud error such as “push failed (save loop)”. While a save on this device is failing, the button shows “save error” instead and the app keeps retrying. Your next edit, Retry sync, or signing out and in again saves and syncs again. The Debug log records what led to the stop, without task content.'],
+ ];
+ for(const [question,text] of approved)assert.equal(answerTo(question),text,question);
+ const owned=new Set(['What if a cloud save is damaged?','Can I keep working with a damaged cloud save?','Does the app fix an unreadable cloud copy by itself?']);
+ assert.ok(dataAnswers.length>50&&dataAnswers.some(row=>owned.has(row.question)),'positive control: the mounted Help has the Data and backups answers');
+ const internals=dataAnswers.filter(row=>!owned.has(row.question)&&/generation|acknowledg|checksum|fingerprint|\bbytes?\b|publisher|pointer|encod|revision|exact (?:copy|cop|originals)|authority/i.test(row.text)).map(row=>row.question);
+ assert.deepEqual(internals,[],'no ordinary answer teaches save-repair internals');
+ assert.deepEqual(dataAnswers.filter(row=>row.text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length>130).map(row=>row.question),[],'every Data and backups answer stays within the 130-word limit');
+});
+
+// #234: the current changelog tells the person what changed in Help.
+test('RISK help save-repair guidance: the current changelog says the Data and backups answers are shorter and plainer and no longer explain how saves are repaired',async t=>{
+ const {release}=await mountedHelp234(t);
+ const latest=release('November 15, 2026');
+ // #234 review B2: the answers other open fixes own keep their wording, so
+ // the line says most answers, not all.
+ assert.doesNotMatch(latest,/They no longer explain/);
+ assert.match(latest,/<li>Help’s Data and backups answers are shorter overall and say what you see and can do: whether your work is saved on this device, whether cloud saving is pending, and what to choose when the app needs you\. Most no longer explain how saves are repaired behind the scenes\. Answers that only retold earlier fixes are gone; this changelog keeps that history\.<\/li>/);
 });
