@@ -210,7 +210,9 @@
           if(reply.cancelled)return settle({accepted:false,reason:"cancelled"});
           if(reply.error)return settle({accepted:false,reason:"failed"});
           if(reply.conflict)return settle({accepted:false,reason:"conflict"});
-          if(typeof reply.rev!=="number")return settle({accepted:false,reason:"unavailable"});
+          // Every backend sends a whole revision; a reply without one says
+          // nothing (#2377 review N3: 2.5, NaN or Infinity used to be accepted).
+          if(!Number.isSafeInteger(reply.rev))return settle({accepted:false,reason:"unavailable"});
           // Never rewind this device's revision or replace a newer copy with an
           // older one. The saved revision alone decides; the base is not checked.
           if(reply.rev<acknowledged()?.revision)return settle({accepted:false,reason:"stale"});
@@ -227,7 +229,10 @@
             if(made){
               if(authority===made.authority)authority=before.authority;
               if(known===made.known)known=before.known;
-              if(owner===made.owner)owner=before.owner;
+              // Only a binding this acceptance made is withdrawn. When it
+              // could bind none, a null owner may as well be a sign-out's or
+              // a hide's, which must stand (#2377 review N3).
+              if(made.owner!==null&&owner===made.owner)owner=before.owner;
               changed();
             }
             return settle({accepted:false,reason:"unsaved",...(error?{error}:{})});

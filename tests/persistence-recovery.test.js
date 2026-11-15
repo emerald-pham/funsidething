@@ -13792,6 +13792,38 @@ test('RISK sync session: while the acknowledged board saves, its copy and owner 
  assert.ok(bound.owner);
 });
 
+// #2377 review N3: a reply's revision must be a whole number to be accepted,
+// as every backend sends, and a refused save withdraws only a binding its
+// acceptance made. When that acceptance could bind no owner, a sign-out or
+// hide during the save stays in force.
+test('RISK sync session: a reply whose revision is not a whole number is not accepted and records nothing',async()=>{
+ const {session}=syncSession2377(),bound=await acceptedRead2377(session);
+ for(const rev of [2.5,NaN,Infinity]){
+  let installed=0;
+  const outcome=await session.mayPush().write.accept({ok:true,rev},{payload:'board at '+rev,install:async()=>{installed++;return true;}});
+  assert.deepEqual({accepted:outcome.accepted,reason:outcome.reason},{accepted:false,reason:'unavailable'},rev+': a reply without a whole revision says nothing');
+  assert.equal(installed,0,rev+': nothing is saved');
+  assert.deepEqual({...session.snapshot().known},{...bound.known},rev+': nothing is recorded');
+  assert.equal(session.snapshot().owner,bound.owner,rev+': and the binding stays');
+ }
+});
+
+test('RISK sync session: a refused save whose acceptance bound no owner never brings back the binding a sign-out during it ended',async()=>{
+ const {session,cloud}=syncSession2377(),bound=await acceptedRead2377(session);
+ assert.ok(bound.owner,'positive control: there is a binding a refused save could bring back');
+ // A recovery publication may accept while the backend is not ready; then
+ // its acceptance records the copy but cannot bind the owner.
+ cloud.replace({user:'e@example.com',ready:false});
+ const ticket=session.mayPush({replacing:true});assert.equal(ticket.go,true,'positive control: the publication may write');
+ let during=null;
+ const outcome=await ticket.write.accept(ack2377(3),{payload:'board at 3',install:async()=>{during=session.snapshot();session.requireRead('signed-out');return false;}});
+ assert.equal(during.owner,null,'positive control: the acceptance bound no owner');
+ assert.equal(outcome.reason,'unsaved');
+ assert.equal(session.snapshot().owner,null,'the refused save leaves the sign-out’s unbinding');
+ assert.equal(session.snapshot().authority,null,'and its end of read authority');
+ assert.deepEqual({...session.snapshot().known},{...bound.known},'and withdraws the copy it recorded');
+});
+
 // #2377 slice 2 (#2350): Help's "What does Synced confirm?" already says the
 // board must be saved on this device and acknowledged; the changelog says an
 // acknowledgement this device could not save no longer counts.
