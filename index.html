@@ -2128,9 +2128,13 @@ const backupRetention=(()=>{
       // #2333 review: a stale-tab draft a later save may clear as contained
       // never stands in for a copy no save clears, which would go with it.
       const until=new Map(list.map(row=>[row,keptUntil(row)]));
+      // #2379 review (N3, #2342 item 2): Settings offers "Delete backups older
+      // than seven days" by each copy's date, so a copy of another kind dated
+      // earlier would be offered before a copy made today. Another kind's copy
+      // stands in only when it is dated today, and the newest copy wins a tie.
       out.reuse=list.filter(row=>row.bytes===copy.bytes&&!protectedIds.has(row.id)&&!repeating.has(row)&&until.get(row)!==null&&wanted!==null&&until.get(row)>=wanted&&
-        (clearable||!clearableAsContained(row))&&row.readable===true)
-        .sort((a,b)=>(b.kind===copy.kind)-(a.kind===copy.kind)||(until.get(a)===until.get(b)?0:until.get(a)<until.get(b)?1:-1)||a.at-b.at)
+        (clearable||!clearableAsContained(row))&&(row.kind===copy.kind||dayNumber(row.day)===todayNumber)&&row.readable===true)
+        .sort((a,b)=>(b.kind===copy.kind)-(a.kind===copy.kind)||(until.get(a)===until.get(b)?0:until.get(a)<until.get(b)?1:-1)||b.at-a.at)
         .map(name);
     }
     return out;

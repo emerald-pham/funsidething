@@ -14080,3 +14080,22 @@ test('RISK backup retention (device mirror): the browser list still lists its co
  assert.equal(listed.length,1,'the row is listed once');
  assert.equal(listed[0].payload,row.payload,'from the browser list’s mirror copy, which still holds its text');
 });
+
+// #2379 review N3 (#2342 item 2): Settings offers "Delete backups older than
+// seven days" by each copy's date, so a copy of another kind dated earlier
+// would be offered before a new copy made today. Another kind's copy stands in
+// only when it is dated today, and of several the newest wins.
+test('RISK backup retention (device store): a copy kept before a cloud local edit is not met by an older copy of another kind, and the newest of today’s copies wins',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),Q=boardWithExtraTask2335(s.ctx,'only-in-q','Only in Q');
+ await s.seed([s.row('switch-p-old','before-account-switch',P,{day:s.daysAgo(10)}),
+  s.row('switch-q-earlier','before-account-switch',Q),s.row('import-q-later','before-import',Q)]);
+ const made=await s.copy('before-cloud-local-edit',P);
+ const edits=(await s.holding(P)).filter(row=>row.kind==='before-cloud-local-edit');
+ assert.equal(edits.length,1,'a new local-edit copy of P is written');
+ assert.equal(edits[0].day,s.today,'dated today');
+ assert.equal(made?.id,edits[0].id,'and it is the copy returned');
+ const reused=await s.copy('before-cloud-local-edit',Q);
+ assert.equal(reused?.id,'import-q-later','of today’s copies of Q the newest stands in');
+ assert.deepEqual((await s.holding(Q)).map(row=>row.id).sort(),['import-q-later','switch-q-earlier'],'and no row is added');
+});
