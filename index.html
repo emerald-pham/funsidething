@@ -4579,7 +4579,13 @@ async function retireExpiredLegacyBackups(expectedHash,payload,expectedIndex,pre
       // only recovery evidence, and a remaining durable reference means expiry
       // was not proved by this successful rotation.
       const holds=retentionHolds({preserveBackupId,headIds:JSON.parse(head.payload).protectedBackupIds,durableIds:backups.map(row=>row?.id)});
-      const remove=backupRetention.decide({rows:legacyRetentionRows(rows),today:backupDay(Date.now()),holds}).expire.sort((a,b)=>a-b);
+      // #2379 review (N1, agreed D5): the mirror keeps main's strict guard. A
+      // row whose id is on any other row, a malformed one included, never
+      // expires here, so the mirror removes nothing main kept.
+      const counts=new Map();
+      for(const row of rows)counts.set(row?.id,(counts.get(row?.id)||0)+1);
+      const remove=backupRetention.decide({rows:legacyRetentionRows(rows),today:backupDay(Date.now()),holds}).expire
+        .filter(i=>counts.get(rows[i]?.id)===1).sort((a,b)=>a-b);
       if(!remove.length) return false;
       let text=unpackBackupIndex(expectedIndex),count=rows.length;
       for(const i of remove.reverse()){
