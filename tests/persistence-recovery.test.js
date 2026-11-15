@@ -14102,3 +14102,14 @@ test('RISK backup retention (device store): a copy kept before a cloud local edi
  assert.equal(reused?.id,'import-q-later','of today’s copies of Q the newest stands in');
  assert.deepEqual((await s.holding(Q)).map(row=>row.id).sort(),['import-q-later','switch-q-earlier'],'and no row is added');
 });
+
+// #2379 review N3 decision (2026-11-15): the dated-today rule for another
+// kind's stand-in is the device store's alone. The browser list keeps main's
+// reuse, so it writes no second full copy where the iOS quota contracts live.
+test('RISK backup retention (browser list): a copy kept before taking a cloud board still reuses an older copy of another kind that the app keeps until it is deleted',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='browser list').open(t);
+ const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P');
+ await s.seed([s.row('other-p-old','other-browser-copy',P,{day:s.daysAgo(10)})]);
+ assert.ok(await s.copy('before-cloud-adoption',P),'the adoption copy of P is reported safe');
+ assert.deepEqual((await s.holding(P)).map(row=>row.id),['other-p-old'],'the ten-day-old other-browser copy stands in, so no row is added');
+});

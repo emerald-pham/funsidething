@@ -2130,10 +2130,14 @@ const backupRetention=(()=>{
       const until=new Map(list.map(row=>[row,keptUntil(row)]));
       // #2379 review (N3, #2342 item 2): Settings offers "Delete backups older
       // than seven days" by each copy's date, so a copy of another kind dated
-      // earlier would be offered before a copy made today. Another kind's copy
-      // stands in only when it is dated today, and the newest copy wins a tie.
+      // earlier would be offered before a copy made today. With {sameDayOtherKinds}
+      // (the device store's choice) another kind's copy stands in only when it
+      // is dated today. The browser list leaves it off (2026-11-15 decision): a
+      // second full row there adds storage-full pressure where main reused one.
+      // The newest copy wins a tie on both.
+      const sameDay=copy.sameDayOtherKinds===true;
       out.reuse=list.filter(row=>row.bytes===copy.bytes&&!protectedIds.has(row.id)&&!repeating.has(row)&&until.get(row)!==null&&wanted!==null&&until.get(row)>=wanted&&
-        (clearable||!clearableAsContained(row))&&(row.kind===copy.kind||dayNumber(row.day)===todayNumber)&&row.readable===true)
+        (clearable||!clearableAsContained(row))&&(!sameDay||row.kind===copy.kind||dayNumber(row.day)===todayNumber)&&row.readable===true)
         .sort((a,b)=>(b.kind===copy.kind)-(a.kind===copy.kind)||(until.get(a)===until.get(b)?0:until.get(a)<until.get(b)?1:-1)||b.at-a.at)
         .map(name);
     }
@@ -4229,7 +4233,8 @@ async function saveDurableBackup(kind,payload,metadata=null){
     let reuse=[];
     try{
       reuse=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:backupDay(Date.now()),holds:retentionHolds(),
-        copy:{kind,bytes:await ChainStorageV2.hashPayload(payload),...(metadata?.losingEdit===true?{losingEdit:true}:{})}}).reuse;
+        // #2379 review N3: a device copy is cheap, so another kind's copy stands in only from today.
+        copy:{kind,bytes:await ChainStorageV2.hashPayload(payload),sameDayOtherKinds:true,...(metadata?.losingEdit===true?{losingEdit:true}:{})}}).reuse;
     }catch(e){reuse=[];}
     if(reuse.length){
       const held=await deviceBackupsWithText(reuse).catch(()=>[]);
