@@ -11599,7 +11599,10 @@ const PassChain=Object.freeze({
       const group=list.filter(row=>passRow(row)&&row.actionId===seed.actionId&&row.target.id===seed.target.id);
       const roots=group.filter(row=>row.target.property==="chain"),modes=group.filter(row=>row.target.property==="scanMode");
       const start=roots.length===1?PassChain.read(roots[0]):null;
-      if(group.length!==2||modes.length!==1||start?.kind!=="start"||!currentChoiceStartEnvelopeMatches(modes[0],roots[0])){
+      // A scanMode row this version cannot read is held like any other
+      // incomplete Start, never read (#2375 review: its draw could be missing).
+      if(group.length!==2||modes.length!==1||start?.kind!=="start"||!supportedCurrentChoiceEvent(modes[0])
+        ||!currentChoiceStartEnvelopeMatches(modes[0],roots[0])){
         issue="unprojectable-decision-evidence";continue;
       }
       const root=roots[0],mode=modes[0],prior=mode.before?.present?mode.before.value:null;

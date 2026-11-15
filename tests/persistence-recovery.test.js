@@ -11999,6 +11999,31 @@ test('RISK chain return Undo: a concurrent Return or Can’t on the other device
  });
 });
 
+// #2375 independent review N1: a Start's scanMode row that this version cannot
+// read is held, never thrown on. A saved board carries a real Start whose
+// scanMode row was later damaged; answering on it must not stop partway.
+test('RISK started pass compatibility: a Start whose scanMode row is damaged is held, and an answer on that board does not throw',async t=>{
+ for(const damage of ['its earlier draw is missing','its earlier mode is a string'])await t.test(damage,async()=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const board=syncState({tasks:Object.entries(unpinnedTitles2375).map(([id,title])=>syncTask(id,title)),chain:[],candidateId:null,
+   mode:'scan',scanMode:'descending',seenQuickStart:true,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}}),raw=JSON.stringify(board);
+  const first=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  setFakeTime(first.ctx,at+100);first.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.equal(await first.ctx.persist(),true);
+  const saved=JSON.parse(first.shim.localStorage.getItem(SYNC_STORE_KEY));
+  const mode=saved.decisionEvents.find(row=>row.kind==='current-choice'&&row.target.type==='pass'&&row.target.property==='scanMode'&&row.target.id!==row.passId);
+  assert.ok(mode,'precondition: the Start recorded its scanMode row');
+  if(damage==='its earlier draw is missing')delete mode.before.value.chance;else mode.before.value='descending';
+  const damaged=JSON.stringify(saved);
+  const app=await loadAppAtTime(at+200,{seedStorage:{[SYNC_STORE_KEY]:damaged,[LOCAL_HEAD_KEY]:damaged}});
+  setFakeTime(app.ctx,at+300);app.ctx.renderScan();
+  const no=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="no" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+  assert.ok(no,'precondition: a candidate is offered');
+  assert.doesNotThrow(()=>app.ctx.onAction('no',{dataset:{candidate:no[1],benchmark:no[2]}}),'answering does not throw');
+  assert.notEqual(vm.runInContext('decisionEvidenceIssue(state,state.syncAccount??state.decisionBaseline?.account??null)',app.ctx),null,'the damaged evidence is held');
+ });
+});
+
 test('RISK chain return sync: a saved legacy pass id is not reported as a displaced edit when another device begins a new pass',async t=>{
  const at=Date.parse('2026-10-17T15:00:00Z');
  const {open,raw}=await pairClients2375(t,{at,passStartedAt:at-60000});
