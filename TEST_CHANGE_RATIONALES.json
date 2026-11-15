@@ -23385,5 +23385,26 @@
       "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-concurrency=1 --test-name-pattern=<the 54 updated and new Help guidance tests> tests/core.test.js tests/persistence-recovery.test.js (record 2026-11-15T09-36-05-547Z-71bab168-16ec-4b61-a510-17bf2f49d65c); and --purpose preimplementation-red -- node --test --test-name-pattern='^RISK test inventory: every added environment-gated root is declared with the variable its registration skips on$' tests/repository-process.test.js (record 2026-11-15T09-38-13-440Z-a6a52ca2-40bb-49c8-b268-6abaf3121289); round 2: --purpose preimplementation-red -- node --test --test-name-pattern=<the six changed guidance tests> tests/core.test.js (record 2026-11-15T11-01-56-057Z-a8be3620-8005-48bf-956b-02c650904e54); round 3: --purpose preimplementation-red -- node --test --test-name-pattern=<the ten round-3 changed guidance tests> tests/core.test.js tests/persistence-recovery.test.js (record 2026-11-15T11-55-08-239Z-bde0b252-094f-4b06-9c75-e004595fcdf3)",
       "failure": "On base 0e3e0a9f Help: 54 of 54 updated and new guidance tests failed with AssertionError (for example the approved wording of \"When are old backups cleaned up?\" not matching, and \"What does the debug log measure?\" still present). After renaming the reminder title before its row: preflight_failed: Environment skip \"RISK manual backup reminder visual browser: the reminder beside Make manual backup ...\" is not registered. The legacy completion Start test pin found later by the core group: its new assertion fails on base Help (later-baseline-sensitivity record 2026-11-15T09-46-26-171Z-70ee4e36-30c1-4bed-859a-b0810bead367) and passes on the candidate. Round 2: on 9d89120b Help, 5 of the 6 changed tests failed with AssertionError (the missing undeleted-tasks and full-storage sentences, and the November 15 line still saying they no longer explain); the sixth, the #2281 tidy-up, passes on both sides by design. GREEN 2026-11-15T11-02-29-438Z-14e2cf34: 6 of 6. Round 3: on f88c6b68 Help, 10 of 10 changed tests failed with AssertionError (the one passing result is a subtest); GREEN 2026-11-15T11-55-20-468Z-df62c4a1: 11 of 11."
     }
+  },
+  {
+    "baseCommit": "648e764e2ab9b876b5c8dcfff01c6b7c07d8a835",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-assert.deepEqual(returnFact221(h.remoteState()).map(row=>row.before.value[0]).sort(),returned,'every return reached the cloud');"
+    ],
+    "reason": "#2376 D1 (owner decision of 2026-11-15): a Postpone of a dot is now recorded as the same #221 Return row a Return as candidate writes, so the pass chain is rebuilt without the postponed dot. The #221 review test that listed the cloud's Return rows expected only the returned tasks; the postponed dots now appear there too, so its expectation names both.",
+    "previousBehavior": "Postpone took a dot off the chain without recording a decision, so the cloud held one Return row per returned task and none for postponed dots, and the next answer could put a postponed dot back once its postponement ended (#2336).",
+    "intendedBehavior": "Every Return and every Postpone of a dot reaches the cloud as a Return row of its pass. The same test still checks that the automatic dot is the first candidate that was not returned, the device and the other device show the same chain, and each Postpone reached the other device.",
+    "preservedCoverage": [
+      "The test still asserts every Return row reached the cloud, now alongside the Postpone rows, with exact task ids from the spec.",
+      "All other assertions of the #221 review test (automatic dot, confirmed sync, the other device's chain and each postponement) are unchanged."
+    ],
+    "replacementTests": [
+      "RISK started pass sync: a Postponed benchmark stays off the chain once its postponement ends and the next candidate is answered, and a second device shows the same chain",
+      "RISK started pass sync: Postpone gives the same chain, mode and marks on a board with no decision history and on one whose history replays, also through the next answer"
+    ],
+    "redEvidence": {
+      "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"undone does not keep its task from the automatic dot|Return already saw does not stop Undo|Postpone that empties the chain after a return\" tests/persistence-recovery.test.js",
+      "failure": "On the slice 1 candidate the #221 review test failed with \"every return reached the cloud\": actual [carried-a, carried-b, carried-c], expected [carried-a, carried-b] (the Postpone of carried-c is now a Return row). Observed in a focused run of the RISK chain return and Postpone tests before the assertion was changed (7 failures; the other six were expired-hold failures that the slice 1 repair fixed, recorder record 2026-11-15T15-02-04-201Z-837454f0)."
+    }
   }
 ]
