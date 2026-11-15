@@ -49,6 +49,7 @@ self.addEventListener("install", event => {
         "./vendor/lz-string-1.5.0.min.js",
         "./device-store-v2.js",
         "./cloud-store-v2.js",
+        "./cloud-sync-session.js",
         "./THIRD_PARTY_NOTICES.md",
         "./vendor/astronomy-LICENSE",
         "./vendor/lz-string-LICENSE",

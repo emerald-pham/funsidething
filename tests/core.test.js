@@ -29854,6 +29854,18 @@ test('RISK SCALABLE OFFLINE SHELL: storage and cloud generation modules load bef
  assert.match(sw,/"\.\/device-store-v2\.js"/);assert.match(sw,/"\.\/cloud-store-v2\.js"/);
 });
 
+// #2377: the sync session decides when this device may save to the cloud. An
+// installed app that opened without it offline could not sync, so it is part
+// of the shell like the codecs, and loads before the scanner that asks it.
+test('RISK SCALABLE OFFLINE SHELL: the sync session loads after the cloud codec, before the scanner, and is precached with the shell',()=>{
+ const cloudScript=html.indexOf('<script src="cloud-store-v2.js"></script>');
+ const sessionScript=html.indexOf('<script src="cloud-sync-session.js"></script>');
+ const appScript=html.indexOf('/* ================================================================\n   ENGINE');
+ assert.ok(cloudScript>0&&sessionScript>cloudScript&&appScript>sessionScript,'the sync session loads after the cloud codec and before scanner boot');
+ assert.ok(fs.existsSync(path.join(__dirname,'cloud-sync-session.js')),'the module is in the checkout');
+ assert.ok(appShellContract(serviceWorkerSource()).localPaths.includes('cloud-sync-session.js'),'and in the precached shell the cache key covers');
+});
+
 test('RISK SCALABLE CONCURRENCY: a newer edit made during a device commit is the only board marked durable',async()=>{
  const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-device-race-'+Date.now()+'-'+Math.random();
  const initial=syncState({tasks:[syncTask('base','Base')]});

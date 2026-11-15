@@ -1297,6 +1297,9 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     shim.window.ChainStorageV2=sandbox.ChainStorageV2;
     shim.window.ChainCloudV2=sandbox.ChainCloudV2;
   }
+  // #2377: the sync session loads before the app, as its script tag does. An
+  // older released app never asks for it, so the current module is harmless there.
+  vm.runInContext(artifacts?.session||fs.readFileSync(path.join(__dirname,"cloud-sync-session.js"),"utf8"),sandbox,{filename:"cloud-sync-session.js"});
   if (seed !== undefined) vm.runInContext(SEED_SNIPPET(seed), sandbox);
   const installSceneModules = () => {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "location.js"), "utf8"), sandbox, { filename: "location.js" });

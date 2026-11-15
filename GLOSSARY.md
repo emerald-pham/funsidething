@@ -99,6 +99,14 @@ separate from device-local saving or reading a cloud copy. It does not establish
 that unavailable historical changes have been recovered.
 _Avoid_: Synced badge
 
+**Sync session**:
+The one owner, while the app is open, of what this device knows about its cloud
+copies. Every cloud read reports what it found to the session, whoever started
+the read, so once any read finds the copy this device's acknowledgement names
+damaged, no sync treats that copy as unchanged until a healthy read. It starts
+empty each time the app opens.
+_Avoid_: Sync manager, cloud cache
+
 
 **History basis memo**:
 One exact serialized numeric-input/result pair reused between matching History observations. Inputs are rebuilt before every lookup; their combined retained strings stay within256Ki UTF-16 units. It retains no task, board or validation graph and grants no cloud authority.
