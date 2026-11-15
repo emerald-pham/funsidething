@@ -4698,7 +4698,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
   'a cloud-reconciliation backup rotation keeps the pending Restore safety copy');
  let cloudSends=0;
  shim.window.CloudSync={ready:true,user:'e@example.com',push:async()=>{cloudSends++;return null;}};
- vm.runInContext('reconciledAs=window.CloudSync.user;',ctx); // an already-reconciled signed-in session
+ await vm.runInContext('(async()=>{const read=(await syncSession.startRead({full:true})).read;read.accept({payload:syncView().known.payload,revision:syncView().known.revision});read.end();})()',ctx); // an already-reconciled signed-in session
  ctx.cloudPush();
  await new Promise(resolve=>setTimeout(resolve,2050));
  assert.equal(vm.runInContext('cloudTimer',ctx),null,'the signed-in two-second cloud retry ran');
@@ -6351,7 +6351,7 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
    Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
     const painted=chainPillIds(value);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
-    const currentCompletionIds=(app.ctx.state.decisionEvents||[]).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id),row={sequence:++sequence,client:app===dotClient?'dot':app===doneClient?'done':'no',chain:Array.from(app.ctx.state.chain),painted,currentCompletionIds,deliveredCompletionIds:[...knowledge.get(app)],knownCloudCompletionIds:JSON.parse(vm.runInContext('JSON.stringify(JSON.parse(lastKnownCloudPayload||"null")?.decisionEvents||[])',app.ctx)).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id)};
+    const currentCompletionIds=(app.ctx.state.decisionEvents||[]).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id),row={sequence:++sequence,client:app===dotClient?'dot':app===doneClient?'done':'no',chain:Array.from(app.ctx.state.chain),painted,currentCompletionIds,deliveredCompletionIds:[...knowledge.get(app)],knownCloudCompletionIds:JSON.parse(vm.runInContext('JSON.stringify(JSON.parse(syncView().known.payload||"null")?.decisionEvents||[])',app.ctx)).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id)};
     if(currentCompletionIds.length||row.knownCloudCompletionIds.length||row.deliveredCompletionIds.length)completionObserved.add(app);row.completionObserved=completionObserved.has(app);
     observations.push(row);if(row.completionObserved)paints.push(row);
    }});
@@ -6802,7 +6802,7 @@ test('RISK support diagnostics: held cloud acknowledgements stay bound to their 
  const entered=[deferredSyncFixture(),deferredSyncFixture()],gates=[deferredSyncFixture(),deferredSyncFixture()];let calls=0,replacementGate=null;
  const backend={configured:true,ready:true,user:'owner',status:'ok',async pull(){return {empty:true};},async push(){const index=calls++;entered[index]?.resolve();await gates[index]?.promise;return {ok:true,rev:2+index};},signIn(){},signOut(){}};
  ctx.window.CloudSync=backend;
- vm.runInContext("reconciledAs='owner';lastKnownCloudPayload=JSON.stringify(state);lastKnownCloudAccount='owner';lastKnownCloudRevision=1;lastPushed=''",ctx);
+ await vm.runInContext("(async()=>{const read=(await syncSession.startRead({full:true})).read;read.accept({payload:JSON.stringify(state),revision:1});read.end();lastPushed='';})()",ctx);
  try{
   ctx.addTask('Request captured before cloud acknowledgement',false);
   const firstRequest=ctx.buildSupportDiagnosticsReport().save.acceptedRequests.value;
@@ -13987,6 +13987,544 @@ test('RISK unchanged cloud pull: signing in again and a same-email account with 
   assert.ok(fullDownload2354(reads,'second',root),'downloads in full: '+JSON.stringify(reads));
   assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'completed');
  });
+});
+
+// #2377 review N2: checking that the saved acknowledgement's board is still
+// valid parses the whole board on the main thread: about 20 ms for a 3 MB
+// board on a laptop, several times that on a phone, and seconds once the board
+// is past the identity cache. So the launch pull that skips the download
+// (#2354) checks it once, as before #2377, and an ordinary push's
+// acknowledgement does not check it. Each check of this board's own
+// acknowledged base is counted through the app's validator.
+const acknowledgedBaseChecks2377=ctx=>vm.runInContext(`(()=>{const real=validDecisionBase,checks=[];
+ validDecisionBase=function(base,account,revision){if(base!==undefined&&base===state?.decisionBase)checks.push(revision);return real(base,account,revision);};
+ return checks;})()`,ctx);
+
+test('RISK unchanged cloud pull: a launch pull that skips the download checks the acknowledged board once, and an ordinary push’s acknowledgement does not check it again',async t=>{
+ const device=await acknowledgedDevice2354(t,'checked-once'),revision=device.backend.docs.get('users/owner').rev;
+ let checks=null;
+ const {reopened}=await relaunch2354(t,device,'checked-once-reopened',{opened:app=>{checks=acknowledgedBaseChecks2377(app.ctx);}});
+ assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'unchanged','positive control: the launch pull skipped the download');
+ assert.equal(reopened.status().text,'☁ synced','positive control: and settled synced');
+ const launchPull=checks.length;
+ const {ctx,shim,backend}=reopened;ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ shim.document.getElementById('addInput').value='Pushed after the launch 2377';await ctx.onAction('add',{});await savesSettled2334(reopened);
+ checks.length=0;
+ await ctx.sendPush();await savesSettled2334(reopened);
+ assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: the push landed');
+ assert.equal(reopened.status().text,'☁ synced','positive control: and its acknowledgement was accepted');
+ assert.deepEqual({launchPull,push:checks.length},{launchPull:1,push:0},'the launch pull checks the acknowledged board once, and the push’s acknowledgement not at all');
+});
+
+// #2377 (closes #2358): a copy this device found damaged by any read, not only
+// the sync read, stops the next ordinary pull from skipping to it. Each finder
+// below reads this device's damaged acknowledged copy outside the sync read:
+// Settings → Review saved decisions, a file restore's fresh cloud read, and the
+// server-only repair a pull runs when device storage is slow to answer. Then
+// one ordinary pull runs, as focus, a return to the app or coming back online
+// start. These read only what the person, the server or another device sees.
+const DAILY_HOLD2377='fvp:chain-scanner:daily-backup-recovery-hold';
+const damageFinders2377={
+ async 'Review saved decisions'(device){
+  await device.ctx.onAction('review-decision-recovery',{});await savesSettled2334(device);
+ },
+ async 'a file restore'(device){
+  const {ctx,shim}=device;
+  assert.equal(await pasteIntoRestore2247(device,ctx.currentBoardExportPayload()),true,'positive control: Restore previews the board file: '+shim.document.getElementById('toast').textContent);
+  assert.equal(await ctx.onAction('confirm-file-restore',{}),false,'positive control: the restore stops at its cloud read');
+  ctx.closeModal();await savesSettled2334(device);
+ },
+ async 'the server-only repair'(device){
+  // Device storage does not answer the pull's availability read, so the pull
+  // repairs from the server alone. The repair finds the damage and then stops:
+  // its read of the recovery protections fails once.
+  const {ctx,faults}=device,store=ctx.window.ScannerDeviceStore,answer=store.getPendingUpload;
+  let stalled=false,refused=false;
+  store.getPendingUpload=function(...args){if(!stalled){stalled=true;return new Promise(()=>{});}return answer.apply(this,args);};
+  faults.serverRead=async path=>{if(path==='users/owner/recoveryProtections'&&!refused){refused=true;throw Object.assign(Error('offline'),{code:'unavailable'});}};
+  // The app's timers do not hold the test process open; this does, while the pull waits out the read.
+  const awake=setInterval(()=>{},50);
+  try{await ctx.cloudPull();}finally{clearInterval(awake);}
+  await savesSettled2334(device);
+  store.getPendingUpload=answer;faults.serverRead=null;
+  assert.ok(stalled&&refused,'positive control: the pull ran the server-only repair and it stopped');
+ },
+};
+async function damageFoundOutsideSync2377(t,finder,{rebuildLands}){
+ const device=await acknowledgedDevice2354(t,'damage-2377-'+finder.replace(/\W+/g,'-')),{ctx,backend,faults}=device,docs=backend.docs,root=docs.get('users/owner');
+ const chunks='users/owner/generations/'+root.activeGeneration+'/chunks';
+ assert.equal(ctx.state.decisionBase?.copy?.generationId,root.activeGeneration,'positive control: the acknowledgement names the cloud copy');
+ for(const key of [...docs.keys()])if(key.startsWith(chunks+'/'))docs.delete(key);
+ await damageFinders2377[finder](device);
+ assert.equal(backend.CS.knownDamagedSource,true,'positive control: '+finder+' found the copy damaged');
+ assert.equal(docs.get('users/owner').rev,root.rev,'positive control: '+finder+' changed nothing in the cloud');
+ // Every cloud write waits forever, as one does when the app is closed mid-upload.
+ if(!rebuildLands)faults.pushPending=new Promise(()=>{});
+ const reads=[];faults.serverRead=async path=>{reads.push(path);};
+ await ctx.cloudPull();await savesSettled2334(device);await syncSettle(500);
+ const pulls=cloudPullEvents2354(device).map(event=>event.status);
+ t.diagnostic(JSON.stringify({finder,reads,pulls,status:device.status(),known:backend.CS.knownDamagedSource,rev:[root.rev,docs.get('users/owner').rev]}));
+ assert.ok(reads.includes(chunks),'the ordinary pull downloads the damaged copy in full: '+JSON.stringify(reads));
+ assert.notEqual(pulls.at(-1),'unchanged','and does not record it as unchanged: '+JSON.stringify(pulls));
+ const peer=await loadCloudBackendV2({sharedDocs:docs,timeoutMs:5000});t.after(()=>peer.CS.suspend());
+ return {device,root,docs,peer,pulls};
+}
+
+test('RISK known-damaged cloud copy: after Review saved decisions, a file restore or the server-only repair finds this device’s acknowledged copy damaged, the next ordinary pull downloads it in full and does not show synced while the rebuild cannot land',async t=>{
+ for(const finder of Object.keys(damageFinders2377))await t.test(finder,async sub=>{
+  const {device,root,docs,peer,pulls}=await damageFoundOutsideSync2377(sub,finder,{rebuildLands:false});
+  assert.equal(pulls.at(-1),'failed','the pull reports the damage: '+JSON.stringify(pulls));
+  assert.notEqual(device.status().text,'☁ synced','the sync button does not show synced: '+device.status().title);
+  assert.equal(device.backend.CS.knownDamagedSource,true,'the damage stays known');
+  assert.deepEqual(JSON.parse(device.shim.localStorage.getItem(DAILY_HOLD2377)),{v:1,account:'e@example.com'},'the daily backups keep their seven-day hold');
+  assert.equal(docs.get('users/owner').rev,root.rev,'positive control: the rebuild did not land');
+  assert.equal((await peer.CS.pull()).code,'corrupt-generation','positive control: another device still cannot read the cloud copy');
+ });
+});
+
+test('RISK known-damaged cloud copy: after Review saved decisions, a file restore or the server-only repair finds this device’s acknowledged copy damaged, the next ordinary pull rebuilds it from this device’s exact board, readable by another device',async t=>{
+ for(const finder of Object.keys(damageFinders2377))await t.test(finder,async sub=>{
+  const {device,root,docs,peer}=await damageFoundOutsideSync2377(sub,finder,{rebuildLands:true});
+  const repaired=docs.get('users/owner');
+  assert.equal(repaired.rev,root.rev+1,'the rebuild publishes the board at the next revision');
+  assert.notEqual(repaired.activeGeneration,root.activeGeneration,'as a new copy');
+  assert.ok(JSON.parse((await peer.CS.pull()).payload).tasks.some(task=>task.title==='Acknowledged task 2354'),'another device reads the board from it');
+  assert.equal(device.status().text,'☁ synced',device.status().title);
+ });
+});
+
+// #2358 L2: Help said an exact acknowledged copy rebuilds damaged cloud saves
+// by itself, but the device holding that copy reads only the root while the
+// copy is unchanged, so it rebuilds only after a check finds the damage.
+// #2377 specialist review N1: a read can find this device's acknowledged copy
+// damaged while its board is not accepted (a recovery source still to be
+// chosen). Saving the acknowledgement without that copy is then refused, and
+// said "Couldn't save this edit" though nothing was edited. Nothing is saved
+// until the board is accepted; the damage stays known, so no read skips to it.
+test('RISK known-damaged cloud copy: damage found while this device’s board is not accepted saves nothing and shows no save error, and the next sync once it is accepted downloads that copy in full',async t=>{
+ for(const variant of ['no damage report','an accepted board','a board not accepted'])await t.test(variant,async t=>{
+  const device=await acknowledgedDevice2354(t,'unaccepted-'+variant.replaceAll(' ','-')),{ctx,shim,backend}=device,store=ctx.window.ScannerDeviceStore;
+  const root=backend.docs.get('users/owner'),savedCopy=async()=>JSON.parse((await store.readHead()).payload).decisionBase?.copy?.generationId??null;
+  assert.equal(await savedCopy(),root.activeGeneration,'positive control: the saved acknowledgement names the cloud copy');
+  const toast=()=>shim.document.getElementById('toast')?.textContent||'';
+  if(variant==='a board not accepted')vm.runInContext('liveBoardAccepted=false',ctx);
+  if(variant!=='no damage report'){
+   ctx.window.dispatchEvent({type:'cloudread',detail:{user:'e@example.com',identity:'owner',outcome:'damaged',rev:root.rev,generationId:root.activeGeneration}});
+   await syncSettle(300);
+   assert.doesNotMatch(toast(),/save this edit/,'no save error is shown: '+toast());
+   assert.equal(ctx.deviceSaveIssue(),null,'and none is recorded');
+   assert.equal(vm.runInContext('syncView().damaged?.generationId',ctx),root.activeGeneration,'the damage is known');
+   assert.equal(await savedCopy(),variant==='an accepted board'?null:root.activeGeneration,
+    variant==='an accepted board'?'positive control: an accepted board saves its acknowledgement without the copy':'a board not accepted saves nothing');
+  }
+  vm.runInContext('liveBoardAccepted=true',ctx);
+  const reads=[];device.faults.serverRead=async path=>{reads.push(path);};
+  await ctx.cloudPull();await savesSettled2334(device);await syncSettle(300);
+  t.diagnostic(JSON.stringify({reads,status:device.status()}));
+  if(variant==='no damage report')assert.ok(!fullDownload2354(reads,'owner',root),'positive control: without a report the next sync reads only the root: '+JSON.stringify(reads));
+  else assert.ok(fullDownload2354(reads,'owner',root),'the next sync downloads the copy in full: '+JSON.stringify(reads));
+  assert.equal(device.status().text,'☁ synced','and, the copy being readable after all, settles synced: '+device.status().title);
+ });
+});
+
+test('RISK known-damaged cloud copy guidance: Help and the changelog say this device rebuilds its damaged save once Retry sync or any other check finds the damage',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();
+ const help=shim.document.getElementById('modalRoot').innerHTML;
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ // #2377 review N9 and the typography note: "its" read as Retry sync's save.
+ // The same sentence opens both damaged-save answers (#2358's L2).
+ const opening=/^Once Retry sync or another check finds this device’s confirmed save damaged, it is rebuilt exactly\./;
+ const damaged=help.split('<dt>What if a cloud save is damaged?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const working=help.split('<dt>Can I keep working with a damaged cloud save?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.deepEqual({damaged:opening.test(damaged),working:opening.test(working)},{damaged:true,working:true},
+  'both damaged-save answers open with when this device’s save is rebuilt: '+JSON.stringify({damaged:damaged.slice(0,120),working:working.slice(0,120)}));
+ assert.doesNotMatch(damaged,/automatically rebuilds/,'it no longer says a damaged save rebuilds by itself');
+ assert.ok(words(damaged)<=130,'the answer keeps the FAQ word limit: '+words(damaged));
+ assert.match(working,/rebuilt exactly\. Without an exact copy, ordinary tasks remain saved locally and pending; they do not download that same source for every edit\./,'and says what happens without an exact copy');
+ assert.doesNotMatch(working,/can rebuild a damaged cloud save from an exact verified copy/,'it no longer says any damaged save can be rebuilt');
+ assert.ok(words(working)<=130,'that answer keeps the FAQ word limit: '+words(working));
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ const latest=current.split('<h3>November 15, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(latest,/Review saved decisions, a restore from a file or the cloud’s own repair/,'the changelog names the checks that now count: '+latest);
+ assert.match(latest,/next sync downloads it in full instead of showing Synced/,'and what the next sync does');
+});
+
+// #2377: the sync session (cloud-sync-session.js) at its own seam. It is loaded
+// as the page loads it, a plain script beside the device codec, and driven
+// through the calls the app makes. Its ports are stand-ins for the backend, the
+// signed-in identity and this device's saved Cloud acknowledgement (account,
+// identity, revision and decision base); the expected hashes are computed here
+// with node:crypto, not by the module.
+const sha2377=text=>createHash('sha256').update(text,'utf8').digest('hex');
+function acknowledgement2377({account='e@example.com',identity='owner',revision=2,generationId='gen-2377-a',payload=JSON.stringify({tasks:[{id:'a',title:'Acknowledged 2377'}]}),hash=sha2377(payload)}={}){
+ return {account,identity,revision,base:{v:1,id:'db1:fixture-2377',account,revision,payload,copy:{generationId,hash}}};
+}
+// valid() stands in for the app's full check of a saved decision base; each
+// call is counted, since it parses the whole board.
+function syncSession2377({ack=acknowledgement2377(),user='e@example.com',uid='owner',save=null,valid=()=>true}={}){
+ const listeners={},events={addEventListener(type,fn){(listeners[type]??=[]).push(fn);},removeEventListener(){},
+  dispatchEvent(event){for(const fn of listeners[event.type]||[])fn(event);return true;}};
+ const context=vm.createContext({crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,structuredClone,console,setTimeout,clearTimeout});
+ context.globalThis=context;
+ for(const file of ['device-store-v2.js','cloud-sync-session.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
+ const connection={current:{user,ready:true}},saves=[],held={ack},checks=[];
+ const acknowledgement={get:()=>held.ack,valid:checked=>{checks.push(checked);return valid(checked);},
+  save:async next=>{saves.push(next);const saved=save?await save(next):true;if(saved===true)held.ack=next;return saved;}};
+ const session=context.ChainSyncSession.createSyncSession({backend:()=>connection.current,identity:()=>uid,acknowledgement,events});
+ const cloud={replace:next=>{connection.current=next;}};
+ return {session,cloud,events,saves,held,checks,setIdentity:value=>{uid=value;}};
+}
+const shortcut2377=async(session,options)=>{const ticket=await session.startRead(options);assert.equal(ticket.go,true,'a read may start');const since=ticket.read.unchangedSince;ticket.read.end();return since&&{rev:since.rev,generationId:since.generationId};};
+const damaged2377=(generationId='gen-2377-a',rev=2,identity='owner',user='e@example.com')=>({user,identity,outcome:'damaged',rev,generationId});
+
+test('RISK sync session: a read that finds this device’s acknowledged copy damaged saves the acknowledgement without that copy, and no later read skips to it until a healthy read',async()=>{
+ const {session,saves,held}=syncSession2377(),original=held.ack,changes=[];
+ session.onChange(snapshot=>changes.push(snapshot.damaged&&{...snapshot.damaged}));
+ assert.deepEqual(await shortcut2377(session),{rev:2,generationId:'gen-2377-a'},'positive control: this device holds the acknowledged copy exactly');
+ const outcome=await session.observeRead(damaged2377());
+ assert.deepEqual({...outcome},{saved:true},'the acknowledgement is saved');
+ assert.equal(saves.length,1,'once');
+ const {copy,...withoutCopy}=original.base;
+ assert.deepEqual(JSON.parse(JSON.stringify(saves[0])),{...original,base:withoutCopy},'without the damaged copy, the board and revision unchanged');
+ assert.deepEqual({...session.snapshot().damaged},{account:'e@example.com',identity:'owner',rev:2,generationId:'gen-2377-a'},'the session knows the damage');
+ assert.deepEqual(changes.at(-1),{account:'e@example.com',identity:'owner',rev:2,generationId:'gen-2377-a'},'and says so to its listeners');
+ // A board that still names the copy (a save from before the report) is not
+ // proof either: no read may skip to a copy a read found damaged.
+ held.ack=original;
+ assert.equal(await shortcut2377(session),null,'no read skips to the damaged copy');
+ assert.equal(await shortcut2377(session,{deliberate:true}),null);
+ await session.observeRead({user:'e@example.com',identity:'owner',outcome:'healthy',rev:3,generationId:'gen-2377-b'});
+ assert.equal(session.snapshot().damaged,null,'a healthy read clears the damage');
+ assert.equal(changes.at(-1),null,'and says so');
+ assert.deepEqual(await shortcut2377(session),{rev:2,generationId:'gen-2377-a'},'after it, the exact acknowledged copy is proof again');
+});
+
+test('RISK sync session: damage is known before its save finishes, a refused save keeps it known for this page, and a read started before the report stops offering the shortcut',async()=>{
+ let release;const {session,held}=syncSession2377({save:()=>new Promise(resolve=>{release=resolve;})}),original=held.ack;
+ const saving=session.observeRead(damaged2377());
+ assert.equal(await shortcut2377(session),null,'a read that starts while the save is running cannot skip');
+ release(false);
+ assert.deepEqual({...await saving},{saved:false},'a refused save is reported');
+ assert.equal(held.ack,original,'positive control: the saved acknowledgement still names the copy');
+ assert.equal(await shortcut2377(session),null,'this page still never skips to it');
+ const fresh=syncSession2377(),ticket=await fresh.session.startRead();
+ assert.equal(ticket.read.unchangedSince?.generationId,'gen-2377-a','positive control: the read was offered the shortcut');
+ await fresh.session.observeRead(damaged2377());
+ assert.equal(ticket.read.unchangedSince,null,'a damage report while the read prepares takes the shortcut away');
+ ticket.read.end();
+});
+
+test('RISK sync session: the unchanged shortcut needs this device’s exact acknowledged copy for the signed-in account and identity, and never for a deliberate or full read',async()=>{
+ assert.deepEqual(await shortcut2377(syncSession2377().session),{rev:2,generationId:'gen-2377-a'},'positive control');
+ const none=async(label,options={},read={})=>assert.equal(await shortcut2377(syncSession2377(options).session,read),null,label);
+ await none('a board whose bytes do not hash to the copy',{ack:acknowledgement2377({hash:sha2377('other bytes')})});
+ await none('an acknowledgement for another account',{user:'other@example.com'});
+ await none('an acknowledgement for another identity',{uid:'other-uid'});
+ await none('an acknowledgement that names no copy',{ack:(()=>{const ack=acknowledgement2377();delete ack.base.copy;return ack;})()});
+ await none('an acknowledgement before the first revision',{ack:acknowledgement2377({revision:0})});
+ await none('no acknowledgement',{ack:null});
+ await none('an acknowledgement whose saved board does not check out for its account and revision',{valid:()=>false});
+ await none('a deliberate read (Retry sync, signing in again)',{},{deliberate:true});
+ await none('a read that must download in full',{},{full:true});
+});
+
+// #2377 review N2: the full check of the acknowledged board parses all of it,
+// so a read asks for it once, and nothing else asks for it at all.
+test('RISK sync session: a read checks the acknowledged board once however often it asks for the shortcut, and replies, damage reports and reads that cannot skip never check it',async()=>{
+ const {session,held,checks}=syncSession2377();
+ const ticket=await session.startRead();
+ for(let asked=0;asked<3;asked++)assert.equal(ticket.read.unchangedSince?.generationId,'gen-2377-a','positive control: the shortcut is offered');
+ assert.equal(checks.length,1,'the read checks the board once');
+ held.ack=acknowledgement2377();
+ assert.equal(ticket.read.unchangedSince?.generationId,'gen-2377-a','an equal acknowledgement saved again (another tab’s board) still names the copy');
+ held.ack=acknowledgement2377({revision:3});
+ assert.equal(ticket.read.unchangedSince,null,'a changed acknowledgement does not');
+ ticket.read.end();
+ assert.equal(checks.length,1,'and neither is a check');
+ await acceptedRead2377(session);
+ await shortcut2377(session,{deliberate:true});
+ const accepted=await session.mayPush().write.accept(ack2377(4),{payload:'board at 4',install:async()=>true});
+ assert.equal(accepted.accepted,true,'positive control: the push’s acknowledgement is accepted');
+ const stale=await session.mayPush().write.accept(ack2377(2),{payload:'board at 2',install:async()=>true});
+ assert.equal(stale.reason,'stale','positive control: an older reply is refused by the saved revision alone');
+ await session.observeRead(damaged2377('gen-2377-other',3));
+ assert.equal(checks.length,1,'no reply, damage report, full or deliberate read checks the board');
+});
+
+test('RISK sync session: a read of the cloud copy reports through the backend’s cloudread event, and damage for one identity neither blocks nor clears another’s',async()=>{
+ const {session,events,saves,held,setIdentity}=syncSession2377();
+ events.dispatchEvent({type:'cloudread',detail:damaged2377('gen-2377-other',5,'other-uid','o@example.com')});
+ await flush();
+ assert.equal(saves.length,0,'another account’s damaged copy changes nothing here');
+ assert.deepEqual(await shortcut2377(session),{rev:2,generationId:'gen-2377-a'},'and does not block this identity');
+ events.dispatchEvent({type:'cloudread',detail:damaged2377()});
+ await flush();
+ assert.equal(saves.length,1,'this identity’s damaged copy is dropped from its acknowledgement');
+ assert.equal(held.ack.base.copy,undefined);
+ events.dispatchEvent({type:'cloudread',detail:{user:'o@example.com',identity:'other-uid',outcome:'healthy',rev:6,generationId:'gen-2377-c'}});
+ assert.equal(session.snapshot().damaged?.generationId,'gen-2377-a','another identity’s healthy read does not clear it');
+ setIdentity('other-uid');
+ assert.equal(session.snapshot().damaged,null,'the snapshot reports the signed-in identity’s damage only');
+});
+
+// #2377 slice 2: every Cloud acknowledgement is accepted in one place, the
+// session's write ticket. Its reply rules moved from the ordinary push
+// (sendPush) and the recovery publications unchanged; the one deliberate change
+// is #2350's: an acknowledgement whose board save is refused is not accepted.
+// A read ticket's accept records what a read found, as the sync pull does.
+async function acceptedRead2377(session,{payload='board at 2',revision=2}={}){
+ const ticket=await session.startRead({full:true});ticket.read.accept({payload,revision});ticket.read.end();
+ session.bindOwner();return session.snapshot();
+}
+const ack2377=(rev=3,extra={})=>({ok:true,rev,...extra});
+
+test('RISK sync session: a Cloud acknowledgement whose board save is refused is not accepted, so this device records no confirmed copy and stays unbound with its work pending',async()=>{
+ const {session}=syncSession2377(),bound=await acceptedRead2377(session);
+ assert.equal(bound.owner?.revision,2,'positive control: an accepted read binds the Confirmed device cloud owner');
+ for(const [label,install] of [['a save that reports failure',async()=>false],['a save that throws',async()=>{throw Error('quota');}],['a save refused at once',()=>false]]){
+  const ticket=session.mayPush();assert.equal(ticket.go,true,label+': a write may start');
+  const outcome=await ticket.write.accept(ack2377(3),{payload:'board at 3',install});
+  assert.equal(outcome.accepted,false,label+': not accepted');assert.equal(outcome.reason,'unsaved',label);
+  const after=session.snapshot();
+  assert.deepEqual({...after.known},{payload:'board at 2',account:'e@example.com',revision:2},label+': the cloud copy is not recorded as this device’s');
+  assert.equal(after.owner,bound.owner,label+': the owner is not rebound to the unsaved revision');
+  assert.equal(after.writing,false,label+': the write ticket is released');
+ }
+ const ticket=session.mayPush(),saved=await ticket.write.accept(ack2377(3),{payload:'board at 3',install:async()=>true});
+ assert.deepEqual({...saved},{accepted:true,revision:3},'positive control: the same reply with a saved board is accepted');
+ assert.deepEqual({...session.snapshot().known},{payload:'board at 3',account:'e@example.com',revision:3});
+ assert.equal(session.snapshot().owner?.revision,3,'and binds the owner at its revision');
+});
+
+test('RISK sync session: an obsolete reply leaves the work pending and asks for a fresh read in the same owner lifetime, but never binds a replacement connection',async()=>{
+ const {session,cloud}=syncSession2377(),bound=await acceptedRead2377(session);
+ let installed=0;
+ const ticket=session.mayPush();
+ // The same connection is still signed in, but a read rebound the owner since.
+ session.bindOwner();
+ const outcome=await ticket.write.accept(ack2377(3),{payload:'board at 3',install:async()=>{installed++;return true;}});
+ assert.deepEqual({accepted:outcome.accepted,reason:outcome.reason},{accepted:false,reason:'obsolete'});
+ assert.equal(installed,0,'nothing is saved for an obsolete reply');
+ assert.equal(session.snapshot().known.revision,2,'nothing is recorded');
+ // The ticket's own owner lifetime, still live: the reply needs a fresh read.
+ await acceptedRead2377(session);const live=session.mayPush();
+ const ended=live.write.end('obsolete');
+ assert.equal(ended.readRequired,true,'an obsolete push of the live owner requires a fresh current-owner read');
+ assert.equal(session.snapshot().authority,null,'its read can no longer authorise writes');
+ assert.equal(session.snapshot().owner,null,'and the owner is unbound');
+ // A replacement connection: the reply cannot mint a witness for it.
+ await acceptedRead2377(session);const old=session.mayPush();
+ const replacement={user:'e@example.com',ready:true};cloud.replace(replacement);
+ const late=await old.write.accept(ack2377(3),{payload:'board at 3',install:async()=>{installed++;return true;}});
+ assert.deepEqual({accepted:late.accepted,reason:late.reason},{accepted:false,reason:'obsolete'});
+ assert.equal(installed,0);assert.notEqual(session.snapshot().owner?.backend,replacement,'no owner is bound for the replacement connection');
+ assert.ok(bound);
+});
+
+test('RISK sync session: an ordinary push’s acknowledgement older than this device’s revision is ignored, a recovery publication’s is not, and cancelled, failed, conflicting and missing replies are not accepted',async()=>{
+ const {session,held}=syncSession2377({ack:acknowledgement2377({revision:5})});await acceptedRead2377(session,{revision:5});
+ const before=session.snapshot();
+ for(const [reply,reason] of [[ack2377(4),'stale'],[{cancelled:true},'cancelled'],[{error:true,code:'unavailable'},'failed'],[{conflict:true,rev:6},'conflict'],[null,'unavailable'],[{ok:true},'unavailable']]){
+  let installed=false;const ticket=session.mayPush();
+  const outcome=await ticket.write.accept(reply,{payload:'other board',install:async()=>{installed=true;return true;}});
+  assert.equal(outcome.reason,reason,JSON.stringify(reply));assert.equal(outcome.accepted,false);assert.equal(installed,false,'nothing is saved: '+reason);
+  assert.deepEqual({...session.snapshot().known},{...before.known},'nothing is recorded: '+reason);
+ }
+ assert.equal(held.ack.revision,5);
+ // A replacing write confirms the cloud with its own reads (specialist review N4).
+ const replacing=await session.mayPush({replacing:true}).write.accept(ack2377(4),{payload:'recovered board',install:async()=>true});
+ assert.deepEqual({...replacing},{accepted:true,revision:4},'a recovery publication below the saved revision is accepted');
+});
+
+test('RISK sync session: only one write ticket is open at a time, and a recovery publication’s acknowledgement takes read authority while a saved-decisions Apply records without binding',async()=>{
+ const {session}=syncSession2377(),first=session.mayPush({replacing:true});
+ assert.equal(first.go,true,'a recovery publication may write with no read authority');
+ assert.deepEqual({...session.mayPush()},{go:false,wait:'writing'},'a second write waits for the first');
+ assert.deepEqual({...session.mayPush({replacing:true})},{go:false,wait:'writing'},'so does a second replacing write');
+ const published=await first.write.accept(ack2377(3),{payload:'recovered board',install:async()=>true});
+ assert.equal(published.accepted,true);
+ const view=session.snapshot();
+ assert.equal(view.authority,'e@example.com','the publication takes read authority');
+ assert.deepEqual({...view.known},{payload:'recovered board',account:'e@example.com',revision:3});
+ assert.equal(view.owner?.revision,3,'and binds the owner');
+ const apply=session.mayPush({replacing:true}),applied=await apply.write.accept(ack2377(4),{payload:'decided board',install:async()=>true,bind:false});
+ assert.deepEqual({...applied},{accepted:true,revision:4},'the saved-decisions Apply is accepted');
+ assert.deepEqual({...session.snapshot().known},{...view.known},'without recording its copy');
+ assert.equal(session.snapshot().owner,view.owner,'or binding the owner');
+});
+
+test('RISK sync session: a read’s accept records what it found and a read that is held reverts to what this device knew before it',async()=>{
+ const {session}=syncSession2377(),before=await acceptedRead2377(session);
+ const ticket=await session.startRead({full:true});
+ ticket.read.accept({payload:'newer board',revision:3});
+ assert.deepEqual({...session.snapshot().known},{payload:'newer board',account:'e@example.com',revision:3},'the read is recorded');
+ ticket.read.revert();ticket.read.end();
+ assert.deepEqual({...session.snapshot().known},{...before.known},'a held adoption reverts it');
+ assert.equal(session.snapshot().authority,before.authority);
+ session.requireRead('page-hidden');
+ assert.equal(session.snapshot().authority,null,'hiding the page ends read authority');assert.equal(session.snapshot().owner,null,'and the owner');
+ assert.deepEqual({...session.snapshot().known},{...before.known},'but keeps what the cloud was last known to hold');
+});
+
+// A device CAS repair that finishes while the acknowledged board is saving may
+// keep the higher confirmed revision only with the owner bound to it (GLOSSARY:
+// Confirmed device cloud owner). So the copy and owner are recorded before the
+// save, as sendPush always did, and withdrawn only if that save is refused.
+test('RISK sync session: while the acknowledged board saves, its copy and owner are already recorded, and a refused save withdraws them without undoing a sign-out or hide meanwhile',async()=>{
+ const {session}=syncSession2377();const bound=await acceptedRead2377(session);
+ let during=null;
+ const saved=await session.mayPush().write.accept(ack2377(3),{payload:'board at 3',install:async()=>{during=session.snapshot();return true;}});
+ assert.equal(saved.accepted,true);
+ assert.equal(during?.known.revision,3,'the confirmed copy is recorded while its board saves');
+ assert.equal(during?.owner?.revision,3,'and the Confirmed device cloud owner is bound to its revision');
+ assert.equal(session.snapshot().owner,during.owner,'a saved board keeps that binding');
+ const refused=await session.mayPush().write.accept(ack2377(4),{payload:'board at 4',install:async()=>false});
+ assert.equal(refused.reason,'unsaved');
+ assert.equal(session.snapshot().owner,during.owner,'a refused save withdraws the binding it made');
+ assert.equal(session.snapshot().known.revision,3,'and the copy it recorded');
+ const hidden=await session.mayPush().write.accept(ack2377(4),{payload:'board at 4',install:async()=>{session.requireRead('page-hidden');return false;}});
+ assert.equal(hidden.reason,'unsaved');
+ assert.equal(session.snapshot().authority,null,'hiding the page during the save still ends read authority');
+ assert.equal(session.snapshot().owner,null,'and the owner');
+ assert.ok(bound.owner);
+});
+
+// #2377 review N3: a reply's revision must be a whole number to be accepted,
+// as every backend sends, and a refused save withdraws only a binding its
+// acceptance made. When that acceptance could bind no owner, a sign-out or
+// hide during the save stays in force.
+test('RISK sync session: a reply whose revision is not a whole number is not accepted and records nothing',async()=>{
+ const {session}=syncSession2377(),bound=await acceptedRead2377(session);
+ for(const rev of [2.5,NaN,Infinity]){
+  let installed=0;
+  const outcome=await session.mayPush().write.accept({ok:true,rev},{payload:'board at '+rev,install:async()=>{installed++;return true;}});
+  assert.deepEqual({accepted:outcome.accepted,reason:outcome.reason},{accepted:false,reason:'unavailable'},rev+': a reply without a whole revision says nothing');
+  assert.equal(installed,0,rev+': nothing is saved');
+  assert.deepEqual({...session.snapshot().known},{...bound.known},rev+': nothing is recorded');
+  assert.equal(session.snapshot().owner,bound.owner,rev+': and the binding stays');
+ }
+});
+
+test('RISK sync session: a refused save whose acceptance bound no owner never brings back the binding a sign-out during it ended',async()=>{
+ const {session,cloud}=syncSession2377(),bound=await acceptedRead2377(session);
+ assert.ok(bound.owner,'positive control: there is a binding a refused save could bring back');
+ // A recovery publication may accept while the backend is not ready; then
+ // its acceptance records the copy but cannot bind the owner.
+ cloud.replace({user:'e@example.com',ready:false});
+ const ticket=session.mayPush({replacing:true});assert.equal(ticket.go,true,'positive control: the publication may write');
+ let during=null;
+ const outcome=await ticket.write.accept(ack2377(3),{payload:'board at 3',install:async()=>{during=session.snapshot();session.requireRead('signed-out');return false;}});
+ assert.equal(during.owner,null,'positive control: the acceptance bound no owner');
+ assert.equal(outcome.reason,'unsaved');
+ assert.equal(session.snapshot().owner,null,'the refused save leaves the sign-out’s unbinding');
+ assert.equal(session.snapshot().authority,null,'and its end of read authority');
+ assert.deepEqual({...session.snapshot().known},{...bound.known},'and withdraws the copy it recorded');
+});
+
+// #2377 slice 2 (#2350): Help's "What does Synced confirm?" already says the
+// board is saved on this device and the cloud has confirmed it; the changelog
+// says an acknowledgement this device could not save no longer counts.
+test('RISK sync session guidance: Help keeps Synced to a board saved here and acknowledged, and the changelog says an acknowledgement this device could not save no longer counts',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();
+ const help=shim.document.getElementById('modalRoot').innerHTML;
+ const synced=help.split('<dt>What does Synced confirm?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ // #2391 rewrote this answer: "Synced means this board is saved on this
+ // device and the cloud has confirmed it."
+ assert.match(synced,/^Synced means this board is saved on this device and the cloud has confirmed it\./,'positive control: Help says what Synced needs: '+synced);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ const latest=current.split('<h3>November 15, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.match(latest,/the cloud takes the board but this device cannot save that it did/,'the changelog names the case: '+latest);
+ assert.match(latest,/no longer counts as synced until this device saves it and the cloud confirms it again/,'and what happens instead');
+});
+
+// #2377 review B1 (#2350): the app's half of an acknowledgement this device
+// cannot save. The cloud takes the push, then saving here that it did is
+// refused: by full device storage, or by the cloud save-loop guard when that
+// save is the run past its limit. These drive the loaded app on the plain
+// cloud stand-in and read the stand-in's copy, the board saved on this
+// device, its unsynced flag and the sync button.
+async function refusedAcknowledgementApp2377(){
+ const initial=syncState({tasks:[syncTask('base','Base task')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:3,delayMs:2});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>h.factory()});
+ const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ await ctx.__dataReady;await ctx.cloudPull();await syncSettle(50);
+ const saved=()=>JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));
+ const button=()=>shim.document.getElementById('syncBtn')?.textContent;
+ assert.equal(button(),'☁ synced','positive control: the board starts synced');
+ assert.equal(saved().syncRev,3,'positive control: at the cloud revision');
+ return {...app,h,saved,button};
+}
+// The cloud takes the next push, then device storage refuses every board
+// write, as on a full phone, until restore().
+function storageFullAfterPush2377({ctx,shim}){
+ let refusing=false;const set=shim.localStorage.setItem.bind(shim.localStorage),push=ctx.window.CloudSync.push;
+ shim.localStorage.setItem=(key,value)=>{if(refusing&&(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY))throw Object.assign(Error('quota'),{name:'QuotaExceededError'});return set(key,value);};
+ ctx.window.CloudSync.push=async(...args)=>{const reply=await push(...args);refusing=true;return reply;};
+ return {restore(){refusing=false;ctx.window.CloudSync.push=push;}};
+}
+function assertAcknowledgementUnsaved2377(app,title,label){
+ const {ctx,h}=app;
+ assert.equal(h.doc.rev,4,label+': positive control: the cloud took the push');
+ assert.ok(h.doc.payload.includes(title),label+': with the edit');
+ assert.equal(app.saved().syncRev,3,label+': positive control: this device could not save that it did');
+ assert.equal(ctx.state.syncDirty,true,label+': the board stays unsynced, its edit pending');
+ assert.notEqual(app.button(),'☁ synced',label+': the sync button does not say synced');
+}
+
+test('RISK cloud acknowledgement durability: when the cloud takes a push but this device cannot save that it did, the board stays unsynced until this device saves it and the cloud confirms it again',async t=>{
+ await t.test('device storage is full',async()=>{
+  const app=await refusedAcknowledgementApp2377(),{ctx,h}=app,storage=storageFullAfterPush2377(app);
+  ctx.addTask('Edit the cloud took');
+  await ctx.sendPush();await syncSettle(100);
+  assertAcknowledgementUnsaved2377(app,'Edit the cloud took','full storage');
+  assert.equal(app.button(),'☁ save error','positive control: the refusal was device storage’s');
+  storage.restore();
+  await ctx.cloudPull();await syncSettle(400);
+  assert.equal(ctx.state.syncDirty,false,'once storage returns, the next sync settles');
+  assert.equal(app.button(),'☁ synced');
+  assert.equal(app.saved().syncRev,h.doc.rev,'and the board saved on this device names the cloud revision');
+  assert.ok(app.saved().tasks.some(task=>task.title==='Edit the cloud took'),'with the edit');
+  ctx.suspendCloudSync();
+ });
+ await t.test('the cloud save-loop guard stops at the acknowledgement',async()=>{
+  const app=await refusedAcknowledgementApp2377(),{ctx,h}=app;
+  ctx.addTask('Edit before the stop');assert.equal(await ctx.persist(),true,'positive control: the edit is saved');
+  // Then six save runs with no save request and nothing new for the cloud,
+  // as a loop's bookkeeping makes: the guard's limit is five after the first,
+  // so the acknowledgement's save is the run it stops.
+  for(let run=0;run<6;run++){ctx.state.lastCloudServerAt=1792323000000+run;assert.equal(await ctx.persist(),true,'positive control: bookkeeping run '+run+' is saved');}
+  await ctx.sendPush();await syncSettle(100);
+  assertAcknowledgementUnsaved2377(app,'Edit before the stop','loop guard');
+  const stops=JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='save-loop-stop');
+  assert.deepEqual(stops.map(event=>event.metadata?.revision),[4],'positive control: the guard stopped once, at the acknowledgement of revision 4: '+JSON.stringify(stops));
+  // A later edit is a save request, which starts the guard's count again.
+  ctx.window.CLOUD_PUSH_DELAY_MS=5;
+  ctx.addTask('Edit after the stop');await syncSettle(900);
+  assert.equal(ctx.state.syncDirty,false,'the next edit’s save and push settle it');
+  assert.equal(app.button(),'☁ synced');
+  assert.equal(app.saved().syncRev,h.doc.rev,'and the board saved on this device names the cloud revision');
+  for(const title of ['Edit before the stop','Edit after the stop'])assert.ok(h.doc.payload.includes(title),'the cloud holds '+title);
+  ctx.suspendCloudSync();
+ });
+});
+
+test('RISK cloud acknowledgement durability: a cold open after an acknowledgement this device could not save reads the cloud first and keeps the edit',async()=>{
+ const app=await refusedAcknowledgementApp2377(),{ctx,shim,h}=app;storageFullAfterPush2377(app);
+ ctx.addTask('Edit before the cold open');
+ await ctx.sendPush();await syncSettle(100);
+ assertAcknowledgementUnsaved2377(app,'Edit before the cold open','before the cold open');
+ const saved=shim.localStorage.getItem(SYNC_STORE_KEY),head=shim.localStorage.getItem(LOCAL_HEAD_KEY);
+ assert.ok(saved.includes('Edit before the cold open'),'positive control: the edit was saved on this device before its push');
+ ctx.suspendCloudSync();
+ const calls=h.calls.length;
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:head},cloudSyncFactory:()=>h.factory()});
+ await reopened.ctx.__dataReady;await reopened.ctx.cloudPull();await syncSettle(400);
+ assert.equal(h.calls[calls],'pull','the reopened app reads the cloud first: '+h.calls.slice(calls).join(','));
+ assert.equal(reopened.ctx.state.syncRev,h.doc.rev,'and starts from the cloud revision');
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='Edit before the cold open'),'keeping the edit');
+ assert.equal(reopened.shim.document.getElementById('syncBtn')?.textContent,'☁ synced','and shows synced');
+ reopened.ctx.suspendCloudSync();
 });
 
 // ---------- #2359: a Postpone or unrecorded mode change in a pass Start began ----------

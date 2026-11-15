@@ -99,6 +99,22 @@ separate from device-local saving or reading a cloud copy. It does not establish
 that unavailable historical changes have been recovered.
 _Avoid_: Synced badge
 
+**Sync session**:
+The one owner, while the app is open, of what this device knows about its cloud
+copies. Each read of the cloud copy reports what it found to the session,
+whoever started the read (a sync, Retry sync, Review saved decisions, a file
+restore or a recovery's confirmation), and so does the cloud's own repair. So
+once any of them finds the copy this device's acknowledgement names damaged,
+no sync treats that copy as unchanged until a healthy read. Reads of earlier
+recovery sources and a push's own checks do not report. It also
+holds the page's read authority, the exact cloud copy last read or acknowledged
+and the Confirmed device cloud owner, and it is the one place a cloud reply is
+accepted as a Cloud acknowledgement: only while the reply still belongs to the
+connection its push started under, is not older than this device's revision,
+and this device has saved the acknowledged board. It starts empty each time the
+app opens.
+_Avoid_: Sync manager, cloud cache
+
 
 **History basis memo**:
 One exact serialized numeric-input/result pair reused between matching History observations. Inputs are rebuilt before every lookup; their combined retained strings stay within256Ki UTF-16 units. It retains no task, board or validation graph and grants no cloud authority.
@@ -111,6 +127,6 @@ changed calculators, Math or string methods, accessors, nonprimitive and
 oversized inputs use the ordinary calculation. It retains no saved object or
 source-validation result.
 
-- **Confirmed device cloud owner**: one process-local backend, account, identity and revision binding established by an accepted cloud read or acknowledgement. Device CAS repair may retain a higher confirmed revision only with current reconciliation authority, the same exact decision-base payload and unchanged owner. Sign-out or suspension invalidates the binding; a replacement backend needs a fresh accepted read. The binding retains no board graph or extra payload. Shared edits still require their own cloud confirmation.
+- **Confirmed device cloud owner**: one process-local backend, account, identity and revision binding established by an accepted cloud read or acknowledgement. An acknowledgement binds it while its board saves on this device, and a refused save withdraws that binding. Device CAS repair may retain a higher confirmed revision only with current reconciliation authority, the same exact decision-base payload and unchanged owner. Sign-out or suspension invalidates the binding; a replacement backend needs a fresh accepted read. The binding retains no board graph or extra payload. Shared edits still require their own cloud confirmation.
 
 - **Push response authority**: the captured backend, account, UID and current process-local owner binding for a conditional write. Storage preparation and the returned acknowledgement must still belong to that exact connection and reconciliation lifetime. An obsolete reply leaves work pending and requires a fresh current-owner read; it cannot mint a witness for the replacement connection.
