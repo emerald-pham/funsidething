@@ -23334,6 +23334,7 @@
       "tests/core.test.js:-assert.match(waiting,/If that run stops early or this device’s storage is too full to note it, it keeps waiting\\./);",
       "tests/core.test.js:-assert.ok(answer);assert.match(answer,/When safe, changed sources get one fresh check within that minute; nothing is chosen automatically/);",
       "tests/core.test.js:-assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');",
+      "tests/core.test.js:-candidate.ctx.openHelp();assert.match(candidate.shim.document.getElementById('modalRoot').innerHTML,/If an older Start and completion cannot be ordered safely, recovery waits/);",
       "tests/core.test.js:-const answer=(help.match(/<dt>Why did the app close when I tapped Apply selected source\\?<\\/dt><dd>([\\s\\S]*?)<\\/dd>/)||[])[1]||'';",
       "tests/core.test.js:-const close=answer('Why could cloud recovery of a large board close the app?');",
       "tests/core.test.js:-const measures=app.shim.document.getElementById('modalRoot').innerHTML.match(/<dt>What does the debug log measure\\?<\\/dt><dd>(.*?)<\\/dd>/)?.[1];",
@@ -23372,7 +23373,7 @@
     ],
     "redEvidence": {
       "command": "npm run agent:record-test-run -- --purpose preimplementation-red -- node --test --test-concurrency=1 --test-name-pattern=<the 54 updated and new Help guidance tests> tests/core.test.js tests/persistence-recovery.test.js (record 2026-11-15T09-36-05-547Z-71bab168-16ec-4b61-a510-17bf2f49d65c); and --purpose preimplementation-red -- node --test --test-name-pattern='^RISK test inventory: every added environment-gated root is declared with the variable its registration skips on$' tests/repository-process.test.js (record 2026-11-15T09-38-13-440Z-a6a52ca2-40bb-49c8-b268-6abaf3121289)",
-      "failure": "On base 0e3e0a9f Help: 54 of 54 updated and new guidance tests failed with AssertionError (for example the approved wording of \"When are old backups cleaned up?\" not matching, and \"What does the debug log measure?\" still present). After renaming the reminder title before its row: preflight_failed: Environment skip \"RISK manual backup reminder visual browser: the reminder beside Make manual backup ...\" is not registered."
+      "failure": "On base 0e3e0a9f Help: 54 of 54 updated and new guidance tests failed with AssertionError (for example the approved wording of \"When are old backups cleaned up?\" not matching, and \"What does the debug log measure?\" still present). After renaming the reminder title before its row: preflight_failed: Environment skip \"RISK manual backup reminder visual browser: the reminder beside Make manual backup ...\" is not registered. The legacy completion Start test pin found later by the core group: its new assertion fails on base Help (later-baseline-sensitivity record 2026-11-15T09-46-26-171Z-70ee4e36-30c1-4bed-859a-b0810bead367) and passes on the candidate."
     }
   }
 ]
