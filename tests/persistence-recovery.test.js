@@ -4918,10 +4918,10 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   assert.ok(restoreFaq,'the extended FAQ explains file restore');
   assert.ok(restoreFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Restore FAQ keeps its word limit');
   // #234: the same outcomes in plain words.
-  assert.match(restoreFaq,/Restore first backs up your current board, then shows a preview/);
-  assert.match(restoreFaq,/nothing changes until you confirm, and Cancel or closing stops it/);
+  // #234 review B1: file Restore previews first and says it can remove tasks.
+  assert.match(restoreFaq,/Restore first backs up your current board\./);
+  assert.match(restoreFaq,/A file or pasted board shows a preview first, including tasks it would remove; Cancel or closing stops it/);
   assert.match(restoreFaq,/A file restores only its current board.*offline or while sync is held, your board stays unchanged/);
-  assert.match(restoreFaq,/Long values wrap inside the preview\./,'the extended FAQ explains how long restore effects remain readable');
   assert.match(help.match(/<dt>Can I restore raw backup files\?<\/dt><dd>(.*?)<\/dd>/)?.[1]||'',/Your file and current board are kept on this device before the preview\./);
   assert.match(html,/Settings can restore a board JSON file with an explicit preview/,'the current changelog source explains guarded file restore');
   assert.match(html,/Long board-field values wrap within the preview\./,'the current changelog explains the corrected file-restore preview');
