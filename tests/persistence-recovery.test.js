@@ -13774,3 +13774,25 @@ for(const store of RETENTION_STORES_2379){
   assert.deepEqual(rows.map(row=>row.id).filter(id=>id!==edits[0].id).sort(),['adoption-p','daily-p','manual-p'],'the seeded copies all stay listed');
  });
 }
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): a copy kept before taking a cloud board is reused only from a copy kept at least seven days from today`,async t=>{
+  const s=await store.open(t);
+  const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),R=boardWithExtraTask2335(s.ctx,'only-in-r','Only in R');
+  // Positive control: today's adoption copy keeps the same seven days, so it stands in.
+  await s.seed([s.row('adoption-today','before-cloud-adoption',R)]);
+  const same=await s.copy('before-cloud-adoption',R);
+  assert.ok(same,'the copy of R is reported safe');
+  assert.deepEqual((await s.holding(R)).map(row=>row.id),['adoption-today'],'positive control: today’s adoption copy of R stands in');
+  if(typeof same==='object')assert.equal(same.id,'adoption-today','and it is the copy returned');
+  // An adoption copy from five days ago is kept through today+1, a new one through today+6.
+  await s.seed([s.row('adoption-earlier','before-cloud-adoption',P,{day:s.daysAgo(5)})]);
+  const made=await s.copy('before-cloud-adoption',P);
+  assert.ok(made,'the copy of P is reported safe');
+  const rows=await s.holding(P),fresh=rows.filter(row=>row.kind==='before-cloud-adoption'&&row.id!=='adoption-earlier');
+  assert.equal(fresh.length,1,'a new adoption row holds P: '+JSON.stringify(rows.map(row=>row.id+':'+row.day)));
+  assert.equal(fresh[0].day,s.today,'dated today');
+  if(typeof made==='object')assert.equal(made.id,fresh[0].id,'and it is the copy returned');
+  assert.ok(rows.some(row=>row.id==='adoption-earlier'),'the earlier adoption copy stays listed');
+ });
+}

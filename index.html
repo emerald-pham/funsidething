@@ -2097,6 +2097,17 @@ function legacyRetentionRows(rows){
     return shaped;
   });
 }
+// The device store's rows as backupRetention reads them: a row's bytes are
+// its text's hash, and it is readable once the device has measured it so.
+function deviceRetentionRows(rows){
+  return (Array.isArray(rows)?rows:[]).filter(row=>row&&typeof row.id==="string").map(row=>{
+    const shaped={id:row.id,kind:row.kind,day:row.day,at:row.at,bytes:row.payloadHash,readable:row.payloadFacts?.readable===true};
+    if(Object.hasOwn(row,"account"))shaped.account=row.account;
+    if(row.keptForCloudAdoption===true)shaped.keptForCloudAdoption=true;
+    if(row.losingEdit===true)shaped.losingEdit=true;
+    return shaped;
+  });
+}
 // A Restore may remain unsaved while a cloud timer, app update, or later edit
 // invokes persist without its original arguments. Keep its safety copy in
 // memory until some guarded primary write actually succeeds.
@@ -4068,18 +4079,6 @@ function duplicateBackupRows(rows,bytesOf,protectedIds,removing){
 function clearableAsContained(row){
   return row.kind==="stale-tab-draft"&&row.losingEdit!==true;
 }
-// #2335: an existing row with the same bytes stands in for a new automatic
-// copy {kind, day, mark} when its kind keeps it at least as long as the new
-// copy could be kept, the rule duplicateBackupRows clears repeats by. Returns
-// that test.
-function backupStandIn(copy){
-  const today=backupDayNumber(backupDay(Date.now()));
-  const wanted=backupKeptUntil({id:"",...copy},today,{longest:true}),clearable=clearableAsContained(copy);
-  return row=>{
-    const until=backupKeptUntil(row,today);
-    return until!==null&&wanted!==null&&until>=wanted&&(clearable||!clearableAsContained(row));
-  };
-}
 function persistedBackupRecord(row){
   if(!row||typeof row!=="object")return null;
   const record=Object.assign({},row);delete record.newRecovery;return record;
@@ -4179,18 +4178,16 @@ async function saveDurableBackup(kind,payload,metadata=null){
       .sort((a,b)=>b.at-a.at)[0]||true : null;
   const backend=window.CloudSync,account=backend?.user,cloudBackup=["before-cloud-local-edit","before-cloud-adoption"].includes(kind);
   try{
-    if(["before-account-switch","before-cloud-local-edit","before-cloud-adoption"].includes(kind)){
-      // Compared by hash first, then confirmed against the exact stored text.
-      // Copies that cannot be read back are not reused: a second copy is safe.
-      const existing=(await deviceBackupsHoldingPayload(payload).catch(()=>[])).find(row=>row.kind===kind);
-      if(existing)return existing;
-    }
-    // #2335: an automatic copy of a board the device already keeps at least as
-    // long adds nothing, so that copy is the safe one (duplicateBackupRows
-    // would clear the new row on the next save anyway).
-    if(REDUNDANT_BACKUP_KINDS.has(kind)&&kind!=="daily"){
-      const standsIn=backupStandIn({kind,day:backupDay(Date.now()),...(metadata?.losingEdit===true?{losingEdit:true}:{})});
-      const existing=(await deviceBackupsHoldingPayload(payload).catch(()=>[])).filter(row=>readableBackupRow(row)&&standsIn(row))[0];
+    // #2379: the rule the browser list uses (backupRetention): an existing
+    // copy of the same board stands in only when its own kind keeps it at
+    // least as long as this copy would be kept, whatever kind it is. Compared
+    // by hash first, then confirmed against the exact stored text. Copies that
+    // cannot be read back are not reused: a second copy is safe.
+    const reuse=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:backupDay(Date.now()),holds:retentionHolds(),
+      copy:{kind,bytes:await ChainStorageV2.hashPayload(payload),...(metadata?.losingEdit===true?{losingEdit:true}:{})}}).reuse;
+    if(reuse.length){
+      const held=await deviceBackupsWithText(reuse).catch(()=>[]);
+      const existing=reuse.map(id=>Array.from(held).find(row=>row?.id===id&&row.payload===payload&&readableBackupRow(row))).find(Boolean);
       if(existing)return existing;
     }
     // #2254: a manual backup names its board's account (manualBackupReminderHtml).
