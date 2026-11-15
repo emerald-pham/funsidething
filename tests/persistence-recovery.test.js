@@ -15131,6 +15131,21 @@ test('RISK started pass sync: every scanner control gives the same chain, mode a
    act(app);
    steps.push(view(app));
    assert.notEqual(JSON.stringify(steps[0]),board0,'positive control: the control changed the board');
+   // Before any later answer replays both boards: replaying the rows the
+   // control recorded gives the board its direct rule left (review N1′), with
+   // expired holds normalised on both sides, and the coherence check is clear.
+   // A Postpone of the candidate on the board with no history records nothing, so there is nothing to replay.
+   const {ctx}=app,now=vm.runInContext('Date.now()',ctx);
+   const live=JSON.parse(JSON.stringify(ctx.state)),replayed=JSON.parse(JSON.stringify(ctx.state));
+   if(withHistory||control!=='Postpone of the candidate'){
+   assert.equal(ctx.decisionReplayReady(replayed),true,'precondition: the board can replay its rows');
+   ctx.projectDecisionEvents(replayed,null,{refreshRanks:false});
+   ctx.normalizeExpiredTimedHoldsForComparison(live,now);ctx.normalizeExpiredTimedHoldsForComparison(replayed,now);
+   const facts=board=>JSON.parse(JSON.stringify({chain:board.chain,mode:board.mode,considered:board.considered||{},cantAt:board.cantAt||{},
+    workedAt:board.workedAt||{},scanMode:board.scanMode,chance:board.chance??null,passId:board.passId??null}));
+   assert.deepEqual(facts(live),facts(replayed),'the board equals the replay of its decisions right after the control');
+   assert.equal(ctx.decisionProjectionIssue(JSON.parse(JSON.stringify(ctx.state))),null,'and the coherence check finds nothing');
+   }
    // Postponing the candidate changes no chain, mode or mark, so it records nothing.
    if(control!=='Postpone of the candidate')
     assert.ok((app.ctx.state.decisionEvents?.length??0)>before,'the control records its decision');

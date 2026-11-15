@@ -43144,3 +43144,13 @@ test("RISK help scanning guidance: the Done answer says Done on the newest dot e
   assert.match(answer, /Done on the newest dot.*ends scanning/, "Done on the benchmark ends scanning");
   assert.ok(answer.replace(/<[^>]+>/g, " ").trim().split(/\s+/).length <= 130, "the answer stays within 130 words");
 });
+
+// #2376: the changelog line keeps Undo after 2 AM to what it does: it takes
+// off the dot the undone action placed unless a later decision kept it.
+test("RISK help scanning guidance: the #2376 changelog line says Undo after 2 AM keeps a dot a later decision kept", () => {
+  const current = html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+  assert.ok(current, "precondition: the current changelog renders");
+  const items = [...current.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(match => match[1]).filter(text => text.includes("A dot you postpone on this version"));
+  assert.equal(items.length, 1, "one changelog line");
+  assert.match(items[0], /Undo after the 2 AM reset of a Yes, Dot or Postpone made before it now takes off the dot it placed, unless a later decision in today’s pass kept it\./);
+});
