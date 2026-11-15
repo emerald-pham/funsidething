@@ -9897,7 +9897,7 @@ const taskActionOwnerBundle=(()=>{
     observation.at=actionAt;
     pushUndo();
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
-    const replayReady=decisionReplayReady(state);
+    const replayReady=(action==="done"||action==="dot")&&decisionReplayReady(state);
     if(draft){
       applyEditorDraft(task,draft);
       appendCurrentChoiceEvents(prepareCurrentChoiceEvents(
@@ -9947,6 +9947,13 @@ const taskActionOwnerBundle=(()=>{
    *   projectDecisionEvents builds them from the rows just recorded;
    * - direct: a board with no decision history yet, or a held one, gets the
    *   decision's direct rule, which gives what replaying its rows would.
+   * Only the decisions that add rating or completion evidence (Yes, No, Done,
+   * Dot, Dislodge) replay; they replayed before #2376 too. The others (Can't,
+   * Worked on it, Return, Postpone, the mode controls, Start, Rescan) record
+   * their rows and take the direct rule on every board: replaying the whole
+   * history at each press cost a phone several times what the press did
+   * before (#2376 review), and the contract tests hold the direct rule to the
+   * replay's result. Their rows are replayed by the next answer.
    * It never pushes Undo, commits or writes History: TaskActionOwner captures
    * the gesture (which pins the pass, #2375), pushes Undo, calls apply and
    * commits. It returns {path,rows,moved}, or null when the decision does not
@@ -10227,13 +10234,15 @@ const taskActionOwnerBundle=(()=>{
       return {path,rows,moved:[]};
     }
     const decisions={yes,no,cant,done,worked,dislodge,dot,return:returnTask,postpone,mode:setMode,start,rescan};
+    const replaying=new Set(["yes","no","done","dot","dislodge"]);
     return Object.freeze({
       // An action that records rows of its own before its decision (the
       // editor's saved fields) passes replayReady, read before them, so the
       // adapter is still chosen before the action.
       apply(gesture,decision){
         const run=decision&&typeof decision==="object"&&Object.hasOwn(decisions,decision.kind)?decisions[decision.kind]:null;
-        return run&&gesture?run(gesture,decision,typeof decision.replayReady==="boolean"?decision.replayReady:decisionReplayReady(state)):null;
+        if(!run||!gesture)return null;
+        return run(gesture,decision,replaying.has(decision.kind)&&(typeof decision.replayReady==="boolean"?decision.replayReady:decisionReplayReady(state)));
       },
     });
   })();

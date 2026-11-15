@@ -15594,3 +15594,47 @@ test('RISK backup retention (device store): when a read of an unmeasured expirin
  const kept=(await s.list()).map(row=>row.id).filter(id=>ids.includes(id));
  assert.equal(kept.length,2,'the copy read before the failure expires, and the other two stay: '+JSON.stringify(kept));
 });
+
+// #2376 review (replay cost): a control that adds no rating evidence does what
+// it did before #2376, whatever the length of the decision history. The work
+// is counted as the decision rows a replay or its readiness check validates
+// (supportedDecisionEvent), not timed: on a phone the replay of a long history
+// took several times the 40 ms these controls took before.
+async function historyBoard2376(at,answers){
+ const ids=Array.from({length:answers+8},(_,i)=>'h'+String(i).padStart(3,'0'));
+ const board=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+  chain:[ids[0]],candidateId:null,mode:'scan',scanMode:'descending',passId:'history-pass',passStartedAt:at-60000,
+  settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,postponeHours:1,showPostpone:true}});
+ const raw=JSON.stringify(board);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ for(let i=0;i<answers;i++){
+  setFakeTime(app.ctx,at+10+i);app.ctx.renderScan();
+  app.ctx.onAction(i%3===2?'no':'yes',{dataset:{candidate:app.ctx.state.candidateId,benchmark:app.ctx.state.chain.at(-1)}});
+ }
+ assert.ok(app.ctx.state.decisionEvents.length>=answers,'precondition: the board has '+answers+' recorded answers');
+ vm.runInContext('{const checked=supportedDecisionEvent;globalThis.rowsChecked2376=0;supportedDecisionEvent=function(...args){globalThis.rowsChecked2376++;return checked.apply(this,args);};}',app.ctx);
+ return app;
+}
+test('RISK started pass sync: a scanner control that adds no rating evidence does no more replay work on a long decision history than on a short one',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const controls={
+  'Postpone of the benchmark':app=>postponeBenchmark221(app,at+1000),
+  'Can’t on the benchmark':app=>{app.ctx.renderScan();app.ctx.onAction('bench-cant',{dataset:{benchmark:app.ctx.state.chain.at(-1)}});},
+  'Worked on it':app=>{app.ctx.renderScan();app.ctx.onAction('worked',{dataset:{benchmark:app.ctx.state.chain.at(-1)}});},
+  'Can’t on the candidate':app=>{app.ctx.renderScan();app.ctx.onAction('cant',{dataset:{candidate:app.ctx.state.candidateId,benchmark:app.ctx.state.chain.at(-1)}});},
+  'No — work the chain':app=>app.ctx.onAction('start-working',{dataset:{}}),
+  'Rescan skipped tasks':app=>app.ctx.onAction('rescan',{dataset:{}}),
+  'Return as candidate of a dot':app=>{app.ctx.renderScan();returnDotFromScan(app.ctx,app.shim,app.ctx.state.chain[0]);},
+ };
+ for(const [control,act] of Object.entries(controls))await t.test(control,async()=>{
+  const work={};
+  for(const answers of [6,30]){
+   const app=await historyBoard2376(at,answers);
+   const before=app.ctx.state.decisionEvents.length;
+   setFakeTime(app.ctx,at+1000);act(app);
+   assert.ok(app.ctx.state.decisionEvents.length>before,'positive control: the control recorded its decision');
+   work[answers]=vm.runInContext('globalThis.rowsChecked2376',app.ctx);
+  }
+  assert.equal(work[30],work[6],'rows checked with 30 recorded answers ('+work[30]+') and with 6 ('+work[6]+')');
+ });
+});
