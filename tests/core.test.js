@@ -43197,10 +43197,10 @@ test("RISK help scanning guidance: #2375's and #2376's November 15 changelog ite
   const bullets = {
     "Undo of Return as candidate": [/^Undo of Return as candidate now puts the dot back in its place on a board that has never pressed Start, and when the Return was made before the 2 AM reset, unless two devices each began the new day before syncing, while keeping what another device decided about that task since\./, /A copy of the app still open from before this update may pause sync, or may not apply this, until it is reloaded\./],
     "Postponing after a Return": [/^Postponing the other dots no longer dots a returned task again or stops sync\./, /older open copy may not apply this until it is reloaded/],
-    "Done on the newest dot": [/^Done on the newest dot now ends scanning and switches to work mode in every pass, including one Start began, and Run WOOP stays in work mode\./],
+    "Done on the newest dot": [/^Done on the newest dot now ends scanning and switches to work mode in every pass, including one Start began, and Run WOOP stays in work mode\./, /A copy of the app still open from before this update may not apply this until it is reloaded\./],
     "Postpone recorded": [/^A dot you postpone no longer comes back on the chain by itself once its postponement ends and you answer the next candidate, and the dot Postpone places on an emptied chain stays through your next answer, a reload and your other devices\. Undo of that Postpone takes the placed dot off again\./,
-      /A dot postponed before this update can still come back until the next 2 AM reset\./, /A copy of the app still open from before November 12 may pause sync after a Postpone of a dot until it is reloaded\./],
-    "Undo after 2 AM": [/^Undo after the 2 AM reset of a Yes, Dot or Postpone made before it now takes off the dot it placed, unless a later decision in today’s pass kept it\.$/],
+      /A dot postponed before this update can still come back until the next 2 AM reset\./, /A copy of the app still open from before this update may not apply this until it is reloaded, and one from before November 12 may also pause sync after a Postpone of a dot\./],
+    "Undo after 2 AM": [/^Undo after the 2 AM reset of a Yes, Dot or Postpone made before it now takes off the dot it placed, unless a later decision in today’s pass kept it\./, /A copy of the app still open from before this update may not apply this until it is reloaded\./],
   };
   for (const [feature, promises] of Object.entries(bullets)) {
     const matching = items.filter(item => promises[0].test(item));
