@@ -4048,6 +4048,85 @@ async function replaceIndependentServerPayload263(app,id,payload){
  for(const chunk of encoded.chunks)app.backend.docs.set(path+'/chunks/'+String(chunk.index).padStart(8,'0'),chunk);
 }
 
+// ---------- App driver (#2378) ----------
+// Cloud and recovery tests open the app here and wait for sync to settle
+// through the sync session's own signal (cloud-sync-session.js: nothing
+// running and nothing scheduled), instead of a fixed sleep or a poll of the
+// app's busy flags. settled() fails, rather than waiting longer, when sync is
+// still busy at its deadline, and names the work still pending.
+async function openApp(t,options={}){
+ const app=await loadApp(options);
+ t?.after?.(()=>app.dispose());
+ return driveApp(app);
+}
+// The same calls for an app opened some other way (loadAppAtTime and friends).
+function driveApp(app){
+ return {...app,settled:options=>syncSettled(app.ctx,options)};
+}
+const describeSyncWork2378=view=>JSON.stringify({work:[...view.work].map(item=>item.kind+':'+item.state),
+ waiting:[...view.waiting].map(item=>item.kind+':'+item.reason)});
+// Resolves once the session reports settled and nothing changed one macrotask
+// later (a step hands over to the next before it ends, so a settled view that
+// survives that turn is not a gap between two steps). synced also needs
+// nothing waiting: no unsent edit and no read this page still owes.
+async function syncSettled(ctx,{within=5000,synced=false}={}){
+ const session=vm.runInContext('typeof syncSession==="undefined"?null:syncSession',ctx);
+ assert.ok(session&&typeof session.track==='function','the app under test has a sync session that counts its work');
+ const deadline=Date.now()+within;
+ for(;;){
+  const view=session.snapshot();
+  if(view.settled&&(!synced||view.waiting.length===0)){
+   const {turn}=view;
+   await new Promise(resolve=>setImmediate(resolve));
+   const after=session.snapshot();
+   if(after.turn===turn)return {waiting:[...after.waiting].map(item=>({...item})),turn};
+   if(Date.now()>=deadline)assert.fail(`sync did not settle within ${within} ms: it kept changing: ${describeSyncWork2378(after)}`);
+   continue;
+  }
+  const left=deadline-Date.now();
+  if(left<=0)assert.fail(`sync did not settle within ${within} ms: ${describeSyncWork2378(view)}`);
+  await new Promise(resolve=>{
+   let off=()=>{};
+   const timer=setTimeout(()=>{off();resolve();},left);
+   off=session.onChange(()=>{off();clearTimeout(timer);resolve();});
+  });
+ }
+}
+
+// A test's own stand-in for another writer (a second client, a backend that
+// announces each write) works outside every app, so no app counts it. Its
+// later() and run() count that work here, so settledTogether() can wait for it.
+function outsideWork(){
+ let pending=0;const waiters=[];
+ const done=()=>{if(--pending===0)for(const wake of waiters.splice(0))wake();};
+ return {
+  later(fn,ms=0){pending++;setTimeout(()=>{Promise.resolve().then(fn).catch(()=>{}).finally(done);},ms);},
+  run(work){pending++;return Promise.resolve(work).finally(done);},
+  busy:()=>pending>0,
+  idle:()=>pending===0?Promise.resolve():new Promise(resolve=>waiters.push(resolve)),
+ };
+}
+// Several apps, and the outside work between them, settle together: every
+// app's sync has settled, no outside work is pending, and nothing changed one
+// macrotask later. A loop between them never settles and fails at within.
+async function settledTogether(apps,outside=[],{within=10000}={}){
+ const deadline=Date.now()+within,left=()=>Math.max(1,deadline-Date.now());
+ const sessions=apps.map(app=>vm.runInContext('syncSession',app.ctx));
+ for(;;){
+  for(const source of outside){
+   let timer;
+   const late=new Promise(resolve=>{timer=setTimeout(resolve,left(),'late');});
+   const outcome=await Promise.race([source.idle(),late]);clearTimeout(timer);
+   if(outcome==='late')assert.fail(`outside work did not finish within ${within} ms`);
+  }
+  for(const app of apps)await syncSettled(app.ctx,{within:left()});
+  const turns=sessions.map(session=>session.snapshot().turn);
+  await new Promise(resolve=>setImmediate(resolve));
+  if(outside.every(source=>!source.busy())&&sessions.every((session,i)=>{const view=session.snapshot();return view.settled&&view.turn===turns[i];}))return;
+  if(Date.now()>=deadline)assert.fail(`the apps did not settle together within ${within} ms: `+sessions.map(session=>describeSyncWork2378(session.snapshot())).join(' '));
+ }
+}
+
 export { createDeviceBudgetClock, expireDeviceBudget };
 export {
   appFixtureScope, test, injectRecoveryDatabaseFailure187, editRawDevice187, deviceFaultProvider187,
@@ -4113,5 +4192,6 @@ export {
   replaceIndependentServerPayload263,
 };
 export { releaseKnownCloudCopy2377 };
+export { openApp, driveApp, syncSettled, outsideWork, settledTogether };
 export { scanPanelDom221, markupButtons, chainPills, chainPillIds, chainPill, benchmarkEdit, keepEditorValues, returnButton,
   returnDotFromScan, returnFromPill, returnBenchmarkFromEdit };
