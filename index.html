@@ -14002,8 +14002,11 @@ async function applyDecisionRecovery(){
     sealUndoFrame();state=next;localApplied=true;applyTheme();render();clearDeviceSaveIssue();
     if(!await completeDecisionRecoveryHolds({...hold,payload:holdPayload},p.holds))
       throw decisionRecoveryProblem("Cloud and this device saved the choice, but its recovery hold could not finish. All copies stay protected; read sources again before retrying.");
-    const recorded=await decisionWrite.accept(result,{payload:selectedPayload,bind:false});
-    if(!recorded.accepted)throw decisionRecoveryProblem("Cloud saved the choice, but it could not finish applying on this device. Current work and the confirmed cloud source stay protected; read sources again before retrying.");
+    // The acknowledgement records and binds nothing here (D7): the read below
+    // does, for whoever is signed in by then. So a connection or account that
+    // changed during the final apply is that read's to settle, as before #2377;
+    // the choice is applied and its hold has finished (review N6).
+    await decisionWrite.accept(result,{payload:selectedPayload,bind:false});
     decisionRecoveryPreview=null;decisionRecoveryBusy=false;closeModal();cloudWriteFailure=null;clearCloudRetry();lastPushed="";
     await cloudPull();renderSync();return state.syncDirty===false;
   }catch(error){

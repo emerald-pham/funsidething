@@ -40184,6 +40184,27 @@ test('RISK held decision recovery: new reviewed consent supersedes prior prepare
  });
 });
 
+// #2377 review N6: the saved-decisions Apply's acknowledgement records and
+// binds nothing (D7); the read after Apply does, for whoever is signed in by
+// then. So signing out while the applied choice's recovery hold finishes ends
+// Apply as before #2377, not with "its recovery hold could not finish".
+test('RISK held decision recovery: signing out while the applied choice’s recovery hold finishes ends Apply as applied, without saying the hold could not finish',async t=>{
+ const app=await heldDecisionApp188(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;
+ await ctx.onAction('review-decision-recovery',{});ctx.onAction('choose-decision-recovery',{dataset:{value:'light'}});
+ const update=store.updateBackupKind.bind(store);let signedOut=false;
+ store.updateBackupKind=async(...args)=>{const result=await update(...args);if(!signedOut&&args[2]==='decision-recovery-confirmed'){signedOut=true;backend.emitAuth(null);await flush();}return result;};
+ const applied=await ctx.onAction('apply-decision-recovery',{});
+ assert.equal(signedOut,true,'positive control: the sign-out came while the recovery hold finished');
+ const copies=await store.listBackups();
+ assert.ok(copies.some(row=>row.kind==='decision-recovery-confirmed'),'positive control: the recovery hold finished');
+ assert.equal(copies.some(row=>row.kind==='decision-recovery-choice'),false,'and no prepared choice is left waiting');
+ const modal=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(modal,/recovery hold could not finish|could not finish applying/,'nothing says Apply did not finish: '+modal.replace(/<[^>]+>/g,' ').slice(0,300));
+ assert.equal(ctx.state.settings.theme,'light','the choice is applied');
+ assert.equal(JSON.stringify(ctx.state),(await store.readHead()).payload,'and saved on this device');
+ assert.equal(applied,true,'Apply reports the choice applied');
+});
+
 
 test('RISK BACKUP FILE RESTORE: fixture readiness leaves no ordinary save crossing delayed file reading',async t=>{
  const {File}=await import('node:buffer'),{IDBFactory}=await import('fake-indexeddb'),timers=[];
