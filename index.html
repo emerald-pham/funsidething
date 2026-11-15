@@ -6297,8 +6297,15 @@ function syncView(){return syncSession?syncSession.snapshot():NO_SYNC_VIEW;}
 // await the same promise and see the same stack. A timer is counted from
 // countSyncTimer() until its callback starts (endSyncTimer) or it is cleared;
 // whatever the callback starts counts itself before the callback returns.
+// Not counted (#2378, for the tests still to move to settled()): the
+// zero-delay resume of a pull an open editor deferred (focusout, closeModal,
+// the restore follow-up), the acknowledged recovery trim timers, and a late
+// device answer that restarts a pull stopped at the server-only repair.
 const NO_SYNC_WORK=Object.freeze({run:step=>step,end(){}});
-function trackSyncWork(kind){return syncSession?syncSession.track(kind):NO_SYNC_WORK;}
+// A page the service worker does not control can pair this page with an older
+// cached cloud-sync-session.js that has no track() (#2378 review N1); then
+// nothing is counted and saves and sync run exactly as before.
+function trackSyncWork(kind){return typeof syncSession?.track==="function"?syncSession.track(kind):NO_SYNC_WORK;}
 const syncWorkTimers=new Map();
 function countSyncTimer(kind,timer){
   endSyncTimer(timer);syncWorkTimers.set(timer,trackSyncWork(kind));
@@ -6387,7 +6394,11 @@ function queueCloudPull(){
   if(!cloudPullQueuedWork)cloudPullQueuedWork=trackSyncWork("pull");
 }
 function dropQueuedCloudPull(){
-  cloudPullPending=false;
+  cloudPullPending=false;endQueuedCloudPullCount();
+}
+// The queued pull stops counting once a pull runs (itself counted) or startup
+// has passed the point where it replays it; cloudPullPending keeps its meaning.
+function endQueuedCloudPullCount(){
   const work=cloudPullQueuedWork;cloudPullQueuedWork=null;work?.end();
 }
 let cloudRetryTimer = null, cloudRetryAttempt = 0, cloudRetryAccount = null, cloudRetryOwner = null;
@@ -7561,13 +7572,14 @@ let deferredBrowserCopy=false;
 let browserCopyRecoverySerial=0;
 function resumeCloudAfterBrowserRecovery(previousSerial,account){
   if(browserCopyRecoverySerial===previousSerial || !account) return;
-  setTimeout(()=>{
+  const timer=countSyncTimer("recovery-retry",setTimeout(()=>{
+    endSyncTimer(timer);
     if(!cloudReady() || window.CloudSync.user!==account || hasActiveEditor()){
       if(cloudReady() && window.CloudSync.user===account) deferredCloudPull=true;
       return;
     }
     cloudPull();
-  },0);
+  },0));
 }
 function resumeDeferredBrowserCopy(){
   if(!deferredBrowserCopy || !state || hasActiveEditor()) return;
@@ -8282,6 +8294,7 @@ async function cloudPull(){
   // Even source-only repair waits for boot to classify its saved sources.
   // A bounded unavailable startup still replays this queued request afterward.
   if(!state||automaticCloudFallbackBootCapturePending){queueCloudPull();return;}
+  endQueuedCloudPullCount();
   // This read classifies only device availability. Server-only repair cannot
   // consume, clear or acknowledge pending local work that it cannot observe.
   if(cloudReady()&&!cloudSuspended&&!document.hidden&&
@@ -19911,7 +19924,7 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
       // sources or turn their read-only display into an empty working board.
       openingRecoveryHeld=true;storageOK=false;
       window.SavedAppearance.holdRecovery(renderOpeningRecoveryShell);
-      setDeviceSaveIssue("storage","unavailable");return;
+      setDeviceSaveIssue("storage","unavailable");endQueuedCloudPullCount();return;
     }
     unacceptedDeviceSource.workingWorkspace=true;
     // The original remains unaccepted. A separate live workspace permits new
@@ -19976,6 +19989,7 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
   // store. cloudPull() records that early request; replay it now that state
   // exists so a signed-in device paints its synced tasks without a reload.
   if(cloudPullPending) cloudPull();
+  endQueuedCloudPullCount();
   if(isFirstBoot) openHelp();
   if(rejectedSavedState) toast("Saved data couldn’t be loaded. The original copy was left untouched.", 8000);
   checkAppUpdateNotice(!!loaded);

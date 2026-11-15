@@ -13025,6 +13025,76 @@ test('RISK sync session settled: a sign-in pull queued while startup classifies 
  assert.ok(second.ctx.state.tasks.some(task=>task.title==='Saved by the first device 2378'),'the second device has the cloud board once sync settles');
  assert.equal(settled.settled,true,'and shows synced');
 });
+// #2378 review B1: startup replays that queued pull once, and the replay can
+// stop early (here the person signed out meanwhile). The pull is then no longer
+// owed, so it must stop counting, or sync never settles.
+test('RISK sync session settled: a sign-in pull queued during startup stops counting when startup’s replay of it stops early',async t=>{
+ const docs=new Map(),first=await device2347(t,{docs,signedIn:true});
+ first.ctx.addTask('Saved by the first device 2378');
+ assert.equal((await signInSettled2347(first)).settled,true,'positive control: the first device’s board reaches the cloud');
+ await first.close();
+ const second=await device2347(t,{docs});
+ second.signIn();
+ assert.equal(vm.runInContext('cloudPullPending',second.ctx),true,'positive control: startup has not classified the board yet, so the pull is queued');
+ second.signOut();
+ await syncSettled(second.ctx,{within:3000});
+ assert.equal(second.ctx.window.CloudSync.user,null,'positive control: the page is signed out');
+ assert.ok(!second.ctx.state.tasks.some(task=>task.title==='Saved by the first device 2378'),'positive control: no read adopted the cloud board');
+});
+// #2378 review B2: a read that first finds another tab's newer browser copy
+// loads it and hands over to a new read on a zero-delay timer. That timer is
+// sync work: sync settles only after the new read.
+test('RISK sync session settled: a read that loads another tab’s newer browser copy first hands over to a new read, and sync settles only after it',async t=>{
+ const initial=syncState({tasks:[syncTask('base','Base task')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:3,delayMs:2});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+ const app=await openApp(t,{sharedStorage:storage,cloudSyncFactory:()=>h.factory()});
+ await app.ctx.cloudPull();await app.settled();
+ const pulls=()=>h.calls.filter(call=>call==='pull').length,before=pulls();
+ const newer=JSON.stringify(syncState({tasks:[syncTask('base','Base task'),syncTask('other-tab','Added in another tab')],syncRev:3,syncAccount:'e@example.com',syncDirty:false}));
+ storage.setItem(LOCAL_HEAD_KEY,newer);storage.setItem(SYNC_STORE_KEY,newer);
+ app.ctx.cloudPull();
+ await app.settled();
+ assert.ok(app.ctx.state.tasks.some(task=>task.id==='other-tab'),'positive control: this tab loaded the other tab’s copy');
+ assert.equal(pulls(),before+1,'sync settles only after the read that follows loading that copy');
+});
+// #2378 review N2: settled() keeps to its deadline even when sync keeps
+// changing between its checks while looking settled at each one.
+test('RISK sync session settled: the driver’s wait fails at its deadline even while sync keeps changing between checks',async t=>{
+ const app=await openApp(t,{}),session=vm.runInContext('syncSession',app.ctx);
+ let churning=true;
+ const churn=()=>{if(!churning)return;session.track('push-debounce').end();setImmediate(churn);};churn();
+ t.after(()=>{churning=false;});
+ let timer;
+ const outcome=await Promise.race([
+  syncSettled(app.ctx,{within:200}).then(()=>'settled',error=>String(error?.message)),
+  new Promise(resolve=>{timer=setTimeout(resolve,3000,'still waiting');}),
+ ]);
+ clearTimeout(timer);churning=false;
+ assert.notEqual(outcome,'still waiting','the wait ends near its deadline');
+ assert.match(outcome,/did not settle within 200 ms/,'and fails, naming the deadline: '+outcome);
+});
+// #2378 review N1 (specialist B1): a page the service worker does not control
+// can get this index.html with an older cached cloud-sync-session.js, which has
+// no track(). Counting is then skipped; saves and sync work as before.
+const SESSION_WITHOUT_TRACK2378='e64287874b2c55ff894460937be4440d30600920';
+test('RISK sync session settled: with an older session script that cannot count work, edits still save on the device and sync to the cloud',async t=>{
+ const older=spawnSync('git',['show',SESSION_WITHOUT_TRACK2378+':cloud-sync-session.js'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});
+ assert.equal(older.status,0,older.stderr);
+ assert.doesNotMatch(older.stdout,/\btrack\b/,'positive control: that session script has no track()');
+ const initial=syncState({tasks:[syncTask('base','Base task')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:3,delayMs:2});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,artifacts:{session:older.stdout},cloudSyncFactory:()=>h.factory()});
+ ctx.window.CLOUD_PUSH_DELAY_MS=0;
+ await assert.doesNotReject(()=>ctx.cloudPull(),'a cloud read does not fail');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the read finishes synced');
+ assert.doesNotThrow(()=>ctx.addTask('Edited with the older session script'),'adding a task does not fail');
+ assert.equal(await ctx.persist(),true,'the edit saves on this device');
+ assert.match(storage.getItem(LOCAL_HEAD_KEY),/Edited with the older session script/,'and is in the saved board');
+ await assert.doesNotReject(()=>ctx.sendPush(),'a cloud write does not fail');
+ assert.ok(h.remoteTitles().includes('Edited with the older session script'),'and reaches the cloud');
+});
 // The reporter's shape: a phone, signed out, deletes one task and then another,
 // while a laptop signed in to the same account deletes only the second. The
 // phone's deletion evidence then lists its keys in another order than the

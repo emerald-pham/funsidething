@@ -4080,6 +4080,7 @@ async function syncSettled(ctx,{within=5000,synced=false}={}){
    await new Promise(resolve=>setImmediate(resolve));
    const after=session.snapshot();
    if(after.turn===turn)return {waiting:[...after.waiting].map(item=>({...item})),turn};
+   if(Date.now()>=deadline)assert.fail(`sync did not settle within ${within} ms: it kept changing: ${describeSyncWork2378(after)}`);
    continue;
   }
   const left=deadline-Date.now();
