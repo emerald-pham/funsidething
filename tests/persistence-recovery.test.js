@@ -13767,7 +13767,7 @@ test('RISK sync session: an obsolete reply leaves the work pending and asks for 
  assert.ok(bound);
 });
 
-test('RISK sync session: an acknowledgement older than this device’s revision is ignored, and cancelled, failed, conflicting and missing replies are not accepted',async()=>{
+test('RISK sync session: an ordinary push’s acknowledgement older than this device’s revision is ignored, a recovery publication’s is not, and cancelled, failed, conflicting and missing replies are not accepted',async()=>{
  const {session,held}=syncSession2377({ack:acknowledgement2377({revision:5})});await acceptedRead2377(session,{revision:5});
  const before=session.snapshot();
  for(const [reply,reason] of [[ack2377(4),'stale'],[{cancelled:true},'cancelled'],[{error:true,code:'unavailable'},'failed'],[{conflict:true,rev:6},'conflict'],[null,'unavailable'],[{ok:true},'unavailable']]){

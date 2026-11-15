@@ -194,16 +194,18 @@
       const release=()=>{if(!open)return;open=false;if(writer===write)writer=null;changed();};
       const write={...ticket,current,
         // The one acceptance of a Cloud acknowledgement. The reply must still
-        // belong to this ticket's connection, be an acknowledgement, and not
-        // be older than this device's revision. Then the copy is recorded and
-        // the owner bound, and install() saves the acknowledged board (a plain
-        // save for an ordinary push; a recovery flow's state install after its
-        // own head commit). They come first because a device CAS repair that
-        // finishes during that save keeps the confirmed revision only with the
-        // owner bound to it. A save that fails or throws is not accepted
-        // (#2350): the copy and binding it made are withdrawn, unless a
-        // sign-out, hide or newer read replaced them meanwhile. bind:false is
-        // the saved-decisions Apply, which records nothing and binds nothing (D7).
+        // belong to this ticket's connection and be an acknowledgement, and an
+        // ordinary push's must not be older than this device's revision (a
+        // replacing write checks the cloud with its own reads). Then the copy
+        // is recorded and the owner bound, and install() saves the
+        // acknowledged board (a plain save for an ordinary push; a recovery
+        // flow's state install after its own head commit). They come first
+        // because a device CAS repair that finishes during that save keeps the
+        // confirmed revision only with the owner bound to it. A save that fails
+        // or throws is not accepted (#2350): the copy and binding it made are
+        // withdrawn, unless a sign-out, hide or newer read replaced them
+        // meanwhile. bind:false is the saved-decisions Apply, which records
+        // nothing and binds nothing (D7).
         async accept(reply,{payload=null,install=()=>true,bind=true}={}){
           if(!open)return {accepted:false,reason:"ended"};
           const settle=result=>{release();return result;};
