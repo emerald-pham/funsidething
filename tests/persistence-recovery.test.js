@@ -13887,3 +13887,31 @@ for(const store of RETENTION_STORES_2379){
   assert.deepEqual((await s.holding(S)).map(row=>row.kind).sort(),['other-browser-copy','stale-tab-draft'],'the draft of S gets its own row beside the pinned copy');
  });
 }
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): exact repeats are reduced to the copy its own kind keeps longest, and copies no save clears stay`,async t=>{
+  const s=await store.open(t);
+  const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),Q=boardWithExtraTask2335(s.ctx,'only-in-q','Only in Q'),R=boardWithExtraTask2335(s.ctx,'only-in-r','Only in R'),
+   S=boardWithExtraTask2335(s.ctx,'only-in-s','Only in S');
+  await s.seed([
+   // Kept until deleted: the other-browser copy keeps P, so both drafts go.
+   s.row('draft-p-1','stale-tab-draft',P),s.row('draft-p-2','stale-tab-draft',P),s.row('other-p','other-browser-copy',P),
+   // Today's adoption copies keep seven days: the older one stays, and so does
+   // the manual copy no save clears. A cloud-merged copy from three days ago
+   // is kept to today+3, less than the adoption copy, so it goes too.
+   s.row('adoption-q-1','before-cloud-adoption',Q),s.row('adoption-q-2','before-cloud-adoption',Q),
+   s.row('merged-q','cloud-merged',Q,{day:s.daysAgo(3)}),s.row('manual-q','manual',Q,{account:null}),
+   // A before-restore copy is never cleared, and keeps a cloud-merged repeat's seven days.
+   s.row('restore-r','before-restore',R),s.row('merged-r','cloud-merged',R),
+   // Today's daily could be kept seven days if a recovery hold began, longer
+   // than a four-day-old adoption copy's today+2, so neither keeps the other.
+   s.row('adoption-s-old','before-cloud-adoption',S,{day:s.daysAgo(4)}),s.row('daily-s','daily',S,{account:null}),
+  ]);
+  await s.save();
+  const listed=await s.list(),ids=board=>listed.filter(row=>row.payload===board).map(row=>row.id).sort();
+  assert.deepEqual(ids(P),['other-p'],'P stays once, in the copy kept until deleted');
+  assert.deepEqual(ids(Q),['adoption-q-1','manual-q'],'Q stays in the older adoption copy and the manual copy');
+  assert.deepEqual(ids(R),['restore-r'],'R stays in the before-restore copy');
+  assert.deepEqual(ids(S),['adoption-s-old','daily-s'],'S stays in both copies: neither is kept as long as the other could be');
+ });
+}
