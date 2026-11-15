@@ -29,7 +29,8 @@ import { createDeviceBudgetClock, expireDeviceBudget } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
 import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDGET_MS, coldRelaunch2198, refuseNextRecoveryTransaction255,
   exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
-import { chainPills, chainPillIds, returnDotFromScan, benchmarkEdit } from "./shared.js";
+import { chainPills, chainPillIds, returnDotFromScan } from "./shared.js";
+import { benchmarkEdit } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
