@@ -13576,10 +13576,19 @@ test('RISK known-damaged cloud copy: damage found while this device’s board is
 test('RISK known-damaged cloud copy guidance: Help and the changelog say this device rebuilds its damaged save once Retry sync or any other check finds the damage',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML;
+ const words=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
+ // #2377 review N9 and the typography note: "its" read as Retry sync's save.
+ // The same sentence opens both damaged-save answers (#2358's L2).
+ const opening=/^Once Retry sync or another check finds this device’s confirmed save damaged, it is rebuilt exactly\./;
  const damaged=help.split('<dt>What if a cloud save is damaged?</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(damaged,/^Once Retry sync or another check finds its confirmed save damaged, this device rebuilds it exactly\./,'the answer opens with when this device rebuilds: '+damaged);
+ const working=help.split('<dt>Can I keep working with a damaged cloud save?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.deepEqual({damaged:opening.test(damaged),working:opening.test(working)},{damaged:true,working:true},
+  'both damaged-save answers open with when this device’s save is rebuilt: '+JSON.stringify({damaged:damaged.slice(0,120),working:working.slice(0,120)}));
  assert.doesNotMatch(damaged,/automatically rebuilds/,'it no longer says a damaged save rebuilds by itself');
- assert.ok(damaged.split(/\s+/).filter(Boolean).length<=130,'the answer keeps the FAQ word limit');
+ assert.ok(words(damaged)<=130,'the answer keeps the FAQ word limit: '+words(damaged));
+ assert.match(working,/rebuilt exactly\. Without an exact copy, ordinary tasks remain saved locally and pending; they do not download that same source for every edit\./,'and says what happens without an exact copy');
+ assert.doesNotMatch(working,/can rebuild a damaged cloud save from an exact verified copy/,'it no longer says any damaged save can be rebuilt');
+ assert.ok(words(working)<=130,'that answer keeps the FAQ word limit: '+words(working));
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  const latest=current.split('<h3>November 15, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(latest,/Review saved decisions, a restore from a file or the cloud’s own repair/,'the changelog names the checks that now count: '+latest);
