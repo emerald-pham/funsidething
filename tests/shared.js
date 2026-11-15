@@ -362,7 +362,7 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',receiver.ctx))await wait();},
   'the independent receiver completes its own durable-source startup capture before cloud reconciliation');
  await receiver.ctx.cloudPull();await settleRecoveryOperations188(receiver.ctx);
- assert.equal(vm.runInContext('reconciledAs',receiver.ctx),receiving.CS.user,'the independent receiver finishes account-bound cloud reconciliation');
+ assert.equal(vm.runInContext('syncView().authority',receiver.ctx),receiving.CS.user,'the independent receiver finishes account-bound cloud reconciliation');
  assert.ok(receiver.ctx.state.tasks.some(row=>row.id===targetTask.id),'an independent client receives the later recovered decision');
  assert.ok(receiver.ctx.state.tasks.some(row=>row.title==='Accepted while offline'),'the receiver also accepts the offline edit');
  assert.equal(receiver.ctx.cloudPayload(),acknowledged.payload,'the independent receiver accepts the exact complete acknowledged board');
@@ -1297,6 +1297,9 @@ async function loadApp({ appSource=appSrc, artifacts=null, seed, cloudSyncFactor
     shim.window.ChainStorageV2=sandbox.ChainStorageV2;
     shim.window.ChainCloudV2=sandbox.ChainCloudV2;
   }
+  // #2377: the sync session loads before the app, as its script tag does. An
+  // older released app never asks for it, so the current module is harmless there.
+  vm.runInContext(artifacts?.session||fs.readFileSync(path.join(__dirname,"cloud-sync-session.js"),"utf8"),sandbox,{filename:"cloud-sync-session.js"});
   if (seed !== undefined) vm.runInContext(SEED_SNIPPET(seed), sandbox);
   const installSceneModules = () => {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "location.js"), "utf8"), sandbox, { filename: "location.js" });
@@ -3236,6 +3239,13 @@ function exactPaddedBoard(board,field,byteLength){
  assert.ok(unpadded<byteLength,'the synthetic board must fit the captured size');board[field].opaque='p'.repeat(byteLength-unpadded);
  const payload=JSON.stringify(board);assert.equal(Buffer.byteLength(payload,'utf8'),byteLength);return payload;
 }
+// #2377 review N1: a finished realm's sync session still holds the known
+// cloud copy, a board of several megabytes in these fixtures, and the app no
+// longer has a variable of its own for it. Release it through the session, as
+// a full read that found nothing records it.
+async function releaseKnownCloudCopy2377(ctx){
+ try{await vm.runInContext('syncSession?.startRead({full:true}).then(ticket=>{ticket.read.accept();ticket.read.end();})',ctx);}catch{}
+}
 async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_RECOVERY_BUDGET_MS,priorVariant=null,defect=true}={}){
  const {active,prior}=CAPTURED_UNREADABLE_GENERATION;
  // The unproxied factory lets the multi-megabyte database be deleted below.
@@ -3249,8 +3259,9 @@ async function capturedGenerationAcceptedApp2198(t,{recoveryTimeoutMs=CAPTURED_R
  t.after(async()=>{try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}
   backend.CS.suspend();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}
   await app.dispose();backend.docs.clear();try{shim.localStorage.clear();}catch{}
-  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+  for(const name of ['state','undoStack','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
    'unrepairableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',ctx);}catch{}
+  await releaseKnownCloudCopy2377(ctx);
   try{vm.runInContext('decisionBaseIdentityCache.length=0',ctx);}catch{}
   await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});});
  const activePath='users/owner/generations/'+originalRoot.activeGeneration,priorPath='users/owner/generations/'+originalRoot.previousGeneration;
@@ -3339,8 +3350,9 @@ async function coldRelaunch2198(t,app,reads,{signIn=true}={}){
  // megabyte transaction log until it is deleted after this connection closes.
  t.after(async()=>{backend.CS.suspend();try{vm.runInContext('cancelCloudSourceRecoveryRead({record:false});clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',reopened.ctx);}catch{}
   try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}await reopened.dispose();backend.docs.clear();try{reopened.shim.localStorage.clear();}catch{}
-  for(const name of ['state','undoStack','lastKnownCloudPayload','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
+  for(const name of ['state','undoStack','cloudSourceRecoveryCloudInspection','cloudSourceRecoveryPreview',
    'unrepairableCloudSource','provedUnreadableCloudSource','lastPersistedRaw','fileRestorePreview','pasteDraftBuffer','deviceBackupCache','deviceLegacySeenSignature'])try{vm.runInContext(name+'=null',reopened.ctx);}catch{}
+  await releaseKnownCloudCopy2377(reopened.ctx);
   try{vm.runInContext('decisionBaseIdentityCache.length=0',reopened.ctx);}catch{}
   await new Promise(resolve=>{try{const request=app.indexedDB.deleteDatabase(app.deviceDbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();}catch{resolve();}});
   // This retained hook must not keep the relaunched realm or its backend alive.
@@ -3623,7 +3635,7 @@ async function delayedEvergreenReadFixture({incumbentRead=false}={}){
 }
 
 function liveDoneDeliverySnapshot(app,id){
- return JSON.parse(vm.runInContext('JSON.stringify({rev:state.syncRev,dirty:state.syncDirty,reconciledAs,pulling,cloudPushInFlight,pendingPush,pendingCloudRevision,lastKnownCloudRevision,currentDoneAt:state.tasks.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,knownDoneAt:JSON.parse(lastKnownCloudPayload||"null")?.tasks?.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
+ return JSON.parse(vm.runInContext('JSON.stringify({rev:state.syncRev,dirty:state.syncDirty,reconciledAs:syncView().authority,pulling,cloudPushInFlight,pendingPush,pendingCloudRevision,lastKnownCloudRevision:syncView().known.revision,currentDoneAt:state.tasks.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,knownDoneAt:JSON.parse(syncView().known.payload||"null")?.tasks?.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
 }
 async function ordinaryEditDebounceControl(){
  const initial=syncState({tasks:[syncTask('ordinary-control','Ordinary edit control')],syncRev:5,syncAccount:'e@example.com',syncDirty:false}),h=makeSyncHarness({remote:initial,rev:5,delayMs:1}),entered=deferredSyncFixture();
@@ -3634,13 +3646,13 @@ async function ordinaryEditDebounceControl(){
  try{
   await startupEntered.promise;const initialConsumers=reads.filter(call=>!call.settled),caller=app.ctx.cloudPull();await caller;
   assert.ok(initialConsumers.length>0,'the ordinary control captures the real queued startup read');
-  assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),null,'a second early-returning caller is not initial read authority');
+  assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('syncView().authority',app.ctx),null,'a second early-returning caller is not initial read authority');
   assert.equal(app.ctx.state.tasks.length,1,'ordinary Add has not run while startup is pending');assert.equal(h.doc.rev,5);
   const startup={heldConsumers:initialConsumers.length,heldSourceRaw:h.doc.payload,heldRaw:JSON.stringify(app.ctx.state)};
   releaseStartup.resolve();await Promise.all(initialConsumers.map(call=>call.promise));await caller;
-  assert.equal(await app.ctx.persist(),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),'e@example.com');
+  assert.equal(await app.ctx.persist(),true);assert.equal(vm.runInContext('syncView().authority',app.ctx),'e@example.com');
   assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),JSON.stringify(app.ctx.state),'the actual startup consumer and device head are acknowledged before ordinary Add');
-  startup.acknowledgedRaw=JSON.stringify(app.ctx.state);startup.account=vm.runInContext('reconciledAs',app.ctx);
+  startup.acknowledgedRaw=JSON.stringify(app.ctx.state);startup.account=vm.runInContext('syncView().authority',app.ctx);
   assert.equal(app.shim.window.CLOUD_PUSH_DELAY_MS,undefined,'the actual ordinary producer retains the default two-second debounce');
   const acknowledged=deferredSyncFixture(),push=app.shim.window.CloudSync.push;app.shim.window.CloudSync.push=async(...args)=>{entered.resolve({at:performance.now(),args});const reply=await push(...args);acknowledged.resolve({at:performance.now(),reply});return reply;};
   const started=performance.now();app.ctx.addTask('Actual ordinary debounced edit');return {app,h,started,entered:entered.promise,acknowledged:acknowledged.promise,startup};
@@ -3649,7 +3661,7 @@ async function ordinaryEditDebounceControl(){
 }
 
 function liveModeDeliverySnapshot(app){
- return JSON.parse(vm.runInContext('JSON.stringify({mode:state.mode,rev:state.syncRev,dirty:state.syncDirty,reconciledAs,pulling,knownMode:JSON.parse(lastKnownCloudPayload||"null")?.mode??null,lastKnownCloudRevision,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
+ return JSON.parse(vm.runInContext('JSON.stringify({mode:state.mode,rev:state.syncRev,dirty:state.syncDirty,reconciledAs:syncView().authority,pulling,knownMode:JSON.parse(syncView().known.payload||"null")?.mode??null,lastKnownCloudRevision:syncView().known.revision,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
 }
 async function settleLiveModePublication(app,h,label){
  const deadline=performance.now()+8000;let observed,stored;
@@ -4100,5 +4112,6 @@ export {
   settleRecoveryOperations188, retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
   replaceIndependentServerPayload263,
 };
+export { releaseKnownCloudCopy2377 };
 export { scanPanelDom221, markupButtons, chainPills, chainPillIds, chainPill, benchmarkEdit, keepEditorValues, returnButton,
   returnDotFromScan, returnFromPill, returnBenchmarkFromEdit };
