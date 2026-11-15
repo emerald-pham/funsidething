@@ -7150,9 +7150,9 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     // older copies of the app still carry unrecorded Postpones, so the whole
     // chain is still not compared. While the replay leaves the returned task
     // off, the board must not show it. A later Yes or Dot that puts it back is
-    // a choice of its own, so that is not held either. #2375: an undone Return chose nothing any more, so
-    // a board that shows its task again, after Postpone's automatic dot picked
-    // it, is not held.
+    // a choice of its own, so that is not held either. #2375: an undone
+    // Return chose nothing any more, so a board that shows its task again,
+    // after Postpone's automatic dot picked it, is not held.
     const chainRows=compared.map(event=>PassChain.read(event));
     const returned=chainRows.map(row=>row?.kind==="return"?row.taskId:null);
     const undoneReturns=returned.some(id=>id!==null)?decisionUndoTargets(board):new Set();
@@ -9809,16 +9809,17 @@ const taskActionOwnerBundle=(()=>{
     //   it, as they run before every draw, so a choice made next (the
     //   automatic dot) sees the pool the person sees.
     // - The replay clears the candidate when the mode changes, and in a pass
-    //   Start began. The direct rule clears it on a mode change too. An action
-    //   that decided about the candidate cleared it already; one it did not
-    //   touch stays on offer, as before #2376, while the board is scanning and
-    //   the task is still in the pool.
+    //   Start began. An action that decided about the candidate cleared it
+    //   already; one it did not touch stays on offer, as the direct rule and
+    //   every action before #2376 keep it, while it is still in the pool.
+    //   Redrawing it would score tasks added since Start into the pass's saved
+    //   draw, which holds sync (a separate cause the next Yes also reaches).
     function settle(replay,direct){
-      const offered=state.candidateId,mode=state.mode;let path="direct";
+      const offered=state.candidateId;let path="direct";
       if(replay&&decisionReplayReady(state)){
         projectDecisionEvents(state,null,{refreshRanks:false});expireCants();expireWorked();path="replay";
-      }else{direct();if(state.mode!==mode)state.candidateId=null;}
-      if(offered&&state.candidateId===null&&state.mode==="scan"&&!state.interventionActive&&pool().some(task=>task.id===offered))state.candidateId=offered;
+      }else direct();
+      if(offered&&state.candidateId===null&&!state.interventionActive&&pool().some(task=>task.id===offered))state.candidateId=offered;
       return path;
     }
     function record(choices,gesture,taskContextIds={}){

@@ -14593,3 +14593,21 @@ test('RISK started pass sync: every scanner control gives the same chain, mode a
   assert.deepEqual(views.replay,views.direct,'the board with history and the one without agree');
  });
 });
+
+// The mode controls keep the candidate on offer, as they did before #2376.
+// Redrawing it after a task was added to a pass Start began scores the new
+// task into the pass's saved draw, which holds sync (a separate cause, also
+// reached on main by the next Yes); these controls must not start doing that.
+test('RISK started pass sync: No — work the chain and Continue scanning after adding a task to a pass Start began keep the offered candidate and keep syncing',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'mode-after-add'),{ctx,shim}=device;
+ shim.document.getElementById('addInput').value='Task E 2376';await device.act('add');
+ assert.equal(device.status().text,'☁ synced','positive control: the added task syncs: '+device.status().title);
+ const offered=ctx.state.candidateId;
+ assert.ok(offered,'precondition: a candidate is on offer');
+ await device.act('start-working');
+ assert.equal(ctx.state.mode,'work','positive control: work mode');
+ await device.act('continue-scan');
+ assert.equal(ctx.state.mode,'scan','positive control: scanning again');
+ assert.equal(ctx.state.candidateId,offered,'the same candidate is still on offer');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+});
