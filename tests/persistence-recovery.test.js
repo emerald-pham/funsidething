@@ -11869,10 +11869,11 @@ function previousReleaseApp2375(){
  }
  return previousReleaseSource2375;
 }
-async function pairClients2375(t,{at,passStartedAt,without=[]}){
+async function pairClients2375(t,{at,passStartedAt,without=[],passId=null}){
  const initial=syncState({tasks:Object.entries(unpinnedTitles2375).filter(([id])=>!without.includes(id)).map(([id,title])=>syncTask(id,title)),
   chain:['a','b','c'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt,
   syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ if(passId)initial.passId=passId;
  const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
  const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial);
  const open=async(when,seed,previous=false)=>{
@@ -11965,6 +11966,39 @@ test('RISK chain return Undo: Undo of a Return keeps the other device’s later 
 // #2375 review N2: a gesture saves the pass id the board already reported.
 // When another device then begins a new pass, that saved id is not an edit of
 // this tab's, so combining the boards is routine and shows no warning.
+// B1 from the independent review: both devices act on the same pass without
+// seeing each other. The Undo then cannot have seen the other device's
+// decision, and that decision still stands, in either publish order.
+test('RISK chain return Undo: a concurrent Return or Can’t on the other device stands after this device undoes its own Return, in either publish order, with and without a saved pass id',async t=>{
+ const shapes={
+  'both devices return b':{returned:'b',other:peer=>returnDotFromBoard221(peer,'b',Date.parse('2026-10-17T15:00:00Z')+300),expected:['a','c'],held:null},
+  'this device returns c and the other marks c Can’t':{returned:'c',other:peer=>{peer.ctx.renderScan();peer.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});},expected:['a','b'],held:'c'},
+  'this device returns b and the other marks c Can’t':{returned:'b',other:peer=>{peer.ctx.renderScan();peer.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});},expected:['a','b'],held:'c'},
+ };
+ for(const [shape,{returned,other,expected,held}] of Object.entries(shapes))for(const first of ['Undo','the other device'])for(const saved of [true,false])
+ await t.test(`${shape}, ${first} publishes first, ${saved?'saved':'no saved'} pass id`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,passId:saved?'pair-pass':null});
+  const local=await open(at,raw),peer=await open(at,raw);
+  returnDotFromBoard221(local,returned,at+100);
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: this device undid its Return');
+  setFakeTime(peer.ctx,at+300);other(peer);
+  assert.notDeepEqual(Array.from(peer.ctx.state.chain),['a','b','c'],'precondition: the other device took a dot off without seeing the Undo');
+  setFakeTime(peer.ctx,at+2000);
+  const [a,b]=first==='Undo'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);
+  for(let round=0;round<2;round++){await receive221(a);await receive221(b);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the other device’s decision stands');
+   if(held)assert.equal(app.ctx.state.considered[held],'cant',label+': and its Can’t is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the other device’s decision stands');
+ });
+});
+
 test('RISK chain return sync: a saved legacy pass id is not reported as a displaced edit when another device begins a new pass',async t=>{
  const at=Date.parse('2026-10-17T15:00:00Z');
  const {open,raw}=await pairClients2375(t,{at,passStartedAt:at-60000});
