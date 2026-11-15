@@ -10404,7 +10404,7 @@ test('RISK manual backup reminder: Make manual backup stays enabled past two and
 // measured in a real served page beside the established neighbours in the same
 // pane: the Make manual backup button above it and the backup rows below it.
 // One manual backup is the before state (no reminder); the second brings it.
-test('RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK manual backup reminder visual browser: the reminder below Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
  const output=process.env.MANUAL_BACKUP_VISUAL_DIR?path.resolve(process.env.MANUAL_BACKUP_VISUAL_DIR):null;
