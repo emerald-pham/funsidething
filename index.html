@@ -12070,6 +12070,19 @@ const PassChain=Object.freeze({
       const after=at<0?undefined:recorded.slice(at+1).find(value=>next.includes(value));
       next.splice(before!==undefined?next.indexOf(before)+1:after!==undefined?next.indexOf(after):at<0?next.length:Math.min(at,next.length),0,undone.taskId);
     }
+    // #2376 review B1/N1: a Yes or Dot of an earlier pass (Postpone's automatic
+    // dot among them) is not replayed in this one, which starts from the chain
+    // the Undo saw, with that dot still on it. So Undo takes off what the undone
+    // action itself put on, unless an earlier, uncancelled row of this pass
+    // decided about that task: that decision keeps it, from either device. In
+    // the action's own pass the replay already leaves the cancelled row out.
+    for(const targetId of row.targetEventIds){
+      const target=byId?.get?.(targetId);
+      if(target?.kind!=="comparison"||!["yes","dot"].includes(target.action)||target.passId===row.passId)continue;
+      const index=next.indexOf(target.taskId);
+      if(index<0||replayed.some(prior=>prior!==row&&decided(prior,target.taskId)))continue;
+      next.splice(index,1);
+    }
     return next;
   },
 });

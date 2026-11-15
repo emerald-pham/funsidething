@@ -15676,3 +15676,58 @@ test('RISK started pass sync: Done from the editor on a task in the pool while t
  assert.equal(ctx.state.interventionActive,true,'the prompt is still showing');
  assert.equal(ctx.state.candidateId,null,'with no candidate');
 });
+
+// #2376 review B1 and N1: Undo after the 2 AM reset of an action made before
+// it. The new pass is rebuilt from the chain the Undo saw, which still has the
+// dot that action put on, so Undo takes it off itself: Postpone's automatic dot,
+// and the dot a Yes or a Dot added. Local times, so 2 AM is the app's own marker.
+async function nightUndo2376(t,saved,act){
+ const at=new Date(2026,9,17,1,50).getTime();
+ const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:new Date(2026,9,17,1,0).getTime(),passId:saved?'night-pass':null,
+  settings:{postponeHours:1,showPostpone:true}});
+ const local=await open(at,raw);
+ await act(local,at);
+ const before=Array.from(local.ctx.state.chain),passBefore=local.ctx.state.passId;
+ await publish221(local);
+ const when=new Date(2026,9,17,2,5).getTime();
+ setFakeTime(local.ctx,when);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+ await publish221(local);
+ assert.notEqual(local.ctx.state.passId,passBefore,'precondition: the 2 AM reset began a new pass');
+ assert.deepEqual(Array.from(local.ctx.state.chain),before,'precondition: with the chain carried over');
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ setFakeTime(local.ctx,when+100);
+ assert.equal(await local.ctx.onAction('undo',{}),true);
+ const undone=Array.from(local.ctx.state.chain);
+ await publish221(local);
+ assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'sync is not held');
+ assert.deepEqual(h.remoteState().chain,undone,'the cloud has the same chain');
+ const peer=await open(when+200,raw);
+ assert.equal(peer.ctx.window.CloudSync.errorCode??null,null,'the other device takes it without a hold');
+ assert.deepEqual(Array.from(peer.ctx.state.chain),undone,'the other device shows the same chain');
+ return {undone,local};
+}
+test('RISK chain return Undo: Undo after 2 AM of a Postpone made before it puts the dot back and takes the automatic dot off, with and without a saved pass id',async t=>{
+ for(const shape of ['the benchmark','the last dot'])for(const saved of [true,false])
+ await t.test(`Postpone of ${shape}, ${saved?'saved':'no saved'} pass id`,async t=>{
+  const order=shape==='the benchmark'?['c']:['c','b','a'];
+  const {undone,local}=await nightUndo2376(t,saved,async(local,at)=>{
+   for(const [i,id] of order.entries())assert.equal(postponeBenchmark221(local,at+100+i*10),id);
+   if(shape==='the last dot')assert.deepEqual(Array.from(local.ctx.state.chain),['d'],'precondition: Postpone dotted d');
+  });
+  assert.deepEqual(undone,shape==='the benchmark'?['a','b','c']:['a'],'Undo puts the postponed dot back and takes the automatic dot off');
+  assert.equal(local.ctx.taskPostponeUntil(local.ctx.state.tasks.find(task=>task.id===order.at(-1))),0,'and ends that postponement');
+ });
+});
+test('RISK chain return Undo: Undo after 2 AM of a Yes or an editor Dot made before it takes the added dot off, with and without a saved pass id',async t=>{
+ for(const action of ['Yes','editor Dot'])for(const saved of [true,false])
+ await t.test(`${action}, ${saved?'saved':'no saved'} pass id`,async t=>{
+  const {undone}=await nightUndo2376(t,saved,async(local,at)=>{
+   if(action==='Yes'){
+    setFakeTime(local.ctx,at+100);local.ctx.renderScan();
+    local.ctx.onAction('yes',{dataset:{candidate:'d',benchmark:'c'}});
+   }else await dotFromEditor221(local,'d',at+100);
+   assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c','d'],'precondition: d was added');
+  });
+  assert.deepEqual(undone,['a','b','c'],'Undo takes the added dot off');
+ });
+});
