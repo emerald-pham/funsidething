@@ -9034,29 +9034,8 @@ function replaceTaskPostpone(task,current){
   mergeTaskPostpone(task,current);
   if(changed)writeTaskPostpone(task,desired);
 }
-function postponeTask(id){
-  const task=taskById(id);if(!task || task.done || !supportedPostponeEvidence(task))return;
-  const choiceGesture=captureCurrentChoiceGesture(),beforeMode=state.mode;
-  pushUndo();writeTaskPostpone(task,Date.now()+postponeDurationHours(state.settings.postponeHours)*3600000);
-  state.chain=state.chain.filter(id=>id!==task.id);
-  delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
-  if(state.candidateId===id)state.candidateId=null;
-  // #2359: leaving work mode is recorded, as Resume records it. Unrecorded, a
-  // replay of the pass still says work after No — work the chain, and sync held.
-  state.mode="scan";state.interventionActive=false;recordCurrentScannerMode(choiceGesture,beforeMode);
-  if(!state.chain.length){
-    // This automatic dot is not a recorded decision, like the Postpone itself:
-    // the cloud keeps it as board state, and a replay of the pass never sees
-    // it. A task returned as a candidate in this pass is off the chain by a
-    // recorded decision, so dotting it here would leave the board disagreeing
-    // with that record, and sync would hold for hours (#221 review). Only an
-    // explicit Yes or Dot puts a returned task back.
-    const returned=PassChain.returned(state);
-    const next=candidateOrder(pool()).find(task=>!returned.has(task.id));
-    if(next)state.chain=[next.id];
-  }
-  commit();
-}
+// #2376: Postpone is a TaskActionOwner command, applied through BoardDecision.
+function postponeTask(id){return TaskActionOwner.perform({type:"postpone",taskId:id});}
 
 function isIntrinsicallyEligible(t, act,board=state){
   if(t.done) return false;
@@ -9887,9 +9866,83 @@ const taskActionOwnerBundle=(()=>{
     if(result&&action==="return")holdPressesAfterReturn();
     return result;
   }
+  /*
+   * #2376 BoardDecision: the one place a scanner decision changes the board.
+   * apply(gesture,decision) records the decision's rows and makes its
+   * unrecorded changes (a postponement, cleared marks) once. Then the chain,
+   * mode and marks are set once, by one of two adapters chosen before the
+   * action by decisionReplayReady():
+   * - replay: the board can be rebuilt from its decisions, so
+   *   projectDecisionEvents builds them from the rows just recorded;
+   * - direct: a board with no decision history yet, or a held one, gets the
+   *   decision's direct rule, which gives what replaying its rows would.
+   * It never pushes Undo, commits or writes History: TaskActionOwner captures
+   * the gesture (which pins the pass, #2375), pushes Undo, calls apply and
+   * commits. It returns {path,rows,moved}, or null when the decision does not
+   * apply to the board as it is now. Nothing is ordered by wall clock.
+   */
+  const BoardDecision=(()=>{
+    // The replay gives back every recorded Can't and Worked on it hold, also one
+    // whose time has run out; the sweeps that end those holds run after it, as
+    // they run before every draw, so a choice made next (the automatic dot)
+    // sees the pool the person sees.
+    function project(){projectDecisionEvents(state,null,{refreshRanks:false});expireCants();expireWorked();}
+    // Postpone (#2336). Taking the dot off is recorded as the #221 Return row
+    // (D1), and the automatic dot on an emptied chain as a Dot with no
+    // benchmark and no rating (D2), the row a Dot onto an empty chain writes.
+    // Unrecorded, the next answer replayed the pass and put the postponed dot
+    // back once its postponement ended, and dropped the automatic dot. Both
+    // rows share the gesture's action, so Undo cancels them together. A task
+    // returned in this pass, by Return or an earlier Postpone, is skipped by
+    // the automatic dot (PassChain.returned): only an explicit Yes or Dot puts
+    // it back.
+    function postpone(gesture,decision,replay){
+      const task=taskById(decision.taskId);if(!task||task.done||!supportedPostponeEvidence(task))return null;
+      const id=task.id,beforeMode=state.mode,rows=[],moved=[];
+      writeTaskPostpone(task,Date.now()+postponeDurationHours(state.settings.postponeHours)*3600000);
+      delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
+      if(state.candidateId===id)state.candidateId=null;
+      state.interventionActive=false;
+      // #2359: leaving work mode is recorded, as Resume records it.
+      const choices=beforeMode==="scan"?[]:[{target:{type:"pass",id:gesture.passId,property:"mode"},value:"scan",
+        after:{present:true},before:{present:true,value:beforeMode}}];
+      const returnRow=PassChain.record(state,gesture,{return:id});
+      if(returnRow){choices.push(returnRow);moved.push(id);}
+      const recorded=prepareCurrentChoiceEvents(choices,gesture);
+      appendCurrentChoiceEvents(recorded);rows.push(...recorded);
+      const replayed=replay&&decisionReplayReady(state);
+      if(replayed)project();else state.mode="scan";
+      if(!state.chain.length){
+        const returned=PassChain.returned(state);
+        const next=candidateOrder(pool()).find(candidate=>!returned.has(candidate.id));
+        if(next){
+          const dot=prepareComparisonDecisionEvent("dot",next,null,{at:gesture.at},gesture,false);
+          recordDecisionEvent(dot);rows.push(dot);moved.push(next.id);
+          if(replayed&&decisionReplayReady(state))project();else state.chain=[next.id];
+        }
+      }
+      return {path:replayed?"replay":"direct",rows,moved};
+    }
+    const decisions={postpone};
+    return Object.freeze({
+      apply(gesture,decision){
+        const run=decision&&typeof decision==="object"&&Object.hasOwn(decisions,decision.kind)?decisions[decision.kind]:null;
+        return run&&gesture?run(gesture,decision,decisionReplayReady(state)):null;
+      },
+    });
+  })();
   function perform(command){
     if(openingRecoveryHeld)return false;
     if(!command||typeof command!=="object")return false;
+    if(command.type==="postpone"){
+      const task=taskById(command.taskId);if(!task||task.done||!supportedPostponeEvidence(task))return false;
+      const gesture=captureDecisionGesture();
+      pushUndo();
+      const result=BoardDecision.apply(gesture,{kind:"postpone",taskId:task.id});
+      if(result?.path==="replay")recomputeRanks();
+      commit();
+      return !!result;
+    }
     if(command.type==="decision"){
       revealTitleOfNextDraw();
       const kind=command.decision;
@@ -11336,9 +11389,19 @@ function decisionNoHistoryProvesRating(board,event,ratings){
     &&benchmark.mu===benchmarkRow.before.mu&&benchmark.sigma===benchmarkRow.before.sigma
     &&candidateRow.after.mu!==candidateRow.before.mu&&benchmarkRow.after.mu!==benchmarkRow.before.mu;
 }
-function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshRanks=true}={}){
+/* #2376: whether a board can be rebuilt from its recorded decisions: it has a
+   supported decision baseline for its account and nothing in its evidence holds
+   the replay. projectDecisionEvents replays only such a board, and BoardDecision
+   (in TaskActionOwner) picks its adapter with this same check before an action,
+   so the two cannot drift apart. A board with no decision history, or a held
+   one, keeps the direct path. */
+function decisionReplayReady(board=state){
   const baseline=board?.decisionBaseline,account=Object.hasOwn(board,"syncAccount")?board.syncAccount:baseline?.account??window.CloudSync?.user??null;
-  if(!supportedDecisionBaseline(baseline,account)||decisionProjectionIssue(board,false))return false;
+  return supportedDecisionBaseline(baseline,account)&&!decisionProjectionIssue(board,false);
+}
+function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshRanks=true}={}){
+  const baseline=board?.decisionBaseline;
+  if(!decisionReplayReady(board))return false;
   const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.mode,board.scanMode,board.settings?.scanMode]);
   if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
   const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
