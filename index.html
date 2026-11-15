@@ -6492,7 +6492,15 @@ function pendingLocalChoicesRetained(merged,local,base){
     const retainedDraft=local.chain.filter(id=>currentChain.has(id)),mergedDraft=merged.chain.filter(id=>draftChain.has(id));
     if(JSON.stringify(retainedDraft)!==JSON.stringify(mergedDraft))return false;
   }
-  return retained(base,local,merged,["mode","scanMode","passId","passStartedAt","chance","considered","cantAt","workedAt"]);
+  // #2375 review N2: a gesture saves the pass id the ancestor already reported
+  // (PassChain.pin). That makes explicit what the ancestor implied, so it is
+  // not this tab's edit when a peer has since begun another pass.
+  let draft=local;
+  if(local.passId!==base.passId&&local.passId===PassChain.passId(base)){
+    draft={...local};
+    if(Object.hasOwn(base,"passId"))draft.passId=base.passId;else delete draft.passId;
+  }
+  return retained(base,draft,merged,["mode","scanMode","passId","passStartedAt","chance","considered","cantAt","workedAt"]);
 }
 function recoveryBoardRepresented(raw,merged){
   try{

@@ -11933,6 +11933,27 @@ test('RISK chain return Undo: Undo of a Return keeps the other device\'s later N
  });
 });
 
+// #2375 review N2: a gesture saves the pass id the board already reported.
+// When another device then begins a new pass, that saved id is not an edit of
+// this tab's, so combining the boards is routine and shows no warning.
+test('RISK chain return sync: a saved legacy pass id is not reported as a displaced edit when another device begins a new pass',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const {open,raw}=await pairClients2375(t,{at,passStartedAt:at-60000});
+ const local=await open(at,raw),peer=await open(at,raw);
+ assert.equal(Object.hasOwn(local.ctx.state,'passId'),false,'precondition: no saved pass id');
+ assert.equal(await saveEditorChoice(local,'d',at+100,{title:'Renamed on this device'}),true);
+ assert.equal(typeof local.ctx.state.passId,'string','precondition: the rename saved the pass id the board reported');
+ for(const [i,id] of ['c','b','a'].entries()){returnDotFromBoard221(peer,id,at+200+i*50);await new Promise(resolve=>setTimeout(resolve,1100));}
+ setFakeTime(peer.ctx,at+2000);peer.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.notEqual(peer.ctx.state.passId,local.ctx.state.passId,'precondition: the other device began a new pass');
+ await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+ local.shim.document.getElementById('toast').textContent='';
+ await receive221(local);
+ assert.doesNotMatch(local.shim.document.getElementById('toast').textContent,/out of date/,'no out-of-date warning');
+ assert.equal(local.ctx.state.tasks.find(task=>task.id==='d').title,'Renamed on this device','the rename is kept');
+ assert.equal(local.ctx.state.passId,peer.ctx.state.passId,'this device joins the new pass');
+});
+
 // #2334: a save that keeps a missing task must settle. These load the app on a
 // device store with no cloud account, and read only what a person or support can
 // see: the toast, the backups the device lists and the Debug log's save counts.
