@@ -6251,6 +6251,17 @@ function queueDeviceCloudBackupReconcile(){
 let pendingPush = false;   // a write was asked for before that happened — released once we reconcile
 let recoveryReadDeferredPush = false; // #2272: a write held while a recovery read was busy
 let cloudPullPending = false; // auth can report a user before init has loaded the local state
+// #2378: that queued pull is sync work still to run, counted until it runs or
+// is dropped (queueCloudPull / dropQueuedCloudPull).
+let cloudPullQueuedWork = null;
+function queueCloudPull(){
+  cloudPullPending=true;
+  if(!cloudPullQueuedWork)cloudPullQueuedWork=trackSyncWork("pull");
+}
+function dropQueuedCloudPull(){
+  cloudPullPending=false;
+  const work=cloudPullQueuedWork;cloudPullQueuedWork=null;work?.end();
+}
 let cloudRetryTimer = null, cloudRetryAttempt = 0, cloudRetryAccount = null, cloudRetryOwner = null;
 let cloudConflictAttempts = 0;
 let cloudSuspended = !!document.hidden, cloudResumePending = false, cloudPageHidden = false;
@@ -8142,7 +8153,7 @@ async function cloudPull(){
   const syncWork=trackSyncWork("pull");try{
   // Even source-only repair waits for boot to classify its saved sources.
   // A bounded unavailable startup still replays this queued request afterward.
-  if(!state||automaticCloudFallbackBootCapturePending){cloudPullPending=true;return;}
+  if(!state||automaticCloudFallbackBootCapturePending){queueCloudPull();return;}
   // This read classifies only device availability. Server-only repair cannot
   // consume, clear or acknowledge pending local work that it cannot observe.
   if(cloudReady()&&!cloudSuspended&&!document.hidden&&
@@ -8180,7 +8191,7 @@ async function cloudPull(){
     }
   }
   if(deviceRecoveryCloudHold){
-    cloudPullPending=false;
+    dropQueuedCloudPull();
     // #2287 review: the held publication makes its own read before any write,
     // so a visible page goes on with it; a phone lock or app switch left this
     // set for good, since this branch returns before the line below clears it.
@@ -8243,7 +8254,7 @@ async function cloudPull(){
   if(pulling) return;
   if(cloudPushInFlight){deferredCloudPull=true;return;}
   cloudResumePending = false;
-  cloudPullPending = false;
+  dropQueuedCloudPull();
   // Treat cloud replacement like an app update: a DOM-only draft is still
   // user work. Hold both adoption and writes until reconciliation can finish.
   if(hasActiveEditor() || scannerGestureActive){ deferredCloudPull = true; return; }
