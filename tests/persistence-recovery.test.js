@@ -13633,7 +13633,7 @@ const ack2377=(rev=3,extra={})=>({ok:true,rev,...extra});
 test('RISK sync session: a Cloud acknowledgement whose board save is refused is not accepted, so this device records no confirmed copy and stays unbound with its work pending',async()=>{
  const {session}=syncSession2377(),bound=await acceptedRead2377(session);
  assert.equal(bound.owner?.revision,2,'positive control: an accepted read binds the Confirmed device cloud owner');
- for(const [label,install] of [['a save that reports failure',async()=>false],['a save that throws',async()=>{throw Error('quota');}],['a save the loop guard refuses',()=>false]]){
+ for(const [label,install] of [['a save that reports failure',async()=>false],['a save that throws',async()=>{throw Error('quota');}],['a save refused at once',()=>false]]){
   const ticket=session.mayPush();assert.equal(ticket.go,true,label+': a write may start');
   const outcome=await ticket.write.accept(ack2377(3),{payload:'board at 3',install});
   assert.equal(outcome.accepted,false,label+': not accepted');assert.equal(outcome.reason,'unsaved',label);
@@ -13750,6 +13750,96 @@ test('RISK sync session guidance: Help keeps Synced to a board saved here and ac
  const latest=current.split('<h3>November 15, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.match(latest,/the cloud takes the board but this device cannot save that it did/,'the changelog names the case: '+latest);
  assert.match(latest,/no longer counts as synced until this device saves it and the cloud confirms it again/,'and what happens instead');
+});
+
+// #2377 review B1 (#2350): the app's half of an acknowledgement this device
+// cannot save. The cloud takes the push, then saving here that it did is
+// refused: by full device storage, or by the cloud save-loop guard when that
+// save is the run past its limit. These drive the loaded app on the plain
+// cloud stand-in and read the stand-in's copy, the board saved on this
+// device, its unsynced flag and the sync button.
+async function refusedAcknowledgementApp2377(){
+ const initial=syncState({tasks:[syncTask('base','Base task')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:3,delayMs:2});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>h.factory()});
+ const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ await ctx.__dataReady;await ctx.cloudPull();await syncSettle(50);
+ const saved=()=>JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));
+ const button=()=>shim.document.getElementById('syncBtn')?.textContent;
+ assert.equal(button(),'☁ synced','positive control: the board starts synced');
+ assert.equal(saved().syncRev,3,'positive control: at the cloud revision');
+ return {...app,h,saved,button};
+}
+// The cloud takes the next push, then device storage refuses every board
+// write, as on a full phone, until restore().
+function storageFullAfterPush2377({ctx,shim}){
+ let refusing=false;const set=shim.localStorage.setItem.bind(shim.localStorage),push=ctx.window.CloudSync.push;
+ shim.localStorage.setItem=(key,value)=>{if(refusing&&(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY))throw Object.assign(Error('quota'),{name:'QuotaExceededError'});return set(key,value);};
+ ctx.window.CloudSync.push=async(...args)=>{const reply=await push(...args);refusing=true;return reply;};
+ return {restore(){refusing=false;ctx.window.CloudSync.push=push;}};
+}
+function assertAcknowledgementUnsaved2377(app,title,label){
+ const {ctx,h}=app;
+ assert.equal(h.doc.rev,4,label+': positive control: the cloud took the push');
+ assert.ok(h.doc.payload.includes(title),label+': with the edit');
+ assert.equal(app.saved().syncRev,3,label+': positive control: this device could not save that it did');
+ assert.equal(ctx.state.syncDirty,true,label+': the board stays unsynced, its edit pending');
+ assert.notEqual(app.button(),'☁ synced',label+': the sync button does not say synced');
+}
+
+test('RISK cloud acknowledgement durability: when the cloud takes a push but this device cannot save that it did, the board stays unsynced until this device saves it and the cloud confirms it again',async t=>{
+ await t.test('device storage is full',async()=>{
+  const app=await refusedAcknowledgementApp2377(),{ctx,h}=app,storage=storageFullAfterPush2377(app);
+  ctx.addTask('Edit the cloud took');
+  await ctx.sendPush();await syncSettle(100);
+  assertAcknowledgementUnsaved2377(app,'Edit the cloud took','full storage');
+  assert.equal(app.button(),'☁ save error','positive control: the refusal was device storage’s');
+  storage.restore();
+  await ctx.cloudPull();await syncSettle(400);
+  assert.equal(ctx.state.syncDirty,false,'once storage returns, the next sync settles');
+  assert.equal(app.button(),'☁ synced');
+  assert.equal(app.saved().syncRev,h.doc.rev,'and the board saved on this device names the cloud revision');
+  assert.ok(app.saved().tasks.some(task=>task.title==='Edit the cloud took'),'with the edit');
+  ctx.suspendCloudSync();
+ });
+ await t.test('the cloud save-loop guard stops at the acknowledgement',async()=>{
+  const app=await refusedAcknowledgementApp2377(),{ctx,h}=app;
+  ctx.addTask('Edit before the stop');assert.equal(await ctx.persist(),true,'positive control: the edit is saved');
+  // Then six save runs with no save request and nothing new for the cloud,
+  // as a loop's bookkeeping makes: the guard's limit is five after the first,
+  // so the acknowledgement's save is the run it stops.
+  for(let run=0;run<6;run++){ctx.state.lastCloudServerAt=1792323000000+run;assert.equal(await ctx.persist(),true,'positive control: bookkeeping run '+run+' is saved');}
+  await ctx.sendPush();await syncSettle(100);
+  assertAcknowledgementUnsaved2377(app,'Edit before the stop','loop guard');
+  const stops=JSON.parse(ctx.supportDiagnosticsText()).events.filter(event=>event.stage==='save-loop-stop');
+  assert.deepEqual(stops.map(event=>event.metadata?.revision),[4],'positive control: the guard stopped once, at the acknowledgement of revision 4: '+JSON.stringify(stops));
+  // A later edit is a save request, which starts the guard's count again.
+  ctx.window.CLOUD_PUSH_DELAY_MS=5;
+  ctx.addTask('Edit after the stop');await syncSettle(900);
+  assert.equal(ctx.state.syncDirty,false,'the next edit’s save and push settle it');
+  assert.equal(app.button(),'☁ synced');
+  assert.equal(app.saved().syncRev,h.doc.rev,'and the board saved on this device names the cloud revision');
+  for(const title of ['Edit before the stop','Edit after the stop'])assert.ok(h.doc.payload.includes(title),'the cloud holds '+title);
+  ctx.suspendCloudSync();
+ });
+});
+
+test('RISK cloud acknowledgement durability: a cold open after an acknowledgement this device could not save reads the cloud first and keeps the edit',async()=>{
+ const app=await refusedAcknowledgementApp2377(),{ctx,shim,h}=app;storageFullAfterPush2377(app);
+ ctx.addTask('Edit before the cold open');
+ await ctx.sendPush();await syncSettle(100);
+ assertAcknowledgementUnsaved2377(app,'Edit before the cold open','before the cold open');
+ const saved=shim.localStorage.getItem(SYNC_STORE_KEY),head=shim.localStorage.getItem(LOCAL_HEAD_KEY);
+ assert.ok(saved.includes('Edit before the cold open'),'positive control: the edit was saved on this device before its push');
+ ctx.suspendCloudSync();
+ const calls=h.calls.length;
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:head},cloudSyncFactory:()=>h.factory()});
+ await reopened.ctx.__dataReady;await reopened.ctx.cloudPull();await syncSettle(400);
+ assert.equal(h.calls[calls],'pull','the reopened app reads the cloud first: '+h.calls.slice(calls).join(','));
+ assert.equal(reopened.ctx.state.syncRev,h.doc.rev,'and starts from the cloud revision');
+ assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='Edit before the cold open'),'keeping the edit');
+ assert.equal(reopened.shim.document.getElementById('syncBtn')?.textContent,'☁ synced','and shows synced');
+ reopened.ctx.suspendCloudSync();
 });
 
 // ---------- #2359: a Postpone or unrecorded mode change in a pass Start began ----------
