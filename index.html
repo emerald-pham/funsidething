@@ -6085,20 +6085,22 @@ async function supportDiagnosticsCloudPush(payload,updatedAt,base,context,backen
 // #2377: the sync session (cloud-sync-session.js) owns what this device knows
 // about damaged cloud copies. Every cloud read reports to it through the
 // backend's "cloudread" event. Its acknowledgement port is this board's saved
-// Cloud acknowledgement: account, identity, revision and decision base. A base
-// that no longer validates for that account and revision is no proof, so it is
-// offered as none. Saving it is bookkeeping, not an edit, so persist(), not
-// save(), as every acknowledgement save. Without the module (it failed to load)
-// there is no session and every read downloads in full.
+// Cloud acknowledgement: account, identity, revision and decision base, as
+// saved. A base that no longer validates for that account and revision is no
+// proof (valid()); that check parses the whole board, so the session asks it
+// once per read and get() never does (#2377 review N2). Saving it is
+// bookkeeping, not an edit, so persist(), not save(), as every acknowledgement
+// save. Without the module (it failed to load) there is no session and every
+// read downloads in full.
 const syncSession=globalThis.ChainSyncSession?.createSyncSession({
   backend:()=>window.CloudSync,
   identity:()=>cloudAccountIdentity(),
   acknowledgement:{
     get(){
       if(!state)return null;
-      const account=state.syncAccount??null,revision=state.syncRev,base=state.decisionBase;
-      return {account,identity:state.syncIdentity??null,revision,base:validDecisionBase(base,account,revision)?base:null};
+      return {account:state.syncAccount??null,identity:state.syncIdentity??null,revision:state.syncRev,base:state.decisionBase??null};
     },
+    valid(ack){return !!ack&&validDecisionBase(ack.base,ack.account,ack.revision);},
     save(next){
       if(!state)return Promise.resolve(false);
       if(!Object.is(state.decisionBase,next.base))state.decisionBase=next.base;

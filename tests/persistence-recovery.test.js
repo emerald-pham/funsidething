@@ -13435,6 +13435,33 @@ test('RISK unchanged cloud pull: signing in again and a same-email account with 
  });
 });
 
+// #2377 review N2: checking that the saved acknowledgement's board is still
+// valid parses the whole board on the main thread: about 20 ms for a 3 MB
+// board on a laptop, several times that on a phone, and seconds once the board
+// is past the identity cache. So the launch pull that skips the download
+// (#2354) checks it once, as before #2377, and an ordinary push's
+// acknowledgement does not check it. Each check of this board's own
+// acknowledged base is counted through the app's validator.
+const acknowledgedBaseChecks2377=ctx=>vm.runInContext(`(()=>{const real=validDecisionBase,checks=[];
+ validDecisionBase=function(base,account,revision){if(base!==undefined&&base===state?.decisionBase)checks.push(revision);return real(base,account,revision);};
+ return checks;})()`,ctx);
+
+test('RISK unchanged cloud pull: a launch pull that skips the download checks the acknowledged board once, and an ordinary push’s acknowledgement does not check it again',async t=>{
+ const device=await acknowledgedDevice2354(t,'checked-once'),revision=device.backend.docs.get('users/owner').rev;
+ let checks=null;
+ const {reopened}=await relaunch2354(t,device,'checked-once-reopened',{opened:app=>{checks=acknowledgedBaseChecks2377(app.ctx);}});
+ assert.equal(cloudPullEvents2354(reopened).at(-1)?.status,'unchanged','positive control: the launch pull skipped the download');
+ assert.equal(reopened.status().text,'☁ synced','positive control: and settled synced');
+ const launchPull=checks.length;
+ const {ctx,shim,backend}=reopened;ctx.window.CLOUD_PUSH_DELAY_MS=60000;
+ shim.document.getElementById('addInput').value='Pushed after the launch 2377';await ctx.onAction('add',{});await savesSettled2334(reopened);
+ checks.length=0;
+ await ctx.sendPush();await savesSettled2334(reopened);
+ assert.equal(backend.docs.get('users/owner').rev,revision+1,'positive control: the push landed');
+ assert.equal(reopened.status().text,'☁ synced','positive control: and its acknowledgement was accepted');
+ assert.deepEqual({launchPull,push:checks.length},{launchPull:1,push:0},'the launch pull checks the acknowledged board once, and the push’s acknowledgement not at all');
+});
+
 // #2377 (closes #2358): a copy this device found damaged by any read, not only
 // the sync read, stops the next ordinary pull from skipping to it. Each finder
 // below reads this device's damaged acknowledged copy outside the sync read:
@@ -13538,17 +13565,20 @@ const sha2377=text=>createHash('sha256').update(text,'utf8').digest('hex');
 function acknowledgement2377({account='e@example.com',identity='owner',revision=2,generationId='gen-2377-a',payload=JSON.stringify({tasks:[{id:'a',title:'Acknowledged 2377'}]}),hash=sha2377(payload)}={}){
  return {account,identity,revision,base:{v:1,id:'db1:fixture-2377',account,revision,payload,copy:{generationId,hash}}};
 }
-function syncSession2377({ack=acknowledgement2377(),user='e@example.com',uid='owner',save=null}={}){
+// valid() stands in for the app's full check of a saved decision base; each
+// call is counted, since it parses the whole board.
+function syncSession2377({ack=acknowledgement2377(),user='e@example.com',uid='owner',save=null,valid=()=>true}={}){
  const listeners={},events={addEventListener(type,fn){(listeners[type]??=[]).push(fn);},removeEventListener(){},
   dispatchEvent(event){for(const fn of listeners[event.type]||[])fn(event);return true;}};
  const context=vm.createContext({crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,structuredClone,console,setTimeout,clearTimeout});
  context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-sync-session.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
- const connection={current:{user,ready:true}},saves=[],held={ack};
- const acknowledgement={get:()=>held.ack,save:async next=>{saves.push(next);const saved=save?await save(next):true;if(saved===true)held.ack=next;return saved;}};
+ const connection={current:{user,ready:true}},saves=[],held={ack},checks=[];
+ const acknowledgement={get:()=>held.ack,valid:checked=>{checks.push(checked);return valid(checked);},
+  save:async next=>{saves.push(next);const saved=save?await save(next):true;if(saved===true)held.ack=next;return saved;}};
  const session=context.ChainSyncSession.createSyncSession({backend:()=>connection.current,identity:()=>uid,acknowledgement,events});
  const cloud={replace:next=>{connection.current=next;}};
- return {session,cloud,events,saves,held,setIdentity:value=>{uid=value;}};
+ return {session,cloud,events,saves,held,checks,setIdentity:value=>{uid=value;}};
 }
 const shortcut2377=async(session,options)=>{const ticket=await session.startRead(options);assert.equal(ticket.go,true,'a read may start');const since=ticket.read.unchangedSince;ticket.read.end();return since&&{rev:since.rev,generationId:since.generationId};};
 const damaged2377=(generationId='gen-2377-a',rev=2,identity='owner',user='e@example.com')=>({user,identity,outcome:'damaged',rev,generationId});
@@ -13599,8 +13629,32 @@ test('RISK sync session: the unchanged shortcut needs this device’s exact ackn
  await none('an acknowledgement that names no copy',{ack:(()=>{const ack=acknowledgement2377();delete ack.base.copy;return ack;})()});
  await none('an acknowledgement before the first revision',{ack:acknowledgement2377({revision:0})});
  await none('no acknowledgement',{ack:null});
+ await none('an acknowledgement whose saved board does not check out for its account and revision',{valid:()=>false});
  await none('a deliberate read (Retry sync, signing in again)',{},{deliberate:true});
  await none('a read that must download in full',{},{full:true});
+});
+
+// #2377 review N2: the full check of the acknowledged board parses all of it,
+// so a read asks for it once, and nothing else asks for it at all.
+test('RISK sync session: a read checks the acknowledged board once however often it asks for the shortcut, and replies, damage reports and reads that cannot skip never check it',async()=>{
+ const {session,held,checks}=syncSession2377();
+ const ticket=await session.startRead();
+ for(let asked=0;asked<3;asked++)assert.equal(ticket.read.unchangedSince?.generationId,'gen-2377-a','positive control: the shortcut is offered');
+ assert.equal(checks.length,1,'the read checks the board once');
+ held.ack=acknowledgement2377();
+ assert.equal(ticket.read.unchangedSince?.generationId,'gen-2377-a','an equal acknowledgement saved again (another tab’s board) still names the copy');
+ held.ack=acknowledgement2377({revision:3});
+ assert.equal(ticket.read.unchangedSince,null,'a changed acknowledgement does not');
+ ticket.read.end();
+ assert.equal(checks.length,1,'and neither is a check');
+ await acceptedRead2377(session);
+ await shortcut2377(session,{deliberate:true});
+ const accepted=await session.mayPush().write.accept(ack2377(4),{payload:'board at 4',install:async()=>true});
+ assert.equal(accepted.accepted,true,'positive control: the push’s acknowledgement is accepted');
+ const stale=await session.mayPush().write.accept(ack2377(2),{payload:'board at 2',install:async()=>true});
+ assert.equal(stale.reason,'stale','positive control: an older reply is refused by the saved revision alone');
+ await session.observeRead(damaged2377('gen-2377-other',3));
+ assert.equal(checks.length,1,'no reply, damage report, full or deliberate read checks the board');
 });
 
 test('RISK sync session: every cloud read reports through the backend’s cloudread event, and damage for one identity neither blocks nor clears another’s',async()=>{

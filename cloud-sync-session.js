@@ -23,10 +23,16 @@
      backend()         the cloud backend (window.CloudSync): its account, and
                        whether it is ready
      identity()        the signed-in identity (the backend's user ID)
-     acknowledgement   {get(): Ack|null, save(next: Ack): Promise<boolean>}
-                       Ack = {account, identity, revision, base}, where base
-                       is the saved decision base and base.copy names the
-                       published copy {generationId, hash} its bytes are
+     acknowledgement   {get(): Ack|null, valid(ack: Ack): boolean,
+                        save(next: Ack): Promise<boolean>}
+                       Ack = {account, identity, revision, base}, as saved,
+                       where base is the saved decision base and base.copy
+                       names the published copy {generationId, hash} its bytes
+                       are. get() is cheap. valid() checks that base is the
+                       decision base of that account and revision, from the
+                       base's version, ID and bytes alone; it parses the whole
+                       board, so the session asks it at most once per read and
+                       never for a reply.
      events            the window: the session listens for "cloudread" */
 (function(root){
   "use strict";
@@ -39,12 +45,14 @@
     revision:Number.isSafeInteger(revision)?revision:null});
 
   function createSyncSession({backend,identity,acknowledgement,events}={}){
-    if(typeof backend!=="function"||typeof identity!=="function"||typeof acknowledgement?.get!=="function"||typeof acknowledgement.save!=="function")
+    if(typeof backend!=="function"||typeof identity!=="function"||typeof acknowledgement?.get!=="function"||
+      typeof acknowledgement.valid!=="function"||typeof acknowledgement.save!=="function")
       throw new TypeError("The sync session needs its backend, identity and acknowledgement ports.");
     const read=port=>{try{return port();}catch{return null;}};
     const connection=()=>read(backend)??null,account=()=>connection()?.user??null;
     const signedIn=()=>text(read(identity)),rawIdentity=()=>read(identity)??null;
     const acknowledged=()=>read(()=>acknowledgement.get())??null;
+    const validates=ack=>read(()=>acknowledgement.valid(ack))===true;
 
     // One record per identity: the copy a read of that account last found
     // damaged. Kept for this page only; a healthy read of the account clears
@@ -96,18 +104,27 @@
 
     // The acknowledged copy a read may treat as unchanged: this account and
     // identity's acknowledgement names a copy, at revision 1 or later, and no
-    // read has found that copy damaged. The bytes are checked after.
+    // read has found that copy damaged. These checks are cheap; whether the
+    // base is valid, and the bytes, are checked after.
     function namedCopy(ack,user,id){
       const base=ack?.base,copy=copyOf(base?.copy);
-      if(!copy||id===null||typeof user!=="string"||ack.account!==user||ack.identity!==id||
+      if(!copy||Array.isArray(base)||id===null||typeof user!=="string"||ack.account!==user||ack.identity!==id||
         !Number.isSafeInteger(ack.revision)||ack.revision<1||base.account!==ack.account||base.revision!==ack.revision||
         typeof base.payload!=="string"||knownDamaged(id,copy.generationId))return null;
-      return {account:user,identity:id,rev:ack.revision,generationId:copy.generationId,hash:copy.hash,payload:base.payload};
+      return {account:user,identity:id,rev:ack.revision,generationId:copy.generationId,hash:copy.hash,payload:base.payload,
+        base:{v:base.v,id:base.id}};
     }
+    // #2377 review N2: a proof stays a proof while the acknowledgement still
+    // names it, field for field: the account, identity and revision, and the
+    // base's version, ID, bytes and copy. valid() depends on nothing else, so
+    // it is not asked again (a parse of the whole board), and the same base
+    // object compares at once. An equal board saved again, as another tab's,
+    // still names it. A damage report since takes the proof away (namedCopy).
     const stillNamed=proof=>{
       const now=namedCopy(acknowledged(),account(),signedIn());
       return !!now&&now.account===proof.account&&now.identity===proof.identity&&now.rev===proof.rev&&
-        now.generationId===proof.generationId&&now.hash===proof.hash&&now.payload===proof.payload;
+        now.generationId===proof.generationId&&now.hash===proof.hash&&now.payload===proof.payload&&
+        now.base.v===proof.base.v&&now.base.id===proof.base.id;
     };
 
     // #2354, D3: a read may skip downloading only the copy this device holds
@@ -120,8 +137,8 @@
       const reader=account();
       let proof=null,before=null,open=true;
       if(!deliberate&&!full){
-        const candidate=namedCopy(acknowledged(),reader,signedIn());
-        try{if(candidate&&await root.ChainStorageV2.hashPayload(candidate.payload)===candidate.hash)proof=candidate;}
+        const ack=acknowledged(),candidate=namedCopy(ack,reader,signedIn());
+        try{if(candidate&&validates(ack)&&await root.ChainStorageV2.hashPayload(candidate.payload)===candidate.hash)proof=candidate;}
         catch{ /* No digest proves nothing; the read downloads in full. */ }
       }
       return {go:true,read:{
@@ -194,7 +211,8 @@
           if(reply.error)return settle({accepted:false,reason:"failed"});
           if(reply.conflict)return settle({accepted:false,reason:"conflict"});
           if(typeof reply.rev!=="number")return settle({accepted:false,reason:"unavailable"});
-          // Never rewind this device's revision or replace a newer copy with an older one.
+          // Never rewind this device's revision or replace a newer copy with an
+          // older one. The saved revision alone decides; the base is not checked.
           if(reply.rev<acknowledged()?.revision)return settle({accepted:false,reason:"stale"});
           let before=null,made=null;
           if(bind){
