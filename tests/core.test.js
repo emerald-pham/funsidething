@@ -54,6 +54,7 @@ import {
   settleRecovery188, recoveryReleasedArtifacts188, settleRecoveryOperations188,
   retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
 } from "./shared.js";
+import { openApp } from "./shared.js"; // #2378 app driver
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
@@ -28445,9 +28446,13 @@ test('RISK landscape water browser: GPU distortion preserves contact and sharp p
  }finally{await browser.close();}
 });
 
-test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload',async()=>{
- const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+// #2257: the retry's read can take longer than any fixed wait on a slow
+// runner. A one-time stall inside that read reproduces it on every run.
+async function durableSaveRetry2257(t,stallMs){
+ const storage=sharedScannerStorage(),app=await openApp(t,{sharedStorage:storage}),{ctx,shim}=app;
  const cloud=recoveringCloudStatusHarness(shim,ctx);
+ let stallArmed=false;const pull=cloud.CS.pull;
+ cloud.CS.pull=async(...args)=>{if(stallArmed){stallArmed=false;await new Promise(resolve=>setTimeout(resolve,stallMs));}return pull(...args);};
  await ctx.cloudPull();
  cloud.fail('reconcile','invalid-payload');
  const set=storage.setItem;
@@ -28459,17 +28464,55 @@ test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale 
  assert.equal(await ctx.persist(),false,'the production pair write records the local failure first');
  storage.setItem=set;
  assert.equal(await ctx.persist(),true,'automatic archive recovery makes the same board durable');
- await syncSettle(30);
+ stallArmed=true;
+ // The retry's own read, however long it takes. Settling would also wait for
+ // the edit's debounced push, and this checks the screen before that push. If
+ // no retry starts, nothing is pending and settled() ends the wait.
+ const pullNow=ctx.cloudPull;
+ const retry=new Promise(resolve=>{ctx.cloudPull=(...args)=>{ctx.cloudPull=pullNow;const read=pullNow(...args);resolve(read);return read;};});
+ await Promise.race([retry,app.settled()]);
  assert.equal(cloud.pulls(),2,'the successful local recovery retries the failed reconciliation automatically');
  assert.equal(cloud.CS.errorStage,null);assert.equal(cloud.CS.errorCode,null);
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing',
   'a successful read clears the stale error but cannot call an unacknowledged edit synced');
  assert.match(shim.document.getElementById('syncBtn').title,/pending|acknowledged|syncing/i,
   'the accessible status must not claim a pending board is already synced');
- ctx.cloudPushNow();await syncSettle(30);
+ ctx.cloudPushNow();await app.settled();
  assert.equal(cloud.pushes(),1);assert.equal(cloud.remote().tasks.some(task=>task.id==='recovered-edit'),true);
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the write acknowledgement completes recovery');
-});
+}
+test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload',t=>durableSaveRetry2257(t,25));
+test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload (retry read stalled 100 ms)',t=>durableSaveRetry2257(t,100));
+// #2378: the same recovery waited for by the settled signal alone: the retry
+// after the durable save, its stalled read, then the recovered edit's push.
+async function settledRetry2378(t,stallMs){
+ const storage=sharedScannerStorage(),app=await openApp(t,{sharedStorage:storage}),{ctx,shim}=app;
+ ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ const cloud=recoveringCloudStatusHarness(shim,ctx);
+ let stallArmed=false;const pull=cloud.CS.pull;
+ cloud.CS.pull=async(...args)=>{if(stallArmed){stallArmed=false;await new Promise(resolve=>setTimeout(resolve,stallMs));}return pull(...args);};
+ await ctx.cloudPull();
+ cloud.fail('reconcile','invalid-payload');
+ const set=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY){const error=Error('site quota');error.name='QuotaExceededError';throw error;}
+  set(key,value);
+ };
+ ctx.state.tasks.push(syncTask('recovered-edit','Edit that outlived device quota'));ctx.state.syncDirty=true;
+ assert.equal(await ctx.persist(),false,'positive control: the device save fails first');
+ storage.setItem=set;
+ assert.equal(await ctx.persist(),true,'positive control: the same board then saves durably');
+ stallArmed=true;
+ await app.settled();
+ assert.equal(stallArmed,false,'positive control: the retry read was stalled');
+ assert.equal(cloud.pulls(),2,'the durable save retried the failed read');
+ assert.equal(cloud.CS.errorStage,null);assert.equal(cloud.CS.errorCode,null);
+ assert.equal(cloud.pushes(),1,'and the recovered edit was pushed');
+ assert.equal(cloud.remote().tasks.some(task=>task.id==='recovered-edit'),true);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','sync settles only once the push is acknowledged');
+}
+test('RISK CLOUD RECOVERY: sync settles only after a durable save’s retry and the recovered edit’s push (retry read stalled 25 ms)',t=>settledRetry2378(t,25));
+test('RISK CLOUD RECOVERY: sync settles only after a durable save’s retry and the recovered edit’s push (retry read stalled 100 ms)',t=>settledRetry2378(t,100));
 
 test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors', async()=>{
  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});

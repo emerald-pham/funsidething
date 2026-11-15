@@ -4491,8 +4491,8 @@ function refreshBrowserCopy(){
     if(state && !sameListOwner(next,state)) undoStack=[];
     else if(state) pushUndo();
     state=next; lastPersistedRaw=recoveredHead; persistedChanceSeed=state.chance?.seed ?? null;
-    if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
-    if(cloudTimer){ clearTimeout(cloudTimer); cloudTimer=null; }
+    if(saveTimer){ clearSyncTimeout(saveTimer); saveTimer=null; }
+    if(cloudTimer){ clearSyncTimeout(cloudTimer); cloudTimer=null; }
     syncSession?.requireRead("board-replaced"); pendingPush=false; lastPushed="";
     applyTheme(); applyScenePreferences(); recomputeRanks(); render();
     if(added){
@@ -5017,15 +5017,16 @@ function save(preserveBackupId=null){
   state.updatedAt = Date.now();
   state.syncDirty = true;
   cloudPush();
-  if(saveTimer){clearTimeout(saveTimer);saveTimer=null;}
+  if(saveTimer){clearSyncTimeout(saveTimer);saveTimer=null;}
   // A new random draw must survive even an immediate reload. Ordinary edits
   // retain the debounce; cloud pushes retain their revision/reconcile guard.
   if(state.chance && state.chance.seed !== persistedChanceSeed) persist(false,preserveBackupId);
   else{
-    const timer=setTimeout(()=>{
+    const timer=countSyncTimer("save-debounce",setTimeout(()=>{
+      endSyncTimer(timer);
       if(saveTimer!==timer)return;
       saveTimer=null;return persist(false,preserveBackupId);
-    },350);
+    },350));
     saveTimer=timer;
   }
 }
@@ -6144,6 +6145,8 @@ function reportCloudSaveLoop(guard){
   renderSync();
 }
 async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("device-save");try{
   // A device retry belongs to the run that started it.
   let cloudStep=null;
   if(!(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)){
@@ -6191,6 +6194,7 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
     observeCloudSave("failed");
     throw error;
   }finally{supportDiagnosticsActivePersistCalls=Math.max(0,supportDiagnosticsActivePersistCalls-1);}
+  }finally{syncWork.end();}
 }
 function supportDiagnosticsSettleCloudPush(ticket,status,revision=null,code="unknown",pushDetails=null){
   try{
@@ -6264,6 +6268,16 @@ const syncSession=globalThis.ChainSyncSession?.createSyncSession({
     },
   },
   events:window,
+  // #2378: why an unsent edit waits for something outside this page. Only
+  // the test driver reads it, through the snapshot's waiting list.
+  unsent(){
+    if(!state||!window.CloudSync?.user||state.syncDirty!==true&&!pendingPush)return null;
+    if(document.hidden||cloudSuspended||cloudResumePending)return "hidden";
+    if(scannerGestureActive||hasActiveEditor())return "hold:editor";
+    if(cloudAdoptionHeld)return "hold:adoption";
+    if(!cloudReady())return "not-ready";
+    return "pending";
+  },
 })??null;
 // #2377 slice 2: the session also holds what this page knows the cloud holds,
 // which were this page's reconciledAs, lastKnownCloud* and
@@ -6273,6 +6287,40 @@ const syncSession=globalThis.ChainSyncSession?.createSyncSession({
 // the session nothing is known, so nothing is ever written over the cloud.
 const NO_SYNC_VIEW=Object.freeze({damaged:null,authority:null,known:Object.freeze({payload:null,account:null,revision:null}),owner:null,writing:false});
 function syncView(){return syncSession?syncSession.snapshot():NO_SYNC_VIEW;}
+// #2378: each sync step this page starts or schedules is counted by the
+// session, from the call or the timer being set until it finishes or the timer
+// is cleared, so a test can wait until sync has settled instead of guessing
+// with a fixed wait. Counting adds no timer and no await, each call returns
+// the promise it returned before, and nothing on the page reads the count.
+// Without the session nothing is counted.
+// A running step counts itself inside its own body (try/finally), so callers
+// await the same promise and see the same stack. A timer is counted from
+// countSyncTimer() until its callback starts (endSyncTimer) or it is cleared;
+// whatever the callback starts counts itself before the callback returns.
+// Not counted (#2378, for the tests still to move to settled()): the
+// zero-delay resume of a pull an open editor deferred (focusout, closeModal,
+// the restore follow-up), the acknowledged recovery trim timers, and a late
+// device answer that restarts a pull stopped at the server-only repair.
+const NO_SYNC_WORK=Object.freeze({run:step=>step,end(){}});
+// A page the service worker does not control can pair this page with an older
+// cached cloud-sync-session.js that has no track() (#2378 review N1), or one
+// that does not know a kind a later page counts and refuses it. Then nothing
+// is counted and saves and sync run exactly as before: counting never throws
+// into the app. The session itself still throws, so its tests catch typos.
+function trackSyncWork(kind){
+  if(typeof syncSession?.track!=="function")return NO_SYNC_WORK;
+  try{return syncSession.track(kind);}catch{return NO_SYNC_WORK;}
+}
+const syncWorkTimers=new Map();
+function countSyncTimer(kind,timer){
+  endSyncTimer(timer);syncWorkTimers.set(timer,trackSyncWork(kind));
+  return timer;
+}
+function endSyncTimer(timer){
+  const work=syncWorkTimers.get(timer);
+  if(work){syncWorkTimers.delete(timer);work.end();}
+}
+function clearSyncTimeout(timer){clearTimeout(timer);endSyncTimer(timer);}
 // #2264, #2268 review: the cloud confirming a board for this account (a save's
 // acknowledgement, a recovery's or restore's confirmed publication, or a read
 // of a readable cloud board) binds the owner, and that ends the daily backup
@@ -6328,8 +6376,8 @@ function queueDeviceCloudBackupReconcile(){
   if(window.CloudSync!==pending.backend||window.CloudSync?.user!==pending.account||state?.syncAccount!==pending.account){pendingDeviceCloudBackup=null;return;}
   if(!pending.ready||deviceCloudBackupTimer!==null||pulling||cloudPushInFlight||cloudSuspended||cloudResumePending||document.hidden)return;
   if(hasActiveEditor()||scannerGestureActive){deferredCloudPull=true;return;}
-  deviceCloudBackupTimer=setTimeout(()=>{
-    deviceCloudBackupTimer=null;
+  deviceCloudBackupTimer=countSyncTimer("backup-pull",setTimeout(()=>{
+    endSyncTimer(deviceCloudBackupTimer);deviceCloudBackupTimer=null;
     if(pendingDeviceCloudBackup!==pending)return;
     if(window.CloudSync!==pending.backend||window.CloudSync?.user!==pending.account||state?.syncAccount!==pending.account){pendingDeviceCloudBackup=null;return;}
     if(!cloudReady()||cloudSuspended||cloudResumePending||document.hidden||pulling||cloudPushInFlight)return;
@@ -6338,11 +6386,26 @@ function queueDeviceCloudBackupReconcile(){
     // Consume one proven local-save wakeup. Another retry requires a new
     // explicit backup CAS conflict and another verified local save.
     pendingDeviceCloudBackup=null;cloudPull();
-  },0);
+  },0));
 }
 let pendingPush = false;   // a write was asked for before that happened — released once we reconcile
 let recoveryReadDeferredPush = false; // #2272: a write held while a recovery read was busy
 let cloudPullPending = false; // auth can report a user before init has loaded the local state
+// #2378: that queued pull is sync work still to run, counted until it runs or
+// is dropped (queueCloudPull / dropQueuedCloudPull).
+let cloudPullQueuedWork = null;
+function queueCloudPull(){
+  cloudPullPending=true;
+  if(!cloudPullQueuedWork)cloudPullQueuedWork=trackSyncWork("pull");
+}
+function dropQueuedCloudPull(){
+  cloudPullPending=false;endQueuedCloudPullCount();
+}
+// The queued pull stops counting once a pull runs (itself counted) or startup
+// has passed the point where it replays it; cloudPullPending keeps its meaning.
+function endQueuedCloudPullCount(){
+  const work=cloudPullQueuedWork;cloudPullQueuedWork=null;work?.end();
+}
 let cloudRetryTimer = null, cloudRetryAttempt = 0, cloudRetryAccount = null, cloudRetryOwner = null;
 let cloudConflictAttempts = 0;
 let cloudSuspended = !!document.hidden, cloudResumePending = false, cloudPageHidden = false;
@@ -6356,14 +6419,14 @@ function scheduleLiveCloudPull(){
   if(!state || !cloudReady() || cloudSuspended || document.hidden || pulling || cloudPushInFlight || scannerGestureActive) return;
   if(hasActiveEditor()){deferredCloudPull=true;return;}
   if(pending.rev<=lastLiveCloudAttempt || liveCloudTimer) return;
-  liveCloudTimer=setTimeout(()=>{
-    liveCloudTimer=null;
+  liveCloudTimer=countSyncTimer("live-pull",setTimeout(()=>{
+    endSyncTimer(liveCloudTimer);liveCloudTimer=null;
     // The editor, gesture, account, or write slot may have changed while queued.
     if(pendingCloudRevision!==pending || pending.user!==window.CloudSync?.user || document.hidden || cloudSuspended || pulling || cloudPushInFlight || scannerGestureActive) return;
     if(hasActiveEditor()){deferredCloudPull=true;return;}
     lastLiveCloudAttempt=pending.rev;
     cloudPull(); // Full server/codec validation, durable recovery, and revision guards still apply.
-  },0);
+  },0));
 }
 window.addEventListener("cloudboardchange",event=>{
   const {user,rev}=event.detail || {};
@@ -6411,7 +6474,7 @@ function holdRejectedCloudWrite(account){
 
 function clearCloudRetry({preserveAutomaticSource=false}={}){
   if(preserveAutomaticSource&&cloudRetryOwner==="automatic-source")return;
-  if(cloudRetryTimer) clearTimeout(cloudRetryTimer);
+  if(cloudRetryTimer) clearSyncTimeout(cloudRetryTimer);
   cloudRetryTimer=null;cloudRetryAttempt=0;cloudRetryAccount=null;cloudRetryOwner=null;cloudConflictAttempts=0;
 }
 function recoverableCloudFailure(CS){
@@ -6433,18 +6496,19 @@ function scheduleCloudRetry(account,{automaticSource=false,errorCode=null,contin
   const delay=Number.isFinite(override) && override>=0 ? override : delays[cloudRetryAttempt];
   cloudRetryAttempt++;
   cloudRetryOwner=automaticSource?"automatic-source":"cloud";
-  cloudRetryTimer=setTimeout(()=>{
-    cloudRetryTimer=null;
+  cloudRetryTimer=countSyncTimer("cloud-retry",setTimeout(()=>{
+    endSyncTimer(cloudRetryTimer);cloudRetryTimer=null;
     cloudRetryOwner=automaticSource?"automatic-source":null;
     if(!cloudReady() || window.CloudSync!==CS || CS.user!==account ||
       (automaticSource?cloudSuspended||document.hidden:!recoverableCloudFailure(CS)))return;
-    if(automaticSource){Promise.resolve().then(continuation).catch(()=>{});return;}
+    // Its continuation runs one microtask later and stays counted until it ends.
+    if(automaticSource){trackSyncWork("cloud-retry").run(Promise.resolve().then(continuation).catch(()=>{}));return;}
     if(hasActiveEditor()){deferredCloudPull=true;return;}
     // A timed-out write has an unknown outcome until it is read back. Revision
     // arbitration makes that read safe even if the original transaction later
     // finishes: at most one writer can advance the same base revision.
     cloudPull();
-  },delay);
+  },delay));
   return true;
 }
 
@@ -6532,12 +6596,13 @@ function retryCloudAfterDeviceRecovery(){
   // Run outside the guarded primary write. Besides avoiding recursion when a
   // cloud acknowledgement is itself saving revision bookkeeping, this gives
   // an account transition in the same turn authority to cancel the old retry.
-  setTimeout(()=>{
+  const timer=countSyncTimer("recovery-retry",setTimeout(()=>{
+    endSyncTimer(timer);
     if(window.CloudSync!==CS || !cloudReady() || CS.user!==account ||
        CS.status!=="error" || CS.errorStage!==stage || CS.errorCode!==code || lastDeviceSaveIssue) return;
     if(stage==="push") cloudPushNow();
     else cloudPull();
-  },0);
+  },0));
 }
 
 function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && CS.user); }
@@ -6548,9 +6613,9 @@ function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && 
 function reconciled(){ const authority=syncView().authority; return !cloudSuspended && !cloudResumePending && !cloudAdoptionHeld && !deferredCloudPull && authority !== null && cloudReady() && authority === window.CloudSync.user; }
 function cloudPush(){
   if(!cloudReady()) return;
-  if(cloudTimer) clearTimeout(cloudTimer);
+  if(cloudTimer) clearSyncTimeout(cloudTimer);
   const override=Number(window.CLOUD_PUSH_DELAY_MS),delay=Number.isFinite(override)&&override>=0?override:2000;
-  cloudTimer = setTimeout(()=>{ cloudTimer = null; sendPush(); }, delay);   // debounce — cloud traffic is off the keystroke path
+  cloudTimer = countSyncTimer("push-debounce",setTimeout(()=>{ endSyncTimer(cloudTimer); cloudTimer = null; sendPush(); }, delay));   // debounce — cloud traffic is off the keystroke path
 }
 // #2272: once no recovery read is busy, a write it held goes through the
 // ordinary debounced push and every gate that push already has.
@@ -6563,7 +6628,7 @@ function resumeCloudPushAfterRecoveryRead(){
    and sends the current state right now instead. */
 function cloudPushNow(){
   if(!cloudReady()) return;
-  if(cloudTimer){ clearTimeout(cloudTimer); cloudTimer = null; }
+  if(cloudTimer){ clearSyncTimeout(cloudTimer); cloudTimer = null; }
   sendPush();
 }
 // #2310: the device list no longer holds backup text, so proving the displaced
@@ -6770,6 +6835,8 @@ async function heldSourceStillHolds(heldSource,stillCurrent){
    we know what it would be overwriting, so until this session has read the
    cloud we hold the write and go read first. cloudPull() releases it. */
 async function sendPush(){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("push");try{
   if(!liveBoardAccepted)return;
   // #2272: a recovery read compares two captures of the cloud and of this
   // device's pending upload. A write of this device's own landing between them
@@ -6781,7 +6848,7 @@ async function sendPush(){
   if(cloudSuspended || document.hidden || cloudResumePending){pendingPush=true;return;}
   // An immediate release of a pending write supersedes its debounced copy.
   // Leaving that timer alive can bypass the conflict retry's delay/limit.
-  if(cloudTimer){ clearTimeout(cloudTimer); cloudTimer=null; }
+  if(cloudTimer){ clearSyncTimeout(cloudTimer); cloudTimer=null; }
   if(blockedCloudWrite()){ renderSync(); return; }
   const heldSource=unrepairableCloudSource;
   const heldStillCurrent=()=>cloudAdoptionHeld&&unrepairableCloudSource===heldSource&&heldSourceMatchesBoard(heldSource);
@@ -6978,6 +7045,7 @@ async function sendPush(){
     if(reconciled() && !pulling && pendingPush){ pendingPush=false; sendPush(); }
     if(automaticCloudSourceResumeRequested)maybeResumeAutomaticCloudSources();
   }
+  }finally{syncWork.end();}
 }
 /* Device-only revision, account, unsynced-edit, and protected-recovery evidence
    never belongs in a shared list or export. In particular, syncing syncRev
@@ -7511,13 +7579,14 @@ let deferredBrowserCopy=false;
 let browserCopyRecoverySerial=0;
 function resumeCloudAfterBrowserRecovery(previousSerial,account){
   if(browserCopyRecoverySerial===previousSerial || !account) return;
-  setTimeout(()=>{
+  const timer=countSyncTimer("recovery-retry",setTimeout(()=>{
+    endSyncTimer(timer);
     if(!cloudReady() || window.CloudSync.user!==account || hasActiveEditor()){
       if(cloudReady() && window.CloudSync.user===account) deferredCloudPull=true;
       return;
     }
     cloudPull();
-  },0);
+  },0));
 }
 function resumeDeferredBrowserCopy(){
   if(!deferredBrowserCopy || !state || hasActiveEditor()) return;
@@ -8227,9 +8296,12 @@ function boardBeforeCloudRecoveryWork(){
   });
 }
 async function cloudPull(){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("pull");try{
   // Even source-only repair waits for boot to classify its saved sources.
   // A bounded unavailable startup still replays this queued request afterward.
-  if(!state||automaticCloudFallbackBootCapturePending){cloudPullPending=true;return;}
+  if(!state||automaticCloudFallbackBootCapturePending){queueCloudPull();return;}
+  endQueuedCloudPullCount();
   // This read classifies only device availability. Server-only repair cannot
   // consume, clear or acknowledge pending local work that it cannot observe.
   if(cloudReady()&&!cloudSuspended&&!document.hidden&&
@@ -8267,7 +8339,7 @@ async function cloudPull(){
     }
   }
   if(deviceRecoveryCloudHold){
-    cloudPullPending=false;
+    dropQueuedCloudPull();
     // #2287 review: the held publication makes its own read before any write,
     // so a visible page goes on with it; a phone lock or app switch left this
     // set for good, since this branch returns before the line below clears it.
@@ -8304,7 +8376,7 @@ async function cloudPull(){
     if(baseline?.mode==="readable-malformed"&&automaticCloudFallbackBaselineMatches(baseline)){
       if(decisionRecoveryHolds().length){cloudAdoptionHeld=true;reportCloudReconcileError("decision-recovery-pending");return;}
       if(hasActiveEditor()||scannerGestureActive){deferredCloudPull=true;return;}
-      if(cloudRetryTimer){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;}
+      if(cloudRetryTimer){clearSyncTimeout(cloudRetryTimer);cloudRetryTimer=null;}
       const acct=window.CloudSync.user,pullBackend=window.CloudSync,pullIdentity=cloudAccountIdentity();
       const pullStillCurrent=()=>cloudReady()&&window.CloudSync===pullBackend&&pullBackend.user===acct&&
         cloudAccountIdentity()===pullIdentity&&!cloudSuspended&&!cloudResumePending;
@@ -8317,7 +8389,7 @@ async function cloudPull(){
       reportDeviceSaveFailure("device-store","unavailable","The durable saved source remains untouched. Automatic recovery needs readable device storage; retry when storage is available.");
     return;
   }
-  if(cloudRetryTimer&&cloudRetryOwner!=="automatic-source"){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
+  if(cloudRetryTimer&&cloudRetryOwner!=="automatic-source"){clearSyncTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
   if(decisionRecoveryHolds().length){cloudAdoptionHeld=true;reportCloudReconcileError("decision-recovery-pending");return;}
   // An unreadable or unbacked-up browser copy is still evidence to preserve.
   // Do not let a cloud adoption write over it after refreshBrowserCopy fails.
@@ -8330,7 +8402,7 @@ async function cloudPull(){
   if(pulling) return;
   if(cloudPushInFlight){deferredCloudPull=true;return;}
   cloudResumePending = false;
-  cloudPullPending = false;
+  dropQueuedCloudPull();
   // Treat cloud replacement like an app update: a DOM-only draft is still
   // user work. Hold both adoption and writes until reconciliation can finish.
   if(hasActiveEditor() || scannerGestureActive){ deferredCloudPull = true; return; }
@@ -8945,6 +9017,7 @@ async function cloudPull(){
     else if(reconciled() && pendingPush){ pendingPush = false; sendPush(); }
     if(automaticCloudSourceResumeRequested)maybeResumeAutomaticCloudSources();
   }
+  }finally{syncWork.end();}
 }
 // A Home Screen PWA can freeze with a read/write and its timeout still pending.
 // Release those slots on hide; on return, reconnect and read before any write.
@@ -8954,16 +9027,16 @@ function suspendCloudSync(){
   cloudSuspended=true;cloudResumePending=true;
   syncSession?.requireRead("page-hidden");
   pendingDeviceCloudBackup=null;
-  if(deviceCloudBackupTimer!==null){clearTimeout(deviceCloudBackupTimer);deviceCloudBackupTimer=null;}
+  if(deviceCloudBackupTimer!==null){clearSyncTimeout(deviceCloudBackupTimer);deviceCloudBackupTimer=null;}
   cloudAdoptionHeld=true;lastPushed="";
   automaticCloudRecovery=null;
   // #2254 review (S2): hiding the page stops any adoption run of this page,
   // which is an outcome it saw, not a page closed in the middle of the run.
   endContainedAdoptionRun();
   unrepairableCloudSource=null;
-  if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}
+  if(cloudTimer){clearSyncTimeout(cloudTimer);cloudTimer=null;}
   if(cloudSourceRecoveryRead?.automaticHistoryResume)cancelCloudSourceRecoveryRead({record:false});
-  if(cloudRetryTimer){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;}
+  if(cloudRetryTimer){clearSyncTimeout(cloudRetryTimer);cloudRetryTimer=null;}
   cloudRetryOwner=null;cloudRetryAttempt=0;
   window.CloudSync?.suspend?.();
 }
@@ -14295,6 +14368,8 @@ function renderDecisionRecovery(message=null){
     +'<div class="mbtns"><button class="btn '+(applyDisabled?'subtle':'primary')+'" data-act="apply-decision-recovery"'+(applyDisabled?' disabled':'')+'>Save choice and sync</button><button class="btn subtle" data-act="review-decision-recovery"'+(decisionRecoveryBusy?' disabled':'')+'>Read sources again</button><button class="btn subtle" data-act="close-modal">Close</button></div>');
 }
 async function reviewDecisionRecovery(message=""){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("recovery");try{
   if(decisionRecoveryBusy)return false;
   const serial=++decisionRecoveryReviewSerial;
   decisionRecoveryPreview=null;renderDecisionRecovery(message||"Reading this device and the current cloud source…");
@@ -14311,6 +14386,7 @@ async function reviewDecisionRecovery(message=""){
       values:ratings?[...(ratingDevice.changes.length?["device-ratings"]:[]),...(ratingCloud.changes.length?["cloud-ratings"]:[]),"recorded-ratings"]:[...new Set([device.saved,device.recorded,cloudChoice?.saved,cloudChoice?.recorded].filter(Boolean))]};
     renderDecisionRecovery(message);return true;
   }catch(error){if(serial!==decisionRecoveryReviewSerial)return false;renderDecisionRecovery(error.decisionRecoveryMessage||"Storage or cloud evidence could not be verified. Both sources remain protected; retry when available.");return false;}
+  }finally{syncWork.end();}
 }
 function carryMissingRecoveryFields(target,source){
   // Unknown fields are plain data. Copy only absent fields; differing values
@@ -14366,6 +14442,8 @@ function decisionRecoveryEffects(p){
 }
 function decisionRecoveryStillOpen(p){return decisionRecoveryPreview===p&&p.serial===decisionRecoveryReviewSerial;}
 async function applyDecisionRecovery(){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("recovery");try{
   const p=decisionRecoveryPreview;
   if(decisionRecoveryBusy||!p||p.issue||!p.values.includes(p.choice))return false;
   let cloudConfirmed=false,localApplied=false,decisionWrite=null;
@@ -14489,6 +14567,7 @@ async function applyDecisionRecovery(){
     renderDecisionRecovery(cloudConfirmed?confirmedNotice:error.decisionRecoveryMessage||"Storage or cloud evidence could not be verified. Both sources remain protected; retry when available.");return false;
   }
   finally{decisionWrite?.end();decisionRecoveryBusy=false;if(decisionRecoveryPreview)renderDecisionRecovery();}
+  }finally{syncWork.end();}
 }
 
 /* A damaged selected generation cannot prove what its missing bytes meant.
@@ -14637,7 +14716,7 @@ function automaticRecoveryDeviceAuthorityCurrent(captured){
 // board, stopping the recovery with its work half confirmed. A save that still
 // has something to write stays armed.
 function dropDebouncedSaveAlreadyWritten(){
-  if(saveTimer&&lastPersistedRaw===JSON.stringify(state)){clearTimeout(saveTimer);saveTimer=null;}
+  if(saveTimer&&lastPersistedRaw===JSON.stringify(state)){clearSyncTimeout(saveTimer);saveTimer=null;}
 }
 function cloudSourceRecoveryReadTimeout(){
   const configured=Number(window.CLOUD_RECOVERY_READ_TIMEOUT_MS);
@@ -15409,7 +15488,7 @@ function waitForAutomaticSourceRetry(account,errorCode,read){
       if(finished)return;finished=true;read.controller.signal.removeEventListener("abort",aborted);resolve(value);
     };
     const aborted=()=>{
-      if(cloudRetryOwner==="automatic-source"&&cloudRetryTimer){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
+      if(cloudRetryOwner==="automatic-source"&&cloudRetryTimer){clearSyncTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
       done(false);
     };
     if(read.controller.signal.aborted){done(false);return;}
@@ -15993,6 +16072,8 @@ function automaticRecoveryWorkEstimate(generations,board){
   return {generationBytes,boardBytes,decisionBytes,totalBytes:generationBytes+boardBytes+decisionBytes};
 }
 async function openAutomaticCloudSourceFallback(failed,{account,backend,identity,pullStillCurrent,outcome=null,deliberate=false}={}){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("recovery");try{
   const baseline=automaticCloudFallbackBootBaseline;
   const localIntent=failed?.code==="device-source-recovery"?deviceRecoveryCloudHold:null,localIntentDraft=localIntent?cloudSourceRecoveryDraft():null;
   if(localIntent&&!localWorkingRecoveryIntent(localIntent))return false;
@@ -16354,8 +16435,8 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
       persistedChanceSeed=next.chance?.seed??null;freshClient=false;liveBoardAccepted=true;
       unacceptedDeviceSource=null;
       adopted=true;state=next;automaticCloudFallbackBootBaseline=null;forgetUnreadableCloudSourceHold();cloudAdoptionHeld=true;pendingPush=false;
-      if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}
-      if(cloudRetryTimer&&cloudRetryOwner!=="automatic-source"){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
+      if(cloudTimer){clearSyncTimeout(cloudTimer);cloudTimer=null;}
+      if(cloudRetryTimer&&cloudRetryOwner!=="automatic-source"){clearSyncTimeout(cloudRetryTimer);cloudRetryTimer=null;cloudRetryOwner=null;}
       render();renderSync();
       // #2227 (spec #2224): publication runs after this capture returns, so
       // its source captures, candidate boards, reduced board and archive text
@@ -16515,10 +16596,13 @@ async function openAutomaticCloudSourceFallback(failed,{account,backend,identity
     if(cloudSourceRecoveryRead===read){cloudSourceRecoveryRead=null;cloudSourceRecoveryBusy=false;resumeCloudPushAfterRecoveryRead();}
     if(backgroundResume)runRecoveryTrimAfterCheck();
   }
+  }finally{syncWork.end();}
 }
 // An automatic hold is a durable source reference, not consent or an ACK.
 // Revalidate its exact original archive and current device before every write.
 async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null,resumeContext=null}={}){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("recovery");try{
   const hold=deviceRecoveryCloudHold,backend=window.CloudSync,account=backend?.user,identity=cloudAccountIdentity();
   const usingShared=!!sharedRead;
   if(!hold||hold.v!==1||hold.reason!=="cloud-source-recovery"||hold.automaticRecovery!==true||
@@ -16780,6 +16864,7 @@ async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null
     publication.write.end();
     cloudPushInFlight=false;
   }
+  }finally{syncWork.end();}
 }
 // sourceOwned: validate against the source's own account and require complete
 // saved collections, from this one parse (#2225, the opening display source).
@@ -17389,6 +17474,8 @@ function renderCloudSourceRecoveryReading(fresh=false,unavailable=false,deviceUn
   cloudSourceRecoveryInspection=true;
 }
 async function reviewCloudSourceRecovery(message=""){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("recovery");try{
   if(cloudSourceRecoveryBusy)return false;
   restartDiagnosticsRecord("review-start");
   supportDiagnosticsInline=false;
@@ -17525,6 +17612,7 @@ async function reviewCloudSourceRecovery(message=""){
     }
     return false;
   }finally{if(cloudSourceRecoveryRead===read){cloudSourceRecoveryRead=null;cloudSourceRecoveryBusy=false;resumeCloudPushAfterRecoveryRead();if(cloudSourceRecoveryPreview)renderCloudSourceRecovery(message);}}
+  }finally{syncWork.end();}
 }
 function cloudSourceRecoveryPrepared(p){
   if(!p.holds.length)return "";
@@ -17579,6 +17667,8 @@ function cloudSourceRecoveryPublicationFailure(code){
   return "Cloud confirmation is unavailable. The active board and prepared choice remain protected; read sources again before retrying.";
 }
 async function applyCloudSourceRecovery(){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("recovery");try{
   const p=cloudSourceRecoveryPreview,selected=p?.candidates.find(row=>row.id===p.choice&&row.board);
   if(cloudSourceRecoveryBusy||!p||p.issue||!selected)return false;
   cloudSourceRecoveryBusy=true;let confirmed=false,diagnosticPushTicket=null,publication=null;
@@ -17756,7 +17846,7 @@ async function applyCloudSourceRecovery(){
     // refusal and its device record survived until the next healthy pull.
     // A push debounced or held for the replaced board has nothing left to say.
     deviceRecoveryCloudHold=null;automaticCloudRecovery=null;forgetUnreadableCloudSourceHold();
-    if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}recoveryReadDeferredPush=false;
+    if(cloudTimer){clearSyncTimeout(cloudTimer);cloudTimer=null;}recoveryReadDeferredPush=false;
     // #2377: the chosen source is saved and installed above, so its
     // acknowledgement is accepted: the cloud copy is recorded, this page takes
     // read authority and the Confirmed device cloud owner is bound.
@@ -17769,6 +17859,7 @@ async function applyCloudSourceRecovery(){
     if(cloudSourceRecoveryOpen(p))renderCloudSourceRecovery((confirmed?"Cloud saved the selected source. ":"")+(error.message||"Recovery could not finish. All sources remain protected; read them again."));
     return false;
   }finally{publication?.write?.end();if(diagnosticPushTicket&&!diagnosticPushTicket.settled)supportDiagnosticsSettleCloudPush(diagnosticPushTicket,"stale");cloudSourceRecoveryBusy=false;resumeCloudPushAfterRecoveryRead();}
+  }finally{syncWork.end();}
 }
 
 function openCloudRecovery(){
@@ -19115,6 +19206,8 @@ async function handleFileRestoreLearningChange(value){
   }
 }
 async function fileRestoreCloudWrite(p){
+  // #2378: counted from the call until it returns or throws.
+  const syncWork=trackSyncWork("recovery");try{
   const backend=p.backend,account=p.boundAccount;
   if(fileRestoreReadinessReason(p))throw Error(fileRestoreReadinessReason(p));
   const evidence=await backend.recoveryEvidence();
@@ -19153,6 +19246,7 @@ async function fileRestoreCloudWrite(p){
   p.next.decisionBase=makeDecisionBase(account,result.rev,payload);
   p.candidateRaw=JSON.stringify(p.next);
   p.cloudAcknowledged={payload,revision:result.rev,serverUpdatedAt:p.next.lastCloudServerAt};
+  }finally{syncWork.end();}
 }
 async function commitFileRestoreLocally(p){
   if(!await fileRestoreSourcesStillCurrent(p))throw Error("The board or recovery copies changed before local adoption. Nothing was replaced.");
@@ -20043,7 +20137,7 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
       // sources or turn their read-only display into an empty working board.
       openingRecoveryHeld=true;storageOK=false;
       window.SavedAppearance.holdRecovery(renderOpeningRecoveryShell);
-      setDeviceSaveIssue("storage","unavailable");return;
+      setDeviceSaveIssue("storage","unavailable");endQueuedCloudPullCount();return;
     }
     unacceptedDeviceSource.workingWorkspace=true;
     // The original remains unaccepted. A separate live workspace permits new
@@ -20108,6 +20202,7 @@ window.addEventListener("hashchange",()=>{if(state&&debugLogLinkRequested()){deb
   // store. cloudPull() records that early request; replay it now that state
   // exists so a signed-in device paints its synced tasks without a reload.
   if(cloudPullPending) cloudPull();
+  endQueuedCloudPullCount();
   if(isFirstBoot) openHelp();
   if(rejectedSavedState) toast("Saved data couldn’t be loaded. The original copy was left untouched.", 8000);
   checkAppUpdateNotice(!!loaded);

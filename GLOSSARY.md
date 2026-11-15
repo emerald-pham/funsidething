@@ -115,6 +115,15 @@ and this device has saved the acknowledged board. It starts empty each time the
 app opens.
 _Avoid_: Sync manager, cloud cache
 
+**Settled (sync)**:
+The Sync session's report that no sync step is running (a cloud read or
+write, a device save or a recovery flow) and none is scheduled (a save or
+push debounce, a live or backup read, or a retry), so the app will do no more
+sync work on its own. Work that waits on something outside the app, such as
+an open editor, a hidden page or a read still owed, is listed as waiting and
+does not count. Only tests read it; nothing in the app or on screen does.
+_Avoid_: idle, quiet window
+
 
 **History basis memo**:
 One exact serialized numeric-input/result pair reused between matching History observations. Inputs are rebuilt before every lookup; their combined retained strings stay within256Ki UTF-16 units. It retains no task, board or validation graph and grants no cloud authority.
