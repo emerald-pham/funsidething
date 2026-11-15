@@ -9897,7 +9897,6 @@ const taskActionOwnerBundle=(()=>{
     observation.at=actionAt;
     pushUndo();
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
-    const replayReady=(action==="done"||action==="dot")&&decisionReplayReady(state);
     if(draft){
       applyEditorDraft(task,draft);
       appendCurrentChoiceEvents(prepareCurrentChoiceEvents(
@@ -9910,7 +9909,7 @@ const taskActionOwnerBundle=(()=>{
     }
     const observedCtx=beforeChoice?.ctx?.value??task.ctx;
     const result=BoardDecision.apply(actionGesture,{kind:action,taskId:id,mode:modeOnStart||undefined,
-      contextIds:Array.isArray(observedCtx)?observedCtx.slice():[],resting,replayReady});
+      contextIds:Array.isArray(observedCtx)?observedCtx.slice():[],resting});
     if(!result){commit();return false;}
     if(action==="dot")observation.id=result.rows[0].id;
     if(action==="done"||action==="dot")recomputeRanks();
@@ -9941,11 +9940,10 @@ const taskActionOwnerBundle=(()=>{
    * #2376 BoardDecision: the one place a scanner decision changes the board.
    * apply(gesture,decision) records the decision's rows and makes its
    * unrecorded changes (a postponement, cleared marks) once. Then the chain,
-   * mode and marks are set once, by one of two adapters chosen before the
-   * action by decisionReplayReady():
-   * - replay: the board can be rebuilt from its decisions, so
-   *   projectDecisionEvents builds them from the rows just recorded;
-   * - direct: a board with no decision history yet, or a held one, gets the
+   * mode and marks are set once, by one of two adapters:
+   * - replay: the board, with the decision's rows, can be rebuilt from its
+   *   decisions (decisionReplayReady), so projectDecisionEvents builds them;
+   * - direct: a held board, or a decision that does not replay, gets the
    *   decision's direct rule, which gives what replaying its rows would.
    * Only the decisions that add rating or completion evidence (Yes, No, Done,
    * Dot, Dislodge) replay; they replayed before #2376 too. The others (Can't,
@@ -9960,9 +9958,9 @@ const taskActionOwnerBundle=(()=>{
    * apply to the board as it is now. Nothing is ordered by wall clock.
    */
   const BoardDecision=(()=>{
-    // The adapter: the replay when the board could replay before the action
-    // and still can with the rows just recorded; otherwise the direct rule.
-    // If the board refused a row, the direct rule keeps the app working.
+    // The adapter: the replay when the decision replays and the board can,
+    // with the rows just recorded; otherwise the direct rule. If the board
+    // refused a row, or is held, the direct rule keeps the app working.
     // - The replay gives back every recorded Can't and Worked on it hold, also
     //   one whose time has run out; the sweeps that end those holds run after
     //   it, as they run before every draw, so a choice made next (the
@@ -9979,7 +9977,7 @@ const taskActionOwnerBundle=(()=>{
     function settle(replay,direct){
       const offered=state.candidateId,intervening=state.interventionActive,weighed=benchmark()?.id;let path="direct";
       if(replay&&decisionReplayReady(state)){
-        projectDecisionEvents(state,null,{refreshRanks:false});expireCants();expireWorked();path="replay";
+        projectDecisionEvents(state,null,{refreshRanks:false,ready:true});expireCants();expireWorked();path="replay";
       }else direct();
       if(intervening&&!state.interventionActive&&state.mode==="scan"&&benchmark()?.id===weighed){
         state.interventionActive=true;state.candidateId=null;
@@ -10242,13 +10240,13 @@ const taskActionOwnerBundle=(()=>{
     const decisions={yes,no,cant,done,worked,dislodge,dot,return:returnTask,postpone,mode:setMode,start,rescan};
     const replaying=new Set(["yes","no","done","dot","dislodge"]);
     return Object.freeze({
-      // An action that records rows of its own before its decision (the
-      // editor's saved fields) passes replayReady, read before them, so the
-      // adapter is still chosen before the action.
+      // A replaying decision checks once, with its rows recorded, that the
+      // board can replay (settle), as these decisions did before #2376; a
+      // board that just recorded its first rows replays them.
       apply(gesture,decision){
         const run=decision&&typeof decision==="object"&&Object.hasOwn(decisions,decision.kind)?decisions[decision.kind]:null;
         if(!run||!gesture)return null;
-        return run(gesture,decision,replaying.has(decision.kind)&&(typeof decision.replayReady==="boolean"?decision.replayReady:decisionReplayReady(state)));
+        return run(gesture,decision,replaying.has(decision.kind));
       },
     });
   })();
@@ -11711,9 +11709,10 @@ function decisionReplayReady(board=state){
   const baseline=board?.decisionBaseline,account=Object.hasOwn(board,"syncAccount")?board.syncAccount:baseline?.account??window.CloudSync?.user??null;
   return supportedDecisionBaseline(baseline,account)&&!decisionProjectionIssue(board,false);
 }
-function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshRanks=true}={}){
+// ready: the caller has just checked decisionReplayReady on this board.
+function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshRanks=true,ready=false}={}){
   const baseline=board?.decisionBaseline;
-  if(!decisionReplayReady(board))return false;
+  if(!ready&&!decisionReplayReady(board))return false;
   const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.mode,board.scanMode,board.settings?.scanMode]);
   if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
   const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
