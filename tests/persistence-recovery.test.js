@@ -13960,7 +13960,8 @@ for(const store of RETENTION_STORES_2379){
   const s=await store.open(t);
   const board=id=>boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id);
   // Shapes earlier builds saved: a daily without an account, unknown fields, an
-  // unknown kind, a day that isn't a calendar day and a restore-file record.
+  // unknown kind, a day that isn't a calendar day, an old manual copy and an
+  // expired before-restore copy.
   const seeded=[
    s.row('daily-before-accounts','daily',board('a'),{day:s.daysAgo(5),futureField:{kept:true}}),
    s.row('unknown-kind','kind-from-an-older-build',board('b'),{day:s.daysAgo(40)}),
@@ -14065,4 +14066,17 @@ test('RISK backup retention (browser list): a cloud pull pins a manual copy that
  assert.equal(ctx.state.tasks[0].title,'Other device title','positive control: the pull adopts the other device’s title');
  assert.ok(ctx.state.protectedBackupIds.includes('manual-offline'),'the manual copy is pinned');
  assert.deepEqual(listed().filter(row=>row.payload===offline&&row.kind!=='latest').map(row=>row.id+':'+row.kind),['manual-offline:manual'],'it keeps its kind and no second stable copy is written');
+});
+
+// #2379 review N5 (mutant M4): while the device holds the board, the browser
+// list's copy of a row the device still holds is its mirror and stays listed,
+// even past its days, until the device's own save retires that row.
+test('RISK backup retention (device mirror): the browser list still lists its copy of an expired row the device holds',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const row=s.row('held-old','before-restore',boardWithExtraTask2335(s.ctx,'only-in-held','Only in held'),{day:s.daysAgo(10)});
+ await s.seed([row]);
+ s.storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...JSON.parse(s.storage.getItem(LOCAL_BACKUPS_KEY)||'[]'),row]));
+ const listed=Array.from(s.ctx.readLocalBackups()).filter(entry=>entry.id==='held-old');
+ assert.equal(listed.length,1,'the row is listed once');
+ assert.equal(listed[0].payload,row.payload,'from the browser list’s mirror copy, which still holds its text');
 });
