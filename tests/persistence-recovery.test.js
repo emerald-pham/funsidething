@@ -13018,13 +13018,43 @@ test('RISK sync session settled: a sign-in pull queued while startup classifies 
  first.ctx.addTask('Saved by the first device 2378');
  assert.equal((await signInSettled2347(first)).settled,true,'positive control: the first device’s board reaches the cloud');
  await first.close();
- const second=await device2347(t,{docs});
+ const {device:second,release}=await heldStartupDevice2378(t,docs);
  second.signIn();
  assert.equal(vm.runInContext('cloudPullPending',second.ctx),true,'positive control: startup has not classified the board yet, so the pull is queued');
+ release();
  const settled=await signInSettled2347(second);
  assert.ok(second.ctx.state.tasks.some(task=>task.title==='Saved by the first device 2378'),'the second device has the cloud board once sync settles');
  assert.equal(settled.settled,true,'and shows synced');
 });
+// #2378 re-review N7: the page never lets counting throw (trackSyncWork
+// catches), so a misspelt kind in index.html would go uncounted silently.
+// Every kind the page passes must be one this release's session counts.
+test('RISK sync session settled: every kind of work the page counts is one the sync session knows',()=>{
+ const kinds=[...new Set([...html.matchAll(/\b(?:trackSyncWork|countSyncTimer)\("([^"]+)"/g)].map(match=>match[1]))].sort();
+ assert.ok(kinds.length>=9,'positive control: the page counts its kinds of work: '+JSON.stringify(kinds));
+ const {session}=syncSession2378();
+ const unknown=kinds.filter(kind=>{try{session.track(kind).end();return false;}catch{return true;}});
+ assert.deepEqual(unknown,[],'the session knows every kind the page counts');
+});
+// #2378 re-review B3: a fresh device whose startup check of its saved board
+// is held at the raw device read, so a sign-in before release() always
+// queues its pull, whatever ran before in this process.
+async function heldStartupDevice2378(t,docs){
+ const {IDBFactory}=await import('fake-indexeddb');
+ let reached;const atCheck=new Promise(resolve=>{reached=resolve;});
+ // Only the check's own read is held (its call path names it); startup's
+ // earlier reads of the device run as usual.
+ let armed=true,pending=null;
+ const hold={};
+ Object.defineProperty(hold,'stallRawRead',{configurable:true,
+  get:()=>armed&&String(Error().stack).includes('captureAutomaticCloudFallbackBootBaseline'),set:value=>{armed=!!value;}});
+ Object.defineProperty(hold,'releaseRawRead',{configurable:true,get:()=>pending,set:answer=>{pending=answer;reached();}});
+ const release=()=>{armed=false;for(const answer of hold.rawReadReleases||[])answer();hold.rawReadReleases=[];};
+ t.after(release);
+ const device=await device2347(t,{docs,indexedDB:deviceFaultProvider187(new IDBFactory(),hold)});
+ await atCheck;
+ return {device,release};
+}
 // #2378 review B1: startup replays that queued pull once, and the replay can
 // stop early (here the person signed out meanwhile). The pull is then no longer
 // owed, so it must stop counting, or sync never settles.
@@ -13033,10 +13063,10 @@ test('RISK sync session settled: a sign-in pull queued during startup stops coun
  first.ctx.addTask('Saved by the first device 2378');
  assert.equal((await signInSettled2347(first)).settled,true,'positive control: the first device’s board reaches the cloud');
  await first.close();
- const second=await device2347(t,{docs});
+ const {device:second,release}=await heldStartupDevice2378(t,docs);
  second.signIn();
  assert.equal(vm.runInContext('cloudPullPending',second.ctx),true,'positive control: startup has not classified the board yet, so the pull is queued');
- second.signOut();
+ second.signOut();release();
  await syncSettled(second.ctx,{within:3000});
  assert.equal(second.ctx.window.CloudSync.user,null,'positive control: the page is signed out');
  assert.ok(!second.ctx.state.tasks.some(task=>task.title==='Saved by the first device 2378'),'positive control: no read adopted the cloud board');
