@@ -5021,7 +5021,8 @@ test('RISK legacy completion released Start: normally acknowledged expired retur
   assert.deepEqual(Array.from(candidate.ctx.state.chain),['expiry-recurring'],'a normally published supported old Start after expiry must not be silently removed and acknowledged');
   assert.deepEqual(h.remoteState().chain,['expiry-recurring']);
  }
- candidate.ctx.openHelp();assert.match(candidate.shim.document.getElementById('modalRoot').innerHTML,/If an older Start and completion cannot be ordered safely, recovery waits/);
+ // #234: the same rule in plain words.
+ candidate.ctx.openHelp();assert.match(candidate.shim.document.getElementById('modalRoot').innerHTML,/If the app can’t tell whether a Start or a completion came first, it keeps the dot and waits rather than upload a guess\./);
  t.diagnostic(JSON.stringify({exactOldRev,sourceChain:JSON.parse(exactOldCloud).chain,candidateChain:Array.from(candidate.ctx.state.chain),remoteRev:h.doc.rev,error:candidate.ctx.window.CloudSync.errorCode}));
  const retryDraft=candidate.ctx.addTask('New draft while old cloud chronology waits');await candidate.ctx.onAction('sync-retry',{});await candidate.ctx.cloudPull();await candidate.ctx.cloudPushNow();assert.equal(h.doc.payload,exactOldCloud);assert.equal(h.doc.rev,exactOldRev);assert.ok(candidate.ctx.state.tasks.some(row=>row.id===retryDraft.id));assert.equal(candidate.ctx.state.decisionEvents.some(row=>row.kind==='completion-boundary'),false);
  await t.test('completed source without a returned member still upgrades and acknowledges',async t=>{
