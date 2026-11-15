@@ -1666,6 +1666,25 @@ test('RISK automatic recovery publication: exact current-context cloud ACK relea
  assert.notEqual(originalHold.originalKey,null);
 });
 
+// #2377 specialist review N4: the publication replaces the cloud copy and
+// checks the result with its own reads, so its acknowledgement is never
+// refused as older than the board it replaces. A board that names a revision
+// above the cloud's (a recreated cloud document) kept that board in memory
+// after the publication and its saved board had both landed.
+test('RISK automatic recovery publication: a board whose saved revision is above the cloud’s is still replaced by the confirmed publication',async t=>{
+ const app=await automaticDefaultApp251(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
+ const above=originalRoot.rev+5;ctx.state.syncRev=above;
+ assert.equal(await ctx.persist(),true,'positive control: this device saves a board whose revision is above the cloud’s');
+ await ctx.sendPush();
+ assert.equal(await store.getRecoveryCloudHold(),null,'positive control: the publication finished');
+ const remote=await backend.CS.pull(),head=await store.readHead();
+ assert.ok(remote.rev<above,'positive control: the published revision is below the board’s: '+remote.rev);
+ assert.equal(JSON.parse(head.payload).syncRev,remote.rev,'positive control: the saved board names the published revision');
+ assert.equal(ctx.state.syncRev,remote.rev,'the board in use names it too');
+ assert.equal(JSON.stringify(ctx.state),head.payload,'and is the board saved on this device');
+ assert.equal(ctx.state.syncDirty,false);
+});
+
 test('RISK automatic recovery uncertain publication: a lost reply is verified before retry and never duplicates a cloud save',async t=>{
  const app=await automaticDefaultApp251(t),{ctx,backend,originalRoot}=app,store=ctx.window.ScannerDeviceStore;
  let lost=false;

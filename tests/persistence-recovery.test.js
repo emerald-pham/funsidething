@@ -13737,6 +13737,9 @@ test('RISK sync session: an acknowledgement older than this device’s revision 
   assert.deepEqual({...session.snapshot().known},{...before.known},'nothing is recorded: '+reason);
  }
  assert.equal(held.ack.revision,5);
+ // A replacing write confirms the cloud with its own reads (specialist review N4).
+ const replacing=await session.mayPush({replacing:true}).write.accept(ack2377(4),{payload:'recovered board',install:async()=>true});
+ assert.deepEqual({...replacing},{accepted:true,revision:4},'a recovery publication below the saved revision is accepted');
 });
 
 test('RISK sync session: only one write ticket is open at a time, and a recovery publication’s acknowledgement takes read authority while a saved-decisions Apply records without binding',async()=>{

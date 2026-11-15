@@ -213,9 +213,13 @@
           // Every backend sends a whole revision; a reply without one says
           // nothing (#2377 review N3: 2.5, NaN or Infinity used to be accepted).
           if(!Number.isSafeInteger(reply.rev))return settle({accepted:false,reason:"unavailable"});
-          // Never rewind this device's revision or replace a newer copy with an
-          // older one. The saved revision alone decides; the base is not checked.
-          if(reply.rev<acknowledged()?.revision)return settle({accepted:false,reason:"stale"});
+          // An ordinary push never rewinds this device's revision or replaces a
+          // newer copy with an older one. The saved revision alone decides; the
+          // base is not checked. A replacing write confirms the cloud with its
+          // own reads and may replace a board whose revision is above the
+          // cloud's (a recreated cloud document), as before #2377 (specialist
+          // review N4).
+          if(ordinary&&reply.rev<acknowledged()?.revision)return settle({accepted:false,reason:"stale"});
           let before=null,made=null;
           if(bind){
             before={authority,known,owner};
