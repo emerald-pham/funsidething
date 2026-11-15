@@ -14354,3 +14354,134 @@ test('RISK started pass sync: Postpone gives the same chain, mode and marks on a
  }
  assert.deepEqual(views.replay,views.direct,'the board with history and the one without agree at every step');
 });
+
+// Postponing every dot down to the first one empties the chain, and Postpone
+// dots the first candidate. That automatic dot is the person's chain now: the
+// next answer, a reload and another device keep it, and none of the postponed
+// dots comes back by itself once its postponement has ended.
+test('RISK started pass sync: after Postponing every dot of a pass Start began, the automatic dot survives the next answer, a reload and a second device, and no postponed dot comes back once the postponements end',async t=>{
+ // Five tasks added before Start: adding one after Start holds sync at the
+ // next answer on its own (reported separately), whatever this change does.
+ const device=await startedPassDevice2359(t,'postpone-all'),{ctx,shim}=device;
+ await device.signIn();
+ for(const title of ['Task A 2376','Task B 2376','Task C 2376','Task D 2376','Task E 2376']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ await savesSettled2334(device);await syncSettle(300);
+ await device.act('start-scan');await device.act('yes');await device.act('yes');
+ assert.equal(ctx.state.chain.length,3,'precondition: Start and two Yes answers make three dots');
+ assert.equal(device.status().text,'☁ synced','positive control: they sync: '+device.status().title);
+ ctx.state.settings.postponeHours=0.01;   // 36 seconds, so the test never crosses the 2 AM reset
+ const chain0=Array.from(ctx.state.chain);
+ for(const id of [...chain0].reverse()){
+  assert.equal(ctx.state.chain.at(-1),id,'precondition: the next dot down is the benchmark');
+  await device.act('bench-postpone',{dataset:{benchmark:id}});
+  assert.equal(device.status().text,'☁ synced','the Postpone of '+chain0.indexOf(id)+' syncs: '+device.status().title+' '+JSON.stringify(device.steps()));
+ }
+ assert.equal(ctx.state.chain.length,1,'positive control: the last Postpone dotted a candidate');
+ const auto=ctx.state.chain[0];
+ assert.equal(chain0.includes(auto),false,'and it is not a postponed task');
+ assert.equal(device.status().text,'☁ synced','the Postpones sync: '+device.status().title);
+ const first=offeredYes2376(device);
+ await device.act('yes',{dataset:first});
+ const answered=[auto,first.candidate];
+ assert.deepEqual(Array.from(ctx.state.chain),answered,'the next Yes keeps the automatic dot');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ await closeLegacyApp173(device);device.backend.CS.suspend();
+ const reopened=await startedPassDevice2359(t,'postpone-all-reopened',{indexedDB:device.indexedDB,deviceDbName:device.deviceDbName,sharedDocs:device.backend.docs});
+ await reopened.signIn();await syncSettle(300);
+ assert.deepEqual(Array.from(reopened.ctx.state.chain),answered,'reopening keeps the automatic dot');
+ assert.equal(reopened.status().text,'☁ synced','and syncs: '+reopened.status().title);
+ const offset=36000+60000;   // a minute after the last postponement ends
+ shiftClock2376(reopened.ctx,offset);
+ assert.equal(chain0.every(id=>reopened.ctx.pool().some(task=>task.id===id)),true,'precondition: the postponed tasks are eligible again');
+ const next=offeredYes2376(reopened);
+ await reopened.act('yes',{dataset:next});
+ const expected=[...answered,next.candidate];
+ assert.deepEqual(Array.from(reopened.ctx.state.chain),expected,'the next Yes adds only its candidate: no postponed dot comes back by itself');
+ assert.equal(reopened.status().text,'☁ synced','sync is not held: '+reopened.status().title);
+ const peer=await secondDevice2376(t,reopened,'postpone-all-peer',offset);
+ assert.equal(peer.status().text,'☁ synced','the second device syncs: '+peer.status().title);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'the second device shows the same chain');
+});
+
+// Two devices against the fake cloud under a controlled clock: a pass carried
+// over the 2 AM reset, and a synced board that has never saved a pass id.
+// Postpone for (hrs) is 1, so a minute past the hour the hold has ended.
+const passKinds2376={
+ 'a pass carried over the 2 AM reset':async t=>{
+  const {local,peer,h,at}=await carriedPassClients221(t);
+  return {local,peer,h,at,ids:{a:'carried-a',b:'carried-b',c:'carried-c'}};
+ },
+ 'a board with no saved pass id':async t=>{
+  const clients=await scopedUndoClients(initial=>{
+   initial.tasks=['a','b','c','d','e'].map(id=>syncTask(id,'Task '+id));
+   initial.chain=['a','b','c'];initial.candidateId=null;delete initial.passId;
+   Object.assign(initial.settings,{postponeHours:1,showPostpone:true});
+  });
+  for(const app of [clients.local,clients.peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  assert.equal(Object.hasOwn(clients.initial,'passId'),false,'precondition: no saved pass id');
+  return {...clients,ids:{a:'a',b:'b',c:'c'}};
+ },
+};
+function offeredYesAt2376(app,at){
+ setFakeTime(app.ctx,at);app.ctx.renderScan();
+ const yes=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+ assert.ok(yes,'precondition: a candidate is showing');
+ return {candidate:yes[1],benchmark:yes[2]};
+}
+async function bothReceive2376(first,second){
+ for(let round=0;round<2;round++){await receive221(first);await receive221(second);}
+}
+
+test('RISK chain return sync: a Postponed benchmark stays off once its postponement ends, in a pass carried over 2 AM and on a board with no saved pass id, while the other device answers, in either publish order',async t=>{
+ for(const [kind,open] of Object.entries(passKinds2376))for(const first of ['the Postpone','the other device'])await t.test(`${kind}, ${first} publishes first`,async t=>{
+  const {local,peer,h,at,ids}=await open(t);
+  assert.equal(postponeBenchmark221(local,at+100),ids.c);
+  // The other device has not seen the Postpone. It answers No on its candidate.
+  const other=offeredYesAt2376(peer,at+150);
+  peer.ctx.onAction('no',{dataset:other});
+  const [a,b]=first==='the Postpone'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);await bothReceive2376(a,b);
+  for(const [label,app] of [['the device that postponed',local],['the other device',peer]]){
+   assert.deepEqual(Array.from(app.ctx.state.chain),[ids.a,ids.b],label+': the Postpone and the No are both kept');
+   assert.equal(app.ctx.state.considered[other.candidate],'no',label+': with the No');
+  }
+  const later=at+100+HOUR+60000;
+  setFakeTime(local.ctx,later);
+  assert.equal(local.ctx.pool().some(task=>task.id===ids.c),true,'precondition: the postponed task is eligible again');
+  const next=offeredYesAt2376(local,later+100);
+  assert.notEqual(next.candidate,ids.c,'precondition: the candidate is another task');
+  local.ctx.onAction('yes',{dataset:next});
+  const expected=[ids.a,ids.b,next.candidate];
+  assert.deepEqual(Array.from(local.ctx.state.chain),expected,'the Yes adds only its candidate: the postponed task stays off');
+  await publish221(local);
+  confirmedSync221(local,h,expected,'after the next answer');
+  setFakeTime(peer.ctx,later+200);await receive221(peer);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'the other device shows the same chain');
+ });
+});
+
+test('RISK chain return Undo sync: Undo of a Postpone puts the dot back and keeps the other device’s later Yes, also when the Postpone dotted a candidate, in either publish order',async t=>{
+ for(const postponed of ['the benchmark','every dot'])for(const first of ['Undo','the other device’s Yes'])await t.test(`Postpone of ${postponed}, ${first} publishes first`,async t=>{
+  const {local,peer,h,at,ids}=await passKinds2376['a board with no saved pass id'](t);
+  const order=postponed==='the benchmark'?[ids.c]:[ids.c,ids.b,ids.a];
+  for(const [i,id] of order.entries())assert.equal(postponeBenchmark221(local,at+100+i*10),id);
+  const auto=postponed==='every dot'?local.ctx.state.chain[0]:null;
+  if(auto)assert.equal([ids.a,ids.b,ids.c].includes(auto),false,'precondition: Postpone dotted a candidate');
+  await publish221(local);await receive221(peer);
+  const answer=offeredYesAt2376(peer,at+200);
+  peer.ctx.onAction('yes',{dataset:answer});
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  // Undo of the benchmark's Postpone puts it back after b; Undo of the last
+  // Postpone (of a) takes the automatic dot off and puts a back. The other
+  // device's Yes stands either way.
+  const expected=auto?[ids.a,answer.candidate]:[ids.a,ids.b,ids.c,answer.candidate];
+  const [a,b]=first==='Undo'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);await bothReceive2376(a,b);
+  for(const [label,app] of [['the undoing device',local],['the other device',peer]]){
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the Undo and the other device’s Yes are both kept');
+   assert.equal(app.ctx.taskPostponeUntil(app.ctx.state.tasks.find(task=>task.id===order.at(-1))),0,label+': and the undone postponement has ended');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the same chain');
+ });
+});

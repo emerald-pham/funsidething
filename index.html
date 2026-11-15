@@ -9939,7 +9939,8 @@ const taskActionOwnerBundle=(()=>{
       const gesture=captureDecisionGesture();
       pushUndo();
       const result=BoardDecision.apply(gesture,{kind:"postpone",taskId:task.id});
-      if(result?.path==="replay")recomputeRanks();
+      // No rating moves, so ranks are not refreshed, as before #2376: a refresh
+      // scores every task into the pass's saved draw (see the issue on #2376).
       commit();
       return !!result;
     }
