@@ -30,6 +30,7 @@ import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 
 import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDGET_MS, coldRelaunch2198, refuseNextRecoveryTransaction255,
   exactPaddedBoard, CAPTURED_UNREADABLE_GENERATION } from "./shared.js";
 import { chainPills, chainPillIds, returnDotFromScan } from "./shared.js";
+import { benchmarkEdit } from "./shared.js";
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -11630,6 +11631,553 @@ test('RISK chain return sync: a cloud board that still shows a returned dot with
  assert.equal(local.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','the chain disagrees with the recorded return, so sync holds');
  assert.deepEqual(Array.from(local.ctx.state.chain),['carried-a','carried-c'],'this device keeps the return');
  assert.equal(h.doc.payload,cloud,'and writes nothing over the cloud copy');
+});
+
+// ---------- #2375: a board that has never saved a pass id ----------
+// A board that has never pressed Start, Dotted onto an empty chain or crossed
+// 2 AM saves no pass id, so its pass is named after its first dot. Returning
+// that dot must not move the board into another pass. Expected chains are the
+// seeded chain, written from the spec, never read back from the projection.
+const unpinnedTitles2375={a:'Task a',b:'Task b',c:'Task c',d:'Task d'};
+async function unpinnedBoard2375(at,over={}){
+ const board=syncState({tasks:Object.entries(unpinnedTitles2375).map(([id,title])=>syncTask(id,title)),
+  chain:['a','b','c'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt:at-60000,
+  settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8},...over});
+ assert.equal(Object.hasOwn(board,'passId'),false,'precondition: no saved pass id');
+ assert.equal(Object.hasOwn(board,'decisionEvents'),false,'precondition: no recorded decisions');
+ const raw=JSON.stringify(board);
+ return loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+}
+function shownBoard2375(app){
+ app.ctx.renderScan();const scan=app.shim.document.getElementById('scan').innerHTML;
+ const bench=benchmarkEdit(scan)?.dataset.id;
+ return {trail:chainPills(scan).map(pill=>pill.title),benchmark:bench===undefined?null:unpinnedTitles2375[bench]??bench};
+}
+
+test('RISK chain return Undo: on a board with no saved pass id, Undo of returning the first dot puts it back in place',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const app=await unpinnedBoard2375(at);
+ assert.deepEqual(shownBoard2375(app),{trail:['Task a','Task b'],benchmark:'Task c'},'precondition: three dots');
+ setFakeTime(app.ctx,at+100);app.ctx.renderScan();returnDotFromScan(app.ctx,app.shim,'a');
+ assert.deepEqual(shownBoard2375(app),{trail:['Task b'],benchmark:'Task c'},'the first dot is returned');
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ setFakeTime(app.ctx,at+2000);
+ assert.equal(await app.ctx.onAction('undo',{}),true);
+ assert.deepEqual(shownBoard2375(app),{trail:['Task a','Task b'],benchmark:'Task c'},'Undo puts the dot back where it was');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['a','b','c']);
+});
+
+// Two devices open the same synced board with no saved pass id. One returns
+// a dot and undoes it; the other returns a different dot without seeing that.
+async function unpinnedClients2375(t,settings={}){
+ const clients=await scopedUndoClients(initial=>{
+  initial.tasks=Object.entries(unpinnedTitles2375).map(([id,title])=>syncTask(id,title));
+  initial.chain=['a','b','c'];initial.candidateId=null;delete initial.passId;
+  Object.assign(initial.settings,settings);
+ });
+ for(const app of [clients.local,clients.peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ assert.equal(Object.hasOwn(clients.initial,'passId'),false,'precondition: no saved pass id');
+ return clients;
+}
+
+test('RISK chain return Undo sync: with no saved pass id, Undo of a returned first, middle or last dot reaches the cloud and the other device in either order, survives a stale redelivery and reload, with no hold',async t=>{
+ for(const [undone,other] of [['a','c'],['b','c'],['c','a']])for(const first of ['Undo','other return'])await t.test(`Undo of ${undone}, the other device returns ${other}, ${first} publishes first`,async t=>{
+  const {local,peer,h,at}=await unpinnedClients2375(t);
+  const expected=['a','b','c'].filter(id=>id!==other);
+  returnDotFromBoard221(local,undone,at+100);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'].filter(id=>id!==undone),'precondition: returned');
+  const stale=JSON.parse(local.ctx.cloudPayload());
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'Undo puts the dot back where it was');
+  returnDotFromBoard221(peer,other,at+2500);
+  const [a,b]=first==='Undo'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);await a.ctx.cloudPull();await syncSettle(20);
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the Undo and the other return are both kept');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the Undo and the other return are both kept');
+  h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(35);
+  assert.deepEqual(Array.from(local.ctx.state.chain),expected,'redelivering the board from before Undo changes nothing');
+  assert.deepEqual(h.remoteState().chain,expected);
+  assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'and sync is not held');
+  const cold=await reopen221(local,h,at+4000,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),expected,'reopening keeps it');
+  assert.equal(cold.ctx.window.CloudSync.errorCode??null,null);
+ });
+});
+
+test('RISK chain return sync: with no saved pass id, Postponing the rest after a return does not dot the returned task again and does not hold sync',async t=>{
+ const orders={
+  'the first dot returned, then Postpone of the others':{returned:'a',postponed:['c','b']},
+  'a later dot returned, then Postpone of the others':{returned:'b',postponed:['c','a']},
+ };
+ for(const [order,{returned,postponed}] of Object.entries(orders))await t.test(order,async t=>{
+  const {local,peer,h,at}=await unpinnedClients2375(t,{postponeHours:1,showPostpone:true});
+  returnDotFromBoard221(local,returned,at+100);
+  for(const [i,id] of postponed.entries())assert.equal(postponeBenchmark221(local,at+200+i*100),id);
+  // The only task neither returned nor postponed is d.
+  assert.deepEqual(Array.from(local.ctx.state.chain),['d'],'the automatic dot is not the returned task');
+  await publish221(local);
+  confirmedSync221(local,h,['d'],'the device that returned and postponed');
+  await receive221(peer);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['d'],'the other device shows the same chain');
+  const cold=await reopen221(local,h,at+1000,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['d'],'reopening keeps it');
+  assert.equal(cold.ctx.window.CloudSync.errorCode??null,null);
+ });
+});
+
+// Undo is the reversal of the Return (GLOSSARY): once it is undone, the
+// person's record no longer keeps that task off the chain, so Postpone's
+// automatic dot may choose it like any other candidate.
+test('RISK chain return Undo: a Return that was undone does not keep its task from the automatic dot after a Postpone empties the chain, and sync is not held',async t=>{
+ const {local,peer,h,at}=await scopedUndoClients(initial=>{
+  initial.tasks=Object.entries(unpinnedTitles2375).map(([id,title])=>syncTask(id,title));
+  initial.chain=['a','b','c'];initial.candidateId=null;
+  Object.assign(initial.settings,{postponeHours:1,showPostpone:true});
+ });
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ returnDotFromBoard221(local,'c',at+100);
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: the Return of c is undone');
+ // c leaves the chain with a Can't hold, which ends 30 minutes later.
+ setFakeTime(local.ctx,at+3000);local.ctx.renderScan();local.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['a','b'],'precondition: the hold takes c off the chain');
+ const later=at+3000+31*60000;
+ setFakeTime(local.ctx,later);local.ctx.refreshScanClock();
+ assert.equal(local.ctx.pool().some(task=>task.id==='c'),true,'precondition: the hold has ended');
+ returnDotFromBoard221(local,'a',later+100);
+ assert.equal(postponeBenchmark221(local,later+200),'b');
+ // a is still returned in this pass; c, whose Return was undone, comes before d.
+ assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'the automatic dot is the first candidate whose Return was not undone');
+ await publish221(local);
+ confirmedSync221(local,h,['c'],'the device that undid the Return');
+ setFakeTime(peer.ctx,later+300);   // the other device reads it at the same time, after the hold ended
+ await receive221(peer);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['c'],'the other device shows the same chain');
+});
+
+// #2375: a Return pressed before the 2 AM reset and undone after it. The Undo
+// is then the first decision of the new pass, recorded with the chain as it
+// was before the Undo. Local times, so 2 AM is the app's own date marker.
+async function nightClients2375(t,saved){
+ const at=new Date(2026,9,17,1,50).getTime();
+ // d ranks first in the pool, so the other device's next candidate is d, not the returned b.
+ const initial=syncState({tasks:Object.entries(unpinnedTitles2375).map(([id,title])=>({...syncTask(id,title),...(id==='d'?{mu:30}:{})})),
+  chain:['a','b','c'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt:new Date(2026,9,17,1,0).getTime(),
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ if(saved)initial.passId='night-pass';
+ const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const open=async(when,seed)=>{
+  const app=await loadAppAtTime(when,{seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:h.factory});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  await app.ctx.cloudPull();await syncSettle(20);app.ctx.window.CloudSync.ready=false;
+  return app;
+ };
+ return {local:await open(at,raw),open,h,at,night:new Date(2026,9,17,2,5).getTime()};
+}
+
+test('RISK chain return Undo: a Return pressed before 2 AM and undone after it is put back in place, with and without a saved pass id, also after the other device answered in the new pass',async t=>{
+ for(const saved of [true,false])for(const other of ['no other answer','the answer reaches this device before Undo','Undo publishes before the answer'])
+ await t.test(`${saved?'saved':'no saved'} pass id, ${other}`,async t=>{
+  const {local,open,h,at,night}=await nightClients2375(t,saved);
+  assert.equal(Object.hasOwn(local.ctx.state,'passId'),saved,'precondition: '+(saved?'a':'no')+' saved pass id');
+  returnDotFromBoard221(local,'b',at+100);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'precondition: returned before 2 AM');
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  // The app's own focus sweep crosses the 2 AM date marker.
+  const before=local.ctx.state.passId;
+  setFakeTime(local.ctx,night);local.ctx.refreshScanClock();
+  assert.notEqual(local.ctx.state.passId,before,'precondition: the 2 AM reset began a new pass');
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'precondition: with the chain carried over');
+  let peer=null,expected=['a','b','c'];
+  if(other!=='no other answer'){
+   await publish221(local);local.ctx.window.CloudSync.ready=false;
+   peer=await open(night+100,local.shim.localStorage.getItem(SYNC_STORE_KEY));
+   assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: the other device is in the new pass');
+   setFakeTime(peer.ctx,night+200);peer.ctx.renderScan();
+   const yes=peer.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+   assert.deepEqual(yes?.slice(1),['d','c'],'precondition: the other device is offered d against c');
+   peer.ctx.onAction('yes',{dataset:{candidate:'d',benchmark:'c'}});
+   assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c','d'],'precondition: the other device answered in the new pass');
+   expected=['a','b','c','d'];
+   if(other==='the answer reaches this device before Undo'){
+    await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+    await receive221(local);local.ctx.window.CloudSync.ready=false;
+    assert.deepEqual(Array.from(local.ctx.state.chain),['a','c','d'],'precondition: this device has the answer');
+   }
+  }
+  const stale=JSON.parse(local.ctx.cloudPayload());
+  setFakeTime(local.ctx,night+300);assert.equal(await local.ctx.onAction('undo',{}),true);
+  if(other!=='Undo publishes before the answer')
+   assert.deepEqual(Array.from(local.ctx.state.chain),expected,'Undo puts the dot back where it was');
+  await publish221(local);
+  if(peer){await publish221(peer);await local.ctx.cloudPull();await syncSettle(20);await peer.ctx.cloudPull();await syncSettle(20);}
+  for(const [label,app] of [['undoing device',local],...(peer?[['other device',peer]]:[])]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the dot is back in place');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the dot is back in place');
+  h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(35);
+  assert.deepEqual(Array.from(local.ctx.state.chain),expected,'redelivering the board from before Undo changes nothing');
+  assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'and sync is not held');
+  const cold=await reopen221(local,h,night+500,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),expected,'reopening keeps it');
+ });
+});
+
+// #2375 review N6: the remaining publish order after 2 AM. The other device's
+// answer reaches the cloud first, and this device's Undo is made without it.
+test('RISK chain return Undo: a Return undone after 2 AM is put back in place when the other device’s answer in the new pass publishes first and the Undo is concurrent with it',async t=>{
+ for(const saved of [true,false])await t.test(`${saved?'saved':'no saved'} pass id`,async t=>{
+  const {local,open,h,at,night}=await nightClients2375(t,saved);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,night);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  const peer=await open(night+100,local.shim.localStorage.getItem(SYNC_STORE_KEY));
+  assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: the other device is in the new pass');
+  setFakeTime(peer.ctx,night+200);peer.ctx.onAction('yes',{dataset:{candidate:'d',benchmark:'c'}});
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c','d'],'precondition: the other device answered in the new pass');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  // This device has not received the answer when it presses Undo.
+  setFakeTime(local.ctx,night+300);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: Undo before the answer arrived');
+  await publish221(local);await receive221(peer);await receive221(local);
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','b','c','d'],label+': the dot is back in place and the answer is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','b','c','d'],'cloud: the dot is back in place and the answer is kept');
+  const cold=await reopen221(local,h,night+500,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['a','b','c','d'],'reopening keeps it');
+ });
+});
+
+// #2375 review B1: Undo keeps unrelated decisions from either device
+// (GLOSSARY). When the other device dotted the returned task again and then
+// took it off with a decision of its own, and this device saw that before its
+// Undo, the Undo of the earlier Return must not put the task back.
+// The previous release stands for every tab still running it: pinned, never the candidate.
+const PREVIOUS_RELEASE2375='0e3e0a9fda884ca285f59efae75e5ba58b6f4086';
+let previousReleaseSource2375=null;
+function previousReleaseApp2375(){
+ if(previousReleaseSource2375===null){
+  const released=spawnSync('git',['show',PREVIOUS_RELEASE2375+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:64*1024*1024});
+  assert.equal(released.status,0,released.stderr);
+  previousReleaseSource2375=extractAppScript(released.stdout);
+ }
+ return previousReleaseSource2375;
+}
+async function pairClients2375(t,{at,passStartedAt,without=[],passId=null,chain=['a','b','c'],settings={}}){
+ const initial=syncState({tasks:Object.entries(unpinnedTitles2375).filter(([id])=>!without.includes(id)).map(([id,title])=>syncTask(id,title)),
+  chain,candidateId:null,mode:'scan',scanMode:'descending',passStartedAt,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,...settings}});
+ if(passId)initial.passId=passId;
+ const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const open=async(when,seed,previous=false)=>{
+  const app=await loadAppAtTime(when,{...(previous?{appSource:previousReleaseApp2375()}:{}),seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:h.factory});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  await app.ctx.cloudPull();await syncSettle(20);app.ctx.window.CloudSync.ready=false;
+  return app;
+ };
+ return {open,h,raw};
+}
+
+test('RISK chain return Undo: Undo of a Return keeps the other device’s later Dot and removal of that task, in one pass and after 2 AM, also with the other device on the previous release',async t=>{
+ for(const pass of ['one pass','the shared pass after 2 AM'])for(const removal of ['Return','Can\'t'])for(const previous of [false,true])
+ await t.test(`${pass}, the other device Dots b then marks it ${removal}, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const night=pass!=='one pass';
+  const at=night?new Date(2026,9,17,1,50).getTime():Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:night?new Date(2026,9,17,1,0).getTime():at-60000});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'precondition: returned');
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  let when=at+200;
+  if(night){
+   when=new Date(2026,9,17,2,5).getTime();
+   setFakeTime(local.ctx,when);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+   await publish221(local);local.ctx.window.CloudSync.ready=false;
+  }
+  const peer=await open(when+50,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c'],'precondition: the other device has the return');
+  if(night)assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: both devices are in the new pass');
+  await dotFromEditor221(peer,'b',when+100);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c','b'],'precondition: the other device dotted b again');
+  if(removal==='Return')returnDotFromBoard221(peer,'b',when+200);
+  else{setFakeTime(peer.ctx,when+200);peer.ctx.renderScan();peer.ctx.onAction('bench-cant',{dataset:{benchmark:'b'}});}
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c'],'precondition: and took it off again');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  await receive221(local);local.ctx.window.CloudSync.ready=false;
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'precondition: this device saw that');
+  setFakeTime(local.ctx,when+300);setFakeTime(peer.ctx,when+300);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'Undo does not undo the other device\'s later decision');
+  await publish221(local);
+  for(let round=0;round<2;round++){await receive221(peer);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(35);await receive221(local);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','c'],label+': b stays off');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','c'],'cloud: b stays off');
+ });
+});
+
+// B1 again, with no second Dot: the other device answers No or Can't on the
+// returned task, now a candidate, in the same pass. The pass is rebuilt from
+// the chain before the Return, so skipping the cancelled Return already brings
+// b back there, and the other device's answer then takes it off; Undo must
+// not put it back over that answer.
+test('RISK chain return Undo: Undo of a Return keeps the other device’s later No or Can’t on that task as a candidate, also with the other device on the previous release',async t=>{
+ for(const answer of ['no','cant'])for(const previous of [false,true])
+ await t.test(`the other device answers ${answer==='no'?'No':'Can\'t'} on b, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  // No d here: the returned b is then the only candidate.
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,without:['d']});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  const peer=await open(at+150,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  setFakeTime(peer.ctx,at+200);peer.ctx.renderScan();
+  const offered=peer.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="no" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+  assert.deepEqual(offered?.slice(1),['b','c'],'precondition: the other device is offered the returned b against c');
+  peer.ctx.onAction(answer,{dataset:{candidate:'b',benchmark:'c'}});
+  assert.equal(peer.ctx.state.considered.b,answer,'precondition: the other device answered on b');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  await receive221(local);local.ctx.window.CloudSync.ready=false;
+  setFakeTime(local.ctx,at+2000);setFakeTime(peer.ctx,at+2000);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'Undo does not put b back over the other device\'s answer');
+  await publish221(local);
+  for(let round=0;round<2;round++){await receive221(peer);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(35);await receive221(local);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','c'],label+': b stays off');
+   assert.equal(app.ctx.state.considered.b,answer,label+': and keeps the answer');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','c'],'cloud: b stays off');
+ });
+});
+
+// B1 from the independent review: both devices act on the same pass without
+// seeing each other. The Undo then cannot have seen the other device's
+// decision, and that decision still stands, in either publish order.
+test('RISK chain return Undo: a concurrent Return or Can’t on the other device stands after this device undoes its own Return, in either publish order, with and without a saved pass id',async t=>{
+ const shapes={
+  'both devices return b':{returned:'b',other:peer=>returnDotFromBoard221(peer,'b',Date.parse('2026-10-17T15:00:00Z')+300),expected:['a','c'],held:null},
+  'this device returns c and the other marks c Can’t':{returned:'c',other:peer=>{peer.ctx.renderScan();peer.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});},expected:['a','b'],held:'c'},
+  'this device returns b and the other marks c Can’t':{returned:'b',other:peer=>{peer.ctx.renderScan();peer.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});},expected:['a','b'],held:'c'},
+ };
+ for(const [shape,{returned,other,expected,held}] of Object.entries(shapes))for(const first of ['Undo','the other device'])for(const saved of [true,false])
+ await t.test(`${shape}, ${first} publishes first, ${saved?'saved':'no saved'} pass id`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,passId:saved?'pair-pass':null});
+  const local=await open(at,raw),peer=await open(at,raw);
+  returnDotFromBoard221(local,returned,at+100);
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: this device undid its Return');
+  setFakeTime(peer.ctx,at+300);other(peer);
+  assert.notDeepEqual(Array.from(peer.ctx.state.chain),['a','b','c'],'precondition: the other device took a dot off without seeing the Undo');
+  setFakeTime(peer.ctx,at+2000);
+  const [a,b]=first==='Undo'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);
+  for(let round=0;round<2;round++){await receive221(a);await receive221(b);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the other device’s decision stands');
+   if(held)assert.equal(app.ctx.state.considered[held],'cant',label+': and its Can’t is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the other device’s decision stands');
+ });
+});
+
+// #2375 re-review G1: across 2 AM, the other device's own decision about the
+// returned task stands even without a second Dot: No or Can’t on it as a
+// candidate, or a Return of it after Postpone's automatic dot picked it.
+test('RISK chain return Undo: after 2 AM, the other device’s No, Can’t or Return of the returned task stands when this device undoes its Return, also with the other device on the previous release',async t=>{
+ const shapes={
+  'No on b as a candidate':{act:peer=>{peer.ctx.renderScan();peer.ctx.onAction('no',{dataset:{candidate:'b',benchmark:'c'}});},expected:['a','c'],mark:'no'},
+  'Can’t on b as a candidate':{act:peer=>{peer.ctx.renderScan();peer.ctx.onAction('cant',{dataset:{candidate:'b',benchmark:'c'}});},expected:['a','c'],mark:'cant'},
+  'a Return of b after Postpone dotted it':{act:(peer,when)=>{
+   assert.equal(postponeBenchmark221(peer,when+10),'c');assert.equal(postponeBenchmark221(peer,when+20),'a');
+   assert.deepEqual(Array.from(peer.ctx.state.chain),['b'],'precondition: Postpone’s automatic dot picked b');
+   returnDotFromBoard221(peer,'b',when+30);},expected:[],mark:null},
+ };
+ for(const [shape,{act,expected,mark}] of Object.entries(shapes))for(const saved of [true,false])for(const previous of [false,true])
+ await t.test(`${shape}, ${saved?'saved':'no saved'} pass id, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const at=new Date(2026,9,17,1,50).getTime(),night=new Date(2026,9,17,2,5).getTime();
+  // No d here: the returned b is then the only candidate.
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:new Date(2026,9,17,1,0).getTime(),without:['d'],passId:saved?'night-pass':null,
+   settings:{postponeHours:1,showPostpone:true}});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,night);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  const peer=await open(night+50,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: both devices are in the new pass');
+  setFakeTime(peer.ctx,night+100);act(peer,night+100);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'precondition: the other device decided about b');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  await receive221(local);local.ctx.window.CloudSync.ready=false;
+  setFakeTime(local.ctx,night+300);setFakeTime(peer.ctx,night+300);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),expected,'Undo does not override the other device’s decision');
+  await publish221(local);
+  for(let round=0;round<2;round++){await receive221(peer);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(35);await receive221(local);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the other device’s decision stands');
+   if(mark)assert.equal(app.ctx.state.considered.b,mark,label+': and its mark is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the other device’s decision stands');
+ });
+});
+
+// G1 again with the answer concurrent with the Undo: this device undoes before
+// the other device's No or Can’t on b reaches it, in either publish order.
+test('RISK chain return Undo: after 2 AM, a No or Can’t on the returned task made concurrently on the other device stands over this device’s Undo, in either publish order, also with the other device on the previous release',async t=>{
+ for(const answer of ['no','cant'])for(const first of ['Undo','the answer'])for(const saved of [true,false])for(const previous of [false,true])
+ await t.test(`${answer==='no'?'No':'Can’t'}, ${first} publishes first, ${saved?'saved':'no saved'} pass id, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const at=new Date(2026,9,17,1,50).getTime(),night=new Date(2026,9,17,2,5).getTime();
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:new Date(2026,9,17,1,0).getTime(),without:['d'],passId:saved?'night-pass':null});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,night);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  const peer=await open(night+50,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: both devices are in the new pass');
+  setFakeTime(peer.ctx,night+100);peer.ctx.renderScan();peer.ctx.onAction(answer,{dataset:{candidate:'b',benchmark:'c'}});
+  assert.equal(peer.ctx.state.considered.b,answer,'precondition: the other device answered on b');
+  setFakeTime(local.ctx,night+300);setFakeTime(peer.ctx,night+300);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: this device undid before the answer reached it');
+  const [a,b]=first==='Undo'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);
+  for(let round=0;round<2;round++){await receive221(a);await receive221(b);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','c'],label+': the answer stands');
+   assert.equal(app.ctx.state.considered.b,answer,label+': and its mark is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','c'],'cloud: the answer stands');
+ });
+});
+
+// #2375 review E1: a decision the Return already saw does not keep the task
+// off after Undo. Here Can’t took c off before the Return; once its hold
+// ended, Postpone dotted c and c was returned. Undo of that Return puts c back.
+test('RISK chain return Undo: a Can’t the Return already saw does not stop Undo from putting the returned dot back, with and without a saved pass id',async t=>{
+ for(const saved of [true,false])await t.test(`${saved?'saved':'no saved'} pass id`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,passId:saved?'pair-pass':null,settings:{postponeHours:1,showPostpone:true}});
+  const local=await open(at,raw);
+  setFakeTime(local.ctx,at+100);local.ctx.renderScan();local.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b'],'precondition: Can’t takes c off');
+  const later=at+100+31*60000;
+  setFakeTime(local.ctx,later);local.ctx.refreshScanClock();
+  assert.equal(local.ctx.pool().some(task=>task.id==='c'),true,'precondition: the hold has ended');
+  assert.equal(postponeBenchmark221(local,later+100),'b');assert.equal(postponeBenchmark221(local,later+200),'a');
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'precondition: Postpone’s automatic dot is c');
+  returnDotFromBoard221(local,'c',later+300);
+  assert.deepEqual(Array.from(local.ctx.state.chain),[],'precondition: c is returned');
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,later+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'Undo puts c back');
+  await publish221(local);
+  assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'sync is not held');
+  assert.deepEqual(h.remoteState().chain,['c'],'the cloud has it');
+  const cold=await reopen221(local,h,later+3000,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['c'],'reopening keeps it');
+ });
+});
+
+// #2375 re-review G2: in one pass with an earlier answer, Undo of a Return of
+// Postpone's automatic dot puts that dot back. The automatic dot is not
+// recorded, so the pass's own rows never put it on the chain.
+test('RISK chain return Undo: Undo of returning the dot Postpone placed puts it back, after an earlier answer in the same pass, with and without a saved pass id',async t=>{
+ for(const saved of [true,false])await t.test(`${saved?'saved':'no saved'} pass id`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,chain:['a'],passId:saved?'pair-pass':null,settings:{postponeHours:1,showPostpone:true}});
+  const local=await open(at,raw);
+  setFakeTime(local.ctx,at+100);local.ctx.renderScan();
+  const yes=local.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+  assert.deepEqual(yes?.slice(1),['b','a'],'precondition: b is offered against a');
+  local.ctx.onAction('yes',{dataset:{candidate:'b',benchmark:'a'}});
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b'],'precondition: an answer in this pass');
+  assert.equal(postponeBenchmark221(local,at+200),'b');assert.equal(postponeBenchmark221(local,at+300),'a');
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'precondition: Postpone’s automatic dot');
+  returnDotFromBoard221(local,'c',at+400);
+  assert.deepEqual(Array.from(local.ctx.state.chain),[],'precondition: the automatic dot is returned');
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'Undo puts the dot back');
+  await publish221(local);
+  assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'sync is not held');
+  assert.deepEqual(h.remoteState().chain,['c'],'the cloud has it');
+  const cold=await reopen221(local,h,at+3000,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['c'],'reopening keeps it');
+ });
+});
+
+// #2375 independent review N1: a Start's scanMode row that this version cannot
+// read is held, never thrown on. A saved board carries a real Start whose
+// scanMode row was later damaged; answering on it must not stop partway.
+test('RISK started pass compatibility: a Start whose scanMode row is damaged is held, and an answer on that board does not throw',async t=>{
+ for(const damage of ['its earlier draw is missing','its earlier mode is a string'])await t.test(damage,async()=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const board=syncState({tasks:Object.entries(unpinnedTitles2375).map(([id,title])=>syncTask(id,title)),chain:[],candidateId:null,
+   mode:'scan',scanMode:'descending',seenQuickStart:true,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}}),raw=JSON.stringify(board);
+  const first=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+  setFakeTime(first.ctx,at+100);first.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.equal(await first.ctx.persist(),true);
+  const saved=JSON.parse(first.shim.localStorage.getItem(SYNC_STORE_KEY));
+  const mode=saved.decisionEvents.find(row=>row.kind==='current-choice'&&row.target.type==='pass'&&row.target.property==='scanMode'&&row.target.id!==row.passId);
+  assert.ok(mode,'precondition: the Start recorded its scanMode row');
+  if(damage==='its earlier draw is missing')delete mode.before.value.chance;else mode.before.value='descending';
+  const damaged=JSON.stringify(saved);
+  const app=await loadAppAtTime(at+200,{seedStorage:{[SYNC_STORE_KEY]:damaged,[LOCAL_HEAD_KEY]:damaged}});
+  setFakeTime(app.ctx,at+300);app.ctx.renderScan();
+  const no=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="no" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+  assert.ok(no,'precondition: a candidate is offered');
+  assert.doesNotThrow(()=>app.ctx.onAction('no',{dataset:{candidate:no[1],benchmark:no[2]}}),'answering does not throw');
+  assert.notEqual(vm.runInContext('decisionEvidenceIssue(state,state.syncAccount??state.decisionBaseline?.account??null)',app.ctx),null,'the damaged evidence is held');
+ });
+});
+
+// #2375 review N2: a gesture saves the pass id the board already reported.
+// When another device then begins a new pass, that saved id is not an edit of
+// this tab's, so combining the boards is routine and shows no warning.
+test('RISK chain return sync: a saved legacy pass id is not reported as a displaced edit when another device begins a new pass',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const {open,raw}=await pairClients2375(t,{at,passStartedAt:at-60000});
+ const local=await open(at,raw),peer=await open(at,raw);
+ assert.equal(Object.hasOwn(local.ctx.state,'passId'),false,'precondition: no saved pass id');
+ assert.equal(await saveEditorChoice(local,'d',at+100,{title:'Renamed on this device'}),true);
+ assert.equal(typeof local.ctx.state.passId,'string','precondition: the rename saved the pass id the board reported');
+ for(const [i,id] of ['c','b','a'].entries()){returnDotFromBoard221(peer,id,at+200+i*50);await new Promise(resolve=>setTimeout(resolve,1100));}
+ setFakeTime(peer.ctx,at+2000);peer.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+ assert.notEqual(peer.ctx.state.passId,local.ctx.state.passId,'precondition: the other device began a new pass');
+ await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+ local.shim.document.getElementById('toast').textContent='';
+ await receive221(local);
+ assert.doesNotMatch(local.shim.document.getElementById('toast').textContent,/out of date/,'no out-of-date warning');
+ assert.equal(local.ctx.state.tasks.find(task=>task.id==='d').title,'Renamed on this device','the rename is kept');
+ assert.equal(local.ctx.state.passId,peer.ctx.state.passId,'this device joins the new pass');
 });
 
 // #2334: a save that keeps a missing task must settle. These load the app on a
