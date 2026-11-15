@@ -13817,3 +13817,33 @@ for(const store of RETENTION_STORES_2379){
   assert.ok((await s.list()).some(row=>row.id==='restore-unreadable'),'an unreadable copy from ten days ago stays');
  });
 }
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): each automatic backup expires after its own kind's days, and every other backup stays`,async t=>{
+  const s=await store.open(t);
+  // [id, kind, days ago, stored fields, expected to stay after a save]
+  const cases=[
+   ['daily-own-2','daily',2,{account:null},true],
+   ['daily-own-3','daily',3,{account:null},false],
+   ['daily-accountless-6','daily',6,{},true],
+   ['daily-accountless-7','daily',7,{},false],
+   ['daily-other-6','daily',6,{account:'other@example.com'},true],
+   ['daily-other-7','daily',7,{account:'other@example.com'},false],
+   ['daily-adoption-6','daily',6,{account:null,keptForCloudAdoption:true},true],
+   ['restore-6','before-restore',6,{},true],
+   ['restore-7','before-restore',7,{},false],
+   ['adoption-7','before-cloud-adoption',7,{},false],
+   ['merged-7','cloud-merged',7,{},false],
+   ['manual-30','manual',30,{account:null},true],
+   ['edit-30','before-cloud-local-edit',30,{},true],
+   ['switch-30','before-account-switch',30,{},true],
+   ['other-browser-30','other-browser-copy',30,{},true],
+   ['unknown-30','kind-from-a-newer-build',30,{},true],
+  ];
+  await s.seed(cases.map(([id,kind,ago,extra])=>s.row(id,kind,boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id),{day:s.daysAgo(ago),...extra})));
+  await s.save();
+  const ids=new Set((await s.list()).map(row=>row.id));
+  assert.deepEqual(cases.filter(([id])=>ids.has(id)).map(([id])=>id),cases.filter(([,,,,stays])=>stays).map(([id])=>id),
+   'this account’s daily backups keep three calendar days, other automatic copies seven, and the rest stay');
+ });
+}
