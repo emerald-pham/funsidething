@@ -6931,20 +6931,12 @@ function conflictingDecisionEvidence(...boards){
 }
 function decisionStartIssue(board){
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[];
-  // A #221 Return is a lone chain row inside its own pass, not a Start root.
-  const fresh=rows.filter(event=>event?.kind==="current-choice" && event.target?.type==="pass"
-    && (event.target.property==="chain" && currentChoiceChainReturnId(event)===null || event.target.property==="scanMode" && event.target.id!==event.passId)
-    && !attestedDecisionEvent(board.decisionBaseline,event));
-  for(const event of fresh){
-    const group=rows.filter(row=>row?.kind==="current-choice" && row.actionId===event.actionId
-      && row.target?.type==="pass" && row.target.id===event.target.id);
-    const roots=group.filter(row=>row.target.property==="chain"),modes=group.filter(row=>row.target.property==="scanMode");
-    if(group.length!==2 || roots.length!==1 || modes.length!==1
-      || !currentChoiceStartEnvelopeMatches(modes[0],roots[0]) || roots[0].target.id===roots[0].passId
-      || roots[0].chainIds.length!==0 || roots[0].before.value.length!==0)
-      return "unprojectable-decision-evidence";
-  }
-  return null;
+  // Only Starts with a row not already attested by the baseline are checked;
+  // each is checked against every row of its action.
+  const key=row=>JSON.stringify([row?.actionId,row?.target?.id]);
+  const fresh=new Set(rows.filter(event=>event?.kind==="current-choice"&&event.target?.type==="pass"
+    &&!attestedDecisionEvent(board.decisionBaseline,event)).map(key));
+  return PassChain.starts(rows.filter(row=>fresh.has(key(row)))).issue;
 }
 function supportedDecisionReplacement(receipt,account){
   if(!receipt || typeof receipt!=="object" || Array.isArray(receipt) || receipt.v!==1
@@ -6994,7 +6986,7 @@ function restoreRetiredDecisionFields(target,source){
   // without modern Start facts. An exact retired baseline, including a branch
   // with only field choices, cannot make its old root/draw current again;
   // retained active peer facts still project normally after the evidence merge.
-  if(receipts.length&&currentChoicePassId(target)!==currentChoicePassId(source)){
+  if(receipts.length&&PassChain.passId(target)!==PassChain.passId(source)){
     for(const key of ["passId","passStartedAt","mode","scanMode","chance","chain","candidateId","interventionActive","considered","cantAt","workedAt"])copy(target,source,key);
     target.settings||={};copy(target.settings,source.settings,"scanMode");
   }
@@ -7127,7 +7119,8 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     // not show it. A later Yes or Dot that puts it back is a choice of its
     // own, which a Postpone may then take off again without a record, so that
     // is not held either.
-    const returned=compared.map(event=>event.target?.type==="pass"&&event.target.property==="chain"?currentChoiceChainReturnId(event):null);
+    const chainRows=compared.map(event=>PassChain.read(event));
+    const returned=chainRows.map(row=>row?.kind==="return"?row.taskId:null);
     // #2359: a Start root records the pass it began and its first dot, so its
     // row is checked on those, like a Return. Later dots come from answers,
     // which are checked as comparisons, and a Postpone takes a dot off with no
@@ -7137,7 +7130,7 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     // still held, and so is a first dot the board shows while the replay
     // leaves it off. A pass carried over 2 AM has no root and already works
     // this way.
-    const rooted=compared.map((event,index)=>returned[index]===null?currentChoiceStartRootId(event):null);
+    const rooted=chainRows.map(row=>row?.kind==="start"?row.taskId:null);
     const comparedFacts=(source,event,index)=>{
       const {type,id,property}=event.target;
       if(type==="task" && property==="disposition"){
@@ -7151,8 +7144,13 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
           Array.isArray(source.chain)&&source.chain.includes(rooted[index])];
       }
       if(type==="pass"){
+        // #2375: every chain row that reaches this check is a Start or a
+        // Return, because decisionStartIssue holds any other one first. The
+        // whole-chain comparison that stood here could not be reached; a chain
+        // row that somehow did is held rather than compared.
+        if(property==="chain")return null;
         const field=key=>[Object.hasOwn(source,key),source[key]??null];
-        return (property==="chain"?["chain","passId","passStartedAt"]:property==="mode"?["mode"]:["scanMode","chance"]).map(key=>canonicalDecisionFact(field(key)));
+        return (property==="mode"?["mode"]:["scanMode","chance"]).map(key=>canonicalDecisionFact(field(key)));
       }
       const value=currentChoiceTargetRead(source,event.target);
       return value?[canonicalDecisionFact(value)]:null;
@@ -7186,7 +7184,7 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     }))return "unrepresented-legacy-learning";
     for(const [index,event] of compared.entries()){
       const {type,id}=event.target;
-      if(type==="pass" && id!==currentChoicePassId(sourceComparable))continue;
+      if(type==="pass" && id!==PassChain.passId(sourceComparable))continue;
       const actual=comparedFacts(sourceComparable,event,index);
       if(expectedFacts[index].error)throw expectedFacts[index].error;
       const expected=expectedFacts[index].facts;
@@ -7223,10 +7221,7 @@ function ambiguousLegacyCompletion(board){
     const sourceEvidence=canonicalDecisionFact([task.id,task.lastDoneAt??null,task.completedAt??null]);
     if(facts.some(row=>row.taskId===task.id&&(row.kind==="completion-boundary"&&row.sourceEvidence===sourceEvidence
       ||row.kind==="completion"&&row.at===(task.lastDoneAt||task.completedAt))))return false;
-    return facts.some(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain"
-      &&event.target.id!==event.passId&&event.actionId&&event.chainIds?.length===0
-      &&event.before?.present===true&&Array.isArray(event.before.value)&&event.before.value.length===0
-      &&event.after?.present===true&&Array.isArray(event.value)&&event.value.length===1&&event.value[0]===task.id);
+    return facts.some(event=>{const start=PassChain.read(event);return start?.kind==="start"&&start.taskId===task.id;});
   });
 }
 function decisionSourceIssue(board,account){
@@ -9022,15 +9017,11 @@ function postponeTask(id){
     // recorded decision, so dotting it here would leave the board disagreeing
     // with that record, and sync would hold for hours (#221 review). Only an
     // explicit Yes or Dot puts a returned task back.
-    const returned=returnedThisPass();
+    const returned=PassChain.returned(state);
     const next=candidateOrder(pool()).find(task=>!returned.has(task.id));
     if(next)state.chain=[next.id];
   }
   commit();
-}
-function returnedThisPass(board=state){
-  const passId=currentChoicePassId(board);
-  return new Set((board.decisionEvents||[]).filter(event=>event?.target?.id===passId).map(currentChoiceChainReturnId).filter(id=>id!==null));
 }
 
 function isIntrinsicallyEligible(t, act,board=state){
@@ -9595,11 +9586,7 @@ function startScan(mode){
   const choices=[];
   if(t){
     writeTaskComparison(t,true);
-    state.chain.push(t.id);
-    state.passStartedAt = choiceGesture.at;   // the pass clock keeps the original Start action time
-    state.passId = uid();
-    choices.push({target:{type:"pass",id:state.passId,property:"chain"},value:[t.id],after:{present:true},
-      before:{present:true,value:[]}});
+    choices.push(PassChain.record(state,choiceGesture,{start:t.id}));
   }
   const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
   if(t||JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.unshift({
@@ -9818,6 +9805,7 @@ const taskActionOwnerBundle=(()=>{
       return true;
     }
     if(action==="return"){
+      let returnRow=null;
       if(returningDot){
         // #221: membership only. The rest of the chain keeps its order, and
         // the task keeps its fields, rating, History and any hold or mark;
@@ -9825,7 +9813,7 @@ const taskActionOwnerBundle=(()=>{
         // An intervention weighed the returned benchmark; it says nothing
         // about the newest remaining dot, which becomes the benchmark.
         if(benchmark()?.id===id)state.interventionActive=false;
-        state.chain=state.chain.filter(c=>c!==id);
+        returnRow=PassChain.record(state,choiceGesture,{return:id});
       }else{
         if(resting)reopenTask(task);
         if(supportedPostponeEvidence(task)&&Date.now()<taskPostponeUntil(task))writeTaskPostpone(task,0);
@@ -9838,8 +9826,8 @@ const taskActionOwnerBundle=(()=>{
       // that same ordered stream, as this pass's membership going from [id]
       // to [], or every replay, reload and merge would put the dot back.
       // Older clients cannot read this shape and hold sync rather than push
-      // their stale chain (see currentChoiceChainReturnId).
-      const choices=[...(change?[change]:[]),...(returningDot?[currentChoiceChainReturn(choiceGesture.passId,id)]:[])];
+      // their stale chain (see PassChain).
+      const choices=[...(change?[change]:[]),...(returnRow?[returnRow]:[])];
       appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
       finishRatingObservation({...observation,membershipChanged:returningDot?[id]:[]});commit();
       return true;
@@ -10004,17 +9992,16 @@ const taskActionOwnerBundle=(()=>{
       const gesture=captureDecisionGesture();
       cancellation={...decisionGestureFields(gesture,gesture.at),v:1,id:uid(),kind:"undo",baselineId:state.decisionBaseline?.id,
         targetActionId:targets[0].actionId||targets[0].id,targetEventIds:targets.map(row=>row.id)};
-      const root=targets.find(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain");
-      const mode=targets.find(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="scanMode");
-      if(root&&mode)cancellation.passBefore={passId:root.passId,passAt:root.passAt,chainIds:root.chainIds.slice(),mode:before.mode,
-        scanMode:mode.before.value.mode,chance:JSON.parse(JSON.stringify(mode.before.value.chance))};
+      const start=PassChain.starts(targets).pairs[0];
+      if(start)cancellation.passBefore={passId:start.before.passId,passAt:start.before.passAt,chainIds:start.before.chainIds,mode:before.mode,
+        scanMode:start.before.scanMode,chance:start.before.chance};
       appendDecisionEvent(cancellation,next);
     }
     const inputs=t=>t&&[t.mu,t.sigma,t.done,t.ctx,t.startsAt,t.evergreen,t.evergreenHours,t.evergreenResetAtDay,t.lastDoneAt,taskPrerequisiteIds(t),t.dependencyModes];
     const replayLearning=targets.some(event=>event.kind==="no"||event.kind==="comparison");
     // #221: undoing a return puts its dot back, which History shows as it
     // showed the return, though no rating moves.
-    const returnedDots=targets.map(event=>currentChoiceChainReturnId(event)).filter(id=>id!==null);
+    const returnedDots=targets.map(event=>PassChain.read(event)).filter(row=>row?.kind==="return").map(row=>row.taskId);
     const ids=[...next.tasks.filter(t=>replayLearning||JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id),...returnedDots];
     const observation=captureRatingObservation("undo",ids);
     if(cancellation)observation.id=cancellation.id;
@@ -10971,12 +10958,10 @@ function decisionUndoResolution(board){
     const group=[...byId.values()].filter(row=>row.kind!=="undo"&&(row.actionId||row.id)===event.targetActionId&&row.account===targets[0].account);
     if(group.length!==targets.length||group.some(row=>!event.targetEventIds.includes(row.id)))return {cancelled,issue:"unprojectable-decision-undo"};
     if(event.passBefore!==undefined){
-      const root=targets.find(row=>row.kind==="current-choice"&&row.target?.type==="pass"&&row.target.property==="chain");
-      const mode=targets.find(row=>row.kind==="current-choice"&&row.target?.type==="pass"&&row.target.property==="scanMode");
-      if(targets.length!==2||!root||!mode||!currentChoiceStartEnvelopeMatches(mode,root)
-        ||event.passBefore.passId!==root.passId||event.passBefore.passAt!==root.passAt
-        ||JSON.stringify(event.passBefore.chainIds)!==JSON.stringify(root.chainIds)
-        ||JSON.stringify({mode:event.passBefore.scanMode,chance:event.passBefore.chance})!==JSON.stringify(mode.before.value))
+      const start=targets.length===2?PassChain.starts(targets).pairs[0]:undefined;
+      if(!start||event.passBefore.passId!==start.before.passId||event.passBefore.passAt!==start.before.passAt
+        ||JSON.stringify(event.passBefore.chainIds)!==JSON.stringify(start.before.chainIds)
+        ||JSON.stringify({mode:event.passBefore.scanMode,chance:event.passBefore.chance})!==JSON.stringify(start.mode.before.value))
         return {cancelled,issue:"unprojectable-decision-undo"};
     }
     const ancestors=currentChoiceAncestors(event,byId);
@@ -11085,7 +11070,7 @@ function captureDecisionGesture(actionId=null,at=null,options={}){
     :typeof window.CloudSync?.user==="string"&&window.CloudSync.user?window.CloudSync.user:null;
   const base=account&&validDecisionBase(state.decisionBase,account,state.syncRev)?state.decisionBase:null;
   const gestureAt=Number.isFinite(at)&&at>=0?at:Date.now();
-  const passId=decisionId(options?.passId)?options.passId:currentDecisionPassId();
+  const passId=decisionId(options?.passId)?options.passId:PassChain.pin(state);
   const passAt=Number.isFinite(options?.passAt)&&options.passAt>=0?options.passAt:Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0;
   const gesture={actionId:decisionId(actionId)?actionId:uid(),at:gestureAt,account,
     baseId:base?.id??null,passId,passAt,
@@ -11288,13 +11273,11 @@ function outstandingDecisionCompletions(events,byId,cancelled){
     // return the sole first member only when that root observed every saved
     // completion for the task. Unaware roots and passive pass maintenance
     // cannot clear the lifecycle fence.
-    if(event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain"
-      &&event.target.id!==event.passId&&event.actionId&&event.chainIds?.length===0
-      &&event.before?.present===true&&Array.isArray(event.before.value)&&event.before.value.length===0
-      &&event.after?.present===true&&Array.isArray(event.value)&&event.value.length===1){
+    const start=PassChain.read(event);
+    if(start?.kind==="start"){
       const ancestors=decisionEventAncestors(event,byId,memo);
-      const ids=outstanding.get(event.value[0]);
-      if(ids?.size&&[...ids].every(id=>ancestors.has(id)))outstanding.delete(event.value[0]);
+      const ids=outstanding.get(start.taskId);
+      if(ids?.size&&[...ids].every(id=>ancestors.has(id)))outstanding.delete(start.taskId);
       continue;
     }
     if(event.kind!=="comparison"||!(event.action==="yes"||event.action==="dot"))continue;
@@ -11350,7 +11333,7 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
   // Every rating starts at the one frozen inherited value. Legacy ratingHistory
   // remains visible evidence but is never reverse-engineered into comparisons.
   for(const task of board.tasks||[]){const rating=ratings.get(task.id);if(rating){task.mu=rating.mu;task.sigma=rating.sigma;}}
-  const activePass=currentChoicePassId(board),passEvents=events.filter(event=>event.passId===activePass);
+  const activePass=PassChain.passId(board),passEvents=events.filter(event=>event.passId===activePass);
   for(const event of passEvents)if(cancelled.has(event.id)&&(event.kind==="no"||event.kind==="comparison")){
     const id=event.kind==="no"?event.candidateId:event.taskId,kind=baseline.considered?.[id];
     if(board.tasks?.find(task=>task.id===id)?.done)continue;
@@ -11375,8 +11358,9 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
   }
   for(const task of board.tasks||[]){const rating=ratings.get(task.id);if(rating){task.mu=rating.mu;task.sigma=rating.sigma;}}
   if(passEvents.length){
-    const start=passEvents[0].chainIds.filter(id=>board.tasks?.some(task=>task.id===id&&!task.done));
-    const chain=[...new Set(start)];
+    const live=id=>board.tasks?.some(task=>task.id===id&&!task.done);
+    const start=passEvents[0].chainIds.filter(live);
+    let chain=[...new Set(start)];
     for(const event of passEvents){
       if(cancelled.has(event.id))continue;
       if(event.kind==="current-choice"&&event.target?.type==="task"&&event.target.property==="disposition"
@@ -11386,14 +11370,11 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
         const index=chain.indexOf(event.target.id);if(index>=0)chain.splice(index,1);
         continue;
       }
-      const returned=currentChoiceChainReturnId(event);
-      if(returned!==null){
-        // #221 Return as candidate removes only this membership, in decision
-        // order: a later explicit Yes/Dot adds the task again, while ending a
-        // hold or replaying the earlier Yes/Dot cannot.
-        const index=chain.indexOf(returned);if(index>=0)chain.splice(index,1);
-        continue;
-      }
+      // #221 Return as candidate removes only this membership, in decision
+      // order: a later explicit Yes/Dot adds the task again, while ending a
+      // hold or replaying the earlier Yes/Dot cannot. Every other row leaves
+      // the chain to the rules below.
+      chain=PassChain.apply(chain,event,{byId,live});
       const id=event.kind==="no"?null:event.kind==="comparison"&&event.action!=="dislodge"?event.taskId:null;
       if(event.kind==="no"){
         // No is also a current candidate exclusion. Its observation still
@@ -11441,16 +11422,11 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
 function recomputeProjectedDecisionRanks(board){
   if(board===state)recomputeRanks();
 }
-function currentDecisionPassId(){
-  if(typeof state.passId==="string" && state.passId)return state.passId;
-  const started=Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0;
-  return "legacy-pass-v1:"+started+":"+(typeof state.chain?.[0]==="string"?state.chain[0]:"none");
-}
 function decisionGestureFields(gesture,at){
   const captured=gesture&&typeof gesture==="object"?gesture:captureDecisionGesture(null,at);
   return {actionId:decisionId(captured.actionId)?captured.actionId:uid(),at:Number.isFinite(captured.at)&&captured.at>=0?captured.at:at,
     account:typeof captured.account==="string"&&captured.account?captured.account:null,
-    baseId:decisionId(captured.baseId)?captured.baseId:null,passId:decisionId(captured.passId)?captured.passId:currentDecisionPassId(),
+    baseId:decisionId(captured.baseId)?captured.baseId:null,passId:decisionId(captured.passId)?captured.passId:PassChain.pin(state),
     passAt:Number.isFinite(captured.passAt)&&captured.passAt>=0?captured.passAt:0,
     scanMode:["descending","chance","squared","halving"].includes(captured.scanMode)?captured.scanMode:state.scanMode,
     chainIds:Array.isArray(captured.chainIds)?captured.chainIds.filter(decisionId):[],
@@ -11552,25 +11528,99 @@ function currentChoicePassChainValueSupported(value){
   return Array.isArray(value)&&value.every(id=>typeof id==="string"&&id.length>0&&!Object.hasOwn(Object.prototype,id))&&
     new Set(value).size===value.length&&value.length<=1;
 }
-// #221 Return as candidate on a dot: this pass's own membership of one task
-// going from [id] to []. supportedCurrentChoiceEvent admits a chain row in its
-// own pass only in this shape. Clients from before #221 accept a chain row
-// only as a Start root into a new pass, so they report unsupported decision
-// evidence and hold both pull and push: none of them can replay the earlier
-// Yes/Dot and push the removed dot back to the cloud.
-function currentChoiceChainReturn(passId,id){
-  return {target:{type:"pass",id:passId,property:"chain"},value:[],after:{present:true},before:{present:true,value:[id]}};
-}
-function currentChoiceChainReturnId(event){
-  return event?.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain"&&
-    event.target.id===event.passId&&supportedCurrentChoiceEvent(event)?event.before.value[0]:null;
-}
-// #2359: the Start root of a pass, [] to [id] into the new pass it began.
-// supportedCurrentChoiceEvent pins that shape for a row naming another pass.
-function currentChoiceStartRootId(event){
-  return event?.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain"&&
-    event.target.id!==event.passId&&supportedCurrentChoiceEvent(event)?event.value[0]:null;
-}
+/* #2375: the one place that knows what the pass chain's Start root and Return
+   rows look like, which pass a board is in, and what those rows do to the
+   chain. The recorded row shapes are unchanged; supportedCurrentChoiceEvent
+   stays the one schema check, and read() calls it.
+   - #221 Return as candidate on a dot: this pass's own membership of one task
+     going from [id] to []. Clients from before #221 accept a chain row only as
+     a Start root into a new pass, so they report unsupported decision evidence
+     and hold both pull and push: none of them can replay the earlier Yes/Dot
+     and push the removed dot back to the cloud.
+   - #2359 Start root: [] to [id] into the new pass it began, paired with that
+     pass's scanMode row from the same action.
+   Nothing here orders by wall clock: order comes from decision order and the
+   chain each row recorded. Only pin() and record() change the board given. */
+const PassChain=Object.freeze({
+  passId(board){
+    if(typeof board?.passId==="string"&&board.passId)return board.passId;
+    const started=Number.isFinite(board?.passStartedAt)&&board.passStartedAt>=0?board.passStartedAt:0;
+    return "legacy-pass-v1:"+started+":"+(typeof board?.chain?.[0]==="string"?board.chain[0]:"none");
+  },
+  // #2375: a board that never saved a pass id is named after its first dot,
+  // so returning, postponing or undoing that dot moved it into another pass:
+  // Undo then rebuilt the chain without the returned dot, and Postpone dotted
+  // it again and held sync. Every gesture capture saves the id it reports, so
+  // the pass keeps it until Start, a Dot onto an empty chain or 2 AM begins a
+  // new one. The saved value is the id the board already reported, so no row
+  // changes pass, and older clients read it like the id No already saves.
+  pin(board){
+    const id=PassChain.passId(board);
+    if(board&&typeof board==="object"&&!(typeof board.passId==="string"&&board.passId))board.passId=id;
+    return id;
+  },
+  read(row){
+    if(row?.kind!=="current-choice"||row.target?.type!=="pass"||row.target.property!=="chain"||!supportedCurrentChoiceEvent(row))return null;
+    if(row.target.id===row.passId)return {kind:"return",passId:row.passId,taskId:row.before.value[0]};
+    return row.chainIds.length===0?{kind:"start",passId:row.target.id,taskId:row.value[0]}:null;
+  },
+  // Every Start among rows, paired with its scanMode row. A chain row that is
+  // not a Return, or a scanMode row naming another pass, belongs to a Start;
+  // its action must hold exactly that pair, with matching envelopes, or the
+  // evidence cannot be projected. Account, cancellation, liveness, the 2 AM
+  // cutoff and ancestry are projection rules and stay with the caller.
+  starts(rows){
+    const list=Array.isArray(rows)?rows:[],pairs=[],seen=new Set();let issue=null;
+    const passRow=row=>row?.kind==="current-choice"&&row.target?.type==="pass";
+    for(const seed of list){
+      if(!passRow(seed)||!(seed.target.property==="chain"&&PassChain.read(seed)?.kind!=="return"
+        ||seed.target.property==="scanMode"&&seed.target.id!==seed.passId))continue;
+      const key=JSON.stringify([seed.actionId,seed.target.id]);if(seen.has(key))continue;seen.add(key);
+      const group=list.filter(row=>passRow(row)&&row.actionId===seed.actionId&&row.target.id===seed.target.id);
+      const roots=group.filter(row=>row.target.property==="chain"),modes=group.filter(row=>row.target.property==="scanMode");
+      const start=roots.length===1?PassChain.read(roots[0]):null;
+      if(group.length!==2||modes.length!==1||start?.kind!=="start"||!currentChoiceStartEnvelopeMatches(modes[0],roots[0])){
+        issue="unprojectable-decision-evidence";continue;
+      }
+      const root=roots[0],mode=modes[0],prior=mode.before?.present?mode.before.value:null;
+      pairs.push({root,mode,passId:start.passId,taskId:start.taskId,before:{passId:root.passId,passAt:root.passAt,chainIds:root.chainIds.slice(),
+        scanMode:prior?.mode,chance:prior?JSON.parse(JSON.stringify(prior.chance)):undefined}});
+    }
+    return {pairs,issue};
+  },
+  returned(board){
+    const passId=PassChain.passId(board),ids=new Set();
+    for(const row of Array.isArray(board?.decisionEvents)?board.decisionEvents:[]){
+      const read=PassChain.read(row);
+      if(read?.kind==="return"&&read.passId===passId)ids.add(read.taskId);
+    }
+    return ids;
+  },
+  record(board,gesture,change){
+    const chain=Array.isArray(board?.chain)?board.chain:[];
+    if(decisionId(change?.return)){
+      const id=change.return;if(!chain.includes(id))return null;
+      board.chain=chain.filter(value=>value!==id);
+      return {target:{type:"pass",id:gesture.passId,property:"chain"},value:[],after:{present:true},before:{present:true,value:[id]}};
+    }
+    if(decisionId(change?.start)){
+      if(chain.length)return null;
+      board.chain=[change.start];
+      board.passStartedAt=gesture.at;   // the pass clock keeps the original Start action time
+      board.passId=uid();
+      return {target:{type:"pass",id:board.passId,property:"chain"},value:[change.start],after:{present:true},before:{present:true,value:[]}};
+    }
+    return null;
+  },
+  // One row's effect on a chain being rebuilt in decision order. A Return takes
+  // off only its own task; a later Yes or Dot can add it back.
+  apply(chain,row,{byId,live}={}){
+    const next=Array.isArray(chain)?chain.slice():[];
+    const read=PassChain.read(row);
+    if(read?.kind==="return"){const index=next.indexOf(read.taskId);if(index>=0)next.splice(index,1);}
+    return next;
+  },
+});
 function currentChoiceDispositionValueSupported(value){
   if(value?.kind==="no"&&Object.keys(value).length===1)return true;
   return !!value&&typeof value==="object"&&!Array.isArray(value)&&
@@ -11903,11 +11953,6 @@ function projectCurrentChoiceContextExistence(board,events,byId,cancelled){
   }
   return changed;
 }
-function currentChoicePassId(board){
-  if(typeof board?.passId==="string"&&board.passId)return board.passId;
-  const started=Number.isFinite(board?.passStartedAt)&&board.passStartedAt>=0?board.passStartedAt:0;
-  return "legacy-pass-v1:"+started+":"+(typeof board?.chain?.[0]==="string"?board.chain[0]:"none");
-}
 function supportedCurrentChoiceProjectionRecord(event){
   if(event?.kind==="current-choice")return supportedCurrentChoiceEvent(event);
   if(typeof supportedDecisionEvent==="function")return supportedDecisionEvent(event);
@@ -11940,7 +11985,7 @@ function projectDecisionPassBase(board=state){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
   const source=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(source),cancelled=decisionUndoTargets(board);
   for(const event of source)if(event?.kind==="undo"&&supportedDecisionEvent(event)&&event.passBefore){
-    const root=event.targetEventIds.map(id=>byId.get(id)).find(row=>row?.kind==="current-choice"&&row.target?.property==="chain");
+    const root=PassChain.starts(event.targetEventIds.map(id=>byId.get(id))).pairs[0]?.root;
     if(!root||!cancelled.has(root.id)||board.passId!==root.target.id)continue;
     const prior=event.passBefore;
     board.passId=prior.passId;board.passStartedAt=prior.passAt;board.chain=prior.chainIds.slice();board.mode=prior.mode;
@@ -11948,27 +11993,19 @@ function projectDecisionPassBase(board=state){
   }
   const account=typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null;
   const baselineIds=new Set(Array.isArray(board.decisionBaseline?.includedActionIds)?board.decisionBaseline.includedActionIds:[]);
-  const roots=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&
-    event.target.property==="chain"&&event.account===account&&!cancelled.has(event.id));
   const groups=[];
-  for(const root of roots){
-    const modeRows=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&
-      event.target.property==="scanMode"&&event.target.id===root.target.id&&currentChoiceStartEnvelopeMatches(event,root));
-    if(modeRows.length!==1)continue;
-    const allGroupRows=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.actionId===root.actionId&&
-      event.target?.type==="pass"&&event.target.id===root.target.id&&event.account===account&&event.at===root.at);
-    if(allGroupRows.length!==2||!modeRows[0].after.present||!root.after.present||root.target.id===root.passId||
-        root.chainIds.length!==0||root.before.value.length!==0)continue;
+  for(const {root,mode,taskId} of PassChain.starts([...byId.values()].filter(event=>event.account===account)).pairs){
+    if(cancelled.has(root.id)||!mode.after.present)continue;
     if(root.observedActionIds.some(id=>!byId.has(id)&&!baselineIds.has(id)))continue;
-    const task=board.tasks.find(row=>row?.id===root.value[0]);
+    const task=board.tasks.find(row=>row?.id===taskId);
     if(!task||task.done===true||board.deletedTaskIds?.[task.id]===true&&!board.restoredTaskIds?.[task.id])continue;
     if(Date.now()>=passResetCutoff(root.at))continue;
-    groups.push({root,mode:modeRows[0]});
+    groups.push({root,mode});
   }
   if(!groups.length)return false;
   const winnerMode=latestCurrentChoiceEvent(groups.map(group=>group.mode),byId);
   const winner=groups.find(group=>group.mode.id===winnerMode?.id);if(!winner)return false;
-  const activeId=currentChoicePassId(board),samePass=groups.find(group=>group.root.target.id===activeId);
+  const activeId=PassChain.passId(board),samePass=groups.find(group=>group.root.target.id===activeId);
   if(!samePass&&activeId!==winner.root.target.id){
     const activeAt=Number.isFinite(board.passStartedAt)&&board.passStartedAt>=0?board.passStartedAt:0;
     if(activeAt>winner.root.at||activeAt===winner.root.at&&activeId>winner.root.target.id)return false;
@@ -12004,7 +12041,7 @@ function currentChoiceDecisionOwner(event,board,cancelled){
     :event.account===(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null);
 }
 function currentChoiceDispositionActions(board,events,cancellationOverride=null){
-  const byTask=new Map(),passId=currentChoicePassId(board),tasks=new Set(board.tasks.map(task=>task?.id).filter(id=>typeof id==="string"&&id));
+  const byTask=new Map(),passId=PassChain.passId(board),tasks=new Set(board.tasks.map(task=>task?.id).filter(id=>typeof id==="string"&&id));
   const cancelled=cancellationOverride||decisionUndoTargets(board),byId=currentChoiceProjectionIndex(events);
   const dispositionEvents=events.filter(event=>event.kind==="current-choice"&&event.target?.property==="disposition"&&currentChoiceDecisionOwner(event,board,cancelled));
   const add=(id,event,present,value,passScoped)=>{
@@ -12113,7 +12150,7 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
     // Pass roots are installed before comparison replay. Reapplying the
     // original Start root in this final outcome pass would erase later Dots.
     if(type==="pass"&&property==="chain"||type==="context"&&property==="exists")continue;
-    if(type==="pass"&&id!==currentChoicePassId(board))continue;
+    if(type==="pass"&&id!==PassChain.passId(board))continue;
     const key=JSON.stringify([type,id,property]),rows=properties.get(key)||[];rows.push(event);properties.set(key,rows);
   }
   for(const [key,rows] of properties){
