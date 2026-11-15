@@ -362,7 +362,7 @@ async function automaticSourceLifecycle254(t,afterAcknowledged=null){
  await fixtureDeadline(async wait=>{while(vm.runInContext('automaticCloudFallbackBootCapturePending||!state',receiver.ctx))await wait();},
   'the independent receiver completes its own durable-source startup capture before cloud reconciliation');
  await receiver.ctx.cloudPull();await settleRecoveryOperations188(receiver.ctx);
- assert.equal(vm.runInContext('reconciledAs',receiver.ctx),receiving.CS.user,'the independent receiver finishes account-bound cloud reconciliation');
+ assert.equal(vm.runInContext('syncView().authority',receiver.ctx),receiving.CS.user,'the independent receiver finishes account-bound cloud reconciliation');
  assert.ok(receiver.ctx.state.tasks.some(row=>row.id===targetTask.id),'an independent client receives the later recovered decision');
  assert.ok(receiver.ctx.state.tasks.some(row=>row.title==='Accepted while offline'),'the receiver also accepts the offline edit');
  assert.equal(receiver.ctx.cloudPayload(),acknowledged.payload,'the independent receiver accepts the exact complete acknowledged board');
@@ -3626,7 +3626,7 @@ async function delayedEvergreenReadFixture({incumbentRead=false}={}){
 }
 
 function liveDoneDeliverySnapshot(app,id){
- return JSON.parse(vm.runInContext('JSON.stringify({rev:state.syncRev,dirty:state.syncDirty,reconciledAs,pulling,cloudPushInFlight,pendingPush,pendingCloudRevision,lastKnownCloudRevision,currentDoneAt:state.tasks.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,knownDoneAt:JSON.parse(lastKnownCloudPayload||"null")?.tasks?.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
+ return JSON.parse(vm.runInContext('JSON.stringify({rev:state.syncRev,dirty:state.syncDirty,reconciledAs:syncView().authority,pulling,cloudPushInFlight,pendingPush,pendingCloudRevision,lastKnownCloudRevision:syncView().known.revision,currentDoneAt:state.tasks.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,knownDoneAt:JSON.parse(syncView().known.payload||"null")?.tasks?.find(row=>row.id==='+JSON.stringify(id)+')?.lastDoneAt??null,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
 }
 async function ordinaryEditDebounceControl(){
  const initial=syncState({tasks:[syncTask('ordinary-control','Ordinary edit control')],syncRev:5,syncAccount:'e@example.com',syncDirty:false}),h=makeSyncHarness({remote:initial,rev:5,delayMs:1}),entered=deferredSyncFixture();
@@ -3637,13 +3637,13 @@ async function ordinaryEditDebounceControl(){
  try{
   await startupEntered.promise;const initialConsumers=reads.filter(call=>!call.settled),caller=app.ctx.cloudPull();await caller;
   assert.ok(initialConsumers.length>0,'the ordinary control captures the real queued startup read');
-  assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),null,'a second early-returning caller is not initial read authority');
+  assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('syncView().authority',app.ctx),null,'a second early-returning caller is not initial read authority');
   assert.equal(app.ctx.state.tasks.length,1,'ordinary Add has not run while startup is pending');assert.equal(h.doc.rev,5);
   const startup={heldConsumers:initialConsumers.length,heldSourceRaw:h.doc.payload,heldRaw:JSON.stringify(app.ctx.state)};
   releaseStartup.resolve();await Promise.all(initialConsumers.map(call=>call.promise));await caller;
-  assert.equal(await app.ctx.persist(),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),'e@example.com');
+  assert.equal(await app.ctx.persist(),true);assert.equal(vm.runInContext('syncView().authority',app.ctx),'e@example.com');
   assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),JSON.stringify(app.ctx.state),'the actual startup consumer and device head are acknowledged before ordinary Add');
-  startup.acknowledgedRaw=JSON.stringify(app.ctx.state);startup.account=vm.runInContext('reconciledAs',app.ctx);
+  startup.acknowledgedRaw=JSON.stringify(app.ctx.state);startup.account=vm.runInContext('syncView().authority',app.ctx);
   assert.equal(app.shim.window.CLOUD_PUSH_DELAY_MS,undefined,'the actual ordinary producer retains the default two-second debounce');
   const acknowledged=deferredSyncFixture(),push=app.shim.window.CloudSync.push;app.shim.window.CloudSync.push=async(...args)=>{entered.resolve({at:performance.now(),args});const reply=await push(...args);acknowledged.resolve({at:performance.now(),reply});return reply;};
   const started=performance.now();app.ctx.addTask('Actual ordinary debounced edit');return {app,h,started,entered:entered.promise,acknowledged:acknowledged.promise,startup};
@@ -3652,7 +3652,7 @@ async function ordinaryEditDebounceControl(){
 }
 
 function liveModeDeliverySnapshot(app){
- return JSON.parse(vm.runInContext('JSON.stringify({mode:state.mode,rev:state.syncRev,dirty:state.syncDirty,reconciledAs,pulling,knownMode:JSON.parse(lastKnownCloudPayload||"null")?.mode??null,lastKnownCloudRevision,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
+ return JSON.parse(vm.runInContext('JSON.stringify({mode:state.mode,rev:state.syncRev,dirty:state.syncDirty,reconciledAs:syncView().authority,pulling,knownMode:JSON.parse(syncView().known.payload||"null")?.mode??null,lastKnownCloudRevision:syncView().known.revision,lastPersistedRaw,stateRaw:JSON.stringify(state)})',app.ctx));
 }
 async function settleLiveModePublication(app,h,label){
  const deadline=performance.now()+8000;let observed,stored;

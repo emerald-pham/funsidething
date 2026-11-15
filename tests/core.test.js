@@ -17214,7 +17214,7 @@ test('RISK CLOUD ADOPTION: failed safety backup leaves the local revision and bo
   ctx.state.tasks.push(syncTask('unsaved','Unsaved local edit'));
   vm.runInContext('pendingPush=true',ctx);
   const before=JSON.stringify(ctx.state);
-  const markers=()=>vm.runInContext('JSON.stringify({reconciledAs,lastKnownCloudPayload,pendingPush,deferredCloudPull,lastPushed})',ctx);
+  const markers=()=>vm.runInContext('JSON.stringify({reconciledAs:syncView().authority,lastKnownCloudPayload:syncView().known.payload,pendingPush,deferredCloudPull,lastPushed})',ctx);
   const beforeMarkers=markers();
   const write=storage.setItem;
   storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
@@ -17294,7 +17294,7 @@ test('RISK CLOUD ADOPTION: held newer read cannot release a pending write from a
   h.writeBehindBack(syncState({tasks:[syncTask('shared','Changed elsewhere')]}));
   ctx.state.tasks.push(syncTask('unsaved','Offline pending edit'));
   vm.runInContext('pendingPush=true',ctx);
-  const markers=()=>vm.runInContext('JSON.stringify({reconciledAs,lastKnownCloudPayload,pendingPush})',ctx);
+  const markers=()=>vm.runInContext('JSON.stringify({reconciledAs:syncView().authority,lastKnownCloudPayload:syncView().known.payload,pendingPush})',ctx);
   const before=markers();
   const write=storage.setItem;
   storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
@@ -21342,10 +21342,10 @@ test('RISK comparison replay: deleting an opponent keeps its frozen rating avail
   const close=async app=>{app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry();',app.ctx);try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
   try{
    const startupJobs=[phone.ctx.cloudPull(),mac.ctx.cloudPull()];
-   for(const [device,app] of [['phone',phone],['mac',mac]]){await startup[device].entered.promise;assert.ok(app.ctx.state,'state readiness alone can precede the real startup read');assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),null,'the held initial response has not established read authority');assert.ok(startup[device].calls.some(call=>!call.settled),'the actual initial read consumer is still pending');}
+   for(const [device,app] of [['phone',phone],['mac',mac]]){await startup[device].entered.promise;assert.ok(app.ctx.state,'state readiness alone can precede the real startup read');assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('syncView().authority',app.ctx),null,'the held initial response has not established read authority');assert.ok(startup[device].calls.some(call=>!call.settled),'the actual initial read consumer is still pending');}
    const initialConsumers=Object.values(startup).flatMap(control=>control.calls.filter(call=>!call.settled));for(const control of Object.values(startup))control.release.resolve();await Promise.all(initialConsumers.map(call=>call.promise));await Promise.all(startupJobs);
    await phone.ctx.cloudPull();await mac.ctx.cloudPull();assert.equal(await phone.ctx.persist(),true,'the startup phone head is device-acknowledged before the real action');assert.equal(await mac.ctx.persist(),true,'the startup Mac head is device-acknowledged before the real action');
-   for(const app of [phone,mac])assert.equal(vm.runInContext('reconciledAs',app.ctx),'e@example.com','the initial authoritative read completed before either producer acts');
+   for(const app of [phone,mac])assert.equal(vm.runInContext('syncView().authority',app.ctx),'e@example.com','the initial authoritative read completed before either producer acts');
    setFakeTime(phone.ctx,Date.parse('2026-10-17T16:01:00Z'));phone.ctx.state.candidateId='choice';phone.ctx.renderScan();
    assert.match(phone.shim.document.getElementById('scan').innerHTML,/data-act="yes" data-candidate="choice" data-benchmark="base"/);
    phone.ctx.window.CloudSync.ready=false;phone.ctx.onAction('yes',{dataset:{candidate:'choice',benchmark:'base'}});
@@ -31471,7 +31471,7 @@ test('RISK completion boundaries: failed read stays pending and wake exactly ack
   try{CS.user=null;vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',ctx);}catch{}
   try{await store.close();}catch{}
  });
- await ctx.__dataReady;await ctx.cloudPull();assert.equal(await ctx.persist(),true,'the initial head and actual authoritative read complete before offline actions');assert.equal(vm.runInContext('reconciledAs',ctx),'e@example.com');CS.ready=false;
+ await ctx.__dataReady;await ctx.cloudPull();assert.equal(await ctx.persist(),true,'the initial head and actual authoritative read complete before offline actions');assert.equal(vm.runInContext('syncView().authority',ctx),'e@example.com');CS.ready=false;
  hydrateUnchangedEditorDraft(app,doneId);ctx.onAction('done-task',{dataset:{id:doneId}});
  assert.equal(await ctx.persist(),true,'the real evergreen Done is durable while offline');
  hydrateUnchangedEditorDraft(app,candidateId);ctx.onAction('dot-task',{dataset:{id:candidateId}});
@@ -31611,7 +31611,7 @@ test('RISK cloud acknowledgement authority: CAS repair requires current identity
    h=makeSyncHarness({remote:initial,rev:6,delayMs:1}),indexedDB=new IDBFactory(),name='ack-authority-'+Math.random();let identity='owner-a';
   const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},indexedDBProvider:indexedDB,deviceDbName:name,cloudSyncFactory:()=>({...h.factory(),recoveryIdentity:()=>identity})}),{ctx,shim}=app,CS=shim.window.CloudSync,store=shim.window.ScannerDeviceStore;
   await ctx.__dataReady;await ctx.cloudPull();ctx.observeCloudIdentity();assert.equal(await ctx.persist(),true);
-  assert.equal(ctx.state.syncRev,6);assert.equal(vm.runInContext('lastKnownCloudRevision',ctx),6);
+  assert.equal(ctx.state.syncRev,6);assert.equal(vm.runInContext('syncView().known.revision',ctx),6);
   const acknowledged=await store.readHead(),peer=JSON.parse(acknowledged.payload);peer.syncRev=mode==='newer durable peer'?8:mode==='equal durable revision'?6:5;peer.lastCloudServerAt=123;
   const injected=await store.commitHead({expectedHash:acknowledged.hash,payload:JSON.stringify(peer),account:'e@example.com',backup:{id:'original-ack-'+mode,kind:'manual',at:1,day:'2026-10-17',payload:acknowledged.payload}});assert.equal(injected.ok,true);
   ctx.addTask('Later accepted edit '+mode);
@@ -31651,7 +31651,7 @@ test('RISK cloud acknowledgement identity: obsolete replies cannot start replace
  assert.equal(freshReads,0,'an obsolete response cannot start work in the replacement connection');
  assert.equal(ctx.state.syncRev,4,'the old connection reply cannot confirm a revision for a replacement backend');
  assert.equal(ctx.state.syncDirty,true,'the accepted work stays pending until the replacement has fresh authority');
- assert.equal(vm.runInContext('confirmedCloudDeviceOwner?.backend===window.CloudSync&&confirmedCloudDeviceOwner?.identity===cloudAccountIdentity()&&confirmedCloudDeviceOwner?.account===window.CloudSync.user',ctx),false,'a stale reply cannot mint a fresh process-local proof for the replacement');
+ assert.equal(vm.runInContext('syncView().owner?.backend===window.CloudSync&&syncView().owner?.identity===cloudAccountIdentity()&&syncView().owner?.account===window.CloudSync.user',ctx),false,'a stale reply cannot mint a fresh process-local proof for the replacement');
  assert.equal(ctx.state.tasks.some(row=>row.title==='Accepted before connection replacement'),true);assert.equal(replacementWrites,0);
  assert.equal(await ctx.persist(),true);const head=JSON.parse((await shim.window.ScannerDeviceStore.readHead()).payload);assert.equal(head.syncRev,4);assert.equal(head.syncDirty,true);assert.equal(head.tasks.some(row=>row.title==='Accepted before connection replacement'),true);
  const fresh=ctx.cloudPull();await fixtureDeadline(freshEntered.promise,'an explicit current-owner read still reaches the replacement connection');assert.equal(freshReads,1);
@@ -31671,11 +31671,11 @@ test('RISK cloud response ownership: a stale provider return cannot revoke a new
   // is serialized by the slot; this is not a claim it bypasses that guard.
   h.writeBehindBack(h.remoteState());const accepted=await CS.pull();assert.equal(accepted.rev,6);
   ctx.state.syncRev=accepted.rev;ctx.state.syncDirty=false;ctx.bindDecisionBase(CS.user,accepted.rev,accepted.payload);
-  ctx.__newOwnerSource=accepted;vm.runInContext('lastKnownCloudPayload=__newOwnerSource.payload;lastKnownCloudAccount=window.CloudSync.user;lastKnownCloudRevision=__newOwnerSource.rev;reconciledAs=window.CloudSync.user;cloudAdoptionHeld=false;pendingPush=false;',ctx);delete ctx.__newOwnerSource;
-  ctx.bindConfirmedDeviceCloudOwner();const newer=vm.runInContext('confirmedCloudDeviceOwner',ctx);assert.equal(await ctx.persist(),true);
+  ctx.__newOwnerSource=accepted;await vm.runInContext('(async()=>{const read=(await syncSession.startRead({full:true})).read;read.accept({payload:__newOwnerSource.payload,revision:__newOwnerSource.rev});read.end();cloudAdoptionHeld=false;pendingPush=false;})()',ctx);delete ctx.__newOwnerSource;
+  ctx.bindConfirmedDeviceCloudOwner();const newer=vm.runInContext('syncView().owner',ctx);assert.equal(await ctx.persist(),true);
   release.resolve();await sending;
-  assert.equal(vm.runInContext('reconciledAs',ctx),'e@example.com','the obsolete callback cannot revoke the newer accepted read authority');
-  assert.equal(vm.runInContext('cloudAdoptionHeld',ctx),false);assert.equal(vm.runInContext('confirmedCloudDeviceOwner',ctx),newer);
+  assert.equal(vm.runInContext('syncView().authority',ctx),'e@example.com','the obsolete callback cannot revoke the newer accepted read authority');
+  assert.equal(vm.runInContext('cloudAdoptionHeld',ctx),false);assert.equal(vm.runInContext('syncView().owner',ctx),newer);
   assert.equal(ctx.state.syncRev,6);assert.equal(ctx.state.syncDirty,false);assert.equal(vm.runInContext('pendingPush',ctx),false);
   assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).syncRev,6);assert.equal(h.calls.filter(call=>call==='push').length,1);
  }finally{release.resolve();if(sending)await sending;ctx.suspendCloudSync();}
@@ -41972,7 +41972,7 @@ test('RISK support diagnostics: a held local save and cloud acknowledgement stay
   pushEntered=deferredSyncFixture();
   ctx.window.CloudSync={configured:true,ready:true,user:'owner',status:'ok',async pull(){return {empty:true};},
    async push(){pushEntered.resolve();return pushGate.promise;},signIn(){},signOut(){}};
-  vm.runInContext("reconciledAs='owner';lastKnownCloudPayload=JSON.stringify(state);lastKnownCloudAccount='owner';lastKnownCloudRevision=1;lastPushed=''",ctx);
+  await vm.runInContext("(async()=>{const read=(await syncSession.startRead({full:true})).read;read.accept({payload:JSON.stringify(state),revision:1});read.end();lastPushed='';})()",ctx);
   const pushing=ctx.sendPush();
   await fixtureDeadline(pushEntered.promise,'actual cloud push did not enter its held SDK call');
   ctx.onAction('view-support-diagnostics',{});

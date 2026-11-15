@@ -103,8 +103,13 @@ _Avoid_: Synced badge
 The one owner, while the app is open, of what this device knows about its cloud
 copies. Every cloud read reports what it found to the session, whoever started
 the read, so once any read finds the copy this device's acknowledgement names
-damaged, no sync treats that copy as unchanged until a healthy read. It starts
-empty each time the app opens.
+damaged, no sync treats that copy as unchanged until a healthy read. It also
+holds the page's read authority, the exact cloud copy last read or acknowledged
+and the Confirmed device cloud owner, and it is the one place a cloud reply is
+accepted as a Cloud acknowledgement: only while the reply still belongs to the
+connection its push started under, is not older than this device's revision,
+and this device has saved the acknowledged board. It starts empty each time the
+app opens.
 _Avoid_: Sync manager, cloud cache
 
 
