@@ -14032,3 +14032,24 @@ test('RISK backup retention (device mirror): a save removes a same-id daily and 
  assert.equal(kept.includes('pair-mid:daily'),false,'this account’s four-day-old daily is past its three days');
  assert.deepEqual(kept.filter(row=>row.startsWith('pair-old')),[],'a ten-day-old pair is past its days');
 });
+
+// #2379 specialist review N3: what the browser local-edit exception relies on.
+// Cloud pull pins the first stable copy holding the displaced board, and
+// renames it only when it is an automatic copy; a manual copy keeps its kind.
+test('RISK backup retention (browser list): a cloud pull pins a manual copy that holds the displaced edit and keeps it manual, as main does',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx,shim}=app;
+ ctx.addTask('Base title');assert.equal(await ctx.persist(),true);
+ const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+ shim.window.CloudSync=h.factory();await ctx.cloudPull();
+ ctx.state.tasks[0].title='My only offline title';ctx.state.updatedAt=Date.now();ctx.state.syncDirty=true;
+ assert.equal(await ctx.persist(),true);
+ const offline=JSON.stringify(ctx.state),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{id:'manual-offline',day,at:Date.now()-1000,kind:'manual',payload:offline,account:null},...listed()]));
+ assert.equal(listed().filter(row=>row.kind!=='latest'&&row.payload===offline).map(row=>row.id).join(),'manual-offline','precondition: only the manual copy holds the offline edit');
+ const newer=JSON.parse(h.doc.payload);newer.tasks[0].title='Other device title';h.writeBehindBack(newer);
+ await ctx.cloudPull();
+ assert.equal(ctx.state.tasks[0].title,'Other device title','positive control: the pull adopts the other device’s title');
+ assert.ok(ctx.state.protectedBackupIds.includes('manual-offline'),'the manual copy is pinned');
+ assert.deepEqual(listed().filter(row=>row.payload===offline&&row.kind!=='latest').map(row=>row.id+':'+row.kind),['manual-offline:manual'],'it keeps its kind and no second stable copy is written');
+});

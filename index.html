@@ -2754,11 +2754,18 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     const pinned=protectedBackupIdSet();
     // #2379 decision (option b, 2026-11-15): a deliberate exception. On this
     // list any stable copy of the same board still stands in for the copy kept
-    // before a cloud local edit. Cloud pull is its only caller, and it pins the
-    // copy it reuses and renames it to before-cloud-local-edit or cloud-merged,
-    // so that copy takes the kind and retention the copy needs. Writing a
-    // second full copy instead held adoption when storage was full; that part
-    // is left for #2342.
+    // before a cloud local edit. Cloud pull is its only caller. It then finds
+    // the first copy that isn't latest holding that board (its stablePrior,
+    // which may be a different row from the one matched here, since that
+    // lookup doesn't skip clearable drafts) and pins it in the board it saves.
+    // Only an automatic copy (daily, before-restore, before-cloud-adoption or
+    // cloud-merged) is also renamed: to cloud-merged when the merged board
+    // holds everything in it, else to before-cloud-local-edit, which is kept
+    // until deleted. A manual, kept-until-deleted, unknown-kind or draft copy
+    // is pinned but keeps its kind, so once confirmation releases the pin a
+    // displaced edit can live only in a manual copy the Settings reminder asks
+    // people to delete. That is main's behaviour (#2341). Writing a second full
+    // copy instead held adoption when storage was full; both are left for #2342.
     if(kind==="before-cloud-local-edit" && rows.some(row=>row.kind!=="latest" && row.payload===payload && !clearableAsContained(row))) return true;
     if(backupRetention.decide({rows:legacyRetentionRows(rows),today:day,holds:retentionHolds({preserveBackupId}),
       copy:{kind,bytes:payload,...(metadata?.losingEdit===true?{losingEdit:true}:{})}}).reuse.length) return true;
