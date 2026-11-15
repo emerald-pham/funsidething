@@ -12072,6 +12072,34 @@ test('RISK chain return Undo: after 2 AM, a No or Can’t on the returned task m
  });
 });
 
+// #2375 review E1: a decision the Return already saw does not keep the task
+// off after Undo. Here Can’t took c off before the Return; once its hold
+// ended, Postpone dotted c and c was returned. Undo of that Return puts c back.
+test('RISK chain return Undo: a Can’t the Return already saw does not stop Undo from putting the returned dot back, with and without a saved pass id',async t=>{
+ for(const saved of [true,false])await t.test(`${saved?'saved':'no saved'} pass id`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,passId:saved?'pair-pass':null,settings:{postponeHours:1,showPostpone:true}});
+  const local=await open(at,raw);
+  setFakeTime(local.ctx,at+100);local.ctx.renderScan();local.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b'],'precondition: Can’t takes c off');
+  const later=at+100+31*60000;
+  setFakeTime(local.ctx,later);local.ctx.refreshScanClock();
+  assert.equal(local.ctx.pool().some(task=>task.id==='c'),true,'precondition: the hold has ended');
+  assert.equal(postponeBenchmark221(local,later+100),'b');assert.equal(postponeBenchmark221(local,later+200),'a');
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'precondition: Postpone’s automatic dot is c');
+  returnDotFromBoard221(local,'c',later+300);
+  assert.deepEqual(Array.from(local.ctx.state.chain),[],'precondition: c is returned');
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,later+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'Undo puts c back');
+  await publish221(local);
+  assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'sync is not held');
+  assert.deepEqual(h.remoteState().chain,['c'],'the cloud has it');
+  const cold=await reopen221(local,h,later+3000,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['c'],'reopening keeps it');
+ });
+});
+
 // #2375 re-review G2: in one pass with an earlier answer, Undo of a Return of
 // Postpone's automatic dot puts that dot back. The automatic dot is not
 // recorded, so the pass's own rows never put it on the chain.

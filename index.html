@@ -11666,7 +11666,10 @@ const PassChain=Object.freeze({
     for(const targetId of row.targetEventIds){
       const target=byId?.get?.(targetId),undone=PassChain.read(target);
       if(undone?.kind!=="return"||next.includes(undone.taskId)||typeof live==="function"&&!live(undone.taskId))continue;
-      if(replayed.some(prior=>prior!==row&&decided(prior,undone.taskId)))continue;
+      // #2375 review E1: only decisions the Return did not see count; one it
+      // saw was already overridden by the Return, which Undo now reverses.
+      const seen=decisionEventAncestors(target,byId);
+      if(replayed.some(prior=>prior!==row&&!seen.has(prior?.id)&&decided(prior,undone.taskId)))continue;
       const recorded=target.chainIds,at=recorded.indexOf(undone.taskId);
       const before=at<0?undefined:recorded.slice(0,at).reverse().find(value=>next.includes(value));
       const after=at<0?undefined:recorded.slice(at+1).find(value=>next.includes(value));
