@@ -13707,3 +13707,70 @@ test('RISK started pass sync compatibility: a board the released client held aft
   assert.equal(device.status().text,'☁ synced',device.status().title);
  });
 });
+
+// #2379: one automatic backup retention rule for both backup stores. Each case
+// runs on the older browser backup list (no device store) and on the device
+// store (fake IndexedDB), through the app's own entry points: a safety copy
+// (saveDurableBackup) and an ordinary save. It reads only each store's own
+// backup listing. No cloud account is signed in, so a daily seeded with
+// account null is this account's daily.
+const RETENTION_STORES_2379=[
+ {name:'browser list',async open(t){
+  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+  ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+  assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser list holds the backups');
+  const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+  return retentionHandle2379(app,{
+   async seed(rows){storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),...rows]));},
+   async list(){return listed();},
+   async save(){ctx.addTask('An ordinary edit '+Math.random());assert.equal(await ctx.persist(),true);},
+  });
+ }},
+ {name:'device store',async open(t){
+  const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+  assert.equal(vm.runInContext('deviceStorageAuthority',ctx),true,'precondition: the device store holds the backups');
+  return retentionHandle2379(app,{
+   async seed(rows){
+    for(const row of rows){
+     const head=await store.readHead();
+     assert.ok((await store.putBackup({expectedHash:head.hash,backup:row})).ok,'seeded '+row.id);
+    }
+    await vm.runInContext('refreshDeviceBackupCache()',ctx);
+   },
+   async list(){return [...await store.listBackups()];},
+   async save(){ctx.addTask('An ordinary edit '+Math.random());await savesSettled2334(app);},
+  });
+ }},
+];
+function retentionHandle2379(app,store){
+ const {ctx}=app,today=vm.runInContext('backupDay(Date.now())',ctx);
+ // A calendar day n days before today, from local noon so daylight saving never shifts it.
+ const daysAgo=n=>vm.runInContext(`(()=>{const d=new Date(Date.now());d.setHours(12,0,0,0);d.setDate(d.getDate()-${n});return backupDay(+d);})()`,ctx);
+ let n=0;
+ return {...store,app,ctx,today,daysAgo,
+  // A seeded row: {id, kind, payload} on today, plus any stored field.
+  row:(id,kind,payload,extra={})=>({id,day:today,at:Date.now()-60000+(n++),kind,payload,...extra}),
+  copy:(kind,payload)=>ctx.saveDurableBackup(kind,payload),
+  holding:async payload=>(await store.list()).filter(row=>row.payload===payload),
+ };
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): a copy kept before a cloud local edit is reused only from a copy the app keeps until it is deleted`,async t=>{
+  const s=await store.open(t);
+  const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),Q=boardWithExtraTask2335(s.ctx,'only-in-q','Only in Q');
+  // Positive control: a same-kind copy, kept until it is deleted, stands in.
+  await s.seed([s.row('edit-q','before-cloud-local-edit',Q)]);
+  assert.ok(await s.copy('before-cloud-local-edit',Q),'the copy of Q is reported safe');
+  assert.deepEqual((await s.holding(Q)).map(row=>row.id),['edit-q'],'positive control: the earlier local-edit copy of Q stands in');
+  // This account's daily keeps three days, the adoption copy seven and the
+  // manual one until the person deletes it at the Settings reminder: none is
+  // kept until deleted, so none stands in for the local-edit copy.
+  await s.seed([s.row('daily-p','daily',P,{account:null}),s.row('manual-p','manual',P,{account:null}),s.row('adoption-p','before-cloud-adoption',P)]);
+  assert.ok(await s.copy('before-cloud-local-edit',P),'the copy of P is reported safe');
+  const rows=await s.holding(P),edits=rows.filter(row=>row.kind==='before-cloud-local-edit');
+  assert.equal(edits.length,1,'a new before-cloud-local-edit row holds P: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
+  assert.ok(!['daily-p','manual-p','adoption-p'].includes(edits[0].id),'and it is a new row');
+  assert.deepEqual(rows.map(row=>row.id).filter(id=>id!==edits[0].id).sort(),['adoption-p','daily-p','manual-p'],'the seeded copies all stay listed');
+ });
+}
