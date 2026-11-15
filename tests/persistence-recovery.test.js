@@ -13542,6 +13542,37 @@ test('RISK known-damaged cloud copy: after Review saved decisions, a file restor
 // #2358 L2: Help said an exact acknowledged copy rebuilds damaged cloud saves
 // by itself, but the device holding that copy reads only the root while the
 // copy is unchanged, so it rebuilds only after a check finds the damage.
+// #2377 specialist review N1: a read can find this device's acknowledged copy
+// damaged while its board is not accepted (a recovery source still to be
+// chosen). Saving the acknowledgement without that copy is then refused, and
+// said "Couldn't save this edit" though nothing was edited. Nothing is saved
+// until the board is accepted; the damage stays known, so no read skips to it.
+test('RISK known-damaged cloud copy: damage found while this device’s board is not accepted saves nothing and shows no save error, and the next sync once it is accepted downloads that copy in full',async t=>{
+ for(const variant of ['no damage report','an accepted board','a board not accepted'])await t.test(variant,async t=>{
+  const device=await acknowledgedDevice2354(t,'unaccepted-'+variant.replaceAll(' ','-')),{ctx,shim,backend}=device,store=ctx.window.ScannerDeviceStore;
+  const root=backend.docs.get('users/owner'),savedCopy=async()=>JSON.parse((await store.readHead()).payload).decisionBase?.copy?.generationId??null;
+  assert.equal(await savedCopy(),root.activeGeneration,'positive control: the saved acknowledgement names the cloud copy');
+  const toast=()=>shim.document.getElementById('toast')?.textContent||'';
+  if(variant==='a board not accepted')vm.runInContext('liveBoardAccepted=false',ctx);
+  if(variant!=='no damage report'){
+   ctx.window.dispatchEvent({type:'cloudread',detail:{user:'e@example.com',identity:'owner',outcome:'damaged',rev:root.rev,generationId:root.activeGeneration}});
+   await syncSettle(300);
+   assert.doesNotMatch(toast(),/save this edit/,'no save error is shown: '+toast());
+   assert.equal(ctx.deviceSaveIssue(),null,'and none is recorded');
+   assert.equal(vm.runInContext('syncView().damaged?.generationId',ctx),root.activeGeneration,'the damage is known');
+   assert.equal(await savedCopy(),variant==='an accepted board'?null:root.activeGeneration,
+    variant==='an accepted board'?'positive control: an accepted board saves its acknowledgement without the copy':'a board not accepted saves nothing');
+  }
+  vm.runInContext('liveBoardAccepted=true',ctx);
+  const reads=[];device.faults.serverRead=async path=>{reads.push(path);};
+  await ctx.cloudPull();await savesSettled2334(device);await syncSettle(300);
+  t.diagnostic(JSON.stringify({reads,status:device.status()}));
+  if(variant==='no damage report')assert.ok(!fullDownload2354(reads,'owner',root),'positive control: without a report the next sync reads only the root: '+JSON.stringify(reads));
+  else assert.ok(fullDownload2354(reads,'owner',root),'the next sync downloads the copy in full: '+JSON.stringify(reads));
+  assert.equal(device.status().text,'☁ synced','and, the copy being readable after all, settles synced: '+device.status().title);
+ });
+});
+
 test('RISK known-damaged cloud copy guidance: Help and the changelog say this device rebuilds its damaged save once Retry sync or any other check finds the damage',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const help=shim.document.getElementById('modalRoot').innerHTML;

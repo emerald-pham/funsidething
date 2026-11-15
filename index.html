@@ -6101,8 +6101,13 @@ const syncSession=globalThis.ChainSyncSession?.createSyncSession({
       return {account:state.syncAccount??null,identity:state.syncIdentity??null,revision:state.syncRev,base:state.decisionBase??null};
     },
     valid(ack){return !!ack&&validDecisionBase(ack.base,ack.account,ack.revision);},
+    // A board that is not accepted (a recovery source still to be chosen) is
+    // never saved; persist() would refuse it and report an edit that was never
+    // made. The session keeps the damage known meanwhile, so no read skips to
+    // that copy, and the next read that finds it damaged once the board is
+    // accepted saves it (#2377 specialist review N1).
     save(next){
-      if(!state)return Promise.resolve(false);
+      if(!state||!liveBoardAccepted)return Promise.resolve(false);
       if(!Object.is(state.decisionBase,next.base))state.decisionBase=next.base;
       return persist(true);
     },
