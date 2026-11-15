@@ -6303,9 +6303,14 @@ function syncView(){return syncSession?syncSession.snapshot():NO_SYNC_VIEW;}
 // device answer that restarts a pull stopped at the server-only repair.
 const NO_SYNC_WORK=Object.freeze({run:step=>step,end(){}});
 // A page the service worker does not control can pair this page with an older
-// cached cloud-sync-session.js that has no track() (#2378 review N1); then
-// nothing is counted and saves and sync run exactly as before.
-function trackSyncWork(kind){return typeof syncSession?.track==="function"?syncSession.track(kind):NO_SYNC_WORK;}
+// cached cloud-sync-session.js that has no track() (#2378 review N1), or one
+// that does not know a kind a later page counts and refuses it. Then nothing
+// is counted and saves and sync run exactly as before: counting never throws
+// into the app. The session itself still throws, so its tests catch typos.
+function trackSyncWork(kind){
+  if(typeof syncSession?.track!=="function")return NO_SYNC_WORK;
+  try{return syncSession.track(kind);}catch{return NO_SYNC_WORK;}
+}
 const syncWorkTimers=new Map();
 function countSyncTimer(kind,timer){
   endSyncTimer(timer);syncWorkTimers.set(timer,trackSyncWork(kind));

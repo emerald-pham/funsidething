@@ -13095,6 +13095,27 @@ test('RISK sync session settled: with an older session script that cannot count 
  await assert.doesNotReject(()=>ctx.sendPush(),'a cloud write does not fail');
  assert.ok(h.remoteTitles().includes('Edited with the older session script'),'and reaches the cloud');
 });
+// #2378 owner review: a later page may count a kind this release's session
+// does not know, if a cache pairs that page with this session script. The
+// session refuses the kind (so its own tests catch typos), and the page must
+// carry on uncounted rather than fail its saves.
+test('RISK sync session settled: a session that refuses to count a kind of work leaves edits saving on the device and syncing to the cloud',async t=>{
+ const refusing=fs.readFileSync(path.join(__dirname,'cloud-sync-session.js'),'utf8')+`
+;(()=>{const create=ChainSyncSession.createSyncSession;
+ ChainSyncSession.createSyncSession=ports=>({...create(ports),track(kind){throw new TypeError("Unknown sync work: "+kind);}});})();`;
+ const initial=syncState({tasks:[syncTask('base','Base task')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:3,delayMs:2});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,artifacts:{session:refusing},cloudSyncFactory:()=>h.factory()});
+ assert.throws(()=>vm.runInContext('syncSession.track("pull")',ctx),/Unknown sync work/,'positive control: this session refuses every kind');
+ await assert.doesNotReject(()=>ctx.cloudPull(),'a cloud read does not fail');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the read finishes synced');
+ assert.doesNotThrow(()=>ctx.addTask('Edited while counting is refused'),'adding a task does not fail');
+ assert.equal(await ctx.persist(),true,'the edit saves on this device');
+ assert.match(storage.getItem(LOCAL_HEAD_KEY),/Edited while counting is refused/,'and is in the saved board');
+ await assert.doesNotReject(()=>ctx.sendPush(),'a cloud write does not fail');
+ assert.ok(h.remoteTitles().includes('Edited while counting is refused'),'and reaches the cloud');
+});
 // The reporter's shape: a phone, signed out, deletes one task and then another,
 // while a laptop signed in to the same account deletes only the second. The
 // phone's deletion evidence then lists its keys in another order than the
