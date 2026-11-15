@@ -9584,33 +9584,8 @@ function applyScanPreference(mode){
   state.candidateId = null;
   state.interventionActive = false;
 }
-function startScan(mode){
-  const choiceGesture=captureCurrentChoiceGesture(),beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance),beforeMode=state.mode;
-  pushUndo();
-  // Timer/focus sweeps may not have run yet. Reconcile today's eligible
-  // pool before starting with either an automatic dot or an unpaired candidate.
-  ensureCandidate();
-  state.mode = "scan";
-  state.scanMode = ["chance","squared","halving"].includes(mode || state.settings.scanMode) ? (mode || state.settings.scanMode) : "descending";
-  if(["chance","squared","halving"].includes(state.scanMode)) resetChance(true); else state.chance = null;
-  state.candidateId = null;
-  state.interventionActive = false;
-  const t = chainStart() ? firstDotTask() : null;
-  const choices=[];
-  if(t){
-    writeTaskComparison(t,true);
-    choices.push(PassChain.record(state,choiceGesture,{start:t.id}));
-  }
-  const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
-  if(t||JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.unshift({
-    target:{type:"pass",id:state.passId||choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
-    before:{present:true,value:beforePassMode}});
-  // #2359: a Start that keeps this pass records leaving work mode, as Resume
-  // does. A Start that begins a new pass leaves the old pass's mode behind.
-  if(!t)recordCurrentScannerMode(choiceGesture,beforeMode);
-  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture));
-  commit(true, !!t);   // a dot syncs to the cloud right away
-}
+// #2376: Start is a TaskActionOwner command, applied through BoardDecision.
+function startScan(mode){return TaskActionOwner.perform({type:"start",scanMode:mode});}
 /* The first PASS_RESET_HOUR:00 local instant strictly after `startedAt` — the
    date marker. A pass started at 22:00 crosses it at 02:00; one
    started at 09:00 not until 02:00 the next day; one started exactly at 02:00
@@ -9757,7 +9732,6 @@ const taskActionOwnerBundle=(()=>{
       newPassId?{passId:newPassId,passAt:actionAt,chainIds:state.chain}:{});
     const choiceGesture=actionGesture;
     const beforeChoice=draft?currentChoiceTaskSnapshot(task):null;
-    const beforeDisposition=["worked","return"].includes(action)?currentChoiceDispositionSnapshot(id):null;
     const beforeEditBenchmark=action==="dot"?benchmark():null;
     const kind=action==="return"?"return":action;
     const observation=action==="dot"
@@ -9765,9 +9739,7 @@ const taskActionOwnerBundle=(()=>{
       :captureRatingObservation(kind,[task.id]);
     observation.at=actionAt;
     pushUndo();
-    if(modeOnStart)state.mode=modeOnStart;
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
-    const returningDot=action==="return"&&state.chain.includes(id);
     if(draft){
       applyEditorDraft(task,draft);
       appendCurrentChoiceEvents(prepareCurrentChoiceEvents(
@@ -9778,74 +9750,15 @@ const taskActionOwnerBundle=(()=>{
       commit();
       return "saved-dot-unavailable";
     }
-    if(action==="done"){
-      completeTask(task,actionGesture);
-      state.chain=state.chain.filter(c=>c!==id);
-      delete state.cantAt[id];delete state.workedAt[id];
-      if(state.candidateId===id)state.candidateId=null;
-      projectDecisionEvents(state);recomputeRanks();finishRatingObservation(observation);commit(true,true);
-      return true;
-    }
-    if(action==="worked"){
-      state.chain=state.chain.filter(c=>c!==id);
-      state.considered[id]="worked";
-      state.workedAt[id]=actionAt;
-      state.workLog.push({id:uid(),taskId:id,title:task.title,kind:"worked",at:actionAt});
-      delete state.cantAt[id];
-      if(state.candidateId===id)state.candidateId=null;
-      state.interventionActive=false;
-      const change=currentChoiceDispositionChange(id,beforeDisposition,true);
-      const observedCtx=beforeChoice?.ctx?.value??task.ctx;
-      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
-      finishRatingObservation(observation);commit();
-      return true;
-    }
-    if(action==="dot"){
-      const b=beforeEditBenchmark;
-      writeTaskComparison(task,false);
-      // A deliberate Dot can choose an off-context or future-start task; only
-      // the automatic first placement remains neutral in startScan().
-      if(chainStart()){state.passStartedAt=actionGesture.passAt;state.passId=actionGesture.passId;}
-      const decisionEvent=prepareComparisonDecisionEvent("dot",task,b,observation,actionGesture,
-        !!b&&taskComparisonEligible(task)&&taskComparisonEligible(b));
-      observation.id=decisionEvent.id;recordDecisionEvent(decisionEvent);
-      state.chain.push(id);
-      delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
-      if(state.candidateId===id)state.candidateId=null;
-      state.interventionActive=false;
-      if(b)updateTaskComparison(task,b);
-      projectDecisionEvents(state);recomputeRanks();finishRatingObservation(observation);commit(true,true);
-      return true;
-    }
-    if(action==="return"){
-      let returnRow=null;
-      if(returningDot){
-        // #221: membership only. The rest of the chain keeps its order, and
-        // the task keeps its fields, rating, History and any hold or mark;
-        // ending a hold stays a separate, later press of the same button.
-        // An intervention weighed the returned benchmark; it says nothing
-        // about the newest remaining dot, which becomes the benchmark.
-        if(benchmark()?.id===id)state.interventionActive=false;
-        returnRow=PassChain.record(state,choiceGesture,{return:id});
-      }else{
-        if(resting)reopenTask(task);
-        if(supportedPostponeEvidence(task)&&Date.now()<taskPostponeUntil(task))writeTaskPostpone(task,0);
-        delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
-      }
-      const change=currentChoiceDispositionChange(id,beforeDisposition);
-      const observedCtx=beforeChoice?.ctx?.value??task.ctx;
-      // The chain is rebuilt from this pass's recorded decisions, where the
-      // earlier Yes or Dot still adds the task. So the return is recorded in
-      // that same ordered stream, as this pass's membership going from [id]
-      // to [], or every replay, reload and merge would put the dot back.
-      // Older clients cannot read this shape and hold sync rather than push
-      // their stale chain (see PassChain).
-      const choices=[...(change?[change]:[]),...(returnRow?[returnRow]:[])];
-      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
-      finishRatingObservation({...observation,membershipChanged:returningDot?[id]:[]});commit();
-      return true;
-    }
-    return false;
+    const observedCtx=beforeChoice?.ctx?.value??task.ctx;
+    const result=BoardDecision.apply(actionGesture,{kind:action,taskId:id,mode:modeOnStart||undefined,
+      contextIds:Array.isArray(observedCtx)?observedCtx.slice():[],resting});
+    if(!result){commit();return false;}
+    if(action==="dot")observation.id=result.rows[0].id;
+    if(action==="done"||action==="dot")recomputeRanks();
+    finishRatingObservation(action==="return"?{...observation,membershipChanged:result.moved}:observation);
+    commit(action==="done"||action==="dot"?true:undefined,action==="done"||action==="dot"?true:undefined);
+    return true;
   }
   function executeEditorGesture(command){
     const task=taskById(command.taskId),action=command.action,draft=command.draft;
@@ -9886,7 +9799,169 @@ const taskActionOwnerBundle=(()=>{
     // whose time has run out; the sweeps that end those holds run after it, as
     // they run before every draw, so a choice made next (the automatic dot)
     // sees the pool the person sees.
-    function project(){projectDecisionEvents(state,null,{refreshRanks:false});expireCants();expireWorked();}
+    // The replay of a pass Start began also clears the candidate. The action
+    // already cleared it when it decided about it; one it did not touch stays
+    // on offer, as before #2376, while it is still in the pool.
+    function project(){
+      const offered=state.candidateId;
+      projectDecisionEvents(state,null,{refreshRanks:false});expireCants();expireWorked();
+      if(offered&&state.candidateId===null&&state.mode==="scan"&&!state.interventionActive&&pool().some(task=>task.id===offered))state.candidateId=offered;
+    }
+    // The adapter: the replay when the board could replay before the action
+    // and still can with the rows just recorded; otherwise the direct rule.
+    // If the board refused a row, the direct rule keeps the app working.
+    function settle(replay,direct){
+      if(replay&&decisionReplayReady(state)){project();return "replay";}
+      direct();return "direct";
+    }
+    function record(choices,gesture,taskContextIds={}){
+      const rows=prepareCurrentChoiceEvents(choices.filter(Boolean),gesture,taskContextIds);
+      appendCurrentChoiceEvents(rows);return rows;
+    }
+    // The task's contexts as the person saw them: an editor action passes the
+    // ones from before its draft was saved.
+    function contexts(task,observed=task.ctx){return {[task.id]:Array.isArray(observed)?observed.slice():[]};}
+    function modeChoice(gesture,before,value,again=false){
+      return again||before!==value?{target:{type:"pass",id:gesture.passId,property:"mode"},value,after:{present:true},before:{present:true,value:before}}:null;
+    }
+    // A task's Can't, Worked on it or cleared mark, as the row
+    // currentChoiceDispositionChange writes for it. A mark this version cannot
+    // read is left unrecorded, as there.
+    function dispositionChoice(id,before,value,force=true){
+      if(!before||before.present&&!currentChoiceDispositionEvidenceSupported(before.value))return null;
+      const after=value===null?{present:false}:{present:true,value};
+      if(!force&&JSON.stringify(before)===JSON.stringify(after))return null;
+      return {target:{type:"task",id,property:"disposition"},value,after:{present:after.present},before};
+    }
+    function clearMarks(id){delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];}
+    function yes(gesture,{taskId},replay){
+      const candidate=taskById(taskId),b=benchmark();if(!candidate||candidate.done||!b)return null;
+      const row=prepareComparisonDecisionEvent("yes",candidate,b,{at:gesture.at},gesture,false);
+      writeTaskComparison(candidate,false);
+      row.ratingApplied=taskComparisonEligible(candidate)&&taskComparisonEligible(b);
+      recordDecisionEvent(row);state.candidateId=null;
+      const path=settle(replay,()=>{updateTaskComparison(candidate,b);state.chain.push(candidate.id);clearMarks(candidate.id);});
+      return {path,rows:[row],moved:[candidate.id]};
+    }
+    function no(gesture,{taskId},replay){
+      const candidate=taskById(taskId),b=benchmark();if(!candidate||candidate.done||!b)return null;
+      const row=prepareNoDecisionEvent(candidate,b,{at:gesture.at},gesture,taskComparisonEligible(candidate)&&taskComparisonEligible(b));
+      appendNoDecisionEvent(row);state.candidateId=null;
+      const path=settle(replay,()=>{updateTaskComparison(b,candidate);state.considered[candidate.id]="no";});
+      return {path,rows:[row],moved:[]};
+    }
+    // Can't on the candidate or on the benchmark: the hold starts at the
+    // decision time, and a dot leaves the chain.
+    function cant(gesture,{taskId},replay){
+      const task=taskById(taskId);if(!task||task.done)return null;
+      const before=currentChoiceDispositionSnapshot(task.id),dotted=state.chain.includes(task.id);
+      const rows=record([dispositionChoice(task.id,before,{kind:"cant",at:gesture.at})],gesture,contexts(task));
+      if(state.candidateId===task.id)state.candidateId=null;
+      if(dotted)state.interventionActive=false;
+      const path=settle(replay,()=>{
+        if(dotted)state.chain=state.chain.filter(id=>id!==task.id);
+        state.considered[task.id]="cant";state.cantAt[task.id]=gesture.at;
+      });
+      return {path,rows,moved:dotted?[task.id]:[]};
+    }
+    // Done from the scanner, the list or the editor. completeTask records the
+    // completion and writes the task's Done fields and History. Done on the
+    // benchmark ends scanning, and its switch to work mode is recorded (D4):
+    // unrecorded, a replay after any recorded mode row put the board straight
+    // back into scan mode. A benchmark Done that empties the chain begins a new
+    // pass once the chain is settled.
+    function done(gesture,{taskId,mode},replay){
+      const task=taskById(taskId);if(!task||task.done)return null;
+      const id=task.id,dotted=state.chain.includes(id),beforeMode=state.mode,before=(state.decisionEvents||[]).length;
+      completeTask(task,gesture);
+      const rows=(state.decisionEvents||[]).slice(before);
+      if(mode==="work")rows.push(...record([modeChoice(gesture,beforeMode,"work")],gesture));
+      if(state.candidateId===id)state.candidateId=null;
+      if(mode==="work")state.interventionActive=false;
+      const path=settle(replay,()=>{
+        state.chain=state.chain.filter(value=>value!==id);
+        if(mode==="work")state.mode="work";
+      });
+      delete state.cantAt[id];delete state.workedAt[id];
+      if(mode==="work"&&dotted&&state.chain.length===0)newPass(false);
+      return {path,rows,moved:dotted?[id]:[]};
+    }
+    function worked(gesture,{taskId,contextIds},replay){
+      const task=taskById(taskId);if(!task||task.done)return null;
+      const id=task.id,dotted=state.chain.includes(id),before=currentChoiceDispositionSnapshot(id);
+      const rows=record([dispositionChoice(id,before,{kind:"worked",at:gesture.at})],gesture,contexts(task,contextIds??task.ctx));
+      state.workLog.push({id:uid(),taskId:id,title:task.title,kind:"worked",at:gesture.at});
+      if(state.candidateId===id)state.candidateId=null;
+      state.interventionActive=false;
+      const path=settle(replay,()=>{
+        state.chain=state.chain.filter(value=>value!==id);
+        state.considered[id]="worked";state.workedAt[id]=gesture.at;delete state.cantAt[id];
+      });
+      return {path,rows,moved:dotted?[id]:[]};
+    }
+    function dislodge(gesture,{taskId},replay){
+      const b=benchmark();if(!b||b.id!==taskId)return null;
+      // Dislodge is a standalone negative signal; it never moves a reference task.
+      const row=prepareComparisonDecisionEvent("dislodge",b,b,{at:gesture.at},gesture,true);
+      recordDecisionEvent(row);state.interventionActive=false;
+      const path=settle(replay,()=>{
+        updatePair({mu:PRIOR_MU,sigma:PRIOR_SIGMA},b);
+        state.chain=state.chain.filter(id=>id!==b.id);state.considered[b.id]="dislodged";
+      });
+      return {path,rows:[row],moved:[b.id]};
+    }
+    // A Dot onto an empty chain begins the pass the gesture names. The overdue
+    // WOOP Dot also switches to work mode, and records it (D4).
+    function dot(gesture,{taskId,mode},replay){
+      const task=taskById(taskId);if(!task||!canDotTask(task))return null;
+      const b=benchmark(),beforeMode=state.mode;
+      writeTaskComparison(task,false);
+      // A deliberate Dot can choose an off-context or future-start task; only
+      // the automatic first placement remains neutral in startScan().
+      if(chainStart()){state.passStartedAt=gesture.passAt;state.passId=gesture.passId;}
+      const row=prepareComparisonDecisionEvent("dot",task,b,{at:gesture.at},gesture,
+        !!b&&taskComparisonEligible(task)&&taskComparisonEligible(b));
+      recordDecisionEvent(row);
+      const rows=[row];
+      if(mode==="work")rows.push(...record([modeChoice(gesture,beforeMode,"work")],gesture));
+      if(state.candidateId===task.id)state.candidateId=null;
+      state.interventionActive=false;
+      const path=settle(replay,()=>{
+        state.chain.push(task.id);clearMarks(task.id);
+        if(b)updateTaskComparison(task,b);
+        if(mode==="work")state.mode="work";
+      });
+      return {path,rows,moved:[task.id]};
+    }
+    // #221 Return as candidate. On a dot: membership only, recorded as the
+    // pass's chain row (PassChain), and the task keeps its fields, rating,
+    // History and any hold or mark; ending a hold stays a separate, later
+    // press. An intervention weighed the returned benchmark; it says nothing
+    // about the newest remaining dot. Off the chain: a resting evergreen task
+    // reopens, a postponement ends, and its mark is cleared and recorded.
+    function returnTask(gesture,{taskId,contextIds,resting:observedResting},replay){
+      const task=taskById(taskId);if(!task||!canReturnAsCandidate(task))return null;
+      const id=task.id,returningDot=state.chain.includes(id),before=currentChoiceDispositionSnapshot(id);
+      // An editor action passes whether the task was resting before its draft.
+      const resting=typeof observedResting==="boolean"?observedResting:task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
+      let returnRow=null;
+      if(returningDot){
+        if(benchmark()?.id===id)state.interventionActive=false;
+        returnRow=PassChain.record(state,gesture,{return:id});
+      }else{
+        if(resting)reopenTask(task);
+        if(supportedPostponeEvidence(task)&&Date.now()<taskPostponeUntil(task))writeTaskPostpone(task,0);
+      }
+      // The chain is rebuilt from this pass's recorded decisions, where the
+      // earlier Yes or Dot still adds the task. So the return is recorded in
+      // that same ordered stream, as this pass's membership going from [id]
+      // to [], or every replay, reload and merge would put the dot back.
+      // Older clients cannot read this shape and hold sync rather than push
+      // their stale chain (see PassChain).
+      const rows=record([dispositionChoice(id,before,returningDot&&before.present?before.value:null,false),returnRow],gesture,contexts(task,contextIds??task.ctx));
+      const path=settle(replay,()=>{if(!returningDot)clearMarks(id);});
+      return {path,rows,moved:returningDot?[id]:[]};
+    }
     // Postpone (#2336). Taking the dot off is recorded as the #221 Return row
     // (D1), and the automatic dot on an emptied chain as a Dot with no
     // benchmark and no rating (D2), the row a Dot onto an empty chain writes.
@@ -9896,34 +9971,96 @@ const taskActionOwnerBundle=(()=>{
     // returned in this pass, by Return or an earlier Postpone, is skipped by
     // the automatic dot (PassChain.returned): only an explicit Yes or Dot puts
     // it back.
-    function postpone(gesture,decision,replay){
-      const task=taskById(decision.taskId);if(!task||task.done||!supportedPostponeEvidence(task))return null;
-      const id=task.id,beforeMode=state.mode,rows=[],moved=[];
+    function postpone(gesture,{taskId},replay){
+      const task=taskById(taskId);if(!task||task.done||!supportedPostponeEvidence(task))return null;
+      const id=task.id,beforeMode=state.mode,moved=[];
       writeTaskPostpone(task,Date.now()+postponeDurationHours(state.settings.postponeHours)*3600000);
-      delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
+      clearMarks(id);
       if(state.candidateId===id)state.candidateId=null;
       state.interventionActive=false;
       // #2359: leaving work mode is recorded, as Resume records it.
-      const choices=beforeMode==="scan"?[]:[{target:{type:"pass",id:gesture.passId,property:"mode"},value:"scan",
-        after:{present:true},before:{present:true,value:beforeMode}}];
       const returnRow=PassChain.record(state,gesture,{return:id});
-      if(returnRow){choices.push(returnRow);moved.push(id);}
-      const recorded=prepareCurrentChoiceEvents(choices,gesture);
-      appendCurrentChoiceEvents(recorded);rows.push(...recorded);
-      const replayed=replay&&decisionReplayReady(state);
-      if(replayed)project();else state.mode="scan";
+      if(returnRow)moved.push(id);
+      const rows=record([modeChoice(gesture,beforeMode,"scan"),returnRow],gesture);
+      let path=settle(replay,()=>{state.mode="scan";});
       if(!state.chain.length){
         const returned=PassChain.returned(state);
         const next=candidateOrder(pool()).find(candidate=>!returned.has(candidate.id));
         if(next){
-          const dot=prepareComparisonDecisionEvent("dot",next,null,{at:gesture.at},gesture,false);
-          recordDecisionEvent(dot);rows.push(dot);moved.push(next.id);
-          if(replayed&&decisionReplayReady(state))project();else state.chain=[next.id];
+          const row=prepareComparisonDecisionEvent("dot",next,null,{at:gesture.at},gesture,false);
+          recordDecisionEvent(row);rows.push(row);moved.push(next.id);
+          path=settle(path==="replay",()=>{state.chain=[next.id];});
         }
       }
-      return {path:replayed?"replay":"direct",rows,moved};
+      return {path,rows,moved};
     }
-    const decisions={postpone};
+    // Continue scanning, No — work the chain and Resume. Continue is deliberate
+    // Scan intent, so it is recorded even when the board is already scanning.
+    // Resume may also change the scan mode, which applyScanPreference draws
+    // and this records.
+    function setMode(gesture,{mode,again,scanMode,resume,snooze},replay){
+      if(mode!=="scan"&&mode!=="work")return null;
+      const beforeMode=state.mode,beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+      const choices=[];
+      if(resume){
+        applyScanPreference(scanMode);
+        const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+        if(JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.push({
+          target:{type:"pass",id:gesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
+          before:{present:true,value:beforePassMode}});
+      }
+      choices.push(modeChoice(gesture,beforeMode,mode,again===true));
+      const rows=record(choices,gesture);
+      state.interventionActive=false;
+      if(resume)state.candidateId=null;
+      if(Number.isFinite(snooze))state.snooze=snooze;
+      const path=settle(replay,()=>{state.mode=mode;});
+      return {path,rows,moved:[]};
+    }
+    // Start. A board with no dots begins a new pass with its first dot, the
+    // #2359 Start root and its scanMode row; one with dots keeps its pass and
+    // records leaving work mode, as Resume does.
+    function start(gesture,{scanMode},replay){
+      const beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance),beforeMode=state.mode;
+      // Timer/focus sweeps may not have run yet. Reconcile today's eligible
+      // pool before starting with either an automatic dot or an unpaired candidate.
+      ensureCandidate();
+      state.scanMode=["chance","squared","halving"].includes(scanMode||state.settings.scanMode)?(scanMode||state.settings.scanMode):"descending";
+      if(["chance","squared","halving"].includes(state.scanMode))resetChance(true);else state.chance=null;
+      state.candidateId=null;
+      state.interventionActive=false;
+      const first=chainStart()?firstDotTask():null,choices=[];
+      if(first){
+        // A new pass leaves the old pass's mode behind: it starts scanning.
+        state.mode="scan";
+        writeTaskComparison(first,true);
+        choices.push(PassChain.record(state,gesture,{start:first.id}));
+      }
+      const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+      if(first||JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.unshift({
+        target:{type:"pass",id:state.passId||gesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
+        before:{present:true,value:beforePassMode}});
+      // #2359: a Start that keeps this pass records leaving work mode.
+      if(!first)choices.push(modeChoice(gesture,beforeMode,"scan"));
+      const rows=record(choices,gesture);
+      const path=settle(replay,()=>{state.mode="scan";});
+      return {path,rows,moved:first?[first.id]:[]};
+    }
+    // Rescan skipped tasks: clears only the No, Can't, Dislodge and Worked
+    // marks, keeping Done; an explicit override that ignores the Can't timer.
+    function rescan(gesture,decision,replay){
+      const beforeMode=state.mode,choices=[],ids=[];
+      for(const [id,value] of Object.entries(state.considered))if(["no","cant","dislodged","worked"].includes(value)){
+        ids.push(id);choices.push(dispositionChoice(id,currentChoiceDispositionSnapshot(id),null,false));
+      }
+      // #2359: leaving work mode is recorded, as Resume records it.
+      const contextIds=Object.fromEntries(ids.map(id=>[id,Array.isArray(taskById(id)?.ctx)?taskById(id).ctx.slice():[]]));
+      const rows=record([modeChoice(gesture,beforeMode,"scan"),...choices],gesture,contextIds);
+      state.interventionActive=false;state.snooze=6;
+      const path=settle(replay,()=>{for(const id of ids)clearMarks(id);state.mode="scan";});
+      return {path,rows,moved:[]};
+    }
+    const decisions={yes,no,cant,done,worked,dislodge,dot,return:returnTask,postpone,mode:setMode,start,rescan};
     return Object.freeze({
       apply(gesture,decision){
         const run=decision&&typeof decision==="object"&&Object.hasOwn(decisions,decision.kind)?decisions[decision.kind]:null;
@@ -9955,35 +10092,15 @@ const taskActionOwnerBundle=(()=>{
       if(!b&&(kind==="yes"||kind==="no"))return false;
       const observation=captureRatingObservation(kind,[candidate.id,...(b&&(kind==="yes"||kind==="no")?[b.id]:[])]);
       const gesture=captureDecisionGesture(null,observation.at);
-      const decisionEvent=kind==="no"?prepareNoDecisionEvent(candidate,b,observation,gesture,
-        taskComparisonEligible(candidate)&&taskComparisonEligible(b))
-        :kind==="yes"?prepareComparisonDecisionEvent("yes",candidate,b,observation,gesture,false):null;
-      const choiceGesture=kind==="cant"?gesture:null;
-      const beforeDisposition=kind==="cant"?currentChoiceDispositionSnapshot(candidate.id):null;
       pushUndo();recordDecisionTime();
-      if(kind==="yes"){
-        writeTaskComparison(candidate,false);
-        decisionEvent.ratingApplied=!!b&&taskComparisonEligible(candidate)&&taskComparisonEligible(b);
-        observation.id=decisionEvent.id;recordDecisionEvent(decisionEvent);
-        if(b)updateTaskComparison(candidate,b);
-        state.chain.push(candidate.id);
-        delete state.considered[candidate.id];delete state.cantAt[candidate.id];delete state.workedAt[candidate.id];
-      }else if(kind==="no"){
-        observation.id=decisionEvent.id;appendNoDecisionEvent(decisionEvent);
-        if(b)updateTaskComparison(b,candidate);
-        state.considered[candidate.id]="no";
-      }else if(kind==="cant"){
-        state.considered[candidate.id]="cant";state.cantAt[candidate.id]=choiceGesture.at;
-        const change=currentChoiceDispositionChange(candidate.id,beforeDisposition,true);
-        appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[candidate.id]:Array.isArray(candidate.ctx)?candidate.ctx.slice():[]}));
-      }else completeTask(candidate,gesture);
+      const result=BoardDecision.apply(gesture,{kind:kind==="cand-done"?"done":kind,taskId:candidate.id});
+      if(result&&(kind==="yes"||kind==="no"))observation.id=result.rows[0].id;
       state.candidateId=null;
-      if(decisionEvent||kind==="cand-done")projectDecisionEvents(state,null,{refreshRanks:false});
       recomputeRanks();finishRatingObservation(observation);maybeIntervene();
       listRanksDeferred=true;
       commit(true,kind==="yes"||kind==="cand-done");
       listRanksDeferred=false;
-      return true;
+      return !!result;
     }
     if(command.type==="benchmark"){
       const b=benchmark();if(!b)return false;
@@ -9991,33 +10108,54 @@ const taskActionOwnerBundle=(()=>{
         const observation=captureRatingObservation("done",[b.id]);
         const gesture=captureDecisionGesture(null,observation.at);
         // Completing a queued benchmark ends scanning; candidate Done does not.
-        pushUndo();completeTask(b,gesture);state.chain.pop();state.mode="work";
-        if(state.chain.length===0)newPass(false);
-        projectDecisionEvents(state,null,{refreshRanks:false});recomputeRanks();finishRatingObservation(observation);state.interventionActive=false;commit(true,true);
-        return true;
+        pushUndo();
+        const result=BoardDecision.apply(gesture,{kind:"done",taskId:b.id,mode:"work"});
+        recomputeRanks();finishRatingObservation(observation);commit(true,true);
+        return !!result;
       }
       if(command.action==="worked")return executeTaskAction("worked",b.id);
       if(command.action==="dislodge"){
         const observation=captureRatingObservation("dislodge",[b.id]);
         const gesture=captureDecisionGesture(null,observation.at);
         pushUndo();
-        // Dislodge is a standalone negative signal; it never moves a reference task.
-        const decisionEvent=prepareComparisonDecisionEvent("dislodge",b,b,observation,gesture,true);
-        observation.id=decisionEvent.id;recordDecisionEvent(decisionEvent);
-        updatePair({mu:PRIOR_MU,sigma:PRIOR_SIGMA},b);
-        state.chain.pop();state.considered[b.id]="dislodged";state.interventionActive=false;
-        projectDecisionEvents(state);recomputeRanks();finishRatingObservation(observation);commit();
-        return true;
+        const result=BoardDecision.apply(gesture,{kind:"dislodge",taskId:b.id});
+        if(result)observation.id=result.rows[0].id;
+        recomputeRanks();finishRatingObservation(observation);commit();
+        return !!result;
       }
       if(command.action==="cant"){
-        const choiceGesture=captureCurrentChoiceGesture(),beforeDisposition=currentChoiceDispositionSnapshot(b.id);
-        pushUndo();state.chain.pop();state.considered[b.id]="cant";state.cantAt[b.id]=choiceGesture.at;state.interventionActive=false;
-        const change=currentChoiceDispositionChange(b.id,beforeDisposition,true);
-        appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[b.id]:Array.isArray(b.ctx)?b.ctx.slice():[]}));
+        const gesture=captureDecisionGesture();
+        pushUndo();
+        const result=BoardDecision.apply(gesture,{kind:"cant",taskId:b.id});
         commit();
-        return true;
+        return !!result;
       }
       return false;
+    }
+    // #2376 D6: the scanner's mode controls, Start and Rescan, which changed the
+    // board outside this owner before.
+    if(command.type==="mode"){
+      if(command.resume)revealTitleOfNextDraw();
+      const gesture=captureDecisionGesture();
+      pushUndo();
+      const result=BoardDecision.apply(gesture,{kind:"mode",mode:command.mode,again:command.again===true,
+        resume:command.resume===true,scanMode:command.scanMode,snooze:command.snooze});
+      commit(true,command.mode==="work"?true:undefined);
+      return !!result;
+    }
+    if(command.type==="start"){
+      const gesture=captureDecisionGesture();
+      pushUndo();
+      const result=BoardDecision.apply(gesture,{kind:"start",scanMode:command.scanMode});
+      commit(true,!!result?.moved.length);   // a dot syncs to the cloud right away
+      return !!result;
+    }
+    if(command.type==="rescan"){
+      const gesture=captureDecisionGesture();
+      pushUndo();
+      const result=BoardDecision.apply(gesture,{kind:"rescan"});
+      commit();
+      return !!result;
     }
     if(command.type==="candidate-worked"){
       const id=command.taskId;
@@ -10250,24 +10388,9 @@ function clearCompleted(){ // completed tasks and logged worked-on/evergreen-don
   }
   commit();
 }
-function rescanSkipped(){ // clear only the no/can't marks, keep 'done' — an explicit override, ignores the can't timer on purpose
-  const choiceGesture=captureCurrentChoiceGesture(),before=new Map(),beforeMode=state.mode;
-  for(const [id,value] of Object.entries(state.considered))if(["no","cant","dislodged","worked"].includes(value))before.set(id,currentChoiceDispositionSnapshot(id));
-  pushUndo();
-  for(const [id,v] of Object.entries(state.considered)){
-    if(v==="no"||v==="cant"||v==="dislodged"||v==="worked"){ delete state.considered[id]; delete state.cantAt[id]; delete state.workedAt[id]; }
-  }
-  // #2359: leaving work mode is recorded, as Resume records it.
-  state.mode="scan"; state.interventionActive=false; state.snooze = 6; recordCurrentScannerMode(choiceGesture,beforeMode);
-  const choices=[];
-  for(const [id,snapshot] of before){
-    const change=currentChoiceDispositionChange(id,snapshot);
-    if(change)choices.push(change);
-  }
-  const contexts=Object.fromEntries([...before.keys()].map(id=>[id,Array.isArray(taskById(id)?.ctx)?taskById(id).ctx.slice():[]]));
-  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture,contexts));
-  commit();
-}
+// #2376: Rescan skipped tasks is a TaskActionOwner command, applied through
+// BoardDecision: it clears only the no/can't marks, keeping 'done'.
+function rescanSkipped(){return TaskActionOwner.perform({type:"rescan"});}
 /* ---------- bulk list parsing ----------
    Accepts basically any list a human would paste: numbered (1. / 1) / 1] / 1: / 1 -),
    bulleted (- * + • – —), Obsidian checkboxes, markdown links, bare URLs, or plain lines. */
@@ -19092,25 +19215,10 @@ function onAction(act, el){
     case "woop-next": advanceWoop(el.dataset); break;
     case "woop-delete": deleteWoop(el.dataset); break;
     case "worked": TaskActionOwner.perform({type:"benchmark",action:"worked"}); break;
-    case "continue-scan": {
-      const gesture=captureCurrentChoiceGesture(),before=state.mode;
-      // Answering Continue is deliberate Scan intent, including reaffirmation.
-      pushUndo();state.mode="scan";state.interventionActive=false;state.snooze=12;recordCurrentScannerMode(gesture,before,true);commit();break;
-    }
-    case "start-working": {
-      const gesture=captureCurrentChoiceGesture(),before=state.mode;
-      pushUndo();state.interventionActive=false;state.mode="work";recordCurrentScannerMode(gesture,before);commit(true,true);break;
-    }
-    case "resume-scan": {
-      revealTitleOfNextDraw();
-      const choiceGesture=captureCurrentChoiceGesture(),beforeMode=state.mode,beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
-      pushUndo();applyScanPreference(el?.dataset?.mode);
-      const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
-      if(JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
-        target:{type:"pass",id:choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
-        before:{present:true,value:beforePassMode}}],choiceGesture));
-      state.mode="scan";recordCurrentScannerMode(choiceGesture,beforeMode);state.candidateId=null;state.interventionActive=false;state.snooze=6;commit();break;
-    }
+    // Answering Continue is deliberate Scan intent, including reaffirmation.
+    case "continue-scan": TaskActionOwner.perform({type:"mode",mode:"scan",again:true,snooze:12}); break;
+    case "start-working": TaskActionOwner.perform({type:"mode",mode:"work"}); break;
+    case "resume-scan": TaskActionOwner.perform({type:"mode",mode:"scan",resume:true,scanMode:el?.dataset?.mode,snooze:6}); break;
     case "start-scan": revealTitleOfNextDraw();startScan(el.dataset?.mode); break;
     case "rescan": rescanSkipped(); break;
     case "clear-done": clearCompleted(); openSettings(); break;
