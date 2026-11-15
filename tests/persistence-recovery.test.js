@@ -11963,9 +11963,6 @@ test('RISK chain return Undo: Undo of a Return keeps the other device’s later 
  });
 });
 
-// #2375 review N2: a gesture saves the pass id the board already reported.
-// When another device then begins a new pass, that saved id is not an edit of
-// this tab's, so combining the boards is routine and shows no warning.
 // B1 from the independent review: both devices act on the same pass without
 // seeing each other. The Undo then cannot have seen the other device's
 // decision, and that decision still stands, in either publish order.
@@ -12043,6 +12040,38 @@ test('RISK chain return Undo: after 2 AM, the other device’s No, Can’t or Re
  });
 });
 
+// G1 again with the answer concurrent with the Undo: this device undoes before
+// the other device's No or Can’t on b reaches it, in either publish order.
+test('RISK chain return Undo: after 2 AM, a No or Can’t on the returned task made concurrently on the other device stands over this device’s Undo, in either publish order, also with the other device on the previous release',async t=>{
+ for(const answer of ['no','cant'])for(const first of ['Undo','the answer'])for(const saved of [true,false])for(const previous of [false,true])
+ await t.test(`${answer==='no'?'No':'Can’t'}, ${first} publishes first, ${saved?'saved':'no saved'} pass id, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const at=new Date(2026,9,17,1,50).getTime(),night=new Date(2026,9,17,2,5).getTime();
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:new Date(2026,9,17,1,0).getTime(),without:['d'],passId:saved?'night-pass':null});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,night);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  const peer=await open(night+50,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: both devices are in the new pass');
+  setFakeTime(peer.ctx,night+100);peer.ctx.renderScan();peer.ctx.onAction(answer,{dataset:{candidate:'b',benchmark:'c'}});
+  assert.equal(peer.ctx.state.considered.b,answer,'precondition: the other device answered on b');
+  setFakeTime(local.ctx,night+300);setFakeTime(peer.ctx,night+300);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: this device undid before the answer reached it');
+  const [a,b]=first==='Undo'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);
+  for(let round=0;round<2;round++){await receive221(a);await receive221(b);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','c'],label+': the answer stands');
+   assert.equal(app.ctx.state.considered.b,answer,label+': and its mark is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','c'],'cloud: the answer stands');
+ });
+});
+
 // #2375 re-review G2: in one pass with an earlier answer, Undo of a Return of
 // Postpone's automatic dot puts that dot back. The automatic dot is not
 // recorded, so the pass's own rows never put it on the chain.
@@ -12096,6 +12125,9 @@ test('RISK started pass compatibility: a Start whose scanMode row is damaged is 
  });
 });
 
+// #2375 review N2: a gesture saves the pass id the board already reported.
+// When another device then begins a new pass, that saved id is not an edit of
+// this tab's, so combining the boards is routine and shows no warning.
 test('RISK chain return sync: a saved legacy pass id is not reported as a displaced edit when another device begins a new pass',async t=>{
  const at=Date.parse('2026-10-17T15:00:00Z');
  const {open,raw}=await pairClients2375(t,{at,passStartedAt:at-60000});
