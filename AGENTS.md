@@ -18,7 +18,8 @@ For every user-facing behavior change, update the corresponding extended FAQ in
 Quick start and Settings changelog to cover what changed for the person
 (controls, defaults, decisions, visible outcomes, and limits that change what
 they see or can do), not how it is implemented, retaining unrelated content and
-structure.
+structure. Write each changelog entry as one bullet per feature or fix when
+reasonable, and keep a limit that belongs to a feature in that feature's bullet.
 Routine animation-frequency tuning stays out of public patch notes/changelog by
 user preference; keep internal evidence truthful and the extended FAQ accurate.
 This exception does not suppress bugs, safety/accessibility changes or limits.
