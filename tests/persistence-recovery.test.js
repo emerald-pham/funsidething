@@ -13715,6 +13715,29 @@ test('RISK sync session: a read’s accept records what it found and a read that
  assert.deepEqual({...session.snapshot().known},{...before.known},'but keeps what the cloud was last known to hold');
 });
 
+// A device CAS repair that finishes while the acknowledged board is saving may
+// keep the higher confirmed revision only with the owner bound to it (GLOSSARY:
+// Confirmed device cloud owner). So the copy and owner are recorded before the
+// save, as sendPush always did, and withdrawn only if that save is refused.
+test('RISK sync session: while the acknowledged board saves, its copy and owner are already recorded, and a refused save withdraws them without undoing a sign-out or hide meanwhile',async()=>{
+ const {session}=syncSession2377();const bound=await acceptedRead2377(session);
+ let during=null;
+ const saved=await session.mayPush().write.accept(ack2377(3),{payload:'board at 3',install:async()=>{during=session.snapshot();return true;}});
+ assert.equal(saved.accepted,true);
+ assert.equal(during?.known.revision,3,'the confirmed copy is recorded while its board saves');
+ assert.equal(during?.owner?.revision,3,'and the Confirmed device cloud owner is bound to its revision');
+ assert.equal(session.snapshot().owner,during.owner,'a saved board keeps that binding');
+ const refused=await session.mayPush().write.accept(ack2377(4),{payload:'board at 4',install:async()=>false});
+ assert.equal(refused.reason,'unsaved');
+ assert.equal(session.snapshot().owner,during.owner,'a refused save withdraws the binding it made');
+ assert.equal(session.snapshot().known.revision,3,'and the copy it recorded');
+ const hidden=await session.mayPush().write.accept(ack2377(4),{payload:'board at 4',install:async()=>{session.requireRead('page-hidden');return false;}});
+ assert.equal(hidden.reason,'unsaved');
+ assert.equal(session.snapshot().authority,null,'hiding the page during the save still ends read authority');
+ assert.equal(session.snapshot().owner,null,'and the owner');
+ assert.ok(bound.owner);
+});
+
 // #2377 slice 2 (#2350): Help's "What does Synced confirm?" already says the
 // board must be saved on this device and acknowledged; the changelog says an
 // acknowledgement this device could not save no longer counts.

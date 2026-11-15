@@ -176,17 +176,19 @@
       const write={...ticket,current,
         // The one acceptance of a Cloud acknowledgement. The reply must still
         // belong to this ticket's connection, be an acknowledgement, and not
-        // be older than this device's revision. install() then saves the
-        // acknowledged board (a plain save for an ordinary push, the recovery
-        // flow's head commit otherwise); a save that fails or throws is not
-        // accepted (#2350), and the ticket must still be current after it.
-        // Only then is the copy recorded and the owner bound. bind:false is
-        // the saved-decisions Apply, which records without binding (D7).
+        // be older than this device's revision. Then the copy is recorded and
+        // the owner bound, and install() saves the acknowledged board (a plain
+        // save for an ordinary push; a recovery flow's state install after its
+        // own head commit). They come first because a device CAS repair that
+        // finishes during that save keeps the confirmed revision only with the
+        // owner bound to it. A save that fails or throws is not accepted
+        // (#2350): the copy and binding it made are withdrawn, unless a
+        // sign-out, hide or newer read replaced them meanwhile. bind:false is
+        // the saved-decisions Apply, which records nothing and binds nothing (D7).
         async accept(reply,{payload=null,install=()=>true,bind=true}={}){
           if(!open)return {accepted:false,reason:"ended"};
           const settle=result=>{release();return result;};
-          const notCurrent=()=>settle({accepted:false,reason:"obsolete",readRequired:obsolete()});
-          if(!current())return notCurrent();
+          if(!current())return settle({accepted:false,reason:"obsolete",readRequired:obsolete()});
           if(!reply)return settle({accepted:false,reason:"unavailable"});
           if(reply.cancelled)return settle({accepted:false,reason:"cancelled"});
           if(reply.error)return settle({accepted:false,reason:"failed"});
@@ -194,13 +196,23 @@
           if(typeof reply.rev!=="number")return settle({accepted:false,reason:"unavailable"});
           // Never rewind this device's revision or replace a newer copy with an older one.
           if(reply.rev<acknowledged()?.revision)return settle({accepted:false,reason:"stale"});
+          let before=null,made=null;
+          if(bind){
+            before={authority,known,owner};
+            if(!ordinary)authority=ticket.account;
+            known=knownCopy(payload,ticket.account,reply.rev);
+            made={authority,known,owner:bindOwner()};
+          }
           let installed=false,error=null;
           try{installed=await install()===true;}catch(caught){error=caught;}
-          if(!installed)return settle({accepted:false,reason:"unsaved",...(error?{error}:{})});
-          if(!current())return notCurrent();
-          if(bind){
-            if(!ordinary)authority=ticket.account;
-            known=knownCopy(payload,ticket.account,reply.rev);bindOwner();
+          if(!installed){
+            if(made){
+              if(authority===made.authority)authority=before.authority;
+              if(known===made.known)known=before.known;
+              if(owner===made.owner)owner=before.owner;
+              changed();
+            }
+            return settle({accepted:false,reason:"unsaved",...(error?{error}:{})});
           }
           return settle({accepted:true,revision:reply.rev});
         },

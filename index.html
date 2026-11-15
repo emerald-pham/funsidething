@@ -6708,8 +6708,10 @@ async function sendPush(){
       activeDiagnosticPushTicket=pushTicket;adoptionPublished=adoptionPushed&&res?.ok===true;
       if(!pushStillCurrent()){supportDiagnosticsSettleCloudPush(pushTicket,"stale");holdChangedPush();return;}
       // #2377: the reply's acceptance. The session checks it in the order this
-      // push always did; install() is this push's own save of the acknowledged
-      // board, and only once it is saved is the copy recorded and the owner bound.
+      // push always did, then records the copy and binds the owner before
+      // install(), this push's own save of the acknowledged board, as this push
+      // always did (a device CAS repair during that save needs the owner), and
+      // withdraws them if that save is refused (#2350).
       const outcome=await write.accept(res,{payload,install:async()=>{
         supportDiagnosticsSettleCloudPush(pushTicket,window.CloudSync===pushBackend&&pushBackend.user===pushAccount?"acknowledged":"stale",res.rev);
         if(automaticCloudRecovery===recovery)automaticCloudRecovery=null;
@@ -18766,13 +18768,13 @@ async function confirmFileRestore(){
     }
     p.cloudWrite=null;p.cloudReply=undefined;
     if(p.accountBound&&!p.unacceptedSource)await fileRestoreCloudWrite(p);
-    let payload;
-    const install=async()=>{payload=await commitFileRestoreLocally(p);installFileRestoreState(p,payload);return true;};
-    if(p.cloudWrite){
-      const accepted=await p.cloudWrite.accept(p.cloudReply,{payload:p.cloudAcknowledged.payload,install});
-      if(!accepted.accepted)throw accepted.error||Error("The board or signed-in account changed while saving. The restore stopped and both copies remain protected.");
+    const payload=await commitFileRestoreLocally(p);
+    installFileRestoreState(p,payload);
+    // #2377: the restored board is saved and installed, so its Cloud
+    // acknowledgement is accepted. Should the connection have changed since,
+    // the board stays restored here and sync stays held for a fresh read.
+    if(p.cloudWrite&&(await p.cloudWrite.accept(p.cloudReply,{payload:p.cloudAcknowledged.payload})).accepted)
       finishFileRestoreAcknowledgement(p);
-    }else await install();
     const settingsDraft=p.settingsDraft;fileRestorePreview=null;fileRestoreBusy=false;pasteEditorSession=null;pasteDraftBuffer=null;closeModal();
     // The restored board's settings, never the ones from before it (#2303).
     if(settingsDraft!==null)openSettings();
