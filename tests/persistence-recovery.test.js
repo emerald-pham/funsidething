@@ -4918,10 +4918,12 @@ test('RISK BACKUP FILE RESTORE: the actual Settings file selection verifies exac
   const restoreFaq=help.match(/<dt>How do backups and Restore work\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
   assert.ok(restoreFaq,'the extended FAQ explains file restore');
   assert.ok(restoreFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the Restore FAQ keeps its word limit');
-  assert.match(restoreFaq,/exact bytes.*current board.*preview/);
-  assert.match(restoreFaq,/Cancel or close during source checks stops before adoption/);
-  assert.match(restoreFaq,/Archives apply only their current board.*offline or held sync leaves the board unchanged/);
-  assert.match(restoreFaq,/Long before-and-after values wrap inside the preview\./,'the extended FAQ explains how long restore effects remain readable');
+  // #234: the same outcomes in plain words.
+  // #234 review B1: file Restore previews first and says it can remove tasks.
+  assert.match(restoreFaq,/Restore first backs up your current board\./);
+  assert.match(restoreFaq,/A file or pasted board shows a preview first, including tasks it would remove; Cancel or closing stops it/);
+  assert.match(restoreFaq,/A file restores only its current board.*offline or while sync is held, your board stays unchanged/);
+  assert.match(help.match(/<dt>Can I restore raw backup files\?<\/dt><dd>(.*?)<\/dd>/)?.[1]||'',/Your file and current board are kept on this device before the preview\./);
   assert.match(html,/Settings can restore a board JSON file with an explicit preview/,'the current changelog source explains guarded file restore');
   assert.match(html,/Long board-field values wrap within the preview\./,'the current changelog explains the corrected file-restore preview');
 });
@@ -10403,7 +10405,7 @@ test('RISK manual backup reminder: Make manual backup stays enabled past two and
 // measured in a real served page beside the established neighbours in the same
 // pane: the Make manual backup button above it and the backup rows below it.
 // One manual backup is the before state (no reminder); the second brings it.
-test('RISK manual backup reminder visual browser: the reminder beside Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
+test('RISK manual backup reminder visual browser: the reminder below Make manual backup and the backup rows below it fit the Settings pane without overlap in day and night, phone, 260 px and desktop widths, ordinary and 150% text, with keyboard focus on the button, in Chromium and WebKit',{skip:!process.env.LANDSCAPE_BROWSER_URL},async t=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  const fontsUrl=html.match(/href="(https:\/\/fonts.googleapis.com\/css2[^\"]+)"/)[1];
  const output=process.env.MANUAL_BACKUP_VISUAL_DIR?path.resolve(process.env.MANUAL_BACKUP_VISUAL_DIR):null;
@@ -11061,12 +11063,16 @@ test('RISK acknowledged recovery trim guidance: the mounted FAQ and changelog sa
  const answerTo=question=>markup.split('<dt>'+question+'</dt><dd>')[1]?.split('</dd>')[0]||'';
  const section=answerTo('When are old backups cleaned up?');
  assert.ok(section,'positive control: the Data and backups FAQ has the cleanup notes');
- assert.match(section,/Once the cloud confirms your board, the app also clears the copy of the older backup list that a storage upgrade kept\./);
+ // #234 (#2270): that sentence was unconditional, but the app keeps the copy
+ // while any entry in it can't be read. Help leaves the mechanism out; the
+ // November 6 changelog below now states the condition.
+ assert.doesNotMatch(section,/clears the copy of the older backup list/);
  assert.doesNotMatch(section,/Separate recovery archives kept by a storage upgrade remain intact/,'the FAQ does not say that copy stays');
  const wordsOf=text=>text.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length;
  assert.ok(answerTo('Does the app fix an unreadable cloud copy by itself?'),'positive control: the mounted Help has the adoption answer');
  const answer=answerTo('What happens to old recovery copies on this device?');
- assert.match(answer,/Once the cloud confirms your board, the app clears the copies earlier cloud recoveries kept by itself, so it stays fast and the recovery file stays small\. It also clears the copy of the older backup list that a storage upgrade kept\./);
+ assert.match(answer,/^Once the cloud confirms your board, the app clears by itself the copies earlier cloud recoveries kept on this device, so it stays fast and the recovery file stays small\. It keeps your board/);
+ assert.doesNotMatch(answer,/clears the copy of the older backup list/);
  assert.match(answer,/It keeps your board, the copy the cloud confirmed, every backup, and a short note naming any cloud copy it still could not read/);
  assert.match(answer,/In the cloud, a copy with anything left stays protected; one with nothing left is retired once your board has moved past it\./,'a cloud copy with nothing left is retired (#2287)');
  assert.match(answer,/Until the cloud confirms a board, every recovery copy stays on this device\./);
@@ -11074,7 +11080,7 @@ test('RISK acknowledged recovery trim guidance: the mounted FAQ and changelog sa
  assert.ok(wordsOf(answer)<=130,'the answer stays within the 130-word limit: '+wordsOf(answer));
  const release=(markup.split('data-changelog-notes>')[1]||'').split('<h3>November 6, 2026</h3>')[1]?.split('</ul>')[0]||'';
  assert.ok(release,'positive control: the mounted changelog has the November 6 release');
- assert.match(release,/<li>Once the cloud confirms your board, the app now clears the copies earlier cloud recoveries kept on this device by itself\. It also clears the copy of the older backup list that a storage upgrade kept\. This keeps the app fast and the recovery file small, and nothing needs your choice\./);
+ assert.match(release,/<li>Once the cloud confirms your board, the app now clears the copies earlier cloud recoveries kept on this device by itself\. It also clears the copy of the older backup list that a storage upgrade kept, once every entry in it can be read\. This keeps the app fast and the recovery file small, and nothing needs your choice\./,'#234 (#2270): the dated entry states the condition the code has had since #2254');
  assert.match(release,/It keeps your board, the copy the cloud confirmed, every backup and a short note naming any cloud copy it still could not read\. Until the cloud confirms a board, every recovery copy stays\.<\/li>/);
  for(const [question,text] of [['old recovery copies answer',answer],['November 6 changelog',release]]){
   assert.doesNotMatch(text.replace(/<[^>]+>/g,' '),/desktop|computer|laptop|\bMac\b/i,question+': Help never sends anyone to another device');
