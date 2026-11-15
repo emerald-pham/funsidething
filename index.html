@@ -1992,21 +1992,6 @@ function forgetDailyBackupRecoveryHold(account){
     if(record?.v!==1||(record.account??null)===account)localStorage.removeItem(DAILY_BACKUP_RECOVERY_HOLD_KEY);
   }catch{}
 }
-// The oldest local calendar day an automatic backup row is kept from. Only a
-// daily backup that names this account follows the three-day rule, so trimming
-// stays with the account whose board it copies and never reads a board copy
-// to find out: one that names another account, or was saved before daily
-// backups named one, keeps the seven days, as does every daily backup while a
-// recovery holds them. Rows are trimmed only by a successful save (the device
-// head commit, or the backup list's own guarded rewrite), which also retires
-// a removed row's board copy only when nothing else references it; a failed
-// or interrupted save trims nothing, and the next save trims again.
-function automaticBackupRetention(){
-  const account=dailyBackupAccount(),oldest=oldestBackupDay(),daily=dailyBackupsHeldForRecovery()?oldest:oldestDailyBackupDay();
-  // #2268 review: a daily backup kept as the copy from before taking a newer
-  // cloud board (saveLocalBackup) keeps that copy's seven days.
-  return row=>row?.kind==="daily"&&Object.hasOwn(row,"account")&&row.account===account&&row.keptForCloudAdoption!==true?daily:oldest;
-}
 const automaticBackupKinds=new Set(["daily","latest","before-restore","before-cloud-adoption","cloud-merged"]);
 // #2379 (interface agreed 2026-11-15): the automatic backup retention rule,
 // written once for both backup stores. The older browser list and the device
@@ -2051,11 +2036,49 @@ const backupRetention=(()=>{
     const shrinks=!longest&&row.kind==="daily"&&Object.hasOwn(row,"account")&&row.keptForCloudAdoption!==true;
     return day+(shrinks?2:6);
   }
+  // The last day number the app keeps a row by itself before it expires.
+  // Only a daily backup that names this account follows the three-day rule
+  // (#2254), so trimming stays with the account whose board it copies and
+  // never reads a board copy to find out: one that names another account, or
+  // was saved before daily backups named one, keeps the seven days, as does
+  // every daily backup while a recovery holds them (#2275), and one kept as
+  // the copy from before taking a newer cloud board (#2268 review). Only
+  // recognized automatic history expires: other kinds, unknown older-client
+  // ones included, may be the sole copy of divergent work.
+  function lastDay(row,holds){
+    if(!automaticBackupKinds.has(row.kind))return Infinity;
+    const day=dayNumber(row.day);
+    // A day that isn't a calendar day can't be dated, so it is kept.
+    if(!Number.isFinite(day))return Infinity;
+    const ownDaily=row.kind==="daily"&&Object.hasOwn(row,"account")&&row.account===holds.account&&row.keptForCloudAdoption!==true;
+    return day+(ownDaily&&!holds.recovery?2:6);
+  }
+  // Rows are named by the adapter's {ref} when it gives one (the browser list
+  // can repeat an id), else by id. Rows are removed only by a successful save
+  // (the device head commit, or the backup list's own guarded rewrite), which
+  // also retires a removed row's board copy only when nothing else references
+  // it; a failed or interrupted save removes nothing, and the next save
+  // removes it again.
   function decide({rows,today,holds,copy=null}={}){
     const out={reuse:[],expire:[],redundant:[]},todayNumber=dayNumber(today);
     if(!Number.isFinite(todayNumber)||!Array.isArray(rows))return out;
     const list=rows.filter(row=>row&&typeof row.id==="string"&&typeof row.kind==="string");
     const protectedIds=holds?.protectedIds instanceof Set?holds.protectedIds:new Set();
+    const kept={account:holds?.account??null,recovery:holds?.recovery!==false},name=row=>row.ref??row.id;
+    // An id is ambiguous when two rows with it hold different boards or share
+    // a kind: the copy it names may be the only recovery evidence, so no row
+    // with it expires. The browser list's daily and latest copies of one save
+    // share an id and a board, and are not ambiguous.
+    const byId=new Map(),ambiguous=new Set();
+    for(const row of list){
+      const seen=byId.get(row.id);
+      if(!seen){byId.set(row.id,{bytes:row.bytes,kinds:new Set([row.kind])});continue;}
+      if(seen.bytes!==row.bytes||seen.kinds.has(row.kind))ambiguous.add(row.id);
+      seen.kinds.add(row.kind);
+    }
+    const expiring=new Set(list.filter(row=>!protectedIds.has(row.id)&&!ambiguous.has(row.id)&&lastDay(row,kept)<todayNumber&&
+      typeof row.bytes==="string"&&row.readable===true));
+    out.expire=[...expiring].map(name);
     if(copy&&STAND_IN_KINDS.has(copy.kind)&&typeof copy.bytes==="string"){
       const kept={kind:copy.kind,day:today,...(copy.losingEdit===true?{losingEdit:true}:{})};
       const wanted=keptUntil(kept,{longest:true}),clearable=clearableAsContained(kept);
@@ -2065,7 +2088,7 @@ const backupRetention=(()=>{
       out.reuse=list.filter(row=>row.bytes===copy.bytes&&!protectedIds.has(row.id)&&until.get(row)!==null&&wanted!==null&&until.get(row)>=wanted&&
         (clearable||!clearableAsContained(row))&&row.readable===true)
         .sort((a,b)=>(b.kind===copy.kind)-(a.kind===copy.kind)||(until.get(a)===until.get(b)?0:until.get(a)<until.get(b)?1:-1)||a.at-b.at)
-        .map(row=>row.id);
+        .map(name);
     }
     return out;
   }
@@ -2087,14 +2110,15 @@ function retentionHolds({preserveBackupId=null,headIds=[],durableIds=[]}={}){
 // The browser list's rows as backupRetention reads them. Whether a row's
 // board is readable is checked only when the decision needs it.
 function legacyRetentionRows(rows){
-  return rows.map(row=>{
-    const shaped={id:row.id,kind:row.kind,day:row.day,at:row.at,bytes:row.payload};
+  return rows.flatMap((row,ref)=>{
+    if(!row||typeof row!=="object")return [];
+    const shaped={id:row.id,kind:row.kind,day:row.day,at:row.at,bytes:row.payload,ref};
     if(Object.hasOwn(row,"account"))shaped.account=row.account;
     if(row.keptForCloudAdoption===true)shaped.keptForCloudAdoption=true;
     if(row.losingEdit===true)shaped.losingEdit=true;
     let readable;
     Object.defineProperty(shaped,"readable",{enumerable:true,get:()=>readable??=readableBackupRow(row)});
-    return shaped;
+    return [shaped];
   });
 }
 // The device store's rows as backupRetention reads them: a row's bytes are
@@ -2139,11 +2163,14 @@ function hasTodaysDailyBackup(){
 function readLegacyBackups(){
   try{
     const rows = parseBackupIndex(localStorage.getItem(LOCAL_BACKUPS_KEY));
-    const keptFrom=automaticBackupRetention();
-    const protectedIds=protectedBackupIdSet();
-    // Only recognized automatic history expires. Unknown older-client kinds
-    // may be the sole copy of divergent work and must not disappear on save.
-    return Array.isArray(rows) ? rows.filter(row=>row && typeof row.id==="string" && typeof row.day==="string" && (!automaticBackupKinds.has(row.kind) || row.day>=keptFrom(row) || protectedIds.has(row.id)) && typeof row.payload==="string") : [];
+    if(!Array.isArray(rows)) return [];
+    const shaped=rows.filter(row=>row && typeof row.id==="string" && typeof row.day==="string" && typeof row.payload==="string");
+    // #2379: expired rows are hidden here and the list's next guarded rewrite
+    // drops them (backupRetention). While the device holds the board, a row
+    // the device also holds is its mirror and stays (retireExpiredLegacyBackups).
+    const expired=new Set(backupRetention.decide({rows:legacyRetentionRows(shaped),today:backupDay(Date.now()),
+      holds:retentionHolds({durableIds:deviceStorageAuthority?deviceBackupCache.map(row=>row?.id):[]})}).expire);
+    return shaped.filter((row,i)=>!expired.has(i));
   }catch(e){ return []; }
 }
 // #2310: a device row here has no text unless it is a prepared choice. Callers
@@ -2687,7 +2714,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     // against the automatic budget below, and for a board of about 400,000
     // characters the copies it pushed out included the earlier board itself,
     // on the day the cloud board was taken. Today's daily backup of the same
-    // board is kept seven calendar days in place (automaticBackupRetention):
+    // board is kept seven calendar days in place (backupRetention):
     // it stays today's daily, so the next save adds no other full copy today.
     let keptDaily=null;
     if(kind==="before-cloud-adoption"){
@@ -3864,8 +3891,7 @@ async function initializeDeviceStorageWithinBudget(bootAttempt){
 }
 function deviceBackupId(kind){return kind+":"+Date.now()+":"+uid();}
 async function deviceAutomaticBackupPlan(payload,preserveBackupId=null){
-  const now=Date.now(),day=backupDay(now),keptFrom=automaticBackupRetention(),protectedIds=protectedBackupIdSet();
-  if(preserveBackupId)protectedIds.add(preserveBackupId);
+  const now=Date.now(),day=backupDay(now),holds=retentionHolds({preserveBackupId}),protectedIds=holds.protectedIds;
   const backups=[];
   // #2254: the daily backup names the account whose board it copies (this
   // head's), so only that account's saves trim it to three calendar days.
@@ -3875,11 +3901,10 @@ async function deviceAutomaticBackupPlan(payload,preserveBackupId=null){
   // Rows only: the head commit deletes a removed row's snapshot only when no
   // remaining row or the head references it, and none while a recovery hold
   // is stored on this device (commitHead).
-  const removeBackupIds=deviceBackupCache.filter(row=>
-    (row.kind==="latest"||(automaticBackupKinds.has(row.kind)&&row.day<keptFrom(row)))&&
-    !protectedIds.has(row.id)&&row.id!==adoptedSafety?.backupId
-  ).map(row=>row.id);
-  if(adoptedSafety?.backupId)protectedIds.add(adoptedSafety.backupId);
+  // Every earlier latest copy goes with each save; other automatic copies
+  // when their own kind's days are over (backupRetention).
+  const expired=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:day,holds}).expire;
+  const removeBackupIds=[...new Set([...deviceBackupCache.filter(row=>row.kind==="latest"&&!protectedIds.has(row.id)).map(row=>row.id),...expired])];
   const redundantBackups=redundantBackupsAllowed()?duplicateBackupRows(deviceBackupCache,row=>row.payloadHash,protectedIds,new Set(removeBackupIds))
     .map(({row,keeper})=>({id:row.id,payloadHash:row.payloadHash,keptBy:keeper.id})):[];
   redundantBackups.push(...await containedStaleTabDraftProofs(payload,protectedIds,new Set([...removeBackupIds,...redundantBackups.map(proof=>proof.id)])));
@@ -4531,22 +4556,13 @@ async function retireExpiredLegacyBackups(expectedHash,payload,expectedIndex,pre
       if(head.payload!==payload||JSON.stringify(state)!==payload||localStorage.getItem(LOCAL_BACKUPS_KEY)!==expectedIndex) return false;
       const rows=parseBackupIndex(expectedIndex);
       if(!Array.isArray(rows)) return false;
-      const protectedIds=protectedBackupIdSet(),counts=new Map(),durableIds=new Set(backups.map(row=>row.id));
-      for(const id of JSON.parse(head.payload).protectedBackupIds||[])protectedIds.add(id);
-      if(preserveBackupId)protectedIds.add(preserveBackupId);
-      if(adoptedSafety?.backupId)protectedIds.add(adoptedSafety.backupId);
-      for(const row of rows)counts.set(row?.id,(counts.get(row?.id)||0)+1);
-      // #2254: this account's daily backups keep three calendar days, the
-      // rest of automatic history seven (automaticBackupRetention).
-      const keptFrom=automaticBackupRetention(),remove=[];
-      rows.forEach((row,i)=>{
-        // Unknown, unreadable, ambiguous or noncalendar records may be the
-        // only recovery evidence. A remaining durable reference also means
-        // expiry/reclassification was not proved by this successful rotation.
-        if(readableBackupRow(row)&&automaticBackupKinds.has(row.kind)&&counts.get(row.id)===1&&
-           /^\d{4}-\d{2}-\d{2}$/.test(row.day)&&backupDay(new Date(row.day+"T12:00:00"))===row.day&&
-           row.day<keptFrom(row)&&!protectedIds.has(row.id)&&!durableIds.has(row.id))remove.push(i);
-      });
+      // #2379: one rule with the device's (backupRetention). A row the
+      // device still holds, a pin in the head being saved, and an unknown,
+      // unreadable, ambiguous or noncalendar row all stay: each may be the
+      // only recovery evidence, and a remaining durable reference means expiry
+      // was not proved by this successful rotation.
+      const holds=retentionHolds({preserveBackupId,headIds:JSON.parse(head.payload).protectedBackupIds,durableIds:backups.map(row=>row?.id)});
+      const remove=backupRetention.decide({rows:legacyRetentionRows(rows),today:backupDay(Date.now()),holds}).expire.sort((a,b)=>a-b);
       if(!remove.length) return false;
       let text=unpackBackupIndex(expectedIndex),count=rows.length;
       for(const i of remove.reverse()){

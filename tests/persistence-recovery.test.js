@@ -13720,16 +13720,16 @@ const RETENTION_STORES_2379=[
   ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
   assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser list holds the backups');
   const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
-  return retentionHandle2379(app,{
+  return retentionHandle2379(app,{storage,
    async seed(rows){storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),...rows]));},
    async list(){return listed();},
    async save(){ctx.addTask('An ordinary edit '+Math.random());assert.equal(await ctx.persist(),true);},
   });
  }},
  {name:'device store',async open(t){
-  const {app}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+  const {app,storage}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
   assert.equal(vm.runInContext('deviceStorageAuthority',ctx),true,'precondition: the device store holds the backups');
-  return retentionHandle2379(app,{
+  return retentionHandle2379(app,{storage,
    async seed(rows){
     for(const row of rows){
      const head=await store.readHead();
@@ -13794,5 +13794,26 @@ for(const store of RETENTION_STORES_2379){
   assert.equal(fresh[0].day,s.today,'dated today');
   if(typeof made==='object')assert.equal(made.id,fresh[0].id,'and it is the copy returned');
   assert.ok(rows.some(row=>row.id==='adoption-earlier'),'the earlier adoption copy stays listed');
+ });
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): an automatic backup whose day is not a calendar day, or whose board can't be read, is never removed`,async t=>{
+  const s=await store.open(t),old=s.daysAgo(10);
+  const boards=['empty','impossible','word','old'].map(name=>boardWithExtraTask2335(s.ctx,'only-in-'+name,'Only in '+name));
+  await s.seed([
+   s.row('restore-empty-day','before-restore',boards[0],{day:''}),
+   s.row('daily-impossible-day','daily',boards[1],{day:'2026-02-30',account:null}),
+   s.row('adoption-word-day','before-cloud-adoption',boards[2],{day:'yesterday'}),
+   s.row('restore-old','before-restore',boards[3],{day:old}),
+  ]);
+  await s.save();
+  const ids=(await s.list()).map(row=>row.id);
+  assert.ok(!ids.includes('restore-old'),'positive control: a readable before-restore copy from ten days ago expires');
+  assert.deepEqual(['restore-empty-day','daily-impossible-day','adoption-word-day'].filter(id=>!ids.includes(id)),[],'no row without a calendar day is removed');
+  // A board that can't be read may be the only copy of someone's work.
+  await s.seed([s.row('restore-unreadable','before-restore','{"tasks":[',{day:old})]);
+  await s.save().catch(()=>{});await s.save().catch(()=>{});
+  assert.ok((await s.list()).some(row=>row.id==='restore-unreadable'),'an unreadable copy from ten days ago stays');
  });
 }
