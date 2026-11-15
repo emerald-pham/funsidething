@@ -13847,3 +13847,24 @@ for(const store of RETENTION_STORES_2379){
    'this account’s daily backups keep three calendar days, other automatic copies seven, and the rest stay');
  });
 }
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): while a recovery holds daily backups, they keep seven days and no repeated copy is cleared`,async t=>{
+  const s=await store.open(t);
+  // The hold record an earlier recovery left for this (signed-out) account.
+  s.storage.setItem('fvp:chain-scanner:daily-backup-recovery-hold',JSON.stringify({v:1,account:null}));
+  const D=boardWithExtraTask2335(s.ctx,'only-in-d','Only in D'),P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P');
+  await s.seed([s.row('daily-own-4','daily',D,{day:s.daysAgo(4),account:null}),
+   s.row('draft-p-1','stale-tab-draft',P),s.row('draft-p-2','stale-tab-draft',P)]);
+  await s.save();
+  let ids=(await s.list()).map(row=>row.id);
+  assert.deepEqual(['daily-own-4','draft-p-1','draft-p-2'].filter(id=>ids.includes(id)),['daily-own-4','draft-p-1','draft-p-2'],
+   'the four-day-old daily backup and both repeated drafts stay while the recovery holds');
+  // Positive control: once the hold ends, the next save applies the usual rule.
+  s.storage.removeItem('fvp:chain-scanner:daily-backup-recovery-hold');
+  await s.save();
+  ids=(await s.list()).map(row=>row.id);
+  assert.equal(ids.includes('daily-own-4'),false,'positive control: without the hold the four-day-old daily backup expires');
+  assert.equal(ids.filter(id=>id.startsWith('draft-p-')).length,1,'and the repeated draft is kept once');
+ });
+}
