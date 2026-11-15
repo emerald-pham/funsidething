@@ -3956,7 +3956,9 @@ async function deviceAutomaticBackupPlan(payload,preserveBackupId=null){
   // is stored on this device (commitHead).
   // Every earlier latest copy goes with each save; other automatic copies
   // when their own kind's days are over (backupRetention).
-  const decision=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:day,holds});
+  // #2379 review (N5): a decision that fails removes nothing; the next save decides again.
+  let decision={reuse:[],expire:[],redundant:[]};
+  try{decision=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:day,holds});}catch(e){}
   // #2379 review (B1): each opening lists rows before it measures them, as
   // readable but pending, so a save in the first seconds after opening reads
   // the text of an expiring pending row and keeps it unless its board reads.
@@ -4210,9 +4212,14 @@ async function saveDurableBackup(kind,payload,metadata=null){
     // copy of the same board stands in only when its own kind keeps it at
     // least as long as this copy would be kept, whatever kind it is. Compared
     // by hash first, then confirmed against the exact stored text. Copies that
-    // cannot be read back are not reused: a second copy is safe.
-    const reuse=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:backupDay(Date.now()),holds:retentionHolds(),
-      copy:{kind,bytes:await ChainStorageV2.hashPayload(payload),...(metadata?.losingEdit===true?{losingEdit:true}:{})}}).reuse;
+    // cannot be read back are not reused: a second copy is safe. #2379 review
+    // (N5): so is a check that fails, which writes a new copy rather than
+    // refusing one.
+    let reuse=[];
+    try{
+      reuse=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:backupDay(Date.now()),holds:retentionHolds(),
+        copy:{kind,bytes:await ChainStorageV2.hashPayload(payload),...(metadata?.losingEdit===true?{losingEdit:true}:{})}}).reuse;
+    }catch(e){reuse=[];}
     if(reuse.length){
       const held=await deviceBackupsWithText(reuse).catch(()=>[]);
       const existing=reuse.map(id=>Array.from(held).find(row=>row?.id===id&&row.payload===payload&&readableBackupRow(row))).find(Boolean);

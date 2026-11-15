@@ -13994,3 +13994,18 @@ test('RISK backup retention (device store): an unreadable automatic copy past it
  assert.equal(ids.includes('restore-readable-old'),false,'positive control: the readable ten-day-old before-restore copy expires with that save');
  assert.ok(ids.includes('restore-unreadable'),'the unreadable one stays');
 });
+
+// #2379 specialist review N5: when retention can't decide whether an existing
+// copy stands in, the device writes a new copy rather than refusing one.
+test('RISK backup retention (device store): when the reuse check fails, the safety copy is still written',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P');
+ // The page's hashing (WebCrypto) fails once, as a broken crypto provider would.
+ const storage2=vm.runInContext('ChainStorageV2',s.ctx),hash=storage2.hashPayload;let failed=0;
+ storage2.hashPayload=async(...args)=>{if(!failed++)throw Object.assign(new Error('crypto unavailable'),{name:'OperationError'});return hash(...args);};
+ t.after(()=>{storage2.hashPayload=hash;});
+ const made=await s.copy('before-cloud-adoption',P);
+ assert.equal(failed>0,true,'precondition: the reuse check met the failure');
+ assert.ok(made&&typeof made==='object','the copy is reported saved');
+ assert.deepEqual((await s.holding(P)).map(row=>row.kind),['before-cloud-adoption'],'and a copy of P is on the device');
+});
