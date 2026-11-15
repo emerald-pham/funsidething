@@ -14009,3 +14009,26 @@ test('RISK backup retention (device store): when the reuse check fails, the safe
  assert.ok(made&&typeof made==='object','the copy is reported saved');
  assert.deepEqual((await s.holding(P)).map(row=>row.kind),['before-cloud-adoption'],'and a copy of P is on the device');
 });
+
+// #2379 specialist review N1: while the device holds the board, the older
+// browser list is its mirror. A save there removes a daily and latest copy that
+// share one id (one save's pair) only when each is past its own days; the
+// current latest copy and any copy still within its days stay.
+test('RISK backup retention (device mirror): a save removes a same-id daily and latest pair only by each copy’s own days, never the current latest copy',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const board=id=>boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id),at=Date.now()-60000;
+ const pair=(id,day,payload)=>[{id,day,at,kind:'daily',payload,account:null},{id,day,at,kind:'latest',payload}];
+ const old=board('old'),mid=board('mid'),today=board('today'),current=board('current');
+ s.storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([
+  ...pair('pair-old',s.daysAgo(10),old),...pair('pair-mid',s.daysAgo(4),mid),...pair('pair-today',s.today,today),
+  {id:'latest-current',day:s.today,at:at+1,kind:'latest',payload:current},
+ ]));
+ await s.save();
+ const kept=JSON.parse(s.storage.getItem(LOCAL_BACKUPS_KEY)||'[]').map(row=>row.id+':'+row.kind);
+ assert.deepEqual(kept.filter(row=>row.startsWith('pair-today')||row==='latest-current:latest').sort(),['latest-current:latest','pair-today:daily','pair-today:latest'],
+  'today’s pair and the current latest copy stay: '+JSON.stringify(kept));
+ assert.ok(kept.includes('pair-mid:latest'),'a four-day-old latest copy is within its seven days and stays');
+ // What this removes that main kept: a pair's copies past their own days (#2379 review N1).
+ assert.equal(kept.includes('pair-mid:daily'),false,'this account’s four-day-old daily is past its three days');
+ assert.deepEqual(kept.filter(row=>row.startsWith('pair-old')),[],'a ten-day-old pair is past its days');
+});
