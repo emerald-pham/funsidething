@@ -15149,3 +15149,448 @@ test('RISK started pass sync: No — work the chain and Continue scanning after 
  assert.equal(ctx.state.candidateId,offered,'the same candidate is still on offer');
  assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
 });
+
+// #2379: one automatic backup retention rule for both backup stores. Each case
+// runs on the older browser backup list (no device store) and on the device
+// store (fake IndexedDB), through the app's own entry points: a safety copy
+// (saveDurableBackup) and an ordinary save. It reads only each store's own
+// backup listing. No cloud account is signed in, so a daily seeded with
+// account null is this account's daily.
+const RETENTION_STORES_2379=[
+ {name:'browser list',async open(t){
+  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx}=app;
+  ctx.addTask('Board task');assert.equal(await ctx.persist(),true);
+  assert.equal(vm.runInContext('deviceStorageAuthority',ctx),false,'precondition: no device store, so the older browser list holds the backups');
+  const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+  return retentionHandle2379(app,{storage,
+   async seed(rows){storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),...rows]));},
+   async list(){return listed();},
+   async save(){ctx.addTask('An ordinary edit '+Math.random());assert.equal(await ctx.persist(),true);},
+   // Closes this page and opens the app again on the same storage.
+   async reopen(){
+    app.dispose?.();const next=await loadApp({sharedStorage:storage});t.after(()=>next.dispose?.());
+    return {ctx:next.ctx,async save(){next.ctx.addTask('An edit after reopening');assert.equal(await next.ctx.persist(),true);}};
+   },
+  });
+ }},
+ {name:'device store',async open(t){
+  const {app,storage,open}=await redundantBackupsApp2335(t),{ctx,shim}=app;let store=shim.window.ScannerDeviceStore;
+  assert.equal(vm.runInContext('deviceStorageAuthority',ctx),true,'precondition: the device store holds the backups');
+  return retentionHandle2379(app,{storage,
+   async reopen(){
+    await app.dispose?.();const next=await open();store=next.shim.window.ScannerDeviceStore;
+    assert.equal(vm.runInContext('deviceStorageAuthority',next.ctx),true,'the reopened app holds the board on the device');
+    return {ctx:next.ctx,store,async save(){next.ctx.addTask('An edit after reopening');await savesSettled2334(next);}};
+   },
+   async seed(rows){
+    for(const row of rows){
+     const head=await store.readHead();
+     assert.ok((await store.putBackup({expectedHash:head.hash,backup:row})).ok,'seeded '+row.id);
+    }
+    await vm.runInContext('refreshDeviceBackupCache()',ctx);
+   },
+   async list(){return [...await store.listBackups()];},
+   async save(){ctx.addTask('An ordinary edit '+Math.random());await savesSettled2334(app);},
+  });
+ }},
+];
+function retentionHandle2379(app,store){
+ const {ctx}=app,today=vm.runInContext('backupDay(Date.now())',ctx);
+ // A calendar day n days before today, from local noon so daylight saving never shifts it.
+ const daysAgo=n=>vm.runInContext(`(()=>{const d=new Date(Date.now());d.setHours(12,0,0,0);d.setDate(d.getDate()-${n});return backupDay(+d);})()`,ctx);
+ let n=0;
+ return {...store,app,ctx,today,daysAgo,
+  // A seeded row: {id, kind, payload} on today, plus any stored field.
+  row:(id,kind,payload,extra={})=>({id,day:today,at:Date.now()-60000+(n++),kind,payload,...extra}),
+  copy:(kind,payload)=>ctx.saveDurableBackup(kind,payload),
+  holding:async payload=>(await store.list()).filter(row=>row.payload===payload),
+ };
+}
+
+// #2379 decision (option b, 2026-11-15): the browser list keeps main's
+// local-edit rule as a deliberate exception (saveLocalBackup), so this case
+// expects the own-kind rule on the device store only.
+const LOCAL_EDIT_TITLES_2379={
+ 'device store':'a copy kept before a cloud local edit is reused only from a copy the app keeps until it is deleted',
+ 'browser list':'a copy kept before a cloud local edit is reused from any stable copy of the same board, which cloud pull then pins and renames',
+};
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): ${LOCAL_EDIT_TITLES_2379[store.name]}`,async t=>{
+  const s=await store.open(t);
+  const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),Q=boardWithExtraTask2335(s.ctx,'only-in-q','Only in Q');
+  // Positive control: a same-kind copy, kept until it is deleted, stands in.
+  await s.seed([s.row('edit-q','before-cloud-local-edit',Q)]);
+  assert.ok(await s.copy('before-cloud-local-edit',Q),'the copy of Q is reported safe');
+  assert.deepEqual((await s.holding(Q)).map(row=>row.id),['edit-q'],'positive control: the earlier local-edit copy of Q stands in');
+  // This account's daily keeps three days, the adoption copy seven and the
+  // manual one until the person deletes it at the Settings reminder: none is
+  // kept until deleted, so on the device none stands in for the local-edit copy.
+  await s.seed([s.row('daily-p','daily',P,{account:null}),s.row('manual-p','manual',P,{account:null}),s.row('adoption-p','before-cloud-adoption',P)]);
+  assert.ok(await s.copy('before-cloud-local-edit',P),'the copy of P is reported safe');
+  const rows=await s.holding(P),edits=rows.filter(row=>row.kind==='before-cloud-local-edit');
+  if(store.name==='browser list'){
+   // The browser list writes no second full copy: cloud pull pins the stable
+   // copy it finds and renames it to before-cloud-local-edit or cloud-merged.
+   assert.deepEqual(rows.map(row=>row.id).sort(),['adoption-p','daily-p','manual-p'],'a stable copy of P stands in, so no row is added: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
+  }else{
+   assert.equal(edits.length,1,'a new before-cloud-local-edit row holds P: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
+   assert.ok(!['daily-p','manual-p','adoption-p'].includes(edits[0].id),'and it is a new row');
+   assert.deepEqual(rows.map(row=>row.id).filter(id=>id!==edits[0].id).sort(),['adoption-p','daily-p','manual-p'],'the seeded copies all stay listed');
+  }
+ });
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): a copy kept before taking a cloud board is reused only from a copy kept at least seven days from today`,async t=>{
+  const s=await store.open(t);
+  const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),R=boardWithExtraTask2335(s.ctx,'only-in-r','Only in R');
+  // Positive control: today's adoption copy keeps the same seven days, so it stands in.
+  await s.seed([s.row('adoption-today','before-cloud-adoption',R)]);
+  const same=await s.copy('before-cloud-adoption',R);
+  assert.ok(same,'the copy of R is reported safe');
+  assert.deepEqual((await s.holding(R)).map(row=>row.id),['adoption-today'],'positive control: today’s adoption copy of R stands in');
+  if(typeof same==='object')assert.equal(same.id,'adoption-today','and it is the copy returned');
+  // An adoption copy from five days ago is kept through today+1, a new one through today+6.
+  await s.seed([s.row('adoption-earlier','before-cloud-adoption',P,{day:s.daysAgo(5)})]);
+  const made=await s.copy('before-cloud-adoption',P);
+  assert.ok(made,'the copy of P is reported safe');
+  const rows=await s.holding(P),fresh=rows.filter(row=>row.kind==='before-cloud-adoption'&&row.id!=='adoption-earlier');
+  assert.equal(fresh.length,1,'a new adoption row holds P: '+JSON.stringify(rows.map(row=>row.id+':'+row.day)));
+  assert.equal(fresh[0].day,s.today,'dated today');
+  if(typeof made==='object')assert.equal(made.id,fresh[0].id,'and it is the copy returned');
+  assert.ok(rows.some(row=>row.id==='adoption-earlier'),'the earlier adoption copy stays listed');
+ });
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): an automatic backup whose day is not a calendar day, or whose board can't be read, never expires`,async t=>{
+  const s=await store.open(t),old=s.daysAgo(10);
+  const boards=['empty','impossible','word','old'].map(name=>boardWithExtraTask2335(s.ctx,'only-in-'+name,'Only in '+name));
+  await s.seed([
+   s.row('restore-empty-day','before-restore',boards[0],{day:''}),
+   s.row('daily-impossible-day','daily',boards[1],{day:'2026-02-30',account:null}),
+   s.row('adoption-word-day','before-cloud-adoption',boards[2],{day:'yesterday'}),
+   s.row('restore-old','before-restore',boards[3],{day:old}),
+  ]);
+  await s.save();
+  const ids=(await s.list()).map(row=>row.id);
+  assert.ok(!ids.includes('restore-old'),'positive control: a readable before-restore copy from ten days ago expires');
+  assert.deepEqual(['restore-empty-day','daily-impossible-day','adoption-word-day'].filter(id=>!ids.includes(id)),[],'no row without a calendar day is removed');
+  // A board that can't be read may be the only copy of someone's work.
+  await s.seed([s.row('restore-unreadable','before-restore','{"tasks":[',{day:old})]);
+  await s.save().catch(()=>{});await s.save().catch(()=>{});
+  assert.ok((await s.list()).some(row=>row.id==='restore-unreadable'),'an unreadable copy from ten days ago stays');
+ });
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): each automatic backup expires after its own kind's days, and every other backup stays`,async t=>{
+  const s=await store.open(t);
+  // [id, kind, days ago, stored fields, expected to stay after a save]
+  const cases=[
+   ['daily-own-2','daily',2,{account:null},true],
+   ['daily-own-3','daily',3,{account:null},false],
+   ['daily-accountless-6','daily',6,{},true],
+   ['daily-accountless-7','daily',7,{},false],
+   ['daily-other-6','daily',6,{account:'other@example.com'},true],
+   ['daily-other-7','daily',7,{account:'other@example.com'},false],
+   ['daily-adoption-6','daily',6,{account:null,keptForCloudAdoption:true},true],
+   ['restore-6','before-restore',6,{},true],
+   ['restore-7','before-restore',7,{},false],
+   ['adoption-7','before-cloud-adoption',7,{},false],
+   ['merged-7','cloud-merged',7,{},false],
+   ['manual-30','manual',30,{account:null},true],
+   ['edit-30','before-cloud-local-edit',30,{},true],
+   ['switch-30','before-account-switch',30,{},true],
+   ['other-browser-30','other-browser-copy',30,{},true],
+   ['unknown-30','kind-from-a-newer-build',30,{},true],
+  ];
+  await s.seed(cases.map(([id,kind,ago,extra])=>s.row(id,kind,boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id),{day:s.daysAgo(ago),...extra})));
+  await s.save();
+  const ids=new Set((await s.list()).map(row=>row.id));
+  assert.deepEqual(cases.filter(([id])=>ids.has(id)).map(([id])=>id),cases.filter(([,,,,stays])=>stays).map(([id])=>id),
+   'this account’s daily backups keep three calendar days, other automatic copies seven, and the rest stay');
+ });
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): while a recovery holds daily backups, they keep seven days and no repeated copy is cleared`,async t=>{
+  const s=await store.open(t);
+  // The hold record an earlier recovery left for this (signed-out) account.
+  s.storage.setItem('fvp:chain-scanner:daily-backup-recovery-hold',JSON.stringify({v:1,account:null}));
+  const D=boardWithExtraTask2335(s.ctx,'only-in-d','Only in D'),P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P');
+  await s.seed([s.row('daily-own-4','daily',D,{day:s.daysAgo(4),account:null}),
+   s.row('draft-p-1','stale-tab-draft',P),s.row('draft-p-2','stale-tab-draft',P)]);
+  await s.save();
+  let ids=(await s.list()).map(row=>row.id);
+  assert.deepEqual(['daily-own-4','draft-p-1','draft-p-2'].filter(id=>ids.includes(id)),['daily-own-4','draft-p-1','draft-p-2'],
+   'the four-day-old daily backup and both repeated drafts stay while the recovery holds');
+  // Positive control: once the hold ends, the next save applies the usual rule.
+  s.storage.removeItem('fvp:chain-scanner:daily-backup-recovery-hold');
+  await s.save();
+  ids=(await s.list()).map(row=>row.id);
+  assert.equal(ids.includes('daily-own-4'),false,'positive control: without the hold the four-day-old daily backup expires');
+  assert.equal(ids.filter(id=>id.startsWith('draft-p-')).length,1,'and the repeated draft is kept once');
+ });
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): a pinned copy never expires, is never cleared as a repeat and never stands in for another copy`,async t=>{
+  const s=await store.open(t);
+  const D=boardWithExtraTask2335(s.ctx,'only-in-d','Only in D'),P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),S=boardWithExtraTask2335(s.ctx,'only-in-s','Only in S');
+  await s.seed([s.row('restore-pinned','before-restore',D,{day:s.daysAgo(10)}),s.row('restore-unpinned','before-restore',boardWithExtraTask2335(s.ctx,'only-in-u','Only in U'),{day:s.daysAgo(10)}),
+   s.row('draft-p-pinned','stale-tab-draft',P),s.row('draft-p-other','stale-tab-draft',P),s.row('other-s-pinned','other-browser-copy',S)]);
+  // The saved board pins these copies, as a recovery pins the copies it still needs.
+  s.ctx.state.protectedBackupIds=['restore-pinned','draft-p-pinned','other-s-pinned'];
+  await s.save();
+  const ids=(await s.list()).map(row=>row.id);
+  assert.equal(ids.includes('restore-unpinned'),false,'positive control: an unpinned before-restore copy from ten days ago expires');
+  assert.ok(ids.includes('restore-pinned'),'the pinned one stays');
+  assert.ok(ids.includes('draft-p-pinned'),'a pinned draft is never cleared as a repeat');
+  // A pin ends, after which the copy follows its own kind, so it never stands in.
+  assert.ok(await s.copy('stale-tab-draft',S),'the draft of S is reported safe');
+  assert.deepEqual((await s.holding(S)).map(row=>row.kind).sort(),['other-browser-copy','stale-tab-draft'],'the draft of S gets its own row beside the pinned copy');
+ });
+}
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): exact repeats are reduced to the copy its own kind keeps longest, and copies no save clears stay`,async t=>{
+  const s=await store.open(t);
+  const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),Q=boardWithExtraTask2335(s.ctx,'only-in-q','Only in Q'),R=boardWithExtraTask2335(s.ctx,'only-in-r','Only in R'),
+   S=boardWithExtraTask2335(s.ctx,'only-in-s','Only in S');
+  await s.seed([
+   // Kept until deleted: the other-browser copy keeps P, so both drafts go.
+   s.row('draft-p-1','stale-tab-draft',P),s.row('draft-p-2','stale-tab-draft',P),s.row('other-p','other-browser-copy',P),
+   // Today's adoption copies keep seven days: the older one stays, and so does
+   // the manual copy no save clears. A cloud-merged copy from three days ago
+   // is kept to today+3, less than the adoption copy, so it goes too.
+   s.row('adoption-q-1','before-cloud-adoption',Q),s.row('adoption-q-2','before-cloud-adoption',Q),
+   s.row('merged-q','cloud-merged',Q,{day:s.daysAgo(3)}),s.row('manual-q','manual',Q,{account:null}),
+   // A before-restore copy is never cleared, and keeps a cloud-merged repeat's seven days.
+   s.row('restore-r','before-restore',R),s.row('merged-r','cloud-merged',R),
+   // Today's daily could be kept seven days if a recovery hold began, longer
+   // than a four-day-old adoption copy's today+2, so neither keeps the other.
+   s.row('adoption-s-old','before-cloud-adoption',S,{day:s.daysAgo(4)}),s.row('daily-s','daily',S,{account:null}),
+  ]);
+  await s.save();
+  const listed=await s.list(),ids=board=>listed.filter(row=>row.payload===board).map(row=>row.id).sort();
+  assert.deepEqual(ids(P),['other-p'],'P stays once, in the copy kept until deleted');
+  assert.deepEqual(ids(Q),['adoption-q-1','manual-q'],'Q stays in the older adoption copy and the manual copy');
+  assert.deepEqual(ids(R),['restore-r'],'R stays in the before-restore copy');
+  assert.deepEqual(ids(S),['adoption-s-old','daily-s'],'S stays in both copies: neither is kept as long as the other could be');
+ });
+}
+
+test('RISK backup retention guidance: the mounted FAQ and changelog say unreadable or misdated automatic copies never expire, and the changelog promises no browser local-edit change',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=markup.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/Daily copies stay on this device for today/,'positive control: the mounted Help has the retention answer');
+ // #2379 review N2: the size cap and quota rotation can still remove them, so the promise is only that they never expire.
+ assert.match(answer,/Unreadable or misdated automatic copies never expire\./);
+ assert.doesNotMatch(answer,/Unreadable or misdated automatic copies stay/);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ const notes=html.split('<template id="appChangelogCurrent">')[1].split('<h3>November 14, 2026</h3>')[0];
+ assert.match(notes,/<h3>November 15, 2026<\/h3>/);
+ assert.match(notes,/Automatic backups now follow one retention rule in browser storage and device storage\./);
+ assert.match(notes,/an automatic copy whose date or board can’t be read no longer expires/);
+ assert.doesNotMatch(notes,/can’t be read is no longer removed/);
+ // #2379 decision (option b): the browser list keeps its local-edit stand-in, so nothing promises every safety copy the own-kind rule.
+ assert.match(notes,/A copy made before taking a newer cloud board is no longer satisfied by an older copy of the same board that would be removed sooner/);
+ assert.doesNotMatch(notes,/A safety copy reuses an existing copy of the same board only when/);
+});
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): backups saved before this update load unchanged after reopening, and the next save removes only expired automatic copies`,async t=>{
+  const s=await store.open(t);
+  const board=id=>boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id);
+  // Shapes earlier builds saved: a daily without an account, unknown fields, an
+  // unknown kind, a day that isn't a calendar day, an old manual copy and an
+  // expired before-restore copy.
+  const seeded=[
+   s.row('daily-before-accounts','daily',board('a'),{day:s.daysAgo(5),futureField:{kept:true}}),
+   s.row('unknown-kind','kind-from-an-older-build',board('b'),{day:s.daysAgo(40)}),
+   s.row('noncalendar-day','cloud-merged',board('c'),{day:'2026-13-01'}),
+   s.row('manual-old','manual',board('d'),{day:s.daysAgo(60),account:null}),
+   s.row('restore-expired','before-restore',board('e'),{day:s.daysAgo(9)}),
+  ];
+  await s.seed(seeded);
+  const before=await s.list(),shown=rows=>rows.filter(row=>seeded.some(seed=>seed.id===row.id)).map(row=>JSON.stringify(row)).sort();
+  const reopened=await s.reopen();
+  assert.deepEqual(shown(await s.list()),shown(before),'reopening changes no saved backup');
+  await reopened.save();
+  const after=await s.list();
+  assert.equal(after.some(row=>row.id==='restore-expired'),false,'positive control: the save removes the expired before-restore copy');
+  assert.deepEqual(shown(after),shown(before.filter(row=>row.id!=='restore-expired')),'every other saved backup keeps its exact fields');
+ });
+}
+
+// #2379 specialist review B1: each opening lists device rows before measuring
+// them ({readable:true,pending:true}), so a save made right after an opening
+// must not take an unreadable copy for a readable one.
+test('RISK backup retention (device store): an unreadable automatic copy past its days stays when a save comes right after reopening, before the device measures it',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t),old=s.daysAgo(10);
+ await s.seed([s.row('restore-unreadable','before-restore','{"tasks":[',{day:old}),
+  s.row('restore-readable-old','before-restore',boardWithExtraTask2335(s.ctx,'only-in-readable-old','Only in readable old'),{day:old})]);
+ const reopened=await s.reopen();
+ const facts=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache.map(row=>[row.id,row.payloadFacts]))',reopened.ctx));
+ assert.deepEqual(facts.find(([id])=>id==='restore-unreadable')?.[1],{readable:true,pending:true},'precondition: right after reopening the copy is listed before it is measured');
+ reopened.ctx.addTask('An edit right after reopening');assert.equal(await reopened.ctx.persist(),true);
+ const ids=(await s.list()).map(row=>row.id);
+ assert.equal(ids.includes('restore-readable-old'),false,'positive control: the readable ten-day-old before-restore copy expires with that save');
+ assert.ok(ids.includes('restore-unreadable'),'the unreadable one stays');
+});
+
+// #2379 specialist review N5: when retention can't decide whether an existing
+// copy stands in, the device writes a new copy rather than refusing one.
+test('RISK backup retention (device store): when the reuse check fails, the safety copy is still written',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P');
+ // The page's hashing (WebCrypto) fails once, as a broken crypto provider would.
+ const storage2=vm.runInContext('ChainStorageV2',s.ctx),hash=storage2.hashPayload;let failed=0;
+ storage2.hashPayload=async(...args)=>{if(!failed++)throw Object.assign(new Error('crypto unavailable'),{name:'OperationError'});return hash(...args);};
+ t.after(()=>{storage2.hashPayload=hash;});
+ const made=await s.copy('before-cloud-adoption',P);
+ assert.equal(failed>0,true,'precondition: the reuse check met the failure');
+ assert.ok(made&&typeof made==='object','the copy is reported saved');
+ assert.deepEqual((await s.holding(P)).map(row=>row.kind),['before-cloud-adoption'],'and a copy of P is on the device');
+});
+
+// #2379 review N1 (agreed D5): while the device holds the board, the older
+// browser list is its mirror, and it keeps main's strict guard: a row whose id
+// is on another row never expires there, so the mirror removes nothing main
+// kept. The browser list on its own keeps the narrower guard, since a save's
+// daily and latest copies share an id and must still expire (LOCAL BACKUPS).
+test('RISK backup retention (device mirror): a save keeps every row whose id another row shares, and still expires a lone expired copy',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const board=id=>boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id),at=Date.now()-60000;
+ const pair=(id,day,payload)=>[{id,day,at,kind:'daily',payload,account:null},{id,day,at,kind:'latest',payload}];
+ const old=board('old'),mid=board('mid'),today=board('today'),current=board('current');
+ s.storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([
+  ...pair('pair-old',s.daysAgo(10),old),...pair('pair-mid',s.daysAgo(4),mid),...pair('pair-today',s.today,today),
+  {id:'latest-current',day:s.today,at:at+1,kind:'latest',payload:current},
+  {id:'lone-old',day:s.daysAgo(10),at:at+2,kind:'before-restore',payload:board('lone')},
+ ]));
+ await s.save();
+ const kept=JSON.parse(s.storage.getItem(LOCAL_BACKUPS_KEY)||'[]').map(row=>row.id+':'+row.kind);
+ assert.deepEqual(kept.filter(row=>row.startsWith('pair-today')||row==='latest-current:latest').sort(),['latest-current:latest','pair-today:daily','pair-today:latest'],
+  'today’s pair and the current latest copy stay: '+JSON.stringify(kept));
+ assert.ok(kept.includes('pair-mid:latest'),'a four-day-old latest copy is within its seven days and stays');
+ assert.equal(kept.includes('lone-old:before-restore'),false,'positive control: a lone ten-day-old before-restore copy expires from the mirror');
+ assert.ok(kept.includes('pair-mid:daily'),'a four-day-old daily whose id its latest copy shares stays, as on main');
+ assert.deepEqual(kept.filter(row=>row.startsWith('pair-old')).sort(),['pair-old:daily','pair-old:latest'],'and so does a ten-day-old pair');
+});
+
+test('RISK backup retention (browser list): an expired daily and latest pair of one save expires, but two copies that share an id and hold different boards stay',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='browser list').open(t);
+ const board=id=>boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id),old=s.daysAgo(10),at=Date.now()-60000,pair=board('pair');
+ await s.seed([{id:'pair-old',day:old,at,kind:'daily',payload:pair,account:null},{id:'pair-old',day:old,at,kind:'latest',payload:pair},
+  {id:'shared-id',day:old,at,kind:'daily',payload:board('first'),account:null},{id:'shared-id',day:old,at,kind:'latest',payload:board('second')}]);
+ await s.save();
+ const kept=(await s.list()).map(row=>row.id+':'+row.kind);
+ assert.deepEqual(kept.filter(row=>row.startsWith('pair-old')),[],'one save’s expired daily and latest copies expire together');
+ assert.deepEqual(kept.filter(row=>row.startsWith('shared-id')).sort(),['shared-id:daily','shared-id:latest'],'an id naming two different boards is ambiguous, so neither copy expires');
+});
+
+// #2379 specialist review N3: what the browser local-edit exception relies on.
+// Cloud pull pins the first stable copy holding the displaced board, and
+// renames it only when it is an automatic copy; a manual copy keeps its kind.
+test('RISK backup retention (browser list): a cloud pull pins a manual copy that holds the displaced edit and keeps it manual, as main does',async t=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});t.after(()=>app.dispose?.());const {ctx,shim}=app;
+ ctx.addTask('Base title');assert.equal(await ctx.persist(),true);
+ const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+ shim.window.CloudSync=h.factory();await ctx.cloudPull();
+ ctx.state.tasks[0].title='My only offline title';ctx.state.updatedAt=Date.now();ctx.state.syncDirty=true;
+ assert.equal(await ctx.persist(),true);
+ const offline=JSON.stringify(ctx.state),day=vm.runInContext('backupDay(Date.now())',ctx);
+ const listed=()=>JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]');
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{id:'manual-offline',day,at:Date.now()-1000,kind:'manual',payload:offline,account:null},...listed()]));
+ assert.equal(listed().filter(row=>row.kind!=='latest'&&row.payload===offline).map(row=>row.id).join(),'manual-offline','precondition: only the manual copy holds the offline edit');
+ const newer=JSON.parse(h.doc.payload);newer.tasks[0].title='Other device title';h.writeBehindBack(newer);
+ await ctx.cloudPull();
+ assert.equal(ctx.state.tasks[0].title,'Other device title','positive control: the pull adopts the other device’s title');
+ assert.ok(ctx.state.protectedBackupIds.includes('manual-offline'),'the manual copy is pinned');
+ assert.deepEqual(listed().filter(row=>row.payload===offline&&row.kind!=='latest').map(row=>row.id+':'+row.kind),['manual-offline:manual'],'it keeps its kind and no second stable copy is written');
+});
+
+// #2379 review N5 (mutant M4): while the device holds the board, the browser
+// list's copy of a row the device still holds is its mirror and stays listed,
+// even past its days, until the device's own save retires that row.
+test('RISK backup retention (device mirror): the browser list still lists its copy of an expired row the device holds',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const row=s.row('held-old','before-restore',boardWithExtraTask2335(s.ctx,'only-in-held','Only in held'),{day:s.daysAgo(10)});
+ await s.seed([row]);
+ s.storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...JSON.parse(s.storage.getItem(LOCAL_BACKUPS_KEY)||'[]'),row]));
+ const listed=Array.from(s.ctx.readLocalBackups()).filter(entry=>entry.id==='held-old');
+ assert.equal(listed.length,1,'the row is listed once');
+ assert.equal(listed[0].payload,row.payload,'from the browser list’s mirror copy, which still holds its text');
+});
+
+// #2379 review N3 (#2342 item 2): Settings offers "Delete backups older than
+// seven days" by each copy's date, so a copy of another kind dated earlier
+// would be offered before a new copy made today. Another kind's copy stands in
+// only when it is dated today, and of several the newest wins.
+test('RISK backup retention (device store): a copy kept before a cloud local edit is not met by an older copy of another kind, and the newest of today’s copies wins',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t);
+ const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),Q=boardWithExtraTask2335(s.ctx,'only-in-q','Only in Q');
+ await s.seed([s.row('switch-p-old','before-account-switch',P,{day:s.daysAgo(10)}),
+  s.row('switch-q-earlier','before-account-switch',Q),s.row('import-q-later','before-import',Q)]);
+ const made=await s.copy('before-cloud-local-edit',P);
+ const edits=(await s.holding(P)).filter(row=>row.kind==='before-cloud-local-edit');
+ assert.equal(edits.length,1,'a new local-edit copy of P is written');
+ assert.equal(edits[0].day,s.today,'dated today');
+ assert.equal(made?.id,edits[0].id,'and it is the copy returned');
+ const reused=await s.copy('before-cloud-local-edit',Q);
+ assert.equal(reused?.id,'import-q-later','of today’s copies of Q the newest stands in');
+ assert.deepEqual((await s.holding(Q)).map(row=>row.id).sort(),['import-q-later','switch-q-earlier'],'and no row is added');
+});
+
+// #2379 review N3 decision (2026-11-15): the dated-today rule for another
+// kind's stand-in is the device store's alone. The browser list keeps main's
+// reuse, so it writes no second full copy where the iOS quota contracts live.
+test('RISK backup retention (browser list): a copy kept before taking a cloud board still reuses an older copy of another kind that the app keeps until it is deleted',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='browser list').open(t);
+ const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P');
+ await s.seed([s.row('other-p-old','other-browser-copy',P,{day:s.daysAgo(10)})]);
+ assert.ok(await s.copy('before-cloud-adoption',P),'the adoption copy of P is reported safe');
+ assert.deepEqual((await s.holding(P)).map(row=>row.id),['other-p-old'],'the ten-day-old other-browser copy stands in, so no row is added');
+});
+
+// #2379 specialist review R2: on a phone a board can be millions of characters,
+// so the first save after an opening reads the unmeasured expiring copies one
+// at a time, each released before the next, rather than all at once.
+test('RISK backup retention (device store): the first save after reopening reads unmeasured expiring copies one at a time',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t),old=s.daysAgo(10);
+ await s.seed([s.row('restore-unreadable-1','before-restore','{"tasks":[',{day:old}),s.row('restore-unreadable-2','before-restore','{"tasks":[1',{day:old}),
+  s.row('restore-readable-old','before-restore',boardWithExtraTask2335(s.ctx,'only-in-readable-old','Only in readable old'),{day:old})]);
+ const reopened=await s.reopen(),read=reopened.store.readBackups;
+ // A fake around the device read: how many copies one read asks for, and how many reads are in flight.
+ let inFlight=0,mostInFlight=0,mostCopies=0,reads=0;
+ reopened.store.readBackups=async ids=>{
+  reads++;inFlight++;mostInFlight=Math.max(mostInFlight,inFlight);mostCopies=Math.max(mostCopies,Array.from(ids||[]).length);
+  try{await new Promise(resolve=>setTimeout(resolve,5));return await read(ids);}finally{inFlight--;}
+ };
+ t.after(()=>{reopened.store.readBackups=read;});
+ reopened.ctx.addTask('An edit right after reopening');assert.equal(await reopened.ctx.persist(),true);
+ const ids=(await s.list()).map(row=>row.id);
+ assert.ok(reads>=1,'positive control: the save read the unmeasured expiring copies');
+ assert.equal(mostCopies,1,'each read asks for one copy ('+reads+' reads)');
+ assert.equal(mostInFlight,1,'and no two reads are in flight together');
+ assert.equal(ids.includes('restore-readable-old'),false,'the readable expired copy still expires');
+ assert.ok(ids.includes('restore-unreadable-1')&&ids.includes('restore-unreadable-2'),'and both unreadable ones stay');
+});
+
+test('RISK backup retention (device store): when a read of an unmeasured expiring copy fails after reopening, that copy and every one not yet read stay',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t),old=s.daysAgo(10);
+ const ids=['restore-old-1','restore-old-2','restore-old-3'];
+ await s.seed(ids.map(id=>s.row(id,'before-restore',boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id),{day:old})));
+ // As on the first opening after #2310, no backup's measured facts are remembered.
+ s.storage.removeItem('fvp:chain-scanner:backup-facts');
+ const reopened=await s.reopen(),read=reopened.store.readBackups;let reads=0;
+ // The second read fails, as an iOS database connection ended under a read would.
+ reopened.store.readBackups=async list=>{if(++reads===2)throw Object.assign(new Error('read failed'),{name:'InvalidStateError'});return read(list);};
+ t.after(()=>{reopened.store.readBackups=read;});
+ reopened.ctx.addTask('An edit right after reopening');assert.equal(await reopened.ctx.persist(),true);
+ const kept=(await s.list()).map(row=>row.id).filter(id=>ids.includes(id));
+ assert.equal(kept.length,2,'the copy read before the failure expires, and the other two stay: '+JSON.stringify(kept));
+});
