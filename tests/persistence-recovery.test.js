@@ -13765,8 +13765,15 @@ function retentionHandle2379(app,store){
  };
 }
 
+// #2379 decision (option b, 2026-11-15): the browser list keeps main's
+// local-edit rule as a deliberate exception (saveLocalBackup), so this case
+// expects the own-kind rule on the device store only.
+const LOCAL_EDIT_TITLES_2379={
+ 'device store':'a copy kept before a cloud local edit is reused only from a copy the app keeps until it is deleted',
+ 'browser list':'a copy kept before a cloud local edit is reused from any stable copy of the same board, which cloud pull then pins and renames',
+};
 for(const store of RETENTION_STORES_2379){
- test(`RISK backup retention (${store.name}): a copy kept before a cloud local edit is reused only from a copy the app keeps until it is deleted`,async t=>{
+ test(`RISK backup retention (${store.name}): ${LOCAL_EDIT_TITLES_2379[store.name]}`,async t=>{
   const s=await store.open(t);
   const P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),Q=boardWithExtraTask2335(s.ctx,'only-in-q','Only in Q');
   // Positive control: a same-kind copy, kept until it is deleted, stands in.
@@ -13775,10 +13782,16 @@ for(const store of RETENTION_STORES_2379){
   assert.deepEqual((await s.holding(Q)).map(row=>row.id),['edit-q'],'positive control: the earlier local-edit copy of Q stands in');
   // This account's daily keeps three days, the adoption copy seven and the
   // manual one until the person deletes it at the Settings reminder: none is
-  // kept until deleted, so none stands in for the local-edit copy.
+  // kept until deleted, so on the device none stands in for the local-edit copy.
   await s.seed([s.row('daily-p','daily',P,{account:null}),s.row('manual-p','manual',P,{account:null}),s.row('adoption-p','before-cloud-adoption',P)]);
   assert.ok(await s.copy('before-cloud-local-edit',P),'the copy of P is reported safe');
   const rows=await s.holding(P),edits=rows.filter(row=>row.kind==='before-cloud-local-edit');
+  if(store.name==='browser list'){
+   // The browser list writes no second full copy: cloud pull pins the stable
+   // copy it finds and renames it to before-cloud-local-edit or cloud-merged.
+   assert.deepEqual(rows.map(row=>row.id).sort(),['adoption-p','daily-p','manual-p'],'a stable copy of P stands in, so no row is added: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
+   return;
+  }
   assert.equal(edits.length,1,'a new before-cloud-local-edit row holds P: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
   assert.ok(!['daily-p','manual-p','adoption-p'].includes(edits[0].id),'and it is a new row');
   assert.deepEqual(rows.map(row=>row.id).filter(id=>id!==edits[0].id).sort(),['adoption-p','daily-p','manual-p'],'the seeded copies all stay listed');
@@ -13926,7 +13939,7 @@ for(const store of RETENTION_STORES_2379){
  });
 }
 
-test('RISK backup retention guidance: the mounted FAQ and changelog say unreadable or misdated automatic copies stay, and a safety copy is reused only from one kept as long',async t=>{
+test('RISK backup retention guidance: the mounted FAQ and changelog say unreadable or misdated automatic copies stay, and the changelog promises no browser local-edit change',async t=>{
  const app=await loadApp();t.after(()=>app.dispose());
  await app.ctx.onAction('help',{});const markup=app.shim.document.getElementById('modalRoot').innerHTML;
  const answer=markup.split('<dt>How long do backups stay on this device?</dt><dd>')[1]?.split('</dd>')[0]||'';
@@ -13937,6 +13950,9 @@ test('RISK backup retention guidance: the mounted FAQ and changelog say unreadab
  assert.match(notes,/<h3>November 15, 2026<\/h3>/);
  assert.match(notes,/Automatic backups now follow one retention rule in browser storage and device storage\./);
  assert.match(notes,/an automatic copy whose date or board can’t be read is no longer removed/);
+ // #2379 decision (option b): the browser list keeps its local-edit stand-in, so nothing promises every safety copy the own-kind rule.
+ assert.match(notes,/A copy made before taking a newer cloud board is no longer satisfied by an older copy of the same board that would be removed sooner/);
+ assert.doesNotMatch(notes,/A safety copy reuses an existing copy of the same board only when/);
 });
 
 for(const store of RETENTION_STORES_2379){

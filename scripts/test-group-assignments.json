@@ -434,7 +434,7 @@
       "file": "tests/core.test.js"
     },
     {
-      "root": "RISK backup retention (browser list): a copy kept before a cloud local edit is reused only from a copy the app keeps until it is deleted",
+      "root": "RISK backup retention (browser list): a copy kept before a cloud local edit is reused from any stable copy of the same board, which cloud pull then pins and renames",
       "group": "persistence-recovery",
       "file": "tests/persistence-recovery.test.js",
       "registration": "dynamic"
