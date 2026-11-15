@@ -260,13 +260,15 @@ async function runNativeSmoke(options) {
       // Completing the benchmark can remove one wrapped crumbs row. Its new
       // button still overlaps the old button near the top, while the old center
       // can hit the panel. Keep both native inputs on that shared interior.
-      if (index === 10) {
+      // The first Done ends scanning (#2376), so the double-click is on the
+      // second Done, where both buttons are in the work-mode layout.
+      const guardedDoubleClick = index === 11;
+      if (guardedDoubleClick) {
         const position = await control.evaluate(element => ({ x: element.clientWidth / 2, y: 1 }));
         await control.dblclick({ position });
       } else await control.click();
       const delivered = await page.evaluate(({ count, action }) => window.__releaseClicks.slice(count).filter(row => row.act === action),
         { count: before.clicks, action });
-      const guardedDoubleClick = index === 10;
       assert.equal(delivered.length, guardedDoubleClick ? 2 : 1, 'Each requested native click reaches the delegated control');
       const intent = delivered[0];
       const id = action === 'yes' ? intent.dataset.candidate : intent.benchmarkAtClick;
@@ -289,7 +291,11 @@ async function runNativeSmoke(options) {
       assert.equal(await page.evaluate(({ action, id }) => action === 'yes'
         ? state.chain.at(-1) === id
         : state.tasks.find(task => task.id === id)?.done === true, { action, id }), true);
-      const fresh = await page.evaluate(ids => state.decisionEvents.filter(row => !ids.includes(row.id)), intent.factIdsAtClick);
+      const recorded = await page.evaluate(ids => state.decisionEvents.filter(row => !ids.includes(row.id)), intent.factIdsAtClick);
+      // The first Done also records ending scanning, as its pass's mode (#2376).
+      const modeRows = recorded.filter(row => row.kind === 'current-choice' && row.target?.type === 'pass' && row.target.property === 'mode');
+      assert.deepEqual(modeRows.map(row => row.value), index === 10 ? ['work'] : [], 'Only the first Done records leaving scanning');
+      const fresh = recorded.filter(row => !modeRows.includes(row));
       assert.equal(fresh.length, 1, 'Exactly one new decision fact is accepted for the detail-1 gesture');
       const fact = fresh[0];
       if (action === 'yes') {
