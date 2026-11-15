@@ -11648,21 +11648,25 @@ const PassChain=Object.freeze({
   // after the 2 AM reset, even once another device has answered there: that
   // pass is rebuilt from the chain before the Undo, so the dot stayed off. It
   // adds nothing when the dot is already back or can no longer be dotted.
-  // #2375 review B1: Undo keeps unrelated decisions from either device. So the
-  // task goes back only when the Return lies outside the pass being rebuilt
-  // (inside it, skipping the cancelled Return already restores the dot), and
-  // only when no earlier row of this pass (`replayed`, in decision order)
-  // dotted it again: then another device's later Return, Can't, Worked on it,
-  // No or Dislodge of that task stands.
+  // #2375 review B1/B2: Undo keeps unrelated decisions from either device. So
+  // the task goes back only when no earlier, uncancelled row of this pass
+  // (`replayed`, in decision order) decided about it: a Yes, Dot or Dislodge,
+  // a No on it as the candidate, a Return of it, or a Can't or Worked on it.
+  // Any of those, from either device, stands. With none, the task goes back
+  // even within the Return's own pass: Postpone's automatic dot is never
+  // recorded, so the pass's rows would otherwise leave it off.
   apply(chain,row,{byId,live,replayed=[]}={}){
     const next=Array.isArray(chain)?chain.slice():[];
     const read=PassChain.read(row);
     if(read?.kind==="return"){const index=next.indexOf(read.taskId);if(index>=0)next.splice(index,1);return next;}
     if(row?.kind!=="undo"||!Array.isArray(row.targetEventIds))return next;
+    const decided=(prior,id)=>prior?.kind==="comparison"&&prior.taskId===id||prior?.kind==="no"&&prior.candidateId===id
+      ||prior?.kind==="current-choice"&&prior.target?.type==="task"&&prior.target.property==="disposition"&&prior.target.id===id
+      ||PassChain.read(prior)?.kind==="return"&&PassChain.read(prior).taskId===id;
     for(const targetId of row.targetEventIds){
       const target=byId?.get?.(targetId),undone=PassChain.read(target);
-      if(undone?.kind!=="return"||undone.passId===row.passId||next.includes(undone.taskId)||typeof live==="function"&&!live(undone.taskId))continue;
-      if(replayed.some(prior=>prior?.kind==="comparison"&&(prior.action==="yes"||prior.action==="dot")&&prior.taskId===undone.taskId))continue;
+      if(undone?.kind!=="return"||next.includes(undone.taskId)||typeof live==="function"&&!live(undone.taskId))continue;
+      if(replayed.some(prior=>prior!==row&&decided(prior,undone.taskId)))continue;
       const recorded=target.chainIds,at=recorded.indexOf(undone.taskId);
       const before=at<0?undefined:recorded.slice(0,at).reverse().find(value=>next.includes(value));
       const after=at<0?undefined:recorded.slice(at+1).find(value=>next.includes(value));

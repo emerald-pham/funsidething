@@ -11869,10 +11869,10 @@ function previousReleaseApp2375(){
  }
  return previousReleaseSource2375;
 }
-async function pairClients2375(t,{at,passStartedAt,without=[],passId=null}){
+async function pairClients2375(t,{at,passStartedAt,without=[],passId=null,chain=['a','b','c'],settings={}}){
  const initial=syncState({tasks:Object.entries(unpinnedTitles2375).filter(([id])=>!without.includes(id)).map(([id,title])=>syncTask(id,title)),
-  chain:['a','b','c'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt,
-  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+  chain,candidateId:null,mode:'scan',scanMode:'descending',passStartedAt,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,...settings}});
  if(passId)initial.passId=passId;
  const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
  const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial);
@@ -11996,6 +11996,78 @@ test('RISK chain return Undo: a concurrent Return or Can’t on the other device
    if(held)assert.equal(app.ctx.state.considered[held],'cant',label+': and its Can’t is kept');
   }
   assert.deepEqual(h.remoteState().chain,expected,'cloud: the other device’s decision stands');
+ });
+});
+
+// #2375 re-review G1: across 2 AM, the other device's own decision about the
+// returned task stands even without a second Dot: No or Can’t on it as a
+// candidate, or a Return of it after Postpone's automatic dot picked it.
+test('RISK chain return Undo: after 2 AM, the other device’s No, Can’t or Return of the returned task stands when this device undoes its Return, also with the other device on the previous release',async t=>{
+ const shapes={
+  'No on b as a candidate':{act:peer=>{peer.ctx.renderScan();peer.ctx.onAction('no',{dataset:{candidate:'b',benchmark:'c'}});},expected:['a','c'],mark:'no'},
+  'Can’t on b as a candidate':{act:peer=>{peer.ctx.renderScan();peer.ctx.onAction('cant',{dataset:{candidate:'b',benchmark:'c'}});},expected:['a','c'],mark:'cant'},
+  'a Return of b after Postpone dotted it':{act:(peer,when)=>{
+   assert.equal(postponeBenchmark221(peer,when+10),'c');assert.equal(postponeBenchmark221(peer,when+20),'a');
+   assert.deepEqual(Array.from(peer.ctx.state.chain),['b'],'precondition: Postpone’s automatic dot picked b');
+   returnDotFromBoard221(peer,'b',when+30);},expected:[],mark:null},
+ };
+ for(const [shape,{act,expected,mark}] of Object.entries(shapes))for(const saved of [true,false])for(const previous of [false,true])
+ await t.test(`${shape}, ${saved?'saved':'no saved'} pass id, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const at=new Date(2026,9,17,1,50).getTime(),night=new Date(2026,9,17,2,5).getTime();
+  // No d here: the returned b is then the only candidate.
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:new Date(2026,9,17,1,0).getTime(),without:['d'],passId:saved?'night-pass':null,
+   settings:{postponeHours:1,showPostpone:true}});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,night);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  const peer=await open(night+50,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: both devices are in the new pass');
+  setFakeTime(peer.ctx,night+100);act(peer,night+100);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'precondition: the other device decided about b');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  await receive221(local);local.ctx.window.CloudSync.ready=false;
+  setFakeTime(local.ctx,night+300);setFakeTime(peer.ctx,night+300);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),expected,'Undo does not override the other device’s decision');
+  await publish221(local);
+  for(let round=0;round<2;round++){await receive221(peer);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(35);await receive221(local);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the other device’s decision stands');
+   if(mark)assert.equal(app.ctx.state.considered.b,mark,label+': and its mark is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the other device’s decision stands');
+ });
+});
+
+// #2375 re-review G2: in one pass with an earlier answer, Undo of a Return of
+// Postpone's automatic dot puts that dot back. The automatic dot is not
+// recorded, so the pass's own rows never put it on the chain.
+test('RISK chain return Undo: Undo of returning the dot Postpone placed puts it back, after an earlier answer in the same pass, with and without a saved pass id',async t=>{
+ for(const saved of [true,false])await t.test(`${saved?'saved':'no saved'} pass id`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,chain:['a'],passId:saved?'pair-pass':null,settings:{postponeHours:1,showPostpone:true}});
+  const local=await open(at,raw);
+  setFakeTime(local.ctx,at+100);local.ctx.renderScan();
+  const yes=local.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+  assert.deepEqual(yes?.slice(1),['b','a'],'precondition: b is offered against a');
+  local.ctx.onAction('yes',{dataset:{candidate:'b',benchmark:'a'}});
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b'],'precondition: an answer in this pass');
+  assert.equal(postponeBenchmark221(local,at+200),'b');assert.equal(postponeBenchmark221(local,at+300),'a');
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'precondition: Postpone’s automatic dot');
+  returnDotFromBoard221(local,'c',at+400);
+  assert.deepEqual(Array.from(local.ctx.state.chain),[],'precondition: the automatic dot is returned');
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'Undo puts the dot back');
+  await publish221(local);
+  assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'sync is not held');
+  assert.deepEqual(h.remoteState().chain,['c'],'the cloud has it');
+  const cold=await reopen221(local,h,at+3000,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['c'],'reopening keeps it');
  });
 });
 
