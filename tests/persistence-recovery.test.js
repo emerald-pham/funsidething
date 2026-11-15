@@ -11722,6 +11722,37 @@ test('RISK chain return sync: with no saved pass id, Postponing the rest after a
  });
 });
 
+// Undo is the reversal of the Return (GLOSSARY): once it is undone, the
+// person's record no longer keeps that task off the chain, so Postpone's
+// automatic dot may choose it like any other candidate.
+test('RISK chain return Undo: a Return that was undone does not keep its task from the automatic dot after a Postpone empties the chain, and sync is not held',async t=>{
+ const {local,peer,h,at}=await scopedUndoClients(initial=>{
+  initial.tasks=Object.entries(unpinnedTitles2375).map(([id,title])=>syncTask(id,title));
+  initial.chain=['a','b','c'];initial.candidateId=null;
+  Object.assign(initial.settings,{postponeHours:1,showPostpone:true});
+ });
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ returnDotFromBoard221(local,'c',at+100);
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: the Return of c is undone');
+ // c leaves the chain with a Can't hold, which ends 30 minutes later.
+ setFakeTime(local.ctx,at+3000);local.ctx.renderScan();local.ctx.onAction('bench-cant',{dataset:{benchmark:'c'}});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['a','b'],'precondition: the hold takes c off the chain');
+ const later=at+3000+31*60000;
+ setFakeTime(local.ctx,later);local.ctx.refreshScanClock();
+ assert.equal(local.ctx.pool().some(task=>task.id==='c'),true,'precondition: the hold has ended');
+ returnDotFromBoard221(local,'a',later+100);
+ assert.equal(postponeBenchmark221(local,later+200),'b');
+ // a is still returned in this pass; c, whose Return was undone, comes before d.
+ assert.deepEqual(Array.from(local.ctx.state.chain),['c'],'the automatic dot is the first candidate whose Return was not undone');
+ await publish221(local);
+ confirmedSync221(local,h,['c'],'the device that undid the Return');
+ setFakeTime(peer.ctx,later+300);   // the other device reads it at the same time, after the hold ended
+ await receive221(peer);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['c'],'the other device shows the same chain');
+});
+
 // #2334: a save that keeps a missing task must settle. These load the app on a
 // device store with no cloud account, and read only what a person or support can
 // see: the toast, the backups the device lists and the Debug log's save counts.

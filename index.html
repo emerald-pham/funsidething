@@ -7118,9 +7118,12 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
     // reset. While the replay leaves the returned task off, the board must
     // not show it. A later Yes or Dot that puts it back is a choice of its
     // own, which a Postpone may then take off again without a record, so that
-    // is not held either.
+    // is not held either. #2375: an undone Return chose nothing any more, so
+    // a board that shows its task again, after Postpone's automatic dot picked
+    // it, is not held.
     const chainRows=compared.map(event=>PassChain.read(event));
     const returned=chainRows.map(row=>row?.kind==="return"?row.taskId:null);
+    const undoneReturns=returned.some(id=>id!==null)?decisionUndoTargets(board):new Set();
     // #2359: a Start root records the pass it began and its first dot, so its
     // row is checked on those, like a Return. Later dots come from answers,
     // which are checked as comparisons, and a Postpone takes a dot off with no
@@ -7189,7 +7192,7 @@ function decisionProjectionIssue(board,checkCoherence=true,effectiveNow=Date.now
       if(expectedFacts[index].error)throw expectedFacts[index].error;
       const expected=expectedFacts[index].facts;
       if(returned[index]!==null){
-        if(actual[0]&&!expected[0])return "unprojectable-decision-evidence";
+        if(actual[0]&&!expected[0]&&!undoneReturns.has(event.id))return "unprojectable-decision-evidence";
         continue;
       }
       if(rooted[index]!==null){
@@ -11588,11 +11591,15 @@ const PassChain=Object.freeze({
     }
     return {pairs,issue};
   },
+  // #2375: an undone Return no longer counts. Undo reverses the Return, so the
+  // person's record no longer keeps that task off the chain.
   returned(board){
-    const passId=PassChain.passId(board),ids=new Set();
+    const passId=PassChain.passId(board),ids=new Set();let cancelled=null;
     for(const row of Array.isArray(board?.decisionEvents)?board.decisionEvents:[]){
       const read=PassChain.read(row);
-      if(read?.kind==="return"&&read.passId===passId)ids.add(read.taskId);
+      if(read?.kind!=="return"||read.passId!==passId)continue;
+      cancelled||=decisionUndoTargets(board);
+      if(!cancelled.has(row.id))ids.add(read.taskId);
     }
     return ids;
   },
