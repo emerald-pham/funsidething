@@ -11825,6 +11825,35 @@ test('RISK chain return Undo: a Return pressed before 2 AM and undone after it i
  });
 });
 
+// #2375 review N6: the remaining publish order after 2 AM. The other device's
+// answer reaches the cloud first, and this device's Undo is made without it.
+test('RISK chain return Undo: a Return undone after 2 AM is put back in place when the other device\'s answer in the new pass publishes first and the Undo is concurrent with it',async t=>{
+ for(const saved of [true,false])await t.test(`${saved?'saved':'no saved'} pass id`,async t=>{
+  const {local,open,h,at,night}=await nightClients2375(t,saved);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,night);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  const peer=await open(night+100,local.shim.localStorage.getItem(SYNC_STORE_KEY));
+  assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: the other device is in the new pass');
+  setFakeTime(peer.ctx,night+200);peer.ctx.onAction('yes',{dataset:{candidate:'d',benchmark:'c'}});
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c','d'],'precondition: the other device answered in the new pass');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  // This device has not received the answer when it presses Undo.
+  setFakeTime(local.ctx,night+300);assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c'],'precondition: Undo before the answer arrived');
+  await publish221(local);await receive221(peer);await receive221(local);
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','b','c','d'],label+': the dot is back in place and the answer is kept');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','b','c','d'],'cloud: the dot is back in place and the answer is kept');
+  const cold=await reopen221(local,h,night+500,t);await cold.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(Array.from(cold.ctx.state.chain),['a','b','c','d'],'reopening keeps it');
+ });
+});
+
 // #2375 review B1: Undo keeps unrelated decisions from either device
 // (GLOSSARY). When the other device dotted the returned task again and then
 // took it off with a decision of its own, and this device saw that before its
