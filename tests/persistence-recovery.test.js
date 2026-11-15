@@ -13868,3 +13868,22 @@ for(const store of RETENTION_STORES_2379){
   assert.equal(ids.filter(id=>id.startsWith('draft-p-')).length,1,'and the repeated draft is kept once');
  });
 }
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): a pinned copy never expires, is never cleared as a repeat and never stands in for another copy`,async t=>{
+  const s=await store.open(t);
+  const D=boardWithExtraTask2335(s.ctx,'only-in-d','Only in D'),P=boardWithExtraTask2335(s.ctx,'only-in-p','Only in P'),S=boardWithExtraTask2335(s.ctx,'only-in-s','Only in S');
+  await s.seed([s.row('restore-pinned','before-restore',D,{day:s.daysAgo(10)}),s.row('restore-unpinned','before-restore',boardWithExtraTask2335(s.ctx,'only-in-u','Only in U'),{day:s.daysAgo(10)}),
+   s.row('draft-p-pinned','stale-tab-draft',P),s.row('draft-p-other','stale-tab-draft',P),s.row('other-s-pinned','other-browser-copy',S)]);
+  // The saved board pins these copies, as a recovery pins the copies it still needs.
+  s.ctx.state.protectedBackupIds=['restore-pinned','draft-p-pinned','other-s-pinned'];
+  await s.save();
+  const ids=(await s.list()).map(row=>row.id);
+  assert.equal(ids.includes('restore-unpinned'),false,'positive control: an unpinned before-restore copy from ten days ago expires');
+  assert.ok(ids.includes('restore-pinned'),'the pinned one stays');
+  assert.ok(ids.includes('draft-p-pinned'),'a pinned draft is never cleared as a repeat');
+  // A pin ends, after which the copy follows its own kind, so it never stands in.
+  assert.ok(await s.copy('stale-tab-draft',S),'the draft of S is reported safe');
+  assert.deepEqual((await s.holding(S)).map(row=>row.kind).sort(),['other-browser-copy','stale-tab-draft'],'the draft of S gets its own row beside the pinned copy');
+ });
+}
