@@ -11825,6 +11825,114 @@ test('RISK chain return Undo: a Return pressed before 2 AM and undone after it i
  });
 });
 
+// #2375 review B1: Undo keeps unrelated decisions from either device
+// (GLOSSARY). When the other device dotted the returned task again and then
+// took it off with a decision of its own, and this device saw that before its
+// Undo, the Undo of the earlier Return must not put the task back.
+// The previous release stands for every tab still running it: pinned, never the candidate.
+const PREVIOUS_RELEASE2375='0e3e0a9fda884ca285f59efae75e5ba58b6f4086';
+let previousReleaseSource2375=null;
+function previousReleaseApp2375(){
+ if(previousReleaseSource2375===null){
+  const released=spawnSync('git',['show',PREVIOUS_RELEASE2375+':index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:64*1024*1024});
+  assert.equal(released.status,0,released.stderr);
+  previousReleaseSource2375=extractAppScript(released.stdout);
+ }
+ return previousReleaseSource2375;
+}
+async function pairClients2375(t,{at,passStartedAt,without=[]}){
+ const initial=syncState({tasks:Object.entries(unpinnedTitles2375).filter(([id])=>!without.includes(id)).map(([id,title])=>syncTask(id,title)),
+  chain:['a','b','c'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial);
+ const open=async(when,seed,previous=false)=>{
+  const app=await loadAppAtTime(when,{...(previous?{appSource:previousReleaseApp2375()}:{}),seedStorage:{[SYNC_STORE_KEY]:seed,[LOCAL_HEAD_KEY]:seed},cloudSyncFactory:h.factory});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  await app.ctx.cloudPull();await syncSettle(20);app.ctx.window.CloudSync.ready=false;
+  return app;
+ };
+ return {open,h,raw};
+}
+
+test('RISK chain return Undo: Undo of a Return keeps the other device\'s later Dot and removal of that task, in one pass and after 2 AM, also with the other device on the previous release',async t=>{
+ for(const pass of ['one pass','the shared pass after 2 AM'])for(const removal of ['Return','Can\'t'])for(const previous of [false,true])
+ await t.test(`${pass}, the other device Dots b then marks it ${removal}, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const night=pass!=='one pass';
+  const at=night?new Date(2026,9,17,1,50).getTime():Date.parse('2026-10-17T15:00:00Z');
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:night?new Date(2026,9,17,1,0).getTime():at-60000});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'precondition: returned');
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  let when=at+200;
+  if(night){
+   when=new Date(2026,9,17,2,5).getTime();
+   setFakeTime(local.ctx,when);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+   await publish221(local);local.ctx.window.CloudSync.ready=false;
+  }
+  const peer=await open(when+50,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c'],'precondition: the other device has the return');
+  if(night)assert.equal(peer.ctx.state.passId,local.ctx.state.passId,'precondition: both devices are in the new pass');
+  await dotFromEditor221(peer,'b',when+100);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c','b'],'precondition: the other device dotted b again');
+  if(removal==='Return')returnDotFromBoard221(peer,'b',when+200);
+  else{setFakeTime(peer.ctx,when+200);peer.ctx.renderScan();peer.ctx.onAction('bench-cant',{dataset:{benchmark:'b'}});}
+  assert.deepEqual(Array.from(peer.ctx.state.chain),['a','c'],'precondition: and took it off again');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  await receive221(local);local.ctx.window.CloudSync.ready=false;
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'precondition: this device saw that');
+  setFakeTime(local.ctx,when+300);setFakeTime(peer.ctx,when+300);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'Undo does not undo the other device\'s later decision');
+  await publish221(local);
+  for(let round=0;round<2;round++){await receive221(peer);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(35);await receive221(local);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','c'],label+': b stays off');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','c'],'cloud: b stays off');
+ });
+});
+
+// B1 again, with no second Dot: the other device answers No or Can't on the
+// returned task, now a candidate, in the same pass. The pass is rebuilt from
+// the chain before the Return, so skipping the cancelled Return already brings
+// b back there, and the other device's answer then takes it off; Undo must
+// not put it back over that answer.
+test('RISK chain return Undo: Undo of a Return keeps the other device\'s later No or Can\'t on that task as a candidate, also with the other device on the previous release',async t=>{
+ for(const answer of ['no','cant'])for(const previous of [false,true])
+ await t.test(`the other device answers ${answer==='no'?'No':'Can\'t'} on b, other device on ${previous?'the previous release':'this version'}`,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z');
+  // No d here: the returned b is then the only candidate.
+  const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:at-60000,without:['d']});
+  const local=await open(at,raw);
+  returnDotFromBoard221(local,'b',at+100);
+  await publish221(local);local.ctx.window.CloudSync.ready=false;
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  const peer=await open(at+150,local.shim.localStorage.getItem(SYNC_STORE_KEY),previous);
+  setFakeTime(peer.ctx,at+200);peer.ctx.renderScan();
+  const offered=peer.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="no" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+  assert.deepEqual(offered?.slice(1),['b','c'],'precondition: the other device is offered the returned b against c');
+  peer.ctx.onAction(answer,{dataset:{candidate:'b',benchmark:'c'}});
+  assert.equal(peer.ctx.state.considered.b,answer,'precondition: the other device answered on b');
+  await publish221(peer);peer.ctx.window.CloudSync.ready=false;
+  await receive221(local);local.ctx.window.CloudSync.ready=false;
+  setFakeTime(local.ctx,at+2000);setFakeTime(peer.ctx,at+2000);
+  assert.equal(await local.ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(local.ctx.state.chain),['a','c'],'Undo does not put b back over the other device\'s answer');
+  await publish221(local);
+  for(let round=0;round<2;round++){await receive221(peer);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(35);await receive221(local);}
+  for(const [label,app] of [['undoing device',local],['other device',peer]]){
+   assert.equal(app.ctx.window.CloudSync.errorCode??null,null,label+': sync is not held');
+   assert.deepEqual(Array.from(app.ctx.state.chain),['a','c'],label+': b stays off');
+   assert.equal(app.ctx.state.considered.b,answer,label+': and keeps the answer');
+  }
+  assert.deepEqual(h.remoteState().chain,['a','c'],'cloud: b stays off');
+ });
+});
+
 // #2334: a save that keeps a missing task must settle. These load the app on a
 // device store with no cloud account, and read only what a person or support can
 // see: the toast, the backups the device lists and the Debug log's save counts.

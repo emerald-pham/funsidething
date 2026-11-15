@@ -11367,8 +11367,10 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
     const live=id=>board.tasks?.some(task=>task.id===id&&!task.done);
     const start=passEvents[0].chainIds.filter(live);
     let chain=[...new Set(start)];
+    const replayed=[];
     for(const event of passEvents){
       if(cancelled.has(event.id))continue;
+      replayed.push(event);
       if(event.kind==="current-choice"&&event.target?.type==="task"&&event.target.property==="disposition"
         &&event.after?.present===true&&["cant","worked"].includes(event.value?.kind)){
         // Ending a hold returns the task to the pool; it cannot revive its
@@ -11380,7 +11382,7 @@ function projectDecisionEvents(board=state,inheritedCancellations=null,{refreshR
       // order: a later explicit Yes/Dot adds the task again, while ending a
       // hold or replaying the earlier Yes/Dot cannot. Every other row leaves
       // the chain to the rules below.
-      chain=PassChain.apply(chain,event,{byId,live});
+      chain=PassChain.apply(chain,event,{byId,live,replayed});
       const id=event.kind==="no"?null:event.kind==="comparison"&&event.action!=="dislodge"?event.taskId:null;
       if(event.kind==="no"){
         // No is also a current candidate exclusion. Its observation still
@@ -11635,14 +11637,21 @@ const PassChain=Object.freeze({
   // after the 2 AM reset, even once another device has answered there: that
   // pass is rebuilt from the chain before the Undo, so the dot stayed off. It
   // adds nothing when the dot is already back or can no longer be dotted.
-  apply(chain,row,{byId,live}={}){
+  // #2375 review B1: Undo keeps unrelated decisions from either device. So the
+  // task goes back only when the Return lies outside the pass being rebuilt
+  // (inside it, skipping the cancelled Return already restores the dot), and
+  // only when no earlier row of this pass (`replayed`, in decision order)
+  // dotted it again: then another device's later Return, Can't, Worked on it,
+  // No or Dislodge of that task stands.
+  apply(chain,row,{byId,live,replayed=[]}={}){
     const next=Array.isArray(chain)?chain.slice():[];
     const read=PassChain.read(row);
     if(read?.kind==="return"){const index=next.indexOf(read.taskId);if(index>=0)next.splice(index,1);return next;}
     if(row?.kind!=="undo"||!Array.isArray(row.targetEventIds))return next;
     for(const targetId of row.targetEventIds){
       const target=byId?.get?.(targetId),undone=PassChain.read(target);
-      if(undone?.kind!=="return"||next.includes(undone.taskId)||typeof live==="function"&&!live(undone.taskId))continue;
+      if(undone?.kind!=="return"||undone.passId===row.passId||next.includes(undone.taskId)||typeof live==="function"&&!live(undone.taskId))continue;
+      if(replayed.some(prior=>prior?.kind==="comparison"&&(prior.action==="yes"||prior.action==="dot")&&prior.taskId===undone.taskId))continue;
       const recorded=target.chainIds,at=recorded.indexOf(undone.taskId);
       const before=at<0?undefined:recorded.slice(0,at).reverse().find(value=>next.includes(value));
       const after=at<0?undefined:recorded.slice(at+1).find(value=>next.includes(value));
