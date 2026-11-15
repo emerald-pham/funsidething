@@ -13724,12 +13724,22 @@ const RETENTION_STORES_2379=[
    async seed(rows){storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...listed(),...rows]));},
    async list(){return listed();},
    async save(){ctx.addTask('An ordinary edit '+Math.random());assert.equal(await ctx.persist(),true);},
+   // Closes this page and opens the app again on the same storage.
+   async reopen(){
+    app.dispose?.();const next=await loadApp({sharedStorage:storage});t.after(()=>next.dispose?.());
+    return {ctx:next.ctx,async save(){next.ctx.addTask('An edit after reopening');assert.equal(await next.ctx.persist(),true);}};
+   },
   });
  }},
  {name:'device store',async open(t){
-  const {app,storage}=await redundantBackupsApp2335(t),{ctx,shim}=app,store=shim.window.ScannerDeviceStore;
+  const {app,storage,open}=await redundantBackupsApp2335(t),{ctx,shim}=app;let store=shim.window.ScannerDeviceStore;
   assert.equal(vm.runInContext('deviceStorageAuthority',ctx),true,'precondition: the device store holds the backups');
   return retentionHandle2379(app,{storage,
+   async reopen(){
+    await app.dispose?.();const next=await open();store=next.shim.window.ScannerDeviceStore;
+    assert.equal(vm.runInContext('deviceStorageAuthority',next.ctx),true,'the reopened app holds the board on the device');
+    return {ctx:next.ctx,async save(){next.ctx.addTask('An edit after reopening');await savesSettled2334(next);}};
+   },
    async seed(rows){
     for(const row of rows){
      const head=await store.readHead();
@@ -13928,3 +13938,27 @@ test('RISK backup retention guidance: the mounted FAQ and changelog say unreadab
  assert.match(notes,/Automatic backups now follow one retention rule in browser storage and device storage\./);
  assert.match(notes,/an automatic copy whose date or board can’t be read is no longer removed/);
 });
+
+for(const store of RETENTION_STORES_2379){
+ test(`RISK backup retention (${store.name}): backups saved before this update load unchanged after reopening, and the next save removes only expired automatic copies`,async t=>{
+  const s=await store.open(t);
+  const board=id=>boardWithExtraTask2335(s.ctx,'only-in-'+id,'Only in '+id);
+  // Shapes earlier builds saved: a daily without an account, unknown fields, an
+  // unknown kind, a day that isn't a calendar day and a restore-file record.
+  const seeded=[
+   s.row('daily-before-accounts','daily',board('a'),{day:s.daysAgo(5),futureField:{kept:true}}),
+   s.row('unknown-kind','kind-from-an-older-build',board('b'),{day:s.daysAgo(40)}),
+   s.row('noncalendar-day','cloud-merged',board('c'),{day:'2026-13-01'}),
+   s.row('manual-old','manual',board('d'),{day:s.daysAgo(60),account:null}),
+   s.row('restore-expired','before-restore',board('e'),{day:s.daysAgo(9)}),
+  ];
+  await s.seed(seeded);
+  const before=await s.list(),shown=rows=>rows.filter(row=>seeded.some(seed=>seed.id===row.id)).map(row=>JSON.stringify(row)).sort();
+  const reopened=await s.reopen();
+  assert.deepEqual(shown(await s.list()),shown(before),'reopening changes no saved backup');
+  await reopened.save();
+  const after=await s.list();
+  assert.equal(after.some(row=>row.id==='restore-expired'),false,'positive control: the save removes the expired before-restore copy');
+  assert.deepEqual(shown(after),shown(before.filter(row=>row.id!=='restore-expired')),'every other saved backup keeps its exact fields');
+ });
+}
