@@ -6083,8 +6083,8 @@ async function supportDiagnosticsCloudPush(payload,updatedAt,base,context,backen
 }
 
 // #2377: the sync session (cloud-sync-session.js) owns what this device knows
-// about damaged cloud copies. Every cloud read reports to it through the
-// backend's "cloudread" event. Its acknowledgement port is this board's saved
+// about damaged cloud copies. Each backend read of the cloud copy, and the
+// server-only repair, reports to it through the backend's "cloudread" event. Its acknowledgement port is this board's saved
 // Cloud acknowledgement: account, identity, revision and decision base, as
 // saved. A base that no longer validates for that account and revision is no
 // proof (valid()); that check parses the whole board, so the session asks it
@@ -19751,9 +19751,11 @@ const CS = window.CloudSync = {
   signIn(){}, signOut(){}, async pull(){ return { error:true }; }, async push(){ return { error:true }; }
 };
 const ping = ()=> window.dispatchEvent(new CustomEvent("cloudsync"));
-// #2377: each read of the cloud copy reports what it found to the sync session
-// (cloud-sync-session.js), whoever asked for the read, so no caller has to
-// (#2358). A thrown or offline read found nothing and reports nothing.
+// #2377: each read of the cloud copy (CS.pull) and the server-only repair
+// report what they found to the sync session (cloud-sync-session.js), whoever
+// asked for the read, so no caller has to (#2358). A thrown or offline read
+// found nothing and reports nothing. The recovery-source reads and CS.push's
+// own reads do not report.
 // knownDamagedSource stays this backend's own record of the same reads.
 const reportCloudRead=(user,identity,outcome,result)=>{
   try{window.dispatchEvent(new CustomEvent("cloudread",{detail:{user,identity,outcome,

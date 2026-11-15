@@ -4,13 +4,15 @@
    clock: the page creates one session and asks it. Ordering is by revision
    only; nothing here reads a time.
 
-   Damage. Every cloud read reports here, whoever started it (sync, Retry
-   sync, Review saved decisions, a file restore or the server-only repair),
-   through the backend's one "cloudread" event, so no caller has to remember to
-   report (#2358: one forgot). When a read finds the copy this device's Cloud
-   acknowledgement names damaged, the session saves the acknowledgement without
-   that copy, and no read may skip downloading a copy a read found damaged
-   until a healthy read of that account.
+   Damage. Each backend read of the cloud copy reports here, whoever started it
+   (sync, Retry sync, Review saved decisions, a file restore or a recovery's
+   confirmation), as does the server-only repair, through the backend's one
+   "cloudread" event, so no caller has to remember to report (#2358: one
+   forgot). Reads of earlier recovery sources and a push's own checks do not
+   report. When a read finds the copy this device's Cloud acknowledgement
+   names damaged, the session saves the acknowledgement without that copy, and
+   no read may skip downloading a copy a read found damaged until a healthy
+   read of that account.
 
    Acknowledgements. The session holds what this page knows the cloud holds:
    read authority (the account whose cloud copy it read or published), the

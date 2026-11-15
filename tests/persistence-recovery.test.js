@@ -13697,7 +13697,7 @@ test('RISK sync session: a read checks the acknowledged board once however often
  assert.equal(checks.length,1,'no reply, damage report, full or deliberate read checks the board');
 });
 
-test('RISK sync session: every cloud read reports through the backend’s cloudread event, and damage for one identity neither blocks nor clears another’s',async()=>{
+test('RISK sync session: a read of the cloud copy reports through the backend’s cloudread event, and damage for one identity neither blocks nor clears another’s',async()=>{
  const {session,events,saves,held,setIdentity}=syncSession2377();
  events.dispatchEvent({type:'cloudread',detail:damaged2377('gen-2377-other',5,'other-uid','o@example.com')});
  await flush();
