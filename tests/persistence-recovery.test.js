@@ -13790,11 +13790,11 @@ for(const store of RETENTION_STORES_2379){
    // The browser list writes no second full copy: cloud pull pins the stable
    // copy it finds and renames it to before-cloud-local-edit or cloud-merged.
    assert.deepEqual(rows.map(row=>row.id).sort(),['adoption-p','daily-p','manual-p'],'a stable copy of P stands in, so no row is added: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
-   return;
+  }else{
+   assert.equal(edits.length,1,'a new before-cloud-local-edit row holds P: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
+   assert.ok(!['daily-p','manual-p','adoption-p'].includes(edits[0].id),'and it is a new row');
+   assert.deepEqual(rows.map(row=>row.id).filter(id=>id!==edits[0].id).sort(),['adoption-p','daily-p','manual-p'],'the seeded copies all stay listed');
   }
-  assert.equal(edits.length,1,'a new before-cloud-local-edit row holds P: '+JSON.stringify(rows.map(row=>row.id+':'+row.kind)));
-  assert.ok(!['daily-p','manual-p','adoption-p'].includes(edits[0].id),'and it is a new row');
-  assert.deepEqual(rows.map(row=>row.id).filter(id=>id!==edits[0].id).sort(),['adoption-p','daily-p','manual-p'],'the seeded copies all stay listed');
  });
 }
 
