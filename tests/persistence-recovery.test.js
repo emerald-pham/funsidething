@@ -13978,3 +13978,19 @@ for(const store of RETENTION_STORES_2379){
   assert.deepEqual(shown(after),shown(before.filter(row=>row.id!=='restore-expired')),'every other saved backup keeps its exact fields');
  });
 }
+
+// #2379 specialist review B1: each opening lists device rows before measuring
+// them ({readable:true,pending:true}), so a save made right after an opening
+// must not take an unreadable copy for a readable one.
+test('RISK backup retention (device store): an unreadable automatic copy past its days stays when a save comes right after reopening, before the device measures it',async t=>{
+ const s=await RETENTION_STORES_2379.find(store=>store.name==='device store').open(t),old=s.daysAgo(10);
+ await s.seed([s.row('restore-unreadable','before-restore','{"tasks":[',{day:old}),
+  s.row('restore-readable-old','before-restore',boardWithExtraTask2335(s.ctx,'only-in-readable-old','Only in readable old'),{day:old})]);
+ const reopened=await s.reopen();
+ const facts=JSON.parse(vm.runInContext('JSON.stringify(deviceBackupCache.map(row=>[row.id,row.payloadFacts]))',reopened.ctx));
+ assert.deepEqual(facts.find(([id])=>id==='restore-unreadable')?.[1],{readable:true,pending:true},'precondition: right after reopening the copy is listed before it is measured');
+ reopened.ctx.addTask('An edit right after reopening');assert.equal(await reopened.ctx.persist(),true);
+ const ids=(await s.list()).map(row=>row.id);
+ assert.equal(ids.includes('restore-readable-old'),false,'positive control: the readable ten-day-old before-restore copy expires with that save');
+ assert.ok(ids.includes('restore-unreadable'),'the unreadable one stays');
+});

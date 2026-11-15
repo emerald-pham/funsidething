@@ -3957,6 +3957,15 @@ async function deviceAutomaticBackupPlan(payload,preserveBackupId=null){
   // Every earlier latest copy goes with each save; other automatic copies
   // when their own kind's days are over (backupRetention).
   const decision=backupRetention.decide({rows:deviceRetentionRows(deviceBackupCache),today:day,holds});
+  // #2379 review (B1): each opening lists rows before it measures them, as
+  // readable but pending, so a save in the first seconds after opening reads
+  // the text of an expiring pending row and keeps it unless its board reads.
+  const pending=decision.expire.filter(id=>deviceBackupCache.find(row=>row.id===id)?.payloadFacts?.pending===true);
+  if(pending.length){
+    let readable=new Set();
+    try{readable=new Set(Array.from(await deviceBackupsWithText(pending)).filter(row=>readableBackupRow(row)).map(row=>row.id));}catch(e){}
+    decision.expire=decision.expire.filter(id=>!pending.includes(id)||readable.has(id));
+  }
   const removeBackupIds=[...new Set([...deviceBackupCache.filter(row=>row.kind==="latest"&&!protectedIds.has(row.id)).map(row=>row.id),...decision.expire])];
   // #2335: exact repeats go with the same commit, which checks each proof again.
   const redundantBackups=decision.redundant.filter(proof=>!removeBackupIds.includes(proof.id))
