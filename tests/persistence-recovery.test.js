@@ -11827,7 +11827,7 @@ test('RISK chain return Undo: a Return pressed before 2 AM and undone after it i
 
 // #2375 review N6: the remaining publish order after 2 AM. The other device's
 // answer reaches the cloud first, and this device's Undo is made without it.
-test('RISK chain return Undo: a Return undone after 2 AM is put back in place when the other device\'s answer in the new pass publishes first and the Undo is concurrent with it',async t=>{
+test('RISK chain return Undo: a Return undone after 2 AM is put back in place when the other device’s answer in the new pass publishes first and the Undo is concurrent with it',async t=>{
  for(const saved of [true,false])await t.test(`${saved?'saved':'no saved'} pass id`,async t=>{
   const {local,open,h,at,night}=await nightClients2375(t,saved);
   returnDotFromBoard221(local,'b',at+100);
@@ -11884,7 +11884,7 @@ async function pairClients2375(t,{at,passStartedAt,without=[]}){
  return {open,h,raw};
 }
 
-test('RISK chain return Undo: Undo of a Return keeps the other device\'s later Dot and removal of that task, in one pass and after 2 AM, also with the other device on the previous release',async t=>{
+test('RISK chain return Undo: Undo of a Return keeps the other device’s later Dot and removal of that task, in one pass and after 2 AM, also with the other device on the previous release',async t=>{
  for(const pass of ['one pass','the shared pass after 2 AM'])for(const removal of ['Return','Can\'t'])for(const previous of [false,true])
  await t.test(`${pass}, the other device Dots b then marks it ${removal}, other device on ${previous?'the previous release':'this version'}`,async t=>{
   const night=pass!=='one pass';
@@ -11930,7 +11930,7 @@ test('RISK chain return Undo: Undo of a Return keeps the other device\'s later D
 // the chain before the Return, so skipping the cancelled Return already brings
 // b back there, and the other device's answer then takes it off; Undo must
 // not put it back over that answer.
-test('RISK chain return Undo: Undo of a Return keeps the other device\'s later No or Can\'t on that task as a candidate, also with the other device on the previous release',async t=>{
+test('RISK chain return Undo: Undo of a Return keeps the other device’s later No or Can’t on that task as a candidate, also with the other device on the previous release',async t=>{
  for(const answer of ['no','cant'])for(const previous of [false,true])
  await t.test(`the other device answers ${answer==='no'?'No':'Can\'t'} on b, other device on ${previous?'the previous release':'this version'}`,async t=>{
   const at=Date.parse('2026-10-17T15:00:00Z');
