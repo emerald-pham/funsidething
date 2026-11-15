@@ -14849,10 +14849,12 @@ test('RISK started pass sync: a Postponed benchmark stays off the chain once its
 // one whose history can be replayed takes the replay. The same controls on the
 // same board must give the same chain, mode and marks either way, and keep
 // giving them once the next answer replays what was recorded.
-const contractTitles2376={a:'Task a',b:'Task b',c:'Task c',d:'Task d',e:'Task e'};
-async function contractBoard2376(at,withHistory,mode='work'){
+const contractTitles2376={a:'Task a',b:'Task b',c:'Task c',d:'Task d',e:'Task e',f:'Task f'};
+// marks: e is marked No and f Can't, so Rescan has marks to clear.
+async function contractBoard2376(at,withHistory,mode='work',marks=false){
  const board=syncState({tasks:Object.entries(contractTitles2376).map(([id,title])=>syncTask(id,title)),
   chain:['a','b','c'],candidateId:'d',mode:withHistory?'scan':mode,scanMode:'descending',passId:'contract-pass',passStartedAt:at-60000,
+  ...(marks?{considered:{e:'no',f:'cant'},cantAt:{f:at-60000}}:{}),
   // Descending scans draw no random order, so Start and Resume pick the same candidate on both boards.
   settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,postponeHours:1,showPostpone:true}});
  const raw=JSON.stringify(board);
@@ -15087,41 +15089,50 @@ test('RISK started pass sync: every scanner control gives the same chain, mode a
  const at=Date.parse('2026-10-17T15:00:00Z');
  const scan=(app,act,dataset)=>{setFakeTime(app.ctx,at+100);app.ctx.renderScan();app.ctx.onAction(act,{dataset});};
  const editor=(app,act,id)=>{setFakeTime(app.ctx,at+100);hydrateUnchangedEditorDraft(app,id);app.ctx.onAction(act,{dataset:{id}});};
- const controls={
-  'Yes':app=>scan(app,'yes',{candidate:'d',benchmark:'c'}),
-  'No':app=>scan(app,'no',{candidate:'d',benchmark:'c'}),
-  'Can’t on the candidate':app=>scan(app,'cant',{candidate:'d',benchmark:'c'}),
-  'Done on the candidate':app=>scan(app,'cand-done',{candidate:'d',benchmark:'c'}),
-  'Postpone of the candidate':app=>scan(app,'postpone',{candidate:'d',benchmark:'c'}),
-  'Done on the benchmark':app=>scan(app,'bench-done',{benchmark:'c'}),
-  'Can’t on the benchmark':app=>scan(app,'bench-cant',{benchmark:'c'}),
-  'Dislodge':app=>scan(app,'dislodge',{benchmark:'c'}),
-  'Worked on it':app=>scan(app,'worked',{benchmark:'c'}),
-  'Postpone of the benchmark':app=>scan(app,'bench-postpone',{benchmark:'c'}),
-  'No — work the chain':app=>scan(app,'start-working',{}),
-  'Continue scanning':app=>scan(app,'continue-scan',{}),
-  'Resume scanning':app=>scan(app,'resume-scan',{}),
-  'Rescan skipped tasks':app=>scan(app,'rescan',{}),
-  'Start, with dots on the chain':app=>scan(app,'start-scan',{}),
-  'Dot from the editor':app=>editor(app,'dot-task','e'),
-  'Done from the editor':app=>editor(app,'done-task','a'),
-  'Return as candidate of a dot':app=>{setFakeTime(app.ctx,at+100);app.ctx.renderScan();returnDotFromScan(app.ctx,app.shim,'b');},
+ // Both fixtures carry a No and a Can't mark. The scanning one offers d against
+ // c; the working one has stopped scanning, so Resume, Start and Continue change it.
+ const fixtures={
+  'scanning, with marks':{mode:'scan',controls:{
+   'Yes':app=>scan(app,'yes',{candidate:'d',benchmark:'c'}),
+   'No':app=>scan(app,'no',{candidate:'d',benchmark:'c'}),
+   'Can’t on the candidate':app=>scan(app,'cant',{candidate:'d',benchmark:'c'}),
+   'Done on the candidate':app=>scan(app,'cand-done',{candidate:'d',benchmark:'c'}),
+   'Postpone of the candidate':app=>scan(app,'postpone',{candidate:'d',benchmark:'c'}),
+   'Done on the benchmark':app=>scan(app,'bench-done',{benchmark:'c'}),
+   'Can’t on the benchmark':app=>scan(app,'bench-cant',{benchmark:'c'}),
+   'Dislodge':app=>scan(app,'dislodge',{benchmark:'c'}),
+   'Worked on it':app=>scan(app,'worked',{benchmark:'c'}),
+   'Postpone of the benchmark':app=>scan(app,'bench-postpone',{benchmark:'c'}),
+   'No — work the chain':app=>scan(app,'start-working',{}),
+   'Rescan skipped tasks':app=>scan(app,'rescan',{}),
+   'Dot from the editor':app=>editor(app,'dot-task','e'),
+   'Done from the editor':app=>editor(app,'done-task','a'),
+   'Return as candidate of a dot':app=>{setFakeTime(app.ctx,at+100);app.ctx.renderScan();returnDotFromScan(app.ctx,app.shim,'b');},
+   'Return as candidate of a marked task':app=>editor(app,'return-candidate','e'),
+  }},
+  'working the chain, with marks':{mode:'work',controls:{
+   'Continue scanning':app=>scan(app,'continue-scan',{}),
+   'Resume scanning':app=>scan(app,'resume-scan',{}),
+   'Start, with dots on the chain':app=>scan(app,'start-scan',{}),
+   'Rescan skipped tasks':app=>scan(app,'rescan',{}),
+   'Postpone of the benchmark':app=>scan(app,'bench-postpone',{benchmark:'c'}),
+   'Done on the benchmark':app=>scan(app,'bench-done',{benchmark:'c'}),
+  }},
  };
  const view=app=>({chain:Array.from(app.ctx.state.chain),mode:app.ctx.state.mode,scanMode:app.ctx.state.scanMode,
   considered:JSON.parse(JSON.stringify(app.ctx.state.considered)),cantAt:JSON.parse(JSON.stringify(app.ctx.state.cantAt)),
   workedAt:JSON.parse(JSON.stringify(app.ctx.state.workedAt)),candidate:app.ctx.state.candidateId,
   done:app.ctx.state.tasks.filter(task=>task.done).map(task=>task.id)});
- for(const [control,act] of Object.entries(controls))await t.test(control,async()=>{
+ for(const [fixture,{mode,controls}] of Object.entries(fixtures))for(const [control,act] of Object.entries(controls))await t.test(fixture+': '+control,async()=>{
   const views={};
   for(const withHistory of [false,true]){
-   const app=await contractBoard2376(at,withHistory,'scan'),steps=[];
-   const before=app.ctx.state.decisionEvents?.length??0;
+   const app=await contractBoard2376(at,withHistory,mode,true),steps=[];
+   const before=app.ctx.state.decisionEvents?.length??0,board0=JSON.stringify(view(app));
    act(app);
    steps.push(view(app));
-   // Postponing a candidate, and rescanning, resuming or starting a board that
-   // is already scanning in descending order with no marks, change no chain,
-   // mode, scan mode or mark, so they have nothing to record.
-   if(!['Postpone of the candidate','Rescan skipped tasks','Resume scanning','Start, with dots on the chain'].includes(control))
+   assert.notEqual(JSON.stringify(steps[0]),board0,'positive control: the control changed the board');
+   // Postponing the candidate changes no chain, mode or mark, so it records nothing.
+   if(control!=='Postpone of the candidate')
     assert.ok((app.ctx.state.decisionEvents?.length??0)>before,'the control records its decision');
    setFakeTime(app.ctx,at+200);app.ctx.renderScan();
    const yes=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
@@ -15752,4 +15763,26 @@ test('RISK chain return Undo: Undo of a Postpone writes no Task history, also wh
   assert.deepEqual(Array.from(ctx.state.chain),chain,'positive control: Undo put the chain back');
   assert.equal(rows(),start,'Undo of the Postpone writes no Task history either');
  });
+});
+
+// D4's everyday case (#2376 independent review N3): Start, answers, then Done
+// on the benchmark ends scanning, as it does in every other pass.
+test('RISK started pass sync: benchmark Done after Start and two answers switches to work mode, and Undo goes back to scanning',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const board=syncState({tasks:['a','b','c','d','e'].map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+  chain:[],candidateId:null,mode:'scan',scanMode:'descending',seenQuickStart:true,
+  settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ const raw=JSON.stringify(board),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+ setFakeTime(ctx,at+10);ctx.onAction('start-scan',{dataset:{}});
+ for(const when of [at+20,at+30]){setFakeTime(ctx,when);ctx.renderScan();ctx.onAction('yes',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});}
+ const chain0=Array.from(ctx.state.chain),done=chain0.at(-1);
+ assert.equal(chain0.length,3,'precondition: Start and two Yes answers');
+ setFakeTime(ctx,at+40);ctx.renderScan();ctx.onAction('bench-done',{dataset:{benchmark:done}});
+ assert.equal(ctx.state.tasks.find(task=>task.id===done).done,true,'positive control: the benchmark is done');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0.slice(0,-1),'and off the chain');
+ assert.equal(ctx.state.mode,'work','Done on the benchmark ends scanning');
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ setFakeTime(ctx,at+2000);assert.equal(await ctx.onAction('undo',{}),true);
+ assert.equal(ctx.state.mode,'scan','Undo goes back to scanning');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0,'and puts the benchmark back');
 });
