@@ -11595,7 +11595,8 @@ test('RISK chain return sync: a Postpone that empties the chain after a return d
   // The oldest task neither returned nor postponed: the Waiting candidate.
   confirmedSync221(local,h,['carried-d'],'the device that returned and postponed');
   assert.deepEqual(Array.from(local.ctx.state.chain),['carried-d'],'the automatic dot is the first candidate that was not returned');
-  assert.deepEqual(returnFact221(h.remoteState()).map(row=>row.before.value[0]).sort(),returned,'every return reached the cloud');
+  // #2376 D1: a Postpone of a dot is recorded as the same Return row.
+  assert.deepEqual(returnFact221(h.remoteState()).map(row=>row.before.value[0]).sort(),[...returned,...postponed].sort(),'every return and every Postpone of a dot reached the cloud');
   await receive221(peer);
   assert.deepEqual(Array.from(peer.ctx.state.chain),['carried-d'],'the other device shows the same chain');
   for(const id of postponed)assert.equal(peer.ctx.taskPostponeUntil(peer.ctx.state.tasks.find(task=>task.id===id))>at+200,true,'and the Postpone of '+id);
@@ -15094,6 +15095,381 @@ test('RISK started pass sync compatibility: a board the released client held aft
  });
 });
 
+// ---------- #2376: each scanner action applies its Board decision once ----------
+// Postpone took a dot off the chain without recording it, so the next answer
+// rebuilt the pass from its recorded decisions and put the dot back once the
+// postponement had ended (#2336). These use the #2359 signed-in devices.
+// The device clock runs from the real one with an offset, so the app's own
+// timers keep running while the board moves past a postponement.
+function shiftClock2376(ctx,offset){
+ vm.runInContext(`globalThis.realDateNow2376 ||= Date.now;Date.now=()=>globalThis.realDateNow2376()+${offset};`,ctx);
+}
+function offeredYes2376(device){
+ device.ctx.renderScan();
+ const yes=device.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+ assert.ok(yes,'precondition: a candidate is showing');
+ return {candidate:yes[1],benchmark:yes[2]};
+}
+async function secondDevice2376(t,device,name,offset=0){
+ const {IDBFactory}=await import('fake-indexeddb');
+ const peer=await startedPassDevice2359(t,name,{indexedDB:new IDBFactory(),deviceDbName:'second-2376-'+name+'-'+Math.random(),sharedDocs:device.backend.docs});
+ shiftClock2376(peer.ctx,offset);
+ await peer.signIn();await syncSettle(300);
+ return peer;
+}
+
+test('RISK started pass sync: a Postponed benchmark stays off the chain once its postponement ends and the next candidate is answered, and a second device shows the same chain',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'postponed-stays-off'),{ctx}=device;
+ ctx.state.settings.postponeHours=0.01;   // 36 seconds, so the test never crosses the 2 AM reset
+ const chain0=Array.from(ctx.state.chain),postponed=chain0.at(-1);
+ await device.act('bench-postpone');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0.slice(0,-1),'positive control: the Postpone took the benchmark off');
+ assert.equal(device.status().text,'☁ synced','positive control: the Postpone syncs: '+device.status().title);
+ const offset=36000+60000;   // a minute after the postponement ends
+ shiftClock2376(ctx,offset);
+ assert.equal(ctx.pool().some(task=>task.id===postponed),true,'precondition: the postponed task is eligible again');
+ const {candidate,benchmark}=offeredYes2376(device);
+ assert.notEqual(candidate,postponed,'precondition: the candidate is another task');
+ await device.act('yes',{dataset:{candidate,benchmark}});
+ const expected=[...chain0.slice(0,-1),candidate];
+ assert.deepEqual(Array.from(ctx.state.chain),expected,'the Yes adds only the candidate: the postponed task stays off');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ const peer=await secondDevice2376(t,device,'postponed-stays-off-peer',offset);
+ assert.equal(peer.status().text,'☁ synced','the second device syncs: '+peer.status().title);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'the second device shows the same chain');
+});
+
+// #2376 contract: a board with no decision history yet takes the direct path,
+// one whose history can be replayed takes the replay. The same controls on the
+// same board must give the same chain, mode and marks either way, and keep
+// giving them once the next answer replays what was recorded.
+const contractTitles2376={a:'Task a',b:'Task b',c:'Task c',d:'Task d',e:'Task e',f:'Task f'};
+// marks: e is marked No and f Can't, so Rescan has marks to clear.
+async function contractBoard2376(at,withHistory,mode='work',marks=false){
+ const board=syncState({tasks:Object.entries(contractTitles2376).map(([id,title])=>syncTask(id,title)),
+  chain:['a','b','c'],candidateId:'d',mode:withHistory?'scan':mode,scanMode:'descending',passId:'contract-pass',passStartedAt:at-60000,
+  ...(marks?{considered:{e:'no',f:'cant'},cantAt:{f:at-60000}}:{}),
+  // Descending scans draw no random order, so Start and Resume pick the same candidate on both boards.
+  settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,postponeHours:1,showPostpone:true}});
+ const raw=JSON.stringify(board);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ if(withHistory){
+  // A recorded No and its Undo, then No — work the chain: the same board as
+  // the one without history, which was saved in work mode.
+  setFakeTime(app.ctx,at+10);app.ctx.onAction('no',{dataset:{candidate:'d',benchmark:'c'}});
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(app.ctx,at+20);assert.equal(await app.ctx.onAction('undo',{}),true);
+  if(mode==='work'){setFakeTime(app.ctx,at+30);app.ctx.onAction('start-working',{dataset:{}});}
+  assert.ok(app.ctx.state.decisionEvents.length>0,'precondition: the board has decision history');
+ }else assert.equal(app.ctx.state.decisionEvents?.length??0,0,'precondition: the board has no decision history');
+ assert.deepEqual(Array.from(app.ctx.state.chain),['a','b','c'],'precondition: three dots');
+ return app;
+}
+const contractView2376=app=>({chain:Array.from(app.ctx.state.chain),mode:app.ctx.state.mode,
+ considered:JSON.parse(JSON.stringify(app.ctx.state.considered)),candidate:app.ctx.state.candidateId});
+
+test('RISK started pass sync: Postpone gives the same chain, mode and marks on a board with no decision history and on one whose history replays, also through the next answer',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),views={};
+ for(const withHistory of [false,true]){
+  const app=await contractBoard2376(at,withHistory),{ctx}=app,steps=[];
+  assert.equal(ctx.state.mode,'work','precondition: work mode');
+  for(const [i,id] of ['c','b','a'].entries())assert.equal(postponeBenchmark221(app,at+200+i*100),id);
+  steps.push(contractView2376(app));
+  assert.equal(ctx.state.chain.length,1,'the last Postpone dots a candidate');
+  assert.equal(['a','b','c'].includes(ctx.state.chain[0]),false,'which is not a postponed task');
+  assert.equal(ctx.state.mode,'scan','Postpone goes back to scanning');
+  assert.ok(ctx.state.decisionEvents.length>(withHistory?3:0),'the Postpones are recorded');
+  setFakeTime(ctx,at+600);ctx.renderScan();
+  const yes=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+  assert.ok(yes,'precondition: a candidate is showing');
+  ctx.onAction('yes',{dataset:{candidate:yes[1],benchmark:yes[2]}});
+  steps.push(contractView2376(app));
+  assert.deepEqual(steps[1].chain,[...steps[0].chain,yes[1]],'the next answer keeps the automatic dot and adds its candidate');
+  views[withHistory?'replay':'direct']=steps;
+ }
+ assert.deepEqual(views.replay,views.direct,'the board with history and the one without agree at every step');
+});
+
+// Postponing every dot down to the first one empties the chain, and Postpone
+// dots the first candidate. That automatic dot is the person's chain now: the
+// next answer, a reload and another device keep it, and none of the postponed
+// dots comes back by itself once its postponement has ended.
+test('RISK started pass sync: after Postponing every dot of a pass Start began, the automatic dot survives the next answer, a reload and a second device, and no postponed dot comes back once the postponements end',async t=>{
+ // Five tasks added before Start: adding one after Start holds sync at the
+ // next answer on its own (reported separately), whatever this change does.
+ const device=await startedPassDevice2359(t,'postpone-all'),{ctx,shim}=device;
+ await device.signIn();
+ for(const title of ['Task A 2376','Task B 2376','Task C 2376','Task D 2376','Task E 2376']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ await savesSettled2334(device);await syncSettle(300);
+ await device.act('start-scan');await device.act('yes');await device.act('yes');
+ assert.equal(ctx.state.chain.length,3,'precondition: Start and two Yes answers make three dots');
+ assert.equal(device.status().text,'☁ synced','positive control: they sync: '+device.status().title);
+ ctx.state.settings.postponeHours=0.01;   // 36 seconds, so the test never crosses the 2 AM reset
+ const chain0=Array.from(ctx.state.chain);
+ for(const id of [...chain0].reverse()){
+  assert.equal(ctx.state.chain.at(-1),id,'precondition: the next dot down is the benchmark');
+  await device.act('bench-postpone',{dataset:{benchmark:id}});
+  assert.equal(device.status().text,'☁ synced','the Postpone of '+chain0.indexOf(id)+' syncs: '+device.status().title+' '+JSON.stringify(device.steps()));
+ }
+ assert.equal(ctx.state.chain.length,1,'positive control: the last Postpone dotted a candidate');
+ const auto=ctx.state.chain[0];
+ assert.equal(chain0.includes(auto),false,'and it is not a postponed task');
+ assert.equal(device.status().text,'☁ synced','the Postpones sync: '+device.status().title);
+ const first=offeredYes2376(device);
+ await device.act('yes',{dataset:first});
+ const answered=[auto,first.candidate];
+ assert.deepEqual(Array.from(ctx.state.chain),answered,'the next Yes keeps the automatic dot');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ await closeLegacyApp173(device);device.backend.CS.suspend();
+ const reopened=await startedPassDevice2359(t,'postpone-all-reopened',{indexedDB:device.indexedDB,deviceDbName:device.deviceDbName,sharedDocs:device.backend.docs});
+ await reopened.signIn();await syncSettle(300);
+ assert.deepEqual(Array.from(reopened.ctx.state.chain),answered,'reopening keeps the automatic dot');
+ assert.equal(reopened.status().text,'☁ synced','and syncs: '+reopened.status().title);
+ const offset=36000+60000;   // a minute after the last postponement ends
+ shiftClock2376(reopened.ctx,offset);
+ assert.equal(chain0.every(id=>reopened.ctx.pool().some(task=>task.id===id)),true,'precondition: the postponed tasks are eligible again');
+ const next=offeredYes2376(reopened);
+ await reopened.act('yes',{dataset:next});
+ const expected=[...answered,next.candidate];
+ assert.deepEqual(Array.from(reopened.ctx.state.chain),expected,'the next Yes adds only its candidate: no postponed dot comes back by itself');
+ assert.equal(reopened.status().text,'☁ synced','sync is not held: '+reopened.status().title);
+ const peer=await secondDevice2376(t,reopened,'postpone-all-peer',offset);
+ assert.equal(peer.status().text,'☁ synced','the second device syncs: '+peer.status().title);
+ assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'the second device shows the same chain');
+});
+
+// Two devices against the fake cloud under a controlled clock: a pass carried
+// over the 2 AM reset, and a synced board that has never saved a pass id.
+// Postpone for (hrs) is 1, so a minute past the hour the hold has ended.
+const passKinds2376={
+ 'a pass carried over the 2 AM reset':async t=>{
+  const {local,peer,h,at}=await carriedPassClients221(t);
+  return {local,peer,h,at,ids:{a:'carried-a',b:'carried-b',c:'carried-c'}};
+ },
+ 'a board with no saved pass id':async t=>{
+  const clients=await scopedUndoClients(initial=>{
+   initial.tasks=['a','b','c','d','e'].map(id=>syncTask(id,'Task '+id));
+   initial.chain=['a','b','c'];initial.candidateId=null;delete initial.passId;
+   Object.assign(initial.settings,{postponeHours:1,showPostpone:true});
+  });
+  for(const app of [clients.local,clients.peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  assert.equal(Object.hasOwn(clients.initial,'passId'),false,'precondition: no saved pass id');
+  return {...clients,ids:{a:'a',b:'b',c:'c'}};
+ },
+};
+function offeredYesAt2376(app,at){
+ setFakeTime(app.ctx,at);app.ctx.renderScan();
+ const yes=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+ assert.ok(yes,'precondition: a candidate is showing');
+ return {candidate:yes[1],benchmark:yes[2]};
+}
+async function bothReceive2376(first,second){
+ for(let round=0;round<2;round++){await receive221(first);await receive221(second);}
+}
+
+test('RISK chain return sync: a Postponed benchmark stays off once its postponement ends, in a pass carried over 2 AM and on a board with no saved pass id, while the other device answers, in either publish order',async t=>{
+ for(const [kind,open] of Object.entries(passKinds2376))for(const first of ['the Postpone','the other device'])await t.test(`${kind}, ${first} publishes first`,async t=>{
+  const {local,peer,h,at,ids}=await open(t);
+  assert.equal(postponeBenchmark221(local,at+100),ids.c);
+  // The other device has not seen the Postpone. It answers No on its candidate.
+  const other=offeredYesAt2376(peer,at+150);
+  peer.ctx.onAction('no',{dataset:other});
+  const [a,b]=first==='the Postpone'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);await bothReceive2376(a,b);
+  for(const [label,app] of [['the device that postponed',local],['the other device',peer]]){
+   assert.deepEqual(Array.from(app.ctx.state.chain),[ids.a,ids.b],label+': the Postpone and the No are both kept');
+   assert.equal(app.ctx.state.considered[other.candidate],'no',label+': with the No');
+  }
+  const later=at+100+HOUR+60000;
+  setFakeTime(local.ctx,later);
+  assert.equal(local.ctx.pool().some(task=>task.id===ids.c),true,'precondition: the postponed task is eligible again');
+  const next=offeredYesAt2376(local,later+100);
+  assert.notEqual(next.candidate,ids.c,'precondition: the candidate is another task');
+  local.ctx.onAction('yes',{dataset:next});
+  const expected=[ids.a,ids.b,next.candidate];
+  assert.deepEqual(Array.from(local.ctx.state.chain),expected,'the Yes adds only its candidate: the postponed task stays off');
+  await publish221(local);
+  confirmedSync221(local,h,expected,'after the next answer');
+  setFakeTime(peer.ctx,later+200);await receive221(peer);
+  assert.deepEqual(Array.from(peer.ctx.state.chain),expected,'the other device shows the same chain');
+ });
+});
+
+test('RISK chain return Undo sync: Undo of a Postpone puts the dot back and keeps the other device’s later Yes, also when the Postpone dotted a candidate, in either publish order',async t=>{
+ for(const postponed of ['the benchmark','every dot'])for(const first of ['Undo','the other device’s Yes'])await t.test(`Postpone of ${postponed}, ${first} publishes first`,async t=>{
+  const {local,peer,h,at,ids}=await passKinds2376['a board with no saved pass id'](t);
+  const order=postponed==='the benchmark'?[ids.c]:[ids.c,ids.b,ids.a];
+  for(const [i,id] of order.entries())assert.equal(postponeBenchmark221(local,at+100+i*10),id);
+  const auto=postponed==='every dot'?local.ctx.state.chain[0]:null;
+  if(auto)assert.equal([ids.a,ids.b,ids.c].includes(auto),false,'precondition: Postpone dotted a candidate');
+  await publish221(local);await receive221(peer);
+  const answer=offeredYesAt2376(peer,at+200);
+  peer.ctx.onAction('yes',{dataset:answer});
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(local.ctx,at+2000);assert.equal(await local.ctx.onAction('undo',{}),true);
+  // Undo of the benchmark's Postpone puts it back after b; Undo of the last
+  // Postpone (of a) takes the automatic dot off and puts a back. The other
+  // device's Yes stands either way.
+  const expected=auto?[ids.a,answer.candidate]:[ids.a,ids.b,ids.c,answer.candidate];
+  const [a,b]=first==='Undo'?[local,peer]:[peer,local];
+  await publish221(a);await publish221(b);await bothReceive2376(a,b);
+  for(const [label,app] of [['the undoing device',local],['the other device',peer]]){
+   assert.deepEqual(Array.from(app.ctx.state.chain),expected,label+': the Undo and the other device’s Yes are both kept');
+   assert.equal(app.ctx.taskPostponeUntil(app.ctx.state.tasks.find(task=>task.id===order.at(-1))),0,label+': and the undone postponement has ended');
+  }
+  assert.deepEqual(h.remoteState().chain,expected,'cloud: the same chain');
+ });
+});
+
+// Done on the benchmark ends scanning: the board goes to work mode. Once the
+// pass has a recorded mode row (No — work the chain, then Continue scanning),
+// the replay after Done read that row and put the board straight back into
+// scan mode, because the switch to work was never recorded (#2376 D4).
+test('RISK started pass sync: benchmark Done after No — work the chain and Continue scanning switches to work mode, syncs, reaches a second device, and Undo goes back to scanning',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'bench-done-work'),{ctx}=device;
+ await device.act('start-working');
+ await device.act('continue-scan');
+ assert.equal(ctx.state.mode,'scan','precondition: Continue scanning went back to scanning');
+ const chain0=Array.from(ctx.state.chain),done=chain0.at(-1);
+ await device.act('bench-done',{dataset:{benchmark:done}});
+ assert.equal(ctx.state.tasks.find(task=>task.id===done).done,true,'positive control: the benchmark is done');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0.slice(0,-1),'and off the chain');
+ assert.equal(ctx.state.mode,'work','Done on the benchmark switches to work mode');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ const peer=await secondDevice2376(t,device,'bench-done-work-peer');
+ assert.equal(peer.status().text,'☁ synced','the second device syncs: '+peer.status().title);
+ assert.equal(peer.ctx.state.mode,'work','the second device shows work mode');
+ await device.act('undo');
+ assert.equal(ctx.state.mode,'scan','Undo goes back to scanning');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0,'and puts the benchmark back');
+ assert.equal(device.status().text,'☁ synced','and syncs: '+device.status().title);
+});
+
+// Run WOOP on an overdue candidate dots it and switches to work mode, so the
+// person works the plan. The same unrecorded switch as benchmark Done (D4).
+// The overdue task is added before Start, so it is not the Start dot (oldest
+// first), and adding no task after Start keeps clear of the separate hold an
+// added task causes at the next answer.
+test('RISK started pass sync: Run WOOP on an overdue candidate after No — work the chain and Continue scanning stays in work mode through sync and on a second device',async t=>{
+ const device=await startedPassDevice2359(t,'woop-work'),{ctx,shim}=device;
+ await device.signIn();
+ for(const title of ['Task A 2376','Task B 2376','Task C 2376']){shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+ const overdue=ctx.addTask('Overdue Task 2376',false,[],{due:ctx.todayISO(-1)});
+ await savesSettled2334(device);await syncSettle(300);
+ await device.act('start-scan');
+ assert.notEqual(ctx.state.chain[0],overdue.id,'precondition: Start dotted another task');
+ await device.act('start-working');
+ await device.act('continue-scan');
+ ctx.state.candidateId=overdue.id;ctx.renderScan();   // as overdueWoopFixture offers it
+ const tag=shim.document.getElementById('scan').innerHTML.match(/<button[^>]*data-act="run-woop"[^>]*>/)?.[0];
+ assert.ok(tag,'precondition: the overdue candidate offers Run WOOP');
+ const control={dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};
+ const chain0=Array.from(ctx.state.chain);
+ await ctx.onAction('run-woop',control);ctx.closeModal();await flush();await savesSettled2334(device);await syncSettle(300);
+ assert.deepEqual(Array.from(ctx.state.chain),[...chain0,overdue.id],'positive control: Run WOOP dotted the overdue task');
+ assert.equal(ctx.state.mode,'work','and switched to work mode');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ const peer=await secondDevice2376(t,device,'woop-work-peer');
+ assert.equal(peer.status().text,'☁ synced','the second device syncs: '+peer.status().title);
+ assert.equal(peer.ctx.state.mode,'work','the second device shows work mode');
+ assert.deepEqual(Array.from(peer.ctx.state.chain),[...chain0,overdue.id],'and the same chain');
+});
+
+// #2376 contract for every routed control: on the same board, the direct path
+// (no decision history yet) and the replay (history that replays) give the
+// same chain, mode, marks and candidate, and still agree after the next Yes.
+// The history board's No and Undo leave it exactly as the other one.
+test('RISK started pass sync: every scanner control gives the same chain, mode and marks on a board with no decision history and on one whose history replays',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const scan=(app,act,dataset)=>{setFakeTime(app.ctx,at+100);app.ctx.renderScan();app.ctx.onAction(act,{dataset});};
+ const editor=(app,act,id)=>{setFakeTime(app.ctx,at+100);hydrateUnchangedEditorDraft(app,id);app.ctx.onAction(act,{dataset:{id}});};
+ // Both fixtures carry a No and a Can't mark. The scanning one offers d against
+ // c; the working one has stopped scanning, so Resume, Start and Continue change it.
+ const fixtures={
+  'scanning, with marks':{mode:'scan',controls:{
+   'Yes':app=>scan(app,'yes',{candidate:'d',benchmark:'c'}),
+   'No':app=>scan(app,'no',{candidate:'d',benchmark:'c'}),
+   'Can’t on the candidate':app=>scan(app,'cant',{candidate:'d',benchmark:'c'}),
+   'Done on the candidate':app=>scan(app,'cand-done',{candidate:'d',benchmark:'c'}),
+   'Postpone of the candidate':app=>scan(app,'postpone',{candidate:'d',benchmark:'c'}),
+   'Done on the benchmark':app=>scan(app,'bench-done',{benchmark:'c'}),
+   'Can’t on the benchmark':app=>scan(app,'bench-cant',{benchmark:'c'}),
+   'Dislodge':app=>scan(app,'dislodge',{benchmark:'c'}),
+   'Worked on it':app=>scan(app,'worked',{benchmark:'c'}),
+   'Postpone of the benchmark':app=>scan(app,'bench-postpone',{benchmark:'c'}),
+   'No — work the chain':app=>scan(app,'start-working',{}),
+   'Rescan skipped tasks':app=>scan(app,'rescan',{}),
+   'Dot from the editor':app=>editor(app,'dot-task','e'),
+   'Done from the editor':app=>editor(app,'done-task','a'),
+   'Return as candidate of a dot':app=>{setFakeTime(app.ctx,at+100);app.ctx.renderScan();returnDotFromScan(app.ctx,app.shim,'b');},
+   'Return as candidate of a marked task':app=>editor(app,'return-candidate','e'),
+  }},
+  'working the chain, with marks':{mode:'work',controls:{
+   'Continue scanning':app=>scan(app,'continue-scan',{}),
+   'Resume scanning':app=>scan(app,'resume-scan',{}),
+   'Start, with dots on the chain':app=>scan(app,'start-scan',{}),
+   'Rescan skipped tasks':app=>scan(app,'rescan',{}),
+   'Postpone of the benchmark':app=>scan(app,'bench-postpone',{benchmark:'c'}),
+   'Done on the benchmark':app=>scan(app,'bench-done',{benchmark:'c'}),
+  }},
+ };
+ const view=app=>({chain:Array.from(app.ctx.state.chain),mode:app.ctx.state.mode,scanMode:app.ctx.state.scanMode,
+  considered:JSON.parse(JSON.stringify(app.ctx.state.considered)),cantAt:JSON.parse(JSON.stringify(app.ctx.state.cantAt)),
+  workedAt:JSON.parse(JSON.stringify(app.ctx.state.workedAt)),candidate:app.ctx.state.candidateId,
+  done:app.ctx.state.tasks.filter(task=>task.done).map(task=>task.id)});
+ for(const [fixture,{mode,controls}] of Object.entries(fixtures))for(const [control,act] of Object.entries(controls))await t.test(fixture+': '+control,async()=>{
+  const views={};
+  for(const withHistory of [false,true]){
+   const app=await contractBoard2376(at,withHistory,mode,true),steps=[];
+   const before=app.ctx.state.decisionEvents?.length??0,board0=JSON.stringify(view(app));
+   act(app);
+   steps.push(view(app));
+   assert.notEqual(JSON.stringify(steps[0]),board0,'positive control: the control changed the board');
+   // Before any later answer replays both boards: replaying the rows the
+   // control recorded gives the board its direct rule left (review N1′), with
+   // expired holds normalised on both sides, and the coherence check is clear.
+   // A Postpone of the candidate on the board with no history records nothing, so there is nothing to replay.
+   const {ctx}=app,now=vm.runInContext('Date.now()',ctx);
+   const live=JSON.parse(JSON.stringify(ctx.state)),replayed=JSON.parse(JSON.stringify(ctx.state));
+   if(withHistory||control!=='Postpone of the candidate'){
+   assert.equal(ctx.decisionReplayReady(replayed),true,'precondition: the board can replay its rows');
+   ctx.projectDecisionEvents(replayed,null,{refreshRanks:false});
+   ctx.normalizeExpiredTimedHoldsForComparison(live,now);ctx.normalizeExpiredTimedHoldsForComparison(replayed,now);
+   const facts=board=>JSON.parse(JSON.stringify({chain:board.chain,mode:board.mode,considered:board.considered||{},cantAt:board.cantAt||{},
+    workedAt:board.workedAt||{},scanMode:board.scanMode,chance:board.chance??null,passId:board.passId??null}));
+   assert.deepEqual(facts(live),facts(replayed),'the board equals the replay of its decisions right after the control');
+   assert.equal(ctx.decisionProjectionIssue(JSON.parse(JSON.stringify(ctx.state))),null,'and the coherence check finds nothing');
+   }
+   // Postponing the candidate changes no chain, mode or mark, so it records nothing.
+   if(control!=='Postpone of the candidate')
+    assert.ok((app.ctx.state.decisionEvents?.length??0)>before,'the control records its decision');
+   setFakeTime(app.ctx,at+200);app.ctx.renderScan();
+   const yes=app.shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="yes" data-candidate="([^"]+)" data-benchmark="([^"]+)"/);
+   if(yes){app.ctx.onAction('yes',{dataset:{candidate:yes[1],benchmark:yes[2]}});steps.push(view(app));}
+   views[withHistory?'replay':'direct']=steps;
+  }
+  assert.deepEqual(views.replay,views.direct,'the board with history and the one without agree');
+ });
+});
+
+// The mode controls keep the candidate on offer, as they did before #2376.
+// Redrawing it after a task was added to a pass Start began scores the new
+// task into the pass's saved draw, which holds sync (a separate cause, also
+// reached on main by the next Yes); these controls must not start doing that.
+test('RISK started pass sync: No — work the chain and Continue scanning after adding a task to a pass Start began keep the offered candidate and keep syncing',async t=>{
+ const device=await startedPassWithTwoAnswers2359(t,'mode-after-add'),{ctx,shim}=device;
+ shim.document.getElementById('addInput').value='Task E 2376';await device.act('add');
+ assert.equal(device.status().text,'☁ synced','positive control: the added task syncs: '+device.status().title);
+ const offered=ctx.state.candidateId;
+ assert.ok(offered,'precondition: a candidate is on offer');
+ await device.act('start-working');
+ assert.equal(ctx.state.mode,'work','positive control: work mode');
+ await device.act('continue-scan');
+ assert.equal(ctx.state.mode,'scan','positive control: scanning again');
+ assert.equal(ctx.state.candidateId,offered,'the same candidate is still on offer');
+ assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+});
+
 // #2379: one automatic backup retention rule for both backup stores. Each case
 // runs on the older browser backup list (no device store) and on the device
 // store (fake IndexedDB), through the app's own entry points: a safety copy
@@ -15537,4 +15913,185 @@ test('RISK backup retention (device store): when a read of an unmeasured expirin
  reopened.ctx.addTask('An edit right after reopening');assert.equal(await reopened.ctx.persist(),true);
  const kept=(await s.list()).map(row=>row.id).filter(id=>ids.includes(id));
  assert.equal(kept.length,2,'the copy read before the failure expires, and the other two stay: '+JSON.stringify(kept));
+});
+
+// #2376 review (replay cost): a control that adds no rating evidence does what
+// it did before #2376, whatever the length of the decision history. The work
+// is counted as the decision rows a replay or its readiness check validates
+// (supportedDecisionEvent), not timed: on a phone the replay of a long history
+// took several times the 40 ms these controls took before.
+async function historyBoard2376(at,answers){
+ const ids=Array.from({length:answers+8},(_,i)=>'h'+String(i).padStart(3,'0'));
+ const board=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+  chain:[ids[0]],candidateId:null,mode:'scan',scanMode:'descending',passId:'history-pass',passStartedAt:at-60000,
+  settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,postponeHours:1,showPostpone:true}});
+ const raw=JSON.stringify(board);
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ for(let i=0;i<answers;i++){
+  setFakeTime(app.ctx,at+10+i);app.ctx.renderScan();
+  app.ctx.onAction(i%3===2?'no':'yes',{dataset:{candidate:app.ctx.state.candidateId,benchmark:app.ctx.state.chain.at(-1)}});
+ }
+ assert.ok(app.ctx.state.decisionEvents.length>=answers,'precondition: the board has '+answers+' recorded answers');
+ vm.runInContext('{const checked=supportedDecisionEvent;globalThis.rowsChecked2376=0;supportedDecisionEvent=function(...args){globalThis.rowsChecked2376++;return checked.apply(this,args);};}',app.ctx);
+ return app;
+}
+test('RISK started pass sync: a scanner control that adds no rating evidence does no more replay work on a long decision history than on a short one',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const controls={
+  'Postpone of the benchmark':app=>postponeBenchmark221(app,at+1000),
+  'Can’t on the benchmark':app=>{app.ctx.renderScan();app.ctx.onAction('bench-cant',{dataset:{benchmark:app.ctx.state.chain.at(-1)}});},
+  'Worked on it':app=>{app.ctx.renderScan();app.ctx.onAction('worked',{dataset:{benchmark:app.ctx.state.chain.at(-1)}});},
+  'Can’t on the candidate':app=>{app.ctx.renderScan();app.ctx.onAction('cant',{dataset:{candidate:app.ctx.state.candidateId,benchmark:app.ctx.state.chain.at(-1)}});},
+  'No — work the chain':app=>app.ctx.onAction('start-working',{dataset:{}}),
+  'Rescan skipped tasks':app=>app.ctx.onAction('rescan',{dataset:{}}),
+  'Return as candidate of a dot':app=>{app.ctx.renderScan();returnDotFromScan(app.ctx,app.shim,app.ctx.state.chain[0]);},
+ };
+ for(const [control,act] of Object.entries(controls))await t.test(control,async()=>{
+  const work={};
+  for(const answers of [6,30]){
+   const app=await historyBoard2376(at,answers);
+   const before=app.ctx.state.decisionEvents.length;
+   setFakeTime(app.ctx,at+1000);act(app);
+   assert.ok(app.ctx.state.decisionEvents.length>before,'positive control: the control recorded its decision');
+   work[answers]=vm.runInContext('globalThis.rowsChecked2376',app.ctx);
+  }
+  assert.equal(work[30],work[6],'rows checked with 30 recorded answers ('+work[30]+') and with 6 ('+work[6]+')');
+ });
+});
+
+// #2376 review B2: while the intervention prompt shows, Return as candidate of
+// an earlier dot leaves the prompt up and draws no candidate, as before #2376.
+// Drawing one after a task was added to a pass Start began holds sync (#2395).
+test('RISK started pass sync: Return as candidate of an earlier dot while the intervention prompt shows keeps the prompt and keeps syncing, with and without a task added after Start',async t=>{
+ for(const added of [false,true])await t.test(added?'a task added after Start':'no task added',async t=>{
+  const device=await startedPassWithTwoAnswers2359(t,'intervention-'+(added?'added':'plain')),{ctx,shim}=device;
+  if(added){shim.document.getElementById('addInput').value='Task E 2376';await device.act('add');}
+  // As maybeIntervene leaves it: the prompt replaces the candidate.
+  ctx.state.interventionActive=true;ctx.state.candidateId=null;ctx.renderScan();
+  const chain0=Array.from(ctx.state.chain),returned=chain0[0];
+  returnDotFromScan(ctx,shim,returned);await flush();await savesSettled2334(device);await syncSettle(300);
+  assert.deepEqual(Array.from(ctx.state.chain),chain0.slice(1),'positive control: the Return took the dot off');
+  assert.equal(ctx.state.interventionActive,true,'the prompt is still showing');
+  assert.equal(ctx.state.candidateId,null,'and no candidate was drawn');
+  assert.equal(device.status().text,'☁ synced','sync is not held: '+device.status().title);
+ });
+});
+
+// The same for a decision that replays: Done on a task in the pool, from its
+// editor, ends no intervention, so the prompt stays up over the same benchmark.
+test('RISK started pass sync: Done from the editor on a task in the pool while the intervention prompt shows keeps the prompt',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const board=syncState({tasks:['a','b','c','d','e','f'].map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+  chain:[],candidateId:null,mode:'scan',scanMode:'descending',seenQuickStart:true,
+  settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ const raw=JSON.stringify(board),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+ setFakeTime(ctx,at+10);ctx.onAction('start-scan',{dataset:{}});
+ for(const when of [at+20,at+30]){setFakeTime(ctx,when);ctx.renderScan();ctx.onAction('yes',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});}
+ assert.equal(ctx.state.chain.length,3,'precondition: Start and two Yes answers');
+ ctx.state.interventionActive=true;ctx.state.candidateId=null;ctx.renderScan();
+ const done=ctx.state.tasks.find(task=>!ctx.state.chain.includes(task.id)&&!task.done).id,chain0=Array.from(ctx.state.chain);
+ setFakeTime(ctx,at+40);hydrateUnchangedEditorDraft(app,done);ctx.onAction('done-task',{dataset:{id:done}});
+ assert.equal(ctx.state.tasks.find(task=>task.id===done).done,true,'positive control: the task is done');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0,'and the chain is unchanged');
+ assert.equal(ctx.state.interventionActive,true,'the prompt is still showing');
+ assert.equal(ctx.state.candidateId,null,'with no candidate');
+});
+
+// #2376 review B1 and N1: Undo after the 2 AM reset of an action made before
+// it. The new pass is rebuilt from the chain the Undo saw, which still has the
+// dot that action put on, so Undo takes it off itself: Postpone's automatic dot,
+// and the dot a Yes or a Dot added. Local times, so 2 AM is the app's own marker.
+async function nightUndo2376(t,saved,act){
+ const at=new Date(2026,9,17,1,50).getTime();
+ const {open,h,raw}=await pairClients2375(t,{at,passStartedAt:new Date(2026,9,17,1,0).getTime(),passId:saved?'night-pass':null,
+  settings:{postponeHours:1,showPostpone:true}});
+ const local=await open(at,raw);
+ await act(local,at);
+ const before=Array.from(local.ctx.state.chain),passBefore=local.ctx.state.passId;
+ await publish221(local);
+ const when=new Date(2026,9,17,2,5).getTime();
+ setFakeTime(local.ctx,when);local.ctx.refreshScanClock();   // the app's own focus sweep crosses 2 AM
+ await publish221(local);
+ assert.notEqual(local.ctx.state.passId,passBefore,'precondition: the 2 AM reset began a new pass');
+ assert.deepEqual(Array.from(local.ctx.state.chain),before,'precondition: with the chain carried over');
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ setFakeTime(local.ctx,when+100);
+ assert.equal(await local.ctx.onAction('undo',{}),true);
+ const undone=Array.from(local.ctx.state.chain);
+ await publish221(local);
+ assert.equal(local.ctx.window.CloudSync.errorCode??null,null,'sync is not held');
+ assert.deepEqual(h.remoteState().chain,undone,'the cloud has the same chain');
+ const peer=await open(when+200,raw);
+ assert.equal(peer.ctx.window.CloudSync.errorCode??null,null,'the other device takes it without a hold');
+ assert.deepEqual(Array.from(peer.ctx.state.chain),undone,'the other device shows the same chain');
+ return {undone,local};
+}
+test('RISK chain return Undo: Undo after 2 AM of a Postpone made before it puts the dot back and takes the automatic dot off, with and without a saved pass id',async t=>{
+ for(const shape of ['the benchmark','the last dot'])for(const saved of [true,false])
+ await t.test(`Postpone of ${shape}, ${saved?'saved':'no saved'} pass id`,async t=>{
+  const order=shape==='the benchmark'?['c']:['c','b','a'];
+  const {undone,local}=await nightUndo2376(t,saved,async(local,at)=>{
+   for(const [i,id] of order.entries())assert.equal(postponeBenchmark221(local,at+100+i*10),id);
+   if(shape==='the last dot')assert.deepEqual(Array.from(local.ctx.state.chain),['d'],'precondition: Postpone dotted d');
+  });
+  assert.deepEqual(undone,shape==='the benchmark'?['a','b','c']:['a'],'Undo puts the postponed dot back and takes the automatic dot off');
+  assert.equal(local.ctx.taskPostponeUntil(local.ctx.state.tasks.find(task=>task.id===order.at(-1))),0,'and ends that postponement');
+ });
+});
+test('RISK chain return Undo: Undo after 2 AM of a Yes or an editor Dot made before it takes the added dot off, with and without a saved pass id',async t=>{
+ for(const action of ['Yes','editor Dot'])for(const saved of [true,false])
+ await t.test(`${action}, ${saved?'saved':'no saved'} pass id`,async t=>{
+  const {undone}=await nightUndo2376(t,saved,async(local,at)=>{
+   if(action==='Yes'){
+    setFakeTime(local.ctx,at+100);local.ctx.renderScan();
+    local.ctx.onAction('yes',{dataset:{candidate:'d',benchmark:'c'}});
+   }else await dotFromEditor221(local,'d',at+100);
+   assert.deepEqual(Array.from(local.ctx.state.chain),['a','b','c','d'],'precondition: d was added');
+  });
+  assert.deepEqual(undone,['a','b','c'],'Undo takes the added dot off');
+ });
+});
+
+// #2376 independent review N2: Postpone writes no Task history, and neither
+// does its Undo, as before #2376. Its rows (a Return and the automatic dot's
+// Dot with no rating) are not a Return as candidate or a comparison to show.
+test('RISK chain return Undo: Undo of a Postpone writes no Task history, also when the Postpone placed an automatic dot',async t=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ for(const chain of [['a','b','c'],['a']])await t.test(chain.length>1?'Postpone of the benchmark':'Postpone of the only dot',async()=>{
+  const board=syncState({tasks:['a','b','c','d','e','f'].map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+   chain,candidateId:'d',mode:'scan',scanMode:'descending',passId:'history-pass',passStartedAt:at-60000,
+   settings:{scanMode:'descending',horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,postponeHours:1,showPostpone:true}});
+  const raw=JSON.stringify(board),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+  const rows=()=>ctx.state.tasks.map(task=>(task.ratingHistory||[]).length).reduce((a,b)=>a+b,0);
+  const start=rows();
+  assert.equal(postponeBenchmark221(app,at+100),chain.at(-1));
+  if(chain.length===1)assert.equal(ctx.state.chain.length,1,'precondition: Postpone placed an automatic dot');
+  assert.equal(rows(),start,'positive control: the Postpone itself writes no Task history');
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  setFakeTime(ctx,at+2000);assert.equal(await ctx.onAction('undo',{}),true);
+  assert.deepEqual(Array.from(ctx.state.chain),chain,'positive control: Undo put the chain back');
+  assert.equal(rows(),start,'Undo of the Postpone writes no Task history either');
+ });
+});
+
+// D4's everyday case (#2376 independent review N3): Start, answers, then Done
+// on the benchmark ends scanning, as it does in every other pass.
+test('RISK started pass sync: benchmark Done after Start and two answers switches to work mode, and Undo goes back to scanning',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const board=syncState({tasks:['a','b','c','d','e'].map((id,i)=>({...syncTask(id,'Task '+id),createdAt:at-100000+i})),
+  chain:[],candidateId:null,mode:'scan',scanMode:'descending',seenQuickStart:true,
+  settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ const raw=JSON.stringify(board),app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}}),{ctx}=app;
+ setFakeTime(ctx,at+10);ctx.onAction('start-scan',{dataset:{}});
+ for(const when of [at+20,at+30]){setFakeTime(ctx,when);ctx.renderScan();ctx.onAction('yes',{dataset:{candidate:ctx.state.candidateId,benchmark:ctx.state.chain.at(-1)}});}
+ const chain0=Array.from(ctx.state.chain),done=chain0.at(-1);
+ assert.equal(chain0.length,3,'precondition: Start and two Yes answers');
+ setFakeTime(ctx,at+40);ctx.renderScan();ctx.onAction('bench-done',{dataset:{benchmark:done}});
+ assert.equal(ctx.state.tasks.find(task=>task.id===done).done,true,'positive control: the benchmark is done');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0.slice(0,-1),'and off the chain');
+ assert.equal(ctx.state.mode,'work','Done on the benchmark ends scanning');
+ await new Promise(resolve=>setTimeout(resolve,1200));
+ setFakeTime(ctx,at+2000);assert.equal(await ctx.onAction('undo',{}),true);
+ assert.equal(ctx.state.mode,'scan','Undo goes back to scanning');
+ assert.deepEqual(Array.from(ctx.state.chain),chain0,'and puts the benchmark back');
 });

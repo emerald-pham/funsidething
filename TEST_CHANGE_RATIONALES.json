@@ -23561,5 +23561,26 @@
       "command": "node scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"a durable ordinary save retries and clears its stale cloud error\" tests/core.test.js (record 2026-11-15T16-25-17-340Z-1b1a9601, on 544f90e1 with only the stall added and the fixed syncSettle(30) kept)",
       "failure": "25 ms stall: AssertionError, cloud.CS.errorStage actual 'reconcile', expected null. 100 ms stall: AssertionError 'the successful local recovery retries the failed reconciliation automatically', pulls actual 1, expected 2."
     }
+  },
+  {
+    "baseCommit": "648e764e2ab9b876b5c8dcfff01c6b7c07d8a835",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-assert.deepEqual(returnFact221(h.remoteState()).map(row=>row.before.value[0]).sort(),returned,'every return reached the cloud');"
+    ],
+    "reason": "#2376 D1 (owner decision of 2026-11-15): a Postpone of a dot is now recorded as the same #221 Return row a Return as candidate writes, so the pass chain is rebuilt without the postponed dot. The #221 review test that listed the cloud's Return rows expected only the returned tasks; the postponed dots now appear there too, so its expectation names both.",
+    "previousBehavior": "Postpone took a dot off the chain without recording a decision, so the cloud held one Return row per returned task and none for postponed dots, and the next answer could put a postponed dot back once its postponement ended (#2336).",
+    "intendedBehavior": "Every Return and every Postpone of a dot reaches the cloud as a Return row of its pass. The same test still checks that the automatic dot is the first candidate that was not returned, the device and the other device show the same chain, and each Postpone reached the other device.",
+    "preservedCoverage": [
+      "The test still asserts every Return row reached the cloud, now alongside the Postpone rows, with exact task ids from the spec.",
+      "All other assertions of the #221 review test (automatic dot, confirmed sync, the other device's chain and each postponement) are unchanged."
+    ],
+    "replacementTests": [
+      "RISK started pass sync: a Postponed benchmark stays off the chain once its postponement ends and the next candidate is answered, and a second device shows the same chain",
+      "RISK started pass sync: Postpone gives the same chain, mode and marks on a board with no decision history and on one whose history replays, also through the next answer"
+    ],
+    "redEvidence": {
+      "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"undone does not keep its task from the automatic dot|Return already saw does not stop Undo|Postpone that empties the chain after a return\" tests/persistence-recovery.test.js",
+      "failure": "On the slice 1 candidate the #221 review test failed with \"every return reached the cloud\": actual [carried-a, carried-b, carried-c], expected [carried-a, carried-b] (the Postpone of carried-c is now a Return row). Observed in a focused run of the RISK chain return and Postpone tests before the assertion was changed (7 failures; the other six were expired-hold failures that the slice 1 repair fixed, recorder record 2026-11-15T15-02-04-201Z-837454f0)."
+    }
   }
 ]

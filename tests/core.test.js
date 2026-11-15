@@ -43174,3 +43174,39 @@ test('RISK help save-repair guidance: the current changelog says the Data and ba
  assert.doesNotMatch(latest,/They no longer explain/);
  assert.match(latest,/<li>Help’s Data and backups answers are shorter overall and say what you see and can do: whether your work is saved on this device, whether cloud saving is pending, and what to choose when the app needs you\. Most no longer explain how saves are repaired behind the scenes\. Answers that only retold earlier fixes are gone; this changelog keeps that history\.<\/li>/);
 });
+
+// #2376: Done on the benchmark ends scanning in every pass, also one Start
+// began. Help's Done answer says so, within the 130-word answer limit.
+test("RISK help scanning guidance: the Done answer says Done on the newest dot ends scanning", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openHelp();
+  const faq = shim.elements.get("modalRoot").innerHTML.match(/<details class="help-faq"><summary><h3>Scanning and recurrence<\/h3><\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(faq, "precondition: the scanning chapter renders");
+  const answer = new Map([...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(([, question, text]) => [question, text])).get("What happens when I choose Done?");
+  assert.match(answer, /ordinary task.*active task list.*crossed out in History/, "the existing guidance stays");
+  assert.match(answer, /Done on the newest dot.*ends scanning/, "Done on the benchmark ends scanning");
+  assert.ok(answer.replace(/<[^>]+>/g, " ").trim().split(/\s+/).length <= 130, "the answer stays within 130 words");
+});
+
+// #2375 and #2376: one changelog bullet per feature (owner, 2026-11-15), each
+// keeping its own limits, so every promise below sits in exactly one bullet.
+test("RISK help scanning guidance: #2375's and #2376's November 15 changelog items are one bullet per feature, each with its own limits", () => {
+  const current = html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+  assert.ok(current, "precondition: the current changelog renders");
+  const items = [...current.split("<h3>November 14")[0].matchAll(/<li>([\s\S]*?)<\/li>/g)].map(match => match[1]);
+  const bullets = {
+    "Undo of Return as candidate": [/^Undo of Return as candidate now puts the dot back in its place on a board that has never pressed Start, and when the Return was made before the 2 AM reset, unless two devices each began the new day before syncing, while keeping what another device decided about that task since\./, /A copy of the app still open from before this update may pause sync, or may not apply this, until it is reloaded\./],
+    "Postponing after a Return": [/^Postponing the other dots no longer dots a returned task again or stops sync\./, /older open copy may not apply this until it is reloaded/],
+    "Done on the newest dot": [/^Done on the newest dot now ends scanning and switches to work mode in every pass, including one Start began, and Run WOOP stays in work mode\./, /A copy of the app still open from before this update may not apply this until it is reloaded\./],
+    "Postpone recorded": [/^A dot you postpone no longer comes back on the chain by itself once its postponement ends and you answer the next candidate, and the dot Postpone places on an emptied chain stays through your next answer, a reload and your other devices\. Undo of that Postpone takes the placed dot off again\./,
+      /A dot postponed before this update can still come back until the next 2 AM reset\./, /A copy of the app still open from before this update may not apply this until it is reloaded, and one from before November 12 may also pause sync after a Postpone of a dot\./],
+    "Undo after 2 AM": [/^Undo after the 2 AM reset of a Yes, Dot or Postpone made before it now takes off the dot it placed, unless a later decision in today’s pass kept it\./, /A copy of the app still open from before this update may not apply this until it is reloaded\./],
+  };
+  for (const [feature, promises] of Object.entries(bullets)) {
+    const matching = items.filter(item => promises[0].test(item));
+    assert.equal(matching.length, 1, feature + ": exactly one bullet");
+    for (const promise of promises) assert.match(matching[0], promise, feature + ": its promise stays in its bullet");
+    for (const [other, otherPromises] of Object.entries(bullets)) if (other !== feature)
+      assert.doesNotMatch(matching[0], new RegExp(otherPromises[0].source.replace(/^\^/, "").replace(/\$$/, "")), feature + " does not also hold " + other);
+  }
+});
