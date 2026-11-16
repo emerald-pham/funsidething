@@ -150,6 +150,32 @@ test('without a usable ledger, prepare still makes dependencies available, warns
   }
 });
 
+// Subagent shells keep no environment between commands, so the test-run
+// recorder, which every RED and GREEN goes through, reads the prepared ports.
+test('a test command run through the recorder in a prepared worktree gets its ports, unless the shell set its own', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-recorder-');
+  try {
+    const agent = addWorktree(main, join(fixture, 'agent-recorded'));
+    assert.equal(run(['prepare'], agent, { ledger, npm }).status, 0);
+    const claimed = loopbackPorts(ownerOf(ledger, agent)[0]);
+    const recorder = fileURLToPath(new URL('./record-run.mjs', import.meta.url));
+    const record = (environment) => {
+      const env = { ...process.env, CI: '', CHAIN_NATIVE_PORT: '', CHAIN_NATIVE_SMOKE_PORT: '', ...environment };
+      delete env.NODE_TEST_CONTEXT;
+      return spawnSync(process.execPath, [recorder, '--repo', agent, '--evidence-dir', join(fixture, 'evidence'), '--purpose', 'green', '--',
+        process.execPath, '-e', 'console.log(`ports ${process.env.CHAIN_NATIVE_PORT} ${process.env.CHAIN_NATIVE_SMOKE_PORT}`)'],
+      { cwd: agent, encoding: 'utf8', env });
+    };
+    const prepared = record({});
+    assert.equal(prepared.status, 0, prepared.stderr);
+    assert.match(prepared.stdout, new RegExp(`^ports ${claimed[0]} ${claimed[1]}$`, 'm'), 'the child sees the claimed ports');
+    const explicit = record({ CHAIN_NATIVE_PORT: '47081', CHAIN_NATIVE_SMOKE_PORT: '47082' });
+    assert.match(explicit.stdout, /^ports 47081 47082$/m, 'ports the shell set explicitly win');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 // Claude Code removes an unchanged subagent worktree itself and runs no
 // WorktreeRemove hook for it, and the coordinator removes the rest directly.
 // So claims are freed by sweeping entries whose worktree is gone (#2368).

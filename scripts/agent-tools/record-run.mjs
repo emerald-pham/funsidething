@@ -117,6 +117,21 @@ async function runGit(repo, args) {
   return result;
 }
 
+// A worktree prepared by worktree-ready.mjs keeps its claimed ports in its own
+// Git directory. Subagent shells keep no environment between commands, so the
+// recorder hands them to the child unless the shell set its own (#2364). CI
+// uses ephemeral ports and never reads them.
+async function loadPreparedPorts(repo, environment) {
+  if (environment.CI === 'true') return;
+  const gitDirectory = await runGit(repo, ['rev-parse', '--absolute-git-dir']);
+  if (gitDirectory.code !== 0) return;
+  const prepared = await readFile(path.join(gitDirectory.stdout.toString('utf8').trim(), 'chain-worktree-ports.env'), 'utf8').catch(() => '');
+  for (const name of ['CHAIN_NATIVE_PORT', 'CHAIN_NATIVE_SMOKE_PORT']) {
+    const port = new RegExp(`^export ${name}=(\\d+)$`, 'm').exec(prepared)?.[1];
+    if (port && !environment[name]?.trim()) environment[name] = port;
+  }
+}
+
 async function gitIdentity(repo, redaction) {
   const result = await runGit(repo, ['rev-parse', 'HEAD']);
   return result.code === 0
@@ -627,6 +642,7 @@ async function main(argv) {
   for (const pattern of redaction.patterns) {
     try { new RegExp(pattern); } catch (error) { throw new Error(`Invalid --redact-pattern: ${error.message}`); }
   }
+  await loadPreparedPorts(repo, process.env);
   const git = await gitIdentity(repo, redaction);
   const workingTree = await collectSourceTestState(repo, redaction);
   // Keep filesystem destinations private to I/O; evidence metadata follows the
