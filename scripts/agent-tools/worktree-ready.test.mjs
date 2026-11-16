@@ -270,6 +270,22 @@ test("prune frees the entries and ports of removed worktrees and leaves live, pa
     assert.equal(unconfigured.status, 0, unconfigured.stderr);
     assert.match(unconfigured.stderr, /skipped prune/i);
     assert.equal(readFileSync(ledger, 'utf8'), before, 'with no configured ledger nothing is written');
+
+    const missing = join(fixture, 'missing', 'host-ledger.json');
+    const other = join(fixture, 'other-ledger.json');
+    writeFileSync(other, before);
+    git(main, 'worktree', 'remove', '--force', join(fixture, 'agent-next'));
+    for (const { name, configured, environment } of [
+      { name: 'missing', configured: missing },
+      { name: 'conflicting', configured: ledger, environment: { DOW_EMULATOR_COORDINATION_FILE: other } },
+    ]) {
+      const skipped = run(['prune'], main, { ledger: configured, npm, environment });
+      assert.equal(skipped.status, 0, `${name}: ${skipped.stderr}`);
+      assert.match(skipped.stderr, /skipped prune/i, `${name}: says it skipped the prune`);
+    }
+    assert.equal(existsSync(join(fixture, 'missing')), false, 'no ledger, lock or directory is created where the ledger is missing');
+    assert.equal(readFileSync(ledger, 'utf8'), before, 'a conflicting configuration writes nothing to the configured ledger');
+    assert.equal(readFileSync(other, 'utf8'), before, 'nor to the conflicting one');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
