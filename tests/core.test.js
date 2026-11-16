@@ -3956,20 +3956,22 @@ test('RISK rapid action guidance: mounted Help distinguishes later accepted work
 });
 
 // #2408: Help and the changelog say that answering with sync on no longer
-// slows down and when the cloud confirms a run of answers.
-test('RISK sync responsiveness guidance: mounted Help and the changelog say a run of answers with sync on saves about once per answer and when the cloud confirms it',async()=>{
+// slows down and when the cloud confirms a run of answers. #2406 review: they
+// say what the person sees, not how many saves an answer costs.
+test('RISK sync responsiveness guidance: mounted Help and the changelog say answering with sync on no longer slows down and when the cloud confirms a run of answers',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const rapid=help.split('<dt>Does answering slow down with sync on?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid,'Data and backups answers whether answering slows down with sync on');
- assert.match(rapid,/With sync on, answering several tasks in a row no longer slows down/);
+ assert.match(rapid,/^No\. You can keep answering while the board saves on this device and syncs\./,'the answer says what the person sees: '+rapid);
  assert.match(rapid,/after a short pause, or at least every 20 seconds or so/);
  assert.match(rapid,/A single Yes or Done with nothing else syncing goes to the cloud at once/);
  const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];
  assert.match(current,/<h3>November 16, 2026<\/h3>/);
  const items=current.split('<li>').slice(1);
- assert.ok(items.some(item=>/answering several tasks in a row no longer slows down/.test(item)&&!/20 seconds/.test(item)),'the saving change has its own bullet');
+ assert.ok(items.some(item=>/answering several tasks in a row no longer slows the app down/.test(item)&&!/20 seconds/.test(item)),'the slowdown fix has its own bullet');
  assert.ok(items.some(item=>/after a short pause, or at least every 20 seconds or so/.test(item)),'the cloud timing has its own bullet');
+ for(const text of [rapid,...items])assert.doesNotMatch(text,/saves? the board on this device about once|three times/,'no save counts: '+text);
  assert.ok(rapid.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
 });
 
@@ -6521,7 +6523,7 @@ test('RISK task rating history: editor observations distinguish relative movemen
 });
 test('RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes',async()=>{
  const {ctx,a,b}=await ratingHistoryFixture(615);ctx.decide('no');await answersCaughtUp(ctx);assert.equal(b.ratingHistory?.[0]?.kind,'no');
- ctx.dotTask(b.id);assert.equal(b.ratingHistory.at(-1).kind,'dot');ctx.dislodge();assert.equal(b.ratingHistory.at(-1).kind,'dislodge');
+ ctx.dotTask(b.id);assert.equal(b.ratingHistory.at(-1).kind,'dot');ctx.dislodge();await answersCaughtUp(ctx);assert.equal(b.ratingHistory.at(-1).kind,'dislodge');
  const before=ratingHistoryCopy(b.ratingHistory),mu=b.mu,sigma=b.sigma;
  ctx.doneTask(b.id);assert.equal(b.mu,mu);assert.equal(b.sigma,sigma);assert.equal(b.ratingHistory.at(-1).change,'relative');assert.equal(b.ratingHistory.at(-1).after.likelihood,0);assert.equal(b.ratingHistory.at(-1).after.topK,null);
  const completed=ratingHistoryCopy(b.ratingHistory);ctx.undo();const restored=ratingHistoryTask(ctx,b.id);
@@ -30015,9 +30017,7 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
   if(key!=='transaction'){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}
   return(...args)=>{
    const transaction=target.transaction(...args),id=++transactionId,owner=commits.getStore(),write=args[1]==='readwrite';
-   // #2408: a push no longer rewrites a head it has proved current, so the
-   // held background write is the push's own save of the new board.
-   const hold=write&&owner?.caller==='sendPush'&&armed&&!held;
+   const hold=write&&owner?.caller==='background'&&owner.idempotent&&armed&&!held;
    if(write&&owner?.caller==='native-Add'&&held&&id!==held.transaction)secondNativeWrite.resolve();
    return new Proxy(transaction,{get(tx,key){const value=Reflect.get(tx,key,tx);return typeof value==='function'?value.bind(tx):value;},set(tx,key,value){
     if(key==='oncomplete'&&hold){
@@ -30069,7 +30069,7 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
  Object.defineProperty(toast,'textContent',{get(){return toastText;},set(value){toastText=value;toasts.push(String(value));}});
  const originalCommit=store.commitHead;
  store.commitHead=async function(...args){
-  const id=commitCalls.length+1,stack=new Error().stack||'',caller=stack.includes('sendPush')?'sendPush':actions.getStore()==='native-Add'?'native-Add':'other';
+  const id=commitCalls.length+1,caller=['native-Add','background'].includes(actions.getStore())?actions.getStore():'other';
   const payload=args[0]?.payload||'',payloadSha256=createHash('sha256').update(payload).digest('hex');
   const observation={id,caller,expectedHash:args[0]?.expectedHash,payloadSha256,idempotent:payloadSha256===args[0]?.expectedHash};commitCalls.push(observation);
   try{return await commits.run({id,caller,idempotent:observation.idempotent},()=>originalCommit.apply(this,args));}
@@ -30080,17 +30080,24 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
   return actions.run('native-Add',()=>ctx.onAction('add',ctx.document.getElementById('addButton')));
  };
  await bounded(add('Rapid accepted one'),'first native Add');
- await bounded(backgroundComplete.promise,'background sendPush transaction commit');
+ await until(exactlyCurrent,'first Add durable and acknowledged');
+ // #2408: the push's save and the save recording its acknowledgement now run
+ // in this tab's device-save lane, one at a time, so neither overlaps an
+ // Add's save. The background checkpoint is a save outside that lane, as
+ // Reload app, an app update or a recovery makes, of the current head.
+ const checkpointSave=actions.run('background',()=>ctx.persist());
+ await bounded(backgroundComplete.promise,'background checkpoint transaction commit');
  const second=add('Rapid accepted two');
  await bounded(secondNativeWrite.promise,'second native Add write queued behind committed background transaction');
  releaseBackground.resolve();
  await bounded(second,'second native Add durable acknowledgement');
+ assert.equal(await bounded(checkpointSave,'background checkpoint result'),true,'the overtaken background checkpoint reports its save as made');
  await until(exactlyCurrent,'final durable and cloud acknowledgement');
 
- const background=commitCalls.find(call=>call.caller==='sendPush'),newerNative=commitCalls.find(call=>call.caller==='native-Add'&&call.expectedHash===background?.expectedHash&&call.payloadSha256!==background?.payloadSha256);
- assert.ok(background,'the ordinary background sendPush path must use the device-store port');
+ const background=commitCalls.find(call=>call.caller==='background'&&call.idempotent),newerNative=commitCalls.find(call=>call.caller==='native-Add'&&call.expectedHash===background?.expectedHash&&call.payloadSha256!==background?.payloadSha256);
+ assert.ok(background,'the background checkpoint must use the device-store port');
  assert.ok(newerNative,'the second native Add must commit a distinct payload against the same observed head: '+JSON.stringify(commitCalls));
- assert.equal(background.idempotent,false,'#2408: the background push saves the new board, never a second copy of its current head');
+ assert.equal(background.idempotent,true,'the earlier background checkpoint is an idempotent save of its current head');
  assert.ok(held,'the older transaction really committed before its completion delivery was held');
  const warnings=toasts.filter(message=>/Couldn't save this edit|device-save:/.test(message));
  assert.deepEqual(warnings,[],'a successful overlapping save must not show a device-store write-failed warning: '+JSON.stringify({warnings,commitErrors}));
@@ -40249,6 +40256,27 @@ test('RISK held decision recovery: actual Settings review gives unchosen Apply i
   assert.match(apply(),/class="btn primary"/,'the selected action retains its existing primary appearance');
   assert.doesNotMatch(apply(),/disabled/,'the selected action remains enabled');
  });
+});
+
+// #2406 review: on the #2406 branch the light cases above failed. The push
+// that follows the opening read saves the board, and Review saved decisions
+// read the stored head after that save's commit had landed but before it had
+// returned, then took this tab's own save for another tab's. Here the save is
+// held at exactly that point.
+test('RISK held decision recovery: Review saved decisions started while this tab’s own save is still committing reads the sources instead of reporting another tab’s change',async t=>{
+ const app=await heldDecisionApp188(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const commit=store.commitHead.bind(store);let landed,release;
+ const landedOnce=new Promise(resolve=>{landed=resolve;}),gate=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+ // The next commit reaches the device store and then waits before returning.
+ store.commitHead=async options=>{store.commitHead=commit;const result=await commit(options);landed();await gate;return result;};
+ shim.document.getElementById('addInput').value='Added before the review';const added=ctx.onAction('add',{});
+ await landedOnce;
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks.some(task=>task.title==='Added before the review'),true,'positive control: this tab’s save has landed and not returned');
+ await ctx.onAction('review-decision-recovery',{});
+ const ui=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(ui,/changed in another tab/,'this tab’s own save is not another tab’s change');
+ assert.match(ui,/Saved appearance: <b>dark/,'the review reads this device');
+ release();await added;
 });
 
 

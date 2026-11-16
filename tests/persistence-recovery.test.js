@@ -1070,12 +1070,7 @@ test('RISK device save settle: a second copy saving repeatedly but finitely duri
  for(let i=0;i<4;i++)assert.equal(title('settle-repeat-theirs-'+i),'Other copy write '+(i+1),'every write of the other copy is kept');
  assert.equal(durable.tasks.some(task=>task.id==='settle-repeat-gone'),false,'a task deleted by the other copy stays deleted');
  assert.ok(draft,'the repair kept a copy of this tab\'s draft');
- // #2408: the edit accepted during the repair now saves after it, and that
- // save finds everything in the draft already in the saved board, so #2335
- // removes the draft as redundant. Before, that save ran beside the repair
- // and missed it. The draft is kept until then, or its work is saved.
- const draftBoard=JSON.parse(draft),keptDraft=(await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft);
- assert.ok(keptDraft||draftBoard.tasks.every(task=>durable.tasks.some(row=>row.id===task.id&&(task.id!=='settle-repeat-mine'||row.title===task.title))||Object.hasOwn(durable.deletedTaskIds||{},task.id)),'the exact superseded draft is kept as a backup, or every task in it is in the saved board');
+ assert.ok((await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft),'the exact superseded draft is kept as a backup');
  const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
  assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows every copy\'s work');
 });
@@ -1127,8 +1122,9 @@ test('RISK device save settle: saving on top of an earlier save of this tab keep
  assert.equal(vm.runInContext("releaseCloudRecoveryPins(['pin-released-2323'])",f.ctx),true);
  f.edit('settle-pins-b','Edited B');
  // #2408: an edit's own save now waits for the earlier one, so the overlap
- // comes from a save that does not wait, as the acknowledgement's does.
- vm.runInContext('clearSyncTimeout(saveTimer);saveTimer=null',f.ctx);f.ctx.persist();
+ // comes from a save outside the device-save lane, as an explicit save, a
+ // recovery's or a cloud read's merge is.
+ f.ctx.persist();
  const head=await f.settled('saves on top of this tab\'s own save');
  assert.ok(results.some(result=>result?.conflict),'a save found the head moved by this tab\'s own earlier save');
  assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'it saved on top of it rather than merging');
@@ -16118,6 +16114,29 @@ test('RISK started pass sync: benchmark Done after Start and two answers switche
 // for the app's timers and the #2378 settled signal. They tap the scanner's
 // own Yes and No buttons, count device saves where the device store commits a
 // board and pushes where the fake backend is asked to upload one.
+// #2406 review: shared by the #2407 and #2408 harnesses. The scanner's own
+// control for an act, as rendered.
+function scannerControl2406(scanHtml,act){
+ const button=markupButtons(scanHtml).find(control=>control.dataset.act===act);
+ assert.ok(button,'the scanner shows a '+act+' button');
+ return button;
+}
+// Every whole-board commit the device store makes, as these tests count device
+// saves. Each record keeps its payload, what onStart and onReturn add (when it
+// began and returned) and whether the store refused it because the head had
+// moved (the #2324 repair that follows). beforeCommit can make a commit take
+// time first, as a phone's save does.
+function recordDeviceCommits2406(store,{onStart=()=>({}),beforeCommit=null,onReturn=()=>({})}={}){
+ const commits=[],commit=store.commitHead;
+ store.commitHead=async options=>{
+  const record={...onStart(),payload:options?.payload};commits.push(record);
+  if(beforeCommit)await beforeCommit(record);
+  const result=await commit.call(store,options);
+  Object.assign(record,{conflict:!!result?.conflict},onReturn());
+  return result;
+ };
+ return commits;
+}
 const ACCOUNT2408={uid:'owner',email:'e@example.com'};
 const PUSH_DEBOUNCE2408=2000,LONGEST_WAIT2408=20000;
 // A board of several megabytes, made here from synthetic tasks and padding.
@@ -16174,7 +16193,7 @@ function answerClock2408(ctx,counters){
   }};
  return clock;
 }
-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs=0,signedIn=true}={}){
+async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs=0,signedIn=true,dropDatabase=false}={}){
  if(!indexedDB)({indexedDB}=await import('fake-indexeddb'));
  dbName??='chain-scanner-2408-'+Date.now()+'-'+Math.random();
  if(!storage){const raw=JSON.stringify(board);storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw});}
@@ -16194,14 +16213,17 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
   const method=store[key];if(typeof method!=='function')continue;
   store[key]=async(...args)=>{counters.store++;try{return await method.apply(store,args);}finally{counters.store--;}};
  }
- const commit=store.commitHead;
  const device={...app,backend,faults,docs,indexedDB,dbName,storage,clock,counters,saveMs};
- store.commitHead=async options=>{counters.commits.push({at:clock.now,seq:++counters.seq,payload:options?.payload});if(device.saveMs)await clock.sleep(device.saveMs);return commit(options);};
+ counters.commits=recordDeviceCommits2406(store,{onStart:()=>({at:clock.now,seq:++counters.seq}),
+  beforeCommit:async()=>{if(device.saveMs)await clock.sleep(device.saveMs);},onReturn:()=>({endedAt:clock.now})});
  const push=backend.CS.push.bind(backend.CS);
  backend.CS.push=(payload,...rest)=>{counters.uploads.push({at:clock.now,seq:++counters.seq,payload});return push(payload,...rest);};
  let closed=false;
  device.close=async()=>{if(closed)return;closed=true;backend.CS.suspend();
-  try{vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}await app.dispose?.();};
+  try{vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',ctx);}catch{}await app.dispose?.();
+  // A device no test reopens frees its in-memory database (several megabytes
+  // a commit) once closed.
+  if(dropDatabase)await new Promise(resolve=>{const request=indexedDB.deleteDatabase(dbName);request.onsuccess=request.onerror=request.onblocked=()=>resolve();});};
  t.after(device.close);
  const scan=shim.document.getElementById('scan');
  Object.assign(device,{
@@ -16210,11 +16232,13 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
   // A person's tap on the scanner's own button reaches the app as one click
   // on the document.
   tap(act){
-   const button=markupButtons(scan.innerHTML).find(control=>control.dataset.act===act);
-   assert.ok(button,'the scanner shows a '+act+' button');
+   const button=scannerControl2406(scan.innerHTML,act);
    const target={dataset:button.dataset,classList:{contains:name=>button.classes.includes(name)}};target.closest=()=>target;
    const candidate=ctx.state.candidateId;
-   counters.taps.push({at:clock.now,seq:++counters.seq,act,candidate});
+   // #2406 review: whether a push was running when the person tapped, from the
+   // #2378 settled signal's work list, which only tests read.
+   const pushRunning=[...vm.runInContext('syncSession',ctx).snapshot().work].some(item=>item.kind==='push');
+   counters.taps.push({at:clock.now,seq:++counters.seq,act,candidate,pushRunning});
    shim.document.dispatchEvent({type:'click',detail:1,target});
    return candidate;
   },
@@ -16245,6 +16269,17 @@ function answeredDecisions2408(board,taps){
  return (board.decisionEvents||[]).map(event=>[event.kind,event.candidateId??event.taskId]).filter(([,id])=>asked.has(id)).map(([kind,id])=>kind+':'+id).sort();
 }
 const RUN2408=['yes','no','no','yes','no','yes','no','no','yes','no'];
+// No follow-up push starts within the push debounce of the latest answer. A
+// Yes given while no push runs pushes at once, and only that push may come
+// sooner; a follow-up, including one a Yes asked for while a push ran, waits
+// (#2406 review: the check once let every upload after a Yes through).
+function followUpsWaitForTheDebounce2408(taps,uploads){
+ for(const upload of uploads){
+  const latest=taps.filter(tap=>tap.seq<upload.seq).at(-1);if(!latest)continue;
+  const yesPushedAtOnce=latest.act==='yes'&&!latest.pushRunning&&!uploads.some(other=>other.seq>latest.seq&&other.seq<upload.seq);
+  assert.ok(yesPushedAtOnce||upload.at-latest.at>=PUSH_DEBOUNCE2408,'a follow-up push waits for the push debounce after the latest answer: upload at '+upload.at+', answer '+latest.act+' at '+latest.at+(latest.pushRunning?' while a push ran':''));
+ }
+}
 
 test('RISK one save per answer: ten Yes and No answers with sync on, faster than one device save, cost at most one device save per answer plus one per acknowledged push, and one push after the run carries every answer',{timeout:120000},async t=>{
  const device=await answeringDevice2408(t,{saveMs:1500});
@@ -16258,13 +16293,10 @@ test('RISK one save per answer: ten Yes and No answers with sync on, faster than
  assert.ok(!counters.uploads.slice(uploadsBefore).some(upload=>upload.payload===ctx.cloudPayload()),'positive control: the final board is not pushed yet');
  await clock.settle();
  const commits=counters.commits.length-commitsBefore,acks=device.backend.writes.length-acksBefore,uploads=counters.uploads.slice(uploadsBefore);
- t.diagnostic(JSON.stringify({commits,acks,commitTimes:counters.commits.slice(commitsBefore).map(commit=>commit.at),uploads:uploads.map(upload=>upload.at),taps:taps.map(tap=>tap.at+':'+tap.act)}));
+ t.diagnostic(JSON.stringify({commits,acks,commitTimes:counters.commits.slice(commitsBefore).map(commit=>commit.at),uploads:uploads.map(upload=>upload.at),taps:taps.map(tap=>tap.at+':'+tap.act+(tap.pushRunning?' (push running)':''))}));
  assert.equal(new Set(taps.map(tap=>tap.candidate)).size,10,'each answer reaches its own candidate');
  assert.ok(commits<=RUN2408.length+acks,'device saves for the run are at most one per answer plus one per acknowledged push: '+commits+' saves, '+acks+' acknowledged pushes');
- for(const upload of uploads){
-  const latest=taps.filter(tap=>tap.seq<upload.seq).at(-1);
-  assert.ok(latest.act==='yes'||upload.at-latest.at>=PUSH_DEBOUNCE2408,'a follow-up push waits for the push debounce after the latest answer: upload at '+upload.at+', answer '+latest.act+' at '+latest.at);
- }
+ followUpsWaitForTheDebounce2408(taps,uploads);
  const after=uploads.filter(upload=>upload.at>lastAnswerAt);
  assert.equal(after.length,1,'once the run stops, one push goes out');
  assert.equal(after[0].payload,ctx.cloudPayload(),'and it carries the final board');
@@ -16445,6 +16477,37 @@ test('RISK one save per answer: the support report records a push dropped becaus
  assert.equal(waiting.report().save.pushOutcome.value,'pending','and the push outcome is pending');
 });
 
+// #2406 review: the recovery fixtures run an edit's own debounced save and
+// wait for it to report the board durable (finishSeedSave, #187). Through the
+// device-save lane it still settles as persist() does.
+// #2406 review: answers given while the cloud was not ready push once it is,
+// from their catch-up, when the next save runs it. That push ends with the
+// save that ran it, as before the device-save lane, so a push asked for right
+// after the save starts at once instead of joining the debounced follow-up.
+// (The #221 chain-return stories publish this way.)
+test('RISK one save per answer: answers caught up by a save once the cloud is ready are published by a push asked for right after that save',{timeout:60000},async t=>{
+ const {local,peer,at}=await scopedUndoClients(initial=>{initial.tasks.push(syncTask('undo-extra','Undotted task'));});
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',app.ctx);});
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ setFakeTime(local.ctx,at+150);local.ctx.onAction('yes',{dataset:{candidate:'undo-peer',benchmark:'undo-local'}});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-local','undo-peer'],'positive control: three dots');
+ local.ctx.window.CloudSync.ready=true;assert.equal(await local.ctx.persist(),true);await local.ctx.cloudPushNow();
+ await new Promise(resolve=>setTimeout(resolve,35));
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['undo-base','undo-local','undo-peer'],'the other device reads both answers from the cloud');
+});
+
+test('RISK one save per answer: the save an edit schedules settles true once its board is durable on this device',{timeout:60000},async t=>{
+ const device=await answeringDevice2408(t,{signedIn:false});
+ const {ctx,shim}=device,schedule=ctx.setTimeout,debounced=[];
+ ctx.setTimeout=(fn,ms,...args)=>{if(ms!==350)return schedule(fn,ms,...args);debounced.push(()=>fn(...args));return {debounced2406:true};};
+ shim.document.getElementById('addInput').value='Saved by its own debounce';await ctx.onAction('add',{});
+ ctx.setTimeout=schedule;
+ assert.equal(debounced.length,1,'positive control: the Add scheduled its save');
+ assert.equal(await debounced[0](),true,'that save settles true');
+ assert.ok(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).tasks.some(task=>task.title==='Saved by its own debounce'),'and the board it saved holds the Add');
+});
+
 test('RISK one save per answer: a device save hashes the board once for the write when its latest backup holds the same text',{timeout:60000},async t=>{
  const device=await answeringDevice2408(t,{signedIn:false});
  await startAnswering2408(device);
@@ -16455,6 +16518,120 @@ test('RISK one save per answer: a device save hashes the board once for the writ
  // Once to write the board and its latest backup, and once more when the
  // store reads the written head back to verify it.
  assert.equal(counters.hashed.slice(hashedBefore).filter(length=>length===bytes).length,2,'the saved board and its latest backup are hashed once for the write');
+});
+
+// #2406 review (spec a): a device save serializes the board once and reuses
+// that text for its save-loop check, its missing-task check and its commit,
+// and parses the last saved copy at most once. Each whole pass over a board
+// of several megabytes is measured where the app turns a board into the text
+// a device save writes (which keeps syncRev). The save that records a Cloud
+// acknowledgement runs every one of those steps: the loop check reads the
+// board's text (no new edit came with it) and the board differs from its last
+// save (the revision moved).
+test('RISK one save per answer: the save that records a Cloud acknowledgement serializes the board once for its save-loop check, its missing-task check and its write',{timeout:90000},async t=>{
+ const device=await answeringDevice2408(t);
+ await startAnswering2408(device);
+ const {ctx,counters,clock}=device,passes=[];
+ const json=vm.runInContext('JSON',ctx),stringify=json.stringify;
+ json.stringify=function(...args){const text=stringify.apply(this,args);
+  if(typeof text==='string'&&text.length>1_000_000&&text.includes('"syncRev":'))passes.push({at:clock.now,seq:++counters.seq});return text;};
+ t.after(()=>{json.stringify=stringify;});
+ const tapped=clock.now;device.tap('no');
+ await clock.settle();
+ const uploads=counters.uploads.filter(upload=>upload.at>=tapped),acknowledged=counters.commits.filter(commit=>commit.at>=tapped).at(-1);
+ assert.equal(uploads.length,1,'positive control: the answer is pushed once');
+ assert.ok(acknowledged.seq>uploads[0].seq,'positive control: a save after the upload records the acknowledgement');
+ assert.equal(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).syncRev,ctx.state.syncRev,'positive control: that save holds the acknowledged revision');
+ const recording=passes.filter(pass=>pass.seq>uploads[0].seq&&pass.seq<acknowledged.seq);
+ assert.equal(recording.length,1,'the board is serialized once from the upload to that save\'s write: '+recording.length);
+});
+
+// #2406 review round 1: a phone's device saves take 0.6 to 7 s (support
+// report, 2026-11-16). These run on a phone whose every device save takes
+// saveMs from the moment the app opens: the fake clock runs from the start, so
+// sign-in and Start already save at that pace before the answers begin.
+async function slowPhone2408(t,{saveMs}){
+ const device=await answeringDevice2408(t,{saveMs,signedIn:false,dropDatabase:true});
+ const {ctx,clock}=device;
+ delete ctx.window.CLOUD_PUSH_DELAY_MS;clock.install();
+ device.signIn();await clock.settle();
+ ctx.onAction('start-scan',{dataset:{}});await clock.settle();
+ await clock.advance(1000);
+ assert.ok(ctx.state.candidateId,'the scan offers a candidate');
+ assert.equal(device.shim.document.getElementById('syncBtn').textContent,'☁ synced','positive control: sign-in and Start settle synced');
+ return device;
+}
+// Yes and No answers at a steady pace for longer than the longest wait, then
+// the clock runs on until sync has settled.
+async function answerRunOnSlowPhone2408(t,{saveMs,gapMs,forMs=32000}){
+ const device=await slowPhone2408(t,{saveMs});
+ const {counters,clock,backend}=device;
+ const from={commits:counters.commits.length,uploads:counters.uploads.length,acks:backend.writes.length,taps:counters.taps.length};
+ for(let i=0;i*gapMs<forMs;i++){device.tap(RUN2408[i%RUN2408.length]);await clock.advance(gapMs);}
+ await clock.settle();
+ const run={device,taps:counters.taps.slice(from.taps),commits:counters.commits.slice(from.commits),uploads:counters.uploads.slice(from.uploads),acks:backend.writes.length-from.acks};
+ // Each upload keeps the candidates its board holds a decision about, not its
+ // text: dozens of copies of a board of several megabytes outgrow the heap.
+ for(const upload of run.uploads){upload.decided=new Set((JSON.parse(upload.payload).decisionEvents||[]).map(event=>event.candidateId??event.taskId));upload.payload=null;}
+ for(const commit of counters.commits)commit.payload=null;
+ t.diagnostic(JSON.stringify({saveMs,gapMs,taps:run.taps.length,commits:run.commits.length,conflicts:run.commits.filter(commit=>commit.conflict).length,acks:run.acks,
+  uploads:run.uploads.map(upload=>upload.at),commitTimes:run.commits.map(commit=>commit.at+'-'+commit.endedAt)}));
+ return run;
+}
+
+test('RISK one save per answer: on a phone whose device saves take 0.7 to 3 s, answers every 1 to 2 s for over 20 s each reach the cloud within the 20 s longest wait while the run goes on',{timeout:900000},async t=>{
+ for(const [saveMs,gapMs] of [[700,1000],[1500,1000],[3000,1000],[3000,2000]])await t.test(saveMs+' ms saves, an answer every '+gapMs+' ms',async t=>{
+  const run=await answerRunOnSlowPhone2408(t,{saveMs,gapMs});
+  assert.equal(new Set(run.taps.map(tap=>tap.candidate)).size,run.taps.length,'positive control: each answer reaches its own candidate');
+  const lastTap=run.taps.at(-1).at;
+  for(const tap of run.taps.filter(tap=>tap.at+LONGEST_WAIT2408<=lastTap)){
+   const first=run.uploads.find(upload=>upload.seq>tap.seq&&upload.decided.has(tap.candidate));
+   assert.ok(first&&first.at<=tap.at+LONGEST_WAIT2408,'the '+tap.act+' at '+tap.at+' ms reaches the cloud within 20 s while answers keep arriving: first upload with it '+(first?'at '+first.at+' ms':'after the run'));
+  }
+  const cloud=await run.device.cloud();
+  assert.equal(answeredDecisions2408(cloud.board,run.taps).length,run.taps.length,'once the run stops the cloud copy holds every answer');
+  assert.equal(cloud.rev,run.device.ctx.state.syncRev,'and this device is acknowledged at its revision');
+ });
+});
+
+test('RISK one save per answer: on a phone whose device saves take 0.7 to 3 s, a run of answers saves at most once per answer plus once per acknowledged push, one save at a time',{timeout:900000},async t=>{
+ for(const [saveMs,gapMs] of [[700,2000],[700,2500],[1500,1000],[3000,2000]])await t.test(saveMs+' ms saves, an answer every '+gapMs+' ms',async t=>{
+  const run=await answerRunOnSlowPhone2408(t,{saveMs,gapMs});
+  assert.ok(run.acks>=1,'positive control: the cloud acknowledges the run');
+  // When a save fits between answers, pushes upload during the run and the
+  // longest wait never comes due, so every follow-up keeps the debounce.
+  if(saveMs<gapMs&&gapMs>=PUSH_DEBOUNCE2408)followUpsWaitForTheDebounce2408(run.taps,run.uploads);
+  assert.ok(run.commits.length<=run.taps.length+run.acks,'device saves for the run are at most one per answer plus one per acknowledged push: '+run.commits.length+' saves, '+run.taps.length+' answers, '+run.acks+' acknowledged pushes');
+  // One device save at a time: none starts before the one before it returns,
+  // so none finds the head moved by this tab and repairs onto it (#2324).
+  for(const [i,commit] of run.commits.entries())if(i>0)assert.ok(commit.at>=run.commits[i-1].endedAt,'the save at '+commit.at+' ms starts after the one at '+run.commits[i-1].at+' ms returns at '+run.commits[i-1].endedAt+' ms');
+  assert.deepEqual(run.commits.filter(commit=>commit.conflict).map(commit=>commit.at),[],'no save repairs onto another save of this tab');
+  const head=JSON.parse((await run.device.ctx.window.ScannerDeviceStore.readHead()).payload);
+  assert.equal(answeredDecisions2408(head,run.taps).length,run.taps.length,'the device holds every answer');
+  assert.equal(run.device.ctx.state.syncRev,(await run.device.cloud()).rev,'and records the cloud revision that acknowledged them');
+ });
+});
+
+test('RISK one save per answer: a push that starts while the answer’s own device save is still running waits for that save instead of saving the same board beside it',{timeout:120000},async t=>{
+ // On this phone a device save takes 3 s, longer than the 2 s push debounce.
+ const device=await slowPhone2408(t,{saveMs:3000});
+ const {ctx,counters,clock}=device,commitsBefore=counters.commits.length,uploadsBefore=counters.uploads.length;
+ device.tap('no');
+ await clock.advance(PUSH_DEBOUNCE2408);
+ const running=[...vm.runInContext('syncSession',ctx).snapshot().work].map(item=>item.kind);
+ assert.ok(running.includes('push'),'positive control: the push has started: '+JSON.stringify(running));
+ const saving=counters.commits.slice(commitsBefore);
+ assert.ok(saving.length>=1&&saving[0].endedAt===undefined,'positive control: the answer’s own save is still running');
+ assert.equal(saving.length,1,'the push starts no second save of the same board beside it');
+ await clock.settle();
+ const commits=counters.commits.slice(commitsBefore),uploads=counters.uploads.slice(uploadsBefore);
+ t.diagnostic(JSON.stringify({commits:commits.map(commit=>commit.at+'-'+commit.endedAt+(commit.conflict?' conflict':'')),uploads:uploads.map(upload=>upload.at)}));
+ assert.equal(commits.filter(commit=>commit.payload===saving[0].payload).length,1,'the board with the answer is saved once');
+ assert.deepEqual(commits.filter(commit=>commit.conflict).map(commit=>commit.at),[],'no save repairs onto another save of this tab');
+ assert.equal(uploads.length,1,'one push goes out');
+ assert.ok(uploads[0].at>=saving[0].endedAt,'once the answer’s save has returned');
+ assert.equal(answeredDecisions2408(JSON.parse(uploads[0].payload),counters.taps.slice(-1)).length,1,'carrying the answer');
+ assert.equal(commits.length,2,'the answer’s save and the acknowledgement’s save are the only device saves');
 });
 
 // ---------- #2407: the answer shows first ----------
@@ -16468,21 +16645,20 @@ test('RISK one save per answer: a device save hashes the board once for the writ
 // records, device commits and the cloud's copy. Rank sampling is the only
 // part of an answer that draws random numbers, so the app's (seeded) random
 // source counts it at the boundary without changing the stream.
-async function answerFirstApp2407(t,{tasks=14,mus=null,threshold=0,seed=2407,sync=true}={}){
+async function answerFirstApp2407(t,{tasks=14,mus=null,threshold=0,seed=2407,sync=true,settings={}}={}){
  const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-11-16T15:00:00Z');
  const rows=[{...syncTask('bench','Benchmark task'),mu:20}];
  for(const [i,mu] of (mus||Array.from({length:tasks},(_,i)=>39-i)).entries())rows.push({...syncTask('c'+(i+1),'Candidate '+(i+1)),mu});
  const initial=syncState({tasks:rows,chain:['bench'],candidateId:'c1',mode:'scan',scanMode:'descending',passStartedAt:at,passId:'pass-2407',
-  settings:{horizonMin:60,thresholdPct:threshold,samples:250,cantMin:30,workedHours:8},...(sync?{syncRev:5,syncAccount:'e@example.com'}:{}),syncDirty:false});
+  settings:{horizonMin:60,thresholdPct:threshold,samples:250,cantMin:30,workedHours:8,...settings},...(sync?{syncRev:5,syncAccount:'e@example.com'}:{}),syncDirty:false});
  const raw=JSON.stringify(initial),h=makeSyncHarness({remote:initial,rev:5,delayMs:2});
  const app=await openApp(t,{appSource:'Date.now=()=>'+at+';\n'+appSrc,seed,indexedDBProvider:new IDBFactory(),deviceDbName:'answer-first-2407-'+Math.random(),
   seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},...(sync?{cloudSyncFactory:()=>h.factory()}:{})});
  const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=20;
  t.after(()=>{ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);});
- const counts={draws:0,commits:0};
+ const commits=recordDeviceCommits2406(ctx.window.ScannerDeviceStore),counts={draws:0,get commits(){return commits.length;}};
  ctx.__draws2407=()=>counts.draws++;
  vm.runInContext('(()=>{const draw=Math.random;Math.random=function(){__draws2407();return draw.apply(this,arguments);};})()',ctx);
- const store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);store.commitHead=(...args)=>{counts.commits++;return commit(...args);};
  if(sync)await ctx.cloudPull();
  await app.settled({synced:sync});
  const scan=()=>shim.document.getElementById('scan').innerHTML;
@@ -16490,12 +16666,10 @@ async function answerFirstApp2407(t,{tasks=14,mus=null,threshold=0,seed=2407,syn
  const report=()=>JSON.parse(ctx.supportDiagnosticsText({readOnly:true}));
  const pushesStarted=()=>report().events.filter(event=>event.stage==='push'&&event.status==='started').length;
  const history=id=>(ctx.state.tasks.find(task=>task.id===id)?.ratingHistory||[]).length;
- // The control the person taps, bound to the tasks the scanner shows.
- const tap=act=>{
-  const button=scan().match(new RegExp('<button\\b[^>]*data-act="'+act+'"[^>]*>'))?.[0];assert.ok(button,'the scanner shows '+act);
-  const dataset={};for(const [,key,value] of button.matchAll(/data-(candidate|benchmark)="([^"]*)"/g))dataset[key]=value;
-  return ctx.onAction(act,{dataset});
- };
+ // The control the person taps, bound to the tasks the scanner shows. Its
+ // handler runs directly: the double-tap guard reads Date.now, which this
+ // harness holds still.
+ const tap=act=>ctx.onAction(act,{dataset:scannerControl2406(scan(),act).dataset});
  // What a settled board shows: the candidate on offer, the chain, every
  // task's History (its own row IDs are random, so left out) and the list's
  // rank for every unfinished task.
@@ -16543,10 +16717,14 @@ test('RISK answer shows first guidance: Help and the changelog say answers show 
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
- const answer=help.split('<dt>Why does the rank column take a moment after an answer?</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(answer,/^An answer shows the next task, the check-in or the end of scanning straight away\./,'Help says answers show straight away: '+answer);
+ // #2406 review: the answer-first behaviour has its own question, and the
+ // rank column's keeps its own answer.
+ const answer=help.split('<dt>What happens right after I answer?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/^The next task, the check-in or the end of scanning shows straight away\./,'Help says answers show straight away: '+answer);
  assert.match(answer,/Task history, the rank column, saving and syncing catch up just after, in the order you answered, and you can keep answering meanwhile\./);
- assert.match(answer,/catch up at most once a second/,'the earlier answer’s limit stays');
+ const ranks=help.split('<dt>Why does the rank column take a moment after an answer?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(ranks,/^While you answer quickly, the rank column and list order catch up at most once a second/,'the rank column question answers only for the rank column: '+ranks);
+ assert.doesNotMatch(ranks,/saving|syncing|history/i);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  const latest=current.split('<h3>November 16, 2026</h3>')[1]?.split('</ul>')[0]||'';
  const bullet=latest.match(/<li>[^<]*straight away[^<]*<\/li>/)?.[0]||'';
@@ -16629,7 +16807,7 @@ test('RISK answer shows first with sync off: answers show before History, rank s
  }
 });
 
-test('RISK answer shows first: benchmark Done, Dislodge and Can’t show their result before the device save, and all but Dislodge before History and rank sampling',async t=>{
+test('RISK answer shows first: benchmark Done, Dislodge and Can’t show their result before History, rank sampling, the device save or the push start',async t=>{
  const app=await answerFirstApp2407(t),{ctx,counts}=app;
  const before=()=>({draws:counts.draws,persists:app.report().save.persistCalls.value,pushes:app.pushesStarted()});
  const untouched=(mark,label)=>{
@@ -16645,19 +16823,63 @@ test('RISK answer shows first: benchmark Done, Dislodge and Can’t show their r
  // Two Yes answers, then Dislodge the newest benchmark.
  for(const act of ['yes','yes']){app.tap(act);await app.settled({synced:true,within:10000});}
  assert.deepEqual([...ctx.state.chain],['bench','c2','c3'],'positive control: Candidate 3 is the benchmark');
- // Last task WOOP shows after a final task's second recorded Dislodge, so
- // what a Dislodge shows depends on its History: that and the ranks it
- // reads come first, and only the Undo seal, save and push wait.
+ // #2406 review: with Last task WOOP off (the default) nothing a Dislodge
+ // shows reads its History, so its History and ranks wait like the others'.
  mark=before();history=app.history('c3');app.tap('dislodge');
  assert.equal(ctx.state.chain.at(-1),'c2','Dislodge shows the earlier benchmark at once');
- assert.match(app.scan(),/Candidate 2\b/);assert.equal(app.history('c3'),history+1,'Dislodge records its History before the paint');
- assert.equal(app.report().save.persistCalls.value,mark.persists,'Dislodge: no device save has started');
- assert.equal(app.pushesStarted(),mark.pushes,'Dislodge: no push has started');
- await app.settled({synced:true,within:10000});assert.ok(app.report().save.persistCalls.value>mark.persists,'Dislodge then saves');
+ assert.match(app.scan(),/Candidate 2\b/);untouched(mark,'Dislodge');assert.equal(app.history('c3'),history,'Dislodge: History has not been written yet');
+ await app.settled({synced:true,within:10000});assert.equal(app.history('c3'),history+1,'Dislodge then records History');
+ assert.ok(app.report().save.persistCalls.value>mark.persists,'and saves');
  // Done on the benchmark ends scanning.
  mark=before();history=app.history('c2');app.tap('bench-done');
  assert.match(app.scan(),/Scanning paused/,'benchmark Done shows the end of scanning at once');
  assert.equal(ctx.state.mode,'work');untouched(mark,'benchmark Done');assert.equal(app.history('c2'),history);
  await app.settled({synced:true,within:10000});assert.equal(app.history('c2'),history+1,'benchmark Done then records History');
  assert.equal(JSON.parse(app.h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,'and reaches the cloud');
+});
+
+test('RISK answer shows first: benchmark Can’t tapped while an earlier answer is still catching up applies at once, and that catch-up runs after it',async t=>{
+ const app=await answerFirstApp2407(t),{ctx,counts}=app;
+ app.tap('yes');
+ assert.deepEqual([...ctx.state.chain],['bench','c1'],'positive control: the Yes made Candidate 1 the benchmark');
+ assert.equal(app.history('c1'),0,'precondition: the Yes has not caught up');
+ const draws=counts.draws,persists=app.report().save.persistCalls.value,pushes=app.pushesStarted();
+ app.tap('bench-cant');
+ // Straight after the click handler returns, before the test yields.
+ assert.deepEqual([...ctx.state.chain],['bench'],'Can’t takes Candidate 1 off the chain at once');
+ assert.equal(app.offered(),'c2','and the scanner offers the next candidate');
+ assert.equal(app.history('c1'),0,'the Can’t did not wait for the Yes’s History');
+ assert.equal(counts.draws,draws,'or its rank sampling');
+ assert.equal(app.report().save.persistCalls.value,persists,'no device save has started');
+ assert.equal(app.pushesStarted(),pushes,'no push has started');
+ await app.settled({synced:true,within:10000});
+ assert.equal(app.history('c1'),1,'the Yes then records its History');
+ assert.equal(JSON.parse(app.h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,'and both answers reach the cloud');
+ // The same numbers as the code before #2407 for the same taps (fa159866).
+ assert.equal(app.digest(),'d57cf62da99f442d7b020ed99186f49ab578ca5eaf960583febfb3fd55e62a70','the settled board matches the code before #2407: '+app.outcome().slice(0,300));
+});
+
+test('RISK answer shows first: with Last task WOOP on, Dislodge records its History before the scanner shows the result, so a final task’s WOOP counts it',async t=>{
+ const app=await answerFirstApp2407(t,{settings:{lastTaskWoop:true}}),{ctx}=app;
+ for(const act of ['yes','yes']){app.tap(act);await app.settled({synced:true,within:10000});}
+ assert.deepEqual([...ctx.state.chain],['bench','c1','c2'],'positive control: Candidate 2 is the benchmark');
+ const history=app.history('c2');app.tap('dislodge');
+ assert.deepEqual([...ctx.state.chain],['bench','c1'],'Dislodge shows the earlier benchmark at once');
+ assert.equal(app.history('c2'),history+1,'its History is recorded before the paint');
+ await app.settled({synced:true,within:10000});
+ assert.equal(app.history('c2'),history+1,'and only once');
+ assert.equal(JSON.parse(app.h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,'the Dislodge reaches the cloud');
+});
+
+test('RISK answer shows first: Undo straight after a benchmark Can’t tapped while an earlier answer catches up reverses only the Can’t',async t=>{
+ const app=await answerFirstApp2407(t),{ctx}=app;
+ app.tap('yes');app.tap('bench-cant');
+ assert.equal(app.history('c1'),0,'precondition: neither answer has caught up');
+ assert.equal(await ctx.onAction('undo',{}),true);
+ assert.deepEqual([...ctx.state.chain],['bench','c1'],'Undo puts Candidate 1 back as the benchmark');
+ await app.settled({synced:true,within:10000});
+ assert.equal(app.history('c1'),1,'the Yes keeps its History');
+ assert.equal(JSON.parse(app.h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,'and the cloud has the Yes, the Can’t and its Undo');
+ // The same numbers as the code before #2407 for the same taps (fa159866).
+ assert.equal(app.digest(),'8ea79b3af17a5a27846050e56ceb0b85fa329c8cfbac911294cc6ecabcaeb462','the settled board matches the code before #2407: '+app.outcome().slice(0,300));
 });
