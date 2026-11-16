@@ -26,6 +26,7 @@ import {
 } from "./shared.js";
 import { openApp } from "./shared.js"; // #2378 app driver
 import { syncSettled, outsideWork, settledTogether } from "./shared.js"; // #2378 app driver
+import { answersCaughtUp } from "./shared.js"; // #2407: History and ranks catch up after an answer shows
 import { rewriteGenerationFixture } from "./shared.js";
 import { createDeviceBudgetClock, expireDeviceBudget } from "./shared.js";
 import { pendingAutomaticDefault2194, declineButton2194, faithfulModalQuery2194 } from "./shared.js";
@@ -4969,6 +4970,7 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
     acted.push(candidate);
    }
    assert.equal(new Set(acted).size,5,'each deliberate No compares a distinct candidate');
+   await answersCaughtUp(phone); // #2407: the five answers' History catches up after they show
    const localRatings=Object.fromEntries(phone.state.tasks.map(task=>[task.id,[task.mu,task.sigma]]));
    assert.notDeepEqual(localRatings.bench,[initial.tasks[0].mu,initial.tasks[0].sigma],
     'the five actual No actions changed the learned benchmark rating');
@@ -16094,4 +16096,209 @@ test('RISK started pass sync: benchmark Done after Start and two answers switche
  setFakeTime(ctx,at+2000);assert.equal(await ctx.onAction('undo',{}),true);
  assert.equal(ctx.state.mode,'scan','Undo goes back to scanning');
  assert.deepEqual(Array.from(ctx.state.chain),chain0,'and puts the benchmark back');
+});
+
+// ---------- #2407: the answer shows first ----------
+// A scanner answer shows its result (the next candidate, an intervention or
+// the end of the pass) before the bookkeeping the next screen does not need:
+// History's probabilities, rank sampling for the list and sparklines, sealing
+// Undo, the device save and the push. These drive the loaded app on the fake
+// cloud backend and the real device store over the test IndexedDB, wait
+// through the #2378 sync driver, and read what the person or a support report
+// sees: the scanner, History, the list's ranks, the Debug log's save and push
+// records, device commits and the cloud's copy. Rank sampling is the only
+// part of an answer that draws random numbers, so the app's (seeded) random
+// source counts it at the boundary without changing the stream.
+async function answerFirstApp2407(t,{tasks=14,mus=null,threshold=0,seed=2407,sync=true}={}){
+ const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-11-16T15:00:00Z');
+ const rows=[{...syncTask('bench','Benchmark task'),mu:20}];
+ for(const [i,mu] of (mus||Array.from({length:tasks},(_,i)=>39-i)).entries())rows.push({...syncTask('c'+(i+1),'Candidate '+(i+1)),mu});
+ const initial=syncState({tasks:rows,chain:['bench'],candidateId:'c1',mode:'scan',scanMode:'descending',passStartedAt:at,passId:'pass-2407',
+  settings:{horizonMin:60,thresholdPct:threshold,samples:250,cantMin:30,workedHours:8},...(sync?{syncRev:5,syncAccount:'e@example.com'}:{}),syncDirty:false});
+ const raw=JSON.stringify(initial),h=makeSyncHarness({remote:initial,rev:5,delayMs:2});
+ const app=await openApp(t,{appSource:'Date.now=()=>'+at+';\n'+appSrc,seed,indexedDBProvider:new IDBFactory(),deviceDbName:'answer-first-2407-'+Math.random(),
+  seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},...(sync?{cloudSyncFactory:()=>h.factory()}:{})});
+ const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ t.after(()=>{ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);});
+ const counts={draws:0,commits:0};
+ ctx.__draws2407=()=>counts.draws++;
+ vm.runInContext('(()=>{const draw=Math.random;Math.random=function(){__draws2407();return draw.apply(this,arguments);};})()',ctx);
+ const store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);store.commitHead=(...args)=>{counts.commits++;return commit(...args);};
+ if(sync)await ctx.cloudPull();
+ await app.settled({synced:sync});
+ const scan=()=>shim.document.getElementById('scan').innerHTML;
+ const offered=()=>scan().match(/<button\b[^>]*data-act="yes"[^>]*>/)?.[0]?.match(/data-candidate="([^"]*)"/)?.[1]??null;
+ const report=()=>JSON.parse(ctx.supportDiagnosticsText({readOnly:true}));
+ const pushesStarted=()=>report().events.filter(event=>event.stage==='push'&&event.status==='started').length;
+ const history=id=>(ctx.state.tasks.find(task=>task.id===id)?.ratingHistory||[]).length;
+ // The control the person taps, bound to the tasks the scanner shows.
+ const tap=act=>{
+  const button=scan().match(new RegExp('<button\\b[^>]*data-act="'+act+'"[^>]*>'))?.[0];assert.ok(button,'the scanner shows '+act);
+  const dataset={};for(const [,key,value] of button.matchAll(/data-(candidate|benchmark)="([^"]*)"/g))dataset[key]=value;
+  return ctx.onAction(act,{dataset});
+ };
+ // What a settled board shows: the candidate on offer, the chain, every
+ // task's History (its own row IDs are random, so left out) and the list's
+ // rank for every unfinished task.
+ const outcome=()=>JSON.stringify({offered:offered(),chain:[...ctx.state.chain],
+  history:ctx.state.tasks.map(task=>[task.id,(task.ratingHistory||[]).map(({id,...row})=>row)]),
+  ranks:ctx.state.tasks.filter(task=>!task.done).map(task=>[task.id,ctx.topKlabel(task.id)])});
+ const digest=()=>createHash('sha256').update(outcome()).digest('hex');
+ return {...app,h,at,counts,scan,offered,report,pushesStarted,history,tap,outcome,digest};
+}
+
+test('RISK answer shows first: Yes, No and candidate Done show the next candidate before History, rank sampling, the device save or the push start',async t=>{
+ const app=await answerFirstApp2407(t),{ctx,h,counts}=app;
+ assert.equal(app.offered(),'c1','positive control: the scanner offers the top candidate');
+ for(const [act,answered,next] of [['yes','c1','c2'],['no','c2','c3'],['cand-done','c3','c4'],['yes','c4','c5'],['no','c5','c6']]){
+  const benchmark=ctx.state.chain.at(-1),draws=counts.draws,commits=counts.commits,persists=app.report().save.persistCalls.value,pushes=app.pushesStarted(),calls=h.calls.length;
+  const histories=[app.history(answered),app.history(benchmark)];
+  app.tap(act);
+  // Straight after the click handler returns, before the test yields.
+  assert.equal(app.offered(),next,act+' shows the next candidate at once');
+  assert.match(app.scan(),new RegExp('Candidate '+next.slice(1)+'\\b'),act+' draws the next candidate’s card');
+  assert.deepEqual([app.history(answered),app.history(benchmark)],histories,act+': History has not been written yet');
+  assert.equal(counts.draws,draws,act+': no rank sampling has started');
+  assert.equal(app.report().save.persistCalls.value,persists,act+': no device save has started');
+  assert.equal(counts.commits,commits,act+': nothing reached the device store');
+  assert.equal(app.pushesStarted(),pushes,act+': no push has started');assert.equal(h.calls.length,calls,act+': nothing reached the cloud');
+  // Nothing claims saved or synced before it is, and sync is not settled.
+  assert.equal(app.shim.document.getElementById('syncBtn').textContent,'☁ syncing',act+': the board does not show as synced');
+  assert.equal(vm.runInContext('syncSession.snapshot().settled',ctx),false,act+': the queued catch-up keeps sync from settling');
+  await app.settled({synced:true,within:10000});
+  // The catch-up then ran: History, the ranks, the device save and the push.
+  assert.equal(app.history(answered),histories[0]+1,act+' then records History');
+  assert.ok(counts.draws>draws,act+' then samples ranks for the list');
+  assert.ok(counts.commits>commits,act+' then saves on the device');
+  assert.ok(h.calls.slice(calls).includes('push'),act+' then pushes');
+  assert.equal(JSON.parse(h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,act+' reaches the cloud');
+ }
+ // Showing the answer first changes no numbers: once settled, History, the
+ // list's ranks and the candidate on offer are those the code before #2407
+ // gave for the same board, seed and answers (captured from fa159866, where
+ // all of it ran inside the tap).
+ assert.equal(app.digest(),'b0b7a52bec9b0bbd853f27c16e10e985d008dbdb027250c6f0aa938c4c6a6fff','the settled board matches the code before #2407: '+app.outcome().slice(0,300));
+});
+
+test('RISK answer shows first guidance: Help and the changelog say answers show straight away and the rest catches up after',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>Why does the rank column take a moment after an answer?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/^An answer shows the next task, the check-in or the end of scanning straight away\./,'Help says answers show straight away: '+answer);
+ assert.match(answer,/Task history, the rank column, saving and syncing catch up just after, in the order you answered, and you can keep answering meanwhile\./);
+ assert.match(answer,/catch up at most once a second/,'the earlier answer’s limit stays');
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ const latest=current.split('<h3>November 16, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const bullet=latest.match(/<li>[^<]*straight away[^<]*<\/li>/)?.[0]||'';
+ assert.match(bullet,/Yes, No, Can’t, Done and Dislodge on the scanner now show the next task, the check-in or the end of scanning straight away, also with sync on\./,'the changelog has one bullet for it: '+latest);
+ assert.match(bullet,/The cloud button shows syncing until they are saved and the cloud confirms them\./,'and its limit stays in that bullet');
+});
+
+test('RISK answer shows first: an answer that should bring up an intervention shows it at once, not a candidate',async t=>{
+ // After Yes, the new benchmark is far ahead of every remaining candidate.
+ const app=await answerFirstApp2407(t,{mus:[40,5,5,5,5],threshold:25}),{ctx,counts}=app;
+ assert.equal(app.offered(),'c1','positive control: the scanner offers the strong candidate');
+ assert.doesNotMatch(app.scan(),/data-act="continue-scan"/,'positive control: no intervention yet');
+ const draws=counts.draws,history=app.history('c1');
+ app.tap('yes');
+ assert.match(app.scan(),/Only \d+% chance of finding a better task[\s\S]*data-act="continue-scan"/,'the intervention shows at once');
+ assert.equal(app.offered(),null,'and no candidate is offered');
+ assert.equal(counts.draws,draws,'before rank sampling');assert.equal(app.history('c1'),history,'and before History');
+ await app.settled({synced:true,within:10000});
+ assert.match(app.scan(),/data-act="continue-scan"/,'the intervention stays once the answer has caught up');
+ assert.equal(app.offered(),null);assert.equal(app.history('c1'),history+1,'and History caught up');
+});
+
+test('RISK answer shows first: answers tapped before the earlier ones catch up apply to the candidate on screen, and History records them in tap order',async t=>{
+ const app=await answerFirstApp2407(t),{ctx,h}=app;
+ app.tap('yes');assert.equal(app.offered(),'c2','positive control: Yes on Candidate 1 shows Candidate 2');
+ app.tap('no');assert.equal(app.offered(),'c3','No goes to Candidate 2, the one on screen');
+ app.tap('yes');
+ assert.deepEqual([...ctx.state.chain],['bench','c1','c3'],'each Yes dotted the candidate it was tapped on');
+ assert.equal(ctx.state.considered.c2,'no','the No went to Candidate 2');
+ assert.equal(app.history('c1'),0,'precondition: none of the three has caught up');
+ await app.settled({synced:true,within:10000});
+ // Candidate 1 took part in all three: its own Yes, then as the benchmark.
+ const rows=ctx.state.tasks.find(task=>task.id==='c1').ratingHistory;
+ assert.deepEqual(JSON.parse(JSON.stringify(rows.map(row=>[row.kind,row.seq]))),[['yes',1],['no',2],['yes',3]],'History records the three answers in tap order');
+ assert.equal(app.history('c2'),1);assert.equal(app.history('c3'),1);
+ const cloud=h.remoteState();
+ assert.deepEqual(cloud.chain,['bench','c1','c3'],'the cloud has all three answers');assert.equal(cloud.considered.c2,'no');
+ // The same numbers as the code before #2407 for three quick taps (fa159866).
+ assert.equal(app.digest(),'0be1ef21f4bf5e6c7320b30b52634da49f08d39c596d6b24faa71f027f7240e8','quick taps match the code before #2407: '+app.outcome().slice(0,300));
+});
+
+test('RISK answer shows first: Undo straight after an answer, before it catches up, reverses only that answer on the device and in the cloud',async t=>{
+ const app=await answerFirstApp2407(t),{ctx,h}=app;
+ app.tap('yes');await app.settled({synced:true,within:10000});
+ const kept=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ app.tap('no');
+ assert.equal(app.offered(),'c3','positive control: the No showed the next candidate');
+ assert.equal(app.history('c2'),0,'precondition: the No has not caught up');
+ assert.equal(await ctx.onAction('undo',{}),true);
+ assert.equal(app.offered(),'c2','Undo offers the answered candidate again');
+ assert.deepEqual([...ctx.state.chain],['bench','c1'],'the earlier Yes stays');
+ assert.equal(ctx.state.considered.c2,undefined,'the No is gone');
+ assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),kept,'and so are its rating changes');
+ await app.settled({synced:true,within:10000});
+ const device=JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload),cloud=h.remoteState();
+ for(const [where,board] of [['on the device',device],['in the cloud',cloud]]){
+  assert.deepEqual(board.chain,['bench','c1'],'the Yes stays '+where);
+  assert.equal(board.considered.c2,undefined,'the No is reversed '+where);
+  assert.equal(JSON.stringify(board.tasks.map(task=>[task.id,task.mu,task.sigma])),kept,'ratings are back '+where);
+  const no=board.decisionEvents.find(event=>event.kind==='no');
+  assert.ok(no&&board.decisionEvents.some(event=>event.kind==='undo'&&event.targetEventIds.includes(no.id)),'the No and its Undo are both recorded '+where);
+  assert.ok(board.decisionEvents.some(event=>event.kind==='comparison'&&event.action==='yes'&&!board.decisionEvents.some(undo=>undo.kind==='undo'&&undo.targetEventIds.includes(event.id))),'the Yes is not undone '+where);
+ }
+});
+
+test('RISK answer shows first with sync off: answers show before History, rank sampling or the device save, and each saves once',async t=>{
+ const app=await answerFirstApp2407(t,{sync:false}),{ctx,counts}=app;
+ assert.equal(ctx.window.CloudSync,undefined,'positive control: sync is off');
+ for(const [act,next] of [['yes','c2'],['no','c3'],['cand-done','c4']]){
+  const draws=counts.draws,commits=counts.commits,persists=app.report().save.persistCalls.value,history=app.history(app.offered());
+  const answered=app.offered();
+  app.tap(act);
+  assert.equal(app.offered(),next,act+' shows the next candidate at once');
+  assert.equal(app.history(answered),history,act+': History has not been written yet');
+  assert.equal(counts.draws,draws,act+': no rank sampling has started');
+  assert.equal(app.report().save.persistCalls.value,persists,act+': no device save has started');
+  await app.settled({within:10000});
+  assert.equal(app.history(answered),history+1,act+' then records History');
+  assert.equal(counts.commits,commits+1,act+' then saves on the device once');
+ }
+});
+
+test('RISK answer shows first: benchmark Done, Dislodge and Can’t show their result before the device save, and all but Dislodge before History and rank sampling',async t=>{
+ const app=await answerFirstApp2407(t),{ctx,counts}=app;
+ const before=()=>({draws:counts.draws,persists:app.report().save.persistCalls.value,pushes:app.pushesStarted()});
+ const untouched=(mark,label)=>{
+  assert.equal(counts.draws,mark.draws,label+': no rank sampling has started');
+  assert.equal(app.report().save.persistCalls.value,mark.persists,label+': no device save has started');
+  assert.equal(app.pushesStarted(),mark.pushes,label+': no push has started');
+ };
+ // Can't on the candidate. It moves no rating, so it adds no History row.
+ let mark=before(),history;app.tap('cant');
+ assert.equal(app.offered(),'c2','Can’t shows the next candidate at once');untouched(mark,'Can’t');
+ await app.settled({synced:true,within:10000});
+ assert.ok(counts.draws>mark.draws,'Can’t then samples ranks');assert.ok(app.report().save.persistCalls.value>mark.persists,'and saves');
+ // Two Yes answers, then Dislodge the newest benchmark.
+ for(const act of ['yes','yes']){app.tap(act);await app.settled({synced:true,within:10000});}
+ assert.deepEqual([...ctx.state.chain],['bench','c2','c3'],'positive control: Candidate 3 is the benchmark');
+ // Last task WOOP shows after a final task's second recorded Dislodge, so
+ // what a Dislodge shows depends on its History: that and the ranks it
+ // reads come first, and only the Undo seal, save and push wait.
+ mark=before();history=app.history('c3');app.tap('dislodge');
+ assert.equal(ctx.state.chain.at(-1),'c2','Dislodge shows the earlier benchmark at once');
+ assert.match(app.scan(),/Candidate 2\b/);assert.equal(app.history('c3'),history+1,'Dislodge records its History before the paint');
+ assert.equal(app.report().save.persistCalls.value,mark.persists,'Dislodge: no device save has started');
+ assert.equal(app.pushesStarted(),mark.pushes,'Dislodge: no push has started');
+ await app.settled({synced:true,within:10000});assert.ok(app.report().save.persistCalls.value>mark.persists,'Dislodge then saves');
+ // Done on the benchmark ends scanning.
+ mark=before();history=app.history('c2');app.tap('bench-done');
+ assert.match(app.scan(),/Scanning paused/,'benchmark Done shows the end of scanning at once');
+ assert.equal(ctx.state.mode,'work');untouched(mark,'benchmark Done');assert.equal(app.history('c2'),history);
+ await app.settled({synced:true,within:10000});assert.equal(app.history('c2'),history+1,'benchmark Done then records History');
+ assert.equal(JSON.parse(app.h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,'and reaches the cloud');
 });

@@ -23582,5 +23582,33 @@
       "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"undone does not keep its task from the automatic dot|Return already saw does not stop Undo|Postpone that empties the chain after a return\" tests/persistence-recovery.test.js",
       "failure": "On the slice 1 candidate the #221 review test failed with \"every return reached the cloud\": actual [carried-a, carried-b, carried-c], expected [carried-a, carried-b] (the Postpone of carried-c is now a Return row). Observed in a focused run of the RISK chain return and Postpone tests before the assertion was changed (7 failures; the other six were expired-hold failures that the slice 1 repair fixed, recorder record 2026-11-15T15-02-04-201Z-837454f0)."
     }
+  },
+  {
+    "baseCommit": "fa1598667378699e19645f7bac2033f97797e926",
+    "weakenedTestLines": [
+      "tests/core.test.js:-assert.doesNotThrow(()=>ctx.decide('no'),'unknown array items cannot stop a real rating decision');assert.equal(b.ratingHistory.length,4);assert.equal(b.ratingHistory[0],null);assert.equal(b.ratingHistory[1],7);",
+      "tests/core.test.js:-assert.equal(JSON.stringify([a.ratingHistory,b.ratingHistory]),before,'comparison rendering preserves recorded facts');ctx.state.candidateId=b.id;ctx.decide('yes');assert.match(ctx.taskRatingHistoryHTML(a),/<b>Yes comparison<\\/b>/);assert.match(ctx.taskRatingHistoryHTML(b),/<b>Yes comparison<\\/b>/);",
+      "tests/core.test.js:-const h=await ratingHistoryFixture(616),base=ratingHistoryCopy(h.ctx.state);h.ctx.decide('yes');const left=ratingHistoryCopy(h.ctx.state);",
+      "tests/core.test.js:-const r=await loadApp({seed:617,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)}});setFakeTime(r.ctx,Date.parse('2026-10-05T01:02:03Z'));r.ctx.state.chain=[h.a.id];r.ctx.state.candidateId=h.b.id;r.ctx.decide('no');const right=ratingHistoryCopy(r.ctx.state);",
+      "tests/core.test.js:-const {ctx,a,b}=await ratingHistoryFixture(615);ctx.decide('no');assert.equal(b.ratingHistory?.[0]?.kind,'no');",
+      "tests/core.test.js:-const {ctx,a,b}=await ratingHistoryFixture(618),old=ratingHistoryCopy(ctx.state);ctx.decide('yes');const recorded=ratingHistoryCopy(b.ratingHistory);",
+      "tests/core.test.js:-const {ctx,shim,a,b}=await ratingHistoryFixture(621);ctx.decide('yes');ctx.openEdit(b.id);const rendered=shim.document.getElementById('modalRoot').innerHTML;",
+      "tests/core.test.js:-const {ctx,shim,b}=await ratingHistoryFixture(631);ctx.decide('yes');const original=JSON.stringify(b.ratingHistory);ctx.openEdit(b.id);"
+    ],
+    "reason": "#2407 (spec #2406, \"The answer shows first\"): a scanner answer now shows the next candidate first, and its History is written just after the paint, in tap order. Eight core History tests read History on the same line as ctx.decide(), which is now before it is written. Each line keeps every assertion and only inserts await answersCaughtUp(...) (the #2378 sync session's count of queued answer catch-up) between the answer and the read.",
+    "previousBehavior": "ctx.decide() (TaskActionOwner.perform) wrote History, sampled ranks, sealed Undo and started the save and push inside the tap, so History could be read synchronously right after it.",
+    "intendedBehavior": "The answer applies the decision, ratings, intervention check and next pick and draws the scanner; History (same values, computed from inputs captured at the tap), rank sampling, the Undo seal, the save and the push catch up after the paint. Any other action, a save, a push, a cloud read, Undo or an export runs what is queued first.",
+    "preservedCoverage": [
+      "Every assertion on the changed lines is unchanged; the only difference is the inserted wait before History is read.",
+      "The History values themselves are unchanged: the new #2407 tests compare the settled History, list ranks and candidate with digests captured from fa159866 for the same board, seed and answers, slow and fast taps."
+    ],
+    "replacementTests": [
+      "RISK answer shows first: Yes, No and candidate Done show the next candidate before History, rank sampling, the device save or the push start",
+      "RISK answer shows first: answers tapped before the earlier ones catch up apply to the candidate on screen, and History records them in tap order"
+    ],
+    "redEvidence": {
+      "command": "node --max-old-space-size=8192 --test tests/core.test.js",
+      "failure": "On the slice 1 candidate these tests failed reading History straight after ctx.decide(), for example \"RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes\" (b.ratingHistory?.[0]?.kind undefined, expected no) and \"RISK task rating history: malformed and future records remain recoverable\" (ratingHistory length 3, expected 4), in the full core run of 2026-11-16 (26 failures, the History ones fixed by these waits)."
+    }
   }
 ]
