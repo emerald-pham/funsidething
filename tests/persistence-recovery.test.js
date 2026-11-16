@@ -16114,6 +16114,29 @@ test('RISK started pass sync: benchmark Done after Start and two answers switche
 // for the app's timers and the #2378 settled signal. They tap the scanner's
 // own Yes and No buttons, count device saves where the device store commits a
 // board and pushes where the fake backend is asked to upload one.
+// #2406 review: shared by the #2407 and #2408 harnesses. The scanner's own
+// control for an act, as rendered.
+function scannerControl2406(scanHtml,act){
+ const button=markupButtons(scanHtml).find(control=>control.dataset.act===act);
+ assert.ok(button,'the scanner shows a '+act+' button');
+ return button;
+}
+// Every whole-board commit the device store makes, as these tests count device
+// saves. Each record keeps its payload, what onStart and onReturn add (when it
+// began and returned) and whether the store refused it because the head had
+// moved (the #2324 repair that follows). beforeCommit can make a commit take
+// time first, as a phone's save does.
+function recordDeviceCommits2406(store,{onStart=()=>({}),beforeCommit=null,onReturn=()=>({})}={}){
+ const commits=[],commit=store.commitHead;
+ store.commitHead=async options=>{
+  const record={...onStart(),payload:options?.payload};commits.push(record);
+  if(beforeCommit)await beforeCommit(record);
+  const result=await commit.call(store,options);
+  Object.assign(record,{conflict:!!result?.conflict},onReturn());
+  return result;
+ };
+ return commits;
+}
 const ACCOUNT2408={uid:'owner',email:'e@example.com'};
 const PUSH_DEBOUNCE2408=2000,LONGEST_WAIT2408=20000;
 // A board of several megabytes, made here from synthetic tasks and padding.
@@ -16190,17 +16213,9 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
   const method=store[key];if(typeof method!=='function')continue;
   store[key]=async(...args)=>{counters.store++;try{return await method.apply(store,args);}finally{counters.store--;}};
  }
- const commit=store.commitHead;
  const device={...app,backend,faults,docs,indexedDB,dbName,storage,clock,counters,saveMs};
- // #2406 review: each commit also records when it returned and whether the
- // store refused it because the head had moved (the #2324 repair that follows).
- store.commitHead=async options=>{
-  const entry={at:clock.now,seq:++counters.seq,payload:options?.payload};counters.commits.push(entry);
-  if(device.saveMs)await clock.sleep(device.saveMs);
-  const result=await commit(options);
-  entry.endedAt=clock.now;entry.conflict=!!result?.conflict;
-  return result;
- };
+ counters.commits=recordDeviceCommits2406(store,{onStart:()=>({at:clock.now,seq:++counters.seq}),
+  beforeCommit:async()=>{if(device.saveMs)await clock.sleep(device.saveMs);},onReturn:()=>({endedAt:clock.now})});
  const push=backend.CS.push.bind(backend.CS);
  backend.CS.push=(payload,...rest)=>{counters.uploads.push({at:clock.now,seq:++counters.seq,payload});return push(payload,...rest);};
  let closed=false;
@@ -16217,8 +16232,7 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
   // A person's tap on the scanner's own button reaches the app as one click
   // on the document.
   tap(act){
-   const button=markupButtons(scan.innerHTML).find(control=>control.dataset.act===act);
-   assert.ok(button,'the scanner shows a '+act+' button');
+   const button=scannerControl2406(scan.innerHTML,act);
    const target={dataset:button.dataset,classList:{contains:name=>button.classes.includes(name)}};target.closest=()=>target;
    const candidate=ctx.state.candidateId;
    // #2406 review: whether a push was running when the person tapped, from the
@@ -16599,10 +16613,9 @@ async function answerFirstApp2407(t,{tasks=14,mus=null,threshold=0,seed=2407,syn
   seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},...(sync?{cloudSyncFactory:()=>h.factory()}:{})});
  const {ctx,shim}=app;ctx.window.CLOUD_PUSH_DELAY_MS=20;
  t.after(()=>{ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);});
- const counts={draws:0,commits:0};
+ const commits=recordDeviceCommits2406(ctx.window.ScannerDeviceStore),counts={draws:0,get commits(){return commits.length;}};
  ctx.__draws2407=()=>counts.draws++;
  vm.runInContext('(()=>{const draw=Math.random;Math.random=function(){__draws2407();return draw.apply(this,arguments);};})()',ctx);
- const store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);store.commitHead=(...args)=>{counts.commits++;return commit(...args);};
  if(sync)await ctx.cloudPull();
  await app.settled({synced:sync});
  const scan=()=>shim.document.getElementById('scan').innerHTML;
@@ -16610,12 +16623,10 @@ async function answerFirstApp2407(t,{tasks=14,mus=null,threshold=0,seed=2407,syn
  const report=()=>JSON.parse(ctx.supportDiagnosticsText({readOnly:true}));
  const pushesStarted=()=>report().events.filter(event=>event.stage==='push'&&event.status==='started').length;
  const history=id=>(ctx.state.tasks.find(task=>task.id===id)?.ratingHistory||[]).length;
- // The control the person taps, bound to the tasks the scanner shows.
- const tap=act=>{
-  const button=scan().match(new RegExp('<button\\b[^>]*data-act="'+act+'"[^>]*>'))?.[0];assert.ok(button,'the scanner shows '+act);
-  const dataset={};for(const [,key,value] of button.matchAll(/data-(candidate|benchmark)="([^"]*)"/g))dataset[key]=value;
-  return ctx.onAction(act,{dataset});
- };
+ // The control the person taps, bound to the tasks the scanner shows. Its
+ // handler runs directly: the double-tap guard reads Date.now, which this
+ // harness holds still.
+ const tap=act=>ctx.onAction(act,{dataset:scannerControl2406(scan(),act).dataset});
  // What a settled board shows: the candidate on offer, the chain, every
  // task's History (its own row IDs are random, so left out) and the list's
  // rank for every unfinished task.

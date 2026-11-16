@@ -6317,16 +6317,16 @@ const deviceSaveLane=(()=>{
       waiting.push(job);
     }
     job.backupAlreadySafe=job.backupAlreadySafe&&backupAlreadySafe;
-    next();
+    startNextSave();
     return job.done;
   }
   // Only the device store's whole-board commits can run side by side: a
   // browser-storage save writes at once and host storage queues its own
   // writes, so without the device store each save starts when asked, as
   // before.
-  function next(){
+  function startNextSave(){
     if(!waiting.length)return;
-    if(!running.size||!deviceStorageAuthority){startSave(waiting.shift());next();return;}
+    if(!running.size||!deviceStorageAuthority){startSave(waiting.shift());startNextSave();return;}
     watchForStall(waiting[0]);
   }
   function startSave(job){
@@ -6338,7 +6338,7 @@ const deviceSaveLane=(()=>{
       error=>({ok:false,saved:null,generation:null,error}))
       .then(outcome=>{
         running.delete(job);slowestMs=Math.max(slowestMs,performance.now()-begun);
-        job.work.end();job.resolve(outcome);next();
+        job.work.end();job.resolve(outcome);startNextSave();
       });
   }
   // The next save waits for the running one, unless that one stalls. A stalled
@@ -6353,7 +6353,7 @@ const deviceSaveLane=(()=>{
       if(deviceCommitProgress!==seen||[...deviceCommitsRunning].some(commit=>now-commit.at<deviceCommitSlowestMs)){
         seen=deviceCommitProgress;job.escape=setTimeout(check,ORDINARY_SAVE_WAIT_MS);return;
       }
-      running.clear();next();
+      running.clear();startNextSave();
     };
     job.escape=setTimeout(check,ORDINARY_SAVE_WAIT_MS);
   }
