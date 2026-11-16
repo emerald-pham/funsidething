@@ -16503,6 +16503,32 @@ test('RISK one save per answer: a device save hashes the board once for the writ
  assert.equal(counters.hashed.slice(hashedBefore).filter(length=>length===bytes).length,2,'the saved board and its latest backup are hashed once for the write');
 });
 
+// #2406 review (spec a): a device save serializes the board once and reuses
+// that text for its save-loop check, its missing-task check and its commit,
+// and parses the last saved copy at most once. Each whole pass over a board
+// of several megabytes is measured where the app turns a board into the text
+// a device save writes (which keeps syncRev). The save that records a Cloud
+// acknowledgement runs every one of those steps: the loop check reads the
+// board's text (no new edit came with it) and the board differs from its last
+// save (the revision moved).
+test('RISK one save per answer: the save that records a Cloud acknowledgement serializes the board once for its save-loop check, its missing-task check and its write',{timeout:90000},async t=>{
+ const device=await answeringDevice2408(t);
+ await startAnswering2408(device);
+ const {ctx,counters,clock}=device,passes=[];
+ const json=vm.runInContext('JSON',ctx),stringify=json.stringify;
+ json.stringify=function(...args){const text=stringify.apply(this,args);
+  if(typeof text==='string'&&text.length>1_000_000&&text.includes('"syncRev":'))passes.push({at:clock.now,seq:++counters.seq});return text;};
+ t.after(()=>{json.stringify=stringify;});
+ const tapped=clock.now;device.tap('no');
+ await clock.settle();
+ const uploads=counters.uploads.filter(upload=>upload.at>=tapped),acknowledged=counters.commits.filter(commit=>commit.at>=tapped).at(-1);
+ assert.equal(uploads.length,1,'positive control: the answer is pushed once');
+ assert.ok(acknowledged.seq>uploads[0].seq,'positive control: a save after the upload records the acknowledgement');
+ assert.equal(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).syncRev,ctx.state.syncRev,'positive control: that save holds the acknowledged revision');
+ const recording=passes.filter(pass=>pass.seq>uploads[0].seq&&pass.seq<acknowledged.seq);
+ assert.equal(recording.length,1,'the board is serialized once from the upload to that save\'s write: '+recording.length);
+});
+
 // #2406 review round 1: a phone's device saves take 0.6 to 7 s (support
 // report, 2026-11-16). These run on a phone whose every device save takes
 // saveMs from the moment the app opens: the fake clock runs from the start, so

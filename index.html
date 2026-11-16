@@ -3083,10 +3083,12 @@ function reopenTask(task,current=task){
    hold partial boards, so automatic adoption keeps unique task IDs unless a
    delete action left an explicit tombstone. The winning copy owns shared
    scan/layout state; this only repairs the task membership that was missing. */
-function mergeUndeletedTasks(winner, other){
+function mergeUndeletedTasks(winner, other, {otherOwned=false}={}){
   // Attest each original source before union: a peer's equal completion date
   // cannot prove this source already contained that peer's modern Done.
-  other=JSON.parse(JSON.stringify(other));
+  // #2408: a caller that parsed other for this merge alone hands it over
+  // (otherOwned); copying it again passed over a whole board once more.
+  if(!otherOwned)other=JSON.parse(JSON.stringify(other));
   const importedCompletion=checkpointLegacyCompletions(winner,other)|checkpointLegacyCompletions(other,winner);
   const evidenceKeys=["deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps","clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps"];
   const beforeEvidence=JSON.stringify(evidenceKeys.map(key=>winner[key] || {}));
@@ -4656,9 +4658,11 @@ function deviceOwnSaveBase(head){
 // it. Only a task coming back is news to the person, so the message and the
 // Debug log record (count and source, never titles or IDs) follow tasks, not
 // History rows or other evidence the same merge restores (#2333 review).
-function keepMissingTasks(source,keptFrom,message){
+// sourceOwned: the caller parsed source for this check alone, so the merge may
+// use it as it is instead of copying it first (#2408).
+function keepMissingTasks(source,keptFrom,message,{sourceOwned=false}={}){
   const live=new Set(state.tasks.map(task=>task.id));
-  const changed=mergeUndeletedTasks(state,source);
+  const changed=mergeUndeletedTasks(state,source,{otherOwned:sourceOwned});
   const keptTasks=state.tasks.filter(task=>!live.has(task.id)).length;
   if(keptTasks){
     toast(message,6000);
@@ -4728,7 +4732,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   if(lane)lane.requests=deviceSaveLane.requests();
   if(lastPersistedRaw!==payload&&lastPersistedRaw){
     const last=savedPayloadBoard(lastPersistedRaw);
-    if(last&&sameListOwner(state,last)&&keepMissingTasks(last,"last-save","A missing task was kept in the saved board.")){
+    if(last&&sameListOwner(state,last)&&keepMissingTasks(last,"last-save","A missing task was kept in the saved board.",{sourceOwned:true})){
       recomputeRanks();render();payload=JSON.stringify(state);
     }
   }
