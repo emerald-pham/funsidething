@@ -1304,27 +1304,55 @@ async function prune(filePath, options) {
   const repositoryIdentity = resolve(await runGit(['rev-parse', '--path-format=absolute', '--git-common-dir']));
   return withCoordinationLock(filePath, async () => {
     const state = await readState(filePath, { pruneReservations: false });
+    const now = isoNow(options.now);
+    let main;
     const pruned = [];
     for (const entry of state.entries) {
       if (entry.status !== 'active' || entry.registeredBy !== registeredBy || entry.repositoryIdentity !== repositoryIdentity) continue;
       if (typeof entry.worktree !== 'string' || !isAbsolute(entry.worktree)) continue;
       const missing = await lstat(entry.worktree).then(() => false, (error) => error?.code === 'ENOENT');
       if (!missing) continue;
-      const now = new Date().toISOString();
-      entry.claimReleases = [...(entry.claimReleases ?? []), {
-        releasedAt: now, scopes: entry.scopes ?? [], claims: entry.claims ?? [], resources: entry.resources ?? [],
-      }];
-      entry.scopes = [];
-      entry.claims = [];
-      entry.resources = [];
-      entry.status = 'complete';
-      entry.outcome = 'pruned';
-      entry.completedAt = now;
-      entry.result = 'Worktree directory no longer exists.';
+      await completeRemovedEntry(entry, now, () => main ??= readChainScannerMainState().catch(() => undefined));
       pruned.push(entry);
     }
     if (pruned.length) await writeState(filePath, state);
     return pruned;
+  });
+}
+
+// A removed worktree's work is landed only when finish's own proof holds for
+// its exact commit: a detached entry's recorded commit, or its branch's tip if
+// the branch still exists. Anything else is discarded, keeping the fields that
+// can still be known, since ledger clients know no other outcome (#2364).
+async function completeRemovedEntry(entry, now, readMain) {
+  const detached = entry.detachedHead === true;
+  const branchSha = detached
+    ? text(entry.startBranchSha).toLowerCase() || undefined
+    : await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${text(entry.branchName)}^{commit}`]).catch(() => undefined);
+  const main = await readMain();
+  let release = {
+    ...(branchSha && !detached ? { branchName: entry.branchName } : {}),
+    branchSha,
+    mainSha: main?.mainSha ?? (await readMainRef(process.cwd()).catch(() => undefined))?.sha,
+  };
+  let releaseEvidence;
+  if (branchSha && main) {
+    try {
+      release = await releaseStateAt(release.branchName, branchSha, main, process.cwd());
+      releaseEvidence = await proveChainScannerLanding(entry, release, 'chain-scanner', now);
+    } catch {
+      releaseEvidence = undefined;
+    }
+  }
+  entry.claimReleases = [...(entry.claimReleases ?? []), {
+    releasedAt: now, scopes: entry.scopes ?? [], claims: entry.claims ?? [], resources: entry.resources ?? [],
+  }];
+  entry.scopes = [];
+  entry.claims = [];
+  entry.resources = [];
+  if (!releaseEvidence) entry.discard = { reason: 'Worktree removed before finish.', branchSha };
+  completeEntry(entry, {
+    outcome: releaseEvidence ? 'landed' : 'discarded', release, now, result: 'Worktree directory no longer exists.', releaseEvidence,
   });
 }
 

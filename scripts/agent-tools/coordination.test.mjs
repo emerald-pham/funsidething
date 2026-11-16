@@ -1774,6 +1774,91 @@ test('Chain Scanner landed finish through an integration branch refuses unmerged
   }
 });
 
+// Prune finishes the entries of worktrees Claude Code removed without a finish.
+// It writes only the outcomes other ledger clients know: landed when #2412's
+// check proves it, otherwise discarded with a reason (#2364 spec a2 and c).
+test("prune records a removed worktree's merged work as landed through its candidate's receipt and other removed work as discarded", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-prune-outcomes-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'work/unused');
+    git(project, 'checkout', '--quiet', 'main');
+    mkdirSync(join(project, 'scripts'), { recursive: true });
+    copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs');
+    git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+    const integrationBaseSha = git(project, 'rev-parse', 'HEAD');
+    addOrigin(project, fixture);
+    const register = (worktree, port) => {
+      const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Prune fixture ${worktree}`,
+        '--registered-by', 'worktree-ready', '--resources', `loopback:127.0.0.1:${port}`], worktree);
+      assert.equal(began.status, 0, began.stderr);
+      return JSON.parse(began.stdout).id;
+    };
+    const agent = (name, port) => {
+      const worktree = join(fixture, name);
+      git(project, 'worktree', 'add', '--quiet', '-b', `work/${name}`, worktree, 'main');
+      return { worktree, id: register(worktree, port) };
+    };
+
+    const landed = agent('landed-task', 47121);
+    const taskSha = commitDocsNote(landed.worktree, 'task-note.md', 'Task change merged through an integration branch.');
+    const unmerged = agent('unmerged-task', 47122);
+    const unmergedSha = commitDocsNote(unmerged.worktree, 'unmerged-note.md', 'Task change that never reached main.');
+    const deleted = agent('deleted-branch', 47123);
+    git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
+    git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', 'work/landed-task');
+    const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
+    const candidateReceipt = recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidateSha);
+    const reviewerId = register(reviewer, 47124);
+    const mainSha = landIntegrationOnMain(project);
+    for (const worktree of [landed.worktree, unmerged.worktree, deleted.worktree, reviewer]) git(project, 'worktree', 'remove', '--force', worktree);
+    git(project, 'branch', '--quiet', '-D', 'work/deleted-branch');
+
+    const now = '2026-11-16T12:00:00.000Z';
+    const pruned = command(['prune', '--file', ledgerPath, '--registered-by', 'worktree-ready', '--now', now], project);
+    assert.equal(pruned.status, 0, pruned.stderr);
+    const entries = new Map(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.map((entry) => [entry.id, entry]));
+    for (const entry of entries.values()) {
+      assert.equal(entry.status, 'complete', `${entry.worktree} is finished`);
+      assert.ok(['landed', 'discarded'].includes(entry.outcome), `${entry.worktree} records an outcome other ledger clients know, not ${entry.outcome}`);
+      assert.equal(entry.completedAt, now, 'prune completes on the coordination clock');
+      assert.deepEqual(entry.resources, [], `${entry.worktree} releases its port`);
+    }
+
+    const task = entries.get(landed.id);
+    assert.equal(task.outcome, 'landed', 'merged work whose candidate has a receipt is recorded as landed');
+    assert.equal(task.finalBranchName, 'work/landed-task');
+    assert.equal(task.finalBranchSha, taskSha);
+    assert.equal(task.mainSha, mainSha);
+    assert.equal(task.originMainSha, mainSha);
+    assert.equal(task.releaseEvidence.candidate.commitSha, candidateSha, 'the landed record names the candidate whose receipt reviewed it');
+    assert.equal(task.releaseEvidence.receiptSha256, candidateReceipt.receipt.receiptSha256);
+
+    const review = entries.get(reviewerId);
+    assert.equal(review.outcome, 'landed', "a detached reviewer's merged commit is recorded as landed");
+    assert.equal(review.finalBranchSha, candidateSha, 'at the exact commit it recorded');
+    assert.equal(review.releaseEvidence.candidate.commitSha, candidateSha);
+
+    const stray = entries.get(unmerged.id);
+    assert.equal(stray.outcome, 'discarded', 'work main never received is recorded as discarded');
+    assert.match(stray.discard.reason, /worktree removed before finish/i);
+    assert.equal(stray.finalBranchSha, unmergedSha);
+    assert.equal(stray.mainSha, mainSha);
+    assert.equal(stray.releaseEvidence, undefined);
+
+    const gone = entries.get(deleted.id);
+    assert.equal(gone.outcome, 'discarded', 'a removed worktree whose branch is gone cannot prove a landing');
+    assert.match(gone.discard.reason, /worktree removed before finish/i);
+    assert.equal(gone.finalBranchSha, undefined, 'no tip is invented for a deleted branch');
+    assert.equal(gone.mainSha, mainSha);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('claim records additional ownership and resources on the active owner entry', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-claim-'));
   try {
