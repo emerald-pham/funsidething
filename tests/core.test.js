@@ -40251,6 +40251,27 @@ test('RISK held decision recovery: actual Settings review gives unchosen Apply i
  });
 });
 
+// #2406 review: on the #2406 branch the light cases above failed. The push
+// that follows the opening read saves the board, and Review saved decisions
+// read the stored head after that save's commit had landed but before it had
+// returned, then took this tab's own save for another tab's. Here the save is
+// held at exactly that point.
+test('RISK held decision recovery: Review saved decisions started while this tab’s own save is still committing reads the sources instead of reporting another tab’s change',async t=>{
+ const app=await heldDecisionApp188(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const commit=store.commitHead.bind(store);let landed,release;
+ const landedOnce=new Promise(resolve=>{landed=resolve;}),gate=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+ // The next commit reaches the device store and then waits before returning.
+ store.commitHead=async options=>{store.commitHead=commit;const result=await commit(options);landed();await gate;return result;};
+ shim.document.getElementById('addInput').value='Added before the review';const added=ctx.onAction('add',{});
+ await landedOnce;
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks.some(task=>task.title==='Added before the review'),true,'positive control: this tab’s save has landed and not returned');
+ await ctx.onAction('review-decision-recovery',{});
+ const ui=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(ui,/changed in another tab/,'this tab’s own save is not another tab’s change');
+ assert.match(ui,/Saved appearance: <b>dark/,'the review reads this device');
+ release();await added;
+});
+
 
 test('RISK held decision recovery: rejected ordinary Restore leads through the visible error to deliberate recovery',async t=>{
  const app=await heldDecisionApp188(t),{ctx,shim,backend}=app,store=ctx.window.ScannerDeviceStore;

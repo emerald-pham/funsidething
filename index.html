@@ -14735,7 +14735,11 @@ async function decisionRecoverySources(){
   const head=deviceStorageAuthority?await deviceStore.readHead():null;
   const browser=useLocal?[LOCAL_HEAD_KEY,STORE_KEY].map(key=>({key,raw:localStorage.getItem(key)})).filter(row=>row.raw!==null):[];
   if(browser.some(row=>!validSavedPayload(row.raw)))throw decisionRecoveryProblem("A browser source cannot be read safely. Its unreadable original stays protected; recovery waits for a compatible app.");
-  if(deviceStorageAuthority&&(head?.hash!==deviceHeadHash||legacyBoardSignature(browser)!==deviceLegacySeenSignature))throw decisionRecoveryProblem("This device source changed in another tab. Close this review so sync can read it, then review again.");
+  // #2406 review: a head this tab is still committing (it has landed but not
+  // returned, so deviceHeadHash is still the earlier one) is this tab's own,
+  // not another tab's change; so is one that holds exactly this tab's board.
+  const ownHead=head?.hash===deviceHeadHash||typeof head?.payload==="string"&&(head.payload===local||deviceOwnCommits.has(head.payload));
+  if(deviceStorageAuthority&&(!ownHead||legacyBoardSignature(browser)!==deviceLegacySeenSignature))throw decisionRecoveryProblem("This device source changed in another tab. Close this review so sync can read it, then review again.");
   const remote=await backend.pull();
   if(remote?.error||remote?.cancelled||!remote||!remote.payload&&!remote.empty)throw decisionRecoveryProblem("Cloud could not be read. Nothing was applied; retry when the connection is available.");
   const rev=remote.empty?0:remote.rev;
