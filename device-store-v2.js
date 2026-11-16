@@ -951,7 +951,11 @@
       for(const candidate of requested){
         if(!candidate||typeof candidate.id!=="string"||!candidate.id||typeof candidate.payload!=="string"||ids.has(candidate.id))
           return {error:true,code:"invalid-backup"};
-        ids.add(candidate.id);preparedBackups.push({...candidate,payloadHash:await sha(candidate.payload)});
+        // #2408: the automatic latest copy (and a day's first daily copy) holds
+        // the board's own text; hashing several megabytes again on a phone
+        // gave the same hash, so equal text takes the hash it already has.
+        const known=candidate.payload===payload?nextHash:preparedBackups.find(prepared=>prepared.payload===candidate.payload)?.payloadHash;
+        ids.add(candidate.id);preparedBackups.push({...candidate,payloadHash:known??await sha(candidate.payload)});
       }
       const tx=await beginTransaction(["meta","snapshots","backups"],"readwrite"),metaStore=tx.objectStore("meta"),snapshotStore=tx.objectStore("snapshots"),backupStore=tx.objectStore("backups");
       const [current,backupRows,snapshotKeys,recoveryHold,backupKeys]=await Promise.all([
