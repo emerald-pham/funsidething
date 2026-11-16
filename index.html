@@ -5086,7 +5086,8 @@ function save(preserveBackupId=null){
     const timer=countSyncTimer("save-debounce",setTimeout(()=>{
       endSyncTimer(timer);
       if(saveTimer!==timer)return;
-      saveTimer=null;return deviceSaveLane.request({preserveBackupId});
+      // Settles as persist() does: true once the board is durable here.
+      saveTimer=null;return deviceSaveLane.request({preserveBackupId}).then(outcome=>{if(outcome.error)throw outcome.error;return outcome.ok;});
     },350));
     saveTimer=timer;
   }

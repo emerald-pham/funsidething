@@ -16467,6 +16467,20 @@ test('RISK one save per answer: the support report records a push dropped becaus
  assert.equal(waiting.report().save.pushOutcome.value,'pending','and the push outcome is pending');
 });
 
+// #2406 review: the recovery fixtures run an edit's own debounced save and
+// wait for it to report the board durable (finishSeedSave, #187). Through the
+// device-save lane it still settles as persist() does.
+test('RISK one save per answer: the save an edit schedules settles true once its board is durable on this device',{timeout:60000},async t=>{
+ const device=await answeringDevice2408(t,{signedIn:false});
+ const {ctx,shim}=device,schedule=ctx.setTimeout,debounced=[];
+ ctx.setTimeout=(fn,ms,...args)=>{if(ms!==350)return schedule(fn,ms,...args);debounced.push(()=>fn(...args));return {debounced2406:true};};
+ shim.document.getElementById('addInput').value='Saved by its own debounce';await ctx.onAction('add',{});
+ ctx.setTimeout=schedule;
+ assert.equal(debounced.length,1,'positive control: the Add scheduled its save');
+ assert.equal(await debounced[0](),true,'that save settles true');
+ assert.ok(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).tasks.some(task=>task.title==='Saved by its own debounce'),'and the board it saved holds the Add');
+});
+
 test('RISK one save per answer: a device save hashes the board once for the write when its latest backup holds the same text',{timeout:60000},async t=>{
  const device=await answeringDevice2408(t,{signedIn:false});
  await startAnswering2408(device);
