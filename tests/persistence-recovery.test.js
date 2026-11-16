@@ -1070,12 +1070,7 @@ test('RISK device save settle: a second copy saving repeatedly but finitely duri
  for(let i=0;i<4;i++)assert.equal(title('settle-repeat-theirs-'+i),'Other copy write '+(i+1),'every write of the other copy is kept');
  assert.equal(durable.tasks.some(task=>task.id==='settle-repeat-gone'),false,'a task deleted by the other copy stays deleted');
  assert.ok(draft,'the repair kept a copy of this tab\'s draft');
- // #2408: the edit accepted during the repair now saves after it, and that
- // save finds everything in the draft already in the saved board, so #2335
- // removes the draft as redundant. Before, that save ran beside the repair
- // and missed it. The draft is kept until then, or its work is saved.
- const draftBoard=JSON.parse(draft),keptDraft=(await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft);
- assert.ok(keptDraft||draftBoard.tasks.every(task=>durable.tasks.some(row=>row.id===task.id&&(task.id!=='settle-repeat-mine'||row.title===task.title))||Object.hasOwn(durable.deletedTaskIds||{},task.id)),'the exact superseded draft is kept as a backup, or every task in it is in the saved board');
+ assert.ok((await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft),'the exact superseded draft is kept as a backup');
  const reopened=await loadAppAtTime(f.at+10000,{sharedStorage:f.shim.localStorage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,cloudSyncFactory:settleQuietCloud2324});t.after(()=>reopened.dispose());
  assert.equal(JSON.stringify(reopened.ctx.state),head.payload,'a cold reopen shows every copy\'s work');
 });
@@ -1127,8 +1122,9 @@ test('RISK device save settle: saving on top of an earlier save of this tab keep
  assert.equal(vm.runInContext("releaseCloudRecoveryPins(['pin-released-2323'])",f.ctx),true);
  f.edit('settle-pins-b','Edited B');
  // #2408: an edit's own save now waits for the earlier one, so the overlap
- // comes from a save that does not wait, as the acknowledgement's does.
- vm.runInContext('clearSyncTimeout(saveTimer);saveTimer=null',f.ctx);f.ctx.persist();
+ // comes from a save outside the device-save lane, as an explicit save, a
+ // recovery's or a cloud read's merge is.
+ f.ctx.persist();
  const head=await f.settled('saves on top of this tab\'s own save');
  assert.ok(results.some(result=>result?.conflict),'a save found the head moved by this tab\'s own earlier save');
  assert.equal((await f.store.listBackups()).filter(row=>row.kind==='stale-tab-draft').length,0,'it saved on top of it rather than merging');
@@ -16667,10 +16663,14 @@ test('RISK answer shows first guidance: Help and the changelog say answers show 
  const app=await loadApp();t.after(()=>app.dispose());
  for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
- const answer=help.split('<dt>Why does the rank column take a moment after an answer?</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(answer,/^An answer shows the next task, the check-in or the end of scanning straight away\./,'Help says answers show straight away: '+answer);
+ // #2406 review: the answer-first behaviour has its own question, and the
+ // rank column's keeps its own answer.
+ const answer=help.split('<dt>What happens right after I answer?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/^The next task, the check-in or the end of scanning shows straight away\./,'Help says answers show straight away: '+answer);
  assert.match(answer,/Task history, the rank column, saving and syncing catch up just after, in the order you answered, and you can keep answering meanwhile\./);
- assert.match(answer,/catch up at most once a second/,'the earlier answer’s limit stays');
+ const ranks=help.split('<dt>Why does the rank column take a moment after an answer?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(ranks,/^While you answer quickly, the rank column and list order catch up at most once a second/,'the rank column question answers only for the rank column: '+ranks);
+ assert.doesNotMatch(ranks,/saving|syncing|history/i);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  const latest=current.split('<h3>November 16, 2026</h3>')[1]?.split('</ul>')[0]||'';
  const bullet=latest.match(/<li>[^<]*straight away[^<]*<\/li>/)?.[0]||'';

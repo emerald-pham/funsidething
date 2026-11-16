@@ -860,8 +860,11 @@ function woopStep(app,value){
 }
 function woopDislodgeTwice(app){
  const {ctx,task}=app;
+ // #2406 review: with Last task WOOP on, a Dislodge records its History before
+ // the screen updates; with it off that History catches up just after.
+ ctx.state.settings.lastTaskWoop=true;
  for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.dislodge();}
- ctx.state.chain=[task.id];ctx.state.mode='work';ctx.state.settings.lastTaskWoop=true;
+ ctx.state.chain=[task.id];ctx.state.mode='work';
 }
 
 const ratingHistoryCopy = value => JSON.parse(JSON.stringify(value));
