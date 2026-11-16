@@ -55,7 +55,8 @@ ownership and shared-resource coordination.
 Every brief that asks a subagent for a functional change names the `tdd` skill
 and the agreed seams. That includes review fixes, follow-up rounds and
 integration repairs, whose briefs left it out before #2321. The subagent loads
-`tdd` and reads its `tests.md` and `mocking.md` before its first test.
+`tdd` and reads its `tests.md` and `mocking.md` before its first test. Start
+each implementer brief from the [implementer brief](implementer-brief.md).
 
 ## Strict TDD at agreed seams
 

@@ -18,8 +18,9 @@ Domain docs: single-context; see [domain rules](docs/agents/domain.md) before ex
 Before publishing or triaging issues/specs, read the
 [GitHub tracker](docs/agents/issue-tracker.md) and
 [triage labels](docs/agents/triage-labels.md).
-For command-line evidence collection, coordination, audits, or CI/PR automation,
-use [agent evidence tools](docs/agents/agent-evidence.md).
+For command-line evidence collection, coordination, audits, CI automation, or PR
+body updates (`gh pr edit` fails on Projects (classic)), use
+[agent evidence tools](docs/agents/agent-evidence.md).
 For app-opening responsiveness, visible action feedback, or optional/background
 work, read [responsiveness guidance](docs/agents/responsiveness.md).
 

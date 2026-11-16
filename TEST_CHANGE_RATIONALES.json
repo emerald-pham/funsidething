@@ -23627,5 +23627,39 @@
       "command": "npm run agent:record-test-run -- --purpose later-baseline-sensitivity -- node --test --test-name-pattern=\"RISK task rating history|RISK task history: (comparison labels|compact Likelihood|compact Top X)|RISK SCALABLE CONCURRENCY: overlapping native and background saves|RISK scoped Undo: cancelling Start restores|RISK Last task WOOP: cancel empty repeated|RISK scoped Undo recovery: Undo of an informed evergreen return|RISK sync session settled: the settled signal changes nothing|RISK device save settle: a second copy saving repeatedly\" tests-main/core.test.js tests-main/persistence-recovery.test.js, with fa159866's own test files copied to tests-main/ and run against the round-1 app (recorder record 2026-11-16T17-28-26-887Z-0aa91946-875f-4683-ad8d-48ccc3ee1f8b; GREEN with the changed lines: 2026-11-16T17-29-12-706Z-06174eca-b029-4b23-8e22-eec9a5a1f023 and, with the scoped Undo Start line restored, 2026-11-16T18-23-15-827Z-2df77709-a0a5-4f58-9c3b-e0c7b294a84c)",
       "failure": "14 of 33 failed. The History tests read History before it was written (\"No Dot Dislodge completion and Undo\", \"malformed and future records remain recoverable\" and the others listed). SCALABLE CONCURRENCY hit its \"background sendPush transaction commit\" deadline: the push no longer saves an already durable head. The WOOP test read a null task after two Dislodges with Last task WOOP off. Scoped Undo Start's device kept the cancelled pass on that candidate; it passes again since a lane save that starts at once hands back persist()'s own promise, so its line is main's. Scoped Undo recovery timed out waiting for a Dot response the redundant-save proof no longer writes. The settled story failed \"positive control: the Debug log names this page\" on the pretty-printed report. The recorder labels the run infrastructure-failure because several History reads surface as TypeError or SyntaxError on History not yet written; each is a behavioural mismatch. The #2324 finite-peer test passed, so its main assertion is restored. These were first seen in the #2407 and #2408 slice runs and in the round-1 core group run on 6cba91df."
     }
+  },
+  {
+    "baseCommit": "05cace90a806f88acdba762b4ac929fc02e7919c",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs=0,signedIn=true,dropDatabase=false}={}){",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t);",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t);",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t);",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t);",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t);",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{signedIn:false});",
+      "tests/persistence-recovery.test.js:-const device=await answeringDevice2408(t,{signedIn:false});",
+      "tests/persistence-recovery.test.js:-const docs=new Map(),device=await answeringDevice2408(t,{docs});",
+      "tests/persistence-recovery.test.js:-const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage()});",
+      "tests/persistence-recovery.test.js:-const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,signedIn:false});",
+      "tests/persistence-recovery.test.js:-const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage});",
+      "tests/persistence-recovery.test.js:-const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,signedIn:false});",
+      "tests/persistence-recovery.test.js:-const waiting=await answeringDevice2408(t);"
+    ],
+    "reason": "#2405 (retro of #2406, retro 1): #2408's tests met the spec only because the test device store saved instantly; at a phone's measured 0.7 to 3 s saves the 20 s push never went out. The sync-scheduling helper answeringDevice2408 therefore has no default device-save duration and refuses a call that does not state one. Its signature line loses the saveMs=0 default, and every existing caller that relied on that default now states saveMs:0. No assertion, timing or fixture changes: each of those tests runs exactly as before.",
+    "previousBehavior": "answeringDevice2408 defaulted saveMs to 0, so a test that omitted it ran on an instant device store without saying so, and a scheduling test could pass only because saves took no time.",
+    "intendedBehavior": "answeringDevice2408 throws a TypeError naming saveMs and the field timings (0.7 to 3 s) unless saveMs is a finite, non-negative number. Callers state their device-save duration: the existing instant-save callers say saveMs:0, and the 1500 ms and slow-phone 700 to 3000 ms callers are unchanged.",
+    "preservedCoverage": [
+      "Every one save per answer test keeps every assertion, its device-save duration (0 or 1500 ms, or the slow-phone 700 to 3000 ms runs) and its fixtures; only the instant duration is now written out.",
+      "The reopen, laptop and waiting devices in those tests open exactly as before, on an instant store, and keep their cloud, device and reopen assertions.",
+      "The slow-phone helpers slowPhone2408 and answerRunOnSlowPhone2408 already required saveMs and still pass it through unchanged."
+    ],
+    "replacementTests": [
+      "one save per answer harness: a device opened without an explicit device-save duration is refused, naming saveMs"
+    ],
+    "redEvidence": {
+      "command": "npm run agent:record-test-run -- --purpose preimplementation-red --summary -- node --max-old-space-size=8192 --test --test-name-pattern=\"one save per answer harness\" tests/persistence-recovery.test.js, on 05cace90 with only the new test added (recorder record 2026-11-16T22-11-30-332Z-d47b4f08-8809-4a08-9554-482f7b23ff40; GREEN for the helper and every caller: 2026-11-16T22-11-52-089Z-a49c8308-31c6-4017-a822-986e304ba2ab)",
+      "failure": "1 of 1 failed: AssertionError [ERR_ASSERTION]: Missing expected rejection: refused without a stated device-save duration: undefined. The helper opened a device on an instant store when the caller named no duration."
+    }
   }
 ]
