@@ -812,18 +812,20 @@ async function readGitStartState(cwd = process.cwd(), baseRefSelector) {
     runGit(['rev-parse', '--show-toplevel'], cwd),
     runGit(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd),
   ]);
-  if (branchName === 'HEAD') throw new Error('coordination begin requires an attached branch.');
+  // A reviewer checks out the exact candidate commit detached; it registers as
+  // that commit rather than attaching a throwaway branch (#2364, #2406 retro 4).
+  const detachedHead = branchName === 'HEAD';
   let main;
   if (baseRefSelector === undefined) main = await readMainRef(cwd);
   else main = await readMainRef(cwd).catch(() => undefined);
   const selectedBase = baseRefSelector === undefined
     ? { ref: main.fullRef, sha: main.sha, localBranchName: 'main' }
     : await readSelectedBaseRef(cwd, baseRefSelector);
-  if (branchName === 'main' || branchName === selectedBase.localBranchName) {
+  if (!detachedHead && (branchName === 'main' || branchName === selectedBase.localBranchName)) {
     throw new Error(`coordination begin refuses to register work directly on protected base branch ${branchName}.`);
   }
   return {
-    branchName,
+    ...(detachedHead ? { detachedHead } : { branchName }),
     branchSha,
     mainSha: main?.sha,
     selectedBase: { ref: selectedBase.ref, sha: selectedBase.sha },
@@ -888,7 +890,7 @@ async function begin(filePath, options) {
       startedAt: now,
       heartbeatAt: now,
       status: 'active',
-      branchName: start.branchName,
+      ...(start.detachedHead ? { detachedHead: true } : { branchName: start.branchName }),
       startBranchSha: start.branchSha,
       ...(start.mainSha ? { startMainSha: start.mainSha } : {}),
       selectedBase: start.selectedBase,
