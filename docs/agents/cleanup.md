@@ -34,6 +34,9 @@ successful merge. The change owner completes this work before handing off.
    Do not force-remove a worktree to bypass these checks. Never remove the
    primary checkout. Prune stale worktree metadata only after confirming the
    checkout is missing, inactive, and not deliberately locked or offline.
+   After removing worktrees, run `npm run agent:worktree-ready -- prune` to
+   finish their ledger entries and free their ports
+   ([host coordination](host-coordination.md#agent-worktrees)).
 5. Before deleting a remote branch, capture its current full SHA, prove that
    exact tip is an ancestor of fetched `origin/main`, and check for open pull
    requests, live ownership, and associated checkout data again. Delete with

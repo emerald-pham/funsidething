@@ -19,11 +19,13 @@ node scripts/agent-tools/record-run.mjs \
   -- node --test scripts/agent-tools/record-run.test.mjs
 ```
 
+In a worktree prepared with `agent:worktree-ready` ([host coordination](host-coordination.md#agent-worktrees)), its ports reach the test run with no export: the recorder hands them to its child, and the suite's shared setup reads them for a plain `node --test` or `npm run test:group` started at the worktree root. Either way a port variable the shell set wins, and `CI=true` never reads them.
+
 ### Local qualification readiness
 
 For an expensive local qualification run, opt in to the readiness gate explicitly. It checks that `--repo` is a clean Git worktree root; `CHAIN_NATIVE_CANDIDATE_SHA` and `CHAIN_NATIVE_CANDIDATE_TREE` exactly match its committed `HEAD`; recorder evidence and `CHAIN_NATIVE_OUTPUT` are separate writable directories outside that checkout; and distinct `CHAIN_NATIVE_PORT` and `CHAIN_NATIVE_SMOKE_PORT` values are allocated to this active worktree in the configured host coordination ledger. The resource names are `loopback:127.0.0.1:<CHAIN_NATIVE_PORT>` and `loopback:127.0.0.1:<CHAIN_NATIVE_SMOKE_PORT>`. An allocation held by another active or parked worktree is rejected. The gate rejects `CI=true` for local qualification because the native smoke child switches to ephemeral port 0 and ignores the allocated `CHAIN_NATIVE_SMOKE_PORT`. A failed check exits before the requested child starts.
 
-Allocate both ports to the current active worktree through the host coordination flow first, then set the variables from those resource claims. For example, with the allocated values already exported in the shell:
+A prepared worktree already holds both ports. Otherwise allocate them to the current active worktree through the host coordination flow and export the two variables from those resource claims first. Then:
 
 ```sh
 GIT_COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)"
@@ -31,8 +33,6 @@ EVIDENCE_DIR="$GIT_COMMON_DIR/agent-test-runs/issue-277/recorder"
 export CHAIN_NATIVE_CANDIDATE_SHA="$(git rev-parse 'HEAD^{commit}')"
 export CHAIN_NATIVE_CANDIDATE_TREE="$(git rev-parse 'HEAD^{tree}')"
 export CHAIN_NATIVE_OUTPUT="$GIT_COMMON_DIR/agent-test-runs/issue-277/native"
-: "${CHAIN_NATIVE_PORT:?allocate loopback:127.0.0.1:<port> to this worktree first}"
-: "${CHAIN_NATIVE_SMOKE_PORT:?allocate a distinct loopback:127.0.0.1:<port> to this worktree first}"
 node scripts/agent-tools/record-run.mjs \
   --repo "$PWD" \
   --evidence-dir "$EVIDENCE_DIR" \
