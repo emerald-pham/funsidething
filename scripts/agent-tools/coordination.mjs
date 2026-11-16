@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, resolve } from 'node:path';
-import { link, lstat, mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { link, lstat, mkdir, open, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -1036,7 +1036,7 @@ async function finish(filePath, options) {
       if (release.originMainSha !== release.mainSha) {
         throw new Error(`Cannot complete coordination entry ${entry.id}: origin/main (${release.originMainSha}) does not match local main (${release.mainSha}).`);
       }
-      const verified = await verifyChainScannerReleaseEvidence(release.repositoryRoot, release.branchSha);
+      const verified = await verifyChainScannerLandingEvidence(release.repositoryRoot, release.branchSha, release.mainSha);
       if (!verified.ok) throw new Error(`Cannot complete coordination entry ${entry.id}: Chain Scanner release evidence failed: ${verified.errors.join(' ')}`);
       releaseEvidence = {
         adapter,
@@ -1136,6 +1136,46 @@ async function verifyChainScannerReleaseEvidence(repositoryRoot, commitSha) {
     throw new Error(`Chain Scanner release-evidence adapter at ${modulePath} does not export verifyReleaseEvidence().`);
   }
   return releaseEvidenceModule.verifyReleaseEvidence(repositoryRoot, commitSha);
+}
+
+// Work merged through an integration branch has no receipt of its own: the
+// receipt binds the integration candidate that was reviewed and merged (#2412).
+// The task commit's exact receipt still decides when it exists, so direct-to-main
+// work finishes as before. Otherwise a sibling receipt counts only when its
+// candidate is merged into main, contains the task commit, and its reviewed diff
+// (base..candidate) includes it: a later release whose base already held the
+// commit did not review it.
+async function verifyChainScannerLandingEvidence(repositoryRoot, commitSha, mainSha) {
+  const exact = await verifyChainScannerReleaseEvidence(repositoryRoot, commitSha);
+  if (exact.ok || !exact.receiptPath || (await metadataIfPresent(exact.receiptPath))) return exact;
+  // The adapter owns the receipt layout; its exact path names the shared receipt directory.
+  const receiptRoot = dirname(dirname(exact.receiptPath));
+  const errors = [`No valid release receipt for task commit ${commitSha} or for a merged candidate that contains it.`, ...exact.errors];
+  let names = [];
+  try {
+    names = (await readdir(receiptRoot)).filter((name) => /^[0-9a-f]{40}$/.test(name));
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  const recorded = new Set(names);
+  // Newest first from rev-list; the oldest containing candidate brought the commit to main.
+  const between = recorded.size
+    ? (await runGit(['rev-list', '--ancestry-path', `${commitSha}..${mainSha}`], repositoryRoot)).split(/\s+/)
+    : [];
+  for (const candidateSha of between.filter((sha) => recorded.has(sha)).reverse()) {
+    let baseSha;
+    try {
+      baseSha = JSON.parse(await readFile(join(receiptRoot, candidateSha, 'receipt.json'), 'utf8'))?.candidate?.baseSha;
+    } catch {
+      baseSha = undefined;
+    }
+    // An unreadable base cannot prove the commit was already there; full verification decides.
+    if (typeof baseSha === 'string' && /^[0-9a-f]{40}$/.test(baseSha) && (await gitIsAncestor(commitSha, baseSha, repositoryRoot))) continue;
+    const verified = await verifyChainScannerReleaseEvidence(repositoryRoot, candidateSha);
+    if (verified.ok) return verified;
+    errors.push(`Containing candidate ${candidateSha}: ${verified.errors.join(' ')}`);
+  }
+  return { ...exact, errors };
 }
 
 function shellQuote(value) {
