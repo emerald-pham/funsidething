@@ -79,7 +79,7 @@ function ownerOf(ledger, worktree) {
   return JSON.parse(readFileSync(ledger, 'utf8')).entries.filter((entry) => entry.worktree === worktree && entry.status === 'active');
 }
 
-test('prepare gives a new worktree its own dependencies and two exported ports, and a reviewer\'s detached worktree gets different ones', () => {
+test("prepare gives a new worktree its own dependencies and two exported ports, and a reviewer's detached worktree gets different ones", () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-');
   try {
     const agent = addWorktree(main, join(fixture, 'agent-one'));
@@ -202,7 +202,7 @@ test('a test command run through the recorder in a prepared worktree gets its po
 // Claude Code removes an unchanged subagent worktree itself and runs no
 // WorktreeRemove hook for it, and the coordinator removes the rest directly.
 // So claims are freed by sweeping entries whose worktree is gone (#2368).
-test('prune frees the entries and ports of removed worktrees and leaves live, parked, hand-made and other repositories\' entries alone', () => {
+test("prune frees the entries and ports of removed worktrees and leaves live, parked, hand-made and other repositories' entries alone", () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-prune-');
   try {
     const removed = addWorktree(main, join(fixture, 'agent-removed'));

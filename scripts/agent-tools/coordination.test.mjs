@@ -1026,7 +1026,7 @@ test('begin protects main and the selected local base branch, including for orig
 // A reviewer checks out the exact candidate commit detached. Retro 4 of #2406
 // (approved 2026-11-16): the ledger refused that checkout, so the typography
 // reviewer had to attach a throwaway local branch just to claim its ports (#2364).
-test('begin registers a reviewer\'s detached checkout at an exact commit, which can then claim ports', () => {
+test("begin registers a reviewer's detached checkout at an exact commit, which can then claim ports", () => {
   const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-detached-')));
   try {
     const ledgerPath = join(fixture, 'host-ledger.json');
