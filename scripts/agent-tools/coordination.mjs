@@ -906,6 +906,7 @@ async function begin(filePath, options) {
       requestedScopes: scopes,
       requestedClaims: claims,
       ...(implementationPrompt ? { implementationPrompt } : {}),
+      ...(text(options['registered-by']) ? { registeredBy: text(options['registered-by']) } : {}),
     };
     state.entries.push(entry);
     await writeState(filePath, pruneOrphanedConfigurations(state));
@@ -1217,6 +1218,42 @@ async function releaseClaim(filePath, options) {
   });
 }
 
+// Completes this repository's active entries that the named setup tool
+// registered and whose worktree directory no longer exists, releasing their
+// resources. Claude Code removes subagent worktrees without running a removal
+// hook, so their entries could otherwise never be finished (#2364, #2368).
+// Parked, hand-registered and other repositories' entries are never touched:
+// missing paths do not waive their ownership.
+async function prune(filePath, options) {
+  const registeredBy = text(options['registered-by']);
+  if (!registeredBy) throw new Error('coordination prune requires --registered-by <tool>.');
+  const repositoryIdentity = resolve(await runGit(['rev-parse', '--path-format=absolute', '--git-common-dir']));
+  return withCoordinationLock(filePath, async () => {
+    const state = await readState(filePath, { pruneReservations: false });
+    const pruned = [];
+    for (const entry of state.entries) {
+      if (entry.status !== 'active' || entry.registeredBy !== registeredBy || entry.repositoryIdentity !== repositoryIdentity) continue;
+      if (typeof entry.worktree !== 'string' || !isAbsolute(entry.worktree)) continue;
+      const missing = await lstat(entry.worktree).then(() => false, (error) => error?.code === 'ENOENT');
+      if (!missing) continue;
+      const now = new Date().toISOString();
+      entry.claimReleases = [...(entry.claimReleases ?? []), {
+        releasedAt: now, scopes: entry.scopes ?? [], claims: entry.claims ?? [], resources: entry.resources ?? [],
+      }];
+      entry.scopes = [];
+      entry.claims = [];
+      entry.resources = [];
+      entry.status = 'complete';
+      entry.outcome = 'pruned';
+      entry.completedAt = now;
+      entry.result = 'Worktree directory no longer exists.';
+      pruned.push(entry);
+    }
+    if (pruned.length) await writeState(filePath, state);
+    return pruned;
+  });
+}
+
 function parseOptions(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 1) {
@@ -1316,6 +1353,13 @@ if (command === 'discover') {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 2;
   }
+} else if (command === 'prune') {
+  try {
+    console.log(JSON.stringify(await prune(discover(args), parseOptions(args)), null, 2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
 } else if (command === 'release-claim') {
   try {
     const entry = await releaseClaim(discover(args), parseOptions(args));
@@ -1325,6 +1369,6 @@ if (command === 'discover') {
     process.exitCode = 2;
   }
 } else {
-  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|park|resume|finish> [options]');
+  console.error('usage: coordination.mjs <discover|export-env|install|migrate|status|begin|heartbeat|claim|release-claim|prune|park|resume|finish> [options]');
   process.exitCode = 2;
 }

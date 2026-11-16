@@ -151,6 +151,7 @@ function prepare() {
   let ports;
   if (ledger.reason) warn(`skipped ports: ${ledger.reason}. Nothing was written to any ledger.`);
   else {
+    pruneRemoved(where.root);
     const claimed = claimPorts(where.root, ledger);
     if (claimed.reason) warn(`skipped ports: ${claimed.reason}.`);
     else ports = claimed.ports;
@@ -164,6 +165,24 @@ function prepare() {
   console.log(`worktree-ready: ${prepareDependencies(where)}`);
 }
 
+// Finishes the entries of removed worktrees so their ports return to the pool.
+function pruneRemoved(root) {
+  const pruned = coordination(['prune', '--registered-by', REGISTERED_BY], root);
+  if (pruned.status !== 0) {
+    warn(`skipped prune: ${pruned.stderr.trim()}`);
+    return;
+  }
+  const entries = JSON.parse(pruned.stdout);
+  if (entries.length) console.log(`worktree-ready: freed ${entries.length} removed worktree entr${entries.length === 1 ? 'y' : 'ies'}: ${entries.map((entry) => entry.worktree).join(', ')}`);
+}
+
+function prune() {
+  const { root } = checkout(process.cwd());
+  const ledger = usableLedger(root);
+  if (ledger.reason) warn(`skipped prune: ${ledger.reason}. Nothing was written to any ledger.`);
+  else pruneRemoved(root);
+}
+
 function printEnvironment() {
   const { portsFile } = checkout(process.cwd());
   if (existsSync(portsFile)) process.stdout.write(readFileSync(portsFile, 'utf8'));
@@ -174,8 +193,9 @@ const [command] = process.argv.slice(2);
 try {
   if (command === 'prepare') prepare();
   else if (command === 'env') printEnvironment();
+  else if (command === 'prune') prune();
   else {
-    console.error('usage: worktree-ready.mjs <prepare|env>');
+    console.error('usage: worktree-ready.mjs <prepare|env|prune>');
     process.exitCode = 2;
   }
 } catch (error) {

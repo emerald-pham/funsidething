@@ -149,3 +149,51 @@ test('without a usable ledger, prepare still makes dependencies available, warns
     rmSync(fixture, { recursive: true, force: true });
   }
 });
+
+// Claude Code removes an unchanged subagent worktree itself and runs no
+// WorktreeRemove hook for it, and the coordinator removes the rest directly.
+// So claims are freed by sweeping entries whose worktree is gone (#2368).
+test('prune frees the entries and ports of removed worktrees and leaves live, parked, hand-made and other repositories\' entries alone', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-prune-');
+  try {
+    const removed = addWorktree(main, join(fixture, 'agent-removed'));
+    const live = addWorktree(main, join(fixture, 'agent-live'));
+    for (const worktree of [removed, live]) assert.equal(run(['prepare'], worktree, { ledger, npm }).status, 0);
+    const state = JSON.parse(readFileSync(ledger, 'utf8'));
+    const identity = state.entries[0].repositoryIdentity;
+    const gone = (name) => join(fixture, name);
+    const kept = [
+      { id: 'parked-gone', status: 'parked', registeredBy: 'worktree-ready', repositoryIdentity: identity, worktree: gone('parked-gone'), resources: ['loopback:127.0.0.1:42901'] },
+      { id: 'other-repository', status: 'active', registeredBy: 'worktree-ready', repositoryIdentity: join(fixture, 'other', '.git'), worktree: gone('other-gone'), resources: ['loopback:127.0.0.1:42902'] },
+      { id: 'hand-made', status: 'active', repositoryIdentity: identity, worktree: gone('hand-made-gone'), resources: ['loopback:127.0.0.1:42903'] },
+    ];
+    state.entries.push(...kept);
+    writeFileSync(ledger, `${JSON.stringify(state, null, 2)}\n`);
+    const removedPorts = loopbackPorts(ownerOf(ledger, removed)[0]);
+    const livePorts = loopbackPorts(ownerOf(ledger, live)[0]);
+    git(main, 'worktree', 'remove', '--force', removed);
+
+    const pruned = run(['prune'], main, { ledger, npm });
+    assert.equal(pruned.status, 0, pruned.stderr);
+    const after = JSON.parse(readFileSync(ledger, 'utf8')).entries;
+    const removedEntry = after.find((entry) => entry.worktree === removed);
+    assert.equal(removedEntry.status, 'complete', 'the removed worktree\'s entry is finished');
+    assert.deepEqual(loopbackPorts(removedEntry), [], 'its ports are released');
+    assert.equal(removedPorts.length, 2);
+    assert.deepEqual(loopbackPorts(ownerOf(ledger, live)[0]), livePorts, 'a live worktree keeps its entry and ports');
+    for (const entry of kept) assert.deepEqual(after.find((candidate) => candidate.id === entry.id), entry, `${entry.id} is untouched`);
+
+    git(main, 'worktree', 'remove', '--force', live);
+    assert.equal(run(['prepare'], addWorktree(main, join(fixture, 'agent-next')), { ledger, npm }).status, 0);
+    assert.equal(JSON.parse(readFileSync(ledger, 'utf8')).entries.find((entry) => entry.worktree === live).status, 'complete',
+      'preparing a new worktree also frees the entries of removed ones');
+
+    const before = readFileSync(ledger, 'utf8');
+    const unconfigured = run(['prune'], main, { ledger: '', npm });
+    assert.equal(unconfigured.status, 0, unconfigured.stderr);
+    assert.match(unconfigured.stderr, /skipped prune/i);
+    assert.equal(readFileSync(ledger, 'utf8'), before, 'with no configured ledger nothing is written');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
