@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, readFile, readlink, realpath, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { applyPreparedPorts, loopbackResource } from './worktree-ports.mjs';
 
 const purposes = new Set(['preimplementation-red', 'later-baseline-sensitivity', 'green']);
 const cleanupGraceMs = 750;
@@ -117,21 +118,6 @@ async function runGit(repo, args) {
   return result;
 }
 
-// A worktree prepared by worktree-ready.mjs keeps its claimed ports in its own
-// Git directory. Subagent shells keep no environment between commands, so the
-// recorder hands them to the child unless the shell set its own (#2364). CI
-// uses ephemeral ports and never reads them.
-async function loadPreparedPorts(repo, environment) {
-  if (environment.CI === 'true') return;
-  const gitDirectory = await runGit(repo, ['rev-parse', '--absolute-git-dir']);
-  if (gitDirectory.code !== 0) return;
-  const prepared = await readFile(path.join(gitDirectory.stdout.toString('utf8').trim(), 'chain-worktree-ports.env'), 'utf8').catch(() => '');
-  for (const name of ['CHAIN_NATIVE_PORT', 'CHAIN_NATIVE_SMOKE_PORT']) {
-    const port = new RegExp(`^export ${name}=(\\d+)$`, 'm').exec(prepared)?.[1];
-    if (port && !environment[name]?.trim()) environment[name] = port;
-  }
-}
-
 async function gitIdentity(repo, redaction) {
   const result = await runGit(repo, ['rev-parse', 'HEAD']);
   return result.code === 0
@@ -240,8 +226,8 @@ async function validateHostPortOwnership(environment, worktree, deliveryPort, sm
     throw new Error('The active host coordination entry for this worktree has no valid owner ID.');
   }
   const requiredResources = new Map([
-    [deliveryPort, `loopback:127.0.0.1:${deliveryPort}`],
-    [smokePort, `loopback:127.0.0.1:${smokePort}`],
+    [deliveryPort, loopbackResource(deliveryPort)],
+    [smokePort, loopbackResource(smokePort)],
   ]);
   for (const [port, resource] of requiredResources) {
     const variable = port === deliveryPort ? 'CHAIN_NATIVE_PORT' : 'CHAIN_NATIVE_SMOKE_PORT';
@@ -642,7 +628,8 @@ async function main(argv) {
   for (const pattern of redaction.patterns) {
     try { new RegExp(pattern); } catch (error) { throw new Error(`Invalid --redact-pattern: ${error.message}`); }
   }
-  await loadPreparedPorts(repo, process.env);
+  // A worktree prepared by worktree-ready.mjs hands its claimed ports to the child (#2364).
+  applyPreparedPorts(process.env, repo);
   const git = await gitIdentity(repo, redaction);
   const workingTree = await collectSourceTestState(repo, redaction);
   // Keep filesystem destinations private to I/O; evidence metadata follows the
