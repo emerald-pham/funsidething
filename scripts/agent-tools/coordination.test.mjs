@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { recordReleaseEvidence } from '../release-evidence.mjs';
@@ -1569,6 +1569,141 @@ test('Chain Scanner landed finish rejects a stale remote even when local main re
     assert.notEqual(result.status, 0, 'a stale actual remote must block a landed completion');
     assert.match(result.stderr, /remote|origin\/main/i);
     assert.equal(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0].status, 'active');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+function recordDocsOnlyReceipt(project, fixture, candidateSha, baseSha, label) {
+  const ownerEvidencePath = join(fixture, `${label}-owner-review.md`);
+  const ownerEvidence = `Owner reviewed the full exact ${label} documentation candidate in this fixture.`;
+  writeFileSync(ownerEvidencePath, `${ownerEvidence}\n`);
+  return recordReleaseEvidence(project, {
+    schemaVersion: 2,
+    candidate: { commitSha: candidateSha, treeSha: git(project, 'rev-parse', `${candidateSha}^{tree}`), baseSha },
+    ownerReview: {
+      task: `owner-review-2412-${label}`, outcome: 'approved', reviewedSha: candidateSha,
+      completedAt: '2026-11-16T11:00:00.000Z',
+      summary: ownerEvidence,
+      scope: { fullDiff: true, rationale: 'This fixture candidate only changes non-policy documentation notes.' },
+      evidencePath: ownerEvidencePath,
+      evidenceSha256: createHash('sha256').update(`${ownerEvidence}\n`).digest('hex'),
+    },
+  });
+}
+
+function commitDocsNote(project, name, body) {
+  mkdirSync(join(project, 'docs'), { recursive: true });
+  writeFileSync(join(project, 'docs', name), `${body}\n`);
+  git(project, 'add', join('docs', name));
+  git(project, 'commit', '--quiet', '-m', body);
+  return git(project, 'rev-parse', 'HEAD');
+}
+
+// The #2406 shape: a task branch merges into an integration branch, review fixes
+// land there, and the receipt binds the integration candidate, not the task commit.
+function createIntegrationFixture(fixture, branch) {
+  const ledgerPath = join(fixture, 'host-ledger.json');
+  const project = createProject(join(fixture, 'chain-scanner'), branch);
+  git(project, 'checkout', '--quiet', 'main');
+  mkdirSync(join(project, 'scripts'), { recursive: true });
+  copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+  git(project, 'add', 'scripts/release-evidence.mjs');
+  git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+  const integrationBaseSha = git(project, 'rev-parse', 'HEAD');
+  addOrigin(project, fixture);
+  git(project, 'checkout', '--quiet', branch);
+  git(project, 'merge', '--quiet', '--ff-only', 'main');
+  const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Integration landing fixture'], project);
+  assert.equal(began.status, 0, began.stderr);
+  const entry = JSON.parse(began.stdout);
+  const taskSha = commitDocsNote(project, 'task-note.md', 'Task change merged through an integration branch.');
+  git(project, 'checkout', '--quiet', '-b', 'integration/fixture', 'main');
+  git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge task into integration', branch);
+  const candidateSha = commitDocsNote(project, 'review-fix.md', 'Review fix on the integration branch.');
+  return { ledgerPath, project, entry, taskSha, candidateSha, integrationBaseSha };
+}
+
+function landIntegrationOnMain(project, { push = true } = {}) {
+  git(project, 'checkout', '--quiet', 'main');
+  git(project, 'merge', '--quiet', '--no-ff', '-m', 'Merge integration into main', 'integration/fixture');
+  const mergeSha = git(project, 'rev-parse', 'HEAD');
+  if (push) advanceOriginMain(project);
+  return mergeSha;
+}
+
+test('Chain Scanner landed finish records the merged integration candidate whose receipt reviewed the task commit', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-integration-'));
+  try {
+    const { ledgerPath, project, entry, taskSha, candidateSha, integrationBaseSha } = createIntegrationFixture(fixture, 'work/integration-task');
+    const candidateReceipt = recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
+    const mergeSha = landIntegrationOnMain(project, { push: false });
+    // A later main release also contains the task commit, but its receipt reviewed
+    // only what came after the merge, so it is not the task's release evidence.
+    const laterSha = commitDocsNote(project, 'later-release.md', 'Later unrelated release on main.');
+    recordDocsOnlyReceipt(project, fixture, laterSha, mergeSha, 'later');
+    advanceOriginMain(project);
+    git(project, 'checkout', '--quiet', entry.branchName);
+
+    const finished = command([
+      'finish', '--file', ledgerPath, '--id', entry.id, '--outcome', 'landed', '--adapter', 'chain-scanner',
+      '--result', 'Task landed through the integration candidate.',
+    ], project);
+
+    assert.equal(finished.status, 0, finished.stderr);
+    const completed = JSON.parse(finished.stdout);
+    assert.equal(completed.status, 'complete');
+    assert.equal(completed.outcome, 'landed');
+    assert.equal(completed.finalBranchSha, taskSha);
+    assert.equal(completed.mainSha, laterSha);
+    assert.equal(completed.originMainSha, laterSha);
+    assert.equal(completed.pushed, true);
+    assert.equal(completed.releaseEvidence.candidate.commitSha, candidateSha);
+    assert.equal(completed.releaseEvidence.candidate.baseSha, integrationBaseSha);
+    assert.equal(completed.releaseEvidence.receiptPath, candidateReceipt.receiptPath);
+    assert.equal(completed.releaseEvidence.receiptSha256, candidateReceipt.receipt.receiptSha256);
+    assert.equal(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0].outcome, 'landed');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('Chain Scanner landed finish through an integration branch refuses unmerged work, a stale remote and receipts that did not review the task', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-integration-refusals-'));
+  try {
+    const { ledgerPath, project, entry, taskSha, candidateSha, integrationBaseSha } = createIntegrationFixture(fixture, 'work/integration-refusals');
+    const candidateReceipt = recordDocsOnlyReceipt(project, fixture, candidateSha, integrationBaseSha, 'integration');
+    const finish = () => command([
+      'finish', '--file', ledgerPath, '--id', entry.id, '--outcome', 'landed', '--adapter', 'chain-scanner',
+    ], project);
+
+    // A valid receipt on a candidate that main has not merged does not land the task.
+    git(project, 'checkout', '--quiet', entry.branchName);
+    const unmerged = finish();
+    assert.notEqual(unmerged.status, 0);
+    assert.match(unmerged.stderr, new RegExp(`local main does not contain exact task commit ${taskSha}`));
+
+    const mergeSha = landIntegrationOnMain(project, { push: false });
+    git(project, 'checkout', '--quiet', entry.branchName);
+    const unpushed = finish();
+    assert.notEqual(unpushed.status, 0);
+    assert.match(unpushed.stderr, /origin\/main \([0-9a-f]{40}\) does not match local main/);
+
+    // Main moves on with its own release, then the integration receipt is lost:
+    // the later receipt's base already held the task commit, so it never reviewed it.
+    git(project, 'checkout', '--quiet', 'main');
+    const laterSha = commitDocsNote(project, 'later-release.md', 'Later unrelated release on main.');
+    recordDocsOnlyReceipt(project, fixture, laterSha, mergeSha, 'later');
+    advanceOriginMain(project);
+    git(project, 'checkout', '--quiet', entry.branchName);
+    rmSync(dirname(candidateReceipt.receiptPath), { recursive: true, force: true });
+    const unreviewed = finish();
+    assert.notEqual(unreviewed.status, 0, 'a later release that did not review the task commit cannot land it');
+    assert.match(unreviewed.stderr, new RegExp(`no valid release receipt for task commit ${taskSha} or for a merged candidate that contains it`, 'i'));
+
+    const after = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0];
+    assert.equal(after.status, 'active', 'every refusal keeps the active owner');
+    assert.equal(after.releaseEvidence, undefined);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
