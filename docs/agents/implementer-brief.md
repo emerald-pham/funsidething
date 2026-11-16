@@ -21,11 +21,7 @@ your full spec.
 
 - For a functional change, call the Skill tool with `mattpocock-skills:tdd`
   and read its tests.md and mocking.md before your first test. Agreed seams:
-  <seams>.
-- Record RED and GREEN with `npm run agent:record-test-run --`, evidence in
-  `<evidence directory outside the checkout>`.
-- A scheduling or debounce test runs at the timings in the spec's field
-  evidence: <timings>.
+  <seams>. Recorder evidence: `<evidence directory outside the checkout>`.
 
 ## Parallel siblings
 
@@ -40,6 +36,8 @@ your full spec.
 - Commit with messages referencing (#<N>).
 - Merge `origin/<base branch>` into your branch if it moved, then push your
   branch. No PR, no merge into the base or main, no release.
+- Leave your ledger entry open: after the merge to main,
+  `finish --outcome landed` or the prune after your worktree's removal closes it.
 - Report: branch and head SHA; each acceptance criterion, done or not and
   where; RED and GREEN record paths; groups run; rationale entries; decisions,
   each with its reason.

@@ -196,8 +196,9 @@ One independent reviewer, distinct from the owner, covers in one pass:
 2. Relevant tests: an observed behavioral RED and GREEN for each functional
    change, discriminating assertions with independent expected values, a test
    for every case each FAQ answer or changelog line promises, and no removed or
-   weakened protection without a recorded rationale. A scheduling or debounce
-   test covers the timings in the spec's field evidence.
+   weakened protection without a recorded rationale. For a scheduling or
+   debounce test, check its timings against
+   [TDD and regression gates](tdd-and-regression.md#forced-risk-based-tdd-and-regression-gates).
 3. User-visible and data safety: what users see and do, saved boards, backups,
    cloud sync, Undo and offline behavior affected by the change, and the
    extended FAQ where behavior changed.

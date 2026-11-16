@@ -40,7 +40,8 @@ undo, import or restore, deletion, and cross-device reconciliation when those
 paths touch the change. For a visual or motion change, cover the numerical
 geometry or paint contract, reduced motion, and relevant phone, tablet, and
 short-landscape viewports. For offline changes, check the asset fingerprint and
-offline reload. For a sync or scanner hot path, add the work-count test in
+offline reload. A scheduling or debounce test runs at the timings in the
+spec's field evidence. For a sync or scanner hot path, add the work-count test in
 [responsiveness](responsiveness.md). The changelog app fingerprint and the worker `CACHE_NAME` are
 never committed: the checkout keeps placeholders, and every consumer that
 serves the shell (the Pages deploy, `npm run serve`, the test harness, the native
