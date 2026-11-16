@@ -14,11 +14,10 @@ Inputs: the spec and tickets (`gh issue view`), the PR body,
 `<earlier findings file>` and `<recorder evidence directory>`.
 
 Checkout: your own detached worktree,
-`git worktree add --detach <scratchpad>/rev-<role> <full SHA>`, with
-node_modules linked from the main checkout. Before browser or native tests,
-claim ports as docs/agents/host-coordination.md describes; release them and
-remove the worktree when done. Until #2364 lands the ledger refuses a detached
-checkout, so attach a local-only branch to register it.
+`git worktree add --detach <scratchpad>/rev-<role> <full SHA>`; run
+`npm run agent:worktree-ready -- prepare` there for dependencies and ports
+(docs/agents/host-coordination.md). When done, remove the worktree and run
+`npm run agent:worktree-ready -- prune`.
 
 Scope, in docs/agents/release-and-review.md:
 
