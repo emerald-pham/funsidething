@@ -4733,10 +4733,10 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         let result;const own=deviceOwnCommits.get(options.payload)||{base,count:0};own.count++;deviceOwnCommits.set(options.payload,own);
         // A separate signal marks this commit's return for later saves; the
         // commit itself is awaited directly, as before.
-        let returned;const signal=new Promise(resolve=>{returned=resolve;});deviceHeadCommitsInFlight.add(signal);
+        let returned;const signal=new Promise(resolve=>{returned=resolve;});deviceHeadCommitsInFlight.add(signal);deviceCommitProgress++;
         try{result=await deviceWriteBeforeDiagnostics("commitHead",options);}
         catch(error){if(deviceQuotaFailure(error))result={error:true,code:"quota-exhausted"};else throw error;}
-        finally{deviceHeadCommitsInFlight.delete(signal);returned();if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);}
+        finally{deviceHeadCommitsInFlight.delete(signal);returned();deviceCommitProgress++;if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);}
         return result;
       };
       const legacyIndex=backupAlreadySafe?null:inspectBackupIndex();
@@ -6213,13 +6213,18 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
    Started side by side, a later save found the head moved by the earlier one
    and repaired onto it (#2324), a second whole-board commit; with a push
    restarting its own save after every answer, the support report copied on
-   2026-11-16 showed 25 device saves for nine answers. Queued, each runs once
-   the one before it has returned and writes the board as it is then. Those
-   saves and a push's own save are skipped when the board is proved already
-   durable here (deviceHeadHoldsBoard). A push's own save starts without
-   waiting, as before, but the next edit's save waits for it. Every other save
-   (the acknowledgement's, a recovery's, an import's) keeps its own timing. */
-let ordinaryDeviceSave=Promise.resolve(),ordinaryDeviceSaves=0;
+   2026-11-16 showed 25 device saves for nine answers. An edit's save now
+   waits for this tab's edit and push saves still running and then writes the
+   board as it is then. A save stalled for ORDINARY_SAVE_WAIT_MS (a device
+   store that stops answering) no longer holds the next one, which goes ahead
+   as before and repairs if it must. Those saves and a
+   push's own save are skipped when the board is proved already durable here
+   (deviceHeadHoldsBoard). A push's own save starts without waiting, as
+   before. Every other save (the acknowledgement's, a recovery's, an
+   import's) keeps its own timing. */
+const ORDINARY_SAVE_WAIT_MS=2000;
+// The latest edit or push save of this tab: when it began and when it ends.
+let lastOrdinaryDeviceSave=null;
 // The newest save request a durable save of this tab is known to cover. A
 // later request means the board has changed since, so a save goes straight
 // ahead without first serializing the board to compare it.
@@ -6229,15 +6234,32 @@ function saveBoardOnce(preserveBackupId=null,{queued=true}={}){
   const work=trackSyncWork("device-save");
   const start=()=>saveRequestGeneration>durableSaveRequestGeneration?persist(false,preserveBackupId)
     :deviceHeadHoldsBoard().then(held=>held?noteBoardAlreadyDurable():persist(false,preserveBackupId));
-  // With none waiting it starts now, as persist() always has. A push's own
-  // save starts at once too, as it always has (queued:false); the next edit's
-  // save still waits for it.
-  const run=ordinaryDeviceSaves&&queued?ordinaryDeviceSave.then(start):start();
-  ordinaryDeviceSaves++;
-  const earlier=ordinaryDeviceSave;
-  ordinaryDeviceSave=Promise.allSettled([earlier,run]).then(()=>{});
-  ordinaryDeviceSave.then(()=>{ordinaryDeviceSaves--;work.end();});
+  const before=lastOrdinaryDeviceSave;
+  let began;const started=new Promise(resolve=>{began=resolve;});
+  const begin=()=>{began();return start();};
+  // With none running it starts now, as persist() always has.
+  const run=before&&queued?waitForOrdinaryDeviceSave(before).then(begin):begin();
+  const ended=run.then(()=>{},()=>{});
+  // A push's save that did not wait still holds the next edit's save, as
+  // does the save it started beside.
+  const entry=before&&!queued?{started:Promise.all([before.started,started]),ended:Promise.all([before.ended,ended])}:{started,ended};
+  lastOrdinaryDeviceSave=entry;
+  entry.ended.then(()=>{if(lastOrdinaryDeviceSave===entry)lastOrdinaryDeviceSave=null;});
+  ended.then(()=>work.end());
   return run;
+}
+// Waits for that save to end, but stops waiting once ORDINARY_SAVE_WAIT_MS
+// pass with no head commit of this tab starting or returning: a save stalled
+// that long holds no later save. A save still committing, even through
+// several follow-ups, keeps the next one waiting.
+let deviceCommitProgress=0;
+function waitForOrdinaryDeviceSave(save){
+  return save.started.then(()=>new Promise(resolve=>{
+    let timer=null,seen=deviceCommitProgress;
+    const check=()=>{if(deviceCommitProgress===seen){timer=null;resolve();return;}seen=deviceCommitProgress;timer=setTimeout(check,ORDINARY_SAVE_WAIT_MS);};
+    timer=setTimeout(check,ORDINARY_SAVE_WAIT_MS);
+    save.ended.then(()=>{if(timer!==null)clearTimeout(timer);timer=null;resolve();});
+  }));
 }
 /* #2408: the proof that saving the live board would write nothing new. No
    device save issue is outstanding; nothing else a save carries is waiting (a
@@ -6467,8 +6489,9 @@ function queueDeviceCloudBackupReconcile(){
   },0));
 }
 let pendingPush = false;   // a write was asked for before that happened — released once we reconcile
-// #2408: a debounced push came due while another push ran; it goes when that
-// push ends. A newer request restarts its debounce instead (cloudPush).
+// #2408: the write held while another push ran (pendingPush) is only a
+// debounced request that came due; a newer request restarts its debounce
+// instead of sending it the moment that push ends (cloudPush).
 let pushFollowUpDue = false;
 // #2408: sendPush() calls not yet returned, from their first check on.
 let pushesRunning = 0;
@@ -6703,12 +6726,13 @@ let oldestUnpushedRequestAt=null;
 function cloudPush(){
   if(!cloudReady()) return;
   // #2408: a newer request restarts the debounce of a follow-up already due.
-  pushFollowUpDue=false;
+  if(pushFollowUpDue){pushFollowUpDue=false;pendingPush=false;}
   if(cloudTimer) clearSyncTimeout(cloudTimer);
   const now=performance.now();
   if(oldestUnpushedRequestAt===null||oldestUnpushedRequestAt>now)oldestUnpushedRequestAt=now;
-  const override=Number(window.CLOUD_PUSH_DELAY_MS),debounce=Number.isFinite(override)&&override>=0?override:2000;
-  const delay=Math.max(0,Math.min(debounce,oldestUnpushedRequestAt+CLOUD_PUSH_LONGEST_WAIT_MS-now));
+  // A test's own delay (CLOUD_PUSH_DELAY_MS) replaces the whole schedule.
+  const override=Number(window.CLOUD_PUSH_DELAY_MS),delay=Number.isFinite(override)&&override>=0?override
+    :Math.max(0,Math.min(2000,oldestUnpushedRequestAt+CLOUD_PUSH_LONGEST_WAIT_MS-now));
   cloudTimer = countSyncTimer("push-debounce",setTimeout(()=>{ endSyncTimer(cloudTimer); cloudTimer = null; sendPush(); }, delay));   // debounce — cloud traffic is off the keystroke path
 }
 // #2272: once no recovery read is busy, a write it held goes through the
@@ -6966,8 +6990,9 @@ async function sendPush(){
     return;
   }
   // #2408: a request that reaches here while another push runs has waited out
-  // its debounce already; it goes once that push ends (pushFollowUpDue).
-  if(cloudPushInFlight){ pushFollowUpDue=true; return; }
+  // its debounce already; it goes once that push ends, unless a newer request
+  // restarts the debounce first (pushFollowUpDue, cloudPush).
+  if(cloudPushInFlight){ pendingPush=true; pushFollowUpDue=true; return; }
   if(decisionRecoveryHolds().length){reportCloudReconcileError("decision-recovery-pending");return;}
   const browserRecoveryBefore=browserCopyRecoverySerial;
   const browserRecoveryAccount=window.CloudSync.user;
@@ -6976,7 +7001,7 @@ async function sendPush(){
     return;
   }
   // Another caller can claim the write while this preflight awaits storage.
-  if(cloudPushInFlight){pushFollowUpDue=true;return;}
+  if(cloudPushInFlight){pendingPush=true;pushFollowUpDue=true;return;}
   if(!reconciled() || pulling){
     pendingPush = true;
     if(!pulling) cloudPull();   // self-healing: the write triggers the reconcile it is waiting on
@@ -7139,9 +7164,7 @@ async function sendPush(){
   finally{
     write.end();
     cloudPushInFlight=false;
-    // #2408: a follow-up whose debounce ran out during this push goes now,
-    // through the same release as any write held while it ran.
-    if(pushFollowUpDue){pushFollowUpDue=false;pendingPush=true;}
+    pushFollowUpDue=false;
     // #2287: a publication moved the root, so its count ends with it; any other
     // outcome ends the run but keeps the count.
     if(adoptionPublished)forgetContainedAdoptionRun();else if(adoptionPushed)endContainedAdoptionRun();
@@ -16979,8 +17002,7 @@ async function publishAutomaticCloudRecovery({sharedRead=null,sharedAttempt=null
     if(!usingShared&&cloudSourceRecoveryRead===read){cloudSourceRecoveryRead=null;cloudSourceRecoveryBusy=false;resumeCloudPushAfterRecoveryRead();}
     publication.write.end();
     cloudPushInFlight=false;
-    // #2408: a push that waited on this one is held as before.
-    if(pushFollowUpDue){pushFollowUpDue=false;pendingPush=true;}
+    pushFollowUpDue=false;
   }
   }finally{syncWork.end();}
 }

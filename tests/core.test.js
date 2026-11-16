@@ -27147,6 +27147,8 @@ test('CLOUD WRITES: same-tab edits wait for the prior acknowledgement before sen
   ctx.addTask('Base title');await ctx.persist();
   const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
   const CS=h.factory();shim.window.CloudSync=CS;
+  // #2408: the second edit's push follows the first once its debounce allows.
+  shim.window.CLOUD_PUSH_DELAY_MS=0;
   await ctx.cloudPull();
   const pushes=[];let releaseFirst;
   CS.push=(payload,updatedAt,baseRev)=>{
@@ -30006,7 +30008,9 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
   if(key!=='transaction'){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}
   return(...args)=>{
    const transaction=target.transaction(...args),id=++transactionId,owner=commits.getStore(),write=args[1]==='readwrite';
-   const hold=write&&owner?.caller==='sendPush'&&owner.idempotent&&armed&&!held;
+   // #2408: a push no longer rewrites a head it has proved current, so the
+   // held background write is the push's own save of the new board.
+   const hold=write&&owner?.caller==='sendPush'&&armed&&!held;
    if(write&&owner?.caller==='native-Add'&&held&&id!==held.transaction)secondNativeWrite.resolve();
    return new Proxy(transaction,{get(tx,key){const value=Reflect.get(tx,key,tx);return typeof value==='function'?value.bind(tx):value;},set(tx,key,value){
     if(key==='oncomplete'&&hold){
@@ -30076,10 +30080,10 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
  await bounded(second,'second native Add durable acknowledgement');
  await until(exactlyCurrent,'final durable and cloud acknowledgement');
 
- const background=commitCalls.find(call=>call.caller==='sendPush'&&call.idempotent),newerNative=commitCalls.find(call=>call.caller==='native-Add'&&call.expectedHash===background?.expectedHash&&call.payloadSha256!==background?.payloadSha256);
+ const background=commitCalls.find(call=>call.caller==='sendPush'),newerNative=commitCalls.find(call=>call.caller==='native-Add'&&call.expectedHash===background?.expectedHash&&call.payloadSha256!==background?.payloadSha256);
  assert.ok(background,'the ordinary background sendPush path must use the device-store port');
  assert.ok(newerNative,'the second native Add must commit a distinct payload against the same observed head: '+JSON.stringify(commitCalls));
- assert.equal(background.idempotent,true,'the earlier background checkpoint is an idempotent save of its current head');
+ assert.equal(background.idempotent,false,'#2408: the background push saves the new board, never a second copy of its current head');
  assert.ok(held,'the older transaction really committed before its completion delivery was held');
  const warnings=toasts.filter(message=>/Couldn't save this edit|device-save:/.test(message));
  assert.deepEqual(warnings,[],'a successful overlapping save must not show a device-store write-failed warning: '+JSON.stringify({warnings,commitErrors}));
@@ -31537,6 +31541,9 @@ test('RISK completion boundaries: failed device save holds cloud publication and
   if(failNext){failNext=false;enteredResolve();await blocked;return {error:true,code:'injected-primary-save-failure'};}
   return commit(options);
  };
+ // #2408: a push uploads a board already durable here without saving it
+ // again, so the push's mandatory device save needs a change not saved yet.
+ ctx.addTask('Added after the Done was saved');
  CS.ready=true;
  const pending=ctx.cloudPushNow();await entered;
  assert.equal((await store.readHead()).payload,priorHead.payload,'the original durable source remains unchanged while the mandatory device save is pending');
