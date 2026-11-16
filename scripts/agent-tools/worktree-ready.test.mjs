@@ -114,3 +114,38 @@ test('prepare gives a new worktree its own dependencies and two exported ports, 
     rmSync(fixture, { recursive: true, force: true });
   }
 });
+
+test('without a usable ledger, prepare still makes dependencies available, warns which step it skipped and writes no ledger', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-unusable-');
+  try {
+    const other = join(fixture, 'other-ledger.json');
+    writeFileSync(other, readFileSync(ledger));
+    const before = readFileSync(ledger, 'utf8');
+    const missing = join(fixture, 'missing', 'host-ledger.json');
+    const cases = [
+      { name: 'unset', ledger: '' },
+      { name: 'missing', ledger: missing },
+      { name: 'conflicting', ledger, environment: { DOW_EMULATOR_COORDINATION_FILE: other } },
+    ];
+    for (const { name, ledger: configured, environment } of cases) {
+      const agent = addWorktree(main, join(fixture, `agent-${name}`));
+      const prepared = run(['prepare'], agent, { ledger: configured, npm, environment });
+      assert.equal(prepared.status, 0, `${name}: setup never fails the worktree: ${prepared.stderr}`);
+      assert.match(prepared.stderr, /skipped ports/i, `${name}: says it skipped the ports`);
+      assert.equal(existsSync(join(agent, 'node_modules', 'fixture-dep', 'index.js')), true, `${name}: dependencies are still available`);
+      assert.doesNotMatch(run(['env'], agent, { ledger: configured, npm, environment }).stdout, /CHAIN_NATIVE/, `${name}: no ports are exported`);
+    }
+    assert.equal(readFileSync(ledger, 'utf8'), before, 'the configured ledger is untouched');
+    assert.equal(readFileSync(other, 'utf8'), before, 'the conflicting ledger is untouched');
+    assert.equal(existsSync(missing), false, 'no ledger is created where one is missing');
+
+    const inMain = run(['prepare'], main, { ledger, npm });
+    assert.equal(inMain.status, 0, inMain.stderr);
+    assert.match(inMain.stdout, /main checkout/i, 'the main checkout is skipped cleanly');
+    const inCI = run(['prepare'], addWorktree(main, join(fixture, 'agent-ci')), { ledger, npm, environment: { CI: 'true' } });
+    assert.equal(inCI.status, 0, inCI.stderr);
+    assert.equal(readFileSync(ledger, 'utf8'), before, 'neither the main checkout nor a CI run registers anything');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
