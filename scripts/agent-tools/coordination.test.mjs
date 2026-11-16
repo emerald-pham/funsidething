@@ -1060,6 +1060,42 @@ test("begin registers a reviewer's detached checkout at an exact commit, which c
   }
 });
 
+// Finishing the reviewer's entry is how its ports go back to the pool (#2364 spec c).
+test("finish completes a reviewer's detached entry at its recorded commit and frees its ports", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-detached-finish-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/reviewed');
+    addOrigin(project, fixture);
+    writeFileSync(join(project, 'candidate.md'), 'Candidate under review.\n');
+    git(project, 'add', 'candidate.md');
+    git(project, 'commit', '--quiet', '-m', 'candidate');
+    const candidate = git(project, 'rev-parse', 'HEAD');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidate);
+    const port = 'loopback:127.0.0.1:47111';
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'investigation', '--intent', 'Review the exact candidate',
+      '--resources', port], reviewer);
+    assert.equal(began.status, 0, began.stderr);
+    const entry = JSON.parse(began.stdout);
+
+    const finished = command(['finish', '--file', ledgerPath, '--id', entry.id, '--adapter', 'chain-scanner',
+      '--outcome', 'discarded', '--reason', 'Review complete; the reviewer changes nothing.'], reviewer);
+    assert.equal(finished.status, 0, `a detached reviewer entry must finish: ${finished.stderr}`);
+    const completed = JSON.parse(finished.stdout);
+    assert.equal(completed.status, 'complete');
+    assert.equal(completed.outcome, 'discarded');
+    assert.equal(completed.finalBranchSha, candidate, 'the entry finishes at the exact reviewed commit');
+    assert.equal(completed.finalBranchName, undefined, 'no branch name is invented for a detached checkout');
+
+    const next = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reuse the freed port',
+      '--resources', port], project);
+    assert.equal(next.status, 0, `the finished reviewer's port is free again: ${next.stderr}`);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('begin registers a master-only repository without inventing a main SHA', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-master-only-'));
   try {

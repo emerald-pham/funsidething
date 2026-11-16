@@ -1027,29 +1027,11 @@ async function finish(filePath, options) {
     if (entry.status !== 'active') throw new Error(`Coordination entry ${entry.id} is already ${text(entry.status, 'historical')}.`);
     if (entry.worktree !== process.cwd()) throw new Error(`Cannot finish coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
 
+    const now = isoNow(options.now);
     const release = await readChainScannerReleaseState(entry);
     let releaseEvidence;
     if (outcome === 'landed') {
-      if (release.mainContainsBranch !== true) {
-        throw new Error(`Cannot complete coordination entry ${entry.id}: local main does not contain exact task commit ${release.branchSha}.`);
-      }
-      if (release.originMainSha !== release.mainSha) {
-        throw new Error(`Cannot complete coordination entry ${entry.id}: origin/main (${release.originMainSha}) does not match local main (${release.mainSha}).`);
-      }
-      const verified = await verifyChainScannerLandingEvidence(release.repositoryRoot, release.branchSha, release.mainSha);
-      if (!verified.ok) throw new Error(`Cannot complete coordination entry ${entry.id}: Chain Scanner release evidence failed: ${verified.errors.join(' ')}`);
-      releaseEvidence = {
-        adapter,
-        receiptPath: verified.receiptPath,
-        receiptSha256: verified.receipt.receiptSha256,
-        candidate: {
-          commitSha: verified.receipt.candidate.commitSha,
-          treeSha: verified.receipt.candidate.treeSha,
-          baseSha: verified.receipt.candidate.baseSha,
-        },
-        reviewPlan: verified.receipt.reviewPlan,
-        verifiedAt: new Date().toISOString(),
-      };
+      releaseEvidence = await proveChainScannerLanding(entry, release, adapter, now);
     } else if (outcome === 'preserved') {
       const destination = text(options['preserve-ref']);
       if (!destination) throw new Error(`Cannot preserve coordination entry ${entry.id}: --preserve-ref is required.`);
@@ -1058,44 +1040,97 @@ async function finish(filePath, options) {
       const ref = `refs/heads/${destination.slice(separator + 1)}`;
       const actual = (await runGit(['ls-remote', '--exit-code', destination.slice(0, separator), ref], release.repositoryRoot)).split(/\s+/)[0];
       if (actual !== release.branchSha) throw new Error(`Preserved ref ${destination} does not contain ${release.branchSha}.`);
-      entry.preservation = { destination, commitSha: release.branchSha, verifiedAt: new Date().toISOString() };
+      entry.preservation = { destination, commitSha: release.branchSha, verifiedAt: now };
     } else {
       const reason = text(options.reason);
       if (!reason) throw new Error(`Cannot discard coordination entry ${entry.id}: --reason is required.`);
       entry.discard = { reason, branchSha: release.branchSha };
     }
 
-    entry.status = 'complete';
-    entry.outcome = outcome;
-    entry.completedAt = new Date().toISOString();
-    if (text(options.result)) entry.result = text(options.result);
-    entry.finalBranchName = release.branchName;
-    entry.finalBranchSha = release.branchSha;
-    entry.mainSha = release.mainSha;
-    entry.originMainSha = release.originMainSha;
-    entry.pushed = outcome === 'landed' && release.originMainSha === release.mainSha;
-    if (releaseEvidence) entry.releaseEvidence = releaseEvidence;
+    completeEntry(entry, { outcome, release, now, result: text(options.result), releaseEvidence });
     await writeState(filePath, state);
     return entry;
   });
 }
 
+// The completion record that finish and prune both write. A field prune cannot
+// know, such as a deleted branch's tip, is left out.
+function completeEntry(entry, { outcome, release, now, result, releaseEvidence }) {
+  entry.status = 'complete';
+  entry.outcome = outcome;
+  entry.completedAt = now;
+  if (result) entry.result = result;
+  entry.finalBranchName = release.branchName;
+  entry.finalBranchSha = release.branchSha;
+  entry.mainSha = release.mainSha;
+  entry.originMainSha = release.originMainSha;
+  entry.pushed = outcome === 'landed' && release.originMainSha === release.mainSha;
+  if (releaseEvidence) entry.releaseEvidence = releaseEvidence;
+}
+
+// Landed needs the exact task commit in local main, local main equal to the
+// actual origin main, and a valid receipt for that commit or for the merged
+// candidate that reviewed it (#2412).
+async function proveChainScannerLanding(entry, release, adapter, now) {
+  if (release.mainContainsBranch !== true) {
+    throw new Error(`Cannot complete coordination entry ${entry.id}: local main does not contain exact task commit ${release.branchSha}.`);
+  }
+  if (release.originMainSha !== release.mainSha) {
+    throw new Error(`Cannot complete coordination entry ${entry.id}: origin/main (${release.originMainSha}) does not match local main (${release.mainSha}).`);
+  }
+  const verified = await verifyChainScannerLandingEvidence(release.repositoryRoot, release.branchSha, release.mainSha);
+  if (!verified.ok) throw new Error(`Cannot complete coordination entry ${entry.id}: Chain Scanner release evidence failed: ${verified.errors.join(' ')}`);
+  return {
+    adapter,
+    receiptPath: verified.receiptPath,
+    receiptSha256: verified.receipt.receiptSha256,
+    candidate: {
+      commitSha: verified.receipt.candidate.commitSha,
+      treeSha: verified.receipt.candidate.treeSha,
+      baseSha: verified.receipt.candidate.baseSha,
+    },
+    reviewPlan: verified.receipt.reviewPlan,
+    verifiedAt: now,
+  };
+}
+
+// A detached entry, a reviewer's exact-commit checkout, finishes at the commit
+// it recorded (#2364 spec c); any other entry at its task branch's current tip.
 async function readChainScannerReleaseState(entry, cwd = process.cwd()) {
-  const [branchName, branchSha, repositoryRoot, main] = await Promise.all([
+  const [branchName, headSha] = await Promise.all([
     runGit(['rev-parse', '--abbrev-ref', 'HEAD'], cwd),
     runGit(['rev-parse', 'HEAD'], cwd),
-    runGit(['rev-parse', '--show-toplevel'], cwd),
-    readMainRef(cwd),
   ]);
-  const root = resolve(repositoryRoot);
-  if (branchName === 'HEAD' || branchName === 'main') throw new Error('Chain Scanner completion requires the task branch, not detached HEAD or main.');
-  if (branchName !== entry.branchName) throw new Error(`Cannot finish coordination entry ${entry.id}: checkout branch ${branchName} does not match ${entry.branchName}.`);
+  const detached = entry.detachedHead === true;
+  const branchSha = detached ? text(entry.startBranchSha).toLowerCase() : headSha;
+  if (detached && !/^[0-9a-f]{40}$/.test(branchSha)) {
+    throw new Error(`Cannot finish coordination entry ${entry.id}: its detached registration recorded no exact commit.`);
+  }
+  if (!detached && (branchName === 'HEAD' || branchName === 'main')) throw new Error('Chain Scanner completion requires the task branch, not detached HEAD or main.');
+  if (!detached && branchName !== entry.branchName) throw new Error(`Cannot finish coordination entry ${entry.id}: checkout branch ${branchName} does not match ${entry.branchName}.`);
   if ((await runGit(['status', '--porcelain', '--untracked-files=all'], cwd)).trim()) {
     throw new Error(`Cannot finish coordination entry ${entry.id}: the checkout is not clean.`);
   }
   if (entry.startBranchSha && !(await gitIsAncestor(entry.startBranchSha, branchSha, cwd))) {
     throw new Error(`Cannot finish coordination entry ${entry.id}: its registered start commit is not an ancestor of the task branch.`);
   }
+  return releaseStateAt(detached ? undefined : branchName, branchSha, await readChainScannerMainState(cwd), cwd);
+}
+
+async function releaseStateAt(branchName, branchSha, main, cwd) {
+  return {
+    ...(branchName ? { branchName } : {}),
+    branchSha,
+    ...main,
+    mainContainsBranch: await gitIsAncestor(branchSha, main.mainSha, cwd),
+  };
+}
+
+async function readChainScannerMainState(cwd = process.cwd()) {
+  const [repositoryRoot, main] = await Promise.all([
+    runGit(['rev-parse', '--show-toplevel'], cwd),
+    readMainRef(cwd),
+  ]);
   let originTrackingMainSha;
   try {
     originTrackingMainSha = await runGit(['rev-parse', '--verify', 'origin/main^{commit}'], cwd);
@@ -1110,8 +1145,7 @@ async function readChainScannerReleaseState(entry, cwd = process.cwd()) {
   }
   const originMainSha = originMainLine.split(/\s+/)[0];
   if (!/^[0-9a-f]{40}$/.test(originMainSha)) throw new Error('Cannot finish Chain Scanner work: origin returned an invalid main SHA.');
-  const mainContainsBranch = await gitIsAncestor(branchSha, main.sha, cwd);
-  return { branchName, branchSha, repositoryRoot: root, mainSha: main.sha, mainRef: main.ref, originTrackingMainSha, originMainSha, mainContainsBranch };
+  return { repositoryRoot: resolve(repositoryRoot), mainSha: main.sha, mainRef: main.ref, originTrackingMainSha, originMainSha };
 }
 
 async function gitIsAncestor(ancestor, descendant, cwd) {
