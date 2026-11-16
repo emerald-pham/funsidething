@@ -5094,7 +5094,7 @@ function save(preserveBackupId=null){
       endSyncTimer(timer);
       if(saveTimer!==timer)return;
       // Settles as persist() does: true once the board is durable here.
-      saveTimer=null;return deviceSaveLane.request({preserveBackupId}).then(outcome=>{if(outcome.error)throw outcome.error;return outcome.ok;});
+      saveTimer=null;return deviceSaveLane.request({preserveBackupId}).done;
     },350));
     saveTimer=timer;
   }
@@ -6307,22 +6307,27 @@ let deviceCommitProgress=0,deviceCommitSlowestMs=0;
 const deviceCommitsRunning=new Set();
 const deviceSaveLane=(()=>{
   const running=new Set(),waiting=[];let requested=0,slowestMs=0;
-  // The promise gives {ok, saved, generation, error}: whether the save made the
-  // board durable, the text it made durable, the newest save request that text
-  // holds, and what the save threw, if it threw.
+  // Returns {done, lane}. done settles as persist() does: true once the board
+  // is durable here, false, or what it threw. lane then holds what the save
+  // reports: the text it made durable (saved) and the newest save request that
+  // text holds (generation). A save that starts at once hands back its own
+  // persist() promise, so whoever asked goes on exactly when it would have
+  // awaiting persist() itself, as before the lane.
   function request({preserveBackupId=null,backupAlreadySafe=false}={}){
     requested++;
     let job=waiting.at(-1);
     // One save keeps one backup id from retirement; another id waits for its own.
     if(!job||job.preserveBackupId!==preserveBackupId){
-      let resolve;const done=new Promise(settle=>{resolve=settle;});
+      let resolve,reject;const done=new Promise((settle,fail)=>{resolve=settle;reject=fail;});
+      // A save nobody awaits must not leave an unhandled rejection behind.
+      done.catch(()=>{});
       // #2378: counted while it waits its turn too; persist() counts its own run.
-      job={preserveBackupId,backupAlreadySafe:true,done,resolve,work:trackSyncWork("device-save"),escape:null};
+      job={preserveBackupId,backupAlreadySafe:true,done,resolve,reject,lane:{},run:null,work:trackSyncWork("device-save"),escape:null};
       waiting.push(job);
     }
     job.backupAlreadySafe=job.backupAlreadySafe&&backupAlreadySafe;
     startNextSave();
-    return job.done;
+    return {done:job.run??job.done,lane:job.lane};
   }
   // Only the device store's whole-board commits can run side by side: a
   // browser-storage save writes at once and host storage queues its own
@@ -6336,14 +6341,9 @@ const deviceSaveLane=(()=>{
   function startSave(job){
     if(job.escape!==null){clearTimeout(job.escape);job.escape=null;}
     running.add(job);
-    const lane={},begun=performance.now();
-    persist(job.backupAlreadySafe,job.preserveBackupId,0,lane).then(
-      result=>({ok:result===true,saved:result===true?lane.saved:null,generation:lane.generation??null}),
-      error=>({ok:false,saved:null,generation:null,error}))
-      .then(outcome=>{
-        running.delete(job);slowestMs=Math.max(slowestMs,performance.now()-begun);
-        job.work.end();job.resolve(outcome);startNextSave();
-      });
+    const begun=performance.now(),finish=()=>{running.delete(job);slowestMs=Math.max(slowestMs,performance.now()-begun);job.work.end();startNextSave();};
+    job.run=persist(job.backupAlreadySafe,job.preserveBackupId,0,job.lane);
+    job.run.then(result=>{finish();job.resolve(result);},error=>{finish();job.reject(error);});
   }
   // The next save waits for the running one, unless that one stalls. A stalled
   // save goes on to its end, but holds no later save of the lane.
@@ -7159,9 +7159,8 @@ async function sendPush(){
     let pushedThrough=diagnosticRequestGeneration,pushedUpdatedAt=state.updatedAt;
     let pushRecoveryIds=Array.isArray(state.protectedBackupIds) ? [...state.protectedBackupIds] : [];
     if(!savedAdoption){
-      const saved=await deviceSaveLane.request();
-      if(saved.error)throw saved.error;
-      if(!saved.ok)return;
+      const save=deviceSaveLane.request(),saved=save.lane;
+      if(await save.done!==true)return;
       if(!pushStillCurrent()){holdChangedPush();return;}
       if(!reconciled() || pulling){ pendingPush=true; return; }
       if(payload !== cloudPayload()){
@@ -7261,9 +7260,7 @@ async function sendPush(){
         // records the acknowledgement with the answers it carries. Its content
         // is the live board, as before, and the acknowledgement counts only
         // once that save has made this revision durable here.
-        const saved=await deviceSaveLane.request({backupAlreadySafe:!!ackSavedAdoption});
-        if(saved.error)throw saved.error;
-        return trimAfterAcknowledgedPush=saved.ok;
+        return trimAfterAcknowledgedPush=await deviceSaveLane.request({backupAlreadySafe:!!ackSavedAdoption}).done===true;
       }});
       if(outcome.accepted)return;
       if(outcome.reason==="obsolete"){supportDiagnosticsSettleCloudPush(pushTicket,"stale");lastPushed="";if(outcome.readRequired)cloudAdoptionHeld=true;return;}

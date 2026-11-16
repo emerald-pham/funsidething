@@ -55,7 +55,6 @@ import {
   retainedWorkerCacheHarness, divergentCloudSourceApp187, retentionSDK253,
 } from "./shared.js";
 import { openApp } from "./shared.js"; // #2378 app driver
-import { syncSettled } from "./shared.js"; // #2378 settled signal
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
@@ -5836,9 +5835,7 @@ test('RISK scoped Undo: cancelling Start restores the prior pass root and exact 
  const fresh=await loadAppAtTime(at+300,{seedStorage:{[SYNC_STORE_KEY]:raw},cloudSyncFactory:h.factory});await fresh.ctx.cloudPull();
  assert.deepEqual(JSON.parse(JSON.stringify(select(fresh.ctx.state))),prior,'cold reopen keeps the cancelled pass and draw inactive');
  await peer.ctx.cloudPull();setFakeTime(peer.ctx,at+500);peer.ctx.onAction('done-task',{dataset:{id:'undo-base'}});
- // #2408: the Start's push, asked for while the Done's push runs, goes after
- // the push debounce, so the peer's sync settles before this device reads it.
- peer.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettled(peer.ctx);
+ peer.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(40);
  const later=select(peer.ctx.state);assert.notEqual(later.passId,prior.passId);assert.equal(peer.ctx.state.tasks.find(t=>t.id==='undo-base').done,true);
  await local.ctx.cloudPull();await syncSettle(40);
  assert.deepEqual(JSON.parse(JSON.stringify(select(local.ctx.state))),JSON.parse(JSON.stringify(later)),'a later independent peer Start keeps its own pass and draw');

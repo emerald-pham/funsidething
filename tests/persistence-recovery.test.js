@@ -16480,6 +16480,23 @@ test('RISK one save per answer: the support report records a push dropped becaus
 // #2406 review: the recovery fixtures run an edit's own debounced save and
 // wait for it to report the board durable (finishSeedSave, #187). Through the
 // device-save lane it still settles as persist() does.
+// #2406 review: answers given while the cloud was not ready push once it is,
+// from their catch-up, when the next save runs it. That push ends with the
+// save that ran it, as before the device-save lane, so a push asked for right
+// after the save starts at once instead of joining the debounced follow-up.
+// (The #221 chain-return stories publish this way.)
+test('RISK one save per answer: answers caught up by a save once the cloud is ready are published by a push asked for right after that save',{timeout:60000},async t=>{
+ const {local,peer,at}=await scopedUndoClients(initial=>{initial.tasks.push(syncTask('undo-extra','Undotted task'));});
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer)',app.ctx);});
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ setFakeTime(local.ctx,at+150);local.ctx.onAction('yes',{dataset:{candidate:'undo-peer',benchmark:'undo-local'}});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-local','undo-peer'],'positive control: three dots');
+ local.ctx.window.CloudSync.ready=true;assert.equal(await local.ctx.persist(),true);await local.ctx.cloudPushNow();
+ await new Promise(resolve=>setTimeout(resolve,35));
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();
+ assert.deepEqual(Array.from(peer.ctx.state.chain),['undo-base','undo-local','undo-peer'],'the other device reads both answers from the cloud');
+});
+
 test('RISK one save per answer: the save an edit schedules settles true once its board is durable on this device',{timeout:60000},async t=>{
  const device=await answeringDevice2408(t,{signedIn:false});
  const {ctx,shim}=device,schedule=ctx.setTimeout,debounced=[];
