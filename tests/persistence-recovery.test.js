@@ -16225,7 +16225,10 @@ async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),
    assert.ok(button,'the scanner shows a '+act+' button');
    const target={dataset:button.dataset,classList:{contains:name=>button.classes.includes(name)}};target.closest=()=>target;
    const candidate=ctx.state.candidateId;
-   counters.taps.push({at:clock.now,seq:++counters.seq,act,candidate});
+   // #2406 review: whether a push was running when the person tapped, from the
+   // #2378 settled signal's work list, which only tests read.
+   const pushRunning=[...vm.runInContext('syncSession',ctx).snapshot().work].some(item=>item.kind==='push');
+   counters.taps.push({at:clock.now,seq:++counters.seq,act,candidate,pushRunning});
    shim.document.dispatchEvent({type:'click',detail:1,target});
    return candidate;
   },
@@ -16256,6 +16259,17 @@ function answeredDecisions2408(board,taps){
  return (board.decisionEvents||[]).map(event=>[event.kind,event.candidateId??event.taskId]).filter(([,id])=>asked.has(id)).map(([kind,id])=>kind+':'+id).sort();
 }
 const RUN2408=['yes','no','no','yes','no','yes','no','no','yes','no'];
+// No follow-up push starts within the push debounce of the latest answer. A
+// Yes given while no push runs pushes at once, and only that push may come
+// sooner; a follow-up, including one a Yes asked for while a push ran, waits
+// (#2406 review: the check once let every upload after a Yes through).
+function followUpsWaitForTheDebounce2408(taps,uploads){
+ for(const upload of uploads){
+  const latest=taps.filter(tap=>tap.seq<upload.seq).at(-1);if(!latest)continue;
+  const yesPushedAtOnce=latest.act==='yes'&&!latest.pushRunning&&!uploads.some(other=>other.seq>latest.seq&&other.seq<upload.seq);
+  assert.ok(yesPushedAtOnce||upload.at-latest.at>=PUSH_DEBOUNCE2408,'a follow-up push waits for the push debounce after the latest answer: upload at '+upload.at+', answer '+latest.act+' at '+latest.at+(latest.pushRunning?' while a push ran':''));
+ }
+}
 
 test('RISK one save per answer: ten Yes and No answers with sync on, faster than one device save, cost at most one device save per answer plus one per acknowledged push, and one push after the run carries every answer',{timeout:120000},async t=>{
  const device=await answeringDevice2408(t,{saveMs:1500});
@@ -16269,13 +16283,10 @@ test('RISK one save per answer: ten Yes and No answers with sync on, faster than
  assert.ok(!counters.uploads.slice(uploadsBefore).some(upload=>upload.payload===ctx.cloudPayload()),'positive control: the final board is not pushed yet');
  await clock.settle();
  const commits=counters.commits.length-commitsBefore,acks=device.backend.writes.length-acksBefore,uploads=counters.uploads.slice(uploadsBefore);
- t.diagnostic(JSON.stringify({commits,acks,commitTimes:counters.commits.slice(commitsBefore).map(commit=>commit.at),uploads:uploads.map(upload=>upload.at),taps:taps.map(tap=>tap.at+':'+tap.act)}));
+ t.diagnostic(JSON.stringify({commits,acks,commitTimes:counters.commits.slice(commitsBefore).map(commit=>commit.at),uploads:uploads.map(upload=>upload.at),taps:taps.map(tap=>tap.at+':'+tap.act+(tap.pushRunning?' (push running)':''))}));
  assert.equal(new Set(taps.map(tap=>tap.candidate)).size,10,'each answer reaches its own candidate');
  assert.ok(commits<=RUN2408.length+acks,'device saves for the run are at most one per answer plus one per acknowledged push: '+commits+' saves, '+acks+' acknowledged pushes');
- for(const upload of uploads){
-  const latest=taps.filter(tap=>tap.seq<upload.seq).at(-1);
-  assert.ok(latest.act==='yes'||upload.at-latest.at>=PUSH_DEBOUNCE2408,'a follow-up push waits for the push debounce after the latest answer: upload at '+upload.at+', answer '+latest.act+' at '+latest.at);
- }
+ followUpsWaitForTheDebounce2408(taps,uploads);
  const after=uploads.filter(upload=>upload.at>lastAnswerAt);
  assert.equal(after.length,1,'once the run stops, one push goes out');
  assert.equal(after[0].payload,ctx.cloudPayload(),'and it carries the final board');
@@ -16520,6 +16531,9 @@ test('RISK one save per answer: on a phone whose device saves take 0.7 to 3 s, a
  for(const [saveMs,gapMs] of [[700,2000],[700,2500],[1500,1000],[3000,2000]])await t.test(saveMs+' ms saves, an answer every '+gapMs+' ms',async t=>{
   const run=await answerRunOnSlowPhone2408(t,{saveMs,gapMs});
   assert.ok(run.acks>=1,'positive control: the cloud acknowledges the run');
+  // When a save fits between answers, pushes upload during the run and the
+  // longest wait never comes due, so every follow-up keeps the debounce.
+  if(saveMs<gapMs&&gapMs>=PUSH_DEBOUNCE2408)followUpsWaitForTheDebounce2408(run.taps,run.uploads);
   assert.ok(run.commits.length<=run.taps.length+run.acks,'device saves for the run are at most one per answer plus one per acknowledged push: '+run.commits.length+' saves, '+run.taps.length+' answers, '+run.acks+' acknowledged pushes');
   // One device save at a time: none starts before the one before it returns,
   // so none finds the head moved by this tab and repairs onto it (#2324).
