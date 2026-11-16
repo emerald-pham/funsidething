@@ -14,10 +14,8 @@ your full spec.
 
 - Base: `<base branch>` at <sha>. If your worktree isn't on it, `git fetch
   origin` and reset onto `origin/<base branch>`. Work on `ticket/<N>-<slug>`.
-- Set up the worktree and claim `CHAIN_NATIVE_PORT` and
-  `CHAIN_NATIVE_SMOKE_PORT` as docs/agents/host-coordination.md describes;
-  release them when done. Until #2364 lands, also run
-  `ln -s <main checkout>/node_modules node_modules` from the worktree root.
+- From the worktree root, run `npm run agent:worktree-ready -- prepare` for
+  dependencies and ports (docs/agents/host-coordination.md).
 
 ## How to work
 

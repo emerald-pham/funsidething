@@ -23,6 +23,10 @@ This entry point supports shared lifecycle and ownership plus Chain Scanner comp
 
 Tests and examples use an explicit fixture ledger. Never point tests at the live host ledger, and never create a repository-local coordination file for convenience. If the stable copy cannot load or the configured paths conflict, report that state rather than falling back to a second ledger.
 
+## Agent worktrees
+
+In a new agent or reviewer worktree, including a detached checkout, run `npm run agent:worktree-ready -- prepare` once from its root. It gives the worktree its own `node_modules` (never a link) and registers it with two ports for `CHAIN_NATIVE_PORT` and `CHAIN_NATIVE_SMOKE_PORT`. The test-run recorder passes them to its child; for other shells, `eval "$(npm run -s agent:worktree-ready -- env)"`. Without a configured, existing ledger it claims nothing, writes no ledger and says so. After removing worktrees, run `npm run agent:worktree-ready -- prune`; `prepare` also prunes.
+
 ## Durable host migration
 
 Use this procedure only for an authorized host location change, after the concrete

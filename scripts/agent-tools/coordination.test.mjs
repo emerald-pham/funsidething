@@ -1018,14 +1018,43 @@ test('begin protects main and the selected local base branch, including for orig
       assert.match(result.stderr, reason);
       assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, `${branch} rejection must not mutate the ledger`);
     }
-    git(project, 'checkout', '--detach', '--quiet', 'HEAD');
-    const detached = command([
-      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject detached registration',
-      '--base-ref', 'master',
-    ], project);
-    assert.notEqual(detached.status, 0);
-    assert.match(detached.stderr, /attached branch/i);
-    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'detached rejection must not mutate the ledger');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+// A reviewer checks out the exact candidate commit detached. Retro 4 of #2406
+// (approved 2026-11-16): the ledger refused that checkout, so the typography
+// reviewer had to attach a throwaway local branch just to claim its ports (#2364).
+test("begin registers a reviewer's detached checkout at an exact commit, which can then claim ports", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-detached-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/reviewed');
+    writeFileSync(join(project, 'candidate.md'), 'Candidate under review.\n');
+    git(project, 'add', 'candidate.md');
+    git(project, 'commit', '--quiet', '-m', 'candidate');
+    const candidate = git(project, 'rev-parse', 'HEAD');
+    const reviewer = join(fixture, 'reviewer');
+    git(project, 'worktree', 'add', '--quiet', '--detach', reviewer, candidate);
+    const branchesBefore = git(project, 'branch', '--list');
+
+    const began = command([
+      'begin', '--file', ledgerPath, '--work-type', 'investigation', '--intent', 'Review the exact candidate',
+      '--resources', 'loopback:127.0.0.1:47101',
+    ], reviewer);
+    assert.equal(began.status, 0, `a detached reviewer checkout must register: ${began.stderr}`);
+    const entry = JSON.parse(began.stdout);
+    assert.equal(entry.worktree, reviewer);
+    assert.equal(entry.detachedHead, true, 'the entry says the checkout is detached');
+    assert.equal(entry.startBranchSha, candidate, 'the entry records the exact reviewed commit');
+    assert.equal(entry.branchName, undefined, 'no branch name is invented for a detached checkout');
+
+    const claimed = command(['claim', '--file', ledgerPath, '--id', entry.id, '--resources', 'loopback:127.0.0.1:47102'], reviewer);
+    assert.equal(claimed.status, 0, claimed.stderr);
+    const saved = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.find((candidateEntry) => candidateEntry.id === entry.id);
+    assert.deepEqual(saved.resources, ['loopback:127.0.0.1:47101', 'loopback:127.0.0.1:47102']);
+    assert.equal(git(project, 'branch', '--list'), branchesBefore, 'registration creates no throwaway branch');
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
