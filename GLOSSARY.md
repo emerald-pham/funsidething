@@ -117,8 +117,9 @@ _Avoid_: Sync manager, cloud cache
 
 **Settled (sync)**:
 The Sync session's report that no sync step is running (a cloud read or
-write, a device save or a recovery flow) and none is scheduled (a save or
-push debounce, a live or backup read, or a retry), so the app will do no more
+write, a device save or a recovery flow) and none is scheduled (an answer's
+catch-up still queued, a save debounce, a push waiting on its debounce or its
+longest wait, a live or backup read, or a retry), so the app will do no more
 sync work on its own. Work that waits on something outside the app, such as
 an open editor, a hidden page or a read still owed, is listed as waiting and
 does not count. Only tests read it; nothing in the app or on screen does.

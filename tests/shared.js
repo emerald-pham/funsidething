@@ -860,8 +860,11 @@ function woopStep(app,value){
 }
 function woopDislodgeTwice(app){
  const {ctx,task}=app;
+ // #2406 review: with Last task WOOP on, a Dislodge records its History before
+ // the screen updates; with it off that History catches up just after.
+ ctx.state.settings.lastTaskWoop=true;
  for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.dislodge();}
- ctx.state.chain=[task.id];ctx.state.mode='work';ctx.state.settings.lastTaskWoop=true;
+ ctx.state.chain=[task.id];ctx.state.mode='work';
 }
 
 const ratingHistoryCopy = value => JSON.parse(JSON.stringify(value));
@@ -4093,6 +4096,21 @@ async function syncSettled(ctx,{within=5000,synced=false}={}){
  }
 }
 
+// #2407: a scanner answer shows first; its History, ranks, Undo seal, save and
+// push catch up after the paint, counted by the sync session as
+// "answer-catch-up". Resolves once no answer is still catching up, without
+// waiting for the saves and pushes it then asks for (syncSettled waits for
+// those).
+async function answersCaughtUp(ctx,{within=5000}={}){
+ const session=vm.runInContext('typeof syncSession==="undefined"?null:syncSession',ctx);
+ assert.ok(session&&typeof session.track==='function','the app under test has a sync session that counts its work');
+ const deadline=Date.now()+within;
+ while([...session.snapshot().work].some(item=>item.kind==='answer-catch-up')){
+  if(Date.now()>=deadline)assert.fail(`answers did not catch up within ${within} ms`);
+  await new Promise(resolve=>setTimeout(resolve,0));
+ }
+}
+
 // A test's own stand-in for another writer (a second client, a backend that
 // announces each write) works outside every app, so no app counts it. Its
 // later() and run() count that work here, so settledTogether() can wait for it.
@@ -4193,5 +4211,6 @@ export {
 };
 export { releaseKnownCloudCopy2377 };
 export { openApp, driveApp, syncSettled, outsideWork, settledTogether };
+export { answersCaughtUp };
 export { scanPanelDom221, markupButtons, chainPills, chainPillIds, chainPill, benchmarkEdit, keepEditorValues, returnButton,
   returnDotFromScan, returnFromPill, returnBenchmarkFromEdit };

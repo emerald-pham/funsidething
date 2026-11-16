@@ -60,6 +60,7 @@ import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
 import { backupRowsWithText } from "./shared.js";
 import { releaseKnownCloudCopy2377 } from "./shared.js";
+import { answersCaughtUp } from "./shared.js"; // #2407: History and ranks catch up after an answer shows
 import { scanPanelDom221, chainPills, chainPillIds, chainPill, keepEditorValues, returnButton, returnFromPill, returnBenchmarkFromEdit } from "./shared.js";
 
 // #2281 CI: node:test keeps every finished test with its subtests and hooks,
@@ -3954,6 +3955,26 @@ test('RISK rapid action guidance: mounted Help distinguishes later accepted work
  assert.match(html,/Rapid valid actions keep saving without a false repeated-change warning/);
 });
 
+// #2408: Help and the changelog say that answering with sync on no longer
+// slows down and when the cloud confirms a run of answers. #2406 review: they
+// say what the person sees, not how many saves an answer costs.
+test('RISK sync responsiveness guidance: mounted Help and the changelog say answering with sync on no longer slows down and when the cloud confirms a run of answers',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const rapid=help.split('<dt>Does answering slow down with sync on?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid,'Data and backups answers whether answering slows down with sync on');
+ assert.match(rapid,/^No\. You can keep answering while the board saves on this device and syncs\./,'the answer says what the person sees: '+rapid);
+ assert.match(rapid,/after a short pause, or at least every 20 seconds or so/);
+ assert.match(rapid,/A single Yes or Done with nothing else syncing goes to the cloud at once/);
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];
+ assert.match(current,/<h3>November 16, 2026<\/h3>/);
+ const items=current.split('<li>').slice(1);
+ assert.ok(items.some(item=>/answering several tasks in a row no longer slows the app down/.test(item)&&!/20 seconds/.test(item)),'the slowdown fix has its own bullet');
+ assert.ok(items.some(item=>/after a short pause, or at least every 20 seconds or so/.test(item)),'the cloud timing has its own bullet');
+ for(const text of [rapid,...items])assert.doesNotMatch(text,/saves? the board on this device about once|three times/,'no save counts: '+text);
+ assert.ok(rapid.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+});
+
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
@@ -6388,6 +6409,7 @@ test('RISK task action history: scanner comparison stays visible through Undo an
  const scan=shim.document.getElementById('scan').innerHTML;
  assert.ok(scan.includes(`data-act="yes" data-candidate="${candidate.id}" data-benchmark="${benchmark.id}"`),'the rendered scanner binds Yes to the displayed pair');
  ctx.onAction('yes',{dataset:{candidate:candidate.id,benchmark:benchmark.id}});
+ await answersCaughtUp(ctx); // #2407: History is written once the answer catches up
  const selected=ratingHistoryTask(ctx,candidate.id),compared=ratingHistoryTask(ctx,benchmark.id);
  assert.equal(ctx.state.chain.at(-1),candidate.id);assert.equal(ctx.state.candidateId,null);
  assert.equal(selected.ratingHistory?.[0]?.kind,'yes');assert.equal(compared.ratingHistory?.[0]?.kind,'yes');
@@ -6478,6 +6500,7 @@ test('RISK task rating history: actual comparisons retain timestamped before and
  const top=vm.runInContext('rankCache.get('+JSON.stringify(b.id)+').topK',ctx);
  const engine=loadEngine(613),win={mu:b.mu,sigma:b.sigma},lose={mu:a.mu,sigma:a.sigma};engine.updatePair(win,lose);
  ctx.decide('yes');
+ await answersCaughtUp(ctx); // #2407
  assert.ok(Array.isArray(b.ratingHistory),'a real comparison must leave durable rating history');
  assert.equal(b.ratingHistory.length,1);assert.equal(a.ratingHistory.length,1);assert.equal(c.ratingHistory,undefined,'do not copy the entire board for each decision');
  const row=b.ratingHistory[0];assert.equal(row.at,at);assert.equal(row.id,a.ratingHistory[0].id);assert.equal(row.kind,'yes');assert.equal(row.change,'rating');
@@ -6499,8 +6522,8 @@ test('RISK task rating history: editor observations distinguish relative movemen
  assert.equal(first.kind,'edit');assert.equal(first.before,undefined,'do not manufacture an old initial observation');
 });
 test('RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes',async()=>{
- const {ctx,a,b}=await ratingHistoryFixture(615);ctx.decide('no');assert.equal(b.ratingHistory?.[0]?.kind,'no');
- ctx.dotTask(b.id);assert.equal(b.ratingHistory.at(-1).kind,'dot');ctx.dislodge();assert.equal(b.ratingHistory.at(-1).kind,'dislodge');
+ const {ctx,a,b}=await ratingHistoryFixture(615);ctx.decide('no');await answersCaughtUp(ctx);assert.equal(b.ratingHistory?.[0]?.kind,'no');
+ ctx.dotTask(b.id);assert.equal(b.ratingHistory.at(-1).kind,'dot');ctx.dislodge();await answersCaughtUp(ctx);assert.equal(b.ratingHistory.at(-1).kind,'dislodge');
  const before=ratingHistoryCopy(b.ratingHistory),mu=b.mu,sigma=b.sigma;
  ctx.doneTask(b.id);assert.equal(b.mu,mu);assert.equal(b.sigma,sigma);assert.equal(b.ratingHistory.at(-1).change,'relative');assert.equal(b.ratingHistory.at(-1).after.likelihood,0);assert.equal(b.ratingHistory.at(-1).after.topK,null);
  const completed=ratingHistoryCopy(b.ratingHistory);ctx.undo();const restored=ratingHistoryTask(ctx,b.id);
@@ -6509,8 +6532,8 @@ test('RISK task rating history: No Dot Dislodge completion and Undo retain hones
  ctx.undo();const undone=ratingHistoryTask(ctx,b.id);assert.equal(undone.ratingHistory.at(-1).change,'rating','Undo Dislodge restores actual posterior values');
 });
 test('RISK task rating history: concurrent offline and older missing-field copies union immutable facts idempotently without retimestamping',async()=>{
- const h=await ratingHistoryFixture(616),base=ratingHistoryCopy(h.ctx.state);h.ctx.decide('yes');const left=ratingHistoryCopy(h.ctx.state);
- const r=await loadApp({seed:617,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)}});setFakeTime(r.ctx,Date.parse('2026-10-05T01:02:03Z'));r.ctx.state.chain=[h.a.id];r.ctx.state.candidateId=h.b.id;r.ctx.decide('no');const right=ratingHistoryCopy(r.ctx.state);
+ const h=await ratingHistoryFixture(616),base=ratingHistoryCopy(h.ctx.state);h.ctx.decide('yes');await answersCaughtUp(h.ctx);const left=ratingHistoryCopy(h.ctx.state);
+ const r=await loadApp({seed:617,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)}});setFakeTime(r.ctx,Date.parse('2026-10-05T01:02:03Z'));r.ctx.state.chain=[h.a.id];r.ctx.state.candidateId=h.b.id;r.ctx.decide('no');await answersCaughtUp(r.ctx);const right=ratingHistoryCopy(r.ctx.state);
  const l=ratingHistoryCopy(left),q=ratingHistoryCopy(right);h.ctx.mergeUndeletedTasks(l,right);h.ctx.mergeUndeletedTasks(q,left);
  const rows=st=>st.tasks.find(t=>t.id===h.b.id).ratingHistory;
  assert.equal(rows(l)?.length,2,'both devices keep their actual comparison observations');assert.deepEqual(ratingHistoryCopy(rows(l)),ratingHistoryCopy(rows(q)),'merge direction cannot change observation facts');
@@ -6535,7 +6558,7 @@ test('RISK task rating history: immutable fact union and observation fingerprint
  await t.test('extended FAQ',async()=>{const {ctx,shim}=await localized('en');ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Observations stay in exports and backups/);});
 });
 test('RISK task rating history: legacy import restore export deletion and unknown future facts preserve recorded evidence',async()=>{
- const {ctx,a,b}=await ratingHistoryFixture(618),old=ratingHistoryCopy(ctx.state);ctx.decide('yes');const recorded=ratingHistoryCopy(b.ratingHistory);
+ const {ctx,a,b}=await ratingHistoryFixture(618),old=ratingHistoryCopy(ctx.state);ctx.decide('yes');await answersCaughtUp(ctx);const recorded=ratingHistoryCopy(b.ratingHistory);
  const future={v:77,id:'future-private-event',at:1234,extra:{opaque:['kept','verbatim']}};b.ratingHistory.push(future);b.ratingHistory[0].futureField={x:'kept'};b.futureTaskField={y:8};
  const next=ratingHistoryCopy(old);ctx.markReplacementDeletes(next);ctx.replaceState(next);ctx.recomputeRanks();ctx.commit();
  const task=ratingHistoryTask(ctx,b.id);assert.equal(task.ratingHistory?.length,2,'replacement does not erase observations the device has seen');assert.deepEqual(ratingHistoryCopy(task.ratingHistory.find(row=>row.v===77)),future);
@@ -6553,7 +6576,7 @@ test('RISK task rating history: device reload and chunked Unicode exports retain
  const r=await loadApp({seed:620,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});assert.equal(ratingHistoryTask(r.ctx,a.id).ratingHistory.length,2201);assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(r.ctx,a.id).futureTaskField),{opaque:'kept'});assert.equal(ratingHistoryTask(r.ctx,a.id).ratingHistory[0].at,old.at);
 });
 test('RISK task rating history: compact record disclosures retain dates and metrics with explanations in the FAQ',async()=>{
- const {ctx,shim,b}=await ratingHistoryFixture(631);ctx.decide('yes');const original=JSON.stringify(b.ratingHistory);ctx.openEdit(b.id);
+ const {ctx,shim,b}=await ratingHistoryFixture(631);ctx.decide('yes');await answersCaughtUp(ctx);const original=JSON.stringify(b.ratingHistory);ctx.openEdit(b.id);
  const view=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(view,/<details class="rating-record"><summary>/,'each record starts compact with native keyboard disclosure');
  assert.match(view,/<time datetime="2026-10-06T12:34:56\.789Z"/);
@@ -6568,6 +6591,7 @@ test('RISK task rating history: compact record disclosures retain dates and metr
 });
 test('RISK task history: compact Likelihood labels retain recorded values across metric boundaries',async()=>{
  const {ctx,shim,b}=await ratingHistoryFixture(637);ctx.decide('yes');
+ await answersCaughtUp(ctx); // #2407
  const row=b.ratingHistory[0];
  for(const [patch,label] of [[{eligible:true,fallback:false,likelihood:.0108},'1.08%'],[{eligible:false},'0%'],[{eligible:true,fallback:false,likelihood:.00001},'&lt;0.01%'],[{eligible:true,fallback:true},'Numerical fallback']]){
   const task={...b,ratingHistory:[{...row,after:{...row.after,...patch,mu:33.51,sigma:5.27}}]};
@@ -6579,9 +6603,10 @@ test('RISK task history: compact Likelihood labels retain recorded values across
 });
 test('RISK task history: comparison labels preserve initiating action without inventing historical participant roles',async()=>{
  const {ctx,shim,a,b}=await ratingHistoryFixture(633);ctx.decide('no');
+ await answersCaughtUp(ctx); // #2407
  const before=JSON.stringify([a.ratingHistory,b.ratingHistory]);
  for(const task of [a,b]){const view=ctx.taskRatingHistoryHTML(task);assert.match(view,/<b>No comparison<\/b>/);assert.doesNotMatch(view,/<b>No<\/b>|opponent|incumbent won/);}
- assert.equal(JSON.stringify([a.ratingHistory,b.ratingHistory]),before,'comparison rendering preserves recorded facts');ctx.state.candidateId=b.id;ctx.decide('yes');assert.match(ctx.taskRatingHistoryHTML(a),/<b>Yes comparison<\/b>/);assert.match(ctx.taskRatingHistoryHTML(b),/<b>Yes comparison<\/b>/);
+ assert.equal(JSON.stringify([a.ratingHistory,b.ratingHistory]),before,'comparison rendering preserves recorded facts');ctx.state.candidateId=b.id;ctx.decide('yes');await answersCaughtUp(ctx);assert.match(ctx.taskRatingHistoryHTML(a),/<b>Yes comparison<\/b>/);assert.match(ctx.taskRatingHistoryHTML(b),/<b>Yes comparison<\/b>/);
  const recorded=JSON.stringify([a.ratingHistory,b.ratingHistory]);ctx.taskRatingHistoryHTML(a);ctx.taskRatingHistoryHTML(b);assert.equal(JSON.stringify([a.ratingHistory,b.ratingHistory]),recorded);ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Either participant may change/);
 });
 test('RISK task history: Done stays a plain dated event while recorded metrics and missing prior values remain expandable',async()=>{
@@ -6596,7 +6621,7 @@ test('RISK task history: Done stays a plain dated event while recorded metrics a
  const unknown=ctx.taskRatingHistoryHTML({...b,ratingHistory:[{v:99,kind:'done',at:0}]});assert.match(unknown,/unrecognized/);assert.doesNotMatch(unknown,/<b>Done/,'unsupported data does not fabricate a valid event');
 });
 test('RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations',async()=>{
- const {ctx,shim,a,b}=await ratingHistoryFixture(621);ctx.decide('yes');ctx.openEdit(b.id);const rendered=shim.document.getElementById('modalRoot').innerHTML;
+ const {ctx,shim,a,b}=await ratingHistoryFixture(621);ctx.decide('yes');await answersCaughtUp(ctx);ctx.openEdit(b.id);const rendered=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(rendered,/Task history/);assert.match(rendered,/<time datetime="2026-10-06T12:34:56\.789Z"/);assert.match(rendered,/MMR/);assert.match(rendered,/uncertainty/);assert.match(rendered,/Overall likelihood/);assert.match(rendered,/Estimated Top x/);assert.match(rendered,/Own rating/);assert.match(rendered,/observations/);assert.doesNotMatch(rendered,/not a complete/);
  const row=ratingHistoryCopy(b.ratingHistory[0]);b.ratingHistory=Array.from({length:43},(_,i)=>({...row,id:'stored-'+i,at:row.at-i*1000}));b.ratingHistory.push({v:78,raw:'<img src=x onerror=evil()>'});ctx.openEdit(b.id);
  const recent=shim.document.getElementById('modalRoot').innerHTML;assert.equal((recent.match(/class="rating-event"/g)||[]).length,20);assert.match(recent,/Show 20 more/);assert.doesNotMatch(recent,/<img src=x/);assert.equal(b.ratingHistory.length,44,'pagination cannot purge data');
@@ -6607,7 +6632,7 @@ test('RISK task rating history: Edit shows accessible timestamped observations a
 });
 test('RISK task rating history: malformed and future records remain recoverable without blocking actions or injecting markup',async()=>{
  const {ctx,shim,b}=await ratingHistoryFixture(622);b.ratingHistory=[null,7,{v:88,raw:'<img src=x onerror=evil()>'}];b.ratingHistoryRecovery={v:88,length:'<img src=x onerror=evil()>'};
- assert.doesNotThrow(()=>ctx.decide('no'),'unknown array items cannot stop a real rating decision');assert.equal(b.ratingHistory.length,4);assert.equal(b.ratingHistory[0],null);assert.equal(b.ratingHistory[1],7);
+ assert.doesNotThrow(()=>ctx.decide('no'),'unknown array items cannot stop a real rating decision');await answersCaughtUp(ctx);assert.equal(b.ratingHistory.length,4);assert.equal(b.ratingHistory[0],null);assert.equal(b.ratingHistory[1],7);
  ctx.openEdit(b.id);const view=shim.document.getElementById('modalRoot').innerHTML;assert.doesNotMatch(view,/<img src=x/);assert.match(view,/4 unrecognized history items/);
  b.ratingHistory={v:99,data:'kept'};ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/cannot append/i);assert.deepEqual(ratingHistoryCopy(b.ratingHistory),{v:99,data:'kept'});
 });
@@ -13035,6 +13060,7 @@ test("UI #221: a repeated Return is one return and one Undo step, and a stale Re
   keepEditorValues(ctx, shim, bench.id);
   assert.doesNotMatch(returnButton(shim.elements.get("modalRoot").innerHTML), /\bdisabled\b/, "precondition: the editor offers the return");
   ctx.onAction("bench-done", { dataset: { benchmark: bench.id } });   // the task leaves the chain while that editor is open
+  await answersCaughtUp(ctx); // #2407: its History catches up first
   const done = ctx.cloudPayload(), doneSteps = readConst(ctx, "undoStack.length");
   ctx.onAction("return-candidate", { dataset: { id: bench.id } });
   assert.equal(ctx.cloudPayload(), done, "the stale control neither reopens the finished task nor changes anything else");
@@ -21009,6 +21035,7 @@ test('RISK BACKUP FILE RESTORE: replacement preserves completion, History, ratin
   t.after(async()=>{await store?.close?.();});
   const benchmark=ctx.addTask('Rating benchmark'),kept=ctx.addTask('Kept rating task');
   ctx.state.chain=[benchmark.id];ctx.state.candidateId=kept.id;ctx.recomputeRanks();await ctx.decide('yes');
+  await answersCaughtUp(ctx); // #2407
   const currentRating=JSON.parse(JSON.stringify(ctx.state.tasks.find(task=>task.id===kept.id).ratingHistory[0]));
   const completed=ctx.addTask('Completed task'),removed=ctx.addTask('Task removed by replacement');
   await ctx.doneTask(completed.id);await ctx.workedOnTask(removed.id);
@@ -27129,6 +27156,8 @@ test('CLOUD WRITES: same-tab edits wait for the prior acknowledgement before sen
   ctx.addTask('Base title');await ctx.persist();
   const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
   const CS=h.factory();shim.window.CloudSync=CS;
+  // #2408: the second edit's push follows the first once its debounce allows.
+  shim.window.CLOUD_PUSH_DELAY_MS=0;
   await ctx.cloudPull();
   const pushes=[];let releaseFirst;
   CS.push=(payload,updatedAt,baseRev)=>{
@@ -29988,7 +30017,7 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
   if(key!=='transaction'){const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}
   return(...args)=>{
    const transaction=target.transaction(...args),id=++transactionId,owner=commits.getStore(),write=args[1]==='readwrite';
-   const hold=write&&owner?.caller==='sendPush'&&owner.idempotent&&armed&&!held;
+   const hold=write&&owner?.caller==='background'&&owner.idempotent&&armed&&!held;
    if(write&&owner?.caller==='native-Add'&&held&&id!==held.transaction)secondNativeWrite.resolve();
    return new Proxy(transaction,{get(tx,key){const value=Reflect.get(tx,key,tx);return typeof value==='function'?value.bind(tx):value;},set(tx,key,value){
     if(key==='oncomplete'&&hold){
@@ -30040,7 +30069,7 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
  Object.defineProperty(toast,'textContent',{get(){return toastText;},set(value){toastText=value;toasts.push(String(value));}});
  const originalCommit=store.commitHead;
  store.commitHead=async function(...args){
-  const id=commitCalls.length+1,stack=new Error().stack||'',caller=stack.includes('sendPush')?'sendPush':actions.getStore()==='native-Add'?'native-Add':'other';
+  const id=commitCalls.length+1,caller=['native-Add','background'].includes(actions.getStore())?actions.getStore():'other';
   const payload=args[0]?.payload||'',payloadSha256=createHash('sha256').update(payload).digest('hex');
   const observation={id,caller,expectedHash:args[0]?.expectedHash,payloadSha256,idempotent:payloadSha256===args[0]?.expectedHash};commitCalls.push(observation);
   try{return await commits.run({id,caller,idempotent:observation.idempotent},()=>originalCommit.apply(this,args));}
@@ -30051,15 +30080,22 @@ test('RISK SCALABLE CONCURRENCY: overlapping native and background saves do not 
   return actions.run('native-Add',()=>ctx.onAction('add',ctx.document.getElementById('addButton')));
  };
  await bounded(add('Rapid accepted one'),'first native Add');
- await bounded(backgroundComplete.promise,'background sendPush transaction commit');
+ await until(exactlyCurrent,'first Add durable and acknowledged');
+ // #2408: the push's save and the save recording its acknowledgement now run
+ // in this tab's device-save lane, one at a time, so neither overlaps an
+ // Add's save. The background checkpoint is a save outside that lane, as
+ // Reload app, an app update or a recovery makes, of the current head.
+ const checkpointSave=actions.run('background',()=>ctx.persist());
+ await bounded(backgroundComplete.promise,'background checkpoint transaction commit');
  const second=add('Rapid accepted two');
  await bounded(secondNativeWrite.promise,'second native Add write queued behind committed background transaction');
  releaseBackground.resolve();
  await bounded(second,'second native Add durable acknowledgement');
+ assert.equal(await bounded(checkpointSave,'background checkpoint result'),true,'the overtaken background checkpoint reports its save as made');
  await until(exactlyCurrent,'final durable and cloud acknowledgement');
 
- const background=commitCalls.find(call=>call.caller==='sendPush'&&call.idempotent),newerNative=commitCalls.find(call=>call.caller==='native-Add'&&call.expectedHash===background?.expectedHash&&call.payloadSha256!==background?.payloadSha256);
- assert.ok(background,'the ordinary background sendPush path must use the device-store port');
+ const background=commitCalls.find(call=>call.caller==='background'&&call.idempotent),newerNative=commitCalls.find(call=>call.caller==='native-Add'&&call.expectedHash===background?.expectedHash&&call.payloadSha256!==background?.payloadSha256);
+ assert.ok(background,'the background checkpoint must use the device-store port');
  assert.ok(newerNative,'the second native Add must commit a distinct payload against the same observed head: '+JSON.stringify(commitCalls));
  assert.equal(background.idempotent,true,'the earlier background checkpoint is an idempotent save of its current head');
  assert.ok(held,'the older transaction really committed before its completion delivery was held');
@@ -31519,6 +31555,9 @@ test('RISK completion boundaries: failed device save holds cloud publication and
   if(failNext){failNext=false;enteredResolve();await blocked;return {error:true,code:'injected-primary-save-failure'};}
   return commit(options);
  };
+ // #2408: a push uploads a board already durable here without saving it
+ // again, so the push's mandatory device save needs a change not saved yet.
+ ctx.addTask('Added after the Done was saved');
  CS.ready=true;
  const pending=ctx.cloudPushNow();await entered;
  assert.equal((await store.readHead()).payload,priorHead.payload,'the original durable source remains unchanged while the mandatory device save is pending');
@@ -34624,6 +34663,7 @@ test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip repl
   if(key==='y')assert.ok(candidate.mu>25&&bench.mu<25,'Yes retains candidate-over-benchmark orientation');
   if(key==='n')assert.ok(candidate.mu<25&&bench.mu>25,'No retains benchmark-over-candidate orientation');
   if(key==='c')assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),initial,'Cant stays neutral');
+  await answersCaughtUp(ctx); // #2407: the answer's History and save catch up first
   const after=JSON.stringify(ctx.state),undoDepth=vm.runInContext('undoStack.length',ctx);
   for(let repeat=0;repeat<3;repeat++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
   assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a held key cannot act on the replacement or record another observation');
@@ -37998,6 +38038,7 @@ test('RISK Show Postpone normalization: explicit positive choices win and draft 
 
  test('RISK task history: compact Top X uses recorded snapshots and preserves legacy facts',async()=>{
  const {ctx,b}=await ratingHistoryFixture(631);ctx.decide('yes');
+ await answersCaughtUp(ctx); // #2407
  const row=b.ratingHistory[0];row.before.topK=2;row.before.n=7;row.after.topK=4;row.after.n=9;
  const raw=JSON.stringify(b.ratingHistory);
  const compact=()=>ctx.taskRatingHistoryHTML(b).match(/<span class="rating-change">Top X (.*?)<\/span>/)[0];
@@ -40215,6 +40256,27 @@ test('RISK held decision recovery: actual Settings review gives unchosen Apply i
   assert.match(apply(),/class="btn primary"/,'the selected action retains its existing primary appearance');
   assert.doesNotMatch(apply(),/disabled/,'the selected action remains enabled');
  });
+});
+
+// #2406 review: on the #2406 branch the light cases above failed. The push
+// that follows the opening read saves the board, and Review saved decisions
+// read the stored head after that save's commit had landed but before it had
+// returned, then took this tab's own save for another tab's. Here the save is
+// held at exactly that point.
+test('RISK held decision recovery: Review saved decisions started while this tab’s own save is still committing reads the sources instead of reporting another tab’s change',async t=>{
+ const app=await heldDecisionApp188(t),{ctx,shim}=app,store=ctx.window.ScannerDeviceStore;
+ const commit=store.commitHead.bind(store);let landed,release;
+ const landedOnce=new Promise(resolve=>{landed=resolve;}),gate=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+ // The next commit reaches the device store and then waits before returning.
+ store.commitHead=async options=>{store.commitHead=commit;const result=await commit(options);landed();await gate;return result;};
+ shim.document.getElementById('addInput').value='Added before the review';const added=ctx.onAction('add',{});
+ await landedOnce;
+ assert.equal(JSON.parse((await store.readHead()).payload).tasks.some(task=>task.title==='Added before the review'),true,'positive control: this tab’s save has landed and not returned');
+ await ctx.onAction('review-decision-recovery',{});
+ const ui=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(ui,/changed in another tab/,'this tab’s own save is not another tab’s change');
+ assert.match(ui,/Saved appearance: <b>dark/,'the review reads this device');
+ release();await added;
 });
 
 
