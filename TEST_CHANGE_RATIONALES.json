@@ -23582,5 +23582,31 @@
       "command": "node --max-old-space-size=8192 --test --test-name-pattern=\"undone does not keep its task from the automatic dot|Return already saw does not stop Undo|Postpone that empties the chain after a return\" tests/persistence-recovery.test.js",
       "failure": "On the slice 1 candidate the #221 review test failed with \"every return reached the cloud\": actual [carried-a, carried-b, carried-c], expected [carried-a, carried-b] (the Postpone of carried-c is now a Return row). Observed in a focused run of the RISK chain return and Postpone tests before the assertion was changed (7 failures; the other six were expired-hold failures that the slice 1 repair fixed, recorder record 2026-11-15T15-02-04-201Z-837454f0)."
     }
+  },
+  {
+    "baseCommit": "fa1598667378699e19645f7bac2033f97797e926",
+    "weakenedTestLines": [
+      "tests/persistence-recovery.test.js:-assert.ok((await f.store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===draft),'the exact superseded draft is kept as a backup');",
+      "tests/persistence-recovery.test.js:-local.shim.document.getElementById('etDue').value='2026-11-01';preUndoResponseArmed=true;local.ctx.onAction('dot-task',{dataset:{id:targetId}});await local.ctx.persist();",
+      "tests/persistence-recovery.test.js:-const report=ctx.supportDiagnosticsText(),documentId=report.match(/\"currentDocument\":\"([^\"]+)\"/)?.[1];"
+    ],
+    "reason": "#2408 (spec #2406): an edit's own debounced device save now waits for this tab's earlier edit or push save instead of committing beside it, and it is skipped when the board is proved already durable here. Two existing tests leaned on the old overlap and the old redundant save. The #2324 finite-peer test asserted the stale-tab draft row was still listed, which held only because the edit accepted during the repair saved beside the repair and missed it; now that save runs after the merge and #2335 removes the draft as contained. The #172 scoped Undo test held the Dot's queued native save, but first saved the same board directly, so that native save is now skipped and never reached the held commit, and the test waited forever. A third test, the #2378 settled-signal story, found the Debug log's page name with a pattern that only matches the compact report; with fewer saves in the story the report now fits its size limit and is pretty-printed, so the name follows a space.",
+    "previousBehavior": "An edit accepted while a device save ran started its own save at once, beside the running one, and a queued save always wrote the board again even when a direct save had just written the same bytes.",
+    "intendedBehavior": "An edit's queued save runs after the save before it and writes the board as it is then, or is skipped when the stored board is proved to hold it. In the #2324 test the draft is either still listed or provably contained in the saved board (every task in it present, with this tab's edit, or deleted). In the scoped Undo test the Dot's own queued save is the save that commits and is held, so the test waits for that held commit instead of saving first. The settled-signal story matches the page name with or without that space.",
+    "preservedCoverage": [
+      "The #2324 test still asserts the repair kept a copy of this tab's draft, every write of the other copy is kept, the edit accepted during the repair is saved, the deleted task stays deleted, no save failure is shown and a cold reopen shows every copy's work.",
+      "The scoped Undo test still holds the Dot's real successful native device response until the older-source phase and keeps every assertion on publication, Undo, ratings, paints and reopening unchanged.",
+      "#2335's RISK tests keep covering when a contained stale-tab draft may and may not be removed.",
+      "The settled-signal story still requires the Debug log to name this page and compares the whole report, screen, saved board and cloud copy with and without a listener."
+    ],
+    "replacementTests": [
+      "RISK one save per answer: ten Yes and No answers with sync on, faster than one device save, cost at most one device save per answer plus one per acknowledged push, and one push after the run carries every answer",
+      "RISK one save per answer: with sync off there is still one device save per answer",
+      "RISK one save per answer: a push whose board is already the durable device head uploads without saving it again, and saves first when another tab changed the stored board"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern \"device save settle: a second copy saving repeatedly|scoped Undo recovery: Undo of an informed evergreen\" tests/persistence-recovery.test.js",
+      "failure": "On the #2408 candidate, the finite-peer test failed with \"the exact superseded draft is kept as a backup\" (actual false); instrumented commits showed the queued edit save (commit 6) carrying a removeRedundantBackups proof keptBy the saved board, where on the base commit that save was commit 5, before the merge, with none. The scoped Undo test timed out after 15000 ms ('Promise resolution is still pending but the event loop has already resolved') at await preUndoResponse.promise, because the Dot's queued save found the board durable and committed nothing. Both pass on the base commit. The settled-signal story failed with \"positive control: the Debug log names this page\": its report was 23232 characters, pretty-printed, with \"currentDocument\": followed by a space."
+    }
   }
 ]

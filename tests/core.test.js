@@ -3954,6 +3954,24 @@ test('RISK rapid action guidance: mounted Help distinguishes later accepted work
  assert.match(html,/Rapid valid actions keep saving without a false repeated-change warning/);
 });
 
+// #2408: Help and the changelog say that answering with sync on no longer
+// slows down and when the cloud confirms a run of answers.
+test('RISK sync responsiveness guidance: mounted Help and the changelog say a run of answers with sync on saves about once per answer and when the cloud confirms it',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const rapid=help.split('<dt>Does answering slow down with sync on?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(rapid,'Data and backups answers whether answering slows down with sync on');
+ assert.match(rapid,/With sync on, answering several tasks in a row no longer slows down/);
+ assert.match(rapid,/after a short pause, or at least every 20 seconds or so/);
+ assert.match(rapid,/A single Yes or Done with nothing else syncing goes to the cloud at once/);
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];
+ assert.match(current,/<h3>November 16, 2026<\/h3>/);
+ const items=current.split('<li>').slice(1);
+ assert.ok(items.some(item=>/answering several tasks in a row no longer slows down/.test(item)&&!/20 seconds/.test(item)),'the saving change has its own bullet');
+ assert.ok(items.some(item=>/after a short pause, or at least every 20 seconds or so/.test(item)),'the cloud timing has its own bullet');
+ assert.ok(rapid.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+});
+
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
