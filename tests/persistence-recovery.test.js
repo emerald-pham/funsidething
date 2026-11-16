@@ -16193,7 +16193,11 @@ function answerClock2408(ctx,counters){
   }};
  return clock;
 }
-async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs=0,signedIn=true,dropDatabase=false}={}){
+async function answeringDevice2408(t,{board=answeringBoard2408(),docs=new Map(),indexedDB,dbName,storage,saveMs,signedIn=true,dropDatabase=false}={}){
+ // #2405: every caller states how long a device save takes. A phone's saves
+ // take 0.7 to 3 s; 0 is an instant save, for a test whose subject is not
+ // save timing.
+ if(typeof saveMs!=='number'||!Number.isFinite(saveMs)||saveMs<0)throw new TypeError('answeringDevice2408 needs an explicit saveMs, the device-save duration in ms on the fake clock: a phone\'s saves take 0.7–3 s, and 0 states an instant save. Got '+JSON.stringify(saveMs));
  if(!indexedDB)({indexedDB}=await import('fake-indexeddb'));
  dbName??='chain-scanner-2408-'+Date.now()+'-'+Math.random();
  if(!storage){const raw=JSON.stringify(board);storage=sharedScannerStorage({[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw});}
@@ -16308,12 +16312,12 @@ test('RISK one save per answer: ten Yes and No answers with sync on, faster than
  const cloud=await device.cloud();
  assert.equal(answeredDecisions2408(cloud.board,taps).length,10,'the cloud copy holds all ten decisions');
  await device.close();
- const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,signedIn:false});
+ const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false});
  assert.deepEqual(answeredDecisions2408(reopened.ctx.state,taps),answeredDecisions2408(cloud.board,taps),'a cold reopen holds the same ten decisions');
 });
 
 test('RISK one save per answer: a single Yes with nothing else syncing still pushes at once',{timeout:60000},async t=>{
- const device=await answeringDevice2408(t);
+ const device=await answeringDevice2408(t,{saveMs:0});
  await startAnswering2408(device);
  const {ctx,counters,clock}=device,uploadsBefore=counters.uploads.length;
  device.tap('yes');const tappedAt=clock.now;
@@ -16329,7 +16333,7 @@ test('RISK one save per answer: a single Yes with nothing else syncing still pus
 });
 
 test('RISK one save per answer: when No answers keep arriving past the longest wait, a push still goes out within it',{timeout:120000},async t=>{
- const device=await answeringDevice2408(t);
+ const device=await answeringDevice2408(t,{saveMs:0});
  await startAnswering2408(device);
  const {counters,clock}=device,firstTap=counters.taps.length,uploadsBefore=counters.uploads.length;
  for(let i=0;i<26;i++){device.tap('no');await clock.advance(1000);}
@@ -16344,7 +16348,7 @@ test('RISK one save per answer: when No answers keep arriving past the longest w
 });
 
 test('RISK one save per answer: a push whose board is already the durable device head uploads without saving it again, and saves first when another tab changed the stored board',{timeout:90000},async t=>{
- const device=await answeringDevice2408(t);
+ const device=await answeringDevice2408(t,{saveMs:0});
  await startAnswering2408(device);
  const {ctx,counters,clock}=device;
  // The answer's own save runs 350 ms after the tap; its push 2 s after.
@@ -16373,7 +16377,7 @@ test('RISK one save per answer: a push whose board is already the durable device
 
 test('RISK one save per answer: after a refused device save the push does not upload',{timeout:90000},async t=>{
  for(const [refusal,code] of [['storage full','quota-exhausted'],['another copy writing','changed-during-save']]){
-  const device=await answeringDevice2408(t);
+  const device=await answeringDevice2408(t,{saveMs:0});
   await startAnswering2408(device);
   const {ctx,counters,clock}=device,store=ctx.window.ScannerDeviceStore,commit=store.commitHead,uploadsBefore=counters.uploads.length;
   // Every commit is refused, as by a full device or another copy of the app
@@ -16410,7 +16414,7 @@ test('RISK one save per answer: when another device writes during the run, its c
   device.tap(act);await clock.advance(1000);
   if(i===4){
    // A laptop signed in to the same account adds a task and syncs it.
-   const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage()});
+   const laptop=await answeringDevice2408(t,{docs,storage:sharedScannerStorage(),saveMs:0});
    laptop.ctx.addTask('Added on the laptop');await syncSettled(laptop.ctx,{within:20000});
    assert.ok((await laptop.cloud()).board.tasks.some(task=>task.title==='Added on the laptop'),'positive control: the laptop\'s change reaches the cloud');
    await laptop.close();
@@ -16425,13 +16429,13 @@ test('RISK one save per answer: when another device writes during the run, its c
  assert.equal(cloud.rev,ctx.state.syncRev,'this device is acknowledged at the cloud\'s revision');
  assert.equal(ctx.cloudPayload(),JSON.stringify(cloud.board),'and holds the merged board');
  await device.close();
- const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,signedIn:false});
+ const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,signedIn:false});
  assert.ok(reopened.ctx.state.tasks.some(task=>task.title==='Added on the laptop'),'a cold reopen keeps the laptop\'s task');
  assert.equal(answeredDecisions2408(reopened.ctx.state,taps).length,10,'and every answer');
 });
 
 test('RISK one save per answer: answers given offline are pushed after reconnecting, and answers not yet pushed when the app closes are pushed after a cold open',{timeout:120000},async t=>{
- const docs=new Map(),device=await answeringDevice2408(t,{docs});
+ const docs=new Map(),device=await answeringDevice2408(t,{docs,saveMs:0});
  await startAnswering2408(device);
  const {ctx,counters,clock,faults}=device,firstTap=counters.taps.length;
  const offline=Object.assign(Error('offline'),{code:'unavailable'});
@@ -16450,7 +16454,7 @@ test('RISK one save per answer: answers given offline are pushed after reconnect
  assert.equal(answeredDecisions2408(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload),unpushed).length,3,'positive control: the device saved them');
  assert.equal(answeredDecisions2408(await cloudCopy2408(docs),unpushed).length,0,'positive control: the cloud does not have them yet');
  await device.close();
- const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage});
+ const reopened=await answeringDevice2408(t,{docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0});
  await syncSettled(reopened.ctx,{within:20000});
  const cloud=await reopened.cloud();
  assert.equal(answeredDecisions2408(cloud.board,counters.taps.slice(firstTap)).length,8,'after a cold open the cloud holds every answer');
@@ -16469,7 +16473,7 @@ test('RISK one save per answer: the support report records a push dropped becaus
  await clock.settle();
  assert.deepEqual(pushEvents(device,mark),['stale:prepare','started','acknowledged'],'the Yes push is recorded as dropped while it prepared, and the follow-up that carried both answers as started and acknowledged');
  // A No only schedules its push; before the debounce nothing has started.
- const waiting=await answeringDevice2408(t);
+ const waiting=await answeringDevice2408(t,{saveMs:0});
  await startAnswering2408(waiting);
  const before=markOf(waiting);
  waiting.tap('no');await waiting.clock.advance(1000);
@@ -16498,7 +16502,7 @@ test('RISK one save per answer: answers caught up by a save once the cloud is re
 });
 
 test('RISK one save per answer: the save an edit schedules settles true once its board is durable on this device',{timeout:60000},async t=>{
- const device=await answeringDevice2408(t,{signedIn:false});
+ const device=await answeringDevice2408(t,{saveMs:0,signedIn:false});
  const {ctx,shim}=device,schedule=ctx.setTimeout,debounced=[];
  ctx.setTimeout=(fn,ms,...args)=>{if(ms!==350)return schedule(fn,ms,...args);debounced.push(()=>fn(...args));return {debounced2406:true};};
  shim.document.getElementById('addInput').value='Saved by its own debounce';await ctx.onAction('add',{});
@@ -16509,7 +16513,7 @@ test('RISK one save per answer: the save an edit schedules settles true once its
 });
 
 test('RISK one save per answer: a device save hashes the board once for the write when its latest backup holds the same text',{timeout:60000},async t=>{
- const device=await answeringDevice2408(t,{signedIn:false});
+ const device=await answeringDevice2408(t,{saveMs:0,signedIn:false});
  await startAnswering2408(device);
  const {counters,clock}=device,commitsBefore=counters.commits.length,hashedBefore=counters.hashed.length;
  device.tap('no');await clock.advance(1000);
@@ -16529,7 +16533,7 @@ test('RISK one save per answer: a device save hashes the board once for the writ
 // board's text (no new edit came with it) and the board differs from its last
 // save (the revision moved).
 test('RISK one save per answer: the save that records a Cloud acknowledgement serializes the board once for its save-loop check, its missing-task check and its write',{timeout:90000},async t=>{
- const device=await answeringDevice2408(t);
+ const device=await answeringDevice2408(t,{saveMs:0});
  await startAnswering2408(device);
  const {ctx,counters,clock}=device,passes=[];
  const json=vm.runInContext('JSON',ctx),stringify=json.stringify;
@@ -16544,6 +16548,16 @@ test('RISK one save per answer: the save that records a Cloud acknowledgement se
  assert.equal(JSON.parse((await ctx.window.ScannerDeviceStore.readHead()).payload).syncRev,ctx.state.syncRev,'positive control: that save holds the acknowledged revision');
  const recording=passes.filter(pass=>pass.seq>uploads[0].seq&&pass.seq<acknowledged.seq);
  assert.equal(recording.length,1,'the board is serialized once from the upload to that save\'s write: '+recording.length);
+});
+
+// #2405 (retro of #2406): #2408's tests met the spec only because the device
+// store saved instantly, so the scheduling harness has no default save time.
+test('one save per answer harness: a device opened without an explicit device-save duration is refused, naming saveMs',{timeout:60000},async t=>{
+ for(const options of [undefined,{},{signedIn:false},{saveMs:undefined},{saveMs:'1500'},{saveMs:-1}])
+  await assert.rejects(answeringDevice2408(t,options),error=>error instanceof TypeError&&/saveMs/.test(error.message)&&/0\.7.3 s/.test(error.message),
+   'refused without a stated device-save duration: '+JSON.stringify(options));
+ const device=await answeringDevice2408(t,{saveMs:0,signedIn:false});
+ assert.equal(device.saveMs,0,'positive control: a stated instant save still opens a device');
 });
 
 // #2406 review round 1: a phone's device saves take 0.6 to 7 s (support
