@@ -2967,10 +2967,13 @@ function retireAutomaticBackupForPrimarySave(expectedHead,expectedStore,preserve
     return false; // retain the newest stable automatic recovery copy
   }catch(e){ return false; }
 }
-function validSavedPayload(raw){
-  if(!raw) return false;
-  try{ const parsed=JSON.parse(raw); hydrateState(parsed); return true; }
-  catch(e){ return false; }
+function validSavedPayload(raw){return savedPayloadBoard(raw)!==null;}
+// The saved board a payload holds, checked as validSavedPayload checks it, or
+// null. A caller that needs the board as well parses it only once (#2408).
+function savedPayloadBoard(raw){
+  if(!raw) return null;
+  try{ const parsed=JSON.parse(raw); hydrateState(parsed); return parsed; }
+  catch(e){ return null; }
 }
 function historyEntryKey(entry){
   return entry.id || [entry.kind,entry.taskId || entry.title,entry.at].join("|");
@@ -4670,7 +4673,10 @@ function keepMissingTasks(source,keptFrom,message){
    push callback in sendPush() has to record a revision without that counting
    as a change, or every write re-stamps the state and schedules the next one,
    a 2-second write loop with no edit behind it. */
-async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
+async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0,lane=null){
+  // #2408 review: what could change the board between the lane's text
+  // (persist() took it for the save-loop check) and this save's own.
+  const laneSnapshot=lane?{signature:deviceLegacySeenSignature,raw:lastPersistedRaw,hash:deviceHeadHash,authority:deviceStorageAuthority,board:state}:null;
   if(!liveBoardAccepted){
     const unreadableBackup=inspectBackupIndex().rows===null;
     return reportDeviceSaveFailure("device-recovery","unaccepted-source",unreadableBackup
@@ -4703,7 +4709,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   }
   if(ambiguousLegacyCompletion(state))return reportDeviceSaveFailure("completion-upgrade","ambiguous-legacy-completion","This older board has a saved Start and completion whose order cannot be proved. Its exact source stays protected; keep this tab open while sync waits for compatible recovery.");
   const ancestorRaw=lastPersistedRaw; // capture before any storage await can advance the marker
-  projectLegacyPrerequisites(state);
+  const projected=projectLegacyPrerequisites(state);
   if(deviceStore&&!deviceStorageAuthority){
     const bootstrap=JSON.stringify(state);
     await activateDeviceStorage(bootstrap);
@@ -4714,17 +4720,35 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   // it compares and commits; the last saved copy is parsed at most once. On a
   // phone each pass over a board of several megabytes took a noticeable part
   // of a save. Only a missing task kept below changes the board, and then it
-  // is serialized again.
-  let payload=JSON.stringify(state);
+  // is serialized again. A lane save reuses the text its save-loop check took
+  // unless a step above changed the board (#2408 review).
+  const laneText=lane?.text&&!projected&&!completionSourceBackup&&laneSnapshot.signature===deviceLegacySeenSignature&&laneSnapshot.raw===lastPersistedRaw&&
+    laneSnapshot.hash===deviceHeadHash&&laneSnapshot.authority===deviceStorageAuthority&&laneSnapshot.board===state?lane.text:null;
+  let payload=laneText??JSON.stringify(state);
+  if(lane)lane.requests=deviceSaveLane.requests();
   if(lastPersistedRaw!==payload&&lastPersistedRaw){
-    let last=null;
-    try{last=JSON.parse(lastPersistedRaw);hydrateState(last);}catch(e){last=null;} // validSavedPayload's check
+    const last=savedPayloadBoard(lastPersistedRaw);
     if(last&&sameListOwner(state,last)&&keepMissingTasks(last,"last-save","A missing task was kept in the saved board.")){
       recomputeRanks();render();payload=JSON.stringify(state);
     }
   }
   const chanceSeed = state.chance?.seed;
   const requestGeneration = saveRequestGeneration;
+  if(lane){
+    lane.generation=requestGeneration;
+    // #2408 review: a lane save whose board this tab has already made durable
+    // writes nothing. The proof: no device save issue is outstanding, nothing
+    // else a save carries is waiting (a completion upgrade's source, a
+    // Restore's safety rows, a deferred cloud backup's wakeup), this text is
+    // the board this tab last made durable, and the stored head is still that
+    // copy, so a save by another tab in between is caught (the legacy-copy
+    // reconcile above has run). Without all of it, the board is saved.
+    if(payload===lastPersistedRaw&&(chanceSeed??null)===(persistedChanceSeed??null)&&deviceStorageAuthority&&deviceStore&&!lastDeviceSaveIssue&&
+      pendingLegacyCompletionSource===null&&!pendingRestoreSafetyIds.size&&!pendingDeviceCloudBackup&&typeof deviceHeadHash==="string"){
+      const head=await deviceStore.readHead().catch(()=>null);
+      if(head?.hash===deviceHeadHash&&!lastDeviceSaveIssue&&lastPersistedRaw===payload){lane.saved=payload;return true;}
+    }
+  }
   if(deviceStorageAuthority){
     try{
       let commitAttempts=0;
@@ -4736,9 +4760,13 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
         // A separate signal marks this commit's return for later saves; the
         // commit itself is awaited directly, as before.
         let returned;const signal=new Promise(resolve=>{returned=resolve;});deviceHeadCommitsInFlight.add(signal);deviceCommitProgress++;
+        const running={at:performance.now()};deviceCommitsRunning.add(running); // #2408 review: the lane's pace
         try{result=await deviceWriteBeforeDiagnostics("commitHead",options);}
         catch(error){if(deviceQuotaFailure(error))result={error:true,code:"quota-exhausted"};else throw error;}
-        finally{deviceHeadCommitsInFlight.delete(signal);returned();deviceCommitProgress++;if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);}
+        finally{
+          deviceHeadCommitsInFlight.delete(signal);returned();deviceCommitProgress++;if(--own.count<=0&&deviceOwnCommits.get(options.payload)===own)deviceOwnCommits.delete(options.payload);
+          deviceCommitsRunning.delete(running);deviceCommitSlowestMs=Math.max(deviceCommitSlowestMs,performance.now()-running.at);
+        }
         return result;
       };
       const legacyIndex=backupAlreadySafe?null:inspectBackupIndex();
@@ -4867,7 +4895,7 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
           const at=Date.now();
           const saved=await deviceWriteBeforeDiagnostics("putBackup",{expectedHash:result.hash,
             backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:liveRaw,losingEdit:true}});
-          if(saved?.conflict && deviceRetry<3) return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1);
+          if(saved?.conflict && deviceRetry<3) return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1,lane);
           if(!saved?.ok) return reportDeviceSaveFailure("device-store",saved?.code||"recovery-failed","The later draft could not be backed up; keep this tab open and try again.");
           if(JSON.stringify(state)===liveRaw) break;
           liveRaw=JSON.stringify(state);
@@ -4893,7 +4921,20 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
       await refreshDeviceBackupCache();
       if(clearedBackups)logBackupCleanup(clearedBackups,deviceBackupCache.length);
       if(!backupAlreadySafe)await retireExpiredLegacyBackups(result.hash,committedPayload,legacyIndex?.raw,preserveBackupId);
-      if(JSON.stringify(state)!==committedPayload){
+      if(lane){
+        lane.saved=committedPayload;
+        // #2408 review: a lane save writes its board once. Chasing every change
+        // made meanwhile kept a phone saving through a run of answers, and the
+        // push or acknowledgement waiting on that save never went on. A change
+        // that came with its own request (an answer's save, or another lane
+        // request) is the next lane save's; only one that came with none is
+        // saved again here, under the bounded retry guard below.
+        const unrequested=saveRequestGeneration===requestGeneration&&deviceSaveLane.requests()===lane.requests;
+        if(unrequested&&JSON.stringify(state)!==committedPayload){
+          if(deviceRetry>=3) return reportDeviceSaveFailure("device-store","changed-during-save","The board kept changing while it was being saved; keep this tab open and try again.");
+          return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1,lane);
+        }
+      }else if(JSON.stringify(state)!==committedPayload){
         // A newer accepted save request is follow-up work after this exact
         // snapshot succeeded. Unexplained churn keeps its bounded retry guard.
         const followUp=saveRequestGeneration!==requestGeneration;
@@ -5015,6 +5056,13 @@ async function persistImpl(backupAlreadySafe=false,preserveBackupId=null,deviceR
   }
   catch(e){ toast("Couldn't save just now — will retry on your next change."); return false; }
 }
+// The board's own record that it holds an edit not yet saved or synced. A
+// scanner answer marks it before its paint, so nothing shows the board saved
+// or synced before its catch-up saves it (#2407).
+function markBoardEdited(){
+  state.updatedAt = Date.now();
+  state.syncDirty = true;
+}
 function save(preserveBackupId=null){
   saveRequestGeneration++;
   const at=supportDiagnosticsNow();
@@ -5026,19 +5074,19 @@ function save(preserveBackupId=null){
   supportDiagnosticsServerAckAt=at;supportDiagnosticsPushOutcome=window.CloudSync?.configured?"pending":"unavailable";
   supportDiagnosticsObserve("save","started","current",null,null,null,null,null,null,null,null,null,"unknown");
   sealUndoFrame();
-  state.updatedAt = Date.now();
-  state.syncDirty = true;
+  markBoardEdited();
   cloudPush();
   if(saveTimer){clearSyncTimeout(saveTimer);saveTimer=null;}
   // A new random draw must survive even an immediate reload. Ordinary edits
   // retain the debounce; cloud pushes retain their revision/reconcile guard.
-  if(state.chance && state.chance.seed !== persistedChanceSeed) persist(false,preserveBackupId);
+  // #2408: both go through this tab's one device-save lane, so neither runs
+  // beside an earlier save; the draw's save skips the debounce, as before.
+  if(state.chance && state.chance.seed !== persistedChanceSeed) deviceSaveLane.request({preserveBackupId});
   else{
     const timer=countSyncTimer("save-debounce",setTimeout(()=>{
       endSyncTimer(timer);
       if(saveTimer!==timer)return;
-      // #2408: after any earlier edit's save still running here.
-      saveTimer=null;return saveBoardOnce(preserveBackupId);
+      saveTimer=null;return deviceSaveLane.request({preserveBackupId});
     },350));
     saveTimer=timer;
   }
@@ -6103,8 +6151,10 @@ function cloudSaveLoopContent(){
 }
 // Answers whether this save run may go ahead and which cloud step it ran in
 // (null when signed out, or when it ran outside a cloud read's merge and a push
-// as the first run of a save request).
-function cloudSaveLoopCheck(){
+// as the first run of a save request). boardText gives the board's text when
+// the check needs it; a lane save passes its own, so the board is serialized
+// once for the check and the save together (#2408 review).
+function cloudSaveLoopCheck(boardText=()=>JSON.stringify(state)){
   try{
     if(!state||!cloudReady()){cloudSaveLoopGuard=null;return {allowed:true,cloudStep:null};}
     const inStep=pulling||cloudPushInFlight?cloudSaveStep():null;
@@ -6126,7 +6176,7 @@ function cloudSaveLoopCheck(){
     // leaves the board differing from its last save. Rewriting the saved board
     // (before each push, so also each bounded retry of a failed one) does not.
     // After a stop, such a run inside a cloud step is the stopped loop again.
-    if(JSON.stringify(state)===lastPersistedRaw&&(!guard.stopped||inStep===null))return {allowed:true,cloudStep:inStep};
+    if(boardText()===lastPersistedRaw&&(!guard.stopped||inStep===null))return {allowed:true,cloudStep:inStep};
     const content=cloudSaveLoopContent();
     if(guard.content!==content){
       Object.assign(guard,{content,runs:0,step:null,stopped:false,afterStop:0});return {allowed:true,cloudStep:inStep};
@@ -6157,15 +6207,22 @@ function reportCloudSaveLoop(guard){
   if(typeof CS?.reportError==="function")CS.reportError(stage,"save-loop");
   renderSync();
 }
-async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
+// lane: this tab's device-save lane runs this save (deviceSaveLane). It saves
+// its board once, may prove it already durable instead, and reports the text
+// it made durable (lane.saved) and the newest save request that text holds
+// (lane.generation).
+async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0,lane=null){
   // #2407: a device save holds every answer given, with its History.
   answerCatchUp.flush();
   // #2378: counted from the call until it returns or throws.
   const syncWork=trackSyncWork("device-save");try{
+  // #2408 review: a lane save serializes the board once. When the save-loop
+  // check needs the board's text, it takes it here and the save reuses it.
+  if(lane){lane.text=null;lane.saved=null;}
   // A device retry belongs to the run that started it.
   let cloudStep=null;
   if(!(Number.isSafeInteger(deviceRetry)&&deviceRetry>0)){
-    const check=cloudSaveLoopCheck();if(!check.allowed)return false;cloudStep=check.cloudStep;
+    const check=cloudSaveLoopCheck(lane?()=>lane.text??=JSON.stringify(state):undefined);if(!check.allowed)return false;cloudStep=check.cloudStep;
   }
   const startedAt=supportDiagnosticsNow(),requestGeneration=saveRequestGeneration,priorIssue=lastDeviceSaveIssue;
   const observeCloudSave=status=>{if(cloudStep)supportDiagnosticsObserveCloudStep("cloud-save",status,startedAt,state?.syncRev,"unknown",{cloudStep});};
@@ -6175,15 +6232,17 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   supportDiagnosticsLastLocalStatus="pending";supportDiagnosticsLastLocalAt=startedAt;
   supportDiagnosticsObserve("persist","started","current",null,null,null,null,null,null,null,null,null,"unknown");
   try{
-    const run=persistImpl(backupAlreadySafe,preserveBackupId,deviceRetry);deviceSavesInFlight.add(run);
+    const run=persistImpl(backupAlreadySafe,preserveBackupId,deviceRetry,lane);deviceSavesInFlight.add(run);
     let result;try{result=await run;}catch(error){cloudSaveLoopLastSaveFailed=true;throw error;}finally{deviceSavesInFlight.delete(run);}
     cloudSaveLoopLastSaveFailed=result!==true;
     const at=supportDiagnosticsNow();
     if(result===true){
+      // A save that found the live board already durable by another of this
+      // tab's saves (#2326) made that board durable too.
+      if(lane)lane.saved??=lastPersistedRaw;
       supportDiagnosticsLastLocalStatus="durable";supportDiagnosticsLastLocalCode="unknown";supportDiagnosticsLastLocalStage="unknown";supportDiagnosticsLastLocalAttempts=null;
       supportDiagnosticsLastLocalOwnRepairs=null;supportDiagnosticsLastLocalOtherRepairs=null;
       supportDiagnosticsDurableGeneration=Math.max(supportDiagnosticsDurableGeneration,requestGeneration);
-      durableSaveRequestGeneration=Math.max(durableSaveRequestGeneration,requestGeneration); // #2408
       supportDiagnosticsObserve("persist","durable","current",null,startedAt===null||at===null?null:at-startedAt,null,null,null,null,null,null,null,"unknown");
     }else{
       const changedIssue=lastDeviceSaveIssue!==priorIssue;
@@ -6212,86 +6271,87 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   }finally{supportDiagnosticsActivePersistCalls=Math.max(0,supportDiagnosticsActivePersistCalls-1);}
   }finally{syncWork.end();}
 }
-/* #2408: the saves an edit's debounce starts run one at a time. On a phone a
+/* #2408: this tab's ordinary device saves run one at a time, in one lane: an
+   edit's (after its debounce), a new random draw's, a push's own save and the
+   save that records a Cloud acknowledgement (#2408 review). On a phone a
    whole-board save can take seconds, longer than a person takes to answer.
    Started side by side, a later save found the head moved by the earlier one
    and repaired onto it (#2324), a second whole-board commit; with a push
    restarting its own save after every answer, the support report copied on
-   2026-11-16 showed 25 device saves for nine answers. An edit's save now
-   waits for this tab's edit and push saves still running and then writes the
-   board as it is then. A save stalled for ORDINARY_SAVE_WAIT_MS (a device
-   store that stops answering) no longer holds the next one, which goes ahead
-   as before and repairs if it must. Those saves and a
-   push's own save are skipped when the board is proved already durable here
-   (deviceHeadHoldsBoard). A push's own save starts without waiting, as
-   before. Every other save (the acknowledgement's, a recovery's, an
-   import's) keeps its own timing. */
+   2026-11-16 showed 25 device saves for nine answers.
+   A request made while a lane save runs joins the next one, which starts once
+   the running save returns and writes the board as it is then; every request
+   made meanwhile shares it. So a push asked for during the save of its board
+   waits for that save, then proves the board durable instead of saving it
+   again, and an acknowledgement asked for during an answer's save is recorded
+   by the next save rather than beside it. Each lane save writes its board once
+   (persistImpl). A running save that makes no progress for
+   ORDINARY_SAVE_WAIT_MS (a device store that stops answering) no longer holds
+   the next one, which goes ahead beside it as before and repairs if it must. A
+   commit still running counts as progress while it is no slower than the
+   slowest this tab has made, so a phone whose every save takes seconds still
+   saves one at a time. Every other save (a recovery's, an import's, a cloud
+   read's merge) keeps its own timing. */
 const ORDINARY_SAVE_WAIT_MS=2000;
-// The latest edit or push save of this tab: when it began and when it ends.
-let lastOrdinaryDeviceSave=null;
-// The newest save request a durable save of this tab is known to cover. A
-// later request means the board has changed since, so a save goes straight
-// ahead without first serializing the board to compare it.
-let durableSaveRequestGeneration=0;
-function saveBoardOnce(preserveBackupId=null,{queued=true}={}){
-  // #2407: the board compared and saved holds every answer given (persist()
-  // flushes too; the proof below reads the board first).
-  answerCatchUp.flush();
-  // #2378: counted while it waits its turn too; persist() counts its own run.
-  const work=trackSyncWork("device-save");
-  const start=()=>saveRequestGeneration>durableSaveRequestGeneration?persist(false,preserveBackupId)
-    :deviceHeadHoldsBoard().then(held=>held?noteBoardAlreadyDurable():persist(false,preserveBackupId));
-  const before=lastOrdinaryDeviceSave;
-  let began;const started=new Promise(resolve=>{began=resolve;});
-  const begin=()=>{began();return start();};
-  // With none running it starts now, as persist() always has.
-  const run=before&&queued?waitForOrdinaryDeviceSave(before).then(begin):begin();
-  const ended=run.then(()=>{},()=>{});
-  // A push's save that did not wait still holds the next edit's save, as
-  // does the save it started beside.
-  const entry=before&&!queued?{started:Promise.all([before.started,started]),ended:Promise.all([before.ended,ended])}:{started,ended};
-  lastOrdinaryDeviceSave=entry;
-  entry.ended.then(()=>{if(lastOrdinaryDeviceSave===entry)lastOrdinaryDeviceSave=null;});
-  ended.then(()=>work.end());
-  return run;
-}
-// Waits for that save to end, but stops waiting once ORDINARY_SAVE_WAIT_MS
-// pass with no head commit of this tab starting or returning: a save stalled
-// that long holds no later save. A save still committing, even through
-// several follow-ups, keeps the next one waiting.
-let deviceCommitProgress=0;
-function waitForOrdinaryDeviceSave(save){
-  return save.started.then(()=>new Promise(resolve=>{
-    let timer=null,seen=deviceCommitProgress;
-    const check=()=>{if(deviceCommitProgress===seen){timer=null;resolve();return;}seen=deviceCommitProgress;timer=setTimeout(check,ORDINARY_SAVE_WAIT_MS);};
-    timer=setTimeout(check,ORDINARY_SAVE_WAIT_MS);
-    save.ended.then(()=>{if(timer!==null)clearTimeout(timer);timer=null;resolve();});
-  }));
-}
-/* #2408: the proof that saving the live board would write nothing new. No
-   device save issue is outstanding; nothing else a save carries is waiting (a
-   completion upgrade's source, a Restore's safety rows, a deferred cloud
-   backup's wakeup); the live board is exactly the board this tab last made
-   durable; and the stored board is still that copy, the head check the push's
-   legacy-copy reconcile makes, so a save by another tab in between is caught.
-   Without all of it, the board is saved as before. */
-async function deviceHeadHoldsBoard(){
-  try{
-    if(!state||!deviceStorageAuthority||!deviceStore||!liveBoardAccepted||!storageOK||memoryRecoveryWorkspace||lastDeviceSaveIssue||
-      pendingLegacyCompletionSource!==null||pendingRestoreSafetyIds.size||pendingDeviceCloudBackup||typeof deviceHeadHash!=="string")return false;
-    const raw=JSON.stringify(state);
-    if(raw!==lastPersistedRaw||(state.chance?.seed??null)!==(persistedChanceSeed??null))return false;
-    if(!await reconcileDeviceLegacyCopy())return false;
-    const head=await deviceStore.readHead();
-    return !!head&&head.hash===deviceHeadHash&&!lastDeviceSaveIssue&&lastPersistedRaw===raw&&JSON.stringify(state)===raw;
-  }catch{return false;}
-}
-// The skipped save's board is durable: the report says so, as after a save.
-function noteBoardAlreadyDurable(){
-  supportDiagnosticsLastLocalStatus="durable";supportDiagnosticsLastLocalAt=supportDiagnosticsNow();
-  supportDiagnosticsDurableGeneration=Math.max(supportDiagnosticsDurableGeneration,saveRequestGeneration);
-  return true;
-}
+// Head commits of this tab started or returned, those still running (each with
+// when it started), and how long the slowest one that returned took.
+let deviceCommitProgress=0,deviceCommitSlowestMs=0;
+const deviceCommitsRunning=new Set();
+const deviceSaveLane=(()=>{
+  const running=new Set(),waiting=[];let requested=0,slowestMs=0;
+  // The promise gives {ok, saved, generation, error}: whether the save made the
+  // board durable, the text it made durable, the newest save request that text
+  // holds, and what the save threw, if it threw.
+  function request({preserveBackupId=null,backupAlreadySafe=false}={}){
+    requested++;
+    let job=waiting.at(-1);
+    // One save keeps one backup id from retirement; another id waits for its own.
+    if(!job||job.preserveBackupId!==preserveBackupId){
+      let resolve;const done=new Promise(settle=>{resolve=settle;});
+      // #2378: counted while it waits its turn too; persist() counts its own run.
+      job={preserveBackupId,backupAlreadySafe:true,done,resolve,work:trackSyncWork("device-save"),escape:null};
+      waiting.push(job);
+    }
+    job.backupAlreadySafe=job.backupAlreadySafe&&backupAlreadySafe;
+    next();
+    return job.done;
+  }
+  function next(){
+    if(!waiting.length)return;
+    if(!running.size){start(waiting.shift());return;}
+    watch(waiting[0]);
+  }
+  function start(job){
+    if(job.escape!==null){clearTimeout(job.escape);job.escape=null;}
+    running.add(job);
+    const lane={},begun=performance.now();
+    persist(job.backupAlreadySafe,job.preserveBackupId,0,lane).then(
+      result=>({ok:result===true,saved:result===true?lane.saved:null,generation:lane.generation??null}),
+      error=>({ok:false,saved:null,generation:null,error}))
+      .then(outcome=>{
+        running.delete(job);slowestMs=Math.max(slowestMs,performance.now()-begun);
+        job.work.end();job.resolve(outcome);next();
+      });
+  }
+  // The next save waits for the running one, unless that one stalls.
+  function watch(job){
+    if(job.escape!==null)return;
+    let seen=deviceCommitProgress;
+    const check=()=>{
+      job.escape=null;
+      if(waiting[0]!==job||!running.size)return;
+      const now=performance.now();
+      if(deviceCommitProgress!==seen||[...deviceCommitsRunning].some(commit=>now-commit.at<deviceCommitSlowestMs)){
+        seen=deviceCommitProgress;job.escape=setTimeout(check,ORDINARY_SAVE_WAIT_MS);return;
+      }
+      waiting.shift();start(job);
+    };
+    job.escape=setTimeout(check,ORDINARY_SAVE_WAIT_MS);
+  }
+  // requests(): lane requests made so far; slowestMs(): the longest a lane
+  // save of this tab has taken.
+  return Object.freeze({request,requests:()=>requested,slowestMs:()=>slowestMs});
+})();
 function supportDiagnosticsSettleCloudPush(ticket,status,revision=null,code="unknown",pushDetails=null){
   try{
     if(!ticket||ticket.settled)return false;
@@ -6726,20 +6786,42 @@ function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && 
 function reconciled(){ const authority=syncView().authority; return !cloudSuspended && !cloudResumePending && !cloudAdoptionHeld && !deferredCloudPull && authority !== null && cloudReady() && authority === window.CloudSync.user; }
 // #2408: each answer restarts the push debounce, so a long run of answers
 // would hold the cloud back until it stopped. The longest wait bounds that:
-// a push goes out at most this long after the oldest request not yet pushed.
-// It schedules the write only; revisions still order the writes themselves.
+// a push reaches the cloud at most this long after the oldest request not yet
+// pushed. It schedules the write only; revisions still order the writes
+// themselves.
 const CLOUD_PUSH_LONGEST_WAIT_MS=20000;
-let oldestUnpushedRequestAt=null;
+// #2408 review: a push saves its board on this device (or proves it saved)
+// before it uploads, and on a phone a save takes seconds. So the push the
+// longest wait sends starts early by twice the slowest save of this tab's
+// device-save lane (one save still running, then the push's own), at most
+// CLOUD_PUSH_SAVE_LEAD_MAX_MS early, and it reaches the cloud within the
+// longest wait.
+const CLOUD_PUSH_SAVE_LEAD_MAX_MS=10000;
+// Push requests not yet in an upload, oldest first: the newest save request
+// each came with (saveRequestGeneration) and when it was made.
+let unpushedPushRequests=[];
+function noteUnpushedRequest(){
+  const generation=saveRequestGeneration;
+  if(unpushedPushRequests.at(-1)?.generation!==generation)unpushedPushRequests.push({generation,at:performance.now()});
+}
+// An upload of a board holding save requests through `generation` takes
+// those off; requests made after its board was saved stay for the next one.
+function notePushedThrough(generation){unpushedPushRequests=unpushedPushRequests.filter(row=>row.generation>generation);}
+// When the push for the oldest request not yet pushed is due: the longest
+// wait, less the time its save can take. null with nothing waiting.
+function longestWaitPushDueAt(){
+  const oldest=unpushedPushRequests[0];
+  return oldest?oldest.at+CLOUD_PUSH_LONGEST_WAIT_MS-Math.min(CLOUD_PUSH_SAVE_LEAD_MAX_MS,2*deviceSaveLane.slowestMs()):null;
+}
 function cloudPush(){
   if(!cloudReady()) return;
   // #2408: a newer request restarts the debounce of a follow-up already due.
   if(pushFollowUpDue){pushFollowUpDue=false;pendingPush=false;}
   if(cloudTimer) clearSyncTimeout(cloudTimer);
-  const now=performance.now();
-  if(oldestUnpushedRequestAt===null||oldestUnpushedRequestAt>now)oldestUnpushedRequestAt=now;
+  noteUnpushedRequest();
   // A test's own delay (CLOUD_PUSH_DELAY_MS) replaces the whole schedule.
   const override=Number(window.CLOUD_PUSH_DELAY_MS),delay=Number.isFinite(override)&&override>=0?override
-    :Math.max(0,Math.min(2000,oldestUnpushedRequestAt+CLOUD_PUSH_LONGEST_WAIT_MS-now));
+    :Math.max(0,Math.min(2000,longestWaitPushDueAt()-performance.now()));
   cloudTimer = countSyncTimer("push-debounce",setTimeout(()=>{ endSyncTimer(cloudTimer); cloudTimer = null; sendPush(); }, delay));   // debounce — cloud traffic is off the keystroke path
 }
 // #2272: once no recovery read is busy, a write it held goes through the
@@ -6760,7 +6842,7 @@ function cloudPushNow(){
   // and the cloud never got a write in (support report, 2026-11-16).
   if(cloudPushInFlight||pushesRunning>0){cloudPush();return;}
   if(cloudTimer){ clearSyncTimeout(cloudTimer); cloudTimer = null; }
-  if(oldestUnpushedRequestAt===null)oldestUnpushedRequestAt=performance.now();
+  noteUnpushedRequest();
   sendPush();
 }
 // #2408: a push dropped because a newer answer arrived during its own save
@@ -7052,28 +7134,49 @@ async function sendPush(){
     if(decisionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(decisionIssue);return;}
     const diagnosticRequestGeneration=saveRequestGeneration;
     let payload = cloudPayload();
-    if(payload === lastPushed){oldestUnpushedRequestAt=null;return;}      // nothing actually changed
+    if(payload === lastPushed){notePushedThrough(diagnosticRequestGeneration);return;}      // nothing actually changed
     // A cloud write is not allowed to outrun its device-local safety copy.
     // This also covers membership repaired from the last cloud read above.
-    // #2408: the save is skipped when the stored board is proved to hold
-    // these exact bytes already (deviceHeadHoldsBoard).
+    // #2408: the push's save goes through the device-save lane: it waits for a
+    // save of this tab still running, and writes nothing when the stored board
+    // is proved to hold these exact bytes already.
     const savedAdoption=adoptedBoardSavedForPush(pushAccount);
     const adoptionProof=savedAdoption ? adoptedSafety : null;
-    if(!savedAdoption && !await saveBoardOnce(null,{queued:false})) return;
-    if(!pushStillCurrent()){holdChangedPush();return;}
-    if(!reconciled() || pulling){ pendingPush=true; return; }
-    // If an edit arrived while the save was in flight, retry with its exact
-    // payload so a cloud write never outruns that edit's local safety copy.
-    // #2408: that retry is the one follow-up the newer answer asked for,
-    // after the push debounce, not a new push the moment this one ends.
-    if(payload !== cloudPayload()){ supportDiagnosticsDropSupersededPush(); joinPushFollowUp(); return; }
+    const pushedBoard=state;
+    let pushedThrough=diagnosticRequestGeneration,pushedUpdatedAt=state.updatedAt;
+    let pushRecoveryIds=Array.isArray(state.protectedBackupIds) ? [...state.protectedBackupIds] : [];
+    if(!savedAdoption){
+      const saved=await deviceSaveLane.request();
+      if(saved.error)throw saved.error;
+      if(!saved.ok)return;
+      if(!pushStillCurrent()){holdChangedPush();return;}
+      if(!reconciled() || pulling){ pendingPush=true; return; }
+      if(payload !== cloudPayload()){
+        // If an edit arrived while the save was in flight, retry with its exact
+        // payload so a cloud write never outruns that edit's local safety copy.
+        // #2408: that retry is the one follow-up the newer answer asked for,
+        // after the push debounce, not a new push the moment this one ends.
+        // #2408 review: on a phone whose saves take seconds, a run of answers
+        // drops every such push, and the cloud then waited for the run to stop.
+        // Once the longest wait's push is due, the push uploads the board its
+        // save made durable instead; the newer answers stay unsaved to the
+        // cloud and go with the follow-up, which builds on this acknowledged
+        // revision. A board replaced meanwhile (a new state object) still waits
+        // for its own push, as does one whose evidence would not upload.
+        const due=longestWaitPushDueAt(),durable=due!==null&&performance.now()>=due&&state===pushedBoard&&typeof saved.saved==="string"?JSON.parse(saved.saved):null;
+        if(!durable||(durable.syncAccount??null)!==(state.syncAccount??null)||decisionEvidenceIssue(durable,pushAccount)||decisionProjectionIssue(durable)){
+          supportDiagnosticsDropSupersededPush(); joinPushFollowUp(); return;
+        }
+        payload=cloudPayloadFor(durable);pushedThrough=saved.generation;pushedUpdatedAt=durable.updatedAt;
+        pushRecoveryIds=Array.isArray(durable.protectedBackupIds) ? [...durable.protectedBackupIds] : [];
+      }
+    }
     if(payload === lastPushed) return;
     lastPushed = payload;
-    // #2408: every request so far is in this upload; the longest wait starts
-    // again from the next one.
-    oldestUnpushedRequestAt=null;
+    // #2408: the requests this upload holds are pushed; the longest wait
+    // starts again from the oldest one it does not hold.
+    notePushedThrough(pushedThrough);
     const base = state.syncRev;
-    const pushRecoveryIds=Array.isArray(state.protectedBackupIds) ? [...state.protectedBackupIds] : [];
     const recovery=automaticCloudRecovery;
     if(recovery&&(recovery.backend!==window.CloudSync||recovery.revision!==base)){
       lastPushed="";cloudAdoptionHeld=true;reportCloudReconcileError("cloud-recovery-changed");return;
@@ -7083,7 +7186,7 @@ async function sendPush(){
     // acknowledged copy until the cloud confirms the write. Its run ends with
     // this push, whatever the outcome (review S2: the crash mark).
     adoptionPushed=recovery?.adoptOverRevision!==undefined;
-    const pushAttempt=await supportDiagnosticsCloudPush(payload,state.updatedAt||Date.now(),recovery?.adoptOverRevision??base,recovery?.context,
+    const pushAttempt=await supportDiagnosticsCloudPush(payload,pushedUpdatedAt||Date.now(),recovery?.adoptOverRevision??base,recovery?.context,
       pushBackend,null,diagnosticRequestGeneration),res=pushAttempt.result,pushTicket=pushAttempt.ticket;
       activeDiagnosticPushTicket=pushTicket;adoptionPublished=adoptionPushed&&res?.ok===true;
       if(!pushStillCurrent()){supportDiagnosticsSettleCloudPush(pushTicket,"stale");holdChangedPush();return;}
@@ -7138,7 +7241,16 @@ async function sendPush(){
         await releaseStoredCloudRecoveryPins(releasedRecoveryIds);
         // #2254: the acknowledged trim follows once this acknowledgement is
         // saved on this device (runAcknowledgedRecoveryTrim).
-        return trimAfterAcknowledgedPush=await persist(!!ackSavedAdoption)===true;
+        // #2408 review: the save goes through the device-save lane. Run beside
+        // an answer's save still in progress, it and the answer's next save
+        // repaired onto each other (#2324), more whole-board commits during a
+        // run; now it waits for that save, and a save already waiting to start
+        // records the acknowledgement with the answers it carries. Its content
+        // is the live board, as before, and the acknowledgement counts only
+        // once that save has made this revision durable here.
+        const saved=await deviceSaveLane.request({backupAlreadySafe:!!ackSavedAdoption});
+        if(saved.error)throw saved.error;
+        return trimAfterAcknowledgedPush=saved.ok;
       }});
       if(outcome.accepted)return;
       if(outcome.reason==="obsolete"){supportDiagnosticsSettleCloudPush(pushTicket,"stale");lastPushed="";if(outcome.readRequired)cloudAdoptionHeld=true;return;}
@@ -10125,9 +10237,11 @@ const answerCatchUp=(()=>{
   // Behind an answer still queued, the weight cache the next answer's History
   // starts from is the one that answer's History leaves, as in the tap.
   const CHAINED=Object.freeze({});
+  // ids: the tasks whose History the answer records; none (benchmark Can't,
+  // which moves no rating) means it records none and samples no ranks.
   function begin(kind,ids){
-    const before=captureRatingInputs(ids);
-    if(queue.length)before.weights=CHAINED;
+    const before=ids.length?captureRatingInputs(ids):null;
+    if(before&&queue.length)before.weights=CHAINED;
     return {kind,at:Date.now(),ids:[...new Set(ids)],id:null,before,after:null,frame:null,steps:null};
   }
   function ratings(answer){
@@ -10143,33 +10257,29 @@ const answerCatchUp=(()=>{
   }
   function seal(answer){
     // Only its own frame: a later action's pushUndo has sealed it otherwise.
-    const frame=answer.frame;
-    if(frame&&undoStack.at(-1)===frame&&!frame.after)frame.after=captureUndoBoard(state,frame.snapshot);
+    if(answer.frame&&undoStack.at(-1)===answer.frame)sealTopUndoFrame();
   }
-  function store(answer){
-    if(answer.save!==false)save();
-    if(answer.immediate)cloudPushNow();
-  }
+  function store(answer){storeCommit(answer.save,answer.immediate);}
   function draw(answer){
     if(queue.length>1)return;
     listRanksDeferred=answer.deferRanks;
     try{render();}finally{listRanksDeferred=false;}
   }
   // After the decision: capture what History reads now, mark the board
-  // unsaved, pick the next candidate and draw, then queue the rest.
+  // unsaved, pick the next candidate and draw, then queue the rest. These are
+  // commit()'s steps, with the save and the push moved into the queue.
   // historyFirst: what this answer shows reads its own History (Last task
   // WOOP counts recorded Dislodges), so that History and the ranks it reads
   // come before the paint, after everything queued before it.
   function show(answer,{save:doSave=true,immediate=false,deferRanks=false,historyFirst=false}={}){
-    answer.after=captureRatingInputs(answer.ids);
+    answer.after=answer.before?captureRatingInputs(answer.ids):null;
     answer.frame=undoStack.at(-1)||null;
     Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw]});
-    if(historyFirst){flush();ratings(answer);}else answer.steps.unshift(ratings);
+    if(answer.before){if(historyFirst){flush();ratings(answer);}else answer.steps.unshift(ratings);}
     queue.push(answer);
     if(!work)work=trackSyncWork("answer-catch-up");
-    projectLegacyPrerequisites(state);
-    ensureCandidate();
-    if(doSave!==false){state.updatedAt=Date.now();state.syncDirty=true;}
+    settleCommit();
+    if(doSave!==false)markBoardEdited();
     listRanksDeferred=deferRanks;
     try{render();}finally{listRanksDeferred=false;}
     schedule();
@@ -10595,8 +10705,9 @@ const taskActionOwnerBundle=(()=>{
     if(openingRecoveryHeld)return false;
     if(!command||typeof command!=="object")return false;
     // #2407: only a scanner answer goes ahead of the catch-up still queued;
-    // every other action sees the board as it was before #2407.
-    if(command.type!=="decision"&&!(command.type==="benchmark"&&(command.action==="done"||command.action==="dislodge")))answerCatchUp.flush();
+    // every other action sees the board as it was before #2407. Benchmark
+    // Can't is an answer too (#2406 review).
+    if(command.type!=="decision"&&!(command.type==="benchmark"&&["done","dislodge","cant"].includes(command.action)))answerCatchUp.flush();
     if(command.type==="postpone"){
       const task=taskById(command.taskId);if(!task||task.done||!supportedPostponeEvidence(task))return false;
       const gesture=captureDecisionGesture();
@@ -10650,14 +10761,21 @@ const taskActionOwnerBundle=(()=>{
         pushUndo();
         const result=BoardDecision.apply(gesture,{kind:"dislodge",taskId:b.id});
         if(result)answer.id=result.rows[0].id;
-        answerCatchUp.show(answer,{historyFirst:true});
+        // #2406 review: only Last task WOOP reads recorded Dislodges for what the
+        // scanner shows (taskDislodgeCount), so only with it on does a Dislodge
+        // record its History, and the ranks it reads, before the paint.
+        answerCatchUp.show(answer,{historyFirst:state.settings.lastTaskWoop===true});
         return !!result;
       }
       if(command.action==="cant"){
+        // #2406 review: benchmark Can't shows first too. It moves no rating, so
+        // it records no History and samples no ranks, as before; its Undo seal,
+        // save and push wait behind any catch-up still queued.
+        const answer=answerCatchUp.begin("cant",[]);
         const gesture=captureDecisionGesture();
         pushUndo();
         const result=BoardDecision.apply(gesture,{kind:"cant",taskId:b.id});
-        commit();
+        answerCatchUp.show(answer);
         return !!result;
       }
       return false;
@@ -11245,11 +11363,19 @@ function toggleNoContext(){
   if(refocus)for(const button of document.querySelectorAll('[data-act="toggle-no-context"]'))if(button.dataset.ctxScope===scope){button.focus();break;}
 }
 function commit(doSave, immediateSync, preserveBackupId=null){
+  settleCommit();
+  storeCommit(doSave,immediateSync,preserveBackupId);
+  render();
+}
+// commit()'s steps. A scanner answer takes them apart: it settles and draws
+// before the paint and stores in its catch-up (answerCatchUp, #2407).
+function settleCommit(){
   projectLegacyPrerequisites(state);
   ensureCandidate();
+}
+function storeCommit(doSave,immediateSync,preserveBackupId=null){
   if(doSave!==false) save(preserveBackupId);
   if(immediateSync) cloudPushNow();
-  render();
 }
 
 /* ---------- formatting ---------- */
