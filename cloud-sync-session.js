@@ -66,6 +66,9 @@
   // recovers, the cloud retry backoff and #2339's device-save retry.
   const WORK_KINDS=new Set(["pull","push","device-save","recovery","save-debounce","push-debounce","live-pull","backup-pull",
     "recovery-retry","cloud-retry","device-save-retry"]);
+  // #2407: a scanner answer's queued catch-up (its History, ranks, Undo seal,
+  // and the device save and push it then asks for) is scheduled sync work.
+  WORK_KINDS.add("answer-catch-up");
 
   function createSyncSession({backend,identity,acknowledgement,events,unsent=null}={}){
     if(typeof backend!=="function"||typeof identity!=="function"||typeof acknowledgement?.get!=="function"||
