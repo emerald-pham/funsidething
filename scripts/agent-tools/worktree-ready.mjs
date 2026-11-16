@@ -58,8 +58,11 @@ function prepareDependencies({ root, mainCheckout }) {
   return 'dependencies: not available';
 }
 
+// The host ledger's status runs to megabytes, past spawnSync's 1 MB default.
 function coordination(args, cwd) {
-  return spawnSync(process.execPath, [coordinationClient, ...args], { cwd, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [coordinationClient, ...args], { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  const failure = result.status === 0 ? '' : (result.stderr.trim() || result.error?.message || `coordination ${args[0]} failed`);
+  return { ...result, failure };
 }
 
 // Only a ledger the host has configured and that already exists is used.
@@ -69,11 +72,11 @@ function usableLedger(root) {
     return { reason: 'no host ledger is configured (CODEX_COORDINATION_FILE is unset)' };
   }
   const discovered = coordination(['discover'], root);
-  if (discovered.status !== 0) return { reason: discovered.stderr.trim() };
+  if (discovered.failure) return { reason: discovered.failure };
   const file = discovered.stdout.trim();
   if (!existsSync(file)) return { reason: `the configured ledger ${file} does not exist, and setup never creates one` };
   const status = coordination(['status'], root);
-  if (status.status !== 0) return { reason: status.stderr.trim() };
+  if (status.failure) return { reason: status.failure };
   return { file, state: JSON.parse(status.stdout).state };
 }
 
@@ -128,9 +131,9 @@ function claimPorts(root, ledger) {
         '--intent', 'Agent worktree test ports for CHAIN_NATIVE_PORT and CHAIN_NATIVE_SMOKE_PORT (worktree-ready).',
         ...resources(pair)], root);
     if (result.status === 0) return { ports: pair };
-    if (!/Conflict with/.test(result.stderr)) return { reason: result.stderr.trim() };
+    if (!/Conflict with/.test(result.failure)) return { reason: result.failure };
     const status = coordination(['status'], root);
-    if (status.status !== 0) return { reason: status.stderr.trim() };
+    if (status.failure) return { reason: status.failure };
     state = JSON.parse(status.stdout).state;
   }
   return { reason: `ports kept conflicting after ${CLAIM_ATTEMPTS} attempts` };
@@ -147,6 +150,16 @@ function prepare() {
     return;
   }
   // Ports come first, so the ledger checked here is the one written moments later.
+  try {
+    preparePorts(where);
+  } catch (error) {
+    rmSync(where.portsFile, { force: true });
+    warn(`skipped ports: ${error instanceof Error ? error.message : String(error)}.`);
+  }
+  console.log(`worktree-ready: ${prepareDependencies(where)}`);
+}
+
+function preparePorts(where) {
   const ledger = usableLedger(where.root);
   let ports;
   if (ledger.reason) warn(`skipped ports: ${ledger.reason}. Nothing was written to any ledger.`);
@@ -162,14 +175,13 @@ function prepare() {
   } else {
     rmSync(where.portsFile, { force: true });
   }
-  console.log(`worktree-ready: ${prepareDependencies(where)}`);
 }
 
 // Finishes the entries of removed worktrees so their ports return to the pool.
 function pruneRemoved(root) {
   const pruned = coordination(['prune', '--registered-by', REGISTERED_BY], root);
-  if (pruned.status !== 0) {
-    warn(`skipped prune: ${pruned.stderr.trim()}`);
+  if (pruned.failure) {
+    warn(`skipped prune: ${pruned.failure}`);
     return;
   }
   const entries = JSON.parse(pruned.stdout);

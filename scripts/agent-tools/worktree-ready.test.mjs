@@ -115,6 +115,29 @@ test('prepare gives a new worktree its own dependencies and two exported ports, 
   }
 });
 
+// The live host ledger held 452 entries (about 2 MB of status output) on
+// 2026-11-16, past a child process's default 1 MB output buffer.
+test('prepare claims ports from a host-sized ledger and reuses ports the worktree already holds', () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-large-');
+  try {
+    const history = Array.from({ length: 3000 }, (_, index) => ({
+      id: `history-${index}`, status: 'complete', worktree: join(fixture, `old-${index}`), intent: 'x'.repeat(600),
+    }));
+    writeFileSync(ledger, `${JSON.stringify({ version: 1, scope: 'codex-wide', entries: history, reservations: [], configurations: [] }, null, 2)}\n`);
+    const agent = addWorktree(main, join(fixture, 'agent-large'));
+    const prepared = run(['prepare'], agent, { ledger, npm });
+    assert.equal(prepared.status, 0, prepared.stderr);
+    const claimed = loopbackPorts(ownerOf(ledger, agent)[0]);
+    assert.equal(claimed.length, 2, `two ports are claimed: ${prepared.stderr}`);
+    const again = run(['prepare'], agent, { ledger, npm });
+    assert.equal(again.status, 0, again.stderr);
+    assert.equal(ownerOf(ledger, agent).length, 1, 'a second prepare registers no second entry');
+    assert.deepEqual(exportedPorts(run(['env'], agent, { ledger, npm }).stdout), claimed, 'it keeps exporting the ports it holds');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('without a usable ledger, prepare still makes dependencies available, warns which step it skipped and writes no ledger', () => {
   const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-unusable-');
   try {
