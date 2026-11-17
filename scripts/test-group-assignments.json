@@ -551,7 +551,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: the first candidate after opening Start or Resume is revealed without overriding a restored scroll position in Chromium and WebKit",
+      "root": "RISK steady scanner browser: opening Start and Resume leave the page where it is and a restored scroll position stays in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -571,11 +571,6 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: a mouse press on a control partly under the pinned row still clicks it in Chromium and WebKit",
-      "environment": "LANDSCAPE_BROWSER_URL",
-      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
-    },
-    {
       "root": "RISK steady scanner browser: the trail labels keep every letter beside a dot at phone widths with long titles in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
@@ -586,7 +581,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: Undo and a context change leave the page where it is while an answer still reveals a covered title in Chromium and WebKit",
+      "root": "RISK steady scanner browser: an answer Undo and a context change leave the page where it is in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -596,12 +591,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: an answer reveals a next title the pinned row would cover on short screens, and a stable layout does not move between later answers in Chromium and WebKit",
-      "environment": "LANDSCAPE_BROWSER_URL",
-      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
-    },
-    {
-      "root": "RISK steady scanner browser: the pinned row lines up with the panels with rounded ends once it no longer reaches the screen edges in Chromium and WebKit",
+      "root": "RISK steady scanner browser: an answer leaves the page where it is with the next title above the choices on short screens, and a stable layout does not move between later answers in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -611,7 +601,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: Tab never stops on a control hidden behind the pinned row at phone short-landscape and desktop sizes in Chromium and WebKit",
+      "root": "RISK steady scanner browser: every Tab stop including the choices is in view at phone short-landscape and desktop sizes in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -621,7 +611,7 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: Yes No and Cant keep their exact position on screen through a long run of real taps with varied titles in Chromium and WebKit",
+      "root": "RISK steady scanner browser: Yes No and Cant sit inside the scanner box below the question and scroll with the page through a long run of real taps with varied titles in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -631,12 +621,17 @@
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: pinned choices stay readable and clear of content across narrow enlarged short-landscape floating-header and Run WOOP views in Chromium and WebKit",
+      "root": "RISK steady scanner browser: the finish row sits on its own line under the choices with its rank chip on one line and the list toggle at full size at every width with and without web fonts and Postpone in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
     {
-      "root": "RISK steady scanner browser: the pinned row exists only while a candidate is showing and clears the iPhone safe area and toasts",
+      "root": "RISK steady scanner browser: every choice stays reachable unclipped and inside the scanner box across narrow enlarged short-landscape floating-header and overdue views in Chromium and WebKit",
+      "environment": "LANDSCAPE_BROWSER_URL",
+      "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "RISK steady scanner browser: nothing is pinned to the bottom of the screen and the page keeps its ordinary bottom room toast and scroll padding while a candidate is showing",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
     },
@@ -1251,6 +1246,126 @@
       "group": "core",
       "file": "tests/core.test.js",
       "reason": "#2373 changed the rule this root tested: choosing an eligibility control now keeps the search and the context or status filter instead of clearing them. The same test, renamed, now asserts Eligible narrows the evergreen filter to its eligible match and leaves the tag selected."
+    },
+    {
+      "baselineRoot": "RISK Last task WOOP: mounted preference and final paused boundary use unique recorded dislodgements",
+      "currentRoot": "Removed WOOP: the sole remaining dot after two Dislodges offers no WOOP while paused, with Last task WOOP saved on",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the Last task WOOP setting and the final-dot offer this root tested are gone; the replacement checks the paused sole dot after two recorded Dislodges, with the setting saved on, offers no WOOP. See the #2421 TEST_CHANGE_RATIONALES.json entry."
+    },
+    {
+      "baselineRoot": "RISK Last task WOOP: walkthrough saves escaped outcome obstacle plan to bound task and revisits deletes reloads",
+      "currentRoot": "Removed WOOP: a final dot with a saved plan shows no plan and no Delete",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the walkthrough, plan view and Delete this root drove are gone; the replacement checks a saved plan is no longer shown. Plan persistence through reload is kept by the RISK removed WOOP data roots. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK Last task WOOP: cancel empty repeated stale interrupted and peer-plan actions never mutate replacement tasks",
+      "currentRoot": "RISK removed WOOP data: editing and saving a task with a saved plan keeps every WOOP field through a reload",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the walkthrough drafts this root guarded are gone, so nothing in this version can write a plan; this row keeps the baseline root assigned in core through a root that guards saved plans through an edit and reload. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK Last task WOOP: unsupported data survives reload and replacement and interrupted board ownership blocks save",
+      "currentRoot": "RISK removed WOOP data: a plan saved in an unrecognized format stays exactly as it was through an edit and a reload",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the draft-ownership half of this root is gone with the walkthrough; its data half, an unrecognized plan surviving reload unchanged, is what the replacement root checks. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK Last task WOOP: rendered Delete binding rejects same-ID board replacement and restored head",
+      "currentRoot": "RISK removed WOOP data: deleting a task with a saved plan and Undo bring back every WOOP field",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the rendered Delete WOOP plan button whose binding this root tested is gone; this row keeps the baseline root assigned in core through a root guarding saved plans through Delete and Undo. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload",
+      "currentRoot": "Removed WOOP: Settings has no Last task WOOP, even on a board that saved it on",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the env-gated browser root drove the Last task WOOP setting, walkthrough and Delete, all gone; the replacement checks Settings no longer offers the setting even on a board that saved it on. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers",
+      "currentRoot": "Removed WOOP: the sole dot at End of the list after two real Dislodges offers no WOOP, with Last task WOOP saved on",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: this root reached the walkthrough from an exhausted scan; the replacement drives the same real Start, Dislodge and Rescan handlers and checks End of the list offers no WOOP. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off",
+      "currentRoot": "Removed WOOP: an overdue offered candidate gets only the ordinary choices, with no Run WOOP",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: Run WOOP on overdue candidates is gone; the replacement checks an overdue candidate gets exactly the choices of a candidate with no due date. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot",
+      "currentRoot": "Removed WOOP: Help has no Run WOOP or Last task WOOP answer",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the Run WOOP control whose eligibility this root tested is gone; this row keeps the baseline root assigned in core through the root checking Help no longer answers about Run WOOP or Last task WOOP. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement",
+      "currentRoot": "Removed WOOP: a final dot with a saved plan in an unrecognized format shows no WOOP notice",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the plan modal and Delete this root tested are gone; the replacement checks a saved plan, even in an unrecognized format, is not shown. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls",
+      "currentRoot": "RISK removed WOOP data: Restore from pasted board data keeps every WOOP field",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the overdue drafts and controls this root invalidated are gone; this row keeps the baseline root assigned in core through a root guarding saved plans through Restore. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot",
+      "currentRoot": "Removed WOOP: no other Help answer mentions WOOP",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the Run WOOP dot and Cancel this root tested are gone; this row keeps the baseline root assigned in core through the root checking no other Help answer mentions WOOP. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action",
+      "currentRoot": "Removed WOOP: the changelog has one bullet saying WOOP was removed and saved plans stay in backups and exports",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the Run WOOP action and its read-only plan modal are gone; this row keeps the baseline root assigned in core through the root checking the changelog bullet for the removal. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK recovery identity consumers: final-task WOOP advances after acknowledged recovery",
+      "currentRoot": "RISK removed WOOP data: committing another setting keeps a saved Last task WOOP value through a reload",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: the final-task walkthrough this root advanced after recovery is gone; this row keeps the baseline root assigned in core through a root guarding the saved Last task WOOP value. See the #2421 rationale."
+    },
+    {
+      "baselineRoot": "RISK FAQ sections: mounted Quick start matches Settings groups and covers WOOP lifecycle and dependency filter",
+      "currentRoot": "RISK FAQ sections: mounted Quick start matches Settings groups and covers the dependency filter, with no WOOP answers",
+      "baselineGroup": "core",
+      "group": "core",
+      "file": "tests/core.test.js",
+      "reason": "#2421 removed WOOP: renamed: the WOOP lifecycle answers this root required are gone, so it now requires their absence; its section and dependency-filter assertions are unchanged. See the #2421 rationale."
     }
   ]
 }
