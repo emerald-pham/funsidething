@@ -7945,7 +7945,10 @@ const changeRecordOutbox=(()=>{
   function saved(through){
     // #2417 second review B3: an Undo's row stays while the cloud still keeps
     // its answer's record, so that a reopened page knows not to apply it.
-    const heard=typeof window.CloudSync?.heardChangeRecords==="function"?window.CloudSync.heardChangeRecords()||[]:[];
+    // A backend that cannot say (an older or a stand-in one) keeps nothing back:
+    // this runs after a save has committed, which nothing here may undo.
+    let heard=[];
+    try{const rows=window.CloudSync?.heardChangeRecords?.();if(Array.isArray(rows))heard=rows;}catch{heard=[];}
     const device=store(),done=settled.filter(row=>row.order<=through&&!(row.answer&&heard.some(record=>record.id===row.answer)));
     if(!device||!done.length)return;
     for(const row of done)settled.splice(settled.indexOf(row),1);
