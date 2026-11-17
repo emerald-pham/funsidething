@@ -9600,8 +9600,11 @@ async function cloudPull({records=false}={}){
     // copy has it (its save time, and the order of its fields, which a record
     // applied here can leave different), so nothing is left to send; the next
     // save of this board stores the rest.
+    // Only where this board's difference from its last full copy is change
+    // records it applied (lt), every one of which the newer copy includes (rt):
+    // any other newer copy is adopted, with its safety copy and save, as before.
     const sameButSaveTime=useLocal && haveRemote && !switchedAccount && rr!==null && rr!==localRev && !remoteDeletionLogRepaired &&
-      state.syncDirty===false && !!remoteState && remotePayload!==cloudPayload() &&
+      lt>0 && rt>=lt && state.syncDirty===false && !!remoteState && remotePayload!==cloudPayload() &&
       canonicalDecisionFact(JSON.parse(remotePayload))===canonicalDecisionFact(JSON.parse(cloudPayloadFor({...state,updatedAt:remoteState.updatedAt})));
     let sameBoard=null;
     if(sameButSaveTime){
