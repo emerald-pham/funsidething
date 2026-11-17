@@ -16936,6 +16936,16 @@ test('RISK removed WOOP data: Export and Download backup carry every WOOP field 
  assert.equal(woopSnapshot2421(file.currentBoard),expected,'Download backup keeps them');
 });
 
+// #2422 review N2: Last task WOOP is no longer shown, but older versions still
+// read it from saved boards, so a new board must keep it off and anything
+// saved that is not exactly true must read as off, as before #2421.
+test('RISK removed WOOP data: a new board keeps Last task WOOP off and settings turn any saved value but true into off for older versions',async t=>{
+ const app=await loadApp();t.after(()=>app.dispose());
+ assert.equal(app.ctx.state.settings.lastTaskWoop,false,'a new board saves Last task WOOP off');
+ for(const value of [undefined,null,'true',1,{},[]])assert.equal(app.ctx.normalizeSettings({lastTaskWoop:value}).lastTaskWoop,false,`a saved ${JSON.stringify(value)} reads as off`);
+ assert.equal(app.ctx.normalizeSettings({lastTaskWoop:true}).lastTaskWoop,true,'a saved on stays on');
+});
+
 test('RISK answer shows first: Undo straight after a benchmark Can’t tapped while an earlier answer catches up reverses only the Can’t',async t=>{
  const app=await answerFirstApp2407(t),{ctx}=app;
  app.tap('yes');app.tap('bench-cant');
