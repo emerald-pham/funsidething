@@ -3967,7 +3967,8 @@ test('RISK sync responsiveness guidance: mounted Help and the changelog say answ
  assert.match(rapid,/^No\. You can keep answering while the board saves on this device and syncs\./,'the answer says what the person sees: '+rapid);
  assert.match(rapid,/after a short pause, or at least every 20 seconds or so/);
  assert.match(rapid,/A single Yes or Done with nothing else syncing goes to the cloud at once/);
- const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];
+ // #2421 added a November 17 section above it; these bullets stay under November 16.
+ const current=(shim.document.getElementById('appChangelogCurrent').innerHTML.match(/<h3>November 16, 2026<\/h3>[\s\S]*?<\/ul>/)||[''])[0];
  assert.match(current,/<h3>November 16, 2026<\/h3>/);
  const items=current.split('<li>').slice(1);
  assert.ok(items.some(item=>/answering several tasks in a row no longer slows the app down/.test(item)&&!/20 seconds/.test(item)),'the slowdown fix has its own bullet');
