@@ -3966,13 +3966,40 @@ test('RISK sync responsiveness guidance: mounted Help and the changelog say answ
  assert.match(rapid,/^No\. You can keep answering while the board saves on this device and syncs\./,'the answer says what the person sees: '+rapid);
  assert.match(rapid,/after a short pause, or at least every 20 seconds or so/);
  assert.match(rapid,/A single Yes or Done with nothing else syncing goes to the cloud at once/);
- const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('</ul>')[0];
- assert.match(current,/<h3>November 16, 2026<\/h3>/);
+ // #2417: read the November 16 list by its date, so a newer dated entry
+ // above it does not change what this test checks.
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 16, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ assert.ok(current,'the current changelog keeps its November 16, 2026 entry');
  const items=current.split('<li>').slice(1);
  assert.ok(items.some(item=>/answering several tasks in a row no longer slows the app down/.test(item)&&!/20 seconds/.test(item)),'the slowdown fix has its own bullet');
  assert.ok(items.some(item=>/after a short pause, or at least every 20 seconds or so/.test(item)),'the cloud timing has its own bullet');
  for(const text of [rapid,...items])assert.doesNotMatch(text,/saves? the board on this device about once|three times/,'no save counts: '+text);
  assert.ok(rapid.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+});
+
+// #2417: Help and the changelog say a scanner answer shows on other open
+// devices within about a second, what waits and what falls back, in what the
+// person sees; the changelog keeps one feature per bullet.
+test('RISK change records guidance: mounted Help and the changelog say a scanner answer shows on other open devices within about a second, one feature per bullet',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>How soon does an answer show on my other devices?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(answer,'Data and backups answers how soon an answer shows on other devices');
+ assert.match(answer,/^With sync on, a Yes, No, Can’t, Done, Worked on it, Postpone or Dislodge on the scanner shows on your other open devices within about a second/);
+ assert.match(answer,/however large the board/);assert.match(answer,/they don’t download it/);
+ assert.match(answer,/saved on this device first; if it can’t be saved, it isn’t sent/);
+ assert.match(answer,/Offline answers go up when you reconnect, and a long run of them goes as one copy of the board/);
+ assert.match(answer,/while you tap the scanner or edit waits until you finish/);
+ assert.match(answer,/An app copy from before this update syncs as before/);assert.match(answer,/until the cloud accepts these quick updates, answers reach other devices as before/);
+ assert.doesNotMatch(answer,/change record|sequence|includedSeq|listener/i,'the answer says what the person sees, not how it works');
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the 130-word limit');
+ const current=shim.document.getElementById('appChangelogCurrent').innerHTML.split('<h3>November 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ const items=current.split('<li>').slice(1);
+ const quick=items.filter(item=>/shows on your other open devices within about a second/.test(item));
+ assert.equal(quick.length,1,'one bullet says an answer reaches other open devices within about a second');
+ assert.match(quick[0],/without them downloading it/);assert.match(quick[0],/goes up when you reconnect/);assert.match(quick[0],/waits until you finish/);assert.match(quick[0],/answers reach other devices as before/);
+ assert.doesNotMatch(quick[0],/saved on this device before it is sent/,'saving on the device first is its own feature');
+ assert.ok(items.some(item=>/An answer is now saved on this device before it is sent, so an app closed right after an answer opens with it/.test(item)),'saving an answer on the device first has its own bullet');
 });
 
 test('RISK sync responsiveness guidance: mounted Help explains large boards and bounded damaged-source recovery',async()=>{
@@ -16759,7 +16786,8 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(push,/const pushUser\s*=\s*auth\.currentUser/);
   assert.match(push,/const pushUid\s*=\s*pushUser\.uid/);
   assert.match(html,/const rootRef=uid=>F\.doc\(db,"users",uid\)/);
-  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,hash,expectedHeader,stillCurrent,decisionCapability\}\)/);
+  // #2417 adds includedSeq, the change records a full copy includes.
+  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,hash,expectedHeader,stillCurrent,decisionCapability,includedSeq\}\)/);
   assert.match(html,/if\(stillCurrent&&!stillCurrent\(\)\)return \{cancelled:true\}/,'the manifest transaction rechecks identity after its reads');
   assert.match(push,/const stillCurrent=\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation&&recoveryStillCurrent\(\)/,'the shared named guard retains both captured identity and operation');
   assert.match(push,/generationStore\.push\(pushUid,[\s\S]*?stillCurrent\}\)/,'the exact captured guard reaches the publication adapter');

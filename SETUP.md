@@ -27,6 +27,15 @@ read, but blind writes are denied until they reload. Once a board contains
 decision evidence, its root also carries sticky `decisionCapability: 1`;
 writers that drop this capability are denied. Plain boards remain readable and
 writable by the historical supported clients. Root deletion is denied.
+
+Change records (GLOSSARY) live beside the board, owner-only like it: each
+scanner answer is a document in `users/{uid}/changeRecords`, created once in
+the same request that moves the counter at `users/{uid}/changeLog/head` on by
+one and names it, so every record has its own sequence number and none can be
+rewritten. The root may name, as `includedSeq`, the number up to which its full
+copy includes them, never past the counter, and only those records may be
+deleted. Older clients write roots without `includedSeq`, which lists no
+records, so nothing is deleted under their copies.
 The rules check ownership, envelopes, and generation transitions; they cannot
 parse the JSON hidden in chunks, so client validation and recovery copies
 remain necessary.
@@ -40,6 +49,18 @@ reconnect also trigger reconciliation. An open editor or active scanner gesture
 defers adoption, and scanner controls remain bound to the tasks they displayed.
 
 - Writes are debounced 2 seconds, so a fast scanning run costs one write, not thirty
+- Each scanner answer (Yes, No, Can't, Done, Worked on it, Postpone,
+  Dislodge) is also saved on the device as a small row and sent at once as a
+  change record, numbered by the cloud. Other open devices hear it on a live
+  listener and apply it through the same board merge as a full copy holding
+  only that change, without downloading the board; a record arriving during a
+  scanner gesture or with an editor open waits, as a live pull does. Every
+  read applies the records the cloud keeps above the full copy it reads, in
+  number order, never by a device clock. A full copy names the records it
+  includes and they are removed once that copy is active. Offline answers go
+  up on reconnect; a backlog of more than 20 goes as the full copy alone. If
+  the deployed rules refuse records, the app syncs by full copies alone and
+  shows no error
 - A pull that finds nothing new produces zero writes
 - Firestore revisions order copies and prevent concurrent writes from silently
   replacing each other; server dates record when a write landed

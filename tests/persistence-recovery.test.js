@@ -17222,3 +17222,39 @@ test('RISK change records: the support report records each record sent, received
  await until2417(()=>recordEvents2417(phone).includes('replaced'),'a record the rules refuse is recorded as replaced by the full copy');
  assert.notEqual(phone.backend.CS.status,'error','and no error shows');
 });
+
+test('RISK change records: Settled (sync) counts sending a record and applying one as sync work',{timeout:180000},async t=>{
+ const {phone,laptop}=await twoOpenDevices2417(t,answeringBoard2408({tasks:20,padBytes:0}));
+ holdFullCopy2417(t,phone);
+ const work=device=>[...vm.runInContext('syncSession',device.ctx).snapshot().work].map(item=>item.kind);
+ // Every kind of sync work a device's session reports from now on.
+ const kindsSeen=device=>{
+  const session=vm.runInContext('syncSession',device.ctx),kinds=new Set(),note=()=>{for(const item of session.snapshot().work)kinds.add(item.kind);};
+  note();t.after(session.onChange(note));return kinds;
+ };
+ // The phone's record is held at the cloud, so its send stays open.
+ const entered=deferredSyncFixture(),gate=deferredSyncFixture(),append=phone.backend.CS.appendChangeRecord;
+ phone.backend.CS.appendChangeRecord=async record=>{entered.resolve();await gate.promise;return append(record);};
+ const laptopKinds=kindsSeen(laptop),candidate=phone.tap('no');
+ await fixtureDeadline(entered.promise,'positive control: the phone sends its record');
+ assert.ok(work(phone).includes('record-send'),'while its record is being sent, the phone counts it as sync work');
+ gate.resolve();
+ await until2417(()=>!work(phone).includes('record-send'),'once the record has gone up, that work ends');
+ await until2417(()=>laptop.ctx.state.considered?.[candidate]==='no','positive control: the laptop applies the record');
+ assert.ok(laptopKinds.has('record-apply'),'the laptop counts applying the record as sync work');
+ await syncSettled(laptop.ctx,{within:30000});
+});
+
+// #2417: #2287's server-only repair rebuilds the board from retained full
+// copies. Those need not include the change records the damaged copy did, so
+// the repaired copy names none, and every record the cloud keeps is applied
+// over it again rather than skipped or removed.
+test('RISK change records: a server-only repair of a damaged full copy publishes a copy that names no change records',{timeout:120000},async t=>{
+ const {backend,originalRoot}=await damagedAcknowledgedApp187(t);
+ assert.ok(Number.isSafeInteger(originalRoot.includedSeq),'positive control: the damaged full copy names the change records it includes');
+ const result=await fixtureDeadline(backend.CS.repairCloudSources(),'the server-only repair finishes');
+ assert.equal(result?.ok,true,'the repair publishes: '+JSON.stringify(result));
+ const repaired=backend.docs.get('users/owner');
+ assert.ok(repaired.rev>originalRoot.rev,'positive control: the repaired copy is the active root');
+ assert.equal(Object.hasOwn(repaired,'includedSeq'),false,'the repaired copy names no change records');
+});
