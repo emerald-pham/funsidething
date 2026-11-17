@@ -10271,14 +10271,11 @@ const answerCatchUp=(()=>{
   // After the decision: capture what History reads now, mark the board
   // unsaved, pick the next candidate and draw, then queue the rest. These are
   // commit()'s steps, with the save and the push moved into the queue.
-  // historyFirst: what this answer shows reads its own History (Last task
-  // WOOP counts recorded Dislodges), so that History and the ranks it reads
-  // come before the paint, after everything queued before it.
-  function show(answer,{save:doSave=true,immediate=false,deferRanks=false,historyFirst=false}={}){
+  function show(answer,{save:doSave=true,immediate=false,deferRanks=false}={}){
     answer.after=answer.before?captureRatingInputs(answer.ids):null;
     answer.frame=undoStack.at(-1)||null;
     Object.assign(answer,{save:doSave,immediate:!!immediate,deferRanks,steps:[seal,store,draw]});
-    if(answer.before){if(historyFirst){flush();ratings(answer);}else answer.steps.unshift(ratings);}
+    if(answer.before)answer.steps.unshift(ratings);
     queue.push(answer);
     if(!work)work=trackSyncWork("answer-catch-up");
     settleCommit();
@@ -10764,10 +10761,9 @@ const taskActionOwnerBundle=(()=>{
         pushUndo();
         const result=BoardDecision.apply(gesture,{kind:"dislodge",taskId:b.id});
         if(result)answer.id=result.rows[0].id;
-        // #2406 review: only Last task WOOP reads recorded Dislodges for what the
-        // scanner shows (taskDislodgeCount), so only with it on does a Dislodge
-        // record its History, and the ranks it reads, before the paint.
-        answerCatchUp.show(answer,{historyFirst:state.settings.lastTaskWoop===true});
+        // #2421: nothing on screen reads a Dislodge's History any more (Last task
+        // WOOP counted it), so its History and ranks catch up like every answer's.
+        answerCatchUp.show(answer);
         return !!result;
       }
       if(command.action==="cant"){

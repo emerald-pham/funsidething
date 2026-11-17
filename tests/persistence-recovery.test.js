@@ -16873,16 +16873,20 @@ test('RISK answer shows first: benchmark Can’t tapped while an earlier answer 
  assert.equal(app.digest(),'d57cf62da99f442d7b020ed99186f49ab578ca5eaf960583febfb3fd55e62a70','the settled board matches the code before #2407: '+app.outcome().slice(0,300));
 });
 
-test('RISK answer shows first: with Last task WOOP on, Dislodge records its History before the scanner shows the result, so a final task’s WOOP counts it',async t=>{
+// #2421 removed WOOP, the one thing on screen that read a Dislodge's History, so
+// a board that saved Last task WOOP on catches up like any other board.
+test('RISK answer shows first: with Last task WOOP saved on, Dislodge still shows first and its History catches up after, once',async t=>{
  const app=await answerFirstApp2407(t,{settings:{lastTaskWoop:true}}),{ctx}=app;
+ assert.equal(ctx.state.settings.lastTaskWoop,true,'precondition: the board saved Last task WOOP on');
  for(const act of ['yes','yes']){app.tap(act);await app.settled({synced:true,within:10000});}
  assert.deepEqual([...ctx.state.chain],['bench','c1','c2'],'positive control: Candidate 2 is the benchmark');
  const history=app.history('c2');app.tap('dislodge');
  assert.deepEqual([...ctx.state.chain],['bench','c1'],'Dislodge shows the earlier benchmark at once');
- assert.equal(app.history('c2'),history+1,'its History is recorded before the paint');
+ assert.equal(app.history('c2'),history,'its History has not been written before the paint');
  await app.settled({synced:true,within:10000});
- assert.equal(app.history('c2'),history+1,'and only once');
+ assert.equal(app.history('c2'),history+1,'then it is recorded, once');
  assert.equal(JSON.parse(app.h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,'the Dislodge reaches the cloud');
+ assert.equal(ctx.state.settings.lastTaskWoop,true,'and the saved setting stays as it was');
 });
 
 test('RISK answer shows first: Undo straight after a benchmark Can’t tapped while an earlier answer catches up reverses only the Can’t',async t=>{
