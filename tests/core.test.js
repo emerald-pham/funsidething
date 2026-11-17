@@ -37663,6 +37663,69 @@ test('Removed WOOP: the changelog has one bullet saying WOOP was removed and sav
  assert.equal(items.length,1,'exactly one bullet says WOOP was removed');
  for(const promise of [/Run WOOP/,/Last task WOOP/,/saved plans?/i,/backups/,/exports/])assert.match(items[0],promise);
 });
+// #2421 keeps WOOP data: what an older version saved stays exactly as it was.
+const WOOP_FIELDS_2421=['woopPlan','woopHead','woopPlanOps','woopEvidenceRecovery','woopOpaqueRecovery'];
+const woopFields2421=task=>JSON.stringify(Object.fromEntries(WOOP_FIELDS_2421.filter(key=>task&&Object.hasOwn(task,key)).map(key=>[key,task[key]])));
+// One task with a revised plan (two causal operations), one whose plan an older
+// version deleted (a null tombstone), and one with no WOOP data at all.
+function woopBoard2421(over={}){
+ const first={v:1,id:'plan-a1',outcome:'Private outcome A1',obstacle:'Private obstacle A1',plan:'If A1, then act'};
+ const second={v:1,id:'plan-a2',outcome:'Private outcome A2',obstacle:'Private obstacle A2',plan:'If A2, then act'};
+ const deleted={v:1,id:'plan-b1',outcome:'Private outcome B1',obstacle:'Private obstacle B1',plan:'If B1, then act'};
+ const tasks=[
+  {...syncTask('a','Private planned task'),woopPlan:second,woopHead:'op-a2',woopPlanOps:[{v:1,id:'op-a1',observed:[],value:first},{v:1,id:'op-a2',observed:['op-a1'],value:second}]},
+  {...syncTask('b','Private deleted plan task'),woopPlan:null,woopHead:'op-b2',woopPlanOps:[{v:1,id:'op-b1',observed:[],value:deleted},{v:1,id:'op-b2',observed:['op-b1'],value:null}]},
+  syncTask('c','Private plain task'),
+ ];
+ return syncState({tasks,settings:{...syncState().settings,lastTaskWoop:true},...over});
+}
+const woopSnapshot2421=board=>JSON.stringify({lastTaskWoop:board.settings?.lastTaskWoop,tasks:['a','b','c'].map(id=>woopFields2421(board.tasks.find(task=>task.id===id)))});
+async function openWoopBoard2421(board=woopBoard2421()){
+ const raw=JSON.stringify(board),app=await loadApp({seed:2421,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ assert.equal(woopSnapshot2421(app.ctx.state),woopSnapshot2421(board),'precondition: opening keeps every WOOP field');
+ return app;
+}
+const reopened2421=async app=>{assert.equal(await app.ctx.persist(),true);return loadApp({seed:2422,seedStorage:{[SYNC_STORE_KEY]:app.shim.localStorage.getItem(SYNC_STORE_KEY)}});};
+test('RISK removed WOOP data: committing another setting keeps a saved Last task WOOP value through a reload',async()=>{
+ const app=await openWoopBoard2421(),{ctx,shim}=app;
+ ctx.openSettings();commitSetting(shim,'stHorizon',90);ctx.closeModal();
+ assert.equal(ctx.state.settings.horizonMin,90,'positive control: the committed setting saved');
+ const reload=await reopened2421(app);
+ assert.equal(reload.ctx.state.settings.horizonMin,90);
+ assert.equal(reload.ctx.state.settings.lastTaskWoop,true,'the saved Last task WOOP value stays on');
+});
+test('RISK removed WOOP data: editing and saving a task with a saved plan keeps every WOOP field through a reload',async()=>{
+ const board=woopBoard2421(),app=await openWoopBoard2421(board);
+ assert.equal(await saveEditorChoice(app,'a',Date.now(),{title:'Private renamed task'}),true);
+ assert.equal(app.ctx.state.tasks.find(task=>task.id==='a').title,'Private renamed task','positive control: the edit saved');
+ assert.equal(woopSnapshot2421(app.ctx.state),woopSnapshot2421(board));
+ const reload=await reopened2421(app);
+ assert.equal(woopSnapshot2421(reload.ctx.state),woopSnapshot2421(board));
+});
+test('RISK removed WOOP data: Restore from pasted board data keeps every WOOP field',async()=>{
+ const board=woopBoard2421(),{ctx,shim}=await loadApp({seed:2421});
+ ctx.openSettings();shim.document.getElementById('jsonBox').value=JSON.stringify(board);ctx.onAction('import-json',{});
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Private planned task'),'positive control: the pasted board was restored');
+ assert.equal(woopSnapshot2421(ctx.state),woopSnapshot2421(board));
+});
+test('RISK removed WOOP data: deleting a task with a saved plan and Undo bring back every WOOP field',async()=>{
+ const board=woopBoard2421(),app=await openWoopBoard2421(board),{ctx}=app;
+ ctx.onAction('delete-task',{dataset:{id:'a'}});
+ assert.equal(ctx.state.tasks.some(task=>task.id==='a'),false,'positive control: the task was deleted');
+ await ctx.undo();
+ assert.equal(woopSnapshot2421(ctx.state),woopSnapshot2421(board));
+ const reload=await reopened2421(app);
+ assert.equal(woopSnapshot2421(reload.ctx.state),woopSnapshot2421(board));
+});
+test('RISK removed WOOP data: a plan saved in an unrecognized format stays exactly as it was through an edit and a reload',async()=>{
+ const board=woopBoard2421(),future={v:99,payload:{private:'future plan 2421'}};board.tasks[2].woopPlan=future;
+ const app=await openWoopBoard2421(board);
+ assert.equal(await saveEditorChoice(app,'c',Date.now(),{title:'Private renamed plain task'}),true);
+ const reload=await reopened2421(app);
+ assert.equal(reload.ctx.state.tasks.find(task=>task.id==='c').title,'Private renamed plain task','positive control: the edit saved');
+ assert.equal(JSON.stringify(reload.ctx.state.tasks.find(task=>task.id==='c').woopPlan),JSON.stringify(future));
+ assert.equal(woopSnapshot2421(reload.ctx.state),woopSnapshot2421(board));
+});
 test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
  const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
  const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.match(markup,/data-act="run-woop"/);
