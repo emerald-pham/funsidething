@@ -6681,7 +6681,7 @@ function applyHeardRecordsInPlace(){
   let handled=0,changed=false;const brought=[],undos=[],account=CS.user;
   for(const record of records){
     const key=changeRecordKey(account,record.row);
-    if(skippedChangeRecords.has(key)){handled++;continue;}
+    if(skippedChangeRecords.has(key)||locallyUndoneRecords.has(record.row.id)){handled++;continue;}
     const undo=[],result=applyChangeRecordTo(state,record.parts,{cleanOnly:true,undo});
     if(result===null)break;
     handled++;
@@ -6730,8 +6730,8 @@ function absorbHeardRecordsHeld(){
   const acct=window.CloudSync.user,remote=heardRecordsRemote(acct);
   if(!remote||remote.nothing)return !!remote?.nothing;
   let records;
-  try{records=remote.changeRecords.records.map(row=>({seq:row.seq,parts:JSON.parse(row.parts)}));}catch{return false;}
-  const skipped=record=>skippedChangeRecords.has(changeRecordKey(acct,record));
+  try{records=remote.changeRecords.records.map(row=>({id:row.id,seq:row.seq,parts:JSON.parse(row.parts)}));}catch{return false;}
+  const skipped=record=>skippedChangeRecords.has(changeRecordKey(acct,record))||locallyUndoneRecords.has(record.id);
   if(!records.every(record=>skipped(record)||changeRecordIncluded(state,record.parts)))return false;
   let composite;
   try{composite=JSON.parse(remote.payload);hydrateState(composite,{account:acct,rev:remote.rev});}catch{return false;}
@@ -7576,6 +7576,78 @@ function describeBoardChange(beforeCopy,afterCopy){
   }
   return {v:1,before,after};
 }
+/* #2417 second review B3: the change an Undo of a recorded answer made, as
+   this device alone replays it (it is never sent): plain values before and
+   after, and for row lists the rows it removed and the rows it added with
+   their places, which a record's parts cannot carry (an Undo removes or
+   rewrites History and rating rows). null when a task came or went. */
+function describeLocalUndo(beforeCopy,afterCopy){
+  if(!(beforeCopy instanceof UndoBoardCopy)||!(afterCopy instanceof UndoBoardCopy))return null;
+  const partsOf=copy=>new Map(copy.keys.map((key,index)=>[key,copy.parts[index]]));
+  const was=partsOf(beforeCopy),now=partsOf(afterCopy),change={v:1,values:{},lists:{},tasks:[]};
+  const rows=(prior,next)=>{const old=new Set(prior),current=new Set(next);
+    return {removed:prior.filter(row=>!current.has(row)),added:next.map((row,index)=>[index,row]).filter(([,row])=>!old.has(row))};};
+  const whole=part=>part===undefined?{had:false,value:null}:{had:true,value:JSON.parse(Array.isArray(part)?"["+part.join(",")+"]":part)};
+  for(const key of new Set([...was.keys(),...now.keys()])){
+    if(key==="updatedAt"||DEVICE_LOCAL_KEYS.includes(key))continue;
+    const a=was.get(key),b=now.get(key);
+    if(a===b)continue;
+    if(key==="tasks"){
+      if(!Array.isArray(a)||!Array.isArray(b))return null;
+      const {removed,added}=rows(a,b);
+      if(removed.length!==added.length)return null;
+      const prior=new Map(removed.map(row=>{const task=JSON.parse(row);return [task?.id,task];}));
+      for(const [,row] of added){
+        const task=JSON.parse(row),old=prior.get(task?.id);
+        if(!old)return null;
+        const fields={},lists={};
+        for(const field of new Set([...Object.keys(old),...Object.keys(task)])){
+          if(field==="id"||JSON.stringify(old[field])===JSON.stringify(task[field]))continue;
+          if(CHANGE_TASK_ROW_LISTS.has(field)&&(old[field]===undefined||Array.isArray(old[field]))&&Array.isArray(task[field]))
+            lists[field]=rows((old[field]||[]).map(item=>JSON.stringify(item)),task[field].map(item=>JSON.stringify(item)));
+          else fields[field]={had:Object.hasOwn(old,field),before:old[field]??null,has:Object.hasOwn(task,field),after:task[field]??null};
+        }
+        change.tasks.push({id:task.id,fields,lists});
+      }
+      continue;
+    }
+    if(CHANGE_ROW_LISTS.has(key)&&(a===undefined||Array.isArray(a))&&Array.isArray(b)){change.lists[key]=rows(a||[],b);continue;}
+    const prior=whole(a),next=whole(b);
+    change.values[key]={had:prior.had,before:prior.value,has:next.had,after:next.value};
+  }
+  return change;
+}
+// Replays one: each value or row list the Undo changed goes to what the Undo
+// left while it still holds what the Undo found; one already undone, or moved
+// on since, is left as it is. Returns whether the board changed.
+function applyLocalUndo(board,change){
+  if(!change||change.v!==1)return false;
+  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  let changed=false;
+  const value=(owner,key,{had,before,has,after})=>{
+    const holds=Object.hasOwn(owner,key);
+    if(holds===has&&(!has||same(owner[key],after)))return;
+    if(holds!==had||had&&!same(owner[key],before))return;
+    if(has)owner[key]=JSON.parse(JSON.stringify(after));else delete owner[key];
+    changed=true;
+  };
+  const list=(owner,key,{removed,added})=>{
+    const current=Array.isArray(owner[key])?owner[key]:[],texts=current.map(row=>JSON.stringify(row));
+    if(!removed.every(row=>texts.includes(row))||added.some(([,row])=>texts.includes(row)))return;
+    const gone=new Set(removed),next=current.filter((row,index)=>!gone.has(texts[index]));
+    for(const [index,row] of added)next.splice(Math.min(index,next.length),0,JSON.parse(row));
+    owner[key]=next;changed=true;
+  };
+  for(const [key,entry] of Object.entries(change.values||{}))value(board,key,entry);
+  for(const [key,entry] of Object.entries(change.lists||{}))list(board,key,entry);
+  for(const {id,fields,lists} of change.tasks||[]){
+    const task=(board.tasks||[]).find(row=>row?.id===id);
+    if(!task)continue;
+    for(const [field,entry] of Object.entries(fields||{}))value(task,field,entry);
+    for(const [field,entry] of Object.entries(lists||{}))list(task,field,entry);
+  }
+  return changed;
+}
 // A record's rows that carry their own identity: its decision events, History
 // rows and task rows. A board holding every one of them already has the
 // record, so applying it again changes nothing, however the board moved on.
@@ -7731,7 +7803,7 @@ function applyHeardChangeRecords(board,{includedSeq=0,records=[]}={},{account=nu
   const checked=typeof account==="string"&&changeRecordHoldable(board,account);
   for(const record of records){
     through=Math.max(through,record.seq);
-    if(checked&&skippedChangeRecords.has(changeRecordKey(account,record)))continue;
+    if(locallyUndoneRecords.has(record.id)||checked&&skippedChangeRecords.has(changeRecordKey(account,record)))continue;
     let parts=null;
     try{parts=JSON.parse(record.parts);}catch{parts=null;}
     if(!parts)continue;
@@ -7747,6 +7819,9 @@ function applyHeardChangeRecords(board,{includedSeq=0,records=[]}={},{account=nu
    report records it, and sync goes on. Its sender's full copy carries the
    change, as without records. */
 const skippedChangeRecords=new Set();
+// #2417 second review B3: the records of answers this device undid (its Undo
+// rows name them): this device never applies them, whatever the cloud keeps.
+const locallyUndoneRecords=new Set();
 function changeRecordKey(account,record){return account+"\n"+record.seq;}
 function changeRecordHoldable(board,account){return !decisionEvidenceIssue(board,account);}
 // The same checks but the projection's whole-board replay (coherence).
@@ -7802,7 +7877,9 @@ const changeRecordOutbox=(()=>{
     // answer it undid.
     const undoneIds=new Set(rows.filter(row=>row.id.startsWith(LOCAL_UNDO_ROW)).map(row=>row.id.slice(LOCAL_UNDO_ROW.length)));
     for(const row of rows){
-      if(row.sentSeq!==null||row.id.startsWith(LOCAL_UNDO_ROW)||undoneIds.has(row.id)||queue.some(entry=>entry.id===row.id)){settled.push({identity,id:row.id,order:row.order});continue;}
+      if(row.sentSeq!==null||row.id.startsWith(LOCAL_UNDO_ROW)||undoneIds.has(row.id)||queue.some(entry=>entry.id===row.id)){
+        settled.push({identity,id:row.id,order:row.order,...(row.id.startsWith(LOCAL_UNDO_ROW)?{answer:row.id.slice(LOCAL_UNDO_ROW.length)}:{})});continue;
+      }
       queue.push({id:row.id,backend:null,account:null,identity,parts:row.parts,order:row.order,saved:Promise.resolve(true),work:null});
     }
   }
@@ -7866,7 +7943,10 @@ const changeRecordOutbox=(()=>{
   }
   // The rows whose change a whole-board save that began after them now holds.
   function saved(through){
-    const device=store(),done=settled.filter(row=>row.order<=through);
+    // #2417 second review B3: an Undo's row stays while the cloud still keeps
+    // its answer's record, so that a reopened page knows not to apply it.
+    const heard=typeof window.CloudSync?.heardChangeRecords==="function"?window.CloudSync.heardChangeRecords()||[]:[];
+    const device=store(),done=settled.filter(row=>row.order<=through&&!(row.answer&&heard.some(record=>record.id===row.answer)));
     if(!device||!done.length)return;
     for(const row of done)settled.splice(settled.indexOf(row),1);
     const byIdentity=new Map();
@@ -7888,16 +7968,22 @@ const changeRecordOutbox=(()=>{
      that board's next full copy carries the Undo to other devices. */
   function undone(frame,before,after){
     const entry=frame?.changeRecordEntry,device=store();
-    if(!entry||entry.undone||!device)return;
-    entry.undone=true;
+    if(!entry||entry.undone)return;
+    entry.undone=true;locallyUndoneRecords.add(entry.id);
     const at=queue.indexOf(entry);
     if(at>0||at===0&&!draining){queue.splice(at,1);finish(entry,"dropped");}
-    let parts=null;
-    try{parts=describeBoardChange(before,after);}catch{parts=null;}
-    const text=parts&&JSON.stringify(parts);
-    if(!text||text.length>CHANGE_RECORD_MAX_CHARS)return;
-    const row={identity:entry.identity,id:LOCAL_UNDO_ROW+entry.id,order:++order};
-    entry.saved.then(()=>device.putChangeRecord({expectedHash:deviceHeadHash,account:row.identity,id:row.id,parts:text,order:row.order}))
+    if(!device)return;
+    // #2417 second review B3: always a row, as this device replays it (a
+    // record's parts cannot carry an Undo that removes or rewrites rows). It is
+    // never sent, so no record's size limit applies: an Undo that touches every
+    // task's History (Dislodge) is kept whole. One that cannot be described
+    // or saved is a marker: the answer's own row is then not replayed.
+    let change=null;
+    try{change=describeLocalUndo(before,after);}catch{change=null;}
+    const text=JSON.stringify({v:1,localUndo:change}),marker=JSON.stringify({v:1,localUndo:null});
+    const row={identity:entry.identity,id:LOCAL_UNDO_ROW+entry.id,order:++order,answer:entry.id};
+    const put=parts=>device.putChangeRecord({expectedHash:deviceHeadHash,account:row.identity,id:row.id,parts,order:row.order});
+    entry.saved.then(()=>put(text)).then(result=>result?.ok===true||text===marker?result:put(marker))
       .then(result=>{if(result?.ok===true)settled.push(row);},()=>{});
   }
   return Object.freeze({record,resume,drain,saved,forgetOtherAccounts,fullCopyAcknowledged,undone,order:()=>order});
@@ -7914,9 +8000,20 @@ async function replaySavedChangeRecords(){
     let rows;
     try{rows=await deviceStore.listChangeRecords(identity);}catch{return false;}
     let changed=false;
+    // #2417 second review B3: an Undo's own row replays the Undo after its
+    // answer's; a marker (an Undo too large to keep) stops the answer's row.
+    // Either way the cloud's record of that answer is not applied here.
+    const markers=new Set();
+    for(const row of rows)if(row.id.startsWith(LOCAL_UNDO_ROW)){
+      const answer=row.id.slice(LOCAL_UNDO_ROW.length);locallyUndoneRecords.add(answer);
+      let parts=null;try{parts=JSON.parse(row.parts);}catch{parts=null;}
+      if(!parts?.localUndo)markers.add(answer);
+    }
     for(const row of rows){
       let parts=null;
       try{parts=JSON.parse(row.parts);}catch{continue;}
+      if(row.id.startsWith(LOCAL_UNDO_ROW)){if(parts?.localUndo&&applyLocalUndo(state,parts.localUndo))changed=true;continue;}
+      if(markers.has(row.id))continue;
       if(applyChangeRecordTo(state,parts))changed=true;
     }
     changeRecordOutbox.resume(rows,identity);

@@ -17544,33 +17544,56 @@ test('RISK change records: a record the receiving board cannot hold is skipped w
  assert.ok((await cloudCopy2408(docs)).tasks.some(task=>task.title==='Added on the laptop after the skipped record'),'and the laptop’s own edits reach the cloud');
 });
 
-// #2417 specialist review B2: Undo of an answer before its whole-board device
-// save, then the app closes: the answer's device row must not bring it back
-// on reopening, whether its record had gone to the cloud or not.
-test('RISK change records: an answer undone before its whole-board device save stays undone when the app reopens, whether or not its record went',{timeout:240000},async t=>{
- for(const sent of [false,true]){
-  const device=await answeringDevice2408(t,{saveMs:0});
+// #2417 specialist review B2 and second review B3: Undo of an answer before
+// its whole-board device save, then the app closes. The answer's device row
+// must not bring it back on reopening, for every scanner answer (some Undos
+// remove or rewrite rows: Worked on it's History, Dislodge's ratings), whether
+// its record had gone to the cloud or not: the reopened board is the board
+// the Undo left, and the cloud copy it sends carries it.
+test('RISK change records: an answer undone before its whole-board device save stays undone when the app reopens, whether or not its record went',{timeout:900000},async t=>{
+ // Board content compared whatever the order of its fields, and of a task's
+ // postpone operations, which a merge with the cloud's copy sorts; the save
+ // time aside.
+ const canonical=value=>JSON.stringify(value,function(key,item){
+  if(key==='postponeOps'&&Array.isArray(item))return item.map(row=>JSON.stringify(row,Object.keys(row).sort())).sort().map(row=>JSON.parse(row));
+  return item&&typeof item==='object'&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(name=>[name,item[name]])):item;});
+ const content=board=>{const {updatedAt,...rest}=typeof board==='string'?JSON.parse(board):board;return canonical(rest);};
+ // Every case runs, and the test names each one that fails.
+ const failed=[];
+ for(const act of ['yes','no','cant','cand-done','cand-worked','postpone','dislodge','worked','bench-done','bench-cant','bench-postpone'])for(const sent of [false,true]){
+  const label=act+(sent?', its record in the cloud':', its record not sent');
+  const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:false});
   await startAnswering2408(device);
-  const {ctx,clock,counters,backend}=device,commits=counters.commits.length;
+  // From here a whole-board device save takes a minute (a Yes or Done asks for
+  // one at once), so none finishes before the app closes.
+  device.saveMs=60000;
+  const {ctx,clock,counters,backend}=device,commits=counters.commits.length,before=content(ctx.cloudPayload());
   const gate=deferredSyncFixture(),append=backend.CS.appendChangeRecord;
   if(!sent)backend.CS.appendChangeRecord=async record=>{await gate.promise;return append(record);};
-  const candidate=device.tap('no');
+  device.tap(act);
   await clock.advance(100);
-  assert.equal(cloudRecords2417(device.docs).length,sent?1:0,'positive control: the record has '+(sent?'':'not ')+'gone');
-  assert.equal(await ctx.onAction('undo',{}),true,'positive control: Undo runs');
-  assert.notEqual(ctx.state.considered?.[candidate],'no','positive control: the answer is undone');
+  assert.notEqual(content(ctx.cloudPayload()),before,label+': positive control: the answer is taken');
+  assert.equal(cloudRecords2417(device.docs).length,sent?1:0,label+': positive control: the record has '+(sent?'':'not ')+'gone');
+  assert.equal(await ctx.onAction('undo',{}),true,label+': positive control: Undo runs');
   await clock.advance(50);
-  assert.equal(counters.commits.length,commits,'positive control: no whole-board save has run');
+  // The board the Undo left, as an opening reads it back (which can reorder rows).
+  const undone=content(vm.runInContext('(()=>{const board=JSON.parse(cloudPayload());hydrateState(board);return cloudPayloadFor(board);})()',ctx));
+  // A benchmark Done's Undo during a started pass leaves a board no push may
+  // send (as #2395's Add does): the reopened page then holds it, as this one would.
+  const pushable=vm.runInContext('decisionEvidenceIssue(state,window.CloudSync.user)===null',ctx);
+  assert.ok(counters.commits.slice(commits).every(commit=>commit.endedAt===undefined),label+': positive control: no whole-board save has finished');
   await device.close();gate.resolve();
-  const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0});
-  await syncSettled(reopened.ctx,{within:30000,synced:true});
-  const label=sent?'with its record in the cloud':'with its record not sent';
-  assert.notEqual(reopened.ctx.state.considered?.[candidate],'no',label+': the reopened app keeps the Undo');
-  assert.equal(recordsWritten2417(reopened),0,label+': it sends no record of the undone answer');
-  if(!sent)assert.equal(cloudRecords2417(device.docs).length,0,label+': none ever went');
+  const reopened=await answeringDevice2408(t,{docs:device.docs,indexedDB:device.indexedDB,dbName:device.dbName,storage:device.storage,saveMs:0,dropDatabase:true});
+  try{await syncSettled(reopened.ctx,{within:30000,synced:pushable});}
+  catch(error){failed.push(label+': the reopened app does not get synced: '+String(error.message).slice(0,160));await reopened.close();continue;}
+  if(content(reopened.ctx.cloudPayload())!==undone)failed.push(label+': the reopened app does not hold the board the Undo left');
+  if(recordsWritten2417(reopened)!==0)failed.push(label+': it sends a record of the undone answer');
+  if(!sent&&cloudRecords2417(device.docs).length!==0)failed.push(label+': a record went');
   // The Undo goes on to other devices with the reopened board's full copy.
-  assert.notEqual((await cloudCopy2408(device.docs)).considered?.[candidate],'no',label+': the cloud copy carries the Undo');
+  if(pushable&&content(await cloudCopy2408(device.docs))!==undone)failed.push(label+': the cloud copy does not carry the Undo');
+  await reopened.close();
  }
+ assert.deepEqual(failed,[],'every undone answer stays undone after reopening');
 });
 
 // #2417 specialist review N1/N3: a refusal not proved to come from rules
