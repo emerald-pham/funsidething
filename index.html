@@ -6662,8 +6662,59 @@ function scheduleRecordPull(){
     if(hasActiveEditor()){deferredCloudPull=true;return;}
     recordPullWanted=null;
     if(absorbHeardRecordsHeld())return;
+    if(applyHeardRecordsInPlace())return;
     cloudPull({records:true});
   },0));
+}
+/* #2417 review B2: records heard over the copy this page knows, applied to
+   the board itself while each still finds the values it changed (no
+   conflict). The answer is drawn at once: no read, no safety copy, and
+   nothing done to the whole board before the drawing. As with an answer
+   given here (#2407), ranks are sampled after the drawing, and the device
+   save follows it, as does the move of the copy this page knows the cloud
+   holds (absorbHeardRecordsHeld). Records the board already holds need
+   nothing. A record that conflicts goes by the read path (cloudPull with
+   records), which reconciles it as a full copy holding only that change.
+   Returns whether every heard record is handled here. */
+function applyHeardRecordsInPlace(){
+  const CS=window.CloudSync;
+  if(!state||!cloudReady()||!liveBoardAccepted||cloudAdoptionHeld||cloudRecoveryDeliberate||cloudPullRevalidate||
+    provedUnreadableCloudSource||deviceStorageRequired&&!deviceStorageAuthority||decisionRecoveryHolds().length)return false;
+  answerCatchUp.flush();
+  const remote=heardRecordsRemote(CS.user);
+  if(!remote)return false;
+  if(remote.nothing)return true;
+  const records=[];
+  for(const row of remote.changeRecords.records){
+    try{records.push({row,parts:JSON.parse(row.parts)});}catch{return false;}
+  }
+  let applied=0,changed=false;
+  for(const record of records){
+    const result=applyChangeRecordTo(state,record.parts,{cleanOnly:true});
+    if(result===null)break;
+    applied++;if(result)changed=true;
+  }
+  if(!applied)return false;
+  const brought=records.slice(0,applied).map(record=>record.row);
+  state.syncRecords={revision:remote.rev,through:brought.at(-1).seq};
+  if(changed){listRanksDeferred=true;try{render();}finally{listRanksDeferred=false;}}
+  reportChangeRecords("applied",brought);
+  // A conflict after them: the read path reconciles the rest, and saves.
+  if(applied<records.length)return false;
+  const work=trackSyncWork("record-apply"),account=CS.user;
+  setTimeout(()=>{
+    let saving=null;
+    try{
+      if(window.CloudSync===CS&&CS.user===account&&state){
+        if(changed){recomputeRanks();render();}
+        absorbHeardRecordsHeld();
+        if(changed)saving=deviceSaveLane.request({}).done;
+      }
+    }finally{
+      if(saving)saving.then(()=>work.end(),()=>work.end());else work.end();
+    }
+  },0);
+  return true;
 }
 /* #2417: records this board already holds, every one (this device's own
    answers, delivered back), need no reconciling: only the cloud copy this
@@ -7581,33 +7632,52 @@ function changeRecordSlots(parts){
    decision conflict resolves as it does between two full copies. A record the
    board already holds changes nothing. A task the board deleted, or never had,
    takes nothing from it. Returns whether the board changed. */
-function applyChangeRecordTo(board,parts){
+function applyChangeRecordTo(board,parts,{cleanOnly=false}={}){
   const plain=value=>!!value&&typeof value==="object"&&!Array.isArray(value);
   if(!plain(parts)||parts.v!==1||!plain(parts.before)||!plain(parts.after)||changeRecordIncluded(board,parts))return false;
   const owner={syncAccount:board.syncAccount??null,syncIdentity:board.syncIdentity??null};
   const live=new Map((board.tasks||[]).map(task=>[task.id,task])),deleted=board.deletedTaskIds||{};
   const tasksOf=side=>(Array.isArray(side.tasks)?side.tasks:[]).filter(task=>live.has(task?.id)&&!deleted[task.id]);
   const copy=value=>JSON.parse(JSON.stringify(value));
-  const before=JSON.stringify(board),dirty=Object.hasOwn(board,"syncDirty")?board.syncDirty:undefined;
+  const dirty=Object.hasOwn(board,"syncDirty")?board.syncDirty:undefined;
   const slots=changeRecordSlots(parts),same=(held,had,was)=>!!held===had&&(!held||JSON.stringify(held.value)===JSON.stringify(was));
-  const touched=Array.isArray(parts.after.tasks)?parts.after.tasks:[];
-  if(touched.every(task=>live.has(task?.id)&&!deleted[task.id])&&slots.every(slot=>same(slot.read(board),slot.had,slot.was))){
-    for(const slot of slots)slot.write(board,slot.has?{value:copy(slot.now)}:null);
-    if(Array.isArray(parts.after.decisionEvents))mergeDecisionEvents(board,{decisionEvents:parts.after.decisionEvents});
+  const touched=Array.isArray(parts.after.tasks)?parts.after.tasks:[],events=parts.after.decisionEvents;
+  // #2417 review B2: the clean path changes only what the record names, adds
+  // its decisions by their ids, and tells whether anything changed without
+  // serializing the board, so applying an answer costs the same on any board.
+  if(touched.every(task=>live.has(task?.id)&&!deleted[task.id])&&slots.every(slot=>same(slot.read(board),slot.had,slot.was))&&
+    (!Array.isArray(events)||(board.decisionEvents===undefined||Array.isArray(board.decisionEvents))&&events.every(row=>typeof row?.id==="string"&&row.id))){
+    let changed=false;
+    for(const slot of slots){
+      if(same(slot.read(board),slot.has,slot.now))continue;
+      slot.write(board,slot.has?{value:copy(slot.now)}:null);changed=true;
+    }
+    if(Array.isArray(events))for(const row of events){
+      if(retiredDecisionEvent(board.decisionBaseline,row)||(board.decisionEvents||[]).some(held=>held?.id===row.id))continue;
+      (board.decisionEvents??=[]).push(copy(row));changed=true;
+    }
     if(Array.isArray(parts.after.workLog)){
       if(!Array.isArray(board.workLog))board.workLog=[];
       const seen=new Set(board.workLog.map(historyEntryKey));
-      for(const row of parts.after.workLog){const key=historyEntryKey(row);if(!seen.has(key)&&!board.clearedHistoryIds?.[key]){board.workLog.push(copy(row));seen.add(key);}}
+      for(const row of parts.after.workLog){const key=historyEntryKey(row);if(!seen.has(key)&&!board.clearedHistoryIds?.[key]){board.workLog.push(copy(row));seen.add(key);changed=true;}}
     }
-    if(Array.isArray(parts.after.deletionLog))board.deletionLog=exactDeletionLogUnion(board.deletionLog,parts.after.deletionLog);
+    if(Array.isArray(parts.after.deletionLog)){
+      const held=Array.isArray(board.deletionLog)?board.deletionLog.length:0;
+      board.deletionLog=exactDeletionLogUnion(board.deletionLog,parts.after.deletionLog);
+      if((Array.isArray(board.deletionLog)?board.deletionLog.length:0)!==held)changed=true;
+    }
     for(const task of touched){
       const current=live.get(task.id);
-      if(Array.isArray(task.ratingHistory))mergeTaskRatingHistory(current,{ratingHistory:task.ratingHistory});
-      if(Array.isArray(task.comparisonOps))mergeTaskComparison(current,{comparisonOps:task.comparisonOps});
-      if(Array.isArray(task.postponeOps))mergeTaskPostpone(current,{postponeOps:task.postponeOps});
+      if(Array.isArray(task.ratingHistory)&&mergeTaskRatingHistory(current,{ratingHistory:task.ratingHistory}))changed=true;
+      if(Array.isArray(task.comparisonOps)&&mergeTaskComparison(current,{comparisonOps:task.comparisonOps}))changed=true;
+      if(Array.isArray(task.postponeOps)&&mergeTaskPostpone(current,{postponeOps:task.postponeOps}))changed=true;
     }
-    return JSON.stringify(board)!==before;
+    return changed;
   }
+  // A record whose values the board no longer holds conflicts with it: the
+  // caller that asked for the clean path alone takes the read path instead.
+  if(cleanOnly)return null;
+  const before=JSON.stringify(board);
   const draft={...copy(parts.after),...owner,contexts:[],tasks:copy(tasksOf(parts.after))};
   const base={...copy(parts.before),...owner,contexts:[],tasks:copy(tasksOf(parts.before))};
   rebasePendingBoardFields(board,draft,base);
@@ -7686,6 +7756,10 @@ const changeRecordOutbox=(()=>{
     }
   }
   function finish(entry,outcome){
+    // #2417 review N4: once only, whoever ends it first (a send, or a
+    // sign-in to another account while it was being sent).
+    if(entry.finished)return;
+    if(outcome!=="wait")entry.finished=true;
     entry.work?.end();entry.work=null;
     if(outcome!=="wait"&&outcome!=="lost")settled.push({identity:entry.identity,id:entry.id,order:entry.order});
     // The support report: sent, held back by a refused device save, or
@@ -7700,13 +7774,20 @@ const changeRecordOutbox=(()=>{
       entry.backend=CS;entry.account=CS.user;
     }
     // Never under another account or connection than the one it was made in.
-    if(CS!==entry.backend||CS.user!==entry.account||cloudAccountIdentity()!==entry.identity)return "dropped";
+    // #2417 review B1: checked again after every wait, since the account can
+    // change during one (while the row saves on the device, or the send runs).
+    const own=()=>window.CloudSync===entry.backend&&entry.backend.user===entry.account&&cloudAccountIdentity()===entry.identity;
+    if(!own())return "dropped";
     if(!await entry.saved)return "lost";
+    if(!own())return "dropped";
     if(!usable(CS))return "replaced";
     if(!reconciled()||lastDeviceSaveIssue)return "wait";
-    const ticket=syncSession.mayRecord();
-    if(!ticket.go)return "wait";
-    const reply=await CS.appendChangeRecord({id:entry.id,parts:entry.parts});
+    const ticket=syncSession.mayRecord({backend:entry.backend,account:entry.account,identity:entry.identity});
+    if(!ticket.go)return ticket.refused?"dropped":"wait";
+    // An older session script binds no account: the ticket names its own.
+    if(ticket.send.backend!==entry.backend||ticket.send.account!==entry.account||ticket.send.identity!==entry.identity){ticket.send.end();return "dropped";}
+    const reply=await CS.appendChangeRecord({id:entry.id,parts:entry.parts,identity:entry.identity});
+    if(!own()){ticket.send.end();return "dropped";}
     const outcome=await ticket.send.accept(reply,{install:async()=>await store()?.markChangeRecordSent(entry.identity,entry.id,reply.seq)===true});
     if(outcome.accepted){entry.seq=outcome.seq;return "sent";}
     if(outcome.reason==="unsupported")return "replaced";
@@ -7723,8 +7804,11 @@ const changeRecordOutbox=(()=>{
         const entry=queue[0];
         entry.work??=trackSyncWork("record-send");
         const outcome=await send(entry);
-        if(outcome==="wait"){finish(entry,outcome);break;}
-        queue.shift();finish(entry,outcome);
+        if(outcome==="wait"&&queue.includes(entry)){finish(entry,outcome);break;}
+        // #2417 review N4: the entry sent, not whichever is first now: a
+        // sign-in to another account may have taken it out meanwhile.
+        const at=queue.indexOf(entry);if(at>=0)queue.splice(at,1);
+        finish(entry,outcome==="wait"?"dropped":outcome);
       }
     }finally{draining=false;}
   }
@@ -9426,6 +9510,27 @@ async function cloudPull({records=false}={}){
     // heals the next cold open after an acknowledgement save hit quota.
     // #2417: positions within one revision: the change records each side includes.
     const rt=remoteThrough,lt=boardRecordsThrough(state);
+    // #2417 review B2: a newer full copy that holds exactly this board but
+    // for its save time (a peer's copy of answers this page already applied
+    // from their change records) is this board: only the cloud position moves
+    // on, with no safety copy and no device save. Its save time is taken, so
+    // nothing is left to send; the next save of this board stores the rest.
+    const sameButSaveTime=useLocal && haveRemote && !switchedAccount && rr!==null && rr!==localRev && !remoteDeletionLogRepaired &&
+      state.syncDirty===false && !!remoteState && remotePayload!==cloudPayload() && remotePayload===cloudPayloadFor({...state,updatedAt:remoteState.updatedAt});
+    if(sameButSaveTime){
+      state.updatedAt=remoteState.updatedAt;
+      state.syncRev=rr;
+      state.syncAccount=acct;
+      state.syncRecords={revision:rr,through:rt};
+      bindDecisionBase(acct,rr,remoteFullPayload,remoteCopy);
+      const at=serverTimeMs(remote.serverUpdatedAt);
+      if(at!==null) state.lastCloudServerAt=at;
+      syncRead?.accept({payload:remotePayload,revision:rr,through:rt});
+      deferredCloudPull=false; cloudAdoptionHeld=false;
+      state.syncDirty=false; pendingPush=false; lastPushed=remoteFullCopy ?? lastPushed;
+      mergeOutcome="matching-copy";
+      return;
+    }
     if(useLocal && haveRemote && !switchedAccount && rr!==null && rr!==localRev && remotePayload===cloudPayload()){
       const priorBoard=JSON.stringify(state);
       const priorMarkers={deferredCloudPull,lastPushed,pendingPush};
@@ -22030,13 +22135,15 @@ if(configured){
       const user=auth.currentUser;
       if(suspended)return {cancelled:true};
       if(!user)return {error:true,code:"missing-account"};
+      // #2417 review B1: only under the account the record was made in.
+      if(record.identity!==undefined&&record.identity!==user.uid)return {cancelled:true};
       if(CS.changeRecords==="unavailable"||typeof generationStore?.appendChangeRecord!=="function")return {unsupported:true};
       const uid=user.uid,epoch=recoveryAuthEpoch,current=()=>!suspended&&auth.currentUser?.uid===uid&&recoveryAuthEpoch===epoch;
       try{
         const result=await cloudDeadline((async()=>{
           await networkReady;
           if(!current())return {cancelled:true};
-          return generationStore.appendChangeRecord(uid,record,{stillCurrent:current});
+          return generationStore.appendChangeRecord(uid,{id:record.id,parts:record.parts},{stillCurrent:current});
         })());
         if(!current())return {cancelled:true};
         if(result?.ok)CS.changeRecords="available";

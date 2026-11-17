@@ -16929,13 +16929,35 @@ async function twoOpenDevices2417(t,board){
  return {phone,laptop,docs};
 }
 
+// #2417 review B2: the receiving device's own work for an answer: device
+// saves (whole-board commits), device backups, and whole-board text work
+// (JSON text of at least half the board, made or read), counted from now, and
+// as they stood at the first drawing that shows the answer.
+function receiverWork2417(device,boardBytes,shows){
+ const {ctx}=device,store=ctx.window.ScannerDeviceStore,counts={saves:0,backups:0,boardText:0};
+ const put=store.putBackup,commit=store.commitHead;
+ store.putBackup=async(...args)=>{counts.backups++;return put.apply(store,args);};
+ store.commitHead=async(...args)=>{counts.saves++;return commit.apply(store,args);};
+ // Devices share the host's JSON, so this device alone gets its own.
+ const host=ctx.JSON,big=Math.max(1024,Math.floor(boardBytes/2));
+ ctx.JSON={[Symbol.toStringTag]:'JSON',
+  stringify(...args){const text=host.stringify(...args);if(typeof text==='string'&&text.length>=big)counts.boardText++;return text;},
+  parse(text,...rest){if(typeof text==='string'&&text.length>=big)counts.boardText++;return host.parse(text,...rest);}};
+ const now=()=>({...counts}),render=ctx.render;
+ let shown=null;
+ ctx.render=function(...args){const result=render.apply(this,args);if(!shown&&shows())shown=now();return result;};
+ return {now,beforePaint:()=>shown};
+}
+
 test('RISK change records: a scanner answer reaches another open device before the sender’s next full copy lands and without reading chunks, and the work per answer does not grow with board size',{timeout:300000},async t=>{
  const measure=async(label,board)=>{
   const {phone,laptop,docs}=await twoOpenDevices2417(t,board),revision=docs.get('users/owner').rev;
   // The phone's next full copy is held back, so only something else can carry the answer.
   let release;phone.faults.publishPending=new Promise(resolve=>{release=resolve;});t.after(()=>release());
   const writesFrom=phone.backend.docWrites.length,deliveredFrom=laptop.backend.liveReads.length,readsFrom=laptop.backend.network.length;
-  const candidate=phone.tap('no');
+  let candidate=null;
+  const receiver=receiverWork2417(laptop,Buffer.byteLength(laptop.ctx.cloudPayload(),'utf8'),()=>candidate!==null&&laptop.ctx.state.considered?.[candidate]==='no');
+  candidate=phone.tap('no');
   assert.equal(phone.ctx.state.considered?.[candidate],'no',label+': positive control: the phone takes the No');
   await until2417(()=>laptop.ctx.state.considered?.[candidate]==='no',label+': the laptop shows the phone’s No before the phone’s full copy lands');
   await syncSettled(laptop.ctx,{within:30000});
@@ -16946,8 +16968,15 @@ test('RISK change records: a scanner answer reaches another open device before t
   // The full copy keeps its schedule in this ticket; what carried the answer is everything else the phone wrote.
   const writes=phone.backend.docWrites.slice(writesFrom).filter(write=>write.path!=='users/owner'&&!write.path.includes('/generations/'));
   const work={writes:writes.length,bytes:writes.reduce((sum,write)=>sum+write.bytes,0),reads:laptop.backend.liveReads.length-deliveredFrom+serverReads.length};
+  // The phone's full copy lands and the laptop reads it, as its root
+  // listener would have it do: that copy holds nothing the laptop lacks.
   release();await settledTogether([phone,laptop],[],{within:120000});
-  return work;
+  await syncSettled(phone.ctx,{within:60000,synced:true});
+  assert.ok(docs.get('users/owner').rev>revision,label+': positive control: the phone’s full copy has landed');
+  laptop.ctx.window.dispatchEvent({type:'cloudboardchange',detail:{user:'e@example.com',rev:docs.get('users/owner').rev}});
+  await settledTogether([phone,laptop],[],{within:120000});
+  assert.equal(laptop.ctx.state.syncRev,docs.get('users/owner').rev,label+': positive control: the laptop has read the phone’s full copy');
+  return {...work,beforePaint:receiver.beforePaint(),receiver:receiver.now()};
  };
  const small=await measure('small board',answeringBoard2408({tasks:20,padBytes:0}));
  const fixture=await largeSignedInBoardFixture(ACCOUNT2408.email);
@@ -16958,6 +16987,14 @@ test('RISK change records: a scanner answer reaches another open device before t
  assert.equal(large.reads,small.reads,'the laptop makes as many reads for it');
  // On the large board the answer also moves two ratings, so its record carries those two tasks' new History rows; never the board or a task's whole History.
  assert.ok(large.bytes<=small.bytes*1.5+2048&&large.bytes<fixture.stats.serializedBytes/500,'and the bytes sent for the answer do not grow with the board: '+JSON.stringify({small,large}));
+ // #2417 review B2: the laptop shows the answer before any whole-board save
+ // and with no whole-board work at all before that drawing; the answer then
+ // costs it one device save and no backup, and the phone's full copy, which
+ // holds nothing the laptop lacks, costs it neither, on either board.
+ for(const [label,run] of [['small board',small],['large board',large]]){
+  assert.deepEqual(run.beforePaint,{saves:0,backups:0,boardText:0},label+': nothing whole-board happens before the laptop shows the answer: '+JSON.stringify(run));
+  assert.deepEqual({saves:run.receiver.saves,backups:run.receiver.backups},{saves:1,backups:0},label+': the answer costs the laptop one device save and no backup, the full copy after it none: '+JSON.stringify(run));
+ }
 });
 
 test('RISK change records: a device opening from a full copy applies the retained records it does not list, and a record is removed only once the active full copy includes it',{timeout:180000},async t=>{
@@ -17194,6 +17231,39 @@ test('RISK change records: records never cross accounts, and after an account sw
  const records=device.backend.docWrites.filter(write=>write.type==='set'&&/\/changeRecords\//.test(write.path));
  assert.equal(records.length,written,'no record of the first account goes up after the switch');
  assert.ok(!records.some(write=>write.path.startsWith('users/other/')),'and none under the other account');
+});
+
+// #2417 review B1 and N4: the account can change while a record's device row
+// is still saving. That record then goes under no account, and an answer
+// made under the new account meanwhile still goes up, under that account.
+test('RISK change records: a record whose device row is still saving when the account switches goes under no account, and an answer made under the new account meanwhile still goes up',{timeout:180000},async t=>{
+ const device=await answeringDevice2408(t,{saveMs:0,dropDatabase:true});
+ await startAnswering2408(device);
+ const {clock,backend,ctx,docs}=device,store=ctx.window.ScannerDeviceStore,put=store.putChangeRecord,gate=deferredSyncFixture();
+ let saving=0;
+ store.putChangeRecord=async options=>{if(saving++===0)await gate.promise;return put(options);};
+ device.tap('no');await clock.advance(0);
+ assert.equal(saving,1,'positive control: the first answer’s device row is still saving');
+ // The owner signs out and another account signs in; the page reads its cloud.
+ backend.emitAuth(null);await clock.advance(1000);
+ backend.emitAuth({uid:'other',email:'other@example.com'});
+ await clock.settle();
+ assert.equal(backend.CS.user,'other@example.com','positive control: the other account is signed in');
+ // An answer of the other account's own, while the first row still saves.
+ for(const title of ['Other account first task','Other account second task'])ctx.addTask(title,false);
+ await clock.advance(3000);
+ ctx.onAction('start-scan',{dataset:{}});await clock.advance(1000);
+ assert.ok(ctx.state.candidateId,'positive control: the other account’s board offers a candidate');
+ device.tap('no');await clock.advance(3000);
+ assert.equal(saving,2,'positive control: the other account’s answer is saved on the device too');
+ gate.resolve();
+ await clock.advance(10000);
+ const [first,second]=device.counters.taps.map(tap=>tap.candidate);
+ const sent=backend.docWrites.filter(write=>write.type==='set'&&/\/changeRecords\//.test(write.path)).map(write=>write.path);
+ const about=(path,candidate)=>JSON.parse(docs.get(path)?.parts??'{"after":{}}').after.decisionEvents?.some(event=>event.candidateId===candidate);
+ assert.ok(!sent.some(path=>about(path,first)),'the first account’s answer goes under no account: '+JSON.stringify(sent));
+ assert.deepEqual(sent.filter(path=>about(path,second)).map(path=>path.split('/').slice(0,2).join('/')),['users/other'],'the other account’s answer goes up, under that account: '+JSON.stringify(sent));
+ await clock.settle();
 });
 
 // The change-record events of a device's support report, as outcome:seq.

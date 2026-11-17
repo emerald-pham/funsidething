@@ -38,7 +38,8 @@ service cloud.firestore {
       }
       function datedRevision() {
         return request.resource.data.keys().hasAll(['payload', 'updatedAt', 'rev', 'serverUpdatedAt'])
-          && !request.resource.data.keys().hasAny(['schemaVersion'])
+          // #2417 review: only a v2 root names the change records it includes.
+          && !request.resource.data.keys().hasAny(['schemaVersion', 'includedSeq'])
           && request.resource.data.payload is string
           && request.resource.data.rev is int
           && request.resource.data.serverUpdatedAt == request.time;
@@ -118,12 +119,17 @@ service cloud.firestore {
             && request.resource.data.createdAt == request.time;
         }
         allow read: if owner();
+        // #2417 review: created only as the counter moves on to it in the
+        // same request, so a removed record cannot be created again.
         allow create: if owner() && validRecord()
+          && ((!exists(recordHeadPath()) && request.resource.data.seq == 1)
+            || (exists(recordHeadPath()) && get(recordHeadPath()).data.seq == request.resource.data.seq - 1))
           && existsAfter(recordHeadPath())
           && getAfter(recordHeadPath()).data.seq == request.resource.data.seq
           && getAfter(recordHeadPath()).data.lastId == recordId;
         allow update: if false;
         allow delete: if owner() && exists(userPath())
+          && get(userPath()).data.get('schemaVersion', 0) == 2
           && resource.data.seq <= get(userPath()).data.get('includedSeq', 0);
       }
 

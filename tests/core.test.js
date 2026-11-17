@@ -29957,6 +29957,23 @@ test('Firestore rules: change records are owner-only, append-only and immutable,
   assert.equal(await allowed(deleteDoc(record(alice,'r1'))),true,'the owner deletes a record the active copy includes');
   assert.equal(await allowed(setDoc(root,manifest(2,'g2','g1'))),true,'an older app’s full copy, which names none, still publishes');
   assert.equal(await allowed(deleteDoc(record(alice,'r2'))),false,'and after it no record can go');
+  // #2417 specialist review N2: a removed record the counter still names
+  // cannot be created again without the counter moving on, and a dated (v1)
+  // root names no included records, so under one no record can go.
+  assert.equal(await allowed(setDoc(root,manifest(3,'g1','g2',{includedSeq:2}))),true,'positive control: a full copy that includes both records');
+  assert.equal(await allowed(deleteDoc(record(alice,'r2'))),true,'positive control: the record the counter names goes once included');
+  assert.equal(await allowed(setDoc(record(alice,'r2'),{...row(2),parts:'{"v":1,"before":{},"after":{"rewritten":true}}'})),false,'a removed record the counter still names cannot be created again');
+  assert.equal(await allowed(append(alice,'r3',3)),true,'positive control: the next record still goes, the counter moving on');
+  const carol=env.authenticatedContext('carol').firestore(),carolRoot=doc(carol,'users/carol');
+  const dated=(rev,extra={})=>({payload:'{}',updatedAt:rev,rev,serverUpdatedAt:serverTimestamp(),...extra});
+  assert.equal(await allowed(setDoc(carolRoot,dated(1,{includedSeq:999}))),false,'a dated root cannot name included records');
+  assert.equal(await allowed(append(carol,'c1',1)),false,'carol cannot append under alice’s paths');
+  const carolHead=doc(carol,'users/carol/changeLog/head'),carolRecord=doc(carol,'users/carol/changeRecords/c1');
+  const carolAppend=()=>{const batch=writeBatch(carol);batch.set(carolHead,{seq:1,lastId:'c1'});batch.set(carolRecord,row(1));return batch.commit();};
+  assert.equal(await allowed(carolAppend()),true,'positive control: carol appends her first record');
+  assert.equal(await allowed(deleteDoc(carolRecord)),false,'under no full copy naming it, her record stays');
+  assert.equal(await allowed(setDoc(carolRoot,dated(1))),true,'positive control: a dated root without included records publishes');
+  assert.equal(await allowed(deleteDoc(carolRecord)),false,'and under a dated root no record can go');
  }finally{await env.cleanup();}
 });
 

@@ -313,9 +313,14 @@
     // note that the record it saved went up, succeeds. Acceptance adds
     // nothing to what the page knows the cloud holds: the record reaches the
     // known copy only when the cloud delivers it back (receive()).
-    function mayRecord(){
+    // #2417 review B1: a record goes only under the connection, account and
+    // identity it was made in; the caller names them, and a ticket is refused
+    // when they are not the current ones.
+    function mayRecord({backend,account:made,identity:madeIdentity}={}){
       const cloud=connection();
       if(!cloud?.user||!cloud.ready)return {go:false,wait:"not-ready"};
+      if(backend!==undefined&&backend!==cloud||made!==undefined&&made!==cloud.user||
+        madeIdentity!==undefined&&madeIdentity!==rawIdentity())return {go:false,refused:"account"};
       if(authority!==cloud.user)return {go:false,wait:"read"};
       const ticket={backend:cloud,account:cloud.user,identity:rawIdentity(),owner};
       let open=true;
