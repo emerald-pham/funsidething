@@ -212,7 +212,6 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   padding:8px max(14px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
   background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint,var(--panel)));border-top:1px solid var(--line);box-shadow:0 -6px 18px rgba(20,24,48,.12)}
 .decide>.btn{flex:1 1 auto;min-height:44px}
-.decide>[data-act="run-woop"]{flex-basis:100%}
 /* Once the row stops reaching the screen edges it lines up with the panels above. */
 @media (min-width:733px){.decide{max-width:min(732px,100% - 28px);border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0}}
 .wrap:has(.decide){padding-bottom:calc(var(--pinned-decide-height,110px) + 24px)}
@@ -13940,7 +13939,6 @@ function renderScan(){
            + '<button class="btn no" data-act="no"'+choiceBinding+'>No<span class="keyhint">n</span></button>'
            + '<button class="btn cant" data-act="cant"'+choiceBinding+' title="Skip it for a while, even if the chain empties out before then \u2014 see Settings">Can\u2019t<span class="keyhint">c</span></button>'
            + (!state.settings.showPostpone ? '' : '<button class="btn subtle postpone" data-act="postpone"'+choiceBinding+' title="Temporarily defer this task for the Postpone duration in Settings">Postpone</button>')
-           + overdueWoopControl(cand)
            + '<span class="decide-finish">'
            + (state.mode==="scan" && b ? '<button class="btn subtle" data-act="start-working"'+choiceBinding+' title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
            + '<span class="sparkbox">'

@@ -37567,6 +37567,24 @@ test('RISK overdue WOOP: unsupported plans remain read-only and interrupted scan
  ctx.state.interventionActive=false;task.woopPlan={v:9,future:'preserve'};ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
  assert.equal(ctx.state.chain.at(-1),task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/unrecognized/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="woop-delete"|data-act="woop-next"/);assert.equal(task.woopPlan.future,'preserve');ctx.closeModal();
 });
+// #2421 removed WOOP. An overdue task offered by the real Start handler, as the
+// retired overdue WOOP tests offered it, with nothing WOOP-specific set up.
+async function overdueOffered2421(){
+ const app=await loadApp({seed:971}),{ctx}=app;
+ const base=ctx.addTask('Private benchmark'),task=ctx.addTask('Private overdue',false,[],{due:ctx.todayISO(-1)});
+ ctx.dotTask(base.id);ctx.onAction('start-scan',{dataset:{}});ctx.state.candidateId=task.id;ctx.renderScan();
+ return {...app,base,task,scan:()=>app.shim.document.getElementById('scan').innerHTML};
+}
+const decideActs2421=markup=>[...(markup.split('<div class="decide">')[1]||'').matchAll(/data-act="([^"]+)"/g)].map(match=>match[1]);
+test('Removed WOOP: an overdue offered candidate gets only the ordinary choices, with no Run WOOP',async()=>{
+ const {ctx,task,scan}=await overdueOffered2421();
+ assert.equal(ctx.offeredCandidateId(),task.id,'precondition: the overdue task is the offered candidate');
+ assert.equal(ctx.dueInfo(task.due)?.cls,'due-overdue','precondition: its due date is before today');
+ assert.doesNotMatch(scan(),/Run WOOP|data-act="run-woop"/);
+ const overdue=decideActs2421(scan());task.due=null;ctx.renderScan();const ordinary=decideActs2421(scan());
+ assert.deepEqual(ordinary.slice(0,3),['yes','no','cant'],'precondition: an ordinary candidate gets Yes, No and Can’t');
+ assert.deepEqual(overdue,ordinary,'the overdue candidate gets exactly the choices a candidate with no due date gets');
+});
 test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
  const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
  const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.match(markup,/data-act="run-woop"/);
