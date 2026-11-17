@@ -377,6 +377,37 @@ test("prepare in a new worktree at a removed worktree's path registers its own e
   }
 });
 
+// Invariant 6 (PR #2413 N7): prune leaves an earlier worktree's unsettled entry
+// active, holding nothing, at its old path. Qualification readiness counted the
+// active entries at a path, so a new worktree there refused ("found 2") until
+// that earlier work settled.
+test("qualification readiness in a new worktree at a reused path counts only that worktree's entry, not an earlier worktree's unsettled one", () => {
+  const { fixture, main, npm, ledger } = createFixture('chain-worktree-ready-readiness-');
+  try {
+    const path = join(fixture, 'agent-reused');
+    git(main, 'worktree', 'add', '--quiet', '-b', 'ticket/earlier', path);
+    assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
+    const [earlier] = ownerOf(ledger, path);
+    commitFile(path, 'docs/earlier.md', 'Unmerged work of the earlier worktree.');
+    git(main, 'worktree', 'remove', '--force', path);
+    git(main, 'worktree', 'add', '--quiet', '-b', 'ticket/later', path, 'main');
+    assert.equal(run(['prepare'], path, { ledger, npm }).status, 0);
+
+    const owners = ownerOf(ledger, path);
+    assert.equal(owners.length, 2, "the earlier worktree's entry stays active while its work may land");
+    const pending = owners.find((entry) => entry.id === earlier.id);
+    const later = owners.find((entry) => entry.id !== earlier.id);
+    assert.deepEqual(pending.resources, [], 'holding nothing');
+    assert.equal(loopbackPorts(later).length, 2, 'the new worktree holds its own two ports');
+    assert.equal(activeEntries(ledger).flatMap(loopbackPorts).length, 2, 'and they are the only port claims');
+    const readiness = qualificationReadiness(path, ledger, join(fixture, 'evidence'));
+    assert.deepEqual(readiness.errors, [], "readiness counts only the new worktree's entry");
+    assert.equal(readiness.status, 0);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 // A finished entry's ports go back to the pool, so plain test runs in the
 // still-existing worktree must stop reading them (PR #2413 N5).
 test('finish in a prepared worktree that still exists removes its prepared ports', () => {
