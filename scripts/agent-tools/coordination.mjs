@@ -1326,11 +1326,14 @@ async function claim(filePath, options) {
 }
 
 // Prints this worktree's own active or parked entry, or null; an entry an
-// earlier worktree left at this path is never its own. After a switch to
-// another branch, which holds the registration commit since the entry is its
-// own, an active entry moves to that branch: Claude Code starts an agent on its
-// own worktree branch before the agent switches to its work branch, and an
-// entry left behind let prune judge the wrong commit (PR #2413 B1).
+// earlier worktree left at this path is never its own. When the checkout is on
+// another branch, or no longer holds the start commit, an active entry moves to
+// the checkout's branch: Claude Code starts an agent on its own worktree branch
+// before the agent switches to its work branch, and an entry left behind let
+// prune judge the wrong commit (PR #2413 B1). The move restarts the start at
+// HEAD, so commits the branch already had are never the agent's work; keeping
+// the old start counted a newer integration head's merges as work (PR #2413 B1
+// residual, N8). Each move is kept in `rebinds` with the previous start.
 async function own(filePath, options) {
   const worktreeRoot = await realpath(await runGit(['rev-parse', '--show-toplevel']));
   const [identity, headSha, branchName] = await Promise.all([
@@ -1345,13 +1348,19 @@ async function own(filePath, options) {
       if (!ownsCoordination(candidate) || candidate.worktree !== worktreeRoot) continue;
       if (!(await leftByEarlierWorktree(candidate, identity, headSha, worktreeRoot))) entry = candidate;
     }
-    if (entry?.status !== 'active' || branchName === 'HEAD' || (entry.detachedHead !== true && entry.branchName === branchName)) return entry ?? null;
+    if (entry?.status !== 'active' || branchName === 'HEAD') return entry ?? null;
+    const start = text(entry.startBranchSha).toLowerCase();
+    const moved = entry.detachedHead === true || entry.branchName !== branchName;
+    const holdsStart = /^[0-9a-f]{40}$/.test(start) && (await gitIsAncestor(start, headSha, worktreeRoot).catch(() => false));
+    if (!moved && holdsStart) return entry;
     await readGitStartState(worktreeRoot, persistedBaseRef(entry)); // refuses a protected base branch
     entry.rebinds = [...(entry.rebinds ?? []), {
       reboundAt: isoNow(options.now), from: entry.detachedHead === true ? 'detached' : entry.branchName, to: branchName,
+      previousStartBranchSha: entry.startBranchSha,
     }];
     delete entry.detachedHead;
     entry.branchName = branchName;
+    entry.startBranchSha = headSha;
     await writeState(filePath, state);
     return entry;
   });

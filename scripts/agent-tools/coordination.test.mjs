@@ -2009,6 +2009,54 @@ test('prune frees a removed worktree with unmerged work at once and records it l
   }
 });
 
+// Invariant 2 (PR #2413 B1 residual and N8, probe R8): an entry that own moved
+// to a new branch kept its old start commit, so commits the new branch already
+// had, such as an integration head's first wave, counted as the agent's work.
+// Own now restarts the start at the checkout's HEAD, as it does when the
+// checkout no longer holds the start commit, and keeps the previous one.
+test("own moves an entry to the checkout's new branch, or to history without its start commit, with the start restarted at HEAD and the previous start kept in rebinds", () => {
+  const fixture = realpathSync(mkdtempSync(join(tmpdir(), 'chain-coordination-own-restart-')));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'integration/x');
+    const firstWaveSha = commitDocsNote(project, 'first-wave.md', 'First-wave task merged into integration.');
+    git(project, 'checkout', '--quiet', 'main');
+    const mainSha = git(project, 'rev-parse', 'HEAD');
+    const agent = join(fixture, 'agent');
+    git(project, 'worktree', 'add', '--quiet', '-b', 'worktree-agent-own', agent, 'main');
+    const port = 'loopback:127.0.0.1:47161';
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Own restart fixture',
+      '--registered-by', 'worktree-ready', '--resources', port], agent);
+    assert.equal(began.status, 0, began.stderr);
+    const { id } = JSON.parse(began.stdout);
+    const own = (now) => {
+      const owned = command(['own', '--file', ledgerPath, '--now', now], agent);
+      assert.equal(owned.status, 0, owned.stderr);
+      return JSON.parse(owned.stdout);
+    };
+
+    git(agent, 'checkout', '--quiet', '-b', 'ticket/own', 'integration/x');
+    const moved = own('2026-11-16T12:00:00.000Z');
+    assert.equal(moved.id, id);
+    assert.equal(moved.branchName, 'ticket/own');
+    assert.equal(moved.startBranchSha, firstWaveSha, "the start restarts at the checkout's HEAD, so the branch's base is never work");
+    assert.deepEqual(moved.rebinds, [{ reboundAt: '2026-11-16T12:00:00.000Z', from: 'worktree-agent-own', to: 'ticket/own', previousStartBranchSha: mainSha }]);
+
+    git(agent, 'reset', '--quiet', '--hard', 'main');
+    const rewritten = own('2026-11-16T12:30:00.000Z');
+    assert.equal(rewritten.branchName, 'ticket/own');
+    assert.equal(rewritten.startBranchSha, mainSha, 'a checkout without the start commit restarts it at HEAD too');
+    assert.deepEqual(rewritten.rebinds.at(-1), { reboundAt: '2026-11-16T12:30:00.000Z', from: 'ticket/own', to: 'ticket/own', previousStartBranchSha: firstWaveSha });
+
+    const unchanged = own('2026-11-16T13:00:00.000Z');
+    assert.deepEqual(unchanged, rewritten, 'nothing moves while the checkout stays on its branch and start');
+    const active = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries.filter((entry) => entry.status === 'active');
+    assert.deepEqual(active.map((entry) => [entry.id, entry.resources]), [[id, [port]]], 'one active entry, holding its one port');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 // PR #2413 B1 (probe S4): a worktree re-added at a removed one's path is a new
 // owner. It gets its own entry, and the old entry keeps its ownership.
 test("begin in a new worktree at an earlier worktree's path registers a new entry and leaves the earlier one's ownership alone", () => {
