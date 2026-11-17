@@ -7791,9 +7791,9 @@ const changeRecordOutbox=(()=>{
     const CS=window.CloudSync,identity=cloudAccountIdentity(),device=store();
     if(!usable(CS)||!cloudReady()||!identity||!device||state.syncAccount!==CS.user||(state.syncIdentity??null)!==identity)return;
     // #2417 specialist review B1: a record carries nothing this board's own
-    // full copy could not: none while sync holds this board, or while its
-    // decision evidence fails the checks a push makes (sendPush).
-    if(cloudAdoptionHeld||decisionRecoveryHolds().length||decisionEvidenceIssue(state,CS.user))return;
+    // full copy could not: none while its decision evidence fails the checks
+    // a push makes (sendPush). One made while sync holds the board waits.
+    if(decisionRecoveryHolds().length||decisionEvidenceIssue(state,CS.user))return;
     let parts=null;
     try{parts=describeBoardChange(frame.snapshot,frame.after);}catch{parts=null;}
     const text=parts&&JSON.stringify(parts);
