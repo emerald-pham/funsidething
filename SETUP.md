@@ -60,7 +60,11 @@ defers adoption, and scanner controls remain bound to the tasks they displayed.
   includes and they are removed once that copy is active. Offline answers go
   up on reconnect; a backlog of more than 20 goes as the full copy alone. If
   the deployed rules refuse records, the app syncs by full copies alone and
-  shows no error
+  shows no error; a refusal that a plain read of the counter does not repeat
+  (contention) leaves records on. No record goes that a push would refuse, and
+  a received record after which the board could not be pushed is skipped
+  whole, reported, and left to its sender's full copy. Undo of an answer
+  saves its own device row, never sent, so a reopened app keeps the Undo
 - A pull that finds nothing new produces zero writes
 - Firestore revisions order copies and prevent concurrent writes from silently
   replacing each other; server dates record when a write landed
