@@ -759,6 +759,16 @@
       "root": "RISK contained board adoption browser: on a heavy device store, adopting this device’s board over its own interrupted upload peaks no higher than an ordinary cloud save on the same store, with headroom, in Chromium and WebKit",
       "environment": "LANDSCAPE_BROWSER_URL",
       "reason": "Env-gated real-browser seam test: needs a served app plus local Playwright Chromium and WebKit (LANDSCAPE_BROWSER_URL, LANDSCAPE_PLAYWRIGHT), which the CI groups do not provide; it runs in local and release evidence."
+    },
+    {
+      "root": "Firestore rules: change records are owner-only, append-only and immutable, numbered one by one by the counter, and removable only once the active full copy includes them",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "reason": "Env-gated Firestore rules test: needs the Firestore emulator (FIRESTORE_EMULATOR_HOST), which the CI test groups do not start; it runs in the Data safety rules gate (npm run test:rules)."
+    },
+    {
+      "root": "RISK BACKWARD COMPATIBILITY: change records keep the supported floor and the release base syncing by full copies in both deployment orders, an older full copy never drops a record, and rules without records fall back with no error",
+      "environment": "FIRESTORE_EMULATOR_HOST",
+      "reason": "Env-gated Firestore emulator test: needs FIRESTORE_EMULATOR_HOST, which the CI test groups do not start; it runs in the Data safety backward compatibility gate (npm run test:compatibility)."
     }
   ],
   "processControls": [

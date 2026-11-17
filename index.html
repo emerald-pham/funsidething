@@ -5276,6 +5276,10 @@ const SUPPORT_DIAGNOSTICS_ERROR_CODES=new Set([
   // creates. Fixed names only.
   "codec-unavailable","recovery-source-unsupported","recovery-source-budget","recovery-source-read-failed",
   "lifecycle-cancelled",
+  // #2417: why the cloud store refused to send a change record or could not
+  // read the reply to one. Fixed names only; today the Debug log records only
+  // a record's outcome, so these are named should one ever reach it.
+  "invalid-record","invalid-record-reply",
   "unknown"
 ]);
 const SUPPORT_DIAGNOSTICS_ERROR_ALIASES=Object.freeze({
@@ -5309,7 +5313,8 @@ const SUPPORT_DIAGNOSTICS_ERROR_ALIASES=Object.freeze({
   "upload-interrupted":"upload-interrupted",
   "codec-unavailable":"codec-unavailable","recovery-source-unsupported":"recovery-source-unsupported",
   "recovery-source-budget":"recovery-source-budget","recovery-source-read-failed":"recovery-source-read-failed",
-  "lifecycle-cancelled":"lifecycle-cancelled"
+  "lifecycle-cancelled":"lifecycle-cancelled",
+  "invalid-record":"invalid-record","invalid-record-reply":"invalid-record-reply"
 });
 const supportDiagnosticsEvents=[];
 let supportDiagnosticsDroppedEvents=0,supportDiagnosticsSourceSequence=0;
