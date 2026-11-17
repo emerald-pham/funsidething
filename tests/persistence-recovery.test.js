@@ -35,6 +35,7 @@ import { capturedGenerationAcceptedApp2198, syncStatus2200, CAPTURED_RESULT_BUDG
 import { chainPills, chainPillIds, returnDotFromScan } from "./shared.js";
 import { markupButtons } from "./shared.js";
 import { benchmarkEdit } from "./shared.js";
+import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 
 test('RISK cloud recovery memory: retained saved copies leave automatic checks and manual review usable in a bounded heap',async t=>{
  if(process.env.CHAIN_RECOVERY_MEMORY_CHILD!=='1'){
@@ -16887,6 +16888,82 @@ test('RISK answer shows first: with Last task WOOP saved on, Dislodge still show
  assert.equal(app.history('c2'),history+1,'then it is recorded, once');
  assert.equal(JSON.parse(app.h.doc.payload).decisionEvents.length,ctx.state.decisionEvents.length,'the Dislodge reaches the cloud');
  assert.equal(ctx.state.settings.lastTaskWoop,true,'and the saved setting stays as it was');
+});
+
+// #2421 removed WOOP but keeps its data: a board saved with plans and Last task
+// WOOP on goes through this version's ordinary work with every WOOP field kept
+// exactly, so an older version that still shows WOOP never loses a plan.
+async function signedInWoopDevice2421(t,h,board,name){
+ const raw=JSON.stringify(board),{IDBFactory}=await import('fake-indexeddb');
+ const app=await openApp(t,{seed:2421,indexedDBProvider:new IDBFactory(),deviceDbName:'woop-2421-'+name+'-'+Math.random(),
+  seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:()=>h.factory()});
+ const {ctx}=app;ctx.window.CLOUD_PUSH_DELAY_MS=20;
+ t.after(()=>{ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry()',ctx);});
+ await ctx.cloudPull();await app.settled({synced:true,within:10000});
+ const add=async title=>{app.shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});await app.settled({synced:true,within:10000});};
+ return {...app,add};
+}
+const signedInWoopBoard2421=()=>woopBoard2421({syncRev:5,syncAccount:'e@example.com',syncDirty:false});
+// The app this one replaces, which still shows WOOP (#2421's base).
+const olderWoopApp2421=(()=>{
+ let source=null;
+ return options=>{
+  if(!source){const shown=spawnSync('git',['show','df2f95cb21cea958723e336a39da90bb5bc8ea95:index.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:16*1024*1024});assert.equal(shown.status,0,shown.stderr);source=extractAppScript(shown.stdout);}
+  return loadApp({...options,appSource:source});
+ };
+})();
+test('RISK removed WOOP data: opening, saving and syncing keep every WOOP field and Last task WOOP exactly, on this device, in the cloud and on a second device',async t=>{
+ const board=signedInWoopBoard2421(),expected=woopSnapshot2421(board),h=makeSyncHarness({remote:board,rev:5,delayMs:2});
+ const device=await signedInWoopDevice2421(t,h,board,'device');
+ assert.equal(woopSnapshot2421(device.ctx.state),expected,'opening keeps them');
+ await device.add('Private new task 2421');
+ assert.ok(h.remoteState().tasks.some(task=>task.title==='Private new task 2421'),'positive control: the new task saved and synced');
+ assert.equal(woopSnapshot2421(JSON.parse(device.shim.localStorage.getItem(SYNC_STORE_KEY))),expected,'saving keeps them on this device');
+ assert.equal(woopSnapshot2421(h.remoteState()),expected,'syncing keeps them in the cloud');
+ const peer=await signedInWoopDevice2421(t,h,board,'peer');
+ assert.ok(peer.ctx.state.tasks.some(task=>task.title==='Private new task 2421'),'positive control: the second device received the new task');
+ assert.equal(woopSnapshot2421(peer.ctx.state),expected,'and the second device keeps them');
+ const reopened=await loadApp({seed:2422,seedStorage:{[SYNC_STORE_KEY]:device.shim.localStorage.getItem(SYNC_STORE_KEY)}});
+ assert.equal(woopSnapshot2421(reopened.ctx.state),expected,'and so does reopening');
+});
+test('RISK removed WOOP data: merging an older version’s full copy that changed a plan keeps its plan change exactly, and the older version still shows it',async t=>{
+ const board=signedInWoopBoard2421(),raw=JSON.stringify(board),h=makeSyncHarness({remote:board,rev:5,delayMs:2});
+ const device=await signedInWoopDevice2421(t,h,board,'device');
+ // The older version revises task A's plan the way its WOOP walkthrough saved one.
+ const older=await olderWoopApp2421({seed:2423,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ const revised={v:1,id:'plan-a3',outcome:'Private outcome A3',obstacle:'Private obstacle A3',plan:'If A3, then act'};
+ assert.equal(older.ctx.writeTaskWoop(older.ctx.state.tasks.find(task=>task.id==='a'),revised),true,'positive control: the older version saved its plan change');
+ const copy=JSON.parse(older.ctx.cloudPayload());
+ assert.notEqual(woopFields2421(copy.tasks.find(task=>task.id==='a')),woopFields2421(board.tasks[0]),'precondition: the older copy carries a plan change');
+ const expected=woopSnapshot2421({settings:board.settings,tasks:[copy.tasks.find(task=>task.id==='a'),board.tasks[1],board.tasks[2]]});
+ h.writeBehindBack({...copy,updatedAt:Date.now()});
+ // Meanwhile this device edits the same task, so both copies changed it.
+ assert.equal(await saveEditorChoice(device,'a',Date.now(),{title:'Private renamed planned task'}),true);await device.settled({synced:true,within:10000});
+ assert.equal(device.ctx.state.tasks.find(task=>task.id==='a').title,'Private renamed planned task','positive control: the local edit stays');
+ assert.equal(h.remoteState().tasks.find(task=>task.id==='a').title,'Private renamed planned task','positive control: and reaches the cloud');
+ assert.equal(woopSnapshot2421(device.ctx.state),expected,'the merged board keeps the older version’s plan change exactly');
+ assert.equal(woopSnapshot2421(h.remoteState()),expected,'and so does the cloud copy it pushes');
+ const remote=JSON.stringify(h.remoteState()),again=await olderWoopApp2421({seed:2424,seedStorage:{[SYNC_STORE_KEY]:remote,[LOCAL_HEAD_KEY]:remote}});
+ again.ctx.state.mode='work';again.ctx.state.chain=['a'];again.ctx.renderScan();
+ assert.match(again.shim.document.getElementById('scan').innerHTML,/Private outcome A3/,'the older version opens this version’s copy and still shows the plan');
+});
+test('RISK removed WOOP data: Undo of a synced Delete brings back every WOOP field exactly, here and in the cloud',async t=>{
+ const board=signedInWoopBoard2421(),expected=woopSnapshot2421(board),h=makeSyncHarness({remote:board,rev:5,delayMs:2});
+ const device=await signedInWoopDevice2421(t,h,board,'device'),{ctx}=device;
+ await ctx.onAction('delete-task',{dataset:{id:'a'}});await device.settled({synced:true,within:10000});
+ assert.equal(h.remoteState().tasks.some(task=>task.id==='a'),false,'positive control: the Delete synced');
+ await ctx.undo();await device.settled({synced:true,within:10000});
+ assert.equal(woopSnapshot2421(ctx.state),expected,'Undo brings them back here');
+ assert.equal(woopSnapshot2421(h.remoteState()),expected,'and in the cloud');
+});
+test('RISK removed WOOP data: Export and Download backup carry every WOOP field and Last task WOOP exactly',async t=>{
+ const board=signedInWoopBoard2421(),expected=woopSnapshot2421(board),h=makeSyncHarness({remote:board,rev:5,delayMs:2});
+ const device=await signedInWoopDevice2421(t,h,board,'device'),{ctx,shim}=device;
+ ctx.openSettings();await ctx.onAction('export-json',{});
+ assert.equal(woopSnapshot2421(JSON.parse(shim.document.getElementById('jsonBox').value)),expected,'Export keeps them');
+ ctx.closeModal();
+ const {file}=await downloadedRecoveryFile2254(device);
+ assert.equal(woopSnapshot2421(file.currentBoard),expected,'Download backup keeps them');
 });
 
 test('RISK answer shows first: Undo straight after a benchmark Can’t tapped while an earlier answer catches up reverses only the Can’t',async t=>{

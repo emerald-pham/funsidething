@@ -58,6 +58,7 @@ import { openApp } from "./shared.js"; // #2378 app driver
 import { rewriteGenerationFixture } from "./shared.js";
 import { coldRelaunch2198 } from "./shared.js";
 import { appFixtureScope } from "./shared.js";
+import { woopFields2421, woopBoard2421, woopSnapshot2421 } from "./shared.js"; // #2421 saved WOOP data
 import { backupRowsWithText } from "./shared.js";
 import { releaseKnownCloudCopy2377 } from "./shared.js";
 import { answersCaughtUp } from "./shared.js"; // #2407: History and ranks catch up after an answer shows
@@ -37663,23 +37664,6 @@ test('Removed WOOP: the changelog has one bullet saying WOOP was removed and sav
  assert.equal(items.length,1,'exactly one bullet says WOOP was removed');
  for(const promise of [/Run WOOP/,/Last task WOOP/,/saved plans?/i,/backups/,/exports/])assert.match(items[0],promise);
 });
-// #2421 keeps WOOP data: what an older version saved stays exactly as it was.
-const WOOP_FIELDS_2421=['woopPlan','woopHead','woopPlanOps','woopEvidenceRecovery','woopOpaqueRecovery'];
-const woopFields2421=task=>JSON.stringify(Object.fromEntries(WOOP_FIELDS_2421.filter(key=>task&&Object.hasOwn(task,key)).map(key=>[key,task[key]])));
-// One task with a revised plan (two causal operations), one whose plan an older
-// version deleted (a null tombstone), and one with no WOOP data at all.
-function woopBoard2421(over={}){
- const first={v:1,id:'plan-a1',outcome:'Private outcome A1',obstacle:'Private obstacle A1',plan:'If A1, then act'};
- const second={v:1,id:'plan-a2',outcome:'Private outcome A2',obstacle:'Private obstacle A2',plan:'If A2, then act'};
- const deleted={v:1,id:'plan-b1',outcome:'Private outcome B1',obstacle:'Private obstacle B1',plan:'If B1, then act'};
- const tasks=[
-  {...syncTask('a','Private planned task'),woopPlan:second,woopHead:'op-a2',woopPlanOps:[{v:1,id:'op-a1',observed:[],value:first},{v:1,id:'op-a2',observed:['op-a1'],value:second}]},
-  {...syncTask('b','Private deleted plan task'),woopPlan:null,woopHead:'op-b2',woopPlanOps:[{v:1,id:'op-b1',observed:[],value:deleted},{v:1,id:'op-b2',observed:['op-b1'],value:null}]},
-  syncTask('c','Private plain task'),
- ];
- return syncState({tasks,settings:{...syncState().settings,lastTaskWoop:true},...over});
-}
-const woopSnapshot2421=board=>JSON.stringify({lastTaskWoop:board.settings?.lastTaskWoop,tasks:['a','b','c'].map(id=>woopFields2421(board.tasks.find(task=>task.id===id)))});
 async function openWoopBoard2421(board=woopBoard2421()){
  const raw=JSON.stringify(board),app=await loadApp({seed:2421,seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
  assert.equal(woopSnapshot2421(app.ctx.state),woopSnapshot2421(board),'precondition: opening keeps every WOOP field');
